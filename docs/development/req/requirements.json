@@ -8189,6 +8189,150 @@
           "notes": ""
         }
       ]
+    },
+    {
+      "brief": "logistics-goods-roster",
+      "title": "Logistics goods roster",
+      "difficulty": 3,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": "",
+      "promoted_from": "backlog.json § logistics-goods-roster",
+      "batch": "logistics-goods-2026-08-04",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "The nine logistics goods (grain, fodder, water, salt, transport capacity, charcoal, iron blooms, bullion, one endemic-luxury class) exist as resource_type enum values with correctly-widened serialised arrays (deposits/reserves, market supply/demand/price/base-price, stockpiles, nation abundance, substrate capacity); world_audit and determinism_harness both still PASS.",
+          "verification": [
+            "headless"
+          ],
+          "status": "pending",
+          "result_metric": "",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "brief": "logistics-flow-consumption",
+      "title": "Per-tick flow consumption",
+      "difficulty": 3,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": "",
+      "promoted_from": "backlog.json § logistics-flow-consumption",
+      "batch": "logistics-goods-2026-08-04",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Units/armies draw grain, fodder and water from carried stock each tick at an authored rate, and a unit with zero carried stock and no supply line stops advancing (range-capped) rather than moving unboundedly.",
+          "verification": [
+            "headless"
+          ],
+          "status": "pending",
+          "result_metric": "",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "brief": "logistics-transport-capacity",
+      "title": "Transport capacity resource",
+      "difficulty": 4,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": "",
+      "promoted_from": "backlog.json § logistics-transport-capacity",
+      "batch": "logistics-goods-2026-08-04",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Transport capacity is a built, held, attritable stock on a unit/army; effective operating range is bounded by carried-stock-divided-by-consumption-rate scaled by capacity, and capacity differs by route terrain (sea/river/land) per authored ratios.",
+          "verification": [
+            "headless"
+          ],
+          "status": "pending",
+          "result_metric": "",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "brief": "logistics-salt-spoilage",
+      "title": "Salt shelf-life gate",
+      "difficulty": 2,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": "",
+      "promoted_from": "backlog.json § logistics-salt-spoilage",
+      "batch": "logistics-goods-2026-08-04",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Grain stock carried past the authored shelf-life threshold is lost unless the carrying unit also holds salt above the authored ratio; a headless case with salt retains the stock, a matched case without salt loses it.",
+          "verification": [
+            "headless"
+          ],
+          "status": "pending",
+          "result_metric": "",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "brief": "logistics-bullion-purchase",
+      "title": "Bullion local purchase",
+      "difficulty": 3,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": "",
+      "promoted_from": "backlog.json § logistics-bullion-purchase",
+      "batch": "logistics-goods-2026-08-04",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "A bullion-funded local purchase succeeds and draws down the destination market's real grain stock at its current resolve_price when sufficient stock exists, and fails (no stock transfer, no bullion spent) when it does not.",
+          "verification": [
+            "headless"
+          ],
+          "status": "pending",
+          "result_metric": "",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "brief": "logistics-verify-harness",
+      "title": "Logistics verify harness",
+      "difficulty": 2,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": "",
+      "promoted_from": "backlog.json § logistics-verify-harness",
+      "batch": "logistics-goods-2026-08-04",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "tools/verify/logistics_harness.cpp asserts all four prior requirements (draw depletion, range cap, salt gate, bullion purchase failure) and reports PASS on all assertions in one run.",
+          "verification": [
+            "headless"
+          ],
+          "status": "pending",
+          "result_metric": "",
+          "notes": ""
+        }
+      ]
     }
   ]
 }

@@ -1,5 +1,53 @@
 # Project Io — REFINED (active worklist)
 
+# Logistics goods family (BL-286–291, 2026-08-04) — **IN PROGRESS**
+
+Requirements: requirements.json § logistics-goods-roster, logistics-flow-consumption,
+logistics-transport-capacity, logistics-salt-spoilage, logistics-bullion-purchase,
+logistics-verify-harness.
+
+Decoupled from BL-271 (Era −1 sandbox, in progress in another session) per Ben's 2026-08-04 call —
+targets the live economy directly. Collision map: `src/world/components.hpp` (resource_type enum)
+and `src/world/economy_system.cpp` are hotspots touched by every task below, so the group runs as
+**sequential waves**, not fan-out — per DELIVERY.md's "passes sharing a file don't parallelise" rule.
+
+- **[3] A — BL-286, add the nine-good resource_type roster.** Files: `src/world/components.hpp`,
+  `src/world/economy_system.cpp`, `src/world/hard_coded_world.cpp` (market base prices), `docs/economy/RESOURCES.md`.
+  Deps: foundation. Satisfies: logistics-goods-roster R1.
+- **[3] B — BL-287, per-tick grain/fodder/water draw.** Files: `src/world/economy_system.cpp`,
+  `src/world/components.hpp` (unit/army carried-stock fields). Deps: A. Satisfies: logistics-flow-consumption R1.
+- **[4] C — BL-288, transport capacity resource + range cap.** Files: `src/world/economy_system.cpp`,
+  `src/world/components.hpp`. Deps: A, B. Satisfies: logistics-transport-capacity R1.
+- **[2] D — BL-289, salt shelf-life gate.** Files: `src/world/economy_system.cpp`. Deps: A, B.
+  Satisfies: logistics-salt-spoilage R1.
+- **[3] E — BL-290, bullion local purchase via resolve_price.** Files: `src/world/economy_system.cpp`,
+  `src/world/markets.{hpp,cpp}` (or equivalent clearing module). Deps: A. Satisfies: logistics-bullion-purchase R1.
+- **[2] F — BL-291, logistics_harness.cpp.** Files: `tools/verify/logistics_harness.cpp` (new).
+  Deps: B, C, D, E. Satisfies: logistics-verify-harness R1.
+
+Parallelisation note: A is foundation (must land first — it retrofits the serialised arrays every
+other task reads). B, D, E can run concurrently with each other *only* if split into disjoint
+patches of the same hotspot file, which is not reliable — running B → {D, E in worktree isolation,
+integrated by hand} → C → F sequentially is safer for a save-format-adjacent change.
+
+**PAUSED 2026-08-04 — resume here.** A is **code-complete, not verified**: enum values (grain,
+fodder, salt, transport_capacity, charcoal, iron_blooms, bullion, trade_goods_misc — water already
+existed, not duplicated) + base prices landed in `src/world/components.hpp` and
+`src/world/world_gen_config.{hpp,cpp}` on branch `worktree-agent-a737ae8388a41f55b`
+(worktree `C:\Users\benbo\Project-Io\.claude\worktrees\agent-a737ae8388a41f55b`), NOT merged and
+NOT committed to this branch. `resource_count` derives automatically from the enum
+(`static_cast<size_t>(resource_type::count)`) and a grep audit found no hardcoded array widths, so
+no other array should need manual fixing — but this is unverified by an actual compile. **Blocker:
+no network access in this sandbox to fetch SDL3/Lua/sol2/ImGui via CMake FetchContent**, and no
+existing populated `_deps` cache on this machine has all four deps (only SDL3 is cached, in a
+build directory dated 2026-07-21). Cannot run `world_audit` / `determinism_harness` to confirm the
+retrofit is clean. **Next session (native environment, network available): run `build_app.bat`
+or configure the CMake build from the worktree branch above, run the relevant headless harnesses,
+then merge into this branch and continue to task B.** Do not treat A as landed until that build is
+green.
+
+---
+
 # Mediterranean rift sea (BL-276, 2026-08-03) — **COMPLETE**
 
 Requirements: requirements.json § mediterranean-rift-sea (R1–R4 all met).

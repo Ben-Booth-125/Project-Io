@@ -5887,7 +5887,7 @@
       ],
       "authority_doc": "docs/lore/HISTORY.md",
       "summary": "Filed 2026-08-02 from the Ben brainstorm ('use Rome as a sandbox'). The settlement pass (BL-218) already simulates settlement -> industrialisation -> war ONCE, at generation time, then freezes the result. This item promotes it to a running simulation: a YEAR-TICK loop over provinces and nations from 0 CE to the campaign epoch, in which wars, collapses and revolutions recur rather than firing once as checkpoints. PURPOSE IS WRITTEN DOWN AND BOUNDED: this is the proving ground for the nation AI (BL-054's parked runtime half, the BL-155/156 diplomacy/war stubs) and the mil-sim (BL-272), and the instrument for tuning the worlds' 'philosophical development' against a seed spread (BL-275) - it lives behind a harness flag / tools target, never in the shipped campaign path, and it dies into (or is absorbed by) the 1960 era when those systems graduate. TRANSFER CONTRACT stated up front: what transfers to the main era is the ARCHITECTURE (decision loop, spatial reasoning, war/peace evaluation, the combat engine itself), never the tuning constants. Rome is the CALIBRATION REFERENCE, not the content - sea:river:land cost ratios, campaign-season structure (mare-clausum-style closure), army supply radii, plausible hegemony formation speed - while the world itself stays Kepler's own generated antiquity, seed-varied so the AI cannot overfit one map. This item also partially absorbs BL-223's design question: simulating a thousand near-ruptures is how the averted one gets designed against evidence rather than lore.",
-      "design": "## Settled at filing (2026-08-02 brainstorm)\n\n- **Year tick, own loop.** The economy tick is a day; this needs a year (or campaign-season) tick with its own loop - a NEW loop, not a reuse of the economy tick. Seasonality (campaigning season vs winter / mare-clausum closure) is in from the start because it is half of pre-modern strategy, and it is cheap at this granularity (a season flag on the tick; doctrine and supply modifiers keyed to it).\n- **The rupture transforms become recurring systems.** resolve_historical_ruptures' collapse/war/revolution logic is the seed: what fired once as a checkpoint fires each year as an evaluated decision by a nation actor. The checkpoint mechanism (BL-217) stays for one-shot branch points; the sim adds the continuous layer on top.\n- **The record-burning rule carries over.** Wars in the sim erase and lacuna-ise the loser's record exactly as BL-218 landed it - 2000 years of that produces worlds whose written history is itself an artifact of who won, which is the philosophical-development payload.\n- **Non-hegemony becomes emergent, not asserted.** Some seeds WILL produce a Rome; BL-224's invariant becomes a tuning target read off BL-275's sweep distributions (what parameter regions keep worlds multipolar), not a construction guarantee. The sweep is also the answer to 'what does an averted rupture need to look like' (BL-223).\n\n## Open questions (for the design conversation, not blockers)\n\n1. Determinism/runtime budget: 2000 ticks x ~40 nations x seed spread - integer arithmetic throughout per the standing rule, but what is the wall-clock budget per world? (Working target: a full 0-2000 CE run well under a second, so BL-275 can do hundreds.)\n2. What state persists into the 1960 campaign when the sim replaces the pre-computed Stages 3-4 - the full province history, or the same summary the settlement pass produces today? (Cheapest honest answer: the sim RUNS at generation time and writes the same outputs BL-218 writes, plus a richer history log for BL-208's store.)\n3. Does the player ever get a seat in the sandbox (crude feel-testing) or is it bot-only? Ben has not answered this; default is bot-only until he does.\n\n## Naming constraint (Ben, 2026-08-03)\n\nThis item is filed off a real-history analogy (\"use Rome as a sandbox\"). Under the standing\nrule added the same day (io-standing-rules § Terms & docs; GENERATION_STRATEGY § Real history\nin, invented names out), that analogy is a **mechanism** reference only.\n\nWhat this item takes from Rome: campaign-season structure, supply radii, how a frontier stalls,\nhow fast a hegemony forms, what makes a littoral power. What it must never take: a proper noun.\nEvery nation, province, city and commander the sim produces is named from the seeded sci-fi /\nfantasy template banks, and the phoneme tables must not read as recognisably Latin — a name a\nplayer can place as \"the Roman one\" has failed however good the mechanism under it.\n\nIo's existing rule that Rome is *calibration reference, not content* already said this for the\nmil-sim; it now applies to the whole Era −1 arc."
+      "design": "## Settled at filing (2026-08-02 brainstorm)\n\n- **Year tick, own loop.** The economy tick is a day; this needs a year (or campaign-season) tick with its own loop - a NEW loop, not a reuse of the economy tick. Seasonality (campaigning season vs winter / mare-clausum closure) is in from the start because it is half of pre-modern strategy, and it is cheap at this granularity (a season flag on the tick; doctrine and supply modifiers keyed to it).\n- **The rupture transforms become recurring systems.** resolve_historical_ruptures' collapse/war/revolution logic is the seed: what fired once as a checkpoint fires each year as an evaluated decision by a nation actor. The checkpoint mechanism (BL-217) stays for one-shot branch points; the sim adds the continuous layer on top.\n- **The record-burning rule carries over.** Wars in the sim erase and lacuna-ise the loser's record exactly as BL-218 landed it - 2000 years of that produces worlds whose written history is itself an artifact of who won, which is the philosophical-development payload.\n- **Non-hegemony becomes emergent, not asserted.** Some seeds WILL produce a Rome; BL-224's invariant becomes a tuning target read off BL-275's sweep distributions (what parameter regions keep worlds multipolar), not a construction guarantee. The sweep is also the answer to 'what does an averted rupture need to look like' (BL-223).\n\n## Open questions (for the design conversation, not blockers)\n\n1. Determinism/runtime budget: 2000 ticks x ~40 nations x seed spread - integer arithmetic throughout per the standing rule, but what is the wall-clock budget per world? (Working target: a full 0-2000 CE run well under a second, so BL-275 can do hundreds.)\n2. What state persists into the 1960 campaign when the sim replaces the pre-computed Stages 3-4 - the full province history, or the same summary the settlement pass produces today? (Cheapest honest answer: the sim RUNS at generation time and writes the same outputs BL-218 writes, plus a richer history log for BL-208's store.)\n3. Does the player ever get a seat in the sandbox (crude feel-testing) or is it bot-only? Ben has not answered this; default is bot-only until he does.\n\n## Naming constraint (Ben, 2026-08-03)\n\nThis item is filed off a real-history analogy (\"use Rome as a sandbox\"). Under the standing\nrule added the same day (io-standing-rules § Terms & docs; GENERATION_STRATEGY § Real history\nin, invented names out), that analogy is a **mechanism** reference only.\n\nWhat this item takes from Rome: campaign-season structure, supply radii, how a frontier stalls,\nhow fast a hegemony forms, what makes a littoral power. What it must never take: a proper noun.\nEvery nation, province, city and commander the sim produces is named from the seeded sci-fi /\nfantasy template banks, and the phoneme tables must not read as recognisably Latin — a name a\nplayer can place as \"the Roman one\" has failed however good the mechanism under it.\n\nIo's existing rule that Rome is *calibration reference, not content* already said this for the\nmil-sim; it now applies to the whole Era −1 arc.\n\n## The logistics resource roster (2026-08-04, Ben brainstorm — 0 A.D. sandbox)\n\nFiled off the question \"what other resources do we need for a diverse and realistic logistics\nsystem in history?\", asked while setting up the 0 A.D. sandbox as the AI's proving ground.\n\n### Premise: the gap is class, not count\n\n0 A.D.'s four goods (food, wood, stone, metal) are **stocks** — banked, then spent. A logistics\nsystem needs **flows**: goods consumed every tick wherever the army happens to be, whose delivery\nis the problem. Adding more stock-type goods produces a longer list and the same game.\n\nSo the roster is organised by the three axes that actually generate logistical decisions —\nconsumption rate, carrying capacity, and value density — not by a taxonomy of materials.\n\n### Axis 1 — flows (goods consumed continuously in the field)\n\n| Good | Mechanism it carries |\n|---|---|\n| Grain / rations | Per-head daily draw; sets the march radius. The supply-train problem IS this good. |\n| Fodder | Animals draw more than men; why cavalry-heavy forces stalled — endowment, not doctrine. |\n| Potable water | Binds routes to rivers and cisterns; the binding constraint on arid operations. |\n| Salt | Converts perishable to shippable. Its whole value is changing another good's logistics class. |\n\nSalt is the structurally interesting one: a cheap good that exists to transform a second good's\ntransportability. It is the reason a campaign can outlast a harvest.\n\n### Axis 2 — carrying capacity as a held resource\n\nThe largest omission versus 0 A.D. Pack animals, draught teams, carts and hulls are **held, built,\nlost and captured** — not an invisible multiplier on movement.\n\nThe historical curve then falls out for free rather than being tuned: the train eats its own cargo,\nso effective range is capped by fodder rather than by stock on hand. This is the single addition\nthat most changes what the nation AI has to reason about.\n\nSea, river and land carry different capacity-per-cost — the sea:river:land ratio named in the\ntransfer contract above is expressed *here*, as capacity, rather than as a movement-speed constant.\n\n### Axis 3 — value density (what travels, and how far)\n\n| Good | Density | Behaviour it produces |\n|---|---|---|\n| Charcoal / fuel | Very low | Must be made beside the smelter; deforests its own hinterland. |\n| Building stone, timber | Low | Never travels far; sources fortification and shipyard siting. |\n| Iron blooms | Medium | The military-consumable chain; the material gate BL-274 already assumes. |\n| Hides, pitch, sailcloth | Medium | Armour, tents, cordage, ship repair — the goods that keep a force in the field. |\n| Bullion / coin | High | Buy supply locally instead of hauling it. |\n| Endemic luxuries | Extreme | Worth crossing the world for; already Io's mercantile track (BL-191). |\n\n**Bullion is the strategic lever, not a currency convenience.** A nation actor choosing between\n\"haul grain 300 km\" and \"carry coin and buy grain on arrival\" is a genuine decision with a real\nfailure mode — the local market has to have the grain, and a hostile or exhausted province does\nnot. It is the alternative to a supply train, and it is the choice antiquity actually faced.\n\n### Minimum viable set\n\nBeyond the inherited four: **grain, fodder, water, salt, transport capacity, charcoal, iron blooms,\nbullion, one endemic luxury class** — nine. Each earns its slot by changing a movement or siting\ndecision; a good that only changes a number does not go in.\n\nHides / pitch / sailcloth are a **second wave**, folded in once the combat model (BL-272) has\nattrition and ship repair to spend them on. They are listed above for shape, not for the first cut.\n\n### Implementation: a sandbox-local roster, not a `resource_type` extension\n\nExtending `resource_type` is a save-format retrofit — it widens every serialised\n`std::array<float, resource_count>` (RESOURCES.md § Prototype scope). This item must not pay that.\n\nBecause the sandbox lives behind a harness flag and never in the shipped campaign path, it carries\nits **own era-keyed goods roster**, sized and indexed independently of the campaign enum — the same\nshape BL-274 (era-keyed unit rosters) already establishes for units. The two rosters are keyed\ntogether: a material gate on a unit type resolves against the era's goods roster, not against\n`resource_type`.\n\nIf the antiquity goods ever graduate into the 1960 campaign, that is a separate item with the\nretrofit priced into it. Nothing here presumes it.\n\n### Naming\n\nThe roster above uses plain English for the reader. In the sim every good is named from the seeded\nbanks per the § Naming constraint below — \"grain\" is the mechanism, not the string. A good a player\ncan place as the Roman one has failed however good the mechanism under it.\n\n### Open questions\n\n1. Is fodder a distinct good, or grain drawn at an animal multiplier? Distinct is more legible and\n   makes terrain matter (pasture vs arable); merged is cheaper. Leaning distinct.\n2. Does spoilage need a model, or is salt a binary shippable/not flag on grain? A flag is probably\n   enough at year-tick granularity.\n3. Does bullion need a price level per province, or does a flat local-purchase cost suffice for the\n   first cut? The interesting failure mode (exhausted province, no grain to buy) needs the former."
     },
     {
       "id": "BL-272",
@@ -6248,6 +6248,171 @@
       ],
       "summary": "Ben, 2026-08-03 (NR-037): two follow-ons from BL-218/219's harness moves, in order. (1) Re-run and re-bless the GCC golden set on the next Linux session — only the MSVC set was re-blessed, so the two platforms are currently drifting apart. (2) Tag history-ladder lines with their own `chain_stage` so H4 can filter on a field rather than text-match a line; text-matching is exactly the fragility that assertion had to be narrowed around.",
       "design": "DESIGNED 2026-08-03 (Ben, NR-037 option b then c).\n\n**Task 1 — GCC re-bless (do first, it is cheap).** BL-218/219 moved `ai_skill_harness`'s nine\nMSVC assertions; those were re-blessed and verified against a stashed baseline as genuinely\ncaused by the change (every divergence upward — net worth up on seeds 0/2/4, dial counts past\nthe old ceiling on 0/1/4, solvency and survival in band on all five). The GCC set was not\nre-run. Until it is, the two platforms' goldens describe different worlds, and the next\ncross-platform failure will be ambiguous between a real regression and accumulated drift.\nRe-run on Linux, confirm the divergences match the MSVC ones in direction, commit alongside.\n\n**Task 2 — tag the ladder lines (the real fix).** `history_ladder_harness`'s H4 was **narrowed**\nbecause it identifies its window by matching ladder line *text*. Narrowing made it pass; it did\nnot make it right — any rewording of a biography line still silently changes what H4 asserts\nover, which is the failure mode a golden is supposed to catch rather than exhibit.\n\nThe fix: carry each ladder line's own `chain_stage` as a field, so H4 filters on the stage\nrather than pattern-matching prose. Then restore H4 to its **stricter pre-narrowing form** —\nthe narrowing was a workaround for the fragility, so removing the fragility should remove the\nneed for it.\n\n**Note the interaction with BL-283.** That item narrows Pass 3's placement window and expects\nthe corporation-mix goldens to move. Sequence the two so a golden is not re-blessed twice, and\nso a move caused by BL-283 is not mistaken for platform drift."
+    },
+    {
+      "id": "BL-286",
+      "short_name": "LOGISTICS_GOODS_ROSTER",
+      "category": "Environment",
+      "title": "Logistics goods roster (grain, fodder, water, salt, transport capacity, charcoal, iron blooms, bullion, endemic luxury) as a standalone economy extension",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "C",
+      "difficulty": 3,
+      "parked": false,
+      "version_goal": "post-v0.1.0",
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-08-04",
+      "files": [
+        "src/world/components.hpp (resource_type enum)",
+        "src/world/economy_system.cpp",
+        "docs/economy/RESOURCES.md"
+      ],
+      "authority_doc": "docs/economy/RESOURCES.md",
+      "summary": "Filed 2026-08-04, decomposed from a Ben brainstorm (0 A.D. sandbox setup) into its own standalone item family — deliberately decoupled from BL-271 (Era −1 sandbox, in progress in another session) per Ben's call: this adds resources to the actual game economy, not a sandbox-local structure gated on someone else's in-flight work. Defines the nine-good minimum viable roster from the logistics addendum on BL-271's design (kept there for the analysis; this item and its family are the standalone build-out).",
+      "design": "## Decoupling note (Ben, 2026-08-04)\n\nOriginally scoped as a sandbox-local roster keyed to BL-271/BL-274 (both in progress in another session at filing time). Ben's call: treat this as its own item, targeting the live game economy directly rather than hanging a dependency on concurrent work. `requires`/`blocked_on` on BL-271/272/274 removed accordingly. The full logistics analysis (flows vs stocks, the three axes, the minimum viable set) still lives in BL-271's design field — read there for the reasoning; this item and BL-287–291 are the execution against the real economy.\n\n## Scope\n\nThe nine-good roster: grain, fodder, water, salt, transport capacity, charcoal, iron blooms, bullion, one endemic luxury class.\n\n**This IS a `resource_type` extension** (not a sandbox-local enum as originally framed) — per RESOURCES.md § Prototype scope, that widens every serialised `std::array<float, resource_count>`: tile deposits/reserves, market supply/demand/price/base-price, stockpiles, nation abundance, substrate capacity. **This item IS the save-format retrofit**, scoped narrowly to these nine additions rather than the full ~35–40-entry design target.\n\nMost of the nine already have a natural home in the existing tier structure: charcoal and iron blooms slot into Tier 1/2 raw-to-refined alongside the existing metals chain; salt and water sit with the ambient/mercantile tracks; bullion is closer to an abstracted currency proxy than a tradeable good and may need its own handling rather than a `resource_type` slot — flag at implementation.\n\n## Naming\n\nAbove are mechanism labels for design conversation. Any in-game string follows the existing resource-naming convention in RESOURCES.md (plain, no invented-lore requirement here — this is the live economy, not the Era −1 sandbox's history-sim naming rule).\n\n## Open question carried forward\n\nIs fodder a distinct good or a grain draw at an animal multiplier? Leaning distinct (terrain matters — pasture vs arable); settle at implementation if a cheaper merge proves sufficient."
+    },
+    {
+      "id": "BL-287",
+      "short_name": "LOGISTICS_FLOW_CONSUMPTION",
+      "category": "Environment",
+      "title": "Per-tick flow consumption (grain, fodder, water) for units/armies in the live economy",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "C",
+      "difficulty": 3,
+      "parked": false,
+      "version_goal": "post-v0.1.0",
+      "requires": [
+        "BL-286"
+      ],
+      "blocked_on": [
+        "BL-286"
+      ],
+      "written": "2026-08-04",
+      "files": [
+        "src/world/components.hpp (resource_type enum)",
+        "src/world/economy_system.cpp",
+        "docs/economy/RESOURCES.md"
+      ],
+      "authority_doc": "docs/economy/RESOURCES.md",
+      "summary": "Filed 2026-08-04, decomposed from BL-271's logistics addendum; decoupled from BL-271 per Ben's 2026-08-04 call (see BL-286). Implements the actual logistics driver in the live game: goods consumed every tick by units in the field rather than banked and spent, setting effective operating radius from a supply source.",
+      "design": "## Decoupling note\n\nSee BL-286 (goods roster) — this targets the live economy tick, not a sandbox year-tick. \"Per-tick\" here means Io's existing day tick, not BL-271's proposed year/season tick.\n\n## Mechanism\n\nUnits/armies draw grain (and fodder if animal-heavy, pending BL-286's open question) and water per tick from carried stock or a supply line. Range from a supply source is capped by carried stock plus what BL-288 (transport capacity) allows hauling — this item defines the draw rate, BL-288 the haul limit; together they produce the range curve without hand-tuning it directly."
+    },
+    {
+      "id": "BL-288",
+      "short_name": "LOGISTICS_TRANSPORT_CAPACITY",
+      "category": "Environment",
+      "title": "Transport capacity as a held, built and losable resource (pack animals, carts, hulls) with terrain-dependent capacity-per-cost",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "C",
+      "difficulty": 4,
+      "parked": false,
+      "version_goal": "post-v0.1.0",
+      "requires": [
+        "BL-286"
+      ],
+      "blocked_on": [
+        "BL-286"
+      ],
+      "written": "2026-08-04",
+      "files": [
+        "src/world/components.hpp (resource_type enum)",
+        "src/world/economy_system.cpp",
+        "docs/economy/RESOURCES.md",
+        "src/world/economy_system.cpp (attrition/loss)"
+      ],
+      "authority_doc": "docs/economy/RESOURCES.md",
+      "summary": "Filed 2026-08-04, decomposed from BL-271's logistics addendum; decoupled from BL-271/BL-272 per Ben's 2026-08-04 call (see BL-286). Pack animals, draught teams, carts and hulls become an actual held resource — built and lost — instead of an invisible movement-speed multiplier. The capture-on-defeat behaviour originally tied to BL-272's combat model is deferred until that model exists in the main line; this item ships the capacity resource and its attrition on its own.",
+      "design": "## Decoupling note\n\nOriginally blocked on BL-272 (combat model, in progress elsewhere) for capture-on-defeat. That interaction is deferred — this item delivers the held capacity resource and ordinary attrition (loss over distance/terrain/time) without requiring the combat model to exist. Capture can be added later as a small follow-on once BL-272 lands, in the main line rather than a sandbox.\n\n## Mechanism\n\nTransport capacity is a unit/army-attached stock: built (cost in goods + time), consumed by attrition. Sea, river and land routes carry different capacity-per-cost, expressing the terrain-cost differential as capacity rather than a flat movement-speed constant.\n\n## Interaction with BL-287\n\nThe train itself draws fodder/grain (BL-287) to keep its animals fed — this is what caps effective range rather than raw stock on hand. Sequence BL-287 before BL-288 delivery so the curve reads as emergent rather than arbitrary."
+    },
+    {
+      "id": "BL-289",
+      "short_name": "LOGISTICS_SALT_SPOILAGE",
+      "category": "Environment",
+      "title": "Salt as the perishable-to-shippable transform: a binary shelf-life flag on grain rather than a full spoilage model",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "C",
+      "difficulty": 2,
+      "parked": false,
+      "version_goal": "post-v0.1.0",
+      "requires": [
+        "BL-286",
+        "BL-287"
+      ],
+      "blocked_on": [
+        "BL-287"
+      ],
+      "written": "2026-08-04",
+      "files": [
+        "src/world/components.hpp (resource_type enum)",
+        "src/world/economy_system.cpp",
+        "docs/economy/RESOURCES.md"
+      ],
+      "authority_doc": "docs/economy/RESOURCES.md",
+      "summary": "Filed 2026-08-04, decomposed from BL-271's logistics addendum; decoupled from BL-271 per Ben's 2026-08-04 call (see BL-286). Salt changes grain's logistics class — perishable to shippable. Resolves the addendum's open question in favour of a binary shelf-life flag over a decay curve.",
+      "design": "## Decoupling note\n\nSee BL-286. Applies to the live economy's grain stock, not a sandbox season boundary.\n\n## Resolved open question\n\nA decay curve is not legible or cheap to tune at the tick granularities Io actually runs; a binary flag is both cheaper and clearer. Settling on the flag here so BL-287/288 do not each invent their own answer.\n\n## Mechanism\n\nGrain stock carried beyond a distance/time threshold (TBD at implementation) requires salt to remain usable; without it the stock is lost at the threshold rather than decaying gradually. Salt is itself a good on BL-286's roster with its own scarcity, so curing capacity is a real constraint, not a free unlock."
+    },
+    {
+      "id": "BL-290",
+      "short_name": "LOGISTICS_BULLION_LOCAL_PURCHASE",
+      "category": "Environment",
+      "title": "Bullion as an alternative to hauling supply: local-purchase decision gated on a per-province price and availability check",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "C",
+      "difficulty": 3,
+      "parked": false,
+      "version_goal": "post-v0.1.0",
+      "requires": [
+        "BL-286"
+      ],
+      "blocked_on": [
+        "BL-286"
+      ],
+      "written": "2026-08-04",
+      "files": [
+        "src/world/components.hpp (resource_type enum)",
+        "src/world/economy_system.cpp",
+        "docs/economy/RESOURCES.md"
+      ],
+      "authority_doc": "docs/economy/RESOURCES.md",
+      "summary": "Filed 2026-08-04, decomposed from BL-271's logistics addendum; decoupled from BL-271 per Ben's 2026-08-04 call (see BL-286). Bullion lets a corp/army choose \"carry coin, buy supply locally\" over hauling — the strategic alternative to a supply train. Resolves the addendum's open question in favour of a per-market price/availability check.",
+      "design": "## Decoupling note\n\nSee BL-286. This reads Io's existing market clearing model (MARKETS.md) for the destination market's actual grain stock/price, rather than a sandbox province pool.\n\n## Resolved open question\n\nA flat local-purchase cost always succeeds at a price, which loses the interesting failure mode — arriving with coin but nothing to buy. Committing to a per-market check against real supply (drawn down by BL-287's consumption plus ordinary civilian demand) so that failure mode is real.\n\n## Mechanism\n\nA unit/army evaluates, per supply need: haul via BL-288's transport capacity, or spend bullion against the destination market's current grain stock/price via the existing `resolve_price`/clearing pass (MARKETS.md). Both options draw down a real, finite pool."
+    },
+    {
+      "id": "BL-291",
+      "short_name": "LOGISTICS_VERIFY_HARNESS",
+      "category": "Environment",
+      "title": "Headless verify harness for the logistics resource family (draw depletion, range cap, salt gate, bullion purchase failure)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "C",
+      "difficulty": 2,
+      "parked": false,
+      "version_goal": "post-v0.1.0",
+      "requires": [
+        "BL-286",
+        "BL-287",
+        "BL-288",
+        "BL-289",
+        "BL-290"
+      ],
+      "blocked_on": [
+        "BL-287",
+        "BL-288",
+        "BL-289",
+        "BL-290"
+      ],
+      "written": "2026-08-04",
+      "files": [
+        "tools/verify/logistics_harness.cpp (new)"
+      ],
+      "authority_doc": "docs/economy/RESOURCES.md",
+      "summary": "Filed 2026-08-04, decomposed from BL-271's logistics addendum; decoupled from BL-271 per Ben's 2026-08-04 call (see BL-286). Closes the family with an integration check against the live economy rather than a sandbox harness.",
+      "design": "## Decoupling note\n\nOriginally slated to share BL-271's `tools/verify/history_sim_harness.cpp`. Now a standalone harness (`tools/verify/logistics_harness.cpp`) since this family no longer depends on that sandbox existing.\n\n## Assertions (minimum)\n\n1. Grain/fodder/water draw (BL-287) depletes carried stock at the authored per-tick rate.\n2. A force's effective range is bounded by transport capacity (BL-288) once carried stock is exhausted — not by an arbitrary movement constant.\n3. Grain carried past the shelf-life threshold without salt (BL-289) is lost; carried with salt, it is not.\n4. A bullion purchase (BL-290) fails when the destination market's grain stock is below the requested amount, and succeeds (at the market's current price) when it is not.\n\n## Sequencing\n\nFiled last and blocked on all four behaviour items — the integration gate for the family, not a per-item unit check."
     }
   ]
 }
