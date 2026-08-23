@@ -5222,6 +5222,95 @@
     }
    ],
    "resolution": "LANDED 2026-08-22. The world snapshot (IOSV) plus the save-game envelope (IOSG) - one .iosave file, field-wise flat binary, atomic on failure at both levels. Reachable four ways: F5/F6 quick slots, --load <path>, and verify.save/verify.load for capture scripts. Two findings worth carrying out of the work: corp_modifiers is not recomputable and had to be serialised (NR-510), and verify.command had never routed through dispatch_action, so every app-level command it named silently did nothing."
+  },
+  {
+   "brief": "nation-scorer",
+   "batch": "2026-08-23-sprintN2",
+   "title": "BL-542 — A nation states what it cares about, and the amounts follow from what it holds",
+   "status": "active",
+   "promoted_from": "backlog.json BL-542 (nation scorer); docs/politics/NATIONS.md § Settled 5",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): DETERMINISM AND ORDER-INDEPENDENCE. `score_national_budgets` is pure and replayable — two sweeps of one world agree bit for bit, and two worlds with identical CONTENT whose `w.nations` / `w.units` iteration orders differ produce bit-identical weights. This is the binding term of the 2026-08-18 nation grant, not a nicety: `w.nations` and `w.units` are unordered_maps and float addition is not associative.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. nation_scorer_harness R1a/R1b/R1c/R1d. R1b exercises 11 distinct `w.units` walk orders produced by permuting INSERTION order (rehash alone yields only two, because 40 consecutive ids give the same order at every bucket count above the id range). Mutation-confirmed: deleting the unit sort in build_force turns R1b red; deleting the nation sort turns R1c red; a const_cast write into the world turns R1d red.",
+     "notes": "The first cut of R1b compared a SINGLE tick, and on that tick the only nation carrying border force was not in the cadence slot — so the float accumulation the row guards never entered the comparison and the sort could be deleted unnoticed. Every R1 comparison is now over a full rotation, and the row asserts the subject is present before comparing."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "CADENCE OVER THE SORTED NATION SET. Every eligible nation is re-scored exactly once per `cadence_k` ticks; `nation_is_due` agrees with the sweep's key set on every tick; a nation admitted with the HIGHEST id shifts no existing nation's slot; a landless nation is skipped and COUNTED rather than silently dropped.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. nation_scorer_harness R2a/R2b/R2c/R2d — 4 eligible nations, one full rotation, one score each. Mutation-confirmed: keying the index on a set sorted by name instead of id (deterministic, plausible, but not append-stable) turns R2b red; removing the landless guard turns both R2d rows red.",
+     "notes": "A nation admitted with a LOWER id does shift the slots above it. That is inherent to an index over a sorted set, is true of corp_ai's stagger too, and is recorded in nation_is_due rather than asserted as a falsehood — fixing it would need a stored slot, which is state the scorer may not hold."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "TERM 1 — NICHE FIT IS COMPLEMENTARITY, NOT OUTPUT. A nation whose profile complements its neighbours scores strictly higher niche fit, and a strictly larger share on `charters`, than the same nation whose profile duplicates them. And scaling a nation's whole abundance array leaves the weight vector BIT-IDENTICAL: 'a nation scores well by producing what others need and cannot make, never by producing the most'.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. nation_scorer_harness R3a/R3b. niche_fit 0.384330 complementary vs 0.192165 duplicating; charters share 0.138952 vs 0.092450. Scale invariance asserted bit-exact across masses 0.5 / 1.0 / 8.0 / 16.0 / 32.0. Mutation-confirmed: reading abundance as a magnitude instead of a share turns R3a and R3b red; flipping the sign of `lack` turns R3a red.",
+     "notes": "The scale-invariance row originally used mass 8 -> 16, where the raw-abundance mutant simply pins at the clamp in both worlds and the row passes while the property is broken. The masses were lowered so the mutant lands mid-band and the row fails on its own claim."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "TERM 2 — CONFLICT AVOIDANCE IS A NEGATIVE TERM ON EXPECTED WAR COST. Force standing across a border raises `threat` and pushes the budget toward contracted_force / strategic_reserve / military_research and AWAY from schooling. The SAME force with no declared hostility threatens strictly less (stance.hpp's pair-state is really read). Own force on own ground damps the threat without cancelling it. A hostile declaration with no army near the border threatens NOTHING.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. nation_scorer_harness R4a/R4b/R4c. threat 0.383320 declared vs 0.150522 undeclared over the identical 40-unit border force. Mutation-confirmed: dropping the is_hostile read turns R4b red; dropping the deterrence divisor turns R4c red; scoring contracted_force off `calm` instead of `threat` turns R4a red.",
+     "notes": "A nation being deterred by its own force is the only place the scorer reads a nation's own units; it damps rather than cancels, so a garrison never buys immunity."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "TERM 3 — GRUDGES BIAS TERMS 1 AND 2 AND TARGET NOTHING. A grudge lowers that neighbour's niche contribution ('less attractive to complement') and lowers the threat its force carries ('a conflict with them less costly to accept'). AND: with terms 1 and 2 both at zero, a grudge changes the weight vector NOT AT ALL — the row that catches a grudge leaking into a line of its own.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. nation_scorer_harness R5/R5a/R5b/R5c. grudge(A,B) 0.187500 mild vs 0.437500 bitter; niche_fit 0.384330 -> 0.351852; threat 0.383320 -> 0.330448 over identical raw border force. Mutation-confirmed: adding mean_grudge to military_research turns R5c red; making the niche bias additive turns R5a red; removing the conflict-side bias turns R5b red.",
+     "notes": "The grudge is DERIVED, not stored — contested border length plus the pair's generated expansionism posture. NATIONS.md § Settled 4 puts the real Era -1 pair outcomes behind BL-541; `grudge_from_border` is one function precisely so that swapping the input moves nothing else. Recorded as a decision taken on Ben's behalf."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "requirement": "THE TERRESTRIAL HORIZON. A nation sharing no border is outside the horizon: mutating its abundance, its posture, or the force standing on its ground leaves this nation's weights BIT-IDENTICAL. Each row carries a CONTROL — the same mutation applied to a real neighbour, which must move the weights — so the row cannot pass by having been applied to something inert.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. nation_scorer_harness R6/R6a/R6b/R6c, each paired with its control. A's horizon is exactly its two bordering nations. Mutation-confirmed: taking the neighbourhood mean over every nation instead of over A and its neighbours turns R6a red.",
+     "notes": "'Terrestrial' is Ben's word and is enforced structurally: neighbours are tile-edge adjacency, prices are read only from markets on bodies this nation holds tiles on, and force is counted only where it stands against this nation's own border. Nothing in the scorer sums over every nation, market or body."
+    },
+    {
+     "id": "R7",
+     "status": "complete",
+     "requirement": "ANTI-VACUITY. The sweep really covered nations (4 eligible, one rotation, one score each); every returned weight vector sums to 1 and at least one is not all zero; two nations produce DIFFERENT vectors; the reference terms sit strictly INSIDE (0, 1) so no clamp is hiding a mutation; the fixture carries a live grudge; and the float sum R1 guards is genuinely order-sensitive under two reorderings.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. nation_scorer_harness R7a/R7b/R7c/R7d/R7e. Reference terms niche_fit 0.384330, niche_gap 0.192165, threat 0.369010, mean_grudge 0.187500, all strictly interior. Border-force sum ascending 0x1.a0f4b8p+8 differs from both the descending and the interleaved order.",
+     "notes": "Authored because the previous sprint shipped three harnesses at 100% green over two defective subjects. R7 exists to fail when the FIXTURE stops constraining the code, which is the failure mode a green suite cannot otherwise show — and it earned its place here twice, catching the six-unit border table and the mass-8 scale sweep."
+    },
+    {
+     "id": "R8",
+     "status": "complete",
+     "requirement": "INERTNESS. Nothing in the shipped economy tick calls the scorer, so a world runs bit-identical to the pre-BL-542 build; and the scorer adds no persistent field, so it owes nothing at the serialisation seam.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET by construction and by inspection: `score_national_budgets` is declared in a new translation unit that no existing file includes (grep: nation_ai.hpp has one includer, its own .cpp and the harness), takes a const world, and returns weights. R1d asserts the sweep moves no world state. No component gains a field.",
+     "notes": "Deliberate per the brief. The weights are returned to a caller rather than stored on nation_component, exactly as run_national_budget takes its budgets by parameter — a persistent field ahead of its consumer would be state with no reader and a serialisation seam owed for nothing."
+    }
+   ]
   }
  ]
 }
