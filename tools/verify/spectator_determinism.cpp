@@ -179,7 +179,15 @@ constexpr int      k_ticks = 300;
 // worlds, same seed) passed alongside this one, both producing
 // 503FE8B540E58CFC, and every other assertion in this file — the prohibition,
 // the cadence rows, the A/B seat rows, R3's divergence row — passed unchanged.
-constexpr uint64_t k_unspectated_golden = 0x503FE8B540E58CFCull;
+// Re-blessed 2026-08-23 (BL-571, nation garrisons), same Batch Delivery wave
+// as the move above: garrisons are new units seeded into `world::units` at
+// generation (`seed_nation_garrisons`, nation_generation.cpp), and
+// `state_hash` folds every unit unconditionally — so every generated world
+// now carries more units than before, a structural move for the same reason
+// province_holder was. Confirmed reproducible: R2's own row passed alongside
+// this one, both producing 607026DE2C20D27A, and every other assertion in
+// this file passed unchanged.
+constexpr uint64_t k_unspectated_golden = 0x607026DE2C20D27Aull;
 
 /// Hand-built registry mirroring scripts/economy.lua + scripts/recipes.lua for
 /// the building types the generator places. Copied from ai_skill_harness so the

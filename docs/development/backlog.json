@@ -101,8 +101,8 @@
    "id": "BL-570",
    "short_name": "CONDITION_PROVINCE_SUBJECT",
    "title": "condition_set can say 'province P held by the subject', and a contract template is an authored Lua row",
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "✔",
    "priority": "A",
    "difficulty": 3,
    "version_goal": "v0.1.15",
@@ -123,15 +123,15 @@
     "docs/META_LAYER.md"
    ],
    "authority_doc": "docs/economy/CONTRACTS.md",
-   "summary": "CONTRACTS.md's spine - a contract IS a condition_set the client will pay to have become true - cannot be expressed: the nine subjects are world-wide corp scalars with no location qualifier, and a condition_set holds a std::string key so it is not fixed-size or serialisable. This item appends subject province_held with a province qualifier on condition, measured against world::province_holder, and adds the authored contract-template table (scripts/contracts.lua) so a contract stores a template index plus bound operands, never a free condition_set.",
-   "design": "## Work\n\n1. `condition_subject::province_held` (append-only; `condition_subject_count` bumps). `condition` gains `uint32_t province` (sentinel `no_province`). `measure_condition` returns 1 when `province_holder[province] == subject_corp`, else 0; comparator `>=` 1 is the 'hold' predicate. META_LAYER.md gets the tenth subject row.\n2. `condition_text` renders it: 'holds <province name or #id>'.\n3. `scripts/contracts.lua`: a template table `{ id, name, predicate = { subject, comparator, operand }, continuous, fee_mult, deadline_ticks }`. First two rows: **take** (province_held >= 1 at deadline) and **hold** (province_held >= 1 on every tick until deadline; `continuous = true`). Loaded through the existing sol2 registry path, protected calls only.\n4. `condition_set_harness.cpp`: province_held measures correctly for holder / non-holder / sea province; the template table loads and round-trips its index.\n\n## Rule carried\nA new contract kind is a Lua row, not a C++ change (CONTRACTS.md). This item is what makes that true."
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-571",
    "short_name": "NATION_GARRISONS",
    "title": "Nations field force: a garrison per nation, and a battle can have a nation on one side",
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "✔",
    "priority": "A",
    "difficulty": 4,
    "version_goal": "v0.1.15",
@@ -145,17 +145,21 @@
    "parked": false,
    "files": [
     "src/world/components.hpp",
-    "src/world/corporation_generation.cpp",
+    "src/world/nation_generation.hpp",
     "src/world/nation_generation.cpp",
+    "src/world/battle_system.hpp",
     "src/world/battle_system.cpp",
-    "src/world/stance.hpp",
-    "src/world/unit_upkeep.cpp",
+    "src/world/nation_step.hpp",
+    "src/world/nation_step.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/world_save.hpp",
+    "src/world/world_save.cpp",
     "docs/military/MILITARY.md",
     "docs/politics/NATIONS.md"
    ],
    "authority_doc": "docs/military/MILITARY.md",
-   "summary": "A contract offer is 'a campaign a polity wants and cannot win alone' - so the thing the company fights is the OTHER polity's force. Today nations own no units (the only owner assignment is corporation_generation.cpp:1245) and run_battles triggers only on corp_hostile_pairs. Without this item every contract resolves against nothing. Design-owed on two calls: how big a garrison is (anchor: NATIONS.md's value anchor - a unit's equipment costs twice its salary - and the nation's military_research line) and whether a nation garrison marches at all in this slice (proposed: no - garrisons are static defenders; a nation that wants ground hires).",
-   "design": "## Settled (Ben, elicitation, 2026-08-23)\n\n1. **Garrison size.** Capital province + border provinces shared with the highest-grudge neighbour, count treasury-scaled (`nation_component::treasury`) against the value anchor (BL-543). Static this slice.\n2. **Trigger.** `run_battles` gains a second trigger: a unit owned by a corp holding an ACTIVE contract whose target province is held by nation N engages N's garrison there. No `declare_hostile` row needed - the contract is the hostility. Nation-vs-corp pair state is a `stance` row keyed on the contract, cleared at terminal state.\n3. **Upkeep.** YES - a `military_research`-line budget claim (the nation pays its own force).\n\nRatified into docs/military/MILITARY.md § Nation garrisons and docs/politics/NATIONS.md § A budget.\n\n## Work\n`unit_component::owner` accepts a nation entity; generation seeds garrisons; `run_battles` second trigger; `battle_engagement_harness` case: a corp-vs-nation battle opens and resolves; blackboard export lists garrisons as visible units (the competitor-visibility rule applies - count visible, internals private)."
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-572",

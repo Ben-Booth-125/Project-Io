@@ -45,35 +45,21 @@ pass confirmed March is reachable and dispatches; it did not confirm the unit vi
 
 ---
 
-### Wave 2 (after BL-569)
+### Wave 2 — DONE (2026-08-23)
 
-#### BL-570 — CONDITION_PROVINCE_SUBJECT
+**BL-570 (condition province subject)** and **BL-571 (nation garrisons)** landed and merged to
+`main` (worktree-agent-aae464e367f3fcb1d, worktree-agent-a477567f226eaa377); both `complete` in
+backlog.json, design prose archived. Both branches had merged an older `main` into themselves
+before this session's origin/main reconciliation landed, so integrating them meant resolving
+stale-base doc conflicts by hand each time (see commits `0a8f6de2`, `b409fc6f`) — and a real
+collision: both items independently bumped `world_save_version` 4→5 for different new fields;
+combined into one coherent bump to 6. `spectator_determinism`'s golden re-blessed again
+(garrisons are new units, folded into `state_hash` unconditionally).
 
-Requirements: § condition-province-subject. Files: `condition_set.{hpp,cpp}`,
-`scripts/contracts.lua`, `tools/verify/condition_set_harness.cpp`.
-
-1. `condition_subject::province_held` + `condition::province` field.
-   **Consumes:** `world::province_holder` (BL-569). **Provides:**
-   `condition_subject::province_held`, the `contracts.lua` template table shape
-   `{id, name, predicate, continuous, fee_mult, deadline_ticks}`.
-2. `condition_text` rendering; `scripts/contracts.lua` two rows (take, hold).
-3. `condition_set_harness` cases: holder / non-holder / sea; template load + round-trip.
-
-#### BL-571 — NATION_GARRISONS
-
-Requirements: § nation-garrisons. Files: `components.hpp`, `corporation_generation.cpp`,
-`nation_generation.cpp`, `battle_system.cpp`, `stance.hpp`, `unit_upkeep.cpp`.
-
-1. `unit_component::owner` accepts a nation entity; `nation_generation.cpp` seeds garrisons
-   (capital + grudge-border provinces, treasury-scaled). **Consumes:**
-   `world::province_holder` (BL-569, for border-province identification). **Provides:**
-   nation-owned units in `world::units`, garrison-strength-per-province query.
-2. `run_battles` second trigger (contract-is-hostility, stance keyed on contract id) — the
-   contract id it keys on does not exist until BL-573; stub the trigger against a
-   placeholder `active_mercenary_contract_for(corp, province)` returning none until then, so
-   this task is not blocked waiting on wave 4.
-3. Garrison upkeep as a `military_research` budget claim.
-4. `battle_engagement_harness` corp-vs-nation case.
+Two things flagged for Ben, not blockers: `NR-579` (BL-570's `fee_mult`/`deadline_ticks` are
+legible placeholders) and `NR-580` (every nation's treasury is 0 at generation, so BL-571's
+garrisons all land on the sizing floor — the same gap BL-572, next, is about to hit from the
+funding side).
 
 ---
 

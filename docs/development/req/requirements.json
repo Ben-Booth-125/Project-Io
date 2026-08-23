@@ -5782,38 +5782,42 @@
         {
             "brief": "condition-province-subject",
             "title": "condition_set can say 'province P held by the subject', and a contract template is an authored Lua row",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-23",
+            "resolution": "Landed on main (worktree-agent-aae464e367f3fcb1d, merged 0a8f6de2). condition_set_harness 67/67, save_roundtrip clean (world_save_version bumped to 5, then 6 when BL-571 merged on top — see nation-garrisons' resolution).",
             "promoted_from": "backlog.json BL-570 (CONDITION_PROVINCE_SUBJECT) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "headless"
                     ],
                     "requirement": "ITEM-SPANNING: condition_subject::province_held measures against world::province_holder (holder / non-holder / sea province all read correctly), scripts/contracts.lua's template table loads through the protected sol2 path with a 'take' (point) and a 'hold' (continuous) row, and condition_set_harness.cpp exercises the measure and the template load/round-trip.",
-                    "notes": "",
-                    "result_metric": ""
+                    "notes": "condition::province is a new fixed-size field inside every law's/embargo's condition_set — a save-format consequence beyond the item's own file list, correctly caught and handled (world_save_version bump, save_roundtrip P8/P9 extended). fee_mult/deadline_ticks in the two authored template rows are placeholders, not measured — NR-579.",
+                    "result_metric": "condition_set_harness: 67 checks, 0 failures"
                 }
             ]
         },
         {
             "brief": "nation-garrisons",
             "title": "Nations field force: a garrison per nation, and a battle can have a nation on one side",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-23",
+            "resolution": "Landed on main (worktree-agent-a477567f226eaa377, merged b409fc6f). battle_engagement_harness 64/64 (new case B17), save_roundtrip clean. world_save_version collided with BL-570's own bump (both independently went 4->5) — resolved during merge into a single coherent bump to 6 covering both new fields.",
             "promoted_from": "backlog.json BL-571 (NATION_GARRISONS) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "headless"
                     ],
                     "requirement": "ITEM-SPANNING: nation_generation.cpp seeds a treasury-scaled garrison at the capital plus every border province shared with the highest-grudge neighbour (unit_component::owner a nation entity), run_battles' second trigger opens a battle between a corp holding an ACTIVE mercenary contract and the target province's garrison with no declare_hostile row authored, the pair's stance clears at the contract's terminal state, garrison upkeep debits the nation's military_research budget line, and battle_engagement_harness carries a corp-vs-nation case that opens and resolves.",
-                    "notes": "",
-                    "result_metric": ""
+                    "notes": "The 'stance keyed on contract id, cleared at terminal state' half is deferred — no contract id exists to key on until BL-573 lands; the trigger is stubbed against active_mercenary_contract_for (always none), per the item's own brief. Every generated nation's treasury is 0 at generation (existing settled design), so every garrison currently lands on the sizing floor (20) with no wealth differentiation — NR-580, not a defect in this item, a cross-system gap BL-572 is about to hit too.",
+                    "result_metric": "battle_engagement_harness: 64 checks, 0 failures (new case B17)"
                 }
             ]
         },

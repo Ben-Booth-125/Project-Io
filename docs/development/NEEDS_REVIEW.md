@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*5 entries — 5 open, 0 resolved.*
+*6 entries — 6 open, 0 resolved.*
 
 ---
 
@@ -82,6 +82,19 @@ BL-570's task is the vocabulary + template table shape, not a priced contract --
 > **Recommendation:** Re-derive or explicitly re-affirm fee_mult and deadline_ticks once BL-572 can measure them against a real nation treasury and BL-573 against a real contract's pacing -- same discipline CONTRACTS.md and economy.lua already apply elsewhere (iterate by playtest, not by authoring once and forgetting).
 
 *Files: `scripts/contracts.lua`*
+
+### NR-580 — Zero nation treasury at generation now flattens BOTH garrison sizing (BL-571) and will flatten contract-offer funding (BL-572) — the same gap seen from a second system
+*observation · raised 2026-08-23 · from BL-571 (nation garrisons) landing; the treasury-scaling design called for it to differentiate garrison size by nation wealth.*
+
+nation_component::treasury is 0.0 for every nation at generation, by existing settled design (NATIONS.md: 'zero at generation, deliberately'). BL-571's garrison sizing (nation_garrison_params: min_count=20, count_per_credit=0.05, max_count=200) was meant to scale with treasury, but since every nation starts at 0, every garrison lands on the 20-count floor with no differentiation until something credits a treasury (a levy or tariff enacted) before generation's garrison-seeding pass runs -- which nothing in the generation chain does today. This is the SAME gap the retired NR-572 named from the contract-offer side (a nation's exploration/contracted_force budget share needs a non-zero treasury to fund anything): two independent Sprint 16 systems (garrison sizing now, contract-offer funding next in BL-572) are both about to hit the same wall from opposite directions.
+
+**Why it matters.** BL-572 (contract offers, wave 3 of this batch) derives an offer's escrow from a nation's contracted_force budget share -- if treasuries stay at 0 through generation, BL-572 will build correctly and still never produce a live offer in a default world, the same 'wired but not playing' gap NR-572 (now retired) already diagnosed. Worth deciding before BL-578 (the slice playthrough) hits it live, not after.
+
+- A) Wire nation income before generation's garrison/budget passes run -- enact a starting levy or tariff during generation (not just the campaign tick), so treasury is non-zero from tick 0.
+- B) Accept for Sprint 16: garrisons stay floor-sized and contract offers stay rare/small until the FIRST in-campaign levy tick credits a treasury: funding arrives, just not instantly at generation. File nation-income-at-generation as separate, later work.
+- C) Re-scale BL-571's garrison-size anchor off something already non-zero at generation (e.g. resource_abundance or tile count) instead of treasury, decoupling garrison size from the funding question entirely.
+
+> **Recommendation:** B for Sprint 16 -- the mercenary slice's playthrough (BL-578) plays over enough ticks that a levy has time to credit treasuries before the slice needs a contract offer to fire; re-verify that assumption when BL-572/BL-578 land rather than gold-plating generation now. Revisit A as its own item if the playthrough shows the wait is too long to feel alive.
 
 ---
 

@@ -55,6 +55,41 @@ repeat-click cycle, where Soldier already precedes Building. Ratified into that 
 Both items flipped `complete`, design prose archived, `REFINED.md` Wave 1 drained. Waves 2–6
 (BL-570 onward) are next, strictly sequential.
 
+**UPDATE, same session: a concurrent session's push discovered and reconciled.** Fetching
+before Wave 2 found `origin/main` two commits ahead — a separate concurrent session (sharing
+this checkout) had purged `NEEDS_REVIEW.json` (240→2 open entries, Ben's review-queue form
+answered) and filed six items (BL-579–584). Reconciled by hand rather than trusting git's
+line-based merge, since both sides had reformatted the same JSON: `NEEDS_REVIEW.json` took
+origin's purged state as the base and re-appended this session's still-relevant entries,
+renumbered off an id collision (origin's `NR-576` is now canonical, archived; this session's
+became `NR-577`/`578`); `backlog.json` took origin's 16-item structure and spliced in this
+session's four changed items. Commit `f38ddd55`. (First attempt at this merge accidentally
+landed on a different concurrent session's `sprint/32-logistic-points-kickoff` branch — this
+checkout's HEAD moved while the merge was in flight — caught before pushing, redone clean on
+`main`, that branch left untouched.)
+
+**Wave 2 build.** BL-570 (condition province subject) and BL-571 (nation garrisons) — both
+depend only on BL-569, disjoint files — built concurrently, merged, and re-verified. Both
+worktrees had started from a stale base and merged an *older* `main` into themselves before
+this session's own reconciliation landed, so each merge into `main` repeated the doc-conflict
+resolution above, plus one genuine new collision: both items independently bumped
+`world_save_version` 4→5 for different fields (`condition::province`; a `nation_component`
+capital-tile field); combined into one coherent bump to 6. `condition_set_harness` 67/67,
+`battle_engagement_harness` 64/64 (new case B17, corp-vs-nation), `save_roundtrip` clean.
+`spectator_determinism`'s golden re-blessed again — garrisons are new units, folded into
+`state_hash` unconditionally. Commits `0a8f6de2`, `b409fc6f`.
+
+Two things flagged, not blockers: `NR-579` (BL-570's Lua fee/deadline numbers are legible
+placeholders) and `NR-580` — every nation's treasury is 0 at generation, so BL-571's garrisons
+all land on the sizing floor with no wealth differentiation, **the same gap seen from a second
+system**: BL-572 (contract offers, next) derives its fee from the same always-zero treasury.
+Worth a decision before BL-578's playthrough hits it live; recommended accepting it for this
+slice (a levy has ticks to credit a treasury before the playthrough needs an offer) rather than
+wiring nation income into generation now.
+
+Both items flipped `complete`, design prose archived, `REFINED.md` Wave 2 drained. Wave 3
+(BL-572) is next.
+
 ---
 
 ## Session — The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575) (2026-08-23, latest)
