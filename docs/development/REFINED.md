@@ -21,7 +21,14 @@ contracted force is the **second slice of this sprint**. Delegated (NR-569): wei
 with save v2→3; `state_hash` folds treasuries conditionally; player corp not funded this cut; the
 national pass runs regardless of spectating.
 
-### Slice 1 — public exploration proves the loop
+### Slice 1 — public exploration proves the loop — LANDED 2026-08-23 (`f5d68ff1`)
+
+**Done.** run_nation_step is wired into all three drivers; S1/S2/S3 merged; nation_wiring R1–R5
+green (the mechanism closes on a funded fixture, conserves, stays inert at zero treasury,
+replays deterministically). **The loop does NOT close at the scorer's own exploration weight** —
+an indivisible survey earmark cannot be met from a ~1.3% line's single-tick share, and the
+default world enacts no levy so treasuries are 0. That is **NR-572** (R9 pending Ben; options A–E,
+recommendation D-then-A). R8 (live check) is owed to the surface slice (BL-555/BL-558) and NR-572.
 
 Tick order (after `apply_budget`, before `advance_tech_gates`, in all three drivers): score → merge
 weights into `w.nation_budgets` → gather claims → `run_national_budget` → **dispatch the earmarked
