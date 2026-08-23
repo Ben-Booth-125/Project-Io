@@ -359,6 +359,13 @@ What follows from the move:
 
 ## Procurement — a layer over the market, not a second market (BL-350, 2026-08-11)
 
+> **Re-homed 2026-08-22: [`CONTRACTS.md`](CONTRACTS.md) is now the authority for contracting** —
+> both the buy side (procurement, shipped) and the sell side (the mercenary contract, BL-377,
+> designed and unbuilt). This section is kept as the **market-facing** account: how procurement sits
+> against the market rather than replacing it. The counterparty model, the terminal states, the
+> reputation axis and the whole sell side live there. *The game's income loop was a subsection of
+> the market document, which is what the phantom-feature scan found.*
+
 A procurement contract is **a build order placed with someone else**: BL-095's own
 commit-on-affordability, draw-materials-per-tick, pay-across-the-build shape, with the materials
 drawn against the **supplier's** market and the output delivered to the **buyer's** pool. The
@@ -373,8 +380,9 @@ AI's command are one implementation.
   conditions in order — no capacity (the supplier holds no completed building that produces the
   good), no input access (the supplier's local market cannot supply its recipe's inputs), embargo
   (`world::corp_embargo_conditions`, a `condition_set` per supplier — BL-342's generic predicate
-  machinery reaching procurement for free), reputation floor (`world::corp_reputation`, one scalar
-  per (buyer, supplier) pair) — and returns a distinguishable `corp_command_result` for each.
+  machinery reaching procurement for free), reputation floor (`world::procurement_reputation`, a
+  **view** of the relational substrate — see below) — and returns a distinguishable
+  `corp_command_result` for each.
 
   > **Authoring a `market` condition: it measures the WORLD, not a market (BL-342, NR-114).**
   > `condition_subject::market` resolves to the **mean resolved price across every market in the
@@ -399,13 +407,24 @@ AI's command are one implementation.
   price it quotes).
 - **Reputation moves only on completion (+) or cancellation (−)** — narrow by design: it shifts
   price/tie-breaking, never gates access beyond the decline floor above (that is BL-087's job).
-- **Persistence.** `procurement.{hpp,cpp}`, the **third** flat-binary stream in `world/*` —
-  `history_log` (`IOHL`) and `order_book` (`IOOB`) are the other two, and there is no fourth
-  *(corrected 2026-08-12: this line read "the fourth"; `grep magic src/` finds exactly three)*.
-  Magic `IOPC` + version, `world::procurement_quotes` / `procurement_contracts` /
-  `corp_reputation` round-trip in stored order, and a bad stream is refused rather than
-  reinterpreted. All three carry the header BL-107 specifies; what BL-107 still owes is the
-  **world-snapshot** header, which no stream here provides.
+- **Reputation is NOT PROCUREMENT'S STORE (BL-546, landed 2026-08-23).** It is a **view** of
+  `world::sentiment` — the relational substrate, `src/world/sentiment.{hpp,cpp}` — on its **Trust**
+  dimension at (buyer, supplier) grain. The two moves above are one occurrence each of authored
+  conduct (`contract_completed`, `contract_cancelled`) folded into that table at weights seeded from
+  `economy.procurement.reputation_on_*`, so the migration changed **no procurement number**. Two
+  consequences the market side cares about: the floor is **no longer permanent** (the row decays
+  toward neutral, which is how BL-391's deadlock stops existing), so a refusal is a condition of
+  today rather than a verdict; and there is **no second table** the axis can disagree with.
+  [`../politics/RELATIONS.md`](../politics/RELATIONS.md) § 2 is the authority.
+- **Persistence.** `procurement.{hpp,cpp}`, magic `IOPC` + version — **at version 3 since BL-546**,
+  which REMOVED the trailing reputation table: `world::procurement_quotes` and
+  `procurement_contracts` round-trip in stored order, and no relational value crosses this stream at
+  all. The substrate carries its own leg of the seam (`IOSN`, `write_sentiment` / `read_sentiment`),
+  and the whole-world snapshot (BL-536, `IOSV`) carries the widened per-pair record — one float per
+  pair became two, which is why `world_save_version` moved 1 → 2 in the same change. A bad stream is
+  refused rather than reinterpreted, and strict version equality is what makes a v2 procurement
+  stream's trailing block impossible to misread as quote records. Every stream carries the header
+  BL-107 specifies.
 - **The militia's own demand.** `spacecraft_components` (BL-340) carries no background demand —
   a militia's contracts are its only buyer, which is what makes the BL-340/BL-350 coupling real
   rather than thematic.
@@ -458,6 +477,10 @@ Verified by `tools/verify/money_conservation.cpp`.
 
 
 ## Tariffs — the first flow that pays a nation (Sprint D4, 2026-08-20)
+
+> **The nation half of this lives in [`docs/politics/NATIONS.md`](../politics/NATIONS.md)** — what a
+> treasury is, who may author a law, and why no tariff is reachable in a played game today (NR-400).
+> This section owns the **clearing-tick half**: how the duty is charged when a trade matches.
 
 A market has always resolved to a jurisdiction: `market_component::centre_tile` through
 `world::tile_to_nation`. The hook existed and nothing read it, because no sale in this economy had

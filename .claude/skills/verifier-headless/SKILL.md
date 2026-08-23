@@ -443,24 +443,43 @@ in `tools/verify/README.md`.
   silently measures the old economy. S4 asserts the census is identical across two generations of one
   seed; S0–S3 report and assert nothing about the finding.
 
-- **`history_conquest_gap`** — WHY the Era −1 sim fights and never conquers (BL-384, 2026-08-21).
-  **Report-only by design**, and the model to copy when a harness's job is to EXPLAIN a red rather
-  than to add another one: `history_sim_harness`'s B384a/B384b already assert that a region changes
-  hands by war, so this one asserts nothing about the gap and instruments it instead. It reads
-  `history_sim_state::battle_traces`, populated only under `history_sim_params::trace_battles`.
+- **`history_conquest_gap`** — WHY the Era −1 sim fights and never conquers (BL-384), measured on
+  **the era generation actually runs** (BL-462, 2026-08-23). Takes an optional sweep width:
+  `history_conquest_gap 32`. Instruments rather than re-asserts — `history_sim_harness`'s
+  B384a/B384b already assert that a region changes hands by war — but it is **no longer
+  report-only**: it now carries the acceptance test for BL-462.
 
-  It is built to REFUTE its own hypothesis, which is what it did. BL-384's design named a specific
-  mechanism — the scorer estimating odds with no terrain term while the resolver applies one — and
-  the harness separates that from two rival explanations (the scored hub differing from the levying
-  hub; the fight being won but the transfer bar never cleared) so a reading cannot be mistaken for
-  a guess. Measured over 8 worlds: the scorer is calibrated to −0.0pp, hub mismatch is 0/1226, and
-  99.8% of victories convert — all three mechanisms refuted. What it found instead is that **2 of 8
-  worlds fight no war at all** while the rest conquer heavily.
+  **Read this before trusting any number it prints.** Until 2026-08-23 this harness, like every
+  other Era −1 check, took `history_sim_params`'s struct default: a 4000 BCE → 0 CE span on a
+  six-band clock, null creeds, the bare world seed, no works, and the report's POST-sim settlement.
+  Generation runs 400 years on one 4-year band with real creeds and a folded seed. **Six
+  divergences, so every earlier finding described a sim the game does not run** — including "2 of 8
+  worlds fight nothing" and its n=32 restatement. All six are closed by
+  `world/era_minus_one.hpp`: the derivations live in one place that `make_hard_coded_world` calls,
+  and everything a caller cannot re-derive is captured at generation's own call site into
+  `era_minus_one_fixture`. The harness hands those values straight back and constructs nothing.
 
-  Its own two assertions are about the INSTRUMENT, not the finding: T1 that tracing is inert (a
-  traced run matches an untraced one in every other output — an instrument that perturbs what it
-  measures is worse than none), and T2 that it caught something. Runs ~8 real 0→1960 sims; budget
-  several minutes.
+  **A1 is the row that makes the rest mean anything**: for every swept seed the re-run's
+  battles/conquests/foundings must equal `generation_report::prehistory_*` from the same
+  generation, bit for bit. Green at 32/32. Red would mean no other number applies. R1 (the fork is
+  answered for every seed), R2 (the classification comes from counters, never from a battle set),
+  R3 (the pinned 8-seed table — re-pinned 2026-08-23, old values kept in the source comment) and
+  R4 (tracing is inert AND gated) sit under it.
+
+  **THE ONE REMAINING GAP, printed as a banner on every run:** `scripts/works.lua` is Lua-authored
+  and a headless harness cannot load it, so `build_work` is gated out and the run scores **four**
+  verbs where the shipped game scores five. Both sides of A1 pass the same null registry, so A1
+  stays exact — but any statement it makes about what beats Campaign is about a four-verb contest.
+  It was deliberately not closed by transcribing works.lua into C++, which would put the roster in
+  two places and rebuild BL-462's own failure mode one layer down.
+
+  What it finds on the real fixture at n=32: **11 of 32 worlds fight nothing** (not 17 of 32);
+  every one of those clears the campaign threshold and loses the argmax on every round, so the
+  fork's durable answer survives; **Settle takes 83–100% of the rounds Campaign loses** on every
+  world; and neither ceiling-vs-floor (32/32 overlap) nor score level separates a silent world from
+  a fighting one. BL-384's three original mechanisms stay refuted: hub mismatch 0/2503, 92.7% of
+  victories convert. Runs `2 × n` real 400-year sims plus `n` generations; ~28 s at n=8, ~7 min at
+  n=32.
 
 - **`interdiction_harness`** — Can a supply line be cut? (BL-458, Sprint C3, 2026-08-21.) The
   item-spanning check for the mechanic that makes a convoy a military object: a hostile unit
@@ -518,6 +537,101 @@ in `tools/verify/README.md`.
   Registered as a **`sweep`** (needs `IO_RUN_SWEEPS=1`): ~1.0 s/world at `/O2` but ~62 s/world in
   Debug, so the three-seed default is ~186 s in a Debug tree — inside 25% of the long tier, the
   flaky-by-luck margin BL-288 re-tiered the suite to remove. `substrate_census.exe [seeds]`.
+
+- **`value_anchor`** — Does the content honour Ben's value anchor? (BL-543, Sprint N1, 2026-08-22;
+  reworked 2026-08-23.) Ben's sentence — *"a unit's annual equipment costs about twice their annual
+  salary"* — is the only thing in the project anchoring military value to money, and nothing checked
+  it because nothing could: both halves of BL-454's upkeep vector ship at zero. So this is **the
+  argument for what the rates should be, not a gate on what they are.** It authors no rate; it reads
+  `scripts/economy.lua`'s `unit_upkeep`, `scripts/world_gen.lua`'s `base_price` and
+  `scripts/recipes.lua`'s baskets out of the Lua *text* (the Lua TUs are the excluded set here) and
+  states the identity they must satisfy, at **base prices** and at **authoring time** — both
+  narrowings Ben's.
+
+  **R3 IS A BRANCH, NOT AN ASSERTION, and that is the point of it.** The first cut hard-asserted the
+  shipped rates were zero, so it would have gone RED on the one day it exists for. The adversarial
+  pass authored the harness's own solved fixture into `economy.lua` and got exit 1 *with the anchor
+  satisfied and all 19 rows in band.* It now asks which state the content is in and asserts the
+  invariant belonging to that state — inert: nothing is drawn at any scale; authored: R1's band is a
+  claim about shipped content. Verified in both directions.
+
+  **It is scale-invariant and says so (R6).** Multiply all 33 base prices by ten and every row stays
+  green — because the anchor is a *ratio*. That was a silent false green; it is now an asserted
+  property, paired with the row that does bind an absolute price: ordnance's markup over its own
+  recipe basket, against the five Advanced-Fabrication peers `recipes.lua` id 27 says it was derived
+  from (1.415–1.443; ordnance 1.433). Tripling steel alone drops it out of the band.
+
+  **Run from the repo root** — it refuses to run without the authored Lua rather than measure a
+  default. Links `combat.cpp`, `law.cpp`, `unit_roster.cpp`, `world.cpp`. 22 assertions.
+
+- **`nation_budget_harness`** — The national budget's spend side (BL-537, Sprint N1, 2026-08-22;
+  fixed and re-verified 2026-08-23). Exercises `run_national_budget` against the three rules in
+  `nation_budget.hpp`: every credit out is a direct transfer to a named corporation, nations save,
+  and a nation is never overdrawn.
+
+  **RUN IT UNDER AddressSanitizer AS WELL AS PLAIN.** R4f is a *memory* row — a claim naming a line
+  outside `budget_priority` (whose underlying type is `uint8_t`, so 0..255 are valid values while
+  only 0..8 index the weight vector) was an out-of-bounds write, and an out-of-bounds write is not
+  something a value assertion can see. The unfixed pass scores 34/34 on a plain build and aborts at
+  `nation_budget.cpp:62` the moment ASan is on. Build it with
+  `-fsanitize=address,undefined` and treat the clean run as part of the pass.
+
+  Two of its rows are **generated rather than authored** (R4g/R4h): 512 seeded shapes, varying
+  nation and corp counts, treasuries, reserves, weight sets and claim volumes. Measured against the
+  pre-fix pass they catch 156 overdraws and 26 solvent treasuries driven negative — none of which
+  the authored fixtures could reach, because the bound only fails once enough claims land on enough
+  lines. The generator is a fixed-order xorshift: pure, replayable, part of the check and not of the
+  simulation.
+
+  Its dyadic reference fixture proves the *arithmetic*; `make_awkward_fixture` (non-dyadic weights,
+  awkward reserve, off-grid prices) proves the arithmetic is not what was making the reference
+  fixture pass. Links `world.cpp`, `nation_budget.cpp`. 36 assertions.
+
+- **`sentiment_harness`** — The sentiment substrate (BL-545, Sprint N1, 2026-08-22; one row rebuilt
+  2026-08-23). Checks `sentiment.{hpp,cpp}` against the stance invariant (*sentiment informs a
+  declaration and may never make one*), directedness, decay with no floor, two independent
+  dimensions, inertness at authored zero, determinism and the flat-binary round trip.
+
+  R1's strongest form is **structural and cannot be printed**: `sentiment.cpp` is never handed a
+  `world&`, so it has no reach to a stance table at all. The harness asserts it anyway — a
+  structural argument nobody checks is one refactor away from being false.
+
+  **The order-independence rows run on `dense_stream`, not `wide_stream`, and that distinction is
+  the whole row.** `wide_stream` emits exactly one event per ordered pair, so nothing accumulates,
+  so no order can matter: the adversarial pass deleted `std::stable_sort` from `sentiment.cpp:159`
+  and all 39 rows still passed. `dense_stream` puts five events on every key and drives the pair to
+  the saturation limit, which makes the fold order-*sensitive* by two whole points rather than by a
+  low bit. Verified by mutation: without the sort, R6d–R6f fail. Links `world.cpp`, `sentiment.cpp`,
+  `stance.cpp`. 41 assertions.
+
+- **`nation_scorer_harness`** — What a nation CARES ABOUT (BL-542, the requirement group
+  `nation-scorer`). `run_national_budget` consumes a weight vector and nothing authored one;
+  `src/world/nation_ai.{hpp,cpp}` authors it, and this is the check on the three terms — **niche
+  fit**, **conflict avoidance**, and **grudges that bias the first two and target nothing**.
+  Because it is the first use anyone has made of the 2026-08-18 nation grant, the rows that
+  matter most are the grant's own terms: R1 asserts the sweep is pure and produces bit-identical
+  weights across 11 distinct `w.units` walk orders and a reordered `w.nations`; R2 asserts the
+  cadence is an index over the **sorted** nation set, so a nation admitted with the highest id
+  shifts nobody's slot; R6 asserts the **terrestrial horizon** — a nation sharing no border is
+  outside it, each row paired with a control proving the same mutation on a real neighbour DOES
+  move the subject.
+
+  **Read R7 before trusting a green run.** It is the anti-vacuity block, and it earned its place
+  twice while this harness was being written: the border-force table was six units, whose sums
+  agree across almost every ordering, so the unit sort could be deleted with the suite still at
+  100%; and the scale-invariance row used an abundance mass that drove the mutant straight onto
+  its clamp, so it passed while the property was broken. R7 now asserts the fixture really
+  constrains the code — the terms sit strictly inside (0, 1), two nations differ, and the float
+  sum R1 guards is order-sensitive under two reorderings. **Every row was confirmed by mutation**
+  (14 of them: the sorts deleted, the share normalisation removed, the `lack` sign flipped, the
+  hostility read dropped, the deterrence divisor dropped, the grudge made additive and then given
+  a line of its own, the horizon widened to every nation, purity broken with a `const_cast`).
+
+  Nothing in the shipped tick calls the scorer, so this harness is the only caller and a world
+  runs bit-identical without it. **Run it under ASan/UBSan as well as plain** — the raster walk
+  and the six-side neighbour probe index raw vectors, and a wrap or bounds slip there is
+  invisible to a value assertion:
+  `g++ -std=c++20 -O0 -g -fsanitize=address,undefined -Isrc tools/verify/nation_scorer_harness.cpp ...`.
 
 ## Running the whole suite (CTest — BL-104)
 

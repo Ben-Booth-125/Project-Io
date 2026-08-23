@@ -534,6 +534,10 @@ This is the most load-bearing military decision taken so far. It is BL-325's (mi
 supply) ruling 3, Ben's own words on 2026-08-08: *"a nation's reach for economy is also the
 military reach."*
 
+> **The network itself is owned by [`../economy/LOGISTICS.md`](../economy/LOGISTICS.md)** since
+> 2026-08-22 — traversal cost, the reach field, roads, physical scale and travel time, and the
+> designed Logistic Points layer. This section owns the *military reading* of that one ruling.
+
 **There is deliberately no second reach field.** The proposed parallel base-anchored supply
 envelope was overridden. `body_reach_field` — the existing economic logistics network — *is* the
 military supply envelope.
@@ -608,7 +612,7 @@ it is a fresh field with its behaviour filed in the same change.
 This list is the reason this document cannot be read as describing a finished system. Everything
 below is a real gap with a named owner.
 
-- ~~**No hostility model.**~~ — *landed 2026-08-19 (BL-448, BL-449). `src/world/stance.{hpp,cpp}` gives every corp pair a directed hostility state and a symmetric friendship state (`corp_hostile_pairs`, `corp_friend_pairs`, a pending `corp_friend_offers` table), reached through four `corp_command` verbs (`declare_hostile`, `offer_friendship`, `accept_friendship`, `return_to_neutral`) and a Corporation panel Stance column, gated on ordinary BL-068 competitor-visibility (NR-350: a declaration stays silent, discovered on contact rather than announced). Landing the substrate is deliberate and still carries* **no consequence** *— stance gates nothing yet. What hostility permits is BL-315 (armed house conflict spine, still absent, see below); what friendship permits is a later call. No serialiser exists for it either (see `src/world/serialization.cpp` — the file does not exist anywhere in the repo; NR-349), so stance does not yet survive a save.*
+- ~~**No hostility model.**~~ — *landed 2026-08-19 (BL-448, BL-449). `src/world/stance.{hpp,cpp}` gives every corp pair a directed hostility state and a symmetric friendship state (`corp_hostile_pairs`, `corp_friend_pairs`, a pending `corp_friend_offers` table), reached through four `corp_command` verbs (`declare_hostile`, `offer_friendship`, `accept_friendship`, `return_to_neutral`) and a Corporation panel Stance column, gated on ordinary BL-068 competitor-visibility (NR-350: a declaration stays silent, discovered on contact rather than announced). Landing the substrate was deliberate and carried* **no consequence** *at the time — but that line is now stale: as of 2026-08-21 hostility gates* **three** *things — interdiction (`supply_system.cpp`, BL-458), battle engagement (`battle_system.cpp`, BL-467) and the march queue (`economy_system.cpp`, BL-470/NR-344). What* **friendship** *permits is still a later call, and still nothing. No serialiser exists either (see `src/world/serialization.cpp` — the file does not exist anywhere in the repo; NR-349), so stance does not survive a save.* **Authority since 2026-08-22: [`docs/politics/RELATIONS.md`](../politics/RELATIONS.md)** *owns the relational layer as a whole — stance, reputation, embargo and standing, and which question each answers. This document owns what hostility permits* militarily.
 - ~~**No unit-subject verbs.**~~ — *landed 2026-08-19 (BL-470, unit march seam). `march_unit`/`halt_unit`/`disband_unit` extend `corp_command`; a unit can now be marched (path, across ticks, on the shared traversal-cost metric), halted, or disbanded. Merge/split and garrison/scout stay absent — BL-472 (formations) owns them.*
 - ~~**No engagement trigger.**~~ **BUILT 2026-08-21 (BL-467).** `src/world/battle_system.cpp` is
   both the trigger and the step: a battle opens when two corps' units stand in the same province

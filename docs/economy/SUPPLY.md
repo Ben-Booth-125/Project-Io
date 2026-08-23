@@ -1,5 +1,18 @@
 # Project Io — Supply (Layer 5)
 
+> **Scope narrowed 2026-08-22.** This document owns the **flow**: the convoy — its cargo, dispatch,
+> cost, travel and arrival. **[`LOGISTICS.md`](LOGISTICS.md) owns the network it runs on** — traversal
+> cost, A\*, the reach field, roads, physical scale, cache invalidation, interdiction, and the
+> designed Logistic Points layer. *Logistics is the road; Supply is the traffic.* Where the two
+> overlap (travel time, logistical cost), this document keeps the convoy-facing statement and
+> LOGISTICS.md keeps the network-facing one.
+>
+> **One correction carried in from BL-464 (logistic points):** § Infrastructure gates below lists
+> **per-node throughput capacity** as *out of prototype scope*. **Ben overturned that on
+> 2026-08-18** — *"Let's begin codifying Logistic Points in this sprint."* Under the newest-dated-wins
+> rule the exclusion is superseded; it is left in place below because the work has not landed, and
+> is flagged here so a reader does not act on it.
+
 Layer 5 of the economy is the **logistics / convoy layer** — the mechanism that physically moves goods between markets and bodies, coupling otherwise-isolated price pools through cargo movement. A convoy is the unit of flow; there is no abstract price-coupling term between bodies: the convoy *is* the coupling. BL-039 (supply convoys) landed as v0.0.7's theme and is **complete**, so this document is now the authority for the shipped layer (§ Build status for the landed/outstanding split, updated 2026-07-31).
 
 ---

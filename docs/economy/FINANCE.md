@@ -76,6 +76,10 @@ Check: `tools/verify/unit_upkeep.cpp`.
 
 ## Levies — the law enforcement seam (BL-343)
 
+> **The law itself is owned by [`docs/politics/NATIONS.md`](../politics/NATIONS.md)** — the record,
+> its author, its jurisdiction, and the four-family effect taxonomy. This section owns the
+> **accounting half**: where the levy lands in `apply_budget`'s flows and how the player sees it.
+
 This is where a **law** touches money, and the rule that governs it is one sentence:
 *a law is a modifier over the market, never an override of it.* The extraction levy
 (BL-155's law #1) is a per-unit charge on raw output, so it applies where the flow is

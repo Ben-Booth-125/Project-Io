@@ -7,11 +7,32 @@
 // ---------------------------------------------------------------------------
 // The condition side of the meta layer has one shared object (BL-342's
 // `condition_set`, read by laws, techs and quests alike). This header is the
-// EFFECT side's counterpart: the closed list of scalars a tech (BL-479) or a
-// law (BL-480) may move, plus the one pure function that applies a modifier to
-// a value. Authored once and shared — tech and law naming different subject
-// enums would be the same defect as tech and law wording the same predicate
-// differently, which is exactly what condition_set exists to prevent.
+// EFFECT side's counterpart: the closed list of SIMULATION SCALARS a meta
+// effect may move, plus the one pure function that applies a modifier to a
+// value.
+//
+// CORRECTED 2026-08-22 (Ben's ruling, design register). This comment used to
+// say the list was "the scalars a tech (BL-479) OR A LAW (BL-480) may move…
+// authored once and shared". BL-480 landed `law_effect_kind` as its own enum
+// and law.{hpp,cpp} never includes this header, so the claim was false — and a
+// header that misdescribes the shape a future author is extending is the same
+// class of defect as tech_node::condition being a descriptive string.
+//
+// THE EFFECT SIDE IS TWO FAMILIES, DELIBERATELY:
+//
+//   * SCALAR effects (this file). A subject here names one scalar the
+//     simulation already computes, and a modifier moves it. Read by tech
+//     (tech_gate.hpp's effect union) and by world::modified_scalar.
+//   * MONEY-FLOW effects (law.hpp's `law_effect_kind`). A levy or a tariff is
+//     a TRANSFER between two balances, not a scalar the simulation computes —
+//     there is no subject here it could be expressed as, and inventing one
+//     would distort this vocabulary rather than share it.
+//
+// The one-vocabulary rule still binds WITHIN each family: two effects of the
+// same kind must not name different subject enums. Across the two families it
+// does not apply, because they are not the same kind of thing.
+//
+// Authority: docs/META_LAYER.md § The asymmetry.
 //
 // Three properties are load-bearing, mirroring condition_set's:
 //
@@ -45,15 +66,26 @@ enum class modifier_subject : uint8_t
                          ///  applied per-corp in `extraction_nominal`
                          ///  (economy_system.cpp), the single definition of one
                          ///  site's nominal draw.
-    processing_yield,    ///< Output units per recipe batch. Vocabulary only.
-    unit_upkeep,         ///< A unit's per-tick upkeep draw (BL-454). Vocabulary only.
-    logistics_cost,      ///< Per-unit haulage on the reach/convoy network. Vocabulary only.
-    wage_floor,          ///< The wage term of building opex (BL-049). Vocabulary only.
+    // BEN'S RULE, 2026-08-22: an unwired subject must NAME THE ITEM THAT WILL
+    // WIRE IT. Vocabulary-only is a PROMISE, not a state — "a shape is only
+    // proven by an instance" justifies the first unwired entry and does not
+    // justify the fifth. A subject that cannot name an item has not earned its
+    // row, and should be removed rather than left waiting.
+    processing_yield,    ///< Output units per recipe batch. Wired by: BL-513 (denser
+                         ///  facilities raise the province ceiling's effective cap).
+    unit_upkeep,         ///< A unit's per-tick upkeep draw (BL-454). Wired by: BL-543
+                         ///  (the value anchor turns the authored rates on).
+    logistics_cost,      ///< Per-unit haulage on the reach/convoy network. Wired by:
+                         ///  BL-464 (logistic points — active LP resolution costs credits).
+    wage_floor,          ///< The wage term of building opex (BL-049). Wired by: BL-538
+                         ///  (the schooling budget line raises labour productivity).
     collapse_strain,     ///< The era's collapse pressure (BL-477): the ancient
                          ///  era's imperial strain (the Fall arc's accumulator),
-                         ///  the industrial era's rupture proximity. The
-                         ///  strain/cohesion-adjacent subject the era-collapse
-                         ///  paradigm requires expressible. Vocabulary only.
+                         ///  the industrial era's rupture proximity. Wired by:
+                         ///  BL-477, which keeps the ACCUMULATOR — Ben ruled
+                         ///  2026-08-22 that events EXPRESS the collapse metagame
+                         ///  rather than driving it, so BL-548 reads this subject
+                         ///  and does not own it.
 };
 
 /// How a modifier combines with the value it moves. The three ops the BL-479

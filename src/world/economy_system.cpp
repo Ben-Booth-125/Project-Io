@@ -756,6 +756,22 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
 {
     economy_report report;
 
+    // BL-545/BL-546: one tick of the relational substrate's DECAY half, before
+    // anything this tick can observe. `run_sentiment_step` is decay-then-fold
+    // and the fold half is spread across this tick's writers (a contract
+    // completing below, a cancellation arriving through corp_command), so the
+    // two halves are split here rather than called together — the ORDER is the
+    // contract, and this preserves it: conduct that happens this tick is worth
+    // exactly what it was authored to be worth, not that minus one forgetting.
+    //
+    // THIS LINE IS BL-391's FIX. A quantity that decays has no permanent floor,
+    // so the procurement reputation deadlock — below the floor, refused a quote,
+    // and no mechanic anywhere able to move the number back — has nowhere left
+    // to live. It is a no-op until `economy.sentiment` authors a decay rate
+    // (decay_sentiment returns without visiting a row), which is what keeps an
+    // unauthored build byte-identical to the pre-migration one.
+    decay_sentiment(w.sentiment, reg.sentiment());
+
     // Build-time pacing (playtest 2026-07-06 → BL-095): advance every building's
     // construction before anything else runs, so a building finishing this tick is
     // already eligible for production/workforce demand below. BL-095 replaces the
@@ -862,7 +878,14 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 }
                 const entity_id land_on = (c.delivery_body != null_entity) ? c.delivery_body : c.body;
                 w.pool_for(c.buyer, land_on).quantities[ri] += c.quantity;
-                w.corp_reputation[{c.buyer, c.supplier}] += pp.reputation_on_complete;
+                // BL-546: one `contract_completed` occurrence folded into the
+                // relational substrate, at the weight economy.lua authors
+                // (seeded from `reputation_on_complete`, so the magnitude is
+                // unchanged by the migration). The walk is ascending contract
+                // id, so the fold order is the same deterministic order the
+                // instalments above were paid in.
+                w.note_conduct(reg.sentiment(), c.buyer, c.supplier,
+                               sentiment_factor_kind::contract_completed);
                 completed.push_back(i);
             }
         }

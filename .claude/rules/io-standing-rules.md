@@ -91,6 +91,18 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   Reason for the grant: three of the four systems Ben's 2026-08-18 brief names — international
   trade, logistics and diplomacy — are nation-grain, and `GENERATION_STRATEGY.md`'s economic
   premise already assumes nations that act. See `docs/development/SPRINTS.md` § Sprints 26–33.
+  **A rival acting POLITICALLY against the player's corp is granted (Ben, 2026-08-22,
+  answering the design register), on the same terms as BL-450.** This is the newest widening
+  and the one whose subject is furthest from the original prohibition: a rival may **lobby**
+  a nation to shift its budget weights or its law (BL-539), and a nation's derived stance may
+  **gate the player's corp** out of a territory (BL-540) — both being consequences imposed on
+  a corp a human owns by an actor the player does not control. Same constraints, unchanged:
+  deterministic, seeded, scored-utility, legal verbs only, never a planner. It was raised
+  rather than assumed (NR-517) precisely because reading the 2026-08-18 nation grant as
+  already covering it would have set the quiet precedent this section exists to prevent.
+  What it does **not** admit: a rival *enacting* law (only a nation can), or influence
+  acquired outside the `lobby` verb.
+
   **A rival scoring STANCE toward the player's corp is a separate, corp-grain widening
   (BL-450, rivals score stance) and is GRANTED on the same terms and date.** It is called out
   separately because every other widening above is dated and scoped, and because its subject is

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "components.hpp"
+#include "sentiment.hpp"   // BL-545/BL-546: sentiment_params — the authored factor table
 #include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
 
 #include <array>
@@ -449,6 +450,37 @@ struct procurement_params
     float offbody_freight_fraction = 0.05f;
 };
 
+/// BL-546: THE TWO PROCUREMENT RATES ARE TWO SENTIMENT FACTOR WEIGHTS.
+///
+/// Reputation stopped being its own store (`world::corp_reputation`) and became
+/// the TRUST dimension of sentiment at (buyer, supplier) grain. Nothing about
+/// the two rates' MEANING changed with it — a completed contract still raises
+/// the axis by `reputation_on_complete`, a cancelled one still lowers it by
+/// `reputation_on_cancel`. This function is where that is guaranteed once,
+/// rather than restated at each writer: whatever `procurement` authors, the two
+/// Trust weights follow it.
+///
+/// It is also what makes the migration work WITHOUT a Lua edit. `sentiment_params`
+/// defaults every weight to zero — BL-545's inertness rule, which must stay true
+/// of the substrate itself — so unseeded, a build that had not yet authored
+/// `economy.sentiment` would have silently stopped moving reputation at all.
+/// `scripts/economy.lua`'s own `sentiment.factors` rows are applied AFTER this
+/// (recipe_registry.cpp) and win where they name a row.
+///
+/// ACCESS IS DELIBERATELY UNTOUCHED. Procurement conduct says nothing about
+/// whether the observer would LET the subject operate; that dimension belongs to
+/// BL-540, and seeding it here would invent a meaning the rates never had.
+///
+/// @param sp Sentiment parameters to seed, mutated in place.
+/// @param pp The authored procurement rates.
+inline void seed_procurement_sentiment(sentiment_params& sp, const procurement_params& pp)
+{
+    sp.factors[static_cast<std::size_t>(sentiment_factor_kind::contract_completed)].trust =
+        pp.reputation_on_complete;
+    sp.factors[static_cast<std::size_t>(sentiment_factor_kind::contract_cancelled)].trust =
+        pp.reputation_on_cancel;
+}
+
 /// Player road-placement cost for a single tier (BL-147 core, BL-172 ladder), authored in
 /// scripts/economy.lua under `economy.roads.{track,road,highway}`. A placed road tile costs a
 /// flat credit sum plus per-resource materials bought from the local market — the same cost
@@ -565,6 +597,12 @@ public:
 
     /// BL-350 procurement/contract tunables (economy.procurement in Lua).
     const procurement_params& procurement() const { return m_procurement; }
+
+    /// BL-545/BL-546 relational substrate tunables (economy.sentiment in Lua):
+    /// the authored factor table plus the per-dimension decay rates. The two
+    /// `contract_*` Trust weights are seeded from `procurement()` and overridden
+    /// by Lua — see `seed_procurement_sentiment`.
+    const sentiment_params& sentiment() const { return m_sentiment; }
 
     /// BL-430 player-facing recipe-switch cost/cooldown (economy.recipe_switch in Lua).
     const recipe_switch_params& recipe_switch() const { return m_recipe_switch; }
@@ -742,7 +780,19 @@ public:
     void set_market_emergence(const market_emergence_params& m) { m_market_emergence = m; }
     void set_construction(const construction_params& c) { m_construction = c; }
     void set_military(const military_capability_params& m) { m_military = m; }
-    void set_procurement(const procurement_params& p) { m_procurement = p; }
+    /// BL-546: seeds the two `contract_*` Trust weights from @p p in the same
+    /// call, so a harness that sets a procurement rate never gets a registry
+    /// whose sentiment table disagrees with it.
+    void set_procurement(const procurement_params& p)
+    {
+        m_procurement = p;
+        seed_procurement_sentiment(m_sentiment, p);
+    }
+
+    /// Full control of the substrate's tunables (decay, epsilon, limit, every
+    /// factor row). Call AFTER `set_procurement` — that one re-seeds the two
+    /// `contract_*` Trust weights and would otherwise overwrite these.
+    void set_sentiment(const sentiment_params& p) { m_sentiment = p; }
     void set_recipe_switch(const recipe_switch_params& p) { m_recipe_switch = p; }
     void set_economics(building_type type, const building_economics& e)
     {
@@ -918,6 +968,17 @@ private:
 
     /// BL-350 procurement tunables. Defaults match economy.lua.
     procurement_params m_procurement = {};
+
+    /// BL-545/BL-546 relational substrate tunables. Decay defaults to ZERO —
+    /// the substrate is inert until `economy.sentiment` authors a rate, so a
+    /// build that never authors it replays bit-identically — but the two
+    /// `contract_*` Trust weights are seeded from the procurement defaults, or
+    /// the migration would have silently stopped moving reputation.
+    sentiment_params m_sentiment = [] {
+        sentiment_params sp;
+        seed_procurement_sentiment(sp, procurement_params{});
+        return sp;
+    }();
 
     /// BL-430 recipe-switch cost/cooldown. Defaults to free/instant so a
     /// hand-built harness registry that never sets this behaves as it always did.

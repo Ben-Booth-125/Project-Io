@@ -1,11 +1,78 @@
 # Project Io — REFINED (active worklist)
 
-**Empty between work blocks.** Sprints P1, C3, B2 and B3 closed 2026-08-21.
-**Sprint 28 (Lane A) is now active, re-scoped on measurement.**
+**Empty between work blocks.** Sprints P1, C3, B2 and B3 closed 2026-08-21; **N1 closed 2026-08-23**.
+**Sprint N2 is active** — three lanes in parallel worktrees, one of them Sprint 28 (Lane A)'s
+measurement half. See § Sprint N2 below.
+
+---
+
+## Sprint N2 — "the spines move" (opened 2026-08-23, three lanes in parallel worktrees)
+
+N1 landed two spines and a check, **all three inert**. An inert subsystem with no caller is the
+`military_points` defect with a new name, so N2 gives each one a consumer — and measures the one
+thing Lane A cannot fix until it is measured.
+
+| Lane | Item | Result |
+|---|---|---|
+| **N2-a** | BL-542 (nation scorer) | **MERGED** `02d2b64` — 60/60, req group `nation-scorer` R1–R8 complete |
+| **N2-b** | BL-546 (reputation → sentiment) + BL-391 through it | **MERGED** `983abad` — 66 PASS, `reputation-becomes-sentiment` R1–R4 complete |
+| **N2-c** | Sprint 28 Lane A, T1+T2 — verb-competition **measurement** | **MERGED** `e17d6a7` — 4/4, `verb-competition-measurement` R1–R4 complete |
+
+**All three merged and re-verified on the integrated tree**, not on their branches:
+`nation_scorer_harness` 60/60, `nation_budget_harness` 36/36, `sentiment_harness` 41/41,
+`value_anchor` 22/22, `procurement_harness` 66 PASS, `save_roundtrip` OK, `econ_harness`,
+`money_conservation`, `world_determinism`, `history_conquest_gap` 4/4 — plus zero ASan/UBSan
+diagnostics across four harnesses and warning-clean at `-Wall -Wextra`.
+
+**Two lane reports did not survive verification, and both are recorded rather than acted on.** A
+claimed layout-sensitive determinism violation in spectate does not reproduce on four clean trees
+(NR-551) — the likely cause, a stale object in a rebuilt archive, bit a sibling lane in the same
+run, so **delete `obj/` before a rebuild whose point is a comparison**. And the ceiling-vs-floor
+statistic folded Campaign's *winning* scores into the ceiling, conditioning it on the outcome it
+explains; re-derived over lost rounds only it changes one cell in eight and no verdict, and the
+merge took the honest form.
+
+### Lane N2-c: the interpretation was refuted, the instrument was fixed, and the era re-measured
+
+The sequence is worth keeping because it took three passes to get one true number.
+
+1. **n=8 said** two of eight worlds fight nothing, and Campaign's score ceiling sits below the
+   winner's floor on exactly those two.
+2. **n=32 refuted the separation** — 3 of 17 silent seeds disjoint, 14 overlapping, worst by 142.
+3. **BL-462 refuted the fixture itself.** Six divergences from `hard_coded_world.cpp`'s own
+   invocation; the harness was measuring a 4000-year six-band run with no creeds and no works on an
+   already-simulated settlement. Both earlier readings were about a sim the game does not run.
+
+**The corrected era, verified on an independent rebuild** (acceptance test: the harness's re-run
+reproduces `generation_report::prehistory_*` bit-equal on 32 of 32 seeds):
+
+| | corrected |
+|---|---|
+| worlds that fight nothing | **11 of 32 (34%)** |
+| BL-384's premise | **dead** — 2,503 battles → 1,789 conquests (71.5%); no seed fights and takes nothing |
+| the fork's answer | **survives** — all 11 silent worlds clear the threshold and lose every round |
+| ceiling-vs-floor | **32 of 32 overlap**, none disjoint |
+| score level | silent 275–439 (med 348) vs fighting 350–531 (med 405) — 15 of 21 fighting seeds inside the silent range: a shift, not a separation |
+
+**Nothing yet separates silent worlds from fighting ones.** Six candidates tested and refuted. The
+one thing true of every world: **Settle takes 83–100% of the rounds Campaign loses**, silent and
+fighting alike. So the open question is the *per-round joint behaviour* — whether Campaign's good
+rounds ever coincide with Settle's bad ones — and `verb_contest_trace` already carries `year` and
+`polity` for it. NR-554 carries the ruling.
+
+**Still open, and it bounds every finding above:** `build_work` cannot enter the contest headlessly,
+because `works.lua` cannot be loaded without Lua and transcribing it would be BL-462's own failure
+mode one layer down. Every run prints a banner: **four verbs, where the shipped game scores five**
+(NR-558). Two harness fixes landed alongside — the sweep width is decoupled from the pinned table,
+and R3 pins only the seeds it covers.
 
 ---
 
 ## Sprint 28 — "growth stops extinguishing war" (Lane A)
+
+> **T1 and T2 are running now as Sprint N2's lane c.** The section below is the full argument and
+> stays here as the reason; T3 (the fix) is deliberately unwritten until T1/T2 report, and T4 is
+> untouched.
 
 ### Why it is re-scoped before a line is written
 
@@ -216,6 +283,91 @@ whatever got built.
   constraint to a grain where firms actually compete.
 - **NR-415** — where does the per-lens reduction table live, and does every future
   lens inherit the obligation?
+
+
+---
+
+# Sprint N1 — "The two spines, landed inert" (Lane N) — opened 2026-08-22
+
+**Why now.** This session designed the whole corp↔nation channel and settled 41 open calls.
+**None of it exists in code.** This sprint lands the two spines the rest of v0.1.24 requires, plus
+one check.
+
+**The batch's single organising decision: everything lands INERT.** Authored rates at zero, so a
+world runs bit-identical to today. That is the pattern BL-343 (law), BL-480 (treasury) and BL-454
+(upkeep) all shipped under, and it is the only way to add two subsystems and a check without moving
+a single golden — which matters more than usual here, because the economy benchmark is *already*
+deliberately red (NR-269/271/272) and a change that moved it would be unattributable.
+
+## The build recipe — this container CAN verify (NR-264, re-proven 2026-08-22)
+
+`cmake` configure **fails**: SDL3 and Lua arrive by FetchContent and the network policy refuses the
+download, so no target is generated and every harness *looks* unbuildable. It is not.
+
+```
+ls src/world/*.cpp | grep -Ev '(recipe_registry|works_registry|tech_tree|world_gen_config)\.cpp$'
+g++ -std=c++20 -O1 -Isrc -c <each>          # 47 TUs, xargs -P8, ~17s
+ar rcs libioworld.a obj/*.o
+g++ -std=c++20 -O1 -Isrc tools/verify/<h>.cpp libioworld.a -o <h>   # ~5s
+```
+
+Re-verified this session: `law_author_harness` green at 14/14. **This is the answer to NR-392** —
+a worktree agent now has a sanctioned way to build a harness, and every agent brief carries it.
+New harnesses need **no CMakeLists edit**: `file(GLOB IO_VERIFY_HARNESSES tools/verify/*.cpp)`.
+
+## Sprint N1 — CLOSED 2026-08-23. All three landed; two were unsound and were fixed.
+
+Harnesses green at **36 / 41 / 22**, plain and under ASan+UBSan. Retro in `sprints.json` § N1.
+Defects fixed in the closing pass, each now guarded by a row that fails against the pre-fix code:
+an ASan-confirmed heap-buffer-overflow (`uint8_t`-backed enum indexing a 9-element array), an
+overdrawable spend bound (156 overdraws and 26 negative treasuries over 512 generated shapes), a
+check that went red on the day its subject was satisfied, a content claim that survived a ×10
+reprice, and an order-independence row that survived deleting the sort it guarded. Conservation's
+claim was narrowed rather than the code changed — NR-546.
+
+### N1-A — BL-543, the value anchor's CHECK *(no C++ struct change; cleanest slice)*
+- **A1** `tools/verify/value_anchor.cpp` — read `scripts/economy.lua` § `unit_upkeep` and
+  `scripts/world_gen.lua` § `base_price`; assert the band `Σ(goods × base_price) ≈ 2 × credits`
+  per roster class, within a stated tolerance.
+- **A2** The mutation row: perturb a rate in-harness and assert the check goes **red**.
+- **A3** Report the implied *units funded per year* for the seeded extraction levy, so NR-382 can
+  be answered against a number.
+- *Scope: `tools/verify/value_anchor.cpp` only. **Authors no rate** — the numbers wait on BL-544.*
+
+### N1-B — BL-545, the sentiment substrate
+- **B1** `src/world/sentiment.{hpp,cpp}` — a directed, continuous value per (observer, subject)
+  over **two dimensions** (Access, Trust), for corps and nations alike.
+- **B2** Storage on `world` + the decay/factor pass, authored in `economy.lua` at **zero**.
+- **B3** `tools/verify/sentiment_harness.cpp` — the six requirement rows, the **stance invariant**
+  first.
+- *Files: `src/world/sentiment.{hpp,cpp}` (new), `src/world/world.hpp` (hotspot — main session),
+  `scripts/economy.lua` (hotspot — main session), the harness.*
+
+### N1-C — BL-537, the national budget
+- **C1** `src/world/nation_budget.{hpp,cpp}` — weights over priority lines, `reserve_fraction`,
+  the per-tick spend pass.
+- **C2** The field on `nation_component`, and the hook in `apply_budget`.
+- **C3** `tools/verify/nation_budget_harness.cpp` — conservation first.
+- *Files: `src/world/nation_budget.{hpp,cpp}` (new), `src/world/components.hpp` (hotspot),
+  `src/world/budget_system.cpp` (hotspot), `scripts/economy.lua` (hotspot), the harness.*
+
+## Collision map — a splitting heuristic, not a gate
+
+| File | N1-A | N1-B | N1-C | Handling |
+|---|---|---|---|---|
+| `tools/verify/*` (3 new) | ✔ | ✔ | ✔ | disjoint — no collision |
+| `src/world/sentiment.*` | | ✔ | | new TU, slice-owned |
+| `src/world/nation_budget.*` | | | ✔ | new TU, slice-owned |
+| `src/world/world.hpp` | | ✔ | | **hotspot — main session** |
+| `src/world/components.hpp` | | | ✔ | **hotspot — main session** |
+| `src/world/budget_system.cpp` | | | ✔ | **hotspot — main session** |
+| `scripts/economy.lua` | reads | ✔ | ✔ | **hotspot — main session** |
+| `CMakeLists.txt` | | | | none — harnesses are glob-picked |
+
+**The call:** three worktree slices for the new TUs and harnesses; **every shared-header and
+`economy.lua` edit is done by the main session at integration.** That is the DELIVERY rule
+(hotspot/integration wiring stays in the main session) and it is what keeps two difficulty-5 items
+in one batch tractable.
 
 ---
 

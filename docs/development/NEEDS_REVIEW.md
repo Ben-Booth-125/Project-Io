@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*202 entries — 193 open, 9 resolved.*
+*260 entries — 225 open, 35 resolved.*
 
 ---
 
@@ -1137,20 +1137,10 @@ The item specified entity_id convoy_tile_at(const world&, const convoy_component
 ### NR-414 — Scope taken in Lane U: blackboard facts for unit province and order destination
 *Lane U (BL-511 seam half, march_unit to province), merged and verified 2026-08-21. · raised 2026-08-21 · from The agent added unit_province and unit_order_dest_province to corp_ai.cpp blackboard export, beyond the literal task. Reason given, and it holds: without them an agent over the wire reads its unit position as a TILE but must name its destination as a PROVINCE, so the word interface would be unusable - it could not describe the move it is being asked to make. Small, in the spirit of the ruling, and stated rather than slipped in. Confirm or revert.*
 
-### NR-415 — novel-work: the per-lens reduction table is a NEW STANDING DESIGN ARTIFACT nobody has agreed to
-*novel-work · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
-
-Province-grain rendering forces every lens to state how it reduces from tile to province - a blend, a sum, or a reasoned refusal. The agent decided all thirteen and wrote the table into PLANETARY.md. That table is the scope growth worth choosing deliberately: it is a CONTRACT every FUTURE lens now inherits, and neither LENSES.md nor PLANETARY.md previously had a slot for such a thing. Two calls for you. (1) Where does it live - LENSES.md has the better claim on lens-wide obligations, PLANETARY.md is where it landed. (2) Do you accept that adding a lens now means answering it? The refusals are the interesting content: Country and Continent refuse because the MEAN OF TWO NATION COLOURS IS A THIRD NATION COLOUR - a blended political map would draw borders that do not exist. Industry is the only computed reduction (a province sum, filled uniformly).
-
 ### NR-416 — BL-511 R1 is PARTIAL: the live click is owed, and the agent was right not to take it
 *observation · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
 
 The agent declined to drive your desktop unattended to satisfy the LIVE half of requirement R1, which was the correct call for a non-interactive sub-agent session. What it did instead is real coverage rather than a dodge: it added verify.mouse plus two-frame hover captures so the canvas OWN distance-to-hex-centre hit-test resolves a province from a cursor position, and the click handler consumes exactly that hovered_tile. The resolution path is proven; the PRESS is not. Per the 2026-08-19 standing rule a scripted capture does not prove a press is reachable, so R1 stays partial until someone clicks. The app is open on your machine now.
-
-### NR-417 — The map now mixes two visual languages, and the edge alpha is the one dial
-*question · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
-
-Blended provinces read as continuous painted ground; ocean and BUILT tiles stay crisp hexes by construction. In the integrated capture the result is a map that is soft in some regions and hard-edged in others, which may or may not be what you pictured. Also relevant: the first pass had province edges at alpha 70 and they were INVISIBLE - the map read as one field with no cells at all. The committed version is 105, with the stroke moved onto the blended vertices so two neighbours strokes coincide rather than sitting a pixel apart. Soft by design, since you ruled softened borders, with the crisp affordance being the on-demand selection outline. If the gradient reads too blurry at close zoom, edge alpha is the dial to move first and the blur radius second.
 
 ### NR-418 — Three small findings from the render work, all fixed or noted in place
 *observation · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
@@ -1166,11 +1156,6 @@ Blended provinces read as continuous painted ground; ocean and BUILT tiles stay 
 *observation · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
 
 k was pinned at 12.6468 as (pooled per-tile capacity / sustain units) aggregated over the world. Both sides are sums over TILES, so the prediction was that province size cannot move the aggregate. Measured after repartition: 12.5535, a 0.74% move, well inside the pre-existing 28.59% per-seed spread, with ceilings totalling 100.75% of pooled per-tile capacity. k was NOT adjusted. What did change completely is the per-province distribution: ceilings now run 1..262 per province against a previously narrow spread. Worth knowing if the ceiling ever starts to bind.
-
-### NR-421 — The per-province firm cap is inert by ORDERS OF MAGNITUDE, not by a near miss
-*question · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
-
-BL-512 per_province_firm_cap = 2 was measured as nearly inert against 4-tile provinces, and the hope was that 9-tile provinces would make the spatial half of the two-level firm budget do real work. It does not. Measured across 8 seeds after repartition: 296 background firms anchored across 295 DISTINCT provinces; the busiest province holds ONE firm on 7 of 8 seeds; exactly one province in the entire sweep reaches the cap of 2. The reason is structural, not a tuning miss - there are ~24-50 background firms per world against ~3,500 provinces. A per-province cap cannot bind at that ratio at any plausible value. So the two-level budget is really a one-level budget: the per-RESOURCE cap carries the entire result (it took every seed to its coverage target), and the per-province cap is decoration. Three options: drop it as dead weight, keep it as a bound that only matters once player density arrives, or move the spatial constraint to the grain where firms actually compete. It costs nothing today either way, which is why this is a question and not a defect.
 
 ### NR-422 — The march harness fixtures could not survive the repartition, and that is information
 *observation · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
@@ -1207,11 +1192,6 @@ I briefed the agent to append height to the tile record because 'the tile record
 
 BL-517's scope included exposing height to the Generation Ledger's field overlay, 'where it is already designed'. It is designed and not built: GENERATION_LEDGER.md's own status table reads 'Field lenses ... Partial substrate - the generation_record seam exists and is filled on demand; no lens built'. So there was nothing to expose it to, and no UI change was made (src/ui was outside the agent's file scope in any case). The retained field is exactly what such a lens would read without regenerating, so the item still paid for the lens - it just did not build it. Not a gap to fix now; a note so the scope line in BL-517 is not read later as unfinished work.
 
-### NR-433 — 12% of provinces are below the HARD 3-tile floor, and that needs your eye
-*question · raised 2026-08-21 · from BL-515 (organic province borders), merged and verified 2026-08-21.*
-
-Distribution against the 3x3 partition it replaces: 24,498 provinces (was 21,161), mean 7.87 (was 9.11), max 12 and now ABSOLUTE (was 18 overshoot), min 1, 74.71% in the 7-12 band (was 97.90%). The band drop is expected and was explicitly not chased - organic borders are supposed to be irregular. What I want your eye on is a different number: 6,195 provinces under 7, of which 3,008 are under 3 - i.e. roughly 12% sit below the HARD 3-12 target you set. You also ruled 'do not reject tiny provinces', so keeping them is correct per the ruling and the agent was right not to merge them away. But the two rulings pull against each other at this volume, and the visible consequence is in the alpha-220 capture: in places the map reads as a hex lattice again, because a 1-2 tile province is a hex with a border drawn round it. That is the look you moved away from. Options if it bothers you: raise the seed density so fewer pockets are enclosed, let a sub-floor pocket join a neighbour (a softer rule than the merge pass you removed), or accept it and let the blend hide it at play zoom.
-
 ### NR-434 — The agent corrected its own mechanism mid-task, and the correction is the interesting part
 *observation · raised 2026-08-21 · from BL-515 (organic province borders), merged and verified 2026-08-21.*
 
@@ -1241,11 +1221,6 @@ province_capacity_probe's BL-513 ratio moved 12.2546 -> 12.2477 across the absor
 *observation · raised 2026-08-21 · from BL-519 / BL-520 design work, 2026-08-21.*
 
 BL-366's urban transform is documented as one-way and it OVERWRITES terrain_composition. So today, when a metallic tile's building stack fills, the tile stops being metallic - the fact is gone, not hidden. Nothing reads it afterwards, so nothing has broken visibly, but it means a city can never know what it was built on, and any future rule that wants to (a mine under a city, subsidence, resource exhaustion, a lens showing what the land WAS) has no data to read. BL-519 fixes this incidentally: with substrate separate from state, paving a tile leaves the substrate intact. Recorded separately from the item because it is a live data-loss bug, not merely a design awkwardness, and because if BL-519 is ever deferred this should be fixed on its own.
-
-### NR-443 — Texture and the province blend are in direct tension, and BL-514 sits in the middle of it
-*question · raised 2026-08-21 · from BL-519 / BL-520 design work, 2026-08-21.*
-
-The canvas blends colour across a province's tiles (BL-511) to smooth the lattice away. A texture does the opposite - it asserts where one tile ends. Run both naively and they fight. The resolution in BL-520 is to texture the SUBSTRATE (which the blend already averages) and pattern the COVER (which is per-tile and should read as per-tile), so a forest edge is information and a rock-to-rock seam is not. But this collides with BL-514 (blend ALL tiles, not just within provinces), which is HELD pending your look at the organic borders. If texture becomes the thing that makes the map read as terrain, the global blend may be unnecessary - or may be exactly what lets texture stay subtle. Worth deciding BL-514 and BL-520 together rather than in sequence, since each changes what the other is for.
 
 ### NR-444 — The composition migration is 330 references across 49 files, and the accessor decision shapes it
 *question · raised 2026-08-21 · from BL-519 / BL-520 design work, 2026-08-21.*
@@ -1788,12 +1763,543 @@ BL-523 makes `corp_ai.cpp` read a corporation KIND (today the file contains no r
 
 *Files: `src/world/corp_ai.cpp`, `docs/development/backlog.json`*
 
+### NR-501 — BL-519 and BL-520 are now RENDERED — the container-blind half of NR-451 and NR-457 is closed
+*observation · raised 2026-08-22 · from UI session 2026-08-22, local build*
+
+Built ProjectIo locally (BUILD_OK, exe relinked 01:31) and ran tile_texture.lua, province_render.lua and click_injection.lua. NR-451 and NR-457 both recorded that BL-519 and BL-520 were compile-checked only, never rendered, because that container had no SDL3 and no display. That is now closed: 14 texture captures, 20 province captures and 6 click captures exist under build/screenshots/. The texture pass genuinely works — province_blend_close.png is the frame that shows it, with per-tile canopy ticks legible over a province blend that still reads as one continuous field, and texture_cinder_close.png shows the non-biotic chip/scratch grain doing the same on an airless body. Ocean draws nothing, as designed.
+
+**Why it matters.** Two items shipped complete on a compile check alone. They now have eyeballed evidence, and the evidence supports the design rather than contradicting it.
+
+*Files: `build/screenshots/`, `scripts/verify/tile_texture.lua`*
+
+### NR-506 — There is no space to the RIGHT of the minimap — its right edge is flush to the screen edge by design (BL-312)
+*question · raised 2026-08-22 · from UI session 2026-08-22, shell_metrics.cpp*
+
+Your first framing put the legend "to the right of the mini-map", and the form answer sized it at "about 1/4 the minimap space". The first of those cannot be built as stated: minimap_rect returns { disp.x - w, ... }, so the minimap right edge IS the screen edge, deliberately, under BL-312 — the comment calls it an 8px gap with no neighbour to its right to justify it. Measurements, since they are all fixed: minimap_width = max(336, 0.28 * min(disp_x, disp_y)) and minimap_height = 0.75 * width. That floor of 336 wins on every common display — 1280x720, 1600x1000, 1720x1080 and 1920x1080 ALL give exactly 336 x 252 px. It only grows above roughly 1200px of minimum dimension (2560x1440 gives 403 x 302). So a quarter of the minimap space is about 21,168 px-squared, which is 84 x 252 as a side column, or 336 x 63 as a strip above or below it.
+
+**Why it matters.** Three readings produce materially different layouts and I do not want to guess between them. An 84px-wide column cannot hold a nation name at all, so that reading forces the shortened names and wrapping you already asked for, hard.
+
+- A strip 336 x 63 directly ABOVE the minimap, scrolling — full width, so names fit, and nothing moves
+- A column 84 x 252 to the LEFT of the minimap, scrolling — matches "beside it" but is very narrow
+- The legend overlays a quarter of the minimap itself, translucent
+- Shrink the minimap and put the legend in the space freed to its left
+
+> **Recommendation:** The strip above the minimap. It is the only one of the four where a nation name fits on one line at a readable size, and it costs the minimap none of its area.
+
+*Files: `src/ui/shell_metrics.cpp`, `src/ui/body_surface_canvas.cpp`*
+
+### NR-507 — BL-533 landed and found a real click-through defect: the canvas was taking presses meant for the legend
+*observation · raised 2026-08-22 · from UI session 2026-08-22, lens_legend.lua*
+
+Re-homing the legend surfaced a defect that predates it and would have applied to any background-draw-list surface. The legend paints through ImGui::GetBackgroundDrawList(), which draws pixels and registers no window, so io.WantCaptureMouse stayed false over it — and app.cpp derives the canvas primary_input from exactly that flag (primary_input = !mouse_in_mm && !panel_blocking). Measured symptom: clicking the legend header toggled the legend AND selected whatever tile lay underneath, moving the Selection panel to a tile the player never aimed at. Confirmed real rather than a harness artifact by hovering to settle WantCaptureMouse first, which changed nothing. Fixed with an empty always-on window over the box footprint. Proof: legend_country_collapsed.png and legend_country_recollapsed.png are now BYTE-IDENTICAL across an open-then-close cycle, where before the second capture carried a different selected tile.
+
+**Why it matters.** Any future on-canvas surface drawn the same way inherits the same hole, and it is invisible to every check we have — the surface looks correct in a capture while quietly stealing or leaking presses. Worth knowing before the next one is built.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `src/core/app.cpp`*
+
+### NR-512 — docs/CONCEPT.md is two framings behind, and CLAUDE.md sends every new session there first
+*observation · raised 2026-08-22 · from Phantom-feature scan, 2026-08-22 (PHANTOMS.md § Class 5).*
+
+CONCEPT.md carries the 2026-08-10 militia correction (NR-120) but NOT the 2026-08-12 two-arcs split, and not the 2026-08-21 syndicate tier. So it still describes solar-to-galactic scope, orbital logistics and planetary isolation as the live design, when the live arc is ancient and 0 CE with a mercenary company in the seat. CLAUDE.md § Documents says of it: 'Start here for questions about what the game is and how it should feel.' Separately and in the other direction, MANUAL.md § 5 still lists the campaign conflict layer as [OWED], which BL-467/BL-468/BL-469 falsified on 2026-08-21.
+
+**Why it matters.** The doc-map's designated first read is the one most out of date. The authority time-slice explains why - BL-094 is parked and unlanded, so its framing has not propagated - but the two-arcs split is not BL-094's to land, and CONCEPT.md carries no dated note for it the way it does for the militia.
+
+> **Recommendation:** A dated note at the head of CONCEPT.md naming the live arc, same shape as the existing 2026-08-10 correction. Cheap, and it stops the doc actively misleading until BL-094 lands. Filed rather than done: re-voicing CONCEPT.md is session 10 of the proposed sequence, and it is yours to voice.
+
+*Files: `docs/CONCEPT.md`, `docs/MANUAL.md`*
+
+### NR-513 — novel-work: the phantom register is a new standing artifact, and it has no lifecycle
+*novel-work · raised 2026-08-22 · from Phantom-feature scan, 2026-08-22.*
+
+docs/development/PHANTOMS.md is a new document class - a scan output that points at design sessions. Nothing in the corpus owns 'a list of things with no owner', and it overlaps three existing stores: NEEDS_REVIEW.json (open calls), backlog.json (work), and MILITARY.md § What is absent (a per-doc holes list, which is the pattern this file generalises). It is written as transient - stale by design once the sessions run - but nothing says who prunes it or when.
+
+**Why it matters.** An unowned list of unowned things is how a fourth store accretes. The alternative shape, and probably the better one, is no central file at all: every doc that owns a partially-built system carries its own 'What is absent' section, MILITARY.md's model, and the scan becomes a periodic check rather than a document.
+
+- Keep PHANTOMS.md as a transient scan output, pruned as sessions land.
+- Dissolve it into per-doc 'What is absent' sections and re-run the scan periodically instead.
+- Keep it and give it a query tool if it grows.
+
+> **Recommendation:** Option 2 as the destination, option 1 to get there - the file is useful right now because ten sessions are not yet run. Once each subject has an owner, its rows move into that owner's absent-list and the file goes away.
+
+*Files: `docs/development/PHANTOMS.md`*
+
+### NR-525 — REVIEW: docs/economy/LOGISTICS.md — the network authority (Ben flagged this one as the priority)
+*question · raised 2026-08-22 · from Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: "I'll read them in full and let you know where I would want to change things."*
+
+New 322-line authority, split from SUPPLY.md on the line "Logistics is the road; Supply is the traffic". Ben, 2026-08-22: "Pay extra attention to the logistic system, as that is the most substantial part which I feel I haven't given a firm authority on." Owns BL-325 ruling 3 in general form, the shared traversal-cost function, reach as the placement constraint, roads and tiers, physical scale and travel time, cache invalidation, interdiction, and the whole BL-464 Logistic Points design - two rulings, three settled rules, and the seven findings that rejected its first cut. Five open questions at the end. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.
+
+**Why it matters.** Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with "accepted as written".
+
+> **Recommendation:** Read § Logistic Points first - it is the largest section and the one carrying settled rulings that were only ever inside a backlog item. The finding worth your attention is the last one: goods-vs-force priority is currently decided invisibly by tick phase order, so "the army goes unsupplied" is an inherited default nobody chose.
+
+*Files: `docs/economy/LOGISTICS.md`*
+
+### NR-526 — REVIEW: docs/generation/PROVINCES.md — the spatial unit of consequence
+*question · raised 2026-08-22 · from Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: "I'll read them in full and let you know where I would want to change things."*
+
+New 217-line authority for the province as a game object, gathered from province.hpp, TILE_GENERATION.md, PLANETARY.md and SELECTION.md. Owns the four partition rulings, the three size constants (7 soft / 12 preferred / 20 hard) and why the hard cap is asserted rather than imposed, the three domains, unit position at province grain (NR-405), and your 2026-08-22 ruling that every lens blends. Four open questions, two of which are your existing unruled review entries (NR-433 on the 3-tile floor, NR-421 on the inert ceiling). | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.
+
+**Why it matters.** Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with "accepted as written".
+
+> **Recommendation:** The open question worth deciding is 3 - whether a province ever gains an OWNER. Every use so far is spatial, and BL-518 (war redraws borders) is where that pressure first arrives.
+
+*Files: `docs/generation/PROVINCES.md`*
+
+### NR-527 — REVIEW: docs/economy/CONTRACTS.md — the income loop, out of the market doc
+*question · raised 2026-08-22 · from Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: "I'll read them in full and let you know where I would want to change things."*
+
+New 250-line authority carving procurement and the mercenary contract out of MARKETS.md, where the game's income loop had been a subsection of the market document. Records BL-377's full design - the condition_set spine, offers derived from history_sim's campaign scorer, the four settled answers, three terminal states - plus what the nations session changed: the client is now a nation with a treasury, and the relationship rides sentiment's Trust dimension rather than a parallel axis. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.
+
+**Why it matters.** Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with "accepted as written".
+
+> **Recommendation:** Open question 1 is the one that needs you: a contract fee is an actor-to-actor transfer, which NATIONS.md says must conserve - so a nation that cannot afford a contract must not be able to offer it. That couples offer generation to BL-537 budget and is not stated anywhere yet.
+
+*Files: `docs/economy/CONTRACTS.md`*
+
+### NR-528 — REVIEW: docs/PEOPLE.md — named people and roles (NEW system, proposal not design)
+*question · raised 2026-08-22 · from Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: "I'll read them in full and let you know where I would want to change things."*
+
+New 196-line design-owed doc from your 2026-08-22 ask. Everything past § Precedent is a PROPOSAL, not settled design. Builds on BL-207 (persona counsel packs, already fully designed) and BL-370 (corp leader figure, your own 2026-08-11 ask) rather than inventing a rival. Proposes: a person is a name, a role, a seat, a tenure and AT MOST ONE bias; a cast not a population; and mortality, because a person who never leaves is a permanent modifier wearing a name. Six open questions. Filed as BL-547. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.
+
+**Why it matters.** Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with "accepted as written".
+
+> **Recommendation:** Question 2 is the cheapest to overturn now and the most likely to be wrong: one bias, or several. Question 1 sets the order - company head is your own earlier ask and needs no other system; minister is the highest value because it gives lobbying a target.
+
+*Files: `docs/PEOPLE.md`*
+
+### NR-529 — REVIEW: docs/EVENTS.md — random events (NEW system, proposal not design)
+*question · raised 2026-08-22 · from Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: "I'll read them in full and let you know where I would want to change things."*
+
+New 212-line design-owed doc from your 2026-08-22 ask. The interesting problem is the word "random": Io is deterministic, so the doc reuses YOUR OWN BL-315 ruling 4 - uncertain to the player, deterministic to the engine, drawn from a seeded stream folded from the subject's identity. Second finding: the meta layer already supplies two thirds of an event (condition_set = predicate, modifier_set = effect), so only the trigger is new - and it is the consumer collapse_strain has been waiting for. Filed as BL-548. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.
+
+**Why it matters.** Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with "accepted as written".
+
+> **Recommendation:** Question 4 decides how large this system is: do events DRIVE the collapse metagame or merely express it. Question 2 - how often is an event - is the single number separating texture from chaos, and nothing has established a target rhythm.
+
+*Files: `docs/EVENTS.md`*
+
+### NR-532 — The design register is live — 41 open calls across ten sections, as a form
+*observation · raised 2026-08-22 · from Ben, 2026-08-22: "now please revisit each one and open forms for answering the open questions."*
+
+Published at https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc. Every open question across the eight new authority docs plus SYSTEMS.md § The progression chain plus four cross-cutting calls, gathered into one form: 41 questions in 10 sections. Each carries its evidence, 3-5 options with one marked as suggested, and a free-text field that overrides the options. Progress is tracked per section; "Copy all answers" puts everything on the clipboard in one block. It is a LIVE DOC - radios and contenteditable fields are captured as edits, so answers reach a watching session directly; deliberately no <textarea> and no <select>, neither of which is captured. Answers also persist to localStorage as a per-viewer draft.
+
+The generator is committed rather than being a one-off (CLAUDE.md § Tool creation is skill creation): tools/session/register/questions.js is the canonical question set and build.js emits the HTML. Verified to regenerate byte-identically. Republish to the same URL to keep answers in place.
+
+**Why it matters.** The open questions were the point of writing the docs as capture rather than design, and they were spread across ten files. A form is the difference between 41 questions that get answered and 41 that get skimmed. It also means the answers arrive in one structured block that can be propagated in a single pass, the way the six nations rulings were.
+
+> **Recommendation:** Answer in any order. The four that change the most downstream: LOGISTICS Q1 (what generates LP), EVENTS Q4 (drive the collapse metagame or express it - it decides the system's size), PEOPLE Q2 (one bias or several - cheapest to overturn now), and NATIONS Q1 (whether the grant reaches a rival, which blocks the player-facing halves of two items).
+
+*Files: `tools/session/register/questions.js`, `tools/session/register/build.js`*
+
+### NR-533 — A rival hostility declaration is now SIGNALLED, which overturns NR-350 and removes the ambush property for the player
+*decision taken on your behalf · raised 2026-08-22 · from Ben's answer to RELATIONS Q4 in the design register.*
+
+Ben chose "Yes, but signalled - a rival declaration surfaces to the player". NR-350 had a declaration stay SILENT, discovered on contact rather than announced, and BL-448 shipped on that. Newest-dated wins, so the reversal stands and is recorded rather than quietly applied.
+
+**Why it matters.** stance.hpp's directed hostility exists so that "a corp can be at war and not know it yet" - the AMBUSH PROPERTY BL-458's interdiction was designed around. Signalling removes that property FOR THE PLAYER: interdiction becomes a known risk rather than a surprise, and the first lost convoy stops being the first news. Directedness itself is untouched - hostility still needs no reciprocation. What the ruling does NOT settle is whether rival-vs-rival declarations are equally visible, which is a BL-068 question.
+
+> **Recommendation:** Accept - the ruling is deliberate. Two things to carry: BL-458's design prose still argues from the ambush property and should be read with this in mind, and the rival-vs-rival visibility question needs an answer before BL-449 renders anything.
+
+*Files: `docs/politics/RELATIONS.md`, `docs/economy/LOGISTICS.md`, `src/world/stance.hpp`*
+
+### NR-534 — Backlog schema gains `superseded_by` — the first way to retire an item without claiming it was built
+*decision taken on your behalf · raised 2026-08-22 · from The designed/design-owed triage Ben asked for, 2026-08-22.*
+
+backlog.json's note says `complete` is the ONLY terminal status and that terminal items must be retained, never deleted. That left no way to express "this design is superseded and was never built" — the two available readings were both wrong: `complete` claims work landed (which is the BL-377 defect, deliberately re-introduced), and deletion loses the reasoning. Added a `superseded_by` array field carrying the ids that took the strands on, with status `complete` and a resolution opening SUPERSEDED, NOT BUILT. backlog_lint now (1) exempts such items from the false-complete arm — they never intended to write the files they name — and (2) FAILS if a superseded item names a destination id that does not exist, or carries superseded_by without being terminal. Both guards were negative-tested; the first draft of the exemption did not fire at all, because it sat after a guard that skips items naming no source paths.
+
+**Why it matters.** Retiring an item as `complete` would make the backlog lie in exactly the way the phantom scan was opened to catch, and the new drift check would either flag it forever or need allow-listing. This is a schema addition rather than a convention, so Ben should confirm it - two items now carry the field (BL-158, BL-345) and it is cheap to rename or restructure while that is true.
+
+- Keep `superseded_by` as an array of destination ids (what shipped).
+- Add a distinct terminal status `superseded` instead, and update the tooling that reads status.
+- Revert: retire by editing the resolution only, with no structured field.
+
+> **Recommendation:** Keep it. A structured field is queryable and the lint can enforce it; a status change would touch gyre.py, ship_items.js, apply_session_close.js and every progress count, for no more expressiveness.
+
+*Files: `docs/development/backlog.json`, `tools/session/backlog_lint.js`*
+
+### NR-535 — Triage result: 178 open items reviewed, 2 retired, 12 re-pointed, 1 title three framings behind — and the suspects were mostly not stale
+*observation · raised 2026-08-22 · from Ben, 2026-08-22: "let's do a pass on all designed and owed backlog items. We can reword them to fit the current auth docs, or drop things that are no longer relevant."*
+
+178 open items (149 designed, 29 design-owed). A keyword scan flagged 107 as touching a subject the new docs own, which was too coarse to act on — 'province' and 'law' alone matched 32 items each, nearly all of them ordinary mentions. What actually paid:
+
+RETIRED (2). BL-158 (politics datamodel stub) and BL-345 (politics relationship axis), both into BL-545. BL-345 is not merely superseded but CONTRADICTED: it proposed a SYMMETRIC per-pair scalar and Ben ruled directed. Its acceptance rule — 'a stub nothing reads is indistinguishable from no stub' — transferred to BL-545 and now binds it to land with a consumer.
+
+RE-POINTED (12) at the doc that now owns the subject, on a rule applied consistently: a UI item keeps its SURFACE doc, a subject item takes the subject doc. So BL-474/475 (stance surfaces) stayed on LENSES/SELECTION while BL-297/298 (diplomacy seam) moved to RELATIONS.
+
+CORRECTED (1). BL-186's title said the laws ledger is 'the surface for enacting/repealing laws' while its own body had struck exactly that as the overturned governing-body model. The body was right and the title was three framings behind — and a title is what a backlog query returns.
+
+**Why it matters.** The 2026-08-13 retire triage checked 14 suspects and ZERO retirements survived; this one checked more and two survived, for a specific reason worth recording: BL-545 did not exist in August 13. A retirement survives when the destination exists, and not before. That is also why BL-158's earlier refutation ('the character_preset strand would be orphaned') no longer holds — BL-155 has described that object since 2026-07-10 and now names it.
+
+The finding that reaches furthest: BL-158 proposed DIRECTED sentiment on 2026-08-02, with the same argument Ben used twenty days later ('a symmetric scalar cannot express A resents B, B is indifferent'). So NR-520 undercounted — FOUR designs were converging on one quantity, not three, and the earliest was already right about the axis.
+
+> **Recommendation:** Two axes remain unworked and both need a build to do honestly. The 13 FALSE-OPEN candidates the new lint reports each need checking against the code before a status flips - BL-458, BL-511 and BL-480 are near-certain, the rest are not. And the parked set (36 items, mostly space-arc) was left alone deliberately: a parked item legitimately carries its own arc's framing, and rewording it to the live arc would be the churn the two-arcs split exists to avoid.
+
+*Files: `docs/development/backlog.json`*
+
+### NR-536 — Sprint N1 pre-change baseline captured — state_hash B4D09255AF346008, and the one red is the known pre-existing one
+*observation · raised 2026-08-22 · from Opening Sprint N1. An inertness claim can only be proven against a measurement taken BEFORE the change.*
+
+Built the world layer by the NR-264 recipe and ran three baselines at commit d85416e, before a line of Sprint N1 was written.
+
+  world_determinism        ALL PASS (0 failures) - 400-year era pass, identical across two same-seed runs
+  money_conservation       ALL PASS (0 failures) - including P3.0, total corporate cash never moves over 8 ticks
+  spectator_determinism    1 FAILURE, and it is PRE-EXISTING
+
+The failure is R2 byte-identity: golden=344A9FE48306E93A observed=B4D09255AF346008. Those are the SAME TWO VALUES NR-484 and NR-487 record as red on origin/main, so it is attributed and is not this sprint's.
+
+THE USEFUL PART: B4D09255AF346008 is the observed state_hash of an unspectated played session at the pre-N1 commit. All three Sprint N1 items claim INERTNESS at authored-zero rates. If integration leaves that value unchanged, the claim is proven at the strongest available level - the whole world hashing identically - rather than by a harness asserting its own narrow property.
+
+**Why it matters.** Three requirement rows across three items say 'bit-identical to the pre-item build'. Without a pre-change number those rows can only be self-asserted by the harness that ships with the change, which is the false-green failure mode the adversarial pass exists to catch. This is the number they are checked against.
+
+It also means the economy benchmark's deliberate red (NR-269/271/272) and this golden's red are both accounted for BEFORE the batch, so anything new that goes red is the batch's.
+
+> **Recommendation:** Re-run all three after integration and compare against these exact values. A moved state_hash on an all-zero-rates build is a FAILED inertness row, not a re-bless.
+
+*Files: `tools/verify/world_determinism.cpp`, `tools/verify/money_conservation.cpp`, `tools/verify/spectator_determinism.cpp`*
+
+### NR-537 — Hotspot audit: all four "serial" clusters are NOT serial, three more phantom-file declarations, and ~8 more false-opens
+*observation · raised 2026-08-22 · from Four-agent audit of the biggest file hotspots, run while Sprint N1 built. Every claim below was spot-checked by hand before acting.*
+
+A file-collision map over near-term open work said history_sim.cpp (24 items), body_surface_canvas.cpp (13), corp_ai.cpp (11) and components.hpp (11) were serial bottlenecks. AN AGENT READ EACH ONE. All four came back NOT SERIAL, and the file-level count was wrong in a different way each time.
+
+history_sim.cpp: 82% of the file is ONE 1,040-line function, so '24 items touch this file' is nearly '24 items touch this function'. What rescues it is a property stated in the file's own header - `salt` is a HASH, not a generator, so 'nothing here consumes a stream, and inserting a decision does not shift the numbers a later decision sees'. Concurrent edits are safe HERE and would not be in a seeded-stream design. Ten named split seams. Three residual serialisers, all narrow - and the load-bearing one is undocumented: THE SCORING-BLOCK ORDER IS SEMANTICALLY LOAD-BEARING (line 843: build_work is scored last because every earlier verb uses `>` against best_score), so two agents each inserting a scoring block merge into an arbitrary order that changes tie-breaks and therefore every generated world.
+
+components.hpp: THE APPEND-ONLY RULE DOES NOT BIND THIS CLUSTER AT ALL. The agent traced every enum to its consumers: not one of the 11 items appends a value to any enum in the file. I had assumed the opposite. The real append-only contention is in a file NOBODY declared - corp_command.hpp's `corp_decision_reason` (BL-446/447/450) and `corp_verb` (BL-377/472/511).
+
+body_surface_canvas.cpp: 'it is not even 13 items - three have already landed.'
+
+corp_ai.cpp: three independent concerns; export_corp_blackboard shares zero symbols with the scorer.
+
+THREE MORE PHANTOM FILES, the BL-377 shape: BL-505 declares src/world/name_generation.{hpp,cpp} (never existed; the generator is tongue.*), BL-551 declares src/world/contracts.cpp (does not exist - inherited from BL-377), BL-525 declares src/world/serialisation.cpp (does not exist and NO item creates it - the seam is sectional, not central). All three corrected.
+
+AND MORE FALSE-OPENS, each with a commit: BL-514 and BL-532 landed in c8a345a; BL-533's half in 3932eea; BL-408's canvas half at 57e596f; BL-480's treasury at 95a68d8; BL-511's components half at 3f2c7c6; BL-212 'LANDED 2026-07-28' per its own note with ZERO references in the file it declares; BL-439 and BL-440's corp_ai halves.
+
+**Why it matters.** THE METHOD FINDING IS THE BIGGEST ONE: a file-level collision map is systematically WRONG in both directions. It over-counts (two items at opposite ends of a 3,545-line file are not in each other's way) and under-counts (the real append-only contention was in corp_command.hpp, which the map never surfaced because few items declare it). collision_map.js's header already warns of exactly these two blind spots; this audit measured them.
+
+The scheduling consequence is large and favourable: v0.1.16's 36 items are NOT a serial queue. The audit proposes six waves for the Fall cluster with three-and-four-way parallel arms.
+
+The scheduling consequence that is UNfavourable: four v0.1.16 items are blocked by items in LATER minors. BL-491 requires BL-320 (v0.1.19); BL-493 requires BL-425 and BL-427 (both v0.1.22); BL-494 requires all four plus BL-462's territory (v0.1.22). A minor cannot cut while a quarter of its perf chain waits on three later minors.
+
+> **Recommendation:** Three things, in order. (1) The version-goal inconsistency is the one that would actually block a cut - either those four items move out of v0.1.16 or their blockers move in. It is a sequencing call and it is Ben's. (2) The confirmed false-opens want the same treatment BL-514 and BL-532 got here: verify by hand, then flip with the commit named. I did the two the audit called FULLY landed and left the partial ones (BL-533, BL-511, BL-408) with their halves stated, because a partial slice landing under an open item is exactly the case the lint warns not to flip blind. (3) The corp_command.hpp append contention should get the Fall-arc convention applied: one appender per batch, in a stated order.
+
+> **RESOLVED.** PARTLY RULED BY BEN, 2026-08-22: move the inverted items out of v0.1.16. Done, and the count was three rather than four - BL-492's inversion had already been dissolved by correcting its dependency (it named BL-491 where its own text needs strain, which is BL-504 at the same minor), so it is startable in v0.1.16 and was deliberately left there with the reason written into the item so a later pass does not sweep it along. BL-491 -> v0.1.19 (needs BL-320). BL-493 -> v0.1.22 (needs BL-425 and BL-427). BL-494 -> v0.1.22 (latest blocker sets the floor; also missing hard_coded_world.cpp from its file list, where its deliverable actually lives - added). v0.1.16 falls from 36 open items to 33. The audit's other findings - the six-wave batching for the Fall cluster, the corp_command.hpp append contention, the remaining confirmed false-opens - are untouched and still open.
+
+*Files: `docs/development/backlog.json`, `tools/session/collision_map.js`*
+
+### NR-538 — A version-goal inversion sweep found two more, and one was created THIS SESSION by an otherwise-correct ruling
+*decision taken on your behalf · raised 2026-08-22 · from Moving the inverted v0.1.16 items out, on Ben's instruction.*
+
+Having moved the three the audit named, I swept the whole backlog for the same defect - an open item whose version goal sits EARLIER than a blocker's. Two more turned up.
+
+BL-391 (reputation floor deadlock) at v0.1.15 requiring BL-546 at v0.1.24. THIS SESSION CREATED IT: the sentiment ruling made BL-391 require BL-546, and nothing moved the version goal to match. Moved to v0.1.24 and the reasoning written into the item. THE COST IS STATED RATHER THAN BURIED: this is a priority-A LIVE defect - a player measured reputation -6 against a floor of -5 with no mechanic anywhere that could move it back - and it now ships two minors later than it did this morning. The alternative is landing decay standalone at v0.1.15 and migrating it in BL-546, which is the double-build the substrate ruling exists to avoid. If that trade is wrong it is Ben's to overturn.
+
+BL-211 (player-facing history ledger) at v0.1.11 requiring BL-210 at v0.4.0. PRE-EXISTING and NOT moved: BL-210 is PARKED, so this is an item waiting on a decision rather than on a build, which is a different problem from a scheduling inversion. Left alone deliberately and flagged by the new check as 'blocker is PARKED - may be legitimate'.
+
+Added checkVersionInversion() to backlog_lint. Negative-tested: re-introducing BL-494's inversion makes it name all three blockers by version. It is a WARNING not a fail, because a parked blocker can be legitimate and a version goal is a plan rather than a contract.
+
+**Why it matters.** The shape is what makes it worth a permanent check rather than a one-off fix: THE INVERSION ARRIVES AS A SIDE EFFECT OF AN OTHERWISE-CORRECT EDIT. Adding a `requires` is right; forgetting that it re-dates the item is invisible, and nothing else in the tooling notices. That is the third defect class this session that was invisible from every status view - after the false-complete (BL-377) and the false-open (BL-514, BL-532) - and all three now lint.
+
+> **Recommendation:** Confirm or overturn BL-391's move. It is the only one of the five with a real cost, and it is a priority-A defect slipping two minors.
+
+*Files: `docs/development/backlog.json`, `tools/session/backlog_lint.js`*
+
+### NR-510 — corp_modifiers is NOT recomputable from earned_techs - the save serialises it directly, against BL-107's own note
+*decision taken on your behalf · raised 2026-08-22 · from BL-536 (world snapshot save), writing the load path*
+
+world.hpp calls corp_modifiers "DERIVED state - recomputable from earned_techs x the gate table", and BL-107 carries a 2026-08-19 change-note saying the save format "owes a recompute-on-load (re-fold earned techs through the effect table) or loads will silently drop every earned buff". I set out to write that re-fold and it does not reconstruct the right ANSWER.
+
+The order is the problem. advance_tech_gates appends a corp's modify_scalar effects in GATE-TABLE order within one call, but it runs every tick, so the stored sequence is really sorted by (earn tick, gate index). A re-fold from earned_techs can only sort by (gate index). The two differ the moment a corp satisfies a higher-index gate before a lower-index one - and nothing stops that, since gate conditions are independent.
+
+It matters because modified_scalar folds in stored order and apply_scalar_modifier mixes add/subtract with multiply, which do not commute. A re-fold would silently return a different number for a corp that earned its techs out of table order.
+
+DECISION TAKEN: corp_modifiers is SERIALISED directly rather than recomputed. It is small (a handful of entries per corp), and its stored ORDER carries information the earned set does not. This makes it state, not cache.
+
+**Why it matters.** Two docs now say something inaccurate: world.hpp's 'DERIVED state - recomputable' comment, and BL-107's change-note prescribing the re-fold. I have corrected the code and the requirement row; the two prose claims want Ben's eye because the same reasoning may apply to any other field described as 'recomputable' whose consumer is order-sensitive.
+
+### NR-511 — The two shipped binary streams keep private copies of the read/write primitives; the new header does not absorb them
+*decision taken on your behalf · raised 2026-08-22 · from BL-536 (world snapshot save), writing src/world/binary_io.hpp*
+
+history_log.cpp (IOHL) and province.cpp each define file-local write_u32/read_u32/write_str/read_str, byte-identical to the ones binary_io.hpp now provides. I left both alone rather than refactoring them onto the shared header.
+
+Reasoning: their bytes are shipped, a snapshot written by an older build must keep reading, and the refactor changes no behaviour a reader can observe. Against that, CLAUDE.md's tone section calls duplication a debt, and there are now three copies.
+
+**Why it matters.** It is a small, deliberate piece of duplication in exactly the seam that is supposed to have ONE definition of its conventions. Worth a ruling now rather than discovering three more copies later.
+
+### NR-512 — A world snapshot embeds the history-log stream whole, magic and all, rather than re-writing its records
+*decision taken on your behalf · raised 2026-08-22 · from BL-536 (world snapshot save)*
+
+world::history_log and world::provinces already have a serialiser - write_history_log/read_history_log, which since BL-466 also carries the province section as its trailing block. The world snapshot calls those functions as one nested section instead of writing those two containers itself.
+
+The consequence is that a snapshot contains a complete IOHL stream inside it, with its own magic and version header. That reads slightly odd on a hex dump, and it means the history log is version-guarded twice.
+
+**Why it matters.** The alternative was a second definition of the same bytes - the NR-511 problem again, and this time for records that are genuinely intricate (the per-topic timestamp convention, the strictly-ascending province id check). Reuse looked clearly right, but a nested magic is the kind of thing worth stating out loud rather than letting someone find.
+
+### NR-513 — verify.command never routed through dispatch_action, so every app-level command it named silently did nothing
+*observation · raised 2026-08-22 · from BL-536, wiring the F5/F6 quick-slot bindings*
+
+verify_api.cpp's `command` hook called ui::apply_canvas_command directly, under a comment claiming it was "the same dispatch the keyboard uses". It was not. A key press goes through app::dispatch_action, which handles the commands needing app members - the six time controls, the three UI toggles - and only then falls through to apply_canvas_command. So verify.command("pause_toggle") did nothing at all, and neither did speed_1..speed_5, help_toggle, options_toggle or tech_tree_toggle.
+
+Nothing caught it because no committed script uses one: a grep of scripts/verify shows only ascend, descend and zoom_in, all of which apply_canvas_command handles. The gap was invisible precisely because it sat under the part of the vocabulary nobody had scripted yet.
+
+FIXED as part of BL-536 (it had to be, or the two new save bindings would have been the tenth and eleventh commands to silently no-op). Behaviour-identical for every existing caller.
+
+**Why it matters.** A verify hook that quietly does nothing is worse than one that errors: a script reads as if it drove the clock, the capture looks plausible, and the claim is false. Worth knowing that nine commands were in that state, in case any past reasoning leaned on one.
+
+### NR-514 — Save is a discrete act, not the per-tick autosnapshot TECH_FOUNDATIONS described
+*decision taken on your behalf · raised 2026-08-22 · from BL-536 (world snapshot save)*
+
+TECH_FOUNDATIONS' save-model paragraph specified a tick-boundary snapshot: "the full simulation state will be serialised at each economy tick... manual save is a named copy of the most recent snapshot". I did not build that. Saving happens only when asked - F5, --load's counterpart, or verify.save.
+
+Reason: a snapshot is 18.7 MB. Writing one every economy tick would put a multi-megabyte serialise and file write on the tick path, for a rollback feature nothing has asked for. The stated benefit was "clean, deterministic save points", and that is already what world::state_hash provides for debugging, at no I/O cost.
+
+I rewrote the paragraph to describe what exists and to say plainly that the autosnapshot was never built.
+
+**Why it matters.** It reverses a written technical decision rather than merely implementing it, which is Ben's call, not mine. If the intent was rollback or a replay/debug facility, that is a different item and the design should say so.
+
+### NR-515 — Quick save/load has no confirmation and one unnamed slot
+*decision taken on your behalf · raised 2026-08-22 · from BL-536 (world snapshot save)*
+
+F5 overwrites `quicksave.iosave` without asking; F6 discards the live campaign without asking. One slot, no naming, no listing, no menu entry. BL-536's design said explicitly "no autosave cadence, no save-slot UI", so this is in scope as written - but it is the part a player touches, and the failure mode is real: F6 pressed by mistake loses everything since the last F5.
+
+Against that: a refused load costs nothing (the read builds into scratch), and the quick-slot convention is well understood from other games.
+
+**Why it matters.** It is the one place this item can lose a player's work, and the mitigation is a UI item rather than a format one.
+
+### NR-545 — BL-536 landed a world serialiser, and it invalidates the hotspot audit's components.hpp conclusion
+*observation · raised 2026-08-23 · from Evaluating origin/main at Ben's request, mid-turn, while Sprint N1 was being triaged.*
+
+PR #54 merged BL-536 (world snapshot save): src/world/world_save.{hpp,cpp} (847 lines) and binary_io.hpp (442). THIRTY ENUMS NOW CROSS A VERSIONED BYTE STREAM - terrain substrate/cover/landform, building_type, resource_type, condition_subject, condition_comparator, modifier_subject, modifier_op, law_effect_kind, stance, ideology, expansionism, economic_focus, convoy_mode, unit_class, battle_season and more - each written as a uint8 and read back through r_enum against a named maximum, so an out-of-range byte is rejected rather than cast.
+
+THE HOTSPOT AUDIT'S components.hpp VERDICT IS NOW FALSE. It concluded, having traced every enum in the file to its consumers, that 'the append-only rule does not bind this cluster at all' and that resource_type was the only enum crossing a stream. THAT WAS TRUE AT THIS BRANCH'S BASE AND IS FALSE ON origin/main. I gave batching advice resting on it - specifically that the real append contention lived in corp_command.hpp rather than components.hpp - and that advice needs revising: it now lives in BOTH.
+
+Three further things written this session are corrected in the same commit: RELATIONS.md's 'nothing survives a save' (stance IS saved now), META_LAYER.md's 'designed against a save seam that does not exist yet' (it exists, so append-only is a live constraint rather than a forward-looking discipline), and BL-525's note that no item creates a world serialiser.
+
+**Why it matters.** The audit was CORRECT when it ran and WRONG four hours later, because a merge landed underneath it. That is not a defect in the audit - it is the half-life of a finding in a repo with concurrent branches, and it is the argument for Ben's instruction to evaluate origin early rather than at integration.
+
+The practical consequence is a real one: any Sprint N1 or v0.1.24 item that appends an enum is now touching a live save format. BL-537's budget_priority enum, which the quarantined C slice already indexes unchecked (its heap-buffer-overflow), would be written to disk.
+
+> **Recommendation:** Re-run the components.hpp half of the hotspot audit against the merged tree before briefing any agent on that cluster. The other three hotspot verdicts are unaffected - history_sim, corp_ai and body_surface_canvas do not turn on what is serialised.
+
+*Files: `docs/development/backlog.json`, `docs/politics/RELATIONS.md`, `docs/META_LAYER.md`, `src/world/world_save.cpp`*
+
+### NR-546 — BL-537: bit-exact conservation is not achievable over arbitrary float weights — the claim was narrowed rather than the code changed
+*decision taken on your behalf · raised 2026-08-23 · from Fixing the Sprint N1 C-budget slice (BL-537, national budget) after the adversarial pass found conservation failing at ordinary weights.*
+
+The national budget's requirement R1 said world credit is 'conserved bit-exactly over any tick span'. The adversarial pass showed it holds only because the fixture is built from dyadic rationals: at ordinary weights 1.53e-05 vanished in one tick. The decision taken, rather than escalating: the claim was wrong, not the code. Bit-exact conservation of a float transfer requires BOTH endpoints to represent it exactly, and `corporation_component::balance += amount` cannot once the balance has outgrown the credit — the identical rounding `apply_budget`'s `cc.balance += delta` has carried since it shipped. So R1 was split into the half that IS exact for any inputs (the pass debits precisely what it credits: paid, total_transferred and the treasury delta are ONE accumulation) and the half that is not (the world total afterwards). The harness now proves the distinction instead of assuming it: one 64-tick span at ordinary weights whose balances are swept moves world credit by EXACTLY zero; an identical span whose balances accumulate drifts within the destinations' own rounding budget, and the two spans transfer a bit-identical total.
+
+**Why it matters.** It is a design answer, not a code change, and it reaches back into what BL-537's requirement group promises. If Ben wants literal conservation to the bit at any weights, the only construction that delivers it is integer or fixed-point credits — which is a money-model change spanning apply_budget, the market and every balance in the game, not a change to this pass. Worth knowing that the bound was measured rather than assumed: over 512 generated shapes the residual sits at ~5e-8 of everything moved, its sign varies, and it vanishes entirely when the destination can hold the credit.
+
+- Accept the narrowed claim (done). The pass conserves exactly; the destinations round, as they always have.
+- Move credits to fixed-point across the money loop, and get literal conservation everywhere. Large, and touches every balance in the game.
+- Leave a per-tick reconciliation that sweeps the residual somewhere. Rejected — it hides rounding rather than removing it, and gives the residual a destination nobody chose.
+
+> **Recommendation:** Accept the narrowed claim. The residual is float rounding at the destination, not a leak, and it is the rounding every other money flow already carries — a special case here would be inconsistent as well as expensive.
+
+*Files: `src/world/nation_budget.hpp`, `src/world/nation_budget.cpp`, `tools/verify/nation_budget_harness.cpp`*
+
+### NR-547 — Sprint N1's real lesson: all three harnesses were green, two subjects were defective, and every defect was found by mutating content or turning on a sanitizer
+*observation · raised 2026-08-23 · from Closing out the Sprint N1 fixes (BL-537, BL-543, BL-545).*
+
+Three implementing agents each wrote the code AND its harness. All three harnesses passed — 17/17, 39/39, 25/25 — and two of the three subjects were unsound. Not one defect was found by reading. They were found by: authoring the harness's own solved fixture into the real economy.lua (BL-543's check went RED on the day the anchor was satisfied); multiplying all 33 base prices by ten and watching nothing move (the content claim bound nothing); deleting a std::stable_sort and watching 39 rows still pass (the order-independence rows tested no order); compiling under AddressSanitizer (a heap-buffer-overflow the 34 value rows could not see); and running 512 generated shapes instead of one authored fixture (156 overdraws and 26 negative treasuries the authored fixture could not reach). Every fix in this pass added the check that would have caught its own defect, and each was mutation-tested against the pre-fix code before being accepted.
+
+**Why it matters.** The project's verification model is authorship — 'the docs are the audit'. That works for coverage and fails for adequacy: an author writing their own check writes the fixture their code passes. The cheap, repeatable counter is four moves, none of which need a second person: mutate the CONTENT the check reads, mutate the CODE the check guards, generate shapes instead of authoring one, and turn on a sanitizer. Worth considering whether the verifier-headless skill should require the mutation step for a NEW harness the way it now requires a repo-root working directory.
+
+- Add a 'prove the row has teeth' step to verifier-headless: every new assertion must be shown failing against a stated mutation before it is accepted.
+- Leave it to authorship, as with the doc audit.
+- Require it only for harnesses covering a determinism, conservation or memory-safety claim.
+
+> **Recommendation:** The third. The mutation step costs minutes on a rule/arithmetic row and would have caught all four false greens here; requiring it on every row would tax the cheap regression harnesses that are already fine.
+
+*Files: `.claude/skills/verifier-headless/SKILL.md`, `tools/verify/nation_budget_harness.cpp`, `tools/verify/sentiment_harness.cpp`, `tools/verify/value_anchor.cpp`*
+
+### NR-548 — spectator_determinism's golden is MSVC-derived and fails under g++ — every cloud/Linux session will see one red row that is not a regression
+*observation · raised 2026-08-23 · from Regression-running the existing harnesses after the Sprint N1 fixes, in the Linux remote container.*
+
+spectator_determinism reports 'R2 byte-identity: the unspectated hash equals the pre-BL-409 golden' as FAILED here: golden 344A9FE48306E93A, observed B4D09255AF346008. This is not caused by the Sprint N1 work — rebuilding the world library with nation_budget.o and sentiment.o REMOVED produces the identical observed hash. The harness's own provenance log already says why: 'MSVC-derived; this golden is toolchain-specific (float clearing arithmetic differs under g++)'. The two rows that carry real meaning both pass — R2's reproducibility (two independently built worlds agree) and R3 (spectating is deterministic).
+
+**Why it matters.** A permanently-red row trains a reader to ignore the harness, which is exactly how a real regression gets waved through. And it will be red in every session that is not on Ben's Windows box, which now includes every cloud session. Two honest fixes exist; blessing the g++ value is NOT one of them, because it would then be red on MSVC instead.
+
+- Carry TWO goldens, one per toolchain, and check the one matching the compiler. Small, and makes the toolchain dependence visible rather than a footnote.
+- Make the row report rather than assert when the compiler is not the one the golden was taken on — same shape as value_anchor's R3 branch.
+- Leave it, and rely on the provenance comment being read.
+
+> **Recommendation:** The first. It is a few lines, it keeps the row's teeth on both toolchains, and it turns a footnote into a check.
+
+*Files: `tools/verify/spectator_determinism.cpp`*
+
+### NR-549 — binary_io.hpp landed a day after sentiment.cpp copied the older idiom — four files now hand-roll the same byte primitives
+*observation · raised 2026-08-23 · from Integrating Sprint N1's sentiment slice and auditing it against the merged origin/main.*
+
+src/world/sentiment.cpp opens with private write_u32/read_f32 helpers over reinterpret_cast, and says in its own comment that it follows 'history_log / procurement exactly'. It did, and that was correct: binary_io.hpp (BL-536) merged on 2026-08-22, a day after the slice was briefed. So there are now four copies of one idiom, three of them without the shared version's bounds constants and its checked r_enum. Nothing is broken — all three bound their counts and all three round-trip — but the next person to add a stream will copy the nearest one, and three of the four nearest ones are the wrong one. Filed as BL-553 (priority C, v0.1.25).
+
+**Why it matters.** The specific loss is r_enum. It reads a uint8_t and REJECTS an out-of-range byte rather than casting it, which is the property that matters most now that thirty enums cross a versioned byte stream (NR-545). The older streams do not get it. Worth knowing too that this is the second thing BL-536's merge invalidated about work briefed before it (the first was the components.hpp audit conclusion, NR-545) — a merge landing mid-sprint quietly ages every brief written before it, and neither instance was noticed by the agent that hit it.
+
+> **Recommendation:** Land BL-553 when something next touches one of those streams — which BL-546 is doing right now to procurement.cpp. Not worth a pass of its own.
+
+*Files: `src/world/binary_io.hpp`, `src/world/sentiment.cpp`, `src/world/procurement.cpp`, `src/world/history_log.cpp`*
+
+### NR-550 — requirements.json silently deleted a whole requirement group for a day, and a parse-and-rewrite made it permanent
+*observation · raised 2026-08-23 · from Found while integrating Sprint N2's lane B, which hit it independently.*
+
+BL-536's append on 2026-08-22 left out the `},{` between the world-save-snapshot and value-anchor group objects. That is still VALID JSON: the second object's keys land inside the first and JSON's last-key-wins rule discards the collisions. So value-anchor (BL-543, four rows) vanished from every consumer at once - `requirements_query.js value-anchor` answered 'nothing matched', and had been answering that since the day the group was written. The group stayed recoverable from the raw bytes until a parse-and-rewrite script loaded and re-saved the file, which erased it from the text too. THIS SESSION'S OWN SPRINT-SCAFFOLDING WRITE DID THAT. Recovered from 4262d66's raw text and re-inserted with its rows resolved. Also found and disambiguated two groups sharing the brief `battle-state-in-world`, which made every query for it answer for one of two different pieces of work.
+
+**Why it matters.** The store is canonical and it lied for a day, with no symptom a reader would notice: the query answered honestly that nothing matched, and every consumer agreed. What makes it worth machinery rather than care is the second half - the corruption ERASES ITS OWN EVIDENCE on the next write, so the window to recover it is however long until the next tool touches the file. backlog_lint now carries checkStoreIntegrity over both JSON stores (record count in the raw text vs after the parse, plus key uniqueness), mutation-tested three ways. It is the fourth check this session that exists because a defect had no view that could show it.
+
+> **Recommendation:** No action needed - repaired and guarded. Worth knowing that any future hand-edit of these stores should be followed by `node tools/session/backlog_lint.js`, which now catches this in under a second.
+
+*Files: `docs/development/req/requirements.json`, `tools/session/backlog_lint.js`*
+
+### NR-551 — A reported determinism violation in spectate does NOT reproduce - four clean trees give identical hashes
+*observation · raised 2026-08-23 · from Verifying Sprint N2 lane B (BL-546) before merge.*
+
+The lane reported that spectator_determinism's SPECTATED state_hash moves 042D88AB1C8701A2 -> BB2D94F63FC165E5 under its change, and that it had isolated the cause to struct layout by adding one empty std::map member to `world` on a pristine tree. It called this a real violation of the determinism invariant and asked for a review entry. IT DOES NOT REPRODUCE. Built from clean git archives with the same recipe and flags, main (41816d6), 4262d66, this branch after all three merges, and the lane's own tree ALL give the identical pair played=B4D09255AF346008 spectated=BB2D94F63FC165E5. And repeating the lane's own probe - one inert std::map member added to `world` at 4262d66 - moves NEITHER hash. The claimed baseline 042D88AB1C8701A2 matches no tree that can be built here.
+
+**Why it matters.** Two things. First, filing it as reported would have put a false determinism violation into the standing-rules space, and a future session would have spent a day chasing a ghost in the one invariant the project cannot compromise on. Second, the likely cause is worth naming because it bit a sibling lane in the same run: a stale object left in the static archive after a source was restored, so a 'clean' rebuild links a mixture. Lane A hit exactly that and said so ('my mutation runner left a mutated .o in the archive after restoring the source, so one green run was green against a mutant'). An `ar rcs` over a stale obj/ directory is a silent, reproducible way to measure a build that never existed.
+
+> **Recommendation:** No defect to fix. Worth adding to the build recipe in REFINED.md and the agent briefs: delete obj/ before rebuilding when the point of the rebuild is a comparison. If Ben wants certainty, the cheap confirmation is to re-run spectator_determinism on his own MSVC box, where the golden was taken.
+
+*Files: `tools/verify/spectator_determinism.cpp`, `docs/development/REFINED.md`*
+
+### NR-552 — BL-546 decision taken: procurement v3 drops the reputation block entirely rather than re-deriving it
+*decision taken on your behalf · raised 2026-08-23 · from Sprint N2 lane B (BL-546), reported by the lane and accepted at merge.*
+
+The procurement stream bumped 2 -> 3. The alternative considered was to keep writing a reputation-shaped block sourced from the Trust axis, so the format stayed recognisable. That was rejected: it recreates the second store the item exists to delete, and the two would diverge the first time anything other than procurement moved the axis. The relational value now rides write_sentiment/read_sentiment and the world snapshot (bumped 1 -> 2, with the pair map carrying two floats and rejecting a null id, a self pair, a non-finite value or a stored-neutral row). read_procurement's contract narrowed from four fields to three.
+
+**Why it matters.** It is a save-format change behind a strict version gate, so it is not reversible by editing a reader later - a v2 stream is refused, not migrated. That costs nothing today (NR-399 established there is no game save/load path yet) but BL-107 will make it cost something. The reasoning is sound and the harness proves the round trip; this is filed so the call is Ben's to revisit while it is still cheap.
+
+> **Recommendation:** Accept. Two stores for one quantity is the defect BL-546 exists to remove, and a compatibility-shaped block would have preserved the shape while losing the property.
+
+*Files: `src/world/procurement.cpp`, `src/world/procurement.hpp`, `src/world/world_save.cpp`*
+
+### NR-553 — BL-542 novelty: the grudge term has no data source, and corp-grain stance is being read as a nation-grain input
+*novel-work · raised 2026-08-23 · from Sprint N2 lane A (BL-542) raised both under the novelty flag; recorded at merge.*
+
+Two joints in the nation scorer that no authority doc owned. (1) THE GRUDGE HAS NO INPUT. NATIONS.md says the Era -1 residue biases the first two terms, but no campaign-era nation-pair state of any kind reaches `world` - the real pair outcomes sit behind BL-541 (directional tariffs). The lane substituted a derivation from the residue that DOES survive generation - contested border length plus the pair's `expansionism` posture, which NATION_GENERATION.md already derives from a border-contest integral - and isolated it in one function, `grudge_from_border`, so swapping the input when BL-541 lands moves nothing else. (2) NATIONS HOLD NO STANCE. `stance.hpp` is corp->corp only, so 'force standing near its borders' had no nation-grain reading. The lane bridged it: a border unit's owner is hostile toward corps registered in the threatened nation, weighted by the share it has declared against. That is the first place in the codebase where a corp-grain relation is read as a nation-grain input.
+
+**Why it matters.** Both are defensible and both are testable, and the lane flagged them rather than absorbing them, which is the point of the novelty rule. But the second is arguably BL-540's (nation-to-corp stance) to own, and BL-545's sentiment substrate - which landed the same day - is the thing that will eventually supply both readings properly. Deciding now which item owns the bridge is cheaper than discovering two of them later.
+
+- Leave both in nation_ai.cpp and let BL-541 and BL-540 replace them in place - the lane isolated them for exactly this.
+- Move the stance bridge into BL-540's scope now, before it is built on.
+- Reshape both onto BL-545's sentiment substrate directly, skipping the substitutes.
+
+> **Recommendation:** The first. Both substitutes are one function each and named as substitutes in the doc; replacing them is a smaller job than pre-deciding their home. But BL-540 should carry a note that the bridge already exists.
+
+*Files: `src/world/nation_ai.cpp`, `docs/politics/NATIONS.md`*
+
+### NR-554 — ANSWERED IN PART: the corrected Era -1 says 11 of 32 worlds fight nothing, and nothing yet separates them
+*question · raised 2026-08-23 · from Sprint N2 lane C (Sprint 28 lane A T1/T2), reproduced independently by the main session.*
+
+RE-MEASURED 2026-08-23 on the CORRECTED fixture (BL-462), which supersedes both earlier readings - the n=8 one this entry first carried and the n=32 one that refuted it. Both were about a sim the game does not run.
+
+WHAT THE REAL ERA -1 SAYS, verified independently by the integrating session on its own rebuild: 11 of 32 worlds fight nothing (34%). The fork answer SURVIVES unchanged - all 11 silent worlds show the campaign score clearing its threshold and losing the argmax on every round, never failing to clear. And BL-384's founding premise is dead: 2,503 battles produce 1,789 conquests (71.5%), with no seed anywhere fighting and taking nothing.
+
+NOTHING SEPARATES silent worlds from fighting ones, and both earlier diagnoses fail harder on the real fixture than they did on the wrong one. Ceiling-vs-floor: 32 of 32 seeds OVERLAP, none disjoint (it was 3 of 17 before). Score level: silent ceilings 275-439 (median 348) against fighting 350-531 (median 405), with 15 of 21 fighting seeds inside the silent range - a shift, not a separation. Four further candidates were tested (cleared candidates, scored candidates, contacts, foundings) and none separates.
+
+ONE THING DOES HOLD ACROSS EVERY WORLD: Settle takes 83-100% of the rounds Campaign loses, silent and fighting alike (silent median 99.2%, fighting 95.8%). So the open question is not the LEVEL of either score but their PER-ROUND JOINT BEHAVIOUR - whether Campaign's good rounds ever coincide with Settle's bad ones. verb_contest_trace already carries year and polity; nothing slices it that way yet.
+
+**Why it matters.** Zero-war at 34% is a third of every world generated, which keeps Ben's 2026-08-21 ruling biting - if a zero-war world means many ancient tech quests are unreachable, a third of worlds are unfinishable - while sitting further from BL-224's non-hegemony invariant than the 53% figure did. The target is still a rate inside a stated band, reported and never clamped. What has changed is that the measurement is now trustworthy and the diagnosis is genuinely open: three candidate separators have been tested and refuted, so the next move is a real question rather than a tuning pass. AND THE MEASUREMENT IS STILL BOUNDED: build_work cannot enter the contest headlessly (NR-558), so every statement here is about a four-verb contest where the game scores five.
+
+- Slice verb_contest_trace by (year, polity) to test the joint-behaviour hypothesis - the data already exists and nothing reads it that way. Cheapest next measurement and the only one the evidence currently points at.
+- Close the works gap first (NR-558) so the contest has all five verbs, then re-measure. Slower, but every finding until then carries an asterisk.
+- Accept 34% as the rate and rule on the band it should sit in, treating the mechanism as a later question.
+
+> **Recommendation:** The first, then the second. The joint-behaviour slice is a report-only change to an instrument that is now trustworthy, and it is the only hypothesis the measurement has not yet eliminated. But build_work missing from the contest is a real asterisk on any conclusion about which verb wins, so NR-558 should be settled before a fix is chosen rather than after.
+
+*Files: `src/world/history_sim.cpp`, `tools/verify/history_conquest_gap.cpp`, `src/world/hard_coded_world.cpp`*
+
+### NR-555 — Decision taken on Ben's behalf: three rows in a requirement group Sprint 28 did not own were flipped to complete at merge
+*decision taken on your behalf · raised 2026-08-23 · from Sprint N2 lane C reported it; the main session accepted it at merge and did not file the entry Rule 0c requires. Caught by the adversarial pass.*
+
+growth-extinguishes-war R3, R4 and R5 were flipped from pending to complete by the lane, on the grounds that this task's deliverable is precisely what those rows asked for. The main session read the three row texts, judged them satisfied, and carried the flips through the merge - WITHOUT filing a decision-taken entry, which is the exact case CLAUDE.md Rule 0c names. R4 has since been RE-OPENED: it was closed on a false metric (the 1-3 margin bucket recorded as empty; the harness prints 39). R3 and R5 stand - R3's question is genuinely answered by the fork, and R5's inertness claim is true even though the row that asserts it is weaker than its wording.
+
+**Why it matters.** Two things, and the second is the reason this is filed rather than just fixed. An unrecorded delegated decision is indistinguishable from one Ben made - that is Rule 0c's whole argument, and it applied twice over here because the flips were cross-group, which is a stronger claim than closing your own rows. And the flip that turned out to be wrong is the one that would have been hardest to catch later: R4 closed with a confident-sounding note carrying a number nobody had recomputed.
+
+> **Recommendation:** No action beyond what is done - R4 re-opened, R3/R5 stand, entry filed. Worth noting the pattern for future briefs: a lane that closes rows in a group it does not own should be required to say so in its report AND to file the entry itself, rather than leaving the integrator to notice.
+
+*Files: `docs/development/req/requirements.json`*
+
+### NR-556 — A duplicate backlog item was authored for a defect an existing priority-A item already owned
+*observation · raised 2026-08-23 · from Authoring BL-554 (Era -1 harness fixture) during Sprint N2 closeout.*
+
+BL-554 was written up as a new item for the history_conquest_gap fixture divergence. BL-462 (HARNESSES_MEASURE_A_DIFFERENT_SIM_THAN_SHIPS, filed 2026-08-18, priority A, v0.1.22) already owned it, named the span and clock divergences with the same line numbers, and carries the better provenance - it records this as the THIRD instance of the repo failure mode where a check looks like coverage and is not. BL-554 was retired into BL-462 the same day, contributing the four divergences BL-462 did not have (seed, creeds, the works argument that gates build_work out of the contest, the post-sim settlement) and an exact acceptance test.
+
+**Why it matters.** The duplicate cost nothing because it was caught within the hour, but the reason it happened is worth naming: a search for an existing owner was never run. backlog_query.js --grep and --touches exist precisely for this and take seconds. The near-miss is that BL-462 sits at v0.1.22 with a version goal, a file scope and a design; had the duplicate survived, the project would have carried two priority-A items for one defect in two different minors, and whichever one got worked would have silently orphaned the other.
+
+> **Recommendation:** No action - already folded. Worth a line in DELIVERY.md before authoring a new item: grep the backlog for the subject first. The existing rule covers ID allocation (next_id.js) but not subject collision.
+
+*Files: `docs/development/backlog.json`, `docs/development/DELIVERY.md`*
+
+### NR-557 — A new pattern landed without an owner: generation hands a harness its own arguments back
+*novel-work · raised 2026-08-23 · from BL-462's fix; flagged by the implementing lane under the novelty rule and confirmed at merge.*
+
+To let a harness reproduce the Era -1 exactly, `make_hard_coded_world` gained an optional out-parameter that captures the arguments the sim was actually called with - params, seed, creeds, settlement. Nothing in TILE_GENERATION.md, GENERATION_LEDGER.md or DEVELOPMENT_PRACTICES.md owns this shape. The two established precedents are different things: `generation_report` is a presentation record of generation's OUTPUTS, and `generation_record` holds per-pass intermediates regenerated on demand. This is a third - a capture of a call's INPUTS so a check can re-run it faithfully. It is deliberately off the save seam and costs nothing when unrequested.
+
+**Why it matters.** It is the right answer to BL-462 and it generalises: any generation pass a harness might want to re-run faithfully has the same problem, and this shape solves it without a save-format change or a second construction of the value. That is exactly why it wants a decision before it spreads. The rejected alternatives are recorded in the requirement group - re-deriving the creeds in the harness (a second construction of the same value, the defect the item exists to remove) and putting creeds on `body_entry` (a save-format change carrying pantheons and tongues to deliver one integer per culture, and it would not have solved the settlement half at all).
+
+- Adopt it as a named pattern in DEVELOPMENT_PRACTICES.md, so the next harness that needs it does the same thing rather than inventing a third shape.
+- Leave it local to the Era -1 and treat a second instance as the trigger to generalise.
+- Reject it and take the save-format route after all.
+
+> **Recommendation:** The first. The argument for the pattern is the same argument BL-462 makes - two constructions of one call WILL drift - and it applies to every generation pass, not just this one. Naming it costs a paragraph.
+
+*Files: `src/world/era_minus_one.hpp`, `src/world/hard_coded_world.cpp`, `docs/development/DEVELOPMENT_PRACTICES.md`*
+
+### NR-558 — No headless harness can measure the shipped configuration exactly — two Lua-authored inputs reach generation and none can load them
+*question · raised 2026-08-23 · from BL-462's fix; the sixth divergence it could not close.*
+
+`make_hard_coded_world` reads two Lua-authored inputs a headless harness cannot load: `scripts/works.lua` (BL-321's Era -1 works table) and `scripts/world_gen.lua`. The four excluded TUs for a headless build are exactly the Lua ones (NR-264). The consequence is concrete and current: `history_sim.cpp:896` gates `build_work` on a non-empty works registry, so THE HARNESS SCORES FOUR VERBS WHERE THE SHIPPED GAME SCORES FIVE - and verb competition is what that harness exists to measure. The lane declined to transcribe works.lua into C++ because that puts the roster in two places and stales the harness the next time the table moves, which is BL-462's own failure mode one layer down. It passes null on both sides through the shared fixture so they cannot diverge, and prints a banner on every run.
+
+**Why it matters.** DEVELOPMENT_PRACTICES.md treats headless harnesses as THE verification path for `world/*` logic. This says that path has a ceiling: it can verify mechanisms exactly and can never verify the shipped configuration exactly. BL-462's premise - 'no check measures the run that actually generates a world' - is now 5/6 closed, and the last sixth is structural. It also bounds what the Era -1 findings can claim: any statement about which verb wins is a statement about a four-verb contest.
+
+- A Lua-free authoring path for works and world_gen that PRODUCTION also uses - the tables become data the C++ side can read without sol2. Largest, and it removes the class.
+- A Lua-capable verification path: extend `ProjectIo --verify` to run these checks with the real registries, as the live-Lua harnesses (haulage_measure, substrate_census) already do.
+- Accept the ceiling, keep the banner, and require every Era -1 finding to state the verb count it was measured under.
+
+> **Recommendation:** The second, scoped to the harnesses that need it. The live-Lua pattern already exists in the repo and is understood; extending it is cheaper than re-authoring two content files, and it closes the gap for world_gen.lua at the same time. The third is the honest interim and is already in place.
+
+*Files: `tools/verify/history_conquest_gap.cpp`, `docs/development/DEVELOPMENT_PRACTICES.md`, `scripts/works.lua`*
+
 ---
 
 ## Resolved
 
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
+
+### NR-415 — novel-work: the per-lens reduction table is a NEW STANDING DESIGN ARTIFACT nobody has agreed to
+*novel-work · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
+
+Province-grain rendering forces every lens to state how it reduces from tile to province - a blend, a sum, or a reasoned refusal. The agent decided all thirteen and wrote the table into PLANETARY.md. That table is the scope growth worth choosing deliberately: it is a CONTRACT every FUTURE lens now inherits, and neither LENSES.md nor PLANETARY.md previously had a slot for such a thing. Two calls for you. (1) Where does it live - LENSES.md has the better claim on lens-wide obligations, PLANETARY.md is where it landed. (2) Do you accept that adding a lens now means answering it? The refusals are the interesting content: Country and Continent refuse because the MEAN OF TWO NATION COLOURS IS A THIRD NATION COLOUR - a blended political map would draw borders that do not exist. Industry is the only computed reduction (a province sum, filled uniformly).
+
+> **RESOLVED.** RULED Ben, 2026-08-22 (UI session), and the ruling goes AGAINST the refusals. Asked whether Country and Continent should fill uniformly per province or blend across province vertices like every other lens, Ben chose to blend, on an option explicitly labelled as overruling this entry. So the answer to question (2) is: adding a lens no longer means answering a reduction question, because every lens now blends. The mean-of-two-nation-colours objection recorded here is outranked, not withdrawn — it is restated in BL-532 so it can be brought back if Country reads wrong in practice. Question (1), where the table lives, is untouched and still open.
+
+### NR-417 — The map now mixes two visual languages, and the edge alpha is the one dial
+*question · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
+
+Blended provinces read as continuous painted ground; ocean and BUILT tiles stay crisp hexes by construction. In the integrated capture the result is a map that is soft in some regions and hard-edged in others, which may or may not be what you pictured. Also relevant: the first pass had province edges at alpha 70 and they were INVISIBLE - the map read as one field with no cells at all. The committed version is 105, with the stroke moved onto the blended vertices so two neighbours strokes coincide rather than sitting a pixel apart. Soft by design, since you ruled softened borders, with the crisp affordance being the on-demand selection outline. If the gradient reads too blurry at close zoom, edge alpha is the dial to move first and the blur radius second.
+
+> **RESOLVED.** RULED Ben, 2026-08-22 (UI session): the edge alpha goes to 0. Ben: "blur should cross province borders", and asked directly whether the stroke survives, chose to drop it. The map becomes one continuous field with province edges drawn only as the on-demand selection outline. The two-visual-languages observation is NOT thereby resolved — ocean and built tiles stay crisp by construction, so the mix remains and is now the next thing to look at. Carried into BL-514.
+
+### NR-421 — The per-province firm cap is inert by ORDERS OF MAGNITUDE, not by a near miss
+*question · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
+
+BL-512 per_province_firm_cap = 2 was measured as nearly inert against 4-tile provinces, and the hope was that 9-tile provinces would make the spatial half of the two-level firm budget do real work. It does not. Measured across 8 seeds after repartition: 296 background firms anchored across 295 DISTINCT provinces; the busiest province holds ONE firm on 7 of 8 seeds; exactly one province in the entire sweep reaches the cap of 2. The reason is structural, not a tuning miss - there are ~24-50 background firms per world against ~3,500 provinces. A per-province cap cannot bind at that ratio at any plausible value. So the two-level budget is really a one-level budget: the per-RESOURCE cap carries the entire result (it took every seed to its coverage target), and the per-province cap is decoration. Three options: drop it as dead weight, keep it as a bound that only matters once player density arrives, or move the spatial constraint to the grain where firms actually compete. It costs nothing today either way, which is why this is a question and not a defect.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: DROP THE CEILING TO WHERE IT BITES - and Ben added the half neither option named: "Use technology for deeper mines and denser facilities which use more of the cap." So the ceiling becomes a real constraint AND technology becomes what relieves it, which makes BL-513 the first consumer of a modifier subject that does not exist yet. Under the same day's NR-524 ruling every unwired subject must name the item that will wire it, and BL-513 is now the namer for processing_yield. Whether "denser facility" is fewer slots per building or more output per slot is the small call still owed in BL-513.
+
+### NR-433 — 12% of provinces are below the HARD 3-tile floor, and that needs your eye
+*question · raised 2026-08-21 · from BL-515 (organic province borders), merged and verified 2026-08-21.*
+
+Distribution against the 3x3 partition it replaces: 24,498 provinces (was 21,161), mean 7.87 (was 9.11), max 12 and now ABSOLUTE (was 18 overshoot), min 1, 74.71% in the 7-12 band (was 97.90%). The band drop is expected and was explicitly not chased - organic borders are supposed to be irregular. What I want your eye on is a different number: 6,195 provinces under 7, of which 3,008 are under 3 - i.e. roughly 12% sit below the HARD 3-12 target you set. You also ruled 'do not reject tiny provinces', so keeping them is correct per the ruling and the agent was right not to merge them away. But the two rulings pull against each other at this volume, and the visible consequence is in the alpha-220 capture: in places the map reads as a hex lattice again, because a 1-2 tile province is a hex with a border drawn round it. That is the look you moved away from. Options if it bothers you: raise the seed density so fewer pockets are enclosed, let a sub-floor pocket join a neighbour (a softer rule than the merge pass you removed), or accept it and let the blend hide it at play zoom.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: ACCEPT IT. 12% of provinces below the hard 3-tile floor is the "don't reject tiny provinces" ruling working as intended, not a defect. PROVINCES.md § Open questions 1 struck through with the ruling.
+
+### NR-443 — Texture and the province blend are in direct tension, and BL-514 sits in the middle of it
+*question · raised 2026-08-21 · from BL-519 / BL-520 design work, 2026-08-21.*
+
+The canvas blends colour across a province's tiles (BL-511) to smooth the lattice away. A texture does the opposite - it asserts where one tile ends. Run both naively and they fight. The resolution in BL-520 is to texture the SUBSTRATE (which the blend already averages) and pattern the COVER (which is per-tile and should read as per-tile), so a forest edge is information and a rock-to-rock seam is not. But this collides with BL-514 (blend ALL tiles, not just within provinces), which is HELD pending your look at the organic borders. If texture becomes the thing that makes the map read as terrain, the global blend may be unnecessary - or may be exactly what lets texture stay subtle. Worth deciding BL-514 and BL-520 together rather than in sequence, since each changes what the other is for.
+
+> **RESOLVED.** RULED Ben, 2026-08-22 (UI session): decided together, as this entry asked. The global blend goes ahead (BL-514) AND texture stays (BL-520) — so texture is what carries terrain legibility once the province seam is gone, rather than the two competing. The tension this entry named is resolved in favour of doing both.
 
 ### NR-489 — Sprint 28's real subject is verb competition — the scorer discards ~10M campaign candidates to reach zero wars
 *observation · raised 2026-08-21 · from Sprint 28 decomposition. history_conquest_gap campaign funnel, 8 worlds.*
@@ -1956,4 +2462,326 @@ Runners-up and why they lost:
 > **RESOLVED.** Filed as work: BL-531 (session-close indent preservation), version goal v0.1.22 (Harness truth — the tooling-truth minor). Recommendation carried into the item: detect and preserve each store's existing indent rather than hardcoding the other number, so it cannot drift again when a store is reformatted for an unrelated reason.
 
 *Files: `tools/session/apply_session_close.js`*
+
+### NR-502 — tile_texture.lua ran GREEN while two of its load-bearing frames point at open water — the fixtures did not survive the repartition
+*observation · raised 2026-08-22 · from UI session 2026-08-22, tile_texture.lua*
+
+The check reports "0 golden failure(s)" and every capture wrote. But its two framed close-reads are aimed at tiles that no longer hold what the script documents. center_tile(89,10,5) — commented as Kepler grass/scrub/forest/marsh, "where the density scale actually varies" — lands on ocean and ice (texture_density_close.png). center_tile(76,12,8) — commented as a run of same-substrate land tiles inside one province, the R1 negative half proving grain draws no seam — lands on pure open ocean, which by design draws nothing at all (texture_grain_no_seam.png). So R2 (density scaling) and R1-negative (no seam) are currently UNTESTED despite a green run. Same shape as NR-422: BL-515/BL-516 repartitioned the world and the hardcoded fixtures moved out from under the script.
+
+**Why it matters.** This is the exact failure the verifier-visual skill names — a green pass over a frame that never showed the subject. The two claims the item most needs proven are the two that silently went untested.
+
+- Re-aim both center_tile calls at tiles that actually carry the covers, and state the cover in the capture name
+- Give the verify API a find-tile-by-cover helper so the fixture is derived, not hardcoded
+
+> **Recommendation:** Re-aim, and prefer the derived helper — hardcoded tile fixtures will break on the next repartition too.
+
+> **RESOLVED.** FIXED 2026-08-22, in session. Both center_tile fixtures re-aimed onto (40,30)/(37,28) — the land province_render.lua frames, confirmed biotic. texture_density_close.png now shows neighbouring forest tiles at visibly different canopy densities, which is R2 actually being tested; texture_grain_no_seam.png is land-only, scrub above and closed canopy below, so the R1-negative claim is asserted over ground that could show a seam. Each fixture carries a comment naming NR-502 and warning that hardcoded tile fixtures will break on the next repartition. The derived find-tile-by-cover helper recommended above was NOT built — it needs a new verify API function, which is scope growth this session did not take. Left as the standing hazard.
+
+*Files: `scripts/verify/tile_texture.lua`*
+
+### NR-503 — The Country lens legend overflows its container and collides with the tile ledger beneath it
+*observation · raised 2026-08-22 · from UI session 2026-08-22, texture_lens_country.png*
+
+At a 1600x1000 window the Countries legend lists 40 nations in one ungoverned column. It runs past the bottom of the canvas and overprints the tile ledger panel — "Rutam", "Th Thuara", "Te Rerem", "Bethreibei Beise", "Zeithketh", "Beireth Reineth", "Shakei", "Taitamte Tammai", "Toko Roto" are all drawn over the ledger buttons and the resource graph. Legible text on top of legible text, neither readable. Visible in build/screenshots/texture_lens_country.png.
+
+**Why it matters.** Unrelated to BL-520 — the texture work simply made me look at this lens. It is a live clipping defect on a shipped lens at a supported window size, and text_overflow_floor would not catch it because nothing is clipped, it is overdrawn.
+
+> **RESOLVED.** SUPERSEDED BY BL-533, Ben, 2026-08-22 (UI session). Rather than tune this one legend, every legend moves to a reserved scrolling region beside the minimap at about a quarter of its space, with wrapping and shortened names. That removes the overdraw failure class outright — the Country legend cannot overflow a container that scrolls.
+
+*Files: `src/ui/`*
+
+### NR-504 — click_injection C3b and C4 FAIL — the press lands, but the selection cycle does not advance on a repeat click
+*question · raised 2026-08-22 · from UI session 2026-08-22, click_injection.lua*
+
+The press itself is PROVEN, which closes the core of NR-416/NR-424: C1a (click_tile resolved and pressed), C1b (the injected click selected a province through the real handler), C2 (injected click and select_province agree, 22209 vs 22209) and all three hover assertions pass. But two fail. C3b expects a second press on the same tile to walk BL-511 rung UNIT>PROVINCE>BUILDING>TILE off the province to the bare tile; actual is province=22209 has_entity=false, i.e. unchanged. C4 (double_click delivers two presses) fails the same way. TWO candidate causes and I did not determine which: (a) the cycle genuinely does not advance, a real behaviour bug in the click handler; or (b) C2 tears the premise down — it calls verify.clear_selection() then verify.select_province(), so if repeat-click detection keys on the previous CLICK target rather than on selection state, C3s click is a first click by that reckoning and correctly re-selects the province. Cause (b) would make this a script bug, not a product bug.
+
+**Why it matters.** BL-521 exists to close the live-check class. Its own check is now the thing reporting red, and the answer decides whether BL-511s selection walk is broken or the script is.
+
+- Reorder the script so C3 follows C1 without the clear_selection teardown, and see if it goes green
+- Read the click handler cycle condition directly and settle it by inspection
+
+> **Recommendation:** Try the reorder first — it is one edit and it distinguishes the two causes outright.
+
+> **RESOLVED.** ANSWERED AND FIXED 2026-08-22, in session. Cause (b) REFUTED empirically: reordering the script so C3/C4 run immediately after C1, with no clear_selection teardown between, reproduced the failure identically. A hover-before-click diagnostic changed nothing either, ruling out the injection path. Cause (a) confirmed — a REAL bug in shipped selection behaviour. Mechanism: body_surface_canvas.cpp seeded selection_cycle_stage with the OLD FOUR-RUNG indices, never shifted when BL-469 inserted the battle rung at index 0. stages[5] is BATTLE 0, UNIT 1, PROVINCE 2, BUILDING 3, TILE 4, but plain ground seeded 1 (the UNIT rung), so a repeat click walked 1 -> 2 and landed back on the province — reading as the cycle not firing at all. All four seed constants were one short. Shifted to 1/3/3/2, and the comment now states they must track stages[5]. click_injection.lua is 8/8 PASS; C3 reports province=0 has_entity=true. STILL OWED: a live click by Ben per the 2026-08-19 standing rule — the harness proves the press and the walk, not that it feels right.
+
+*Files: `scripts/verify/click_injection.lua`, `src/ui/`*
+
+### NR-505 — BL-532 shipped and the NR-415 artifact is REAL and VISIBLE — nation colours now gradient into a third colour at every border
+*observation · raised 2026-08-22 · from UI session 2026-08-22, province_lens_country.png*
+
+You overruled the NR-415 refusal knowingly, and I said the thing to do if it read wrong was bring it back rather than quietly reinstate it. It reads wrong, so here it is. In build/screenshots/province_lens_country.png the Country lens now keeps the province view as you asked — nations are soft continuous regions rather than a hex lattice, which is the win. But along the boundary between the mauve nation and the gold one there is a wide gradient band, and the colour in that band belongs to NEITHER nation. It resolves to an amber/orange that is itself a plausible nation colour. A player reading that frame cannot tell where one nation stops, and could reasonably read the band as a third nation between them. This is precisely the mean-of-two-nation-colours case NR-415 named, now measured rather than predicted.
+
+**Why it matters.** Country is the lens whose entire job is a categorical boundary. The blend is doing real damage to the one thing this lens exists to answer, in a way the continuous-field lenses (none, resource, market, scarcity) do not suffer, because their fields genuinely are continuous.
+
+- Keep as ruled — accept the soft political border as the price of the province view
+- Country and Continent alone fill uniformly per province: keeps the province view, invents no colour, and is NOT a return to per-tile rendering
+- Blend but narrow the gradient sharply for categorical lenses, so the band is a hairline rather than a wide wash
+
+> **Recommendation:** Option 2. It gives you exactly what you asked for — the province view, no revert to per-tile — while the boundary stays true. The gradient is only meaningful where the underlying field is continuous, and nationhood is not.
+
+> **RESOLVED.** RULED Ben, 2026-08-22 (UI session), and the ruling goes FURTHER than the entry proposed. Ben: "I like the idea of NR-505, we can stop blending across national borders, and give a slight hue for each country, replacing the national lens entirely." So it is not option 2 (Country and Continent fill uniformly per province) — it is a different move altogether. The blend stops at NATIONAL borders rather than province ones, every tile carries a slight hue from the nation that holds it, and overlay_mode::country is RETIRED because the base map now answers the question the lens existed to answer. Filed as BL-535. NR-415, which recorded the original categorical refusal, is vindicated by the outcome even though its specific remedy was not the one taken.
+
+*Files: `src/ui/body_surface_canvas.cpp`*
+
+### NR-508 — lens_legend.lua has to aim at the legend header BY PIXEL, and got it wrong three times before it landed
+*observation · raised 2026-08-22 · from UI session 2026-08-22, lens_legend.lua*
+
+The new check presses the legend header, and the only way to say where that is is to re-derive the shell geometry in Lua: minimap size from its own formula, then shell_margin, then the published time_panel_h, then a guess at the header band. It missed three times in a row — first by aiming below the collapsed box, then by assuming the box grew upward, then by landing on the Market lens resource combo, which stacks ABOVE the header and shifts it 26px down. Each miss silently did something else instead (panned the canvas, opened the good-picker) rather than failing, so each one needed a capture read to diagnose. The constant now reads `local time_panel_h = 84 -- measured off the capture, not assumed`, which is honest but is a number copied from a screenshot, and it will drift the moment the font or the panel changes.
+
+**Why it matters.** This is NR-454 arriving exactly as predicted: BL-521 closed the live-check class for canvases, where click_tile can ask the canvas where a tile is, but NOT for panels, which publish no rect. The first real panel check after that entry needed four attempts, and the fragility is now committed in a script rather than being hypothetical.
+
+- Accept it — panel checks re-derive geometry and are refreshed when they break
+- Give the shell a target registry: each clickable surface publishes {name, rect} into ui_state, and verify gains click("lens.legend.header") — the thing NR-454 says needs a ruling before it can be built
+
+> **Recommendation:** No new work yet, but this is evidence for NR-454 rather than a separate question — worth deciding them together.
+
+> **RESOLVED.** ACCEPTED Ben, 2026-08-22 (UI session) — Ben: "that's no problem." The pixel-aimed panel check stands as written. The underlying gap (panels publish no rect, so a check cannot ask where a control is) remains open as NR-454, which still wants a ruling before a target registry could be built; this entry is closed as an accepted cost rather than as a fixed problem.
+
+*Files: `scripts/verify/lens_legend.lua`*
+
+### NR-509 — BL-534's new tab makes NR-421 visible on its first frame: capacity 103, geology 24
+*observation · raised 2026-08-22 · from UI session 2026-08-22, accordion_view_buildings.png*
+
+The Available buildings tab shipped and the very first province it rendered says: Province capacity 0 / 103 (103 free), over a table whose three workable rows are Agricultural Produce 0/9, Stone 0/9 and Timber 0/6 — 24 placement slots in total. So BL-513's ceiling stands more than four times above everything the province's own geology could ever support, and the binding constraint on building here is deposits, not the ceiling. NR-421 measured exactly this and called the per-province firm cap 'inert by ORDERS OF MAGNITUDE, not by a near miss'. BL-534's design note predicted this tab would be the first surface to make that legible to a player. It is, on frame one, without being asked to.
+
+**Why it matters.** Two things follow. First, the tab reads oddly as shipped: a headline number of 103 sitting over a table that tops out at 24 invites the player to believe there is room they do not have. Second, this is now a PLAYER-VISIBLE statement of a tuning problem rather than an internal measurement — whatever is decided about k_province_buildings_per_sustain_unit, this surface will show it.
+
+- Leave both numbers as they are — they are each true, and the gap is the honest reading
+- Show the effective ceiling alongside: min(province ceiling, sum of per-resource maxima), so the headline is what actually binds
+- Re-pin k_province_buildings_per_sustain_unit so the ceiling lands near what geology supports — a tuning change, not a UI one
+
+> **Recommendation:** Option 2 for this surface, and treat option 3 separately. Naming what actually binds is the tab's job; re-pinning the constant is a balance decision that wants its own measurement, and NR-421 already holds that thread.
+
+> **RESOLVED.** Superseded by the NR-421 ruling of 2026-08-22 - the ceiling drops to where it bites, and technology raises effective density. The 103-vs-24 measurement this entry reported is what the ruling was made against.
+
+*Files: `src/ui/selection_panel.cpp`, `src/world/province.hpp`*
+
+### NR-510 — BL-377 (mercenary contract seam) is marked complete and was NEVER BUILT — the game's income loop is filed as delivered
+*observation · raised 2026-08-22 · from Phantom-feature scan, 2026-08-22 (docs/development/PHANTOMS.md § Class 0).*
+
+BL-377 carries status 'complete'. Four independent checks say no code exists. (1) Its files name src/world/contracts.hpp, src/world/contracts.cpp and scripts/contracts.lua — `git log --all --diff-filter=A` finds NO creation commit for any of the three, on any branch. (2) A grep of src/ for 'BL-377' returns nothing. (3) corp_verb carries no contract verb; the design called for three appended verbs. (4) world.hpp holds procurement_quotes and procurement_contracts only — BL-350's BUY side. It was closed by commit bb4f612, 'Close BL-377 and BL-378 - two more landed items still listed as open'. BL-378 (minimap base render) genuinely HAD landed; BL-377 was swept up with it. MANUAL.md § 4.10 independently marks Contracts [DESIGNED] — the manual is right and the backlog is wrong.
+
+**Why it matters.** This is the player's INCOME under the ancient arc — be contracted, field force, be paid. BL-377's own design field calls it 'the item the refocused product stands on'. ROADMAP § The near sequence still names Sprint 16 as 'BL-377 (contract seam) playable end-to-end' and SPRINTS.md § Sprint 16 is OPEN, so the item is closed inside the sprint that would deliver it. Every status view — the dashboard, the roadmap's open count, any 'what's left' query — currently reads the mercenary loop as done. The design itself survives intact in archive/backlog-design-2026-Q3.json.
+
+> **Recommendation:** Reopen BL-377 as 'designed' with version goal v0.1.15, and re-check BL-378's sibling closures from the same sweep. Not done in this session: the scan was the ask, and flipping a status changes what every roadmap and sprint view reports. Ten minutes of work once you say go.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: reopen it. Done the same session - BL-377 is back to status 'designed', priority A, version goal v0.1.15, with its design prose restored from archive/backlog-design-2026-Q3.json and a dated REOPENED note recording the false close and its four proofs. BL-378, the other half of the bb4f612 sweep, was re-checked and its files all exist - that closure was correct. backlog_lint reports no new warnings. Sprint 16 (the mercenary vertical slice) owes it, as ROADMAP already said.
+
+*Files: `docs/development/backlog.json`, `docs/development/ROADMAP.md`, `docs/development/SPRINTS.md`, `docs/MANUAL.md`*
+
+### NR-511 — docs/lore/COLLAPSE.md is named as authority by 19 open items and declares itself NOT authority
+*question · raised 2026-08-22 · from Phantom-feature scan, 2026-08-22 (PHANTOMS.md § Class 3).*
+
+COLLAPSE.md opens 'Status: research scaffolding - the design conversation's home, not authority.' Nineteen OPEN backlog items name it in authority_doc. A reader following the pointer lands on a page telling them it settles nothing. Five sibling scaffolding docs carry the same banner and total 3,076 lines: ERA1_TECH_LANDSCAPE (882), ANCIENT_TECH_LADDER (739), STRATEGIES (475), COLLAPSE (439), LANGUAGE_POLICY_FEASIBILITY (271), TECH_EFFECTS (270). None of the six has ever graduated.
+
+**Why it matters.** The convention is sound - scaffolding is promoted when the work lands - but no promotion has ever happened, so 3,076 lines of settled thinking sit permanently one step short of readable. COLLAPSE is the case where the contradiction is load-bearing rather than cosmetic, because open items depend on it.
+
+- Graduate COLLAPSE.md to authority and drop its banner.
+- Re-home the 19 items' authority_doc onto docs/lore/HISTORY.md and leave COLLAPSE as scaffolding.
+- Leave it, and accept the pointer means 'read this for context'.
+
+> **Recommendation:** Option 1 for COLLAPSE specifically - nineteen dependants is what an authority doc looks like. The other five can stay scaffolding until their work lands.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: GRADUATE IT. docs/lore/COLLAPSE.md is authority; its "research scaffolding - not authority" banner is withdrawn, and the provenance it carried is kept below the new status line. Nineteen open dependants is what an authority document looks like. Its five sibling scaffolding docs keep their banners until their own work lands. It also now owns something outright: Ben ruled the same day that events EXPRESS the collapse metagame rather than driving it, so the strain accumulator stays with this doc and BL-477, and the event layer reads it.
+
+*Files: `docs/lore/COLLAPSE.md`, `docs/development/backlog.json`*
+
+### NR-514 — Status drift runs BOTH ways — BL-480 (law has an author) shipped and its item still says 'designed'
+*observation · raised 2026-08-22 · from Documenting the nation as an actor (PHANTOMS.md session 2). Found while establishing what actually runs.*
+
+BL-377 was the false-complete. BL-480 is the opposite and is confirmed: commit c00bba8 'Merge BL-480 (law author + treasury) - Sprint D3' IS an ancestor of HEAD, nation_component::treasury and law::enacting_nation exist, budget_system.cpp runs the transfer, balance_ledger.cpp shows the read-only Laws section, and tools/verify/law_author_harness.cpp exists. The item's status is still 'designed'. A first-pass sweep - open, unparked items whose id appears anywhere in src/tools/scripts - returns 48 candidates, but it is NOISY: most hits are forward references in comments ('BL-315 will read this'), and BL-377 itself scores 1 for exactly that reason. So 48 is an upper bound on the drift, not a count of it.
+
+**Why it matters.** Two directions of the same defect. A false-complete hides owed work (BL-377, the income loop); a false-open hides landed work, which is how the same thing gets built twice and how a version's real content is understated. Neither is visible from any status view, because status is the thing that is wrong. A reliable check exists and is cheap: an item is landed if its named files carry its id AND a commit whose subject names the id is an ancestor of HEAD - subject, not body, to drop the forward references.
+
+- Reconcile all 48 candidates in one pass and fix the statuses.
+- Fix BL-480 now (confirmed) and leave the sweep for a session that can run the harnesses.
+- Write the check as a tool and fold it into backlog_lint.js, so drift is caught at close rather than found by accident.
+
+> **Recommendation:** Option 3, with option 2 alongside. The check belongs in backlog_lint - it already warns when a req group is complete and its item is not, which is the same class of drift caught from a different angle. Doing it by hand once fixes today and nothing after.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: BUILD THE CHECK INTO backlog_lint. Landed this session, both arms, and mutation-tested. FALSE COMPLETE: an item is flagged when it names a source path with NO CREATION COMMIT ON ANY BRANCH - the precise fact that identified BL-377. Three earlier drafts were rejected by their own tests: "every named path absent" could not have caught BL-377 (it named ten files, seven of which exist); pairing with "the id appears nowhere in src/" was defeated by a forward reference in scripts/economy.lua. What ships is the precise signal plus a seeded allow-list of the 14 known-benign paths, each with its reason - renames from before the squashed import, the serialisation.cpp gap NR-349 already records, and one retired surface. FALSE OPEN: an item is flagged when a commit whose SUBJECT names it is an ancestor of HEAD, matched against the two landing shapes measured in this repo's history ("BL-N: ..." and "Merge BL-N ...") and excluding lifecycle subjects (File/Close/Pause/...). That narrowed 30 candidates to 13. Both are warnings, never fails - git may be absent, and a partial slice can land under a legitimately open item. Proven by mutation: re-introducing the BL-377 defect makes the check name it and its three never-written paths; a clean tree is silent.
+
+*Files: `docs/development/backlog.json`, `tools/session/backlog_lint.js`*
+
+### NR-515 — NATIONS.md's six questions all settled by Ben in one session, plus a system he raised alongside them
+*decision taken on your behalf · raised 2026-08-22 · from Design session 2026-08-22, immediately after the nations doc was written.*
+
+All six § Open questions answered in Ben's own words, and a new system raised by him in the same message: a two-way channel between corporations and nations - lobbying forward, the national budget in reverse ('it is still fun to have our corporations funded directly via taxes'). Offered A) file to backlog or B) design now, per Rule 0a; Ben chose B. Seven items filed: BL-537 (national budget, the spine), BL-538 (priority lines), BL-539 (lobbying), BL-540 (nation->corp stance), BL-541 (directional tariffs), BL-542 (nation scorer), BL-543 (value anchor). The rulings are recorded in NATIONS.md § Settled; the mechanism design stays in the items until the work lands, per the authority time-slice.
+
+**Why it matters.** The channel closes a circuit that was open at one end - two flows filled a treasury nothing spent - and it gives the player its first lever on law without breaking the law-subject identity. Three of the rulings reach outside this doc: the value anchor sets the unit upkeep rate MILITARY.md lists as absent, the research budget lines are the debit mechanism BL-478 has been missing (NR-387), and BL-538's contracted-force line is BL-377's missing client.
+
+> **Recommendation:** No action - recorded so the rulings are attributable and the seven items' provenance is one place.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22, in his own words on all six. Recorded in NATIONS.md § Settled with his phrasing quoted per ruling.
+
+*Files: `docs/politics/NATIONS.md`, `docs/development/backlog.json`*
+
+### NR-516 — Delegated calls in the v0.1.24 filing: a new minor number, one version goal, and three shapes chosen on Ben's behalf
+*decision taken on your behalf · raised 2026-08-22 · from Filing the seven items from the 2026-08-22 nations design session.*
+
+Five calls taken so the items could be filed. (1) VERSION: the six channel items carry v0.1.24, the next free minor - v0.1.23 is 'Who owns whom' (the syndicate tier). The minor is unnamed and unnamed in ROADMAP; Ben should name it or fold the cluster elsewhere. (2) BL-543 (value anchor) put at v0.1.21 instead, with the economy-tuning items - it is a calibration that unblocks NR-382 and should not wait on a politics minor. (3) TARIFF SHAPE: recommended the tariff stay a `law` and gain a `target_nation` field with an `all_nations` sentinel, rather than moving rates onto a nation-pair table; the fork is stated in BL-541 rather than hidden. (4) TWO DIMENSIONS, not 'possibly multiple' - Access and Trust, each gating something, with a third resisted until it does. (5) LOBBYING FEE assumed CONSUMED rather than credited to the treasury; called out in BL-539 and left open below.
+
+**Why it matters.** A version goal is a sequencing commitment and a new minor number is Ben's to name. The tariff-record shape is the one call that is expensive to reverse later, since it lands on a serialised record.
+
+> **Recommendation:** Confirm or rename v0.1.24, and sanity-check the tariff record shape before BL-541 starts. The other three are cheap to overturn.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: CONFIRM v0.1.24 AND NAME IT. Named "Who answers to whom" - a deliberate echo of v0.1.23 "Who owns whom": that minor settles who owns whom, this one settles who answers to whom, and BL-399 is literally COMPANY_ANSWERABILITY. Added to ROADMAP with the cluster spelled out (BL-537 through BL-542, plus BL-545/546 sentiment, BL-549 friendship, BL-550 national insolvency). The other four calls in that entry - BL-543 at v0.1.21, the tariff record shape, two dimensions not "possibly multiple", and the consumed lobbying fee - are all now settled elsewhere in this session.
+
+*Files: `docs/development/backlog.json`, `docs/development/ROADMAP.md`*
+
+### NR-517 — Your ruling needed: does the nation grant reach a RIVAL acting politically against the player, and is a lobbying fee consumed or banked
+*question · raised 2026-08-22 · from Designing BL-539 (lobbying) and BL-540 (nation->corp stance), 2026-08-22.*
+
+TWO CALLS, both blocking the player-facing halves of those items.
+
+(1) THE GRANT'S REACH. A rival corporation lobbying to shift a law that binds the player's corp, and a nation's Access stance gating the player out of a territory, are both consequences imposed on A CORP A HUMAN OWNS by an actor the player does not control. Every widening of that prohibition to date has been explicit and dated - BL-079, BL-202/203, BL-293, BL-324, BL-181, BL-409, and BL-450 (rivals score stance), which is the closest precedent because it was the first RELATIONAL action against the player's corp. The 2026-08-18 grant (ruling 4 of NR-331) covers a NATION acting in a deterministic scored-utility shape. It does not obviously cover a rival corporation acting politically against the player, and reading it as though it does would set exactly the quiet precedent the standing rules exist to prevent.
+
+(2) THE LOBBYING FEE. Consumed, or credited to the lobbied nation's treasury? Consumed reads as influence-buying and keeps the treasury's inflows purely legal (levy, tariff, charter fees). Credited closes another money loop but makes lobbying a second tax, and means a nation profits from being lobbied - which would give BL-542's scorer an incentive to be corruptible.
+
+- Grant the rival half on the same terms as BL-450 - deterministic, seeded, scored-utility, legal verbs only.
+- Withhold it: nations may act politically, rivals may not, and lobbying is a player-only verb for now.
+- Grant it but gate it behind a visibility rule, so a lobbied law is always attributable to whoever bought it.
+
+> **Recommendation:** Option 1 for the grant, on the BL-450 precedent - a rival that cannot lobby while the player can is the unreachable-capability defect BL-458's design complains about, from the other side. But it is your call and the items are written to stop short of it. On the fee: CONSUMED, which is what BL-539 assumes; a nation that profits from lobbying is one the scorer will learn to invite.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22 (design register). (1) THE GRANT REACHES A RIVAL - granted on the same terms as BL-450: deterministic, seeded, scored-utility, legal verbs only, never a planner. A rival may lobby a nation against the player, and a nation's derived stance may gate the player's corp out of a territory. Recorded as a dated widening in .claude/rules/io-standing-rules.md, since its subject is the one actor the prohibition exists to protect. What it does NOT admit: a rival ENACTING law (only a nation can), and influence acquired by any route other than the lobby verb. The player-facing halves of BL-539 and BL-540 are unblocked. (2) THE LOBBYING FEE IS CONSUMED - a cost, not a transfer, so the treasury's inflows stay purely legal and a nation never profits from being lobbied. That last part is the reason: a nation that profited would give BL-542's scorer an incentive to be corruptible. It is the one flow in the corp-nation channel that deliberately does not conserve, and BL-539's harness row says so.
+
+*Files: `.claude/rules/io-standing-rules.md`, `docs/politics/NATIONS.md`, `docs/development/backlog.json`*
+
+### NR-518 — Io has TWO clocks and the word 'tick' means both - harmless today, load-bearing the moment anything is priced per year
+*observation · raised 2026-08-22 · from Deriving BL-543's value anchor, which needed to know how many ticks a year is.*
+
+A DAY TICK is one in-game day (sim_loop::m_day_tick); the survey system counts these, and survey_system.hpp says 'one tick = one day'. An ECONOMY TICK is 90 of them - sim_loop::econ_tick_days = days_per_month(30) x months_per_econ(3) - so k_ticks_per_year = 4, and budget_system.hpp, corp_ai.cpp and construction_panel.cpp all say 'a tick is one quarter'. BOTH READINGS ARE CORRECT about different clocks, so this is not a defect. It is a naming collision that has already produced two apparently contradictory statements in the corpus, and it cost this session a detour to resolve.
+
+**Why it matters.** It stopped being cosmetic the moment a design was priced 'for that year' (Ben's value anchor). It happens to cancel there - both halves of the ratio are per-head-per-tick, so the factor of 4 disappears - but the next annualised quantity may not be so lucky. GLOSSARY.md defines neither term.
+
+- Add both terms to GLOSSARY.md and leave the code alone.
+- Rename one in code (econ_tick vs day_tick) so the ambiguity cannot be read.
+- Leave it; the comments are individually correct.
+
+> **Recommendation:** Option 1 - it is a doc gap, not a code defect, and GLOSSARY.md is exactly where a term with two live meanings should be pinned. Not done here: the glossary is a canonical-terms authority and adding two entries is a small design call of its own.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: RENAME ONE IN CODE - econ_tick vs day_tick - so the ambiguity cannot be read. Filed as BL-552 with the scope measured rather than estimated: 28 references across 13 source files, including the mirrored econ_tick_days_world in logistics.hpp which must move with it (world/* must not depend on core/*, and the stepped-clock harness already asserts the two agree). NOT done in the session that found it: no build tree and no compiler check were available, and a 28-site cross-file rename with no compile is the shape of change that ships a typo. GLOSSARY.md gains both terms as part of the same work.
+
+*Files: `docs/GLOSSARY.md`, `src/core/sim_loop.hpp`, `src/world/budget_system.hpp`, `src/world/survey_system.hpp`*
+
+### NR-519 — Value anchor clarified to BASE prices and authoring-time — which shrank the item and opened a new gap (BL-544)
+*decision taken on your behalf · raised 2026-08-22 · from Ben's clarification on BL-543, same session as the six rulings.*
+
+Ben: 'let's divorce wages from goods somewhat. My 1/2 figure can use base prices. We don't have to rederive wages every tick.' BL-543's first draft had the ratio resolving LIVE market prices and read as a hard identity. Rewritten: (1) the ratio is stated against scripts/world_gen.lua's base_price table, which is AUTHORED and seed-invariant - verified this session; ordnance 43.0, food_rations 6.0. (2) It is an authoring-time calibration, re-checked only when the base-price table or the roster moves; nothing recomputes per tick. (3) It is a band with a tolerance, not an equality, so a class with deliberately cheap or dear equipment can sit outside it. The harness now reads the authored tables only - no world generation, no market resolution - making it one of the cheapest in the suite.
+
+**Why it matters.** The first draft would have made the same authored rates mean different things on different bodies, since a resolved price carries local scarcity. It would also have coupled the military cost base to every price movement in the game. Both are gone. The clarification also EXPOSES a gap: while the wage and goods were one locked identity, either could be the free variable; divorced, the wage is independently authored and nothing anchors it. Filed as BL-544 (unit wage reference), design-owed, recommending a multiple of the civilian base_wage (6.0-15.0 per workforce per tick) with the per-class spread taken from the roster's power_mod, per NR-322.
+
+> **Recommendation:** No action on BL-543. BL-544 needs a reference chosen before either rate is authored - the ratio is only as good as the quantity it is a ratio of.
+
+> **RESOLVED.** CLARIFIED BY BEN, 2026-08-22. BL-543 rewritten against base prices at authoring time; BL-544 filed for the gap it opens.
+
+*Files: `docs/development/backlog.json`, `docs/politics/NATIONS.md`, `scripts/economy.lua`, `scripts/world_gen.lua`*
+
+### NR-520 — Three designs are converging on the same continuous relational quantity and none of them knows about the other two
+*question · raised 2026-08-22 · from Writing docs/politics/RELATIONS.md (system 2 of the phantom scan).*
+
+Putting all four relational quantities in one table made this visible for the first time. (1) CONCEPT.md § Sentiment-based diplomacy: each faction holds a CONTINUOUS sentiment toward every other, shaped by trade history, territorial conflict and ideological alignment. Designed since the concept doc; MANUAL.md § 5 lists it [OWED]; nothing in code holds it. (2) BL-448 stance: DISCRETE and DECLARED, shipped 2026-08-19. (3) BL-540 (nation->corp stance), designed 2026-08-22 in the nations session: GRADED, multi-dimensional and DERIVED - which is sentiment's shape, arrived at from a different direction and without reference to it. Add w.corp_reputation (BL-350), which is already a continuous per-pair float moved by conduct, and there are arguably FOUR designs in the same space.
+
+**Why it matters.** Each was built for a real reason and none is wrong on its own. But the project is one implementation away from having two continuous derived relational quantities with different names, different owners and no stated relationship - which is how the stance/standing naming collision happened (NR-304), one level up. BL-540 is designed and unbuilt, so this is the cheapest moment it will ever be to decide.
+
+- Declare sentiment the substrate: BL-540's dimensions ARE sentiment at nation->corp grain, and corp_reputation is sentiment at buyer->supplier grain. Stance stays the discrete DECLARED layer on top.
+- Keep them separate and state the boundary in RELATIONS.md, so the next design knows which it is extending.
+- Defer until BL-540 is built and see whether the shapes actually converge in practice.
+
+> **Recommendation:** Option 1 or 2, but not 3 - deferring is what produced the current four. Option 1 is tidier and I lean to it: one continuous derived quantity per (observer, subject) grain, with stance as the discrete declared layer above it. That also gives CONCEPT.md's oldest unbuilt promise a real home instead of leaving it [OWED] indefinitely.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: SENTIMENT IS THE SUBSTRATE (option 1). Propagated the same session. Model is two layers - sentiment derived and continuous, stance declared and discrete on top - recorded in RELATIONS.md § The settled model, with a dated promotion note in CONCEPT.md § Sentiment-based diplomacy, which had said 'designed, not built' since the concept doc. Filed BL-545 (sentiment substrate, A, v0.1.24) and BL-546 (reputation migration, B - the one relational quantity that IS serialised, so its migration is a save-format change rather than a rename). Reshaped three items onto it: BL-540's Access/Trust become dimensions rather than a new table, BL-541's Era -1 grudges become seeded nation->nation sentiment, and BL-391's deadlock stops existing rather than being fixed, since a decaying quantity has no permanent floor. All three now require BL-545. THE INVARIANT carried through everywhere: sentiment informs a declaration and never makes one - no threshold may flip a stance table by itself, preserving Ben's 2026-08-17 ruling that hostility is opted into and never acquired ambiently.
+
+*Files: `docs/politics/RELATIONS.md`, `docs/CONCEPT.md`, `docs/development/backlog.json`*
+
+### NR-521 — MILITARY.md's 'stance gates nothing yet' was stale by three consumers, and friendship still gates zero
+*observation · raised 2026-08-22 · from Writing RELATIONS.md; checked every consumer of is_hostile/are_friends in src/.*
+
+MILITARY.md § What is absent said stance 'still carries no consequence - stance gates nothing yet'. True when BL-448 landed 2026-08-19; false since 2026-08-21. Hostility now gates THREE things: interdiction (supply_system.cpp, BL-458), battle engagement (battle_system.cpp walks corp_hostile_pairs to open a battle, BL-467), and the march queue (economy_system.cpp, BL-470/NR-344). Corrected in place and re-pointed at RELATIONS.md. FRIENDSHIP, by contrast, still gates exactly nothing - are_friends has no consumer outside stance.cpp itself and the corporation panel. It can be offered, accepted and dissolved, and no behaviour reads it.
+
+**Why it matters.** Two directions of the same doc-drift the phantom scan exists to catch: an absent-list entry that outlived its absence, and a shipped surface (four verbs, a UI column) whose effect is still zero. The second is the more interesting one - offer_friendship, accept_friendship and half of return_to_neutral are player-reachable presses that change a table nothing reads.
+
+> **Recommendation:** Give friendship something to permit, or say in RELATIONS.md that it is deliberately inert until BL-315's consequences land. Candidates with existing machinery: passage through territory, a preferential price, shared visibility under BL-068, immunity from interdiction. Filed as RELATIONS.md open question 2 rather than as an item, since choosing is design.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: FRIENDSHIP PERMITS PASSAGE THROUGH TERRITORY AND IMMUNITY FROM INTERDICTION. Filed as BL-549. The immunity half is cheap and safe because declare_hostile already dissolves a friendship row atomically, so the friendship test is an early-out on a pair hostility has already excluded rather than a competing predicate. The passage half needs a reading and BL-549 recommends one: a friend's anchors counting toward your reach field, which makes friendship a logistics fact and cannot be confused with BL-540's Access dimension. The stale MILITARY.md line this entry also reported was corrected on 2026-08-22.
+
+*Files: `docs/military/MILITARY.md`, `docs/politics/RELATIONS.md`, `src/world/stance.cpp`*
+
+### NR-522 — How many dimensions does sentiment carry? The NR-520 ruling settled the architecture, not the count
+*question · raised 2026-08-22 · from Filing BL-545 after Ben's sentiment-is-the-substrate ruling.*
+
+Three existing designs imply three different answers. BL-540 proposed TWO - Access (may this corp operate in our borders) and Trust (would we contract it) - each gating something distinct. corp_reputation reads as ONE (will you deal with me again). CONCEPT.md describes a SINGLE value shaped by several contributing factors. BL-545 assumes the BL-540 pair generalised to every grain, and says so, but that is an assumption rather than a ruling.
+
+**Why it matters.** Collapsing to one makes Access and Trust inexpressible separately, which BL-540 needs - a nation might let a company operate while never contracting it, and those are different facts. Going past two is the failure mode of every multi-dimensional reputation system: dimensions that are stored, displayed and never read. The rule BL-545 adopts is that a dimension must GATE something before it is added, which keeps the count honest without fixing it now.
+
+- Two (Access, Trust), generalised to every grain - what BL-545 assumes.
+- One value plus per-consumer thresholds, with Access and Trust as different cuts of the same number.
+- Decide per grain: nation->corp carries two, corp->corp carries one.
+
+> **Recommendation:** Option 1. Two is the smallest count that expresses what BL-540 and BL-377 both need, and the gate-something rule stops it growing. Option 3 is tempting and should be resisted - a substrate whose shape varies by grain is not a substrate.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: TWO dimensions - Access and Trust - generalised to every grain. Not one, not per-grain. Access gates operating rights inside a jurisdiction; Trust is what a contract client reads. A third must gate something before it is added. Recorded in BL-545 and BL-540, and in RELATIONS.md § The settled model.
+
+*Files: `docs/politics/RELATIONS.md`, `docs/development/backlog.json`*
+
+### NR-523 — modifier_set.hpp claims to be the shared effect vocabulary for tech AND law, and law does not use it
+*observation · raised 2026-08-22 · from Writing docs/META_LAYER.md (system 3 of the phantom scan).*
+
+modifier_set.hpp's header states its own purpose as 'the closed list of scalars a tech (BL-479) OR A LAW (BL-480) may move... Authored once and shared - tech and law naming different subject enums would be the same defect as tech and law wording the same predicate differently, which is exactly what condition_set exists to prevent.' BL-480 then landed with law_effect_kind, its own enum. law.{hpp,cpp} includes condition_set.hpp and never modifier_set.hpp; the only two files that include modifier_set.hpp are world.hpp and tech_gate.hpp. IN FAIRNESS there is a real reason: modifier_subject moves SIMULATION SCALARS (units/tick, yield/batch) and a levy is a FLOW OF MONEY, so no subject in the list could express one and inventing one would distort the vocabulary rather than share it. So the effect side is two vocabularies for a defensible reason that nothing had written down - while the header goes on claiming it is one.
+
+**Why it matters.** The header is the design authority a future author will read before adding an effect, and it currently misleads about the shape of the thing they are extending. It is the same class of drift as tech_node::condition being a descriptive string - a stated intent the code does not honour - which is the failure the whole meta layer was built to fix. There are in fact THREE effect taxonomies with no mapping between them: BL-155's four families (margin/production/permission/relationship, named in no code), law_effect_kind's two, and modifier_subject's six.
+
+- Correct the header to describe a money-flow effect family alongside the scalar family - cheapest, and makes the two-vocabulary split deliberate.
+- Grow modifier_subject with subjects a levy could be expressed as, and make law use it.
+- Leave it and note the divergence in META_LAYER.md only.
+
+> **Recommendation:** Option 1. The split is right; only the claim is wrong. Doing nothing is the one bad option, because the header is what a future author reads before extending the vocabulary. Recorded in META_LAYER.md § The asymmetry either way.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: CORRECT THE HEADER. The split is right; only the claim was wrong. modifier_set.hpp now describes TWO effect families - scalar effects (this file, read by tech) and money-flow effects (law_effect_kind, where a levy or tariff is a transfer between balances rather than a scalar the simulation computes). The one-vocabulary rule still binds WITHIN a family and does not apply across them, because they are not the same kind of thing. modifier_subject deliberately does NOT grow subjects a levy could be expressed as. Landed in the header this session.
+
+*Files: `src/world/modifier_set.hpp`, `src/world/law.hpp`, `docs/META_LAYER.md`*
+
+### NR-524 — Five of six modifier subjects are wired to nothing, and 'a shape is only proven by an instance' has no stopping condition
+*question · raised 2026-08-22 · from Writing docs/META_LAYER.md.*
+
+modifier_subject has six entries and ONE is wired: extraction_rate, applied in extraction_nominal. processing_yield, unit_upkeep, logistics_cost, wage_floor and collapse_strain are vocabulary only. The policy is explicit and defensible - 'wired when an item needs it and NOT before' - and it rests on a principle that appears twice in the code unnamed: a vocabulary claiming to be extensible is only PROVED extensible by carrying an entry of the awkward kind. BL-342 shipped two military condition subjects before anything read them for exactly this reason, and collapse_strain cites that precedent explicitly.
+
+**Why it matters.** The principle justifies the first unwired entry. It does not obviously justify the fifth. An unwired instance proves a shape; five unwired instances are a vocabulary waiting for consumers - which is the state tech_node::condition was in when it was a descriptive string, the defect the meta layer was built to fix. The header already carries a test ('a subject earns its row by being a scalar some real lever wants to move'); nothing checks it.
+
+- Set a cap - at most N unwired subjects at once, enforced by a harness row or backlog_lint.
+- Require each unwired subject to name the backlog item that will wire it, so vocabulary-only is a promise rather than a state.
+- Leave it; the policy is sound and the count is not yet a problem.
+
+> **Recommendation:** Option 2. It costs a comment per subject, keeps the proving-by-instance principle intact, and converts an unbounded state into a tracked one. A cap would be arbitrary; leaving it is how five becomes ten.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: EACH UNWIRED SUBJECT NAMES THE ITEM THAT WILL WIRE IT - vocabulary-only becomes a promise, not a state. Landed in modifier_set.hpp this session: processing_yield -> BL-513 (denser facilities raise the province ceiling), unit_upkeep -> BL-543 (the value anchor turns the rates on), logistics_cost -> BL-464 (active LP resolution costs credits), wage_floor -> BL-538 (the schooling budget line), collapse_strain -> BL-477, which keeps the accumulator since Ben ruled that events EXPRESS the metagame rather than driving it. A subject that cannot name an item has not earned its row.
+
+*Files: `src/world/modifier_set.hpp`, `docs/META_LAYER.md`*
+
+### NR-530 — REVIEW: SYSTEMS.md § The progression chain — your interconnectivity ask, written as a design test
+*question · raised 2026-08-22 · from Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: "I'll read them in full and let you know where I would want to change things."*
+
+Your words, 2026-08-22: "we really want interconnectivity, so a player only progresses so far using one system before the next becomes a natural consequence." Written into SYSTEMS.md as a named principle - EACH SYSTEM'S CEILING IS THE NEXT SYSTEM'S DOOR - and as a three-part design test every system must answer: what forces a player in, what does it open, what does it cap them at. A table applies it to six rungs and names each rung's current ceiling. Every new doc written this session carries a § Where this sits in the chain section against it. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.
+
+**Why it matters.** Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with "accepted as written".
+
+> **Recommendation:** Two claims in it are mine rather than yours and worth checking. First: the chain CLOSES rather than ending, because force's ceiling is supply, which is the logistics rung again - which makes BL-464 a bigger item than its size suggests. Second: a staircase is a solved sequence, which is the argument for EVENTS.md cutting across it.
+
+> **RESOLVED.** CONFIRMED BY BEN, 2026-08-22, both claims. (1) THE CHAIN CLOSES - force's ceiling is supply, which is the logistics rung again, so logistics is the recurring constraint. That makes BL-464 a bigger item than its size suggests. (2) THE STAIRCASE ARGUMENT HOLDS, BOUNDED: variance in texture, never in the sequence itself. A learnable order is the point; what varies is how a rung FEELS on a given campaign. Ben added the tone ruling that belongs with it - "Events should usually be boring. Occasional high stress chains" - now recorded in SYSTEMS.md § The progression chain and in BL-548.
+
+*Files: `docs/SYSTEMS.md`*
+
+### NR-531 — CORRECTION: the star map was NOT a phantom — MINIMAP.md already owns it, and the scan's detection missed prose ownership
+*observation · raised 2026-08-22 · from Writing the remaining Class 1 docs; opened MINIMAP.md to add a star-map section and found one already there.*
+
+PHANTOMS.md § Class 1 listed the star map as a system running in code with no doc that owns it, on the strength of a grep that found no HEADING matching "star map" in any authority doc. That grep was the wrong instrument. docs/ui/MINIMAP.md § The top rung documents it fully and better than the replacement would have been: the ladder wrapping back to the ground rather than inventing a further rung, what it draws, the galactic band and core, six constellations, deep-sky objects, that it turns one revolution per year against the campaign date, and the load-bearing property - "the sky is fixed; the world is not", nothing reads a seed, it is the one fixture a player carries between campaigns, and names are invented per the standing rule.
+
+**Why it matters.** One row of a seven-row table was a false positive, and the method that produced it is worth correcting rather than the row alone: heading-based ownership detection misses a doc that covers a subject in PROSE under a differently-named section. The other six rows were checked by other means and stand. Corrected in PHANTOMS.md in place rather than quietly dropped.
+
+> **Recommendation:** No action. Recorded so the next scan uses a better instrument than a heading grep.
+
+> **RESOLVED.** Self-corrected 2026-08-22 at the moment it was found. PHANTOMS.md § Class 1 marks the row as a false positive with the reason.
+
+*Files: `docs/development/PHANTOMS.md`, `docs/ui/MINIMAP.md`*
 

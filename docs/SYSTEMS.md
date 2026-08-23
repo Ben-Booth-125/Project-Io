@@ -109,6 +109,8 @@ Two different things share this word, and BL-094 separates them.
 
 **Law** — *(corrected 2026-08-10, NR-120: was "the governing body's instrument"; the militia is not the legislator, it is bound by law, which sharpens rather than weakens this sentence's own point)* the load-bearing sense of law in Io. Conscription, requisition, embargo, tariff, war powers: rules that bind actors other than the one who passed them, and that reach force rather than only price. Laws are enacted by nations; the player is a law **subject**, not a legislator, **and stays one after the pivot lands** — the single exception being a private militia's own **negotiated** tax or contract terms with its home nation (BL-280, itself likely re-read against the militia's new bargaining shape, BL-350).
 
+*(Authority since 2026-08-22: [`docs/politics/NATIONS.md`](politics/NATIONS.md) owns the nation as an actor — the law object, the enforcement seam, the treasury, and the 2026-08-18 behaviour grant. What follows is the summary; that doc is the detail.)*
+
 **One law is real (BL-343, landed 2026-08-10, v0.1.3).** A `law` (`src/world/law.{hpp,cpp}`) is an id, a `condition_set`, an effect and an `enacted` flag, held on `world::laws` in authored order. The shipped instance is BL-155's law #1, the **extraction levy**: a per-unit charge on raw output. *(Corrected 2026-08-19, BL-480: the levy now ships **enacted**, authored by the player's home nation, scoped to that nation's territory, and the debit is credited to the author's treasury — a conserved transfer. The Budget-ledger enact control is gone; enactment belongs to the nation actor, and the ledger's Laws section is browse-only.)* It surfaces as its own **Levies** line in the Finance card's flow chart, beside income, inputs, maintenance, wages and interest — because a law the player cannot see working is indistinguishable from an unimplemented one.
 
 **The enforcement seam, settled:** *a law is a modifier OVER the market, never an override OF it.* This is the principle already established when price clamps were vetoed (2026-07-11) — a clamp fights price resolution rather than shifting a flow's cost. So the levy applies where the flow is **accounted** (`apply_budget`), not where the price is **resolved** (`clear_markets`): extraction output is priced by the market exactly as before, and the levy is a separate accounted cost. The market stays the only thing that sets prices, and the player sees the tax as its own number rather than as an unexplained worse price. Predicates are resolved once per law per corp per tick, before the money loop reads them, so ordering is fixed and the determinism invariant holds.
@@ -116,6 +118,8 @@ Two different things share this word, and BL-094 separates them.
 Honestly, an extraction levy reaches economic outcomes and not military ones. What the item owed instead is that **nothing in the record or the effect dispatch assumes an economic subject** — `law_effect_kind` is an open taxonomy a military effect joins without reshaping anything, and the predicate already carries military subjects. Still open: the other nine laws, the other three effect families, enactment politics (BL-186 laws ledger, BL-345 relationship axis), negotiated rates (BL-280). Verified by `tools/verify/law_harness.cpp`.
 
 ### Conditions
+
+*(Authority since 2026-08-22: [`META_LAYER.md`](META_LAYER.md) owns the predicate and effect substrate in full — both vocabularies, their properties, and the wiring asymmetry between them. What follows is the overview.)*
 The shared predicate laws, techs and quests all read (**BL-342**, landed 2026-08-10) — `src/world/condition_set.{hpp,cpp}`. BL-155 and BL-156 had independently settled on the same object, *"a flat AND-list of atomic conditions — no nested OR-mesh"*, and neither built it; one small pure evaluator turned two design-forward minors into shippable ones.
 
 An atomic condition is `<subject> <comparator> <operand>` plus the qualifier its subject reads. Three properties are load-bearing:
@@ -141,6 +145,50 @@ Above that core sits the **language layer** (direction settled 2026-08-03): a sm
 
 ### Comms
 The channel-based chat log (added 2026-07-31) — the surface of the diplomacy-as-communication principle: since every rival is AI, inter-corp coordination happens in a visible medium, and the mechanical actions of background corps surface as messages first. `src/ui/chat_panel.{hpp,cpp}`; authority: `docs/ui/CHAT.md`.
+
+---
+
+## The progression chain
+
+> **Each system's ceiling is the next system's door.**
+> — the shape Ben named on 2026-08-22: *"we really want interconnectivity, so a player only
+> progresses so far using one system before the next becomes a natural consequence."*
+
+This is a **design test**, not a description of what is built. It applies to every system in this
+document and to every new one: *what forces a player into it, what does it open, and what does it
+cap them at?* A system that answers only the middle question is a feature. A system that answers all
+three is a rung.
+
+The intended chain, and where each rung's ceiling is today:
+
+| Rung | You enter because | It opens | Its ceiling |
+|---|---|---|---|
+| **Extraction** | you start with a tile | output, and a balance | one tile's deposits run thin |
+| **Logistics** | the good tile is far from the market | distant markets and deposits | **reach is binary** — the network says *can this be reached*, never *how much can move* |
+| **Markets** | output is worth more elsewhere | price, arbitrage, scale | anonymous, instant, price-only — no lead time, no memory |
+| **Contracts** | you need a counterparty who can refuse | equipment you cannot make; **income that is not extraction** | reputation |
+| **Force** | a contract asks for an outcome, not a good | territory, interdiction, a third name | supply — and supply is the logistics rung again |
+| **Territory / politics** | force without law is banditry | jurisdiction, treasury, lobbying | attention |
+
+**Two things the table is meant to make visible.**
+
+**The chain closes rather than ending.** Force's ceiling is supply, which is the logistics rung
+again at a higher grain — which is exactly BL-325 ruling 3 (*economic reach IS military reach*)
+read as progression rather than as architecture. That is why Logistic Points (BL-464) is a bigger
+item than its size suggests: it is the rung the whole chain currently plateaus at.
+
+**A staircase is a solved sequence — but the variance is bounded.** A chain each rung of which is
+unlocked by the last is learned once and then followed, so [`EVENTS.md`](EVENTS.md) is the argument
+for something cutting across it. **Settled 2026-08-22 (Ben): variance in texture, never in the
+sequence itself.** A learnable order is the point; what varies is how a given rung *feels* on a
+given campaign, not which rung comes next.
+
+His tone ruling for events belongs here too, because it is really a statement about the chain:
+**"Events should usually be boring. Occasional high stress chains."** The default register is low,
+and pressure arrives as a linked sequence rather than as one large roll.
+
+*Both claims in this section were checked with Ben on 2026-08-22 (NR-530): the chain closing was
+confirmed, and the staircase argument was confirmed with the bound above.*
 
 ---
 
