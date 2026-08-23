@@ -3578,6 +3578,25 @@
    "why_it_matters": "It is the one place this item can lose a player's work, and the mitigation is a UI item rather than a format one.",
    "proposed": "Either accept the quick-slot convention as-is, or file a small follow-on for named slots plus a Load confirmation when the live campaign has advanced since the last save. My leaning is the follow-on - the format already carries everything a slot list would need to show (date, seed, corp).",
    "status": "open"
+  },
+  {
+   "id": "NR-545",
+   "title": "BL-536 landed a world serialiser, and it invalidates the hotspot audit's components.hpp conclusion",
+   "raised": "2026-08-23",
+   "kind": "observation",
+   "source": "Evaluating origin/main at Ben's request, mid-turn, while Sprint N1 was being triaged.",
+   "what": "PR #54 merged BL-536 (world snapshot save): src/world/world_save.{hpp,cpp} (847 lines) and binary_io.hpp (442). THIRTY ENUMS NOW CROSS A VERSIONED BYTE STREAM - terrain substrate/cover/landform, building_type, resource_type, condition_subject, condition_comparator, modifier_subject, modifier_op, law_effect_kind, stance, ideology, expansionism, economic_focus, convoy_mode, unit_class, battle_season and more - each written as a uint8 and read back through r_enum against a named maximum, so an out-of-range byte is rejected rather than cast.\n\nTHE HOTSPOT AUDIT'S components.hpp VERDICT IS NOW FALSE. It concluded, having traced every enum in the file to its consumers, that 'the append-only rule does not bind this cluster at all' and that resource_type was the only enum crossing a stream. THAT WAS TRUE AT THIS BRANCH'S BASE AND IS FALSE ON origin/main. I gave batching advice resting on it - specifically that the real append contention lived in corp_command.hpp rather than components.hpp - and that advice needs revising: it now lives in BOTH.\n\nThree further things written this session are corrected in the same commit: RELATIONS.md's 'nothing survives a save' (stance IS saved now), META_LAYER.md's 'designed against a save seam that does not exist yet' (it exists, so append-only is a live constraint rather than a forward-looking discipline), and BL-525's note that no item creates a world serialiser.",
+   "why_it_matters": "The audit was CORRECT when it ran and WRONG four hours later, because a merge landed underneath it. That is not a defect in the audit - it is the half-life of a finding in a repo with concurrent branches, and it is the argument for Ben's instruction to evaluate origin early rather than at integration.\n\nThe practical consequence is a real one: any Sprint N1 or v0.1.24 item that appends an enum is now touching a live save format. BL-537's budget_priority enum, which the quarantined C slice already indexes unchecked (its heap-buffer-overflow), would be written to disk.",
+   "options": [],
+   "recommendation": "Re-run the components.hpp half of the hotspot audit against the merged tree before briefing any agent on that cluster. The other three hotspot verdicts are unaffected - history_sim, corp_ai and body_surface_canvas do not turn on what is serialised.",
+   "files": [
+    "docs/development/backlog.json",
+    "docs/politics/RELATIONS.md",
+    "docs/META_LAYER.md",
+    "src/world/world_save.cpp"
+   ],
+   "status": "open",
+   "resolution": null
   }
  ]
 }

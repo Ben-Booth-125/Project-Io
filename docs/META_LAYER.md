@@ -209,8 +209,14 @@ None of the three maps onto either of the others.
   need an entirely different mechanism and would be a design change, not a wiring job."* That is
   precisely what BL-478 (ancient research spend) is blocked on (NR-387), and what the research
   budget lines in BL-538 would supply.
-- **No serialiser.** Both vocabularies are designed against a save seam (`uint8_t`, append-only,
-  flat layout) that does not exist yet. BL-107 owns it.
+- ~~**No serialiser.**~~ **CORRECTED 2026-08-23 — the seam exists, and both vocabularies are now
+  ON it.** BL-536 landed a whole-world snapshot, and `condition_subject`, `condition_comparator`,
+  `modifier_subject`, `modifier_op` and `law_effect_kind` all cross it as a `uint8` per enum, read
+  back range-gated.
+
+  **So the append-only rule stops being a forward-looking discipline and becomes a live constraint.**
+  Everything these two headers say about appending-never-inserting was written against a seam that
+  did not exist yet; it binds now, and a mis-ordered append breaks a save rather than a future one.
 - **The `era` subject carries an honest caveat** in `measure_condition` itself, and NR-333 records
   that **two independent notions of era have drifted apart**. A predicate over a contested quantity
   is a predicate whose meaning is contested.

@@ -188,10 +188,12 @@ honest visible-information source for it, so the axis is left out rather than fa
 
 ## What is absent, and known to be
 
-- **Nothing survives a save.** `src/world/serialization.cpp` **does not exist anywhere in the
-  repo** (NR-349). Stance, friendship and pending offers have no serialiser, so a declared war does
-  not outlive the session. Reputation is the exception — it rides BL-350's procurement stream. There
-  is no game save/load path at all today, so this costs nothing yet; BL-107 must pick it up.
+- ~~**Nothing survives a save.**~~ **CORRECTED 2026-08-23 — a save exists now.** BL-536 (world
+  snapshot save) landed `src/world/world_save.{hpp,cpp}` and `binary_io.hpp`, and **stance is in it**
+  — `w_enum(o, d.stance)`, read back through `r_enum` against a named maximum so an out-of-range
+  byte is rejected rather than cast. A declared war now outlives the session. NR-349's finding, that
+  no `serialization.cpp` existed, was true when written and is superseded rather than wrong.
+  What is still owed is the *reputation* half once BL-546 migrates it onto sentiment.
 - **No rival ever declares anything.** BL-450 (rivals score stance) was **granted on 2026-08-18**
   and `corp_ai.cpp` contains no stance scoring at all. So every hostility in a played game is one
   the player declared. The grant is a permission nobody has used — the same state

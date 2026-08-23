@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*240 entries — 205 open, 35 resolved.*
+*247 entries — 212 open, 35 resolved.*
 
 ---
 
@@ -2002,6 +2002,85 @@ Added checkVersionInversion() to backlog_lint. Negative-tested: re-introducing B
 > **Recommendation:** Confirm or overturn BL-391's move. It is the only one of the five with a real cost, and it is a priority-A defect slipping two minors.
 
 *Files: `docs/development/backlog.json`, `tools/session/backlog_lint.js`*
+
+### NR-510 — corp_modifiers is NOT recomputable from earned_techs - the save serialises it directly, against BL-107's own note
+*decision taken on your behalf · raised 2026-08-22 · from BL-536 (world snapshot save), writing the load path*
+
+world.hpp calls corp_modifiers "DERIVED state - recomputable from earned_techs x the gate table", and BL-107 carries a 2026-08-19 change-note saying the save format "owes a recompute-on-load (re-fold earned techs through the effect table) or loads will silently drop every earned buff". I set out to write that re-fold and it does not reconstruct the right ANSWER.
+
+The order is the problem. advance_tech_gates appends a corp's modify_scalar effects in GATE-TABLE order within one call, but it runs every tick, so the stored sequence is really sorted by (earn tick, gate index). A re-fold from earned_techs can only sort by (gate index). The two differ the moment a corp satisfies a higher-index gate before a lower-index one - and nothing stops that, since gate conditions are independent.
+
+It matters because modified_scalar folds in stored order and apply_scalar_modifier mixes add/subtract with multiply, which do not commute. A re-fold would silently return a different number for a corp that earned its techs out of table order.
+
+DECISION TAKEN: corp_modifiers is SERIALISED directly rather than recomputed. It is small (a handful of entries per corp), and its stored ORDER carries information the earned set does not. This makes it state, not cache.
+
+**Why it matters.** Two docs now say something inaccurate: world.hpp's 'DERIVED state - recomputable' comment, and BL-107's change-note prescribing the re-fold. I have corrected the code and the requirement row; the two prose claims want Ben's eye because the same reasoning may apply to any other field described as 'recomputable' whose consumer is order-sensitive.
+
+### NR-511 — The two shipped binary streams keep private copies of the read/write primitives; the new header does not absorb them
+*decision taken on your behalf · raised 2026-08-22 · from BL-536 (world snapshot save), writing src/world/binary_io.hpp*
+
+history_log.cpp (IOHL) and province.cpp each define file-local write_u32/read_u32/write_str/read_str, byte-identical to the ones binary_io.hpp now provides. I left both alone rather than refactoring them onto the shared header.
+
+Reasoning: their bytes are shipped, a snapshot written by an older build must keep reading, and the refactor changes no behaviour a reader can observe. Against that, CLAUDE.md's tone section calls duplication a debt, and there are now three copies.
+
+**Why it matters.** It is a small, deliberate piece of duplication in exactly the seam that is supposed to have ONE definition of its conventions. Worth a ruling now rather than discovering three more copies later.
+
+### NR-512 — A world snapshot embeds the history-log stream whole, magic and all, rather than re-writing its records
+*decision taken on your behalf · raised 2026-08-22 · from BL-536 (world snapshot save)*
+
+world::history_log and world::provinces already have a serialiser - write_history_log/read_history_log, which since BL-466 also carries the province section as its trailing block. The world snapshot calls those functions as one nested section instead of writing those two containers itself.
+
+The consequence is that a snapshot contains a complete IOHL stream inside it, with its own magic and version header. That reads slightly odd on a hex dump, and it means the history log is version-guarded twice.
+
+**Why it matters.** The alternative was a second definition of the same bytes - the NR-511 problem again, and this time for records that are genuinely intricate (the per-topic timestamp convention, the strictly-ascending province id check). Reuse looked clearly right, but a nested magic is the kind of thing worth stating out loud rather than letting someone find.
+
+### NR-513 — verify.command never routed through dispatch_action, so every app-level command it named silently did nothing
+*observation · raised 2026-08-22 · from BL-536, wiring the F5/F6 quick-slot bindings*
+
+verify_api.cpp's `command` hook called ui::apply_canvas_command directly, under a comment claiming it was "the same dispatch the keyboard uses". It was not. A key press goes through app::dispatch_action, which handles the commands needing app members - the six time controls, the three UI toggles - and only then falls through to apply_canvas_command. So verify.command("pause_toggle") did nothing at all, and neither did speed_1..speed_5, help_toggle, options_toggle or tech_tree_toggle.
+
+Nothing caught it because no committed script uses one: a grep of scripts/verify shows only ascend, descend and zoom_in, all of which apply_canvas_command handles. The gap was invisible precisely because it sat under the part of the vocabulary nobody had scripted yet.
+
+FIXED as part of BL-536 (it had to be, or the two new save bindings would have been the tenth and eleventh commands to silently no-op). Behaviour-identical for every existing caller.
+
+**Why it matters.** A verify hook that quietly does nothing is worse than one that errors: a script reads as if it drove the clock, the capture looks plausible, and the claim is false. Worth knowing that nine commands were in that state, in case any past reasoning leaned on one.
+
+### NR-514 — Save is a discrete act, not the per-tick autosnapshot TECH_FOUNDATIONS described
+*decision taken on your behalf · raised 2026-08-22 · from BL-536 (world snapshot save)*
+
+TECH_FOUNDATIONS' save-model paragraph specified a tick-boundary snapshot: "the full simulation state will be serialised at each economy tick... manual save is a named copy of the most recent snapshot". I did not build that. Saving happens only when asked - F5, --load's counterpart, or verify.save.
+
+Reason: a snapshot is 18.7 MB. Writing one every economy tick would put a multi-megabyte serialise and file write on the tick path, for a rollback feature nothing has asked for. The stated benefit was "clean, deterministic save points", and that is already what world::state_hash provides for debugging, at no I/O cost.
+
+I rewrote the paragraph to describe what exists and to say plainly that the autosnapshot was never built.
+
+**Why it matters.** It reverses a written technical decision rather than merely implementing it, which is Ben's call, not mine. If the intent was rollback or a replay/debug facility, that is a different item and the design should say so.
+
+### NR-515 — Quick save/load has no confirmation and one unnamed slot
+*decision taken on your behalf · raised 2026-08-22 · from BL-536 (world snapshot save)*
+
+F5 overwrites `quicksave.iosave` without asking; F6 discards the live campaign without asking. One slot, no naming, no listing, no menu entry. BL-536's design said explicitly "no autosave cadence, no save-slot UI", so this is in scope as written - but it is the part a player touches, and the failure mode is real: F6 pressed by mistake loses everything since the last F5.
+
+Against that: a refused load costs nothing (the read builds into scratch), and the quick-slot convention is well understood from other games.
+
+**Why it matters.** It is the one place this item can lose a player's work, and the mitigation is a UI item rather than a format one.
+
+### NR-545 — BL-536 landed a world serialiser, and it invalidates the hotspot audit's components.hpp conclusion
+*observation · raised 2026-08-23 · from Evaluating origin/main at Ben's request, mid-turn, while Sprint N1 was being triaged.*
+
+PR #54 merged BL-536 (world snapshot save): src/world/world_save.{hpp,cpp} (847 lines) and binary_io.hpp (442). THIRTY ENUMS NOW CROSS A VERSIONED BYTE STREAM - terrain substrate/cover/landform, building_type, resource_type, condition_subject, condition_comparator, modifier_subject, modifier_op, law_effect_kind, stance, ideology, expansionism, economic_focus, convoy_mode, unit_class, battle_season and more - each written as a uint8 and read back through r_enum against a named maximum, so an out-of-range byte is rejected rather than cast.
+
+THE HOTSPOT AUDIT'S components.hpp VERDICT IS NOW FALSE. It concluded, having traced every enum in the file to its consumers, that 'the append-only rule does not bind this cluster at all' and that resource_type was the only enum crossing a stream. THAT WAS TRUE AT THIS BRANCH'S BASE AND IS FALSE ON origin/main. I gave batching advice resting on it - specifically that the real append contention lived in corp_command.hpp rather than components.hpp - and that advice needs revising: it now lives in BOTH.
+
+Three further things written this session are corrected in the same commit: RELATIONS.md's 'nothing survives a save' (stance IS saved now), META_LAYER.md's 'designed against a save seam that does not exist yet' (it exists, so append-only is a live constraint rather than a forward-looking discipline), and BL-525's note that no item creates a world serialiser.
+
+**Why it matters.** The audit was CORRECT when it ran and WRONG four hours later, because a merge landed underneath it. That is not a defect in the audit - it is the half-life of a finding in a repo with concurrent branches, and it is the argument for Ben's instruction to evaluate origin early rather than at integration.
+
+The practical consequence is a real one: any Sprint N1 or v0.1.24 item that appends an enum is now touching a live save format. BL-537's budget_priority enum, which the quarantined C slice already indexes unchecked (its heap-buffer-overflow), would be written to disk.
+
+> **Recommendation:** Re-run the components.hpp half of the hotspot audit against the merged tree before briefing any agent on that cluster. The other three hotspot verdicts are unaffected - history_sim, corp_ai and body_surface_canvas do not turn on what is serialised.
+
+*Files: `docs/development/backlog.json`, `docs/politics/RELATIONS.md`, `docs/META_LAYER.md`, `src/world/world_save.cpp`*
 
 ---
 
