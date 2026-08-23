@@ -1223,6 +1223,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // stream at all, so adding it perturbs nothing above it. See province.hpp.
     build_province_partition(w, params.seed ^ 0x50524F56u);
 
+    // BL-569: seed the province holder from tile_to_nation's plurality, now
+    // that both the partition and every tile's nation assignment exist.
+    // `run_battles` moves entries thereafter; the seed here is the only
+    // generation-time write.
+    seed_province_holders(w);
+
     bump(12);
     return w;
 }

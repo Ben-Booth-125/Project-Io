@@ -300,6 +300,31 @@ struct world
     /// outcomes.
     province_partition provinces;
 
+    /// Current holder of each province (BL-569, province holder) — one
+    /// entity_id per province, POSITIONALLY ALIGNED with `provinces.provinces`
+    /// (ascending `province::id` order, the partition's own contract), NOT
+    /// indexed by the raw id, which is a derived tile id and not compact.
+    /// `null_entity` for a non-land province and for a land province with no
+    /// recorded holder. Use `province_holder_for(w, province_id)`
+    /// (province.hpp) rather than indexing this directly.
+    ///
+    /// Seeded once at generation (`seed_province_holders`, called from
+    /// `make_hard_coded_world` right after `build_province_partition`) from
+    /// `tile_to_nation`'s plurality over each province's tiles. Moved
+    /// thereafter by `run_battles` (battle_system.cpp) when a battle closes
+    /// decisively — `province_holder[p]` becomes the winner's
+    /// `battle_dispatch::field_held_by` — and left untouched by a stalemate.
+    ///
+    /// UNLIKE `provinces` ITSELF, this IS folded into `state_hash`: the
+    /// partition is generation output and never moves once built, but the
+    /// holder is exactly the kind of tick-mutable state the hash exists to
+    /// catch a divergence in (the same distinction battles/provinces already
+    /// draw, see the note above). Deliberately narrow: `tile_to_nation` (the
+    /// territorial map) does NOT follow the holder — the political map
+    /// changing hands is unowned work. See docs/military/MILITARY.md § The
+    /// field.
+    std::vector<entity_id> province_holder;
+
     /// Battles in progress (BL-467) — the record that makes a fight a thing in
     /// the world rather than an answer someone computed. Until this existed both
     /// resolvers were compiled, harnessed and CALLED BY NOTHING.

@@ -299,6 +299,61 @@ province_kind province_kind_of(const world& w, uint32_t id)
     return (pr == nullptr) ? province_kind::land : province_kind_of(w, *pr);
 }
 
+// ---------------------------------------------------------------------------
+// The province holder (BL-569, province holder)
+// ---------------------------------------------------------------------------
+
+void seed_province_holders(world& w)
+{
+    w.province_holder.assign(w.provinces.provinces.size(), null_entity);
+
+    for (std::size_t i = 0; i < w.provinces.provinces.size(); ++i)
+    {
+        const province& pr = w.provinces.provinces[i];
+        if (province_kind_of(w, pr) != province_kind::land)
+            continue; // no_entity for a non-land province (already the default)
+
+        // Tally votes in an ORDERED map keyed on nation id, walking
+        // `pr.tiles` in its own ascending order (the partition's contract) —
+        // so the tally itself needs no sort. The winner is picked by a single
+        // strictly-greater scan over the map's own ascending-key order, which
+        // is what makes the tie-break "ascending nation id" fall out for free:
+        // the first candidate to reach a given count is the lowest id that
+        // ever held it, and a later equal count cannot displace it.
+        std::map<entity_id, int> tally;
+        for (const entity_id tile : pr.tiles)
+        {
+            const auto it = w.tile_to_nation.find(tile);
+            if (it == w.tile_to_nation.end())
+                continue; // unclaimed land tile — no vote
+            ++tally[it->second];
+        }
+
+        entity_id best       = null_entity;
+        int       best_count = 0;
+        for (const auto& [nation_id, count] : tally)
+        {
+            if (count > best_count)
+            {
+                best_count = count;
+                best       = nation_id;
+            }
+        }
+        w.province_holder[i] = best;
+    }
+}
+
+entity_id province_holder_for(const world& w, uint32_t province_id)
+{
+    const province* pr = w.provinces.find(province_id);
+    if (pr == nullptr)
+        return null_entity;
+    const auto idx = static_cast<std::size_t>(pr - w.provinces.provinces.data());
+    if (idx >= w.province_holder.size())
+        return null_entity; // partition built but province_holder not yet seeded
+    return w.province_holder[idx];
+}
+
 int province_edge_cost(const world& w, uint32_t seed, entity_id a, entity_id b, int side)
 {
     const auto ait = w.tiles.find(a);
