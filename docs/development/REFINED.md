@@ -112,6 +112,46 @@ the fewest contacts and fights; seed 0 has the most and does not.
 So the sprint's subject is **verb competition**, not combat tuning. That is a different
 sprint from the one on the board, and a smaller one.
 
+### Status, 2026-08-21 — T1/T2 done, T3 half-landed, and the sprint found something bigger
+
+**T1/T2 answered the fork.** In a silent world Campaign **clears** its threshold and **loses every
+single time** — 1006/1006 on seed 0, 913/913 on seed 4. Settle takes ~92% of those losses. Margins
+are mean 133–272 against scores bounded near 1000, so this is *not* the BL-318 incommensurability
+this file has twice been bitten by.
+
+**T3 found a real structural defect and fixed it.** Campaign discounts itself by `p_win_q` — it
+prices its own odds of succeeding. Settle did not, and never asked whether an empty cell existed to
+settle *into*; only the execution found out, and a full neighbourhood spent the round doing nothing.
+**Roughly half of all Settle decisions were no-ops** (762 of 1548 on seed 0). `settle_target_cell`
+is now shared by scorer and executor, so an impossible action stops being offered. Nothing is tuned.
+
+Result at the configuration the harnesses use: **zero-war worlds 2/8 → 0/8**, foundings *unchanged*
+(786 and 762, identical — nothing was suppressed), and four `history_sim_harness` rows flip red to
+green (B318c, BL384a, R5, B384a) with none broken.
+
+**And then it changed nothing in the game.** Base and post-fix `seed_sweep_probe` are byte-identical,
+seed for seed. The cause is **NR-564, which is the sprint's most important finding**: every history
+harness in the repo takes `history_sim_params`' defaults — a 4000-year run on the six-band ladder —
+while `make_hard_coded_world` runs **400 years on one band at step 4**. BL-384's original numbers,
+my restated numbers and the existing B384 assertions were all about a sim the player never sees.
+
+Re-measured at production parameters, the defect is still there (**3 of 12 production seeds fight
+zero wars**) but has a different cause: settle failures are zero at that span, and campaign loses to
+`settle x682` **and `invest x398`** by a margin whose **minimum is 8**. It comes within 8 points of
+winning and never does.
+
+### What remains
+
+- **T3's production half** — a weighting question, and per R2 the band is Ben's to sanction rather
+  than mine to pick (NR-565). **Look at Invest first**: it takes 398 of seed 4's 1080 losses and
+  nobody has checked whether it has the same scorer/executor gap Settle had. A second structural
+  finding is worth more than a weight.
+- **NR-564's harness/production divergence** — worth fixing before any further tuning, or the next
+  measurement is wrong in the same way.
+- **T4 was withdrawn, not completed.** "Defence works appear in zero battles" was an artifact: the
+  harness passes no works registry, so no work could be raised. The question is reopened honestly as
+  NR-563.
+
 ### Tasks
 
 Foundation first; each scoped to its files.
@@ -413,3 +453,8 @@ The app is left open on the save for Ben to press them.
 **Collision map (splitting heuristic).** T2+T3 are one vertical slice over `world/*`;
 T4+T5 are one over `core/*`; T6 and T7 are independent verifiers that only need the
 signatures. T1 is the shared foundation everything else includes — it lands first, alone.
+
+> **Merge note, 2026-08-23.** The T3 gate described above is **not on main**. Re-measured on the
+> BL-462-corrected `history_conquest_gap` fixture it moves every production seed and takes the
+> 8-seed table from 1 to 3 silent worlds. Parked on `feat/sprint28-settle-feasibility`; the call is
+> NR-566.
