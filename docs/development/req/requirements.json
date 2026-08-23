@@ -5981,6 +5981,47 @@
                     "result_metric": ""
                 }
             ]
+        },
+        {
+            "brief": "interchangeable-methods-exist",
+            "title": "Two genuine interchangeable production methods, and the no-dominance guard proving it",
+            "status": "complete",
+            "resolved": "2026-08-23",
+            "promoted_from": "backlog.json BL-587 (INTERCHANGEABLE_METHODS_EXIST) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (R2)"
+                    ],
+                    "requirement": "ITEM-SPANNING: scripts/recipes.lua carries at least two recipe pairs that chain_depth's R2 row classifies as genuine interchangeable methods (sharing an input with an existing sibling, not a disjoint-raw supply route or a named precondition pair), and R2 reports zero pairs dominated on both cost and chain depth across the whole roster.",
+                    "notes": "Landed as recipe ids 29 (charcoal_from_kiln, \"Coking Kiln\") and 30 (steel_bessemer, \"Bessemer Converter\"). chain_depth.exe: \"13 sibling pairs: 10 supply routes, 1 precondition, 2 interchangeable methods\" / \"[PASS] no interchangeable method dominates a sibling on both input cost and chain depth\".",
+                    "result_metric": "2 interchangeable methods, 0 dominated (was 0 methods, 0 dominated before this item)"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: recipe_switch_harness",
+                        "headless: price_band_harness"
+                    ],
+                    "requirement": "The two harnesses that also load scripts/recipes.lua and scripts/economy.lua live (recipe_switch_harness, price_band_harness) build and pass unchanged, confirming the new recipes did not break the shared Lua file for other in-flight work (both harnesses are outside Sprint 16's file set).",
+                    "notes": "recipe_switch_harness: ALL PASS (0 failures). price_band_harness: ALL PASS (0 failures).",
+                    "result_metric": ""
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "doc"
+                    ],
+                    "requirement": "docs/economy/PRODUCTION.md § Alternate production methods no longer reports the four NR-243 pairs as an open call — corrected to state they are supply routes/a precondition, per the 2026-08-16 R2 retraction — and records the two new methods in its group tables and the ancient-chain table.",
+                    "notes": "Corrects NR-577 (a ruling taken on the stale paragraph this row fixes).",
+                    "result_metric": ""
+                }
+            ]
         }
     ]
 }

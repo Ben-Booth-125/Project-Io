@@ -480,12 +480,18 @@ every one of them is priced and consumed, per the admission rule.
 |---|---|---|
 | Charcoal Burner | 3 timber → 1 charcoal | 1 |
 | Peat Kiln | 2 peat → 1 charcoal | 1 |
+| Coking Kiln | 1.5 timber + 0.1 iron blooms → 1 charcoal | 3\* |
 | Bloomery | 2 iron ore + 1 charcoal → 1 iron blooms | 2 |
 | Smithy | 2 iron blooms + 1 charcoal → 1 steel | 3 |
 | Smithy | 2 iron blooms + 1 charcoal → 1 **ordnance** | 3 |
 | Potter & Weaver | 2 clay + 1 timber → 1 trade goods | 1 |
 | Glassworks | 2 sand → 1 trade goods | 1 |
 | Miller | 2 agricultural produce + 1 stone → 1 food rations | 1 |
+
+\* The Coking Kiln's own required depth, not `charcoal`'s overall depth — the Burner keeps that at
+1, since chain depth is a **min across recipes** (§ Chain depth below). The Kiln is BL-587's
+alternate method: unreachable until a corp has already smelted blooms, cheaper by the guard's
+reference prices once it is. See § Alternate production methods.
 
 **The Smithy's second recipe is the ancient arc's route to `ordnance`** (BL-460, ancient
 ordnance) — the same building, same `iron_blooms + charcoal` basket as its steel recipe,
@@ -653,20 +659,43 @@ and instantly — that is sanctioned, narrow, local auto-agency reacting to a su
 strategic commitment, and it never calls `try_switch_recipe`. See
 `.claude/rules/io-standing-rules.md`'s BL-079 exception for the standing invariant this preserves.
 
-**The no-dominance guard.** `tools/verify/recipe_switch_harness.cpp`'s `R1` groups recipes by
-(primary output resource, era band) — the set genuinely interchangeable as methods on one building
-— and asserts no pair beats its sibling on *both* input-basket cost (a fixed reference-price
-snapshot, `world_gen.lua`'s `base_price`) *and* the chain depth of its deepest input at once. A
-pair identical or split across the two axes is a real trade-off; a pair dominated on both is dead
+**The no-dominance guard.** `tools/verify/chain_depth.cpp`'s `R2` is the live guard (moved from
+`recipe_switch_harness.cpp`'s retired `R1` on 2026-08-16 — see that file's own header for the
+retraction). It groups recipes by (primary output resource, era band) and buckets every
+same-output sibling pair as a **supply route** (disjoint raws — which one a corp runs is decided
+by deposit access, not price), a named **precondition pair** (differs by a placement fact the
+recipe data cannot carry, e.g. atmosphere vs airless body), or a genuine **interchangeable
+method** — and only the third bucket is compared, on input-basket cost (a fixed reference-price
+snapshot, `world_gen.lua`'s `base_price`) against the chain depth of its deepest input. A pair
+identical or split across the two axes is a real trade-off; a pair dominated on both is dead
 content the moment its sibling is reachable. Wage and build-duration were considered and rejected
 as guard axes: those live on `building_economics` (the *building type*), not the recipe, and every
 `processing_facility` offers the same era-allowed recipe set — so those axes are identical across
-every sibling by construction and carry no discriminating information. Four sibling pairs —
-`steel_from_iron_nickel` over `steel`, `propellant_atmospheric` over `propellant_electrolysis`,
-`peat_charcoal` over `charcoal`, and `glass` over `trade_goods` — are dominated on both axes;
-whether they are genuine alternates needing a retune, or intended tier upgrades the guard should
-not compare, is Ben's open call (NR-243), and the guard is left to report it rather than tuned
-silently.
+every sibling by construction and carry no discriminating information.
+
+**The four pairs once reported as "dominated" (NR-243) were a false positive of the old grouping,
+not a balance defect.** `steel_from_iron_nickel`/`steel`, `peat_charcoal`/`charcoal` and
+`glass`/`trade_goods` have disjoint raws — supply routes, not methods; the propellant pair is the
+named atmosphere-vs-airless precondition. None of the four is compared by R2 today, and NR-243 is
+closed on that basis rather than by a retune (BL-587, correcting NR-577).
+
+**BL-587 (2026-08-23) authored the roster's first two genuine interchangeable methods**, since
+until then the "methods" bucket was empty — BL-430's ruling had mechanism (the Method page
+compares whatever R2 would call a method) with no content to exercise it. Both trade the chain-
+depth axis: a deeper route that needs a good not yet reached, for a cheaper basket once it is.
+
+| Sibling pair | Shallow route | Deep route (needs) |
+|---|---|---|
+| `charcoal` (ancient) | Charcoal Burner — `timber` only, required depth 0 | Coking Kiln — `timber` + a reagent quantity of `iron_blooms`, required depth 2 |
+| `steel` (industrial) | Smelter — `iron_ore` + `coal`, required depth 0 | Bessemer Converter — `iron_ore` + `coal` + a reagent quantity of `machinery`, required depth 2 |
+
+Neither deep route is a tier upgrade: it is unreachable until the shallow route (or some other
+path to the same reagent) has already been run once, and its reference cost is lower only because
+the guard's fixed snapshot does not price the reagent's own chain. A market where the reagent is
+scarce can still make the shallow route the better-run choice — the point Ben raised authoring
+this sprint (*"it's not always clear that a more advanced method is better, depending on which
+market it builds to"*) — which is why R2 is planned to grow a second price vector (BL-592) rather
+than trusting one snapshot as the final word.
 
 **AI scoring.** `corp_ai.cpp`'s `dial_recipe` candidate does not price `switch_cost` into its
 projected gain and does not pre-filter on `recipe_switch_cooldown`; the seam enforces both at
@@ -690,14 +719,14 @@ sits in the `"General"` catch-all:
 
 | Group | Recipes (era) | Notes |
 |---|---|---|
-| Metal Foundry | `steel` (industrial), `steel_from_iron_nickel` (industrial), `steel_from_regolith` "In-Situ Smelter" (industrial), `refined_copper` (any), `iron_blooms` "Bloomery" (ancient), `steel_from_blooms` "Smithy" (ancient), `ordnance_from_blooms` "Smithy" (ancient) | Every route that smelts or shapes a structural metal — the industrial Smelter and the ancient Bloomery/Smithy chain both land here, since they reach the same terminal goods by different roads. |
+| Metal Foundry | `steel` (industrial), `steel_from_iron_nickel` (industrial), `steel_from_regolith` "In-Situ Smelter" (industrial), `steel_bessemer` "Bessemer Converter" (industrial), `refined_copper` (any), `iron_blooms` "Bloomery" (ancient), `steel_from_blooms` "Smithy" (ancient), `ordnance_from_blooms` "Smithy" (ancient) | Every route that smelts or shapes a structural metal — the industrial Smelter and the ancient Bloomery/Smithy chain both land here, since they reach the same terminal goods by different roads. The Bessemer Converter (BL-587) is the roster's first genuine interchangeable method rather than a disjoint-raw supply route — see § Alternate production methods. |
 | Refinery | `refined_fuel` (industrial) | A singleton — a real, specific kind (distinct from Metal Foundry's smelting), not a forced catch-all; more refined-fuel-family recipes would join it rather than needing a rename. |
 | Food Processing | `food_rations` (any), `hydroponics_bay` (industrial), `food_rations_milled` "Miller" (ancient) | Feeding the population, whether growing the produce (Hydroponics Bay) or milling it into rations (Food Processor, Miller). |
 | Chemical Works | `propellant_atmospheric` (industrial), `propellant_electrolysis` (industrial) | The Chemical Plant's two propellant routes. |
 | Electronics | `silicon` (industrial), `ree_alloy` (industrial), `electronics` (industrial), `electronics_contact_grade` "Contact-Grade Electronics Lab" (industrial) | The silicon/REE/electronics chain. |
 | Advanced Fabrication | `machinery` (industrial), `alloys` (industrial), `ordnance` (industrial), `spacecraft_components` (industrial), `spacecraft_components_heavy` "Heavy Assembly Plant" (industrial) | Fabricator + Assembly Plant: goods assembled from refined inputs rather than smelted from ore. |
 | Welfare Goods | `clean_water` (industrial), `consumer_goods` (industrial), `medical_supplies` (industrial) | The habitability tranche — Water Treatment Plant, Consumer Goods Factory, Pharmaceutical Lab. |
-| Fuel Production | `charcoal` "Charcoal Burner" (ancient), `peat_charcoal` "Peat Kiln" (ancient) | Two independent producers of the same fuel good (`charcoal`). |
+| Fuel Production | `charcoal` "Charcoal Burner" (ancient), `peat_charcoal` "Peat Kiln" (ancient), `charcoal_from_kiln` "Coking Kiln" (ancient) | Three producers of `charcoal`: the Burner and the Peat Kiln are disjoint-raw supply routes, but the Coking Kiln shares `timber` with the Burner and is the roster's first genuine interchangeable method (BL-587) — see § Alternate production methods. |
 | Artisan Goods | `trade_goods` "Potter & Weaver" (ancient), `glass` "Glassworks" (ancient) | Two independent producers of `trade_goods_misc`, same shape as Fuel Production. |
 
 Judgment calls recorded in `NEEDS_REVIEW.json`: whether Hydroponics Bay (an agriculture

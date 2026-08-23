@@ -169,3 +169,36 @@ playthrough, the flag-off determinism check, then the v0.1.15 cut.
 Promote/build order: DELIVERY.md § The Delivery lifecycle. Step 4a (`verifier-review`) runs
 once per wave that merges more than one item, not once for the whole batch, since waves 2–5
 land on top of code the previous wave actually wrote.
+
+---
+
+## Sprint 17 — the ancient roster becomes a ladder (v0.1.17), one item ahead of the batch
+
+Ben's sequencing ruling holds Sprint 17 to start only after Sprint 16 merges to `main`. One item
+is promoted ahead of that gate because it touches no file Sprint 16 owns (checked against Sprint
+16's full file set, `backlog_query.js --sprint 16`): `scripts/recipes.lua`,
+`tools/verify/chain_depth.cpp` and `docs/economy/PRODUCTION.md` appear nowhere in it. The other
+nine items wait for the merge — several depend on this one's chains, and the rest touch
+`world_save.cpp`, `selection_panel.cpp` or `icons.cpp`, all live under Sprint 16.
+
+#### BL-587 — INTERCHANGEABLE_METHODS_EXIST — COMPLETE 2026-08-23
+
+Requirements: `req/requirements.json` § interchangeable-methods-exist. Files: `scripts/recipes.lua`,
+`tools/verify/chain_depth.cpp`, `docs/economy/PRODUCTION.md`.
+
+1. Two genuine interchangeable methods authored on the **existing** resource roster (no new
+   `resource_type` values — that is BL-585's item, gated on Sprint 16's save-format bump):
+   `charcoal_from_kiln` "Coking Kiln" (ancient, shares `timber` with the Charcoal Burner, reagent
+   `iron_blooms` at required depth 2) and `steel_bessemer` "Bessemer Converter" (industrial, shares
+   `iron_ore`+`coal` with the Smelter, reagent `machinery` at required depth 2). Both landed as
+   recipe ids 29/30 — appended, never inserted.
+2. `chain_depth.cpp`'s R2 row re-run against the shipped roster: **13 sibling pairs, 10 supply
+   routes, 1 precondition, 2 interchangeable methods, 0 dominated** — the bucket that was empty
+   before this item now holds real content and the guard still passes.
+3. `recipe_switch_harness` and `price_band_harness` re-run clean — both link the live
+   `recipes.lua`/`economy.lua` and neither is Sprint-16-owned, so both are cheap confirmation that
+   the shared file was not broken for anyone else building against it.
+4. `PRODUCTION.md` § Alternate production methods corrected: the four pairs once reported
+   "dominated" (NR-243) are supply routes/a precondition, not methods — closed rather than
+   retuned (NR-577) — and the new pairs are recorded in the Metal Foundry / Fuel Production group
+   tables and the ancient-chain table.

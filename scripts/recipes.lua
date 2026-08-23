@@ -482,6 +482,53 @@ recipes = {
         inputs  = { iron_blooms = 2.0, charcoal = 1.0 },
         outputs = { ordnance = 1.0 },
     },
+
+    -- =====================================================================
+    -- BL-587 (2026-08-23) — the roster's first GENUINE interchangeable
+    -- methods. chain_depth's R2 buckets every prior same-output sibling pair
+    -- as a supply route (disjoint raws) or a named precondition; the
+    -- "methods" bucket that BL-430's alternate-production-methods ruling
+    -- describes was EMPTY. These two share an input with an existing sibling
+    -- (so R2 actually compares them) and trade BL-430's chain-depth axis: a
+    -- deeper method that needs a good not yet reached, in exchange for a
+    -- cheaper input basket once it is. Neither dominates its sibling — R2
+    -- checks this mechanically, not just by inspection.
+    -- =====================================================================
+
+    -- id 29 — Coking Kiln: a second route to charcoal, sharing `timber` with
+    -- id 17's Charcoal Burner (so R2 actually compares them, unlike the
+    -- Peat Kiln's disjoint raw). Reagent `iron_blooms` (a small, non-fuel
+    -- quantity — tongs and tools, not stock) needs the Bloomery already
+    -- built, so this route is DEEPER (required depth 2, against the
+    -- Charcoal Burner's 0) but its reference cost is lower per batch. Early
+    -- game runs the Charcoal Burner because nothing else exists yet; once a
+    -- corp has smelted its first blooms, the Kiln becomes the cheaper way to
+    -- keep making charcoal — the trade-off is about WHEN it opens, not
+    -- whether it is stronger.
+    {
+        name         = "charcoal_from_kiln",
+        display_name = "Coking Kiln",
+        era          = "ancient",
+        group        = "Fuel Production", -- BL-434, with the Charcoal Burner and Peat Kiln
+        inputs       = { timber = 1.5, iron_blooms = 0.1 },
+        outputs      = { charcoal = 1.0 },
+    },
+
+    -- id 30 — Bessemer Converter: a second route to industrial steel,
+    -- sharing both `iron_ore` and `coal` with id 0's Smelter. Reagent
+    -- `machinery` (required depth 2) puts this route below the Smelter's
+    -- shallow one (required depth 0) on the same growth-track logic as id
+    -- 29 above — a corp needs an existing machine-tool chain before it can
+    -- build the converter that then makes its own steel cheaper. The
+    -- industrial arc's counterpart to the ancient Kiln, on the same axis.
+    {
+        name         = "steel_bessemer",
+        display_name = "Bessemer Converter",
+        era          = "industrial",
+        group        = "Metal Foundry", -- BL-434, with the Smelter and its siblings
+        inputs       = { iron_ore = 1.5, coal = 0.5, machinery = 0.15 },
+        outputs      = { steel = 1.0 },
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))
