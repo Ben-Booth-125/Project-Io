@@ -57,6 +57,7 @@ commit timestamps rather than reviving an unstarted timer.)
 | 10–14 | Re-sequenced 2026-08-10 (the living world inserted) | **Overtaken** — Sprints 10/11 closed 2026-08-11; Sprints 12–14 superseded 2026-08-12 by the 0 CE refocus (NR-177), never opened |
 | 15 | The 0 CE refocus (retro-recorded) | **Closed 2026-08-12** — epoch 0, 3× map, Era −1 sim wired in, mercenary seam designed |
 | 16 | The mercenary vertical slice | **Open 2026-08-12** — BL-377 playable end-to-end + BL-315 on the critical path; cuts v0.1.15 |
+| 17 | The ancient roster becomes a ladder | **Re-planned 2026-08-23** — ten items (BL-585..BL-594); the original set landed or was absorbed. Starts after Sprint 16 merges; cuts v0.1.17 |
 | 18b | Roster invariants (retro-recorded) | **Closed 2026-08-16** — BL-432 landed; BL-435 paused 4/6; BL-436 filed |
 | 19 | The economy tells the truth | **Closed 2026-08-17 — goal NOT met.** The blame moved three times and landed on supply; goldens left red and unblessed |
 | 20 | Not yet chosen | **Proposed 2026-08-17** — three candidates laid out; Ben's call |

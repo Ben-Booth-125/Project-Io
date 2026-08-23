@@ -335,21 +335,25 @@
     },
     {
       "id": "17",
-      "theme": "Economy breadth: the chain is the growth track",
+      "theme": "The ancient roster becomes a ladder",
       "state": "open",
       "opened_date": "2026-08-15",
       "closed_date": null,
-      "goal": "Give the ancient economy enough building options, production methods and depth that progress is something the player builds rather than something a system grants. Cuts v0.1.17. Ben: \"make sure the economy has robust and expansive building options, production methods, and an implied growth track that we can refine tech and politics around.\"",
+      "goal": "Take the 0 CE product from seven named processing buildings to a real roster, and make progress through it something the player climbs rather than something they are handed. Cuts v0.1.17. Ben, 2026-08-15: \"robust and expansive building options, production methods, and an implied growth track that we can refine tech and politics around.\"",
       "planned": [
-        "BL-428 — chain depth is the growth spine (designed, A): the depth metric off the recipe graph, what it gates, the acyclicity it requires. Foundation.",
-        "BL-433 — space-era buildings in the ancient arc (designed, B): answer first; carries an open a/b/c on how the two arcs share one data set, BL-429 writes into exactly those files.",
-        "BL-429 — ancient building roster (designed, A): 7 → 20+ named buildings on ~3 building_type values, following BL-166/BL-168 pattern. Every ancient orphan resource gets a consumer.",
-        "BL-430 — alternate production methods (designed, A): several recipes per output, no method may dominate a sibling on every axis.",
-        "BL-431 — production-method and chain UI (designed, B): the method selector, chain trace, depth readout.",
-        "BL-432 — economy-breadth guard harness (designed, B): four invariants mechanised — acyclic graph, no orphan resources either direction, every building reachable, no dominant method."
+        "BL-585 — ancient goods append (the enum + the save bump, once)",
+        "BL-586 — the wide ancient roster (the chains)",
+        "BL-587 — interchangeable methods exist (the empty bucket)",
+        "BL-588 — unlock_recipe, the tech effect union’s third arm",
+        "BL-589 — the start gate (most of the roster is not buildable at tick 0)",
+        "BL-590 — per-named-building construction materials",
+        "BL-591 — the depth readout on the corporation dashboard",
+        "BL-592 — the roster-breadth guard rows",
+        "BL-593 — the Build door under a doubled roster",
+        "BL-594 — the playthrough and the v0.1.17 cut"
       ],
-      "risk": "Content sprints sprawl, and this one has a real dependency chain (BL-428 → BL-429/430 → BL-431). Order is the mitigation. If the roster runs long, BL-431's UI is the part that must not be cut — 20 invisible buildings are worth less than 12 legible ones.",
-      "notes": "The four rulings that shape it (2026-08-15, elicitation form): (1) the growth spine is CHAIN DEPTH — not building tiers, not tech ladder, not settlement scale; how far down the production graph a corp can reach gates its next building. (2) the roster goes past 20 building types, as a content sprint of its own. (3) buildings offer alternate production methods with real trade-offs, not tier upgrades. (4) economy first, military follows. What the measurement found before any work: scripts/economy.lua carries 7 building_type entries and scripts/recipes.lua carries 17 recipes, one per output, no alternates — choosing a building IS choosing its method today. One of the seven is the space-era Launchpad, refinery chain runs on petroleum, inside a product set at 0 CE. Ancient substrate already in the enum and mostly idle: stone, timber, sand, clay, peat, charcoal, iron_blooms, grain, fodder, salt, bullion are BL-286 values whose behaviours were never filed. Cheapest and most honest version: give those orphans consumers rather than mint new resources. Watch for: corp_ai.cpp scores build candidates over whatever roster it is handed — a 20+ roster and a method choice are both new decision surfaces for the scorer; BL-430 names the call explicitly rather than letting a default pin every rival to the same method."
+      "risk": "Content sprints sprawl, and this one opens the save format (BL-585) and the tech-effect union (BL-588) as well as the data. Order is the mitigation: the enum append lands once, then everything above it is Lua. The item that must not be cut is the depth readout — a wide roster behind an invisible gate is worse than a narrow one, because the player reads the lock as a bug.",
+      "notes": "The four rulings that shape it (2026-08-15, elicitation form): (1) the growth spine is CHAIN DEPTH — not building tiers, not tech ladder, not settlement scale; how far down the production graph a corp can reach gates its next building. (2) the roster goes past 20 building types, as a content sprint of its own. (3) buildings offer alternate production methods with real trade-offs, not tier upgrades. (4) economy first, military follows. What the measurement found before any work: scripts/economy.lua carries 7 building_type entries and scripts/recipes.lua carries 17 recipes, one per output, no alternates — choosing a building IS choosing its method today. One of the seven is the space-era Launchpad, refinery chain runs on petroleum, inside a product set at 0 CE. Ancient substrate already in the enum and mostly idle: stone, timber, sand, clay, peat, charcoal, iron_blooms, grain, fodder, salt, bullion are BL-286 values whose behaviours were never filed. Cheapest and most honest version: give those orphans consumers rather than mint new resources. Watch for: corp_ai.cpp scores build candidates over whatever roster it is handed — a 20+ roster and a method choice are both new decision surfaces for the scorer; BL-430 names the call explicitly rather than letting a default pin every rival to the same method.\n\nRE-PLANNED 2026-08-23 against the code, after the backlog purge. Three of the six items originally planned for this minor LANDED (BL-428 chain depth, BL-432 the guard harness, BL-433 the space-era band split) and the substance of the other three was absorbed by later work — BL-434 gave recipes sub-facility groups, BL-460 gave the ancient arc its ordnance route, BL-436 recalibrated extraction, and the recipe-switch cost/cooldown shipped with them. The theme survives; its item set does not, so ten were authored fresh (BL-585..BL-594).\n\nSIX RULINGS (Ben, 2026-08-23, elicitation form): (1) a FULL CONTENT SPRINT, not a close-out; (2) delete the dominated sibling — SEE THE CORRECTION BELOW, this ruling has no valid subject; (3) the depth readout goes on the CORPORATION DASHBOARD; (4) construction materials vary PER NAMED BUILDING; (5) yes to new resource values, paying the save-format bump; (6) start only AFTER SPRINT 16 MERGES.\n\nBen’s steer on progression, same date: \"include the notion of progression in different methods. It’s not always clear that a more advanced method is better (depending on which market it builds to), but we should still consider that most building types, and most recipes are not buildable on game start.\" Not a reshaping of the tech tree — BL-588 makes a tech able to reach a RECIPE at all (the effect union has two arms today and one authored gate against ~150 inert nodes), and BL-589 makes the opening narrow.\n\nTHE CORRECTION, recorded because a ruling was taken on it (NR-577). PRODUCTION.md still reports four dominated sibling pairs as an open call (NR-243). That text is stale: the guard that found them was retracted on 2026-08-16 and replaced by chain_depth’s R2, which buckets every same-output pair as a supply route, a named precondition pair, or a genuine interchangeable method. All four were false positives of the old grouping. The live finding is the opposite and sharper — the third bucket is EMPTY, so the roster contains no genuine alternate method at all. BL-587 authors the missing content instead of deleting the four; re-rule if the deletion is still wanted.\n\nWHAT WAS MEASURED before any work: 29 recipes, of which 8 carry era = \"ancient\", giving 7 named ancient processing buildings and 5 distinct ancient output goods; ancient max chain depth 3 on one chain; the Build door collapses processing to 4 group rows in the ancient band; all 8 building types cost `steel` and nothing else; `corp_reached_depth` has 6 call sites and every one of them gates, none displays."
     },
     {
       "id": "18",
@@ -1029,6 +1033,11 @@
       "id": "16",
       "theme": "The mercenary vertical slice",
       "state": "Open — re-planned 2026-08-23 on the purged backlog: BL-569..BL-578"
+    },
+    {
+      "id": "17",
+      "theme": "The ancient roster becomes a ladder",
+      "state": "Re-planned 2026-08-23 — ten items (BL-585..BL-594); original set landed or absorbed. Starts after Sprint 16 merges; cuts v0.1.17"
     },
     {
       "id": "18b",

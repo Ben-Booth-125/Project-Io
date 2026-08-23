@@ -3497,6 +3497,59 @@
                 "Switch to highest-value-first (by the offer's scored fee)."
             ],
             "recommendation": "Confirm oldest-issued-first — it is the simplest deterministic rule, matches a FIFO reading of 'the nation gets to what it can afford', and needs no additional per-offer priority field."
+        },
+        {
+            "id": "NR-577",
+            "title": "A ruling was taken on a stale doc paragraph — the four \"dominated\" recipe pairs are false positives, and the real finding is the opposite",
+            "raised": "2026-08-23",
+            "kind": "decision-taken",
+            "source": "Sprint 17 authoring session. Ben ruled \"delete the dominated sibling\" on evidence this session supplied from docs/economy/PRODUCTION.md § Alternate production methods.",
+            "what": "The doc paragraph names four sibling pairs as dominated on both axes and calls it Ben's open call (NR-243). It is stale. recipe_switch_harness.cpp's header records that its R1 grouping was RETRACTED on 2026-08-16 and moved to chain_depth.cpp's R2 row, which buckets every same-output sibling pair as (a) a supply route with disjoint raws, (b) a named precondition pair, or (c) a genuine interchangeable method — and only compares (c) on price. All four pairs fall in (a) or (b). Acting on the ruling would delete the coal Smelter, the Charcoal Burner, the Potter & Weaver and the airless propellant route, and would strand sand, peat and iron_nickel_ore as orphans, failing chain_depth's own R1 in the same pass. Not acted on. What the replacement guard actually shows is sharper and is now BL-587 (interchangeable methods exist): bucket (c) is EMPTY, so the 2026-08-15 alternate-methods ruling is mechanism with no content behind it.",
+            "why_it_matters": "Two things. The ruling stands unfulfilled unless Ben re-rules, and he ruled on a premise this session gave him — so the correction is owed to him directly, not buried in an item. And PRODUCTION.md is stating as an open question something settled seven days earlier, which is exactly the doc-truth failure the 2026-08-23 state-independence sweep exists to catch; the sweep's own holes audit even lists this line as a live hole pointing at an open item.",
+            "options": [],
+            "recommendation": "Take BL-587 (author the missing methods) instead of a deletion, and let it correct PRODUCTION.md § Alternate production methods in the same pass. Re-rule the deletion only if a specific pair is wanted gone for a reason the guard does not model.",
+            "files": [
+                "docs/economy/PRODUCTION.md",
+                "tools/verify/chain_depth.cpp",
+                "tools/verify/recipe_switch_harness.cpp"
+            ],
+            "status": "open",
+            "resolution": null
+        },
+        {
+            "id": "NR-578",
+            "title": "Sprint 17 authored: ten items, six rulings, and four calls taken inside them",
+            "raised": "2026-08-23",
+            "kind": "decision-taken",
+            "source": "Ben, 2026-08-23: \"Let's get sprint 17 started too ... author items in backlog.js\" plus the six-question elicitation form answered the same day.",
+            "what": "BL-585..BL-594 filed for Sprint 17 (v0.1.17), authored against the code rather than against the archived designs. Four calls taken without asking: (1) the sprint keeps the economy-breadth THEME but none of its original items — three landed, three were absorbed by BL-434/BL-460/BL-436 and the recipe-switch work, so re-filing them would have re-litigated finished work; (2) the \"new goods\" ruling is split into its own first item (BL-585) so the enum append and save bump happen once and every later item stays in Lua; (3) Ben's progression steer is implemented as a THIRD ARM on tech_effect (unlock_recipe) rather than as a new lock kind — the union already has two arms and one authored gate, and a recipe lock is the arm it is missing, not a new system; (4) the guard rows go into chain_depth rather than a new harness, because R1 was moved OUT of recipe_switch_harness in 2026-08-16 precisely to stop two harnesses answering one question with two reference-price tables.",
+            "why_it_matters": "The sprint spends a save-format bump and opens the tech-effect union, both of which are cheap now and expensive later. If any of the four calls is wrong, it is cheapest to overturn before BL-585 lands.",
+            "options": [],
+            "recommendation": "No action needed unless one of the four reads wrong. BL-585 is the item to hold if the enum append should wait.",
+            "files": [
+                "docs/development/backlog.json",
+                "docs/development/sprints.json"
+            ],
+            "status": "open",
+            "resolution": null
+        },
+        {
+            "id": "NR-579",
+            "title": "The tech tree is ~150 nodes of inert data with exactly one gate that resolves, and Sprint 17 is the first work to lean on it",
+            "raised": "2026-08-23",
+            "kind": "observation",
+            "source": "Measured while authoring BL-588 (unlock_recipe tech arm).",
+            "what": "scripts/tech_tree.lua opens with \"DATA ONLY — the tech system is post-prototype; nothing in the simulation reads this\", and prototype_tech_gates() in tech_gate.cpp returns a single gate, E0-ML-01, which unlocks the military base. The tech_effect union has two arms: unlock a building_type, or move a scalar. So the only lock the economy earns today is depth_locked, and it applies only to recipes tagged era = \"ancient\". NR-490 already observed the same shape from the progression side (\"one earnable gate in 150 tech nodes\").",
+            "why_it_matters": "BL-588 authors gates for the first time as content rather than as a proof. That is the moment the tree stops being a picture of a system, and it is worth knowing that the node list in tech_tree.lua is still marked status=\"sketch\" for Era 1 and status=\"derived\" for Era -1 — neither is a ratified content set. Authoring gates against ids in that file binds real behaviour to nodes Ben has explicitly not reviewed.",
+            "options": [],
+            "recommendation": "Either author BL-588's first gates against a small, deliberately-chosen set of Era 0 node ids, or let the gate table name its own ids and reconcile with tech_tree.lua later. State which at promotion; do not let the Lua node list become authoritative by accident.",
+            "files": [
+                "scripts/tech_tree.lua",
+                "src/world/tech_gate.cpp",
+                "src/world/tech_gate.hpp"
+            ],
+            "status": "open",
+            "resolution": null
         }
     ]
 }
