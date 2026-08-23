@@ -5,26 +5,13 @@ geopolitical backdrop at campaign start: who controls what land, what the diplom
 positions are, and what legal context corporations operate within.
 
 This document covers **only the generation strategy** — how a nation comes to exist. What a nation
-*does* afterwards is now owned by **[`docs/politics/NATIONS.md`](../politics/NATIONS.md)**, written
-2026-08-22: the treasury, law authorship and the 2026-08-18 nation-behaviour grant. Where the two
-disagree about a field, generation wins on how it is **set** and NATIONS.md wins on what it
-**means**.
+*does* afterwards is owned by **[`docs/politics/NATIONS.md`](../politics/NATIONS.md)**: the
+treasury, law authorship and the nation-behaviour grant (Ben, 2026-08-18). Where the two disagree
+about a field, generation wins on how it is **set** and NATIONS.md wins on what it **means**.
 
-> **Superseded 2026-08-22 — the sentence this doc opened with for seven weeks.** It read: *"Nation
-> system design is an open item... Mechanical behaviour — taxes, laws, military policy, diplomatic
-> actions — is deferred."* That was true when written and stopped being true incrementally: a
-> nation now holds a treasury (BL-480, law has an author), authors the seeded extraction levy, and
-> has been granted deterministic behaviour (standing rules, 2026-08-18). The disclaimer outlived
-> the deferral, and while it stood no doc owned the question — which is what the phantom-feature
-> scan found (`docs/development/PHANTOMS.md` § Class 1).
-
-> **The "nations are backdrop" framing is scoped to v0.1.x.** A forward pointer flagged 2026-08-04
-> under BL-094 (player-identity pivot) said the player would *become* one of these nations. **That
-> reading is superseded twice over**: BL-094's governing-body framing was replaced by the national
-> private militia on 2026-08-10, and the 2026-08-12 two-arcs split parked that whole arc for DLC
-> and put a **mercenary company** in the live seat. The player is a **law subject**, not a nation —
-> so these mechanics stay a nation's, and do not become the player's levers. Authority propagates
-> when the work lands (DELIVERY.md § Design state).
+**Nations are backdrop to the player, not the player.** The player is a **law subject** — a
+mercenary company in the live arc (`docs/development/ROADMAP.md` § The two arcs) — so the
+mechanics a nation holds stay a nation's and do not become the player's levers.
 
 ---
 
@@ -50,16 +37,16 @@ shape it are `land_tiles_per_seed` and `min_nation_tiles` (`nation_params`,
 `src/world/nation_generation.hpp`) — both are retuning dials on *character*, not on count.
 
 **Same pipeline, all bodies.** Nation generation runs only on bodies with sufficient habitable
-area. In the prototype this means Kepler only. The pipeline is body-agnostic; it reads tile
+area — the homeworld. The pipeline is body-agnostic; it reads tile
 compositions and applies the same logic regardless of which body it operates on.
 
 ---
 
 ## Generation pipeline
 
-### Pass 0 — The history ladder (landed 2026-07-30, BL-221 pre-national ladder)
+### Pass 0 — The history ladder
 
-Before any seed is placed, `run_history_ladder` (`src/world/history_ladder.cpp`) runs over the
+The ladder is BL-221 (pre-national ladder). Before any seed is placed, `run_history_ladder` (`src/world/history_ladder.cpp`) runs over the
 finished tile map and the body's planetology state. It scores every tile for agrarian value
 (`agrarian_score` — composition, landform, habitability), picks the independent **cradles** by
 greedy argmax with a separation floor, and measures the **barrier field** (ocean, mountain,
@@ -75,9 +62,9 @@ The ladder **drives** the political map rather than narrating one it was handed 
 2026-07-30). A world with no cradles (below a land biosphere) leaves the caller's defaults
 untouched. Full stage design: `../lore/HISTORY.md`.
 
-### Pass 0b — Settlement & industrialisation (landed 2026-08-02, BL-218 nations rewrite)
+### Pass 0b — Settlement & industrialisation
 
-Between the ladder and the seeds sits `run_settlement` (`src/world/settlement.cpp`), which turns
+The settlement pass is BL-218 (nations rewrite). Between the ladder and the seeds sits `run_settlement` (`src/world/settlement.cpp`), which turns
 the ladder's cradles and the creeds' pantheons into **regions** — the unit that actually gets
 settled, industrialised, fought over, and read by corporation generation.
 
@@ -102,16 +89,14 @@ Two details are load-bearing:
 
 ### Pass 1 — Seed placement
 
-**Since BL-218 the seeds are the region anchors.** `nation_params::seed_tiles` is filled from
+**The seeds are the region anchors.** `nation_params::seed_tiles` is filled from
 `settlement_seed_tiles` and consumed verbatim; the random placement described below is the
-fallback, kept intact for any body with no settlement pass and therefore bit-for-bit identical to
-pre-BL-218 behaviour there.
+fallback for any body with no settlement pass.
 
-This is the rewrite's cost answer in one line — *seeding changes, expansion does not*. Pass 1b/2's
-growth machinery is already tuned for size variance (BL-053) and discarding it would have
-regressed a property that works; reusing the mechanism and replacing its **inputs** keeps the
-tuned behaviour while making the variance **emerge** from where people actually settled rather
-than being dialled in.
+The design in one line — *seeding is settled, expansion is tuned*. Pass 1b/2's growth machinery
+is tuned for size variance (BL-053, nation size variance); the settlement pass replaces its
+**inputs**, which keeps the tuned behaviour while making the variance **emerge** from where
+people actually settled rather than being dialled in.
 
 A set of nation seeds are placed across the body's landmass tiles. The seed count is **derived
 from the habitable landmass, as modulated by the ladder** (Pass 0): one seed per
@@ -127,7 +112,7 @@ Seeds prefer habitable compositions (grassland, forest, wetland) but can land on
 tile. This produces nations that form around productive cores rather than uniformly across
 terrain.
 
-### Pass 1b — Growth weights (BL-053)
+### Pass 1b — Growth weights
 
 Each seed is assigned a **growth weight** drawn from a skewed distribution (the cube of a
 uniform draw → most seeds small, a few large). A seed's BFS step cost is divided by its weight,
@@ -155,7 +140,7 @@ tile across the water** (by Chebyshev grid distance; ties break to the lower nat
 then the lower tile index). After this pass every non-ocean land tile on the body belongs to
 a nation — there are no unclaimed islands.
 
-### Pass 2c — Light "in history" merges: the size floor (BL-053)
+### Pass 2c — Light "in history" merges: the size floor
 
 A deterministic post-pass gives the map a "grown in history" feel without simulating history.
 The body is **over-seeded** in Pass 1, then the smallest nations are repeatedly **absorbed into
@@ -173,13 +158,14 @@ absorbing neighbour by tile count then lowest index; an island with no land neig
 into the globally largest nation). This pass is *not* itself a source of fragmentation — it only
 ever merges a nation into a neighbour it already touches, so it cannot cut one in two.
 
-### Territorial fragmentation, measured (BL-284, landed 2026-08-09)
+### Territorial fragmentation, measured
 
-BL-218 bought the settlement-sim path largely on the claim that **fragmentation would fall out of
-it for free** — a growth front that crosses a strait and stalls, or a nation cut off by a rival's
-expansion, leaves an exclave nobody authored. Nothing counted them, so the claim was untested.
-`tools/verify/world_audit.cpp` now counts each nation's **non-contiguous territorial components**
-across a six-seed sweep and attributes every exclave to one of two producers.
+The settlement-sim path rests largely on the claim that **fragmentation falls out of it for
+free** — a growth front that crosses a strait and stalls, or a nation cut off by a rival's
+expansion, leaves an exclave nobody authored. The claim is measured rather than assumed (BL-284,
+fragmentation audit): `tools/verify/world_audit.cpp` counts each nation's **non-contiguous
+territorial components** across a six-seed sweep and attributes every exclave to one of two
+producers.
 
 The attribution is exact rather than heuristic, and it turns on Pass 2 being water-blocked:
 
@@ -191,9 +177,9 @@ The attribution is exact rather than heuristic, and it turns on Pass 2 being wat
 So an exclave on a **seeded** landmass (one holding at least one region anchor) is **emergent** —
 produced by the sim, whether by a stalled front, a rival cutting it off, or a Pass 4b rupture
 redrawing the border. An exclave on a **seedless** landmass is **Pass 2b** cleanup and is not
-evidence for BL-218's claim.
+evidence for the claim.
 
-**What the measurement says** (seeds 0–5, 2026-08-09): 196 exclaves, **60 emergent** and 136 from
+**What the measurement says** (seeds 0–5): 196 exclaves, **60 emergent** and 136 from
 Pass 2b — 31 % of exclaves by count, but **49 % of exclave tiles** (940 of 1930). Every swept seed
 produced emergent exclaves (6–17 each), and roughly half of all nations hold at least one. The
 promise pays: fragmentation is real and sim-produced, but Pass 2b's long tail of tiny orphan
@@ -210,11 +196,11 @@ economically for diplomacy initialisation and corporation generation.
 
 ### Pass 4 — Political character assignment
 
-**Rewritten 2026-08-02 (BL-218): the three axes are OUTPUTS of the settlement record, not an
-independent draw.** `derive_national_character` (`src/world/settlement.cpp`) runs immediately
-after `generate_nations` — it has to, because every derivation needs the political outcome — and
-overwrites what the random pass drew. The random draw survives only as the fallback for bodies
-with no settlement pass.
+**The three axes are OUTPUTS of the settlement record, not an independent draw.**
+`derive_national_character` (`src/world/settlement.cpp`) runs immediately after
+`generate_nations` — it has to, because every derivation needs the political outcome — and
+overwrites what the random pass drew. The random draw is the fallback for bodies with no
+settlement pass.
 
 | Axis | Derived from | Rule |
 |---|---|---|
@@ -225,11 +211,12 @@ with no settlement pass.
 None of the three needs a new roll — each is computable from the run's own record, which is the
 standing requirement that generation produces consequences rather than dice.
 
-### Pass 4b — The historical ruptures (BL-218, BL-217's second checkpoint class)
+### Pass 4b — The historical ruptures
 
 `resolve_historical_ruptures` then fires a bounded set of ruptures over the most-contested
 nations, reusing `planetology.hpp`'s class-agnostic `resolve_checkpoint` rather than inventing a
-second branch mechanism. Branch eligibility is a **filter, never a weight** (BL-217's rule): a
+second branch mechanism — the second checkpoint class of BL-217 (branch checkpoints). Branch
+eligibility is a **filter, never a weight** (BL-217's rule): a
 nation with no land neighbour cannot go to war, a single-region nation cannot collapse. Every
 attempt appends a `checkpoint_record`, failures included.
 
@@ -239,7 +226,7 @@ a substitute for it:
 - **Collapse** — the two most peripheral regions pass to a bordering neighbour and their
   industrial clock resets; abundance falls 20%. Ideology unchanged.
 - **War** — the contested border redraws toward the stronger (bounded at a quarter of the loser's
-  territory, so BL-224's non-hegemony invariant is respected rather than spent); the loser's
+  territory, so the non-hegemony invariant — BL-224 — is respected rather than spent); the loser's
   posture rises to aggressive (grievance is the point of the axis); both lose abundance; **the
   victor's gods travel with the border**, and part of the loser's record is **destroyed** — see
   below.
@@ -258,11 +245,12 @@ Across a six-seed spread, four worlds lost part of their record to a war.
 
 ---
 
-The pre-BL-218 random pass, kept as the fallback path and as the description of the axes
-themselves:
+The random pass — the fallback path for a body with no settlement record, and the description of
+the axes themselves:
 
-Each nation receives a set of parametric political attributes drawn from a seeded random
-pass. These seed the sentiment graph and the starting tone of diplomatic interactions.
+Each nation carries a set of parametric political attributes; on the fallback path they are drawn
+from a seeded random pass. These seed the sentiment graph and the starting tone of diplomatic
+interactions (`docs/politics/RELATIONS.md` owns sentiment; BL-545, sentiment substrate).
 
 | Attribute | Values | Effect |
 |---|---|---|
@@ -276,7 +264,7 @@ regardless of ideology.
 
 ### Pass 5 — Naming
 
-**There is no name bank** (BL-290, landed 2026-08-09). A nation is named in the **tongue of the
+**There is no name bank** (BL-290, native nation names). A nation is named in the **tongue of the
 culture that settled the region its seed grew from** — the same phoneme inventory the creeds pass
 (BL-235) coined that culture's own name and its gods from. Naming *consumes* the phonology the
 generation chain already produces; it does not roll a second one.
@@ -284,16 +272,15 @@ generation chain already produces; it does not roll a second one.
 The plumbing:
 
 - `world/tongue.{hpp,cpp}` owns the `tongue` (onset / vowel / coda inventory), the word builder,
-  and `coin_lexicon`. `creeds.cpp` rolls the tongue through the same code it always did — the roll
-  is unchanged — and now **retains** it on `culture::speech`.
+  and `coin_lexicon`. `creeds.cpp` rolls the tongue and **retains** it on `culture::speech`.
 - `hard_coded_world.cpp` carries each region's tongue across into `nation_params::seed_tongues`,
   parallel to the `seed_tiles` anchors the settlement pass supplies.
 - Pass 5 gives each surviving nation the speech of the **lowest-indexed seed still inside it** (a
   seed absorbed by the Pass 2c merge contributes nothing — the surviving core names the realm), then
   builds the name with one of three structural forms: bare name, epithet + name, name + realm word.
 
-**The structural words are native too.** "Republic", "Commonwealth", "Free", "United" are gone:
-`coin_lexicon` coins each tongue its *own* morphemes for *realm*, *town* and *standing epithet*,
+**The structural words are native too.** There is no "Republic", "Commonwealth", "Free" or
+"United": `coin_lexicon` coins each tongue its *own* morphemes for *realm*, *town* and *standing epithet*,
 from that tongue's own sounds. The lexicon is a **pure function of the tongue** (its stream is
 seeded by hashing the inventory, not by a caller's RNG), so one culture coins the same words
 wherever it is consumed — nation names in one pass, city names in another — without those passes
@@ -304,45 +291,42 @@ A body with no culture layer (no settlement pass, or a caller supplying bare see
 to **one** tongue rolled in Pass 5 for the whole body, not a per-nation re-roll: an unwritten history
 is still a shared one.
 
-**Region names** follow it too (BL-348, landed 2026-08-10). A region is `<People> <Region>`,
-and the region half was still English — *Reach*, *Coast*, *northern*, *inland* — which was *worse*
-than before BL-290 rather than merely unfixed: with the culture half native, the two naming systems
-sat side by side in one string and read as a bug rather than a style. `coin_lexicon` now coins each
-tongue **nine** region words, and `region_word` asks the region's tongue instead of returning a
-literal.
+**Region names** follow it too (BL-348, native region names). A region is `<People> <Region>`,
+and both halves are native — a native people-name beside an English *Reach* or *Coast* would put
+two naming systems side by side in one string and read as a bug rather than a style.
+`coin_lexicon` coins each tongue **nine** region words, and `region_word` asks the region's tongue
+rather than returning a literal.
 
 Nine, because the choice of region word is **positional** and stays that way: a 5-band
 north→south axis and a 4-sector dawnward→outer axis, so the name still carries a fact about the
-ground rather than becoming decorative. The English table survives only as the fallback for a
-culture whose tongue cannot coin at all. Sample (default seed): *Dothkua Shethdeith*, *Rekmaik
+ground rather than becoming decorative. An English table is the fallback for a culture whose
+tongue cannot coin at all. Sample (default seed): *Dothkua Shethdeith*, *Rekmaik
 Taikme*, *Rairuath Rairith*, *Shuahualmi Beduas*, *Kuakuam Ruatem*, *Nuathorsho Ruvor*,
 *Nuathorsho Rove*, *Tatadith Hezo*, *Kuakuam Muamem* — the kinship is emergent here as well, since
 *Nuathorsho Rove* / *Nuathorsho Ruvor* and *Kuakuam Ruatem* / *Kuakuam Muamem* draw their region
-words from one sound system. The nine words are drawn **last** in `coin_lexicon`, so every nation
-and city name generated before the change is byte-identical after it.
+words from one sound system. The nine words are drawn **last** in `coin_lexicon`, so they perturb
+no nation or city name drawn before them.
 
 **City names** follow the same rule. `generate_city_name` takes a tongue and suffixes the culture's
-own coined settlement morpheme — the `-ton` / `-ford` / `-haven` / `-burg` bank is removed. Because
+own coined settlement morpheme; there is no `-ton` / `-ford` / `-haven` / `-burg` bank. Because
 population centres are placed *before* the creeds exist, they are first named from a tongue rolled
 for the body, then re-named per-region by `name_population_centres` (`world/city_names.cpp`) once
 the settlement record exists, using the **nearest region's** culture — the same "whose gods" rule
 the settlement pass uses.
 
-### Pass 6 — Substrate density (BL-050 saturated substrate)
+### Pass 6 — Substrate density
 
-The last pass in `generate_nations` seeds the background economy's geography. For every
+The last pass in `generate_nations` writes the geography of settlement density. For every
 nation-owned tile it finds the nearest population centre on the same body (Chebyshev distance)
 and computes a **density ripple**: `max(0, 1 − dist/8) × centre.scale`, taking the strongest
-centre. That value is written to `tile_component.substrate_density`, and for every tile with
-density > 0 it accumulates into the per-(nation, body) `nation_substrate`:
-`population_weight += density` and `capacity[r] += density × tile.resource_deposit[r]`.
+centre. That value is written to `tile_component.substrate_density`.
 
-Only **generation baselines** are stored here (BL-078): the economic scalars — capacity scale,
-demand basket, elasticity, clearing fraction — are applied at tick time by
-`inject_substrate_demand`, so the demand/supply model is retunable from `economy.lua` without
-regenerating the world. This is the surface any future substrate work reads. Requires
-population centres to already exist — which is why `generate_population_centres` runs before
-`generate_nations` in `hard_coded_world.cpp` (see § Settlement generation below).
+**Nothing reads the field.** The background economy is carried by real background firms
+(`CORPORATION_GENERATION.md` § Pass 6), not by a per-tile capacity aggregate, and the Industry
+lens (`body_surface_canvas.cpp`) reads those firms' plant on each tile directly. The ripple is a
+settlement-density description with no consumer. The pass requires population centres to already
+exist — which is why `generate_population_centres` runs before `generate_nations` in
+`hard_coded_world.cpp` (see § Settlement generation below).
 
 ---
 
@@ -352,7 +336,7 @@ Not part of `generate_nations`, but sequenced around it and documented here beca
 passes read it.
 
 **Population centres** — `generate_population_centres` (`src/world/population_generation.cpp`)
-runs on Kepler *before* the ladder and the nation pass. It places 20–40 centres (grid tiles /
+runs on the homeworld *before* the ladder and the nation pass. It places 20–40 centres (grid tiles /
 1000, clamped) on valid tiles (`placement_rules::can_place_population_centre`), one at a time
 with a 3× weighting for tiles adjacent to an existing centre, so agglomeration is progressive.
 Each centre draws a **scale** 1–5 from a weighted distribution (40/30/20/8/2%) mapping to
@@ -360,55 +344,49 @@ Each centre draws a **scale** 1–5 from a weighted distribution (40/30/20/8/2%)
 tongue rolled for the body, replaced later by `name_population_centres` — see Pass 5) so
 naming never perturbs placement.
 
-**Market carving** — after nations exist, `hard_coded_world.cpp` seeds Kepler's markets from
-the centres (the surface BL-036, seed market centres, shipped). Markets anchor to
-population-centre tiles but are **resource-carved** (BL-096): each nation's tradeable-raw
+**Market carving** — after nations and corporations exist, `hard_coded_world.cpp` seeds the
+homeworld's markets from the centres. Markets anchor to population-centre tiles but are
+**resource-carved** (BL-096, resource-carved markets): each nation's tradeable-raw
 concentration (mean deposit per owned tile, seeded jitter ×[0.85, 1.15]) is classified against
 the cross-nation mean into a population-scale gate — ≥1.30× mean → gate 2 (fracture: more of
 its centres get markets), <0.70× mean → gate 4 (fold: its small centres route to a
 neighbour's market via `market_for_tile`), otherwise gate 3. A centre seeds a market only if
 its scale clears its nation's gate; one unanchored fallback market is seeded if none qualifies.
-Endemic goods are then priced by distance from where they grow (BL-191).
+Endemic goods are then priced by distance from where they grow (BL-191, endemic pricing).
+`GENERATION_STRATEGY.md` § The economic premise carries the corporate-contest term the carve
+also reads.
 
 ---
 
-## Prototype scope
+## Scope
 
-In the prototype, Kepler is the only body with nation generation. Selene, Cinder, and Pallas
-are unclaimed territory.
+The homeworld is the only body with nation generation. The other prototype bodies are unclaimed
+territory.
 
-Nation count for Kepler: **not authored**. Since the ladder landed (BL-221, 2026-07-30) the
-size floor and seed density are fragmentation-modulated, and the default seed settles at
-**43 nations** — up from the pre-ladder 17–21 (21 on seed 0). The jump is the ladder doing its
-job, and it was settled deliberately (Ben, 2026-07-30 — recorded in `../lore/HISTORY.md`
-§ Implementation): let naturally different cultures emerge; a future war/conflict stage narrows
-the count if needed, rather than tuning the generator to a target. Sizes stay strongly varied.
-The base knobs are `land_tiles_per_seed`, `min_seed_separation`, and `min_nation_tiles`
-(`nation_params`), now modulated by `nation_params_from_ladder`; the New World setup screen has
-**no nations slider** — the count is not the player's to set. (Note: the `min_nation_tiles`
-doc-comment in `nation_generation.hpp` still quotes the pre-ladder 17–21 — stale.)
+The homeworld's nation count is **not authored**. The size floor and seed density are
+fragmentation-modulated, and the default seed settles at **43 nations**. A count that high is the
+ladder doing its job, settled deliberately (Ben, 2026-07-30 — recorded in `../lore/HISTORY.md`
+§ Implementation): let naturally different cultures emerge; a war/conflict stage narrows the
+count if needed, rather than tuning the generator to a target. Sizes stay strongly varied. The
+base knobs are `land_tiles_per_seed`, `min_seed_separation`, and `min_nation_tiles`
+(`nation_params`), modulated by `nation_params_from_ladder`; the New World setup screen has
+**no nations slider** — the count is not the player's to set.
 
 **What planetology data nation placement does and does not consume.** The ladder consumes the
-planetology state directly (`life_stage` peak, `arable_share`, `endemics` — BL-221 closed that
-half of `PLANETOLOGY.md`'s "hands nothing downstream" weakness). `generate_nations` itself
-still reads only tiles: seed preference over habitable compositions and Pass 3's
-deposit-summed resource profile are *indirectly* downstream of the biosphere, but no endowment,
-region, or biography data is read at placement time.
+planetology state directly (`life_stage` peak, `arable_share`, `endemics`). `generate_nations`
+itself reads only tiles: seed preference over habitable compositions and Pass 3's deposit-summed
+resource profile are *indirectly* downstream of the biosphere, but no endowment, region, or
+biography data is read at placement time.
 
-Nation system behaviour — diplomatic actions, military response, territorial ambition — is
-**still not implemented**: a nation takes no autonomous action on any tick, and no `nation_ai`,
-nation verb or nation command exists. *(Amended 2026-08-22: two of the items this paragraph
-originally listed have since moved. **Taxes and laws are no longer deferred** — a nation holds a
-treasury, authors the seeded extraction levy and is credited by it. What it still lacks is the
-means to decide any of that for itself. The whole live/absent split now lives in
-[`docs/politics/NATIONS.md`](../politics/NATIONS.md) § Build status and § What is absent, which is
-the authority; this paragraph is a pointer.)*
+What a nation does once it exists — its treasury, the laws it authors, the budget it allocates
+and the stance it derives — is [`docs/politics/NATIONS.md`](../politics/NATIONS.md)'s, not this
+document's.
 
 ---
 
-## The carve is watched (BL-305, landed 2026-08-13)
+## The carve is watched
 
-The territory carve has a **surface**: it is drawn live on the loading screen
+The territory carve has a **surface** (BL-305, loading-screen carve): it is drawn live on the loading screen
 (`app::draw_building_carve` in `src/core/app.cpp`, `app_screen::building`), in the seconds
 between the New World wizard's "Begin" and the first frame of play. Pass 2's weighted Voronoi
 BFS publishes each tile **at the moment it settles**, so the player watches nations grow
@@ -450,30 +428,29 @@ real nations.
 
 Corporations are legally registered within a nation and operate within its territory by default.
 The nature of this relationship — what obligations it creates, what it restricts, and how it
-evolves across Eras — is an open design item. See `CORPORATION_GENERATION.md` and
-`docs/development/DEVLOG.md` for the current position.
+evolves across Eras — is an open design item. See `CORPORATION_GENERATION.md` § Open items and
+`docs/politics/NATIONS.md`.
 
 ---
 
 ## Open items
 
-**Nation system design.** *(Re-homed 2026-08-22 — this open item now has a document.)* What
-nations actually *do* — tax corporations, issue licences, declare war, provide infrastructure —
-is owned by [`docs/politics/NATIONS.md`](../politics/NATIONS.md), including the six open questions
-it is still short of an answer on. The generation layer was implemented first so the world had
-political structure from turn one without requiring the system to be fully designed, and that
-ordering held: taxation arrived before any nation could choose to levy it.
+**Nation system design.** What nations actually *do* — tax corporations, issue licences, declare
+war, provide infrastructure — is owned by [`docs/politics/NATIONS.md`](../politics/NATIONS.md),
+including the calls it leaves open. The generation layer exists so the world has political
+structure from turn one independent of how much of that system is designed.
 
 **Era-based reform.** There is a working hypothesis that later Eras will see corporations
 become de-facto powers above states, with the nation layer diminishing in authority as the
 game progresses. This has significant implications for what nations need to be able to *do*
-and how that capability decays. It is noted here but not yet scoped.
+and how that capability decays. It is noted here and unscoped.
 
-**Fragmentation and history.** A *light* "in history" pass landed with BL-053 (Pass 2c:
-over-seed + merge-below-the-size-floor, giving varied sizes and irregular borders). Full historical
-fragmentation — exclaves, disputed zones, contested tiles — remains a deferred production pass
-(parked BL-054, nation behaviour).
+**Fragmentation and history.** Pass 2c is a *light* "in history" pass (over-seed +
+merge-below-the-size-floor, giving varied sizes and irregular borders), and the settlement sim
+produces emergent exclaves on top of it. Disputed zones and contested tiles — fragmentation as a
+live political fact rather than a border shape — have no owner in the generation layer; BL-518
+(war redraws borders) is the first thing that moves a border after generation.
 
-**Non-Kepler politics.** As colonies establish on other bodies, some form of jurisdiction
+**Off-homeworld politics.** As colonies establish on other bodies, some form of jurisdiction
 and governance will be needed there. Whether this extends the nation model or introduces a
 new corporate governance model is unresolved.

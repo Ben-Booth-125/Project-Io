@@ -1,10 +1,9 @@
 # Era 1 Tech — Research Landscape (2000–2040)
 
-> **Status: research scaffolding — not authority.** Captured 2026-06-30 on branch
-> `claude/era1-tech-research` during Era 1 tech-system ideation. This document points
-> *toward* a design; it settles nothing. The eventual design lands as a backlog item, and
-> authority propagates into `docs/economy/ERAS.md` (and any new tech doc) only when the work
-> lands. Read it as a map for further reading, not a spec.
+> **Research scaffolding — not authority.** Captured during Era 1 tech-system ideation. This
+> document points *toward* a design; it settles nothing. The design is **BL-087 (Era 1 tech /
+> quest system)**, and authority is `docs/economy/ERAS.md` (and any new tech doc). Read it as a
+> map for further reading, not a spec.
 
 ## What this is for
 
@@ -23,8 +22,8 @@ alternatives) that those three questions need as input.
 The campaign epoch is being moved from 1960 → **~2000**, with **Era 1 ≈ 2000–2040**. This anchors
 Era 1 to the richest, best-documented near-future space window we have (reusable launch, ISRU,
 commercial stations, asteroid sample return, nuclear propulsion revival) plus a deep sci-fi bench
-for the *plausible alternatives*. This is a fiction retcon to CONCEPT/ERAS — captured here, not yet
-applied to the authority docs.
+for the *plausible alternatives*. This is a fiction retcon to CONCEPT/ERAS — captured here, for
+the authority docs to take up.
 
 ### The streamlining principle
 
@@ -183,7 +182,7 @@ Decisions reached before pausing, to resume from:
   toward a `research_cost`. Scale via building more Labs. Resolves the ERAS "purchased" vs CONCEPT
   "build it" wording conflict in favour of build-it.
 
-**Open sub-decisions (not yet locked):**
+**Open sub-decisions:**
 
 1. **Input resource** — Electronics (recommended; ties research into the Era-0 economy) / money-only /
    abstract research budget.
@@ -195,7 +194,7 @@ Decisions reached before pausing, to resume from:
 
 **Scope flag:** this is a real departure from ROADMAP's "Research excluded from v0.1.0." Proposed
 resolution: the *lean gate-tech* is in-scope (it makes the prototype's premise testable) while the
-*full quest-based tree* stays deferred; reconcile ERAS ↔ ROADMAP **when the work lands**, not before.
+*full quest-based tree* is BL-087's; ERAS ↔ ROADMAP reconcile as part of that item.
 
 **Next dig (suggested):** go a level deeper on Thread 2 (ISRU / propellant), the keystone.
 
@@ -399,7 +398,7 @@ Three facts from the web pass that update the threads above:
    carry **long payback curves** (a bank-vs-rush tension), which maps onto open sub-decision #5.
    [MIT Tech Review](https://www.technologyreview.com/2019/06/26/134510/asteroid-mining-bubble-burst-history/)
 
-## Open questions (design-owed — carried into BL-087)
+## Open questions (carried into BL-087)
 
 1. **Within a quest: linear spine or mesh?** Legibility favours a mostly-linear spine + a few optional
    branches, not a web.
@@ -865,10 +864,10 @@ dangerous tech — it is to buy the reassurance that lets them hold it.
 
 > **SETTLED 2026-08-06 (Ben, NR-068): pairwise.** Overrides this document's per-nation lean and
 > BL-223's plain-scalar precedent — Alarm is tracked nation-A-toward-nation-B, N² state. BL-223's
-> reconciliation (still owed) needs to account for Ceiling staying a plain per-nation scalar while
+> reconciliation needs to account for Ceiling staying a plain per-nation scalar while
 > Alarm is pairwise; the two are tested against each other per § The load-bearing half, so the
 > comparison needs a defined reduction (e.g. a nation's aggregate Alarm = its highest or summed
-> pairwise reading) — not yet specified, carried forward as open work.
+> pairwise reading) — open.
 2. **Does the player see rivals' Alarm, or only their own contribution?** The discovery model would
    say: your own contribution always, rivals' level only where your intelligence reaches.
 

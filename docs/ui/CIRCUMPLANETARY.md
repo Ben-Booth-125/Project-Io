@@ -2,8 +2,8 @@
 
 The Circumplanetary screen is the **middle rung** of the canvas ladder: a
 top-down view of a single planet and the space immediately around it — its
-moons, and (later) stations and local traffic. It sits between the Solar screen
-(the whole system) and the Planetary screen (one body's surface). See
+moons, and stations and local traffic as overlays. It sits between the Solar
+screen (the whole system) and the Planetary screen (one body's surface). See
 [CANVASES.md](CANVASES.md) for the layout rules shared across the three canvases.
 
 ---
@@ -21,14 +21,13 @@ alone at the centre. The rung is the deliberate stepping stone between picking a
 planet out of the system and dropping to its surface, so it always exists for any
 descendable body.
 
-At Layer 2, this canvas communicates:
+This canvas communicates:
 
 - Which planet is in focus and what moons it has
 - Which body is currently selected (the Planetary screen target)
 - Body type at a glance via colour
 
-Stations, local traffic, and orbital infrastructure are added in later layers as
-overlays.
+Stations, local traffic, and orbital infrastructure are overlays on this base.
 
 ---
 
@@ -64,14 +63,14 @@ Moon orbital radii are **not** true scale — real moon distances would render o
 top of the planet — they use a visible offset, consistent with how moons are
 drawn on the Solar screen.
 
-**Reference distance is rung-relative (landed).** On the Circumplanetary rung the distance
+**Reference distance is rung-relative.** On the Circumplanetary rung the distance
 reference is the **parent body — 0 AU at the parent** — so a moon's surfaced distance is its
 distance *from its parent*, the meaningful figure when the view is framed on the parent. This
-holds for the hover tooltip, and — landed since this note was first written — for the **body stat
-block** too: the canvas-aware `draw_body_summary(const world&, const ui_state&, entity_id)`
-overload in `entity_summary.cpp` switches on `ui_state::primary_level` and prints
-`Dist from <parent>` on this rung (re-targeted 2026-07-31; the legacy single-argument overload
-keeps the star-referenced line). See SOLAR.md for the Solar-rung reference.
+holds for the hover tooltip and for the **body stat block**: the canvas-aware
+`draw_body_summary(const world&, const ui_state&, entity_id)` overload in `entity_summary.cpp`
+switches on `ui_state::primary_level` and prints `Dist from <parent>` on this rung (the
+single-argument overload keeps the star-referenced line). See SOLAR.md for the Solar-rung
+reference.
 
 ---
 
@@ -104,11 +103,11 @@ framing.
 
 ---
 
-## What is deferred
+## Overlays on this rung
 
-| Item | Deferred to |
+| Overlay | Design |
 |---|---|
-| Stations and orbital infrastructure | Later layers |
-| Local traffic / convoys in transit | Partly landed — the Supply lens draws a per-body **convoy-count badge** on this rung (LENSES.md § Supply); moving convoy entities still undrawn here |
-| True-scale or selectable orbit framing | Post-prototype |
-| Faction overlays | Post-prototype — the **Market lens's per-body price strip** is already built on this rung (LENSES.md § Market; row corrected 2026-07-31) |
+| Convoys in transit | The Supply lens draws a per-body **convoy-count badge** on this rung (LENSES.md § Supply); moving convoy entities are not drawn here. |
+| Market prices | The Market lens's **per-body price strip** (LENSES.md § Market). |
+| Stations and orbital infrastructure | Post-prototype. |
+| True-scale or selectable orbit framing | Post-prototype. |

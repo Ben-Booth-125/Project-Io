@@ -1,57 +1,46 @@
 # Construction — design Q&A
 
 > **Working design doc** for the ledger-mockup pass (Power BI). Strawman answers — Ben revises.
-> Menu slot: `rail slot 6` · Source: `src/ui/construction_panel.cpp` · Mock table(s): `buildings.csv` · Related: `BL-122`, `BL-029` (queue backend), `BL-044` (material build cost), `BL-123` (selection resize)
-> Host: shell fold-out column (BL-122), ~380px @1720 (derived — `shell_column_width(disp.x)`, 380–460 by resolution).
+> Menu slot: `rail slot 6 "Construction"` · Source: `src/ui/construction_panel.cpp` · Mock table(s): `buildings.csv`
+> Host: shell fold-out column, ~380px @1720 (derived — `shell_column_width(disp.x)`, 380–460 by resolution).
 
 ## 1. Top question — the one thing this answers at first glance
-**"What can I build right now, and what will it cost me?"** — the placement affordance. Opening Construction should put the player one click from arming a building type and reading its cost (cash + materials, per `reg.economics()`). The secondary questions that justify the tabs: **"How do I configure the buildings I already have?"** (workforce %, recipe, decommission — the Manage tab) and **"How do I sell what those buildings make?"** (per-body sell orders — the Sell Orders tab). These are three genuinely different verbs (place / configure / sell), which is exactly why the 2026-07-06 redesign split the old single scrolling column into tabs.
+**"What is happening with my construction, and what is it costing me?"** — the in-flight read. The placement verb itself does **not** live here: building is a *targeted* action, so the build front door sits on the **tile Selection card** (extractable-target radios, cost-annotated build buttons, affordability gate — `selection.md`), and per-building configuration (workforce, production method, mothball, dismantle) sits on the **building Selection card**. That is the menus-are-broad-ledgers rule in `MENU.md`: a rail slot is earned by an overview, never by a press on one thing. What remains broad — and what this surface answers — is the **queue**: every player building still under construction, its analog rate, ETA and paused status, and the estimated per-quarter opex of the lot.
 
 ## 2. Sub-levels — views & default
 
-> **The tabs are now Construction / Buildings** (`construction_panel.cpp:553-555`), defaulting to
-> **Buildings**. The three views below were the pre-BL-162 shape: Build became **Construction**,
-> Manage folded into **Buildings**, and Sell Orders **moved to the Market ledger** — exactly the
-> relocation this doc flagged as a candidate. Corrected 2026-08-04.
+The surface is a single **Construction** view — `draw_queue_section` under `foldout_begin("Construction")`, no `nav_button` strip.
 
 | View | Answers (one question) | Content |
 |---|---|---|
-| **Construction** *(was Build)* | "What can I place, and what's it cost?" | Arm-buttons per building class; for extraction, a `placement_rules::k_extractable` target picker; live cost readout (`build_cost` cr + `resource_build_cost[]` materials); "click a tile to build". **The queue is real** since BL-162 — durative, material-gated, and it survives a build; the "placeholder only, `any_items = false`" note is superseded. |
-| **Buildings** *(default; was Manage)* | "How do I configure what I have?" | Per-building rows with type/target/recipe/build-cost/maintenance; workforce slider (0–200%), recipe combo (when >1 recipe), Decommission. |
-| ~~Sell Orders~~ | — | **Moved to the Market ledger**, which now carries a Sell Orders tab of its own. |
+| **Construction** *(only view)* | "What's in flight, and what is it costing?" | **Estimated cost: N / quarter** (`estimated_quarterly_construction_cost` — `compute_building_opex` maintenance + wages summed over every player building with `ticks_remaining > 0`, the same formula the budget loop uses), then the queue table: one row per in-progress build with a progress cell colour-coded dim (<25 %) / mid (25–75 %) / high (>75 %) |
 
-**Default view on open:** **Buildings** — what you own, not what you might place. *(Was `Build`.)*
-**Cross-cutting selectors that are NOT views (toggle-exempt):** the extraction **target** resource picker (Build), the **recipe** combo and **workforce** slider (Manage), and the **body / resource** combos (Sell Orders). None of these are sub-views; they're in-view selectors.
+**Construction is durative and material-gated.** A building under construction advances each economy tick by a rate in [0,1] set by how much of its per-tick material need (`resource_build_cost[r] / build_duration_ticks`) the local market (`market_for_tile`) can supply; below `1 / max_stretch` the build is **paused**. `construction_rate`, `construction_status` ("Building… ~N qtrs", "(materials scarce)", "Paused - market can't supply materials") and `construction_status_colour` (green on schedule / amber scarce / red paused) mirror `run_construction`'s formula so the panel and the Selection front door show the same number. The building carries `ticks_remaining` (an integer gate) and `construction_progress` (the fractional accumulator that lets a starved build stretch over many ticks). The display word is **qtr**, never tick (NR-002, Ben 2026-08-01) — a Tick is literally a calendar quarter.
+
+**Proposed second view — Buildings:** "How do I configure what I have?" — per-building rows with type / target / recipe / build cost / maintenance, a workforce slider (0–200 %), a recipe combo where more than one recipe is era-allowed, and Decommission. This is the overview form of what the building Selection card does one building at a time; the open question is whether the roster earns a tab or the Selection card is enough.
+
+**Default view on open:** Construction.
+**Cross-cutting selectors that are NOT views (toggle-exempt):** none on the live view. The proposed Buildings view's recipe combo and workforce slider are in-row selectors, not sub-views.
 
 ## 3. Lens on open
-**Arm `opportunity`** (per-tile best-building net margin) on the **Build** view — it is the literal "where should I build?" signal that the placement verb is asking, and Ben's stated preference is that opening a menu usually arms a lens. Have the lens **follow the sub-view**, not fixed:
-- **Build → `opportunity`** (best-margin tiles light up as build candidates).
-- **Manage → `production`** (per-tile output intensity — see what your existing buildings are actually yielding while you tune them). Alternative: `none`, since Manage is about one already-selected building, not the map.
-- **Sell Orders → `market`** (price signal for the resources you'd be selling).
+**Proposal: arm `opportunity`** (per-tile best-building net margin) on open — it is the literal "where should I build?" signal, and Ben's stated preference is that opening a menu usually arms a lens. If a Buildings view is added, have the lens **follow the sub-view**:
+- **Construction → `opportunity`** (best-margin tiles light up as the next build candidates).
+- **Buildings → `production`** (per-tile output intensity — see what your estate is yielding while you tune it). Alternative: `none`, since configuration is about one already-selected building, not the map.
 
-Proposal, not currently wired — the panel does not arm any lens today.
+The panel arms no lens on open; the mapping above is the proposal.
 
-## 4. Data — live vs plumbing gaps
-**Live world state today:**
-- **Build arming + cost** — fully live: `recipe_registry::economics()` gives `build_cost` and `resource_build_cost[]`; `placement_rules::k_extractable` drives the target list.
-- **Manage** — fully live against `world::buildings`: `workforce_target`, `active_recipe_index`/`recipe`, `decommissioned` all read and **write back** to the component.
-- **Sell Orders** — live against `world::sell_orders` and the body's `market_component`.
+## 4. Data sources
+- **Queue** — `world::buildings` filtered to `is_player_owned` and `ticks_remaining > 0`; rate from `construction_rate` (market supply against `recipe_registry::economics(type).resource_build_cost` and `build_duration_ticks`, `reg.construction().max_stretch`).
+- **Estimated cost** — `compute_building_opex` (`budget_system.hpp`) over the same set, with `body_mean_habitability` feeding the workforce term.
+- **Build cost, arming, placement** — `recipe_registry::economics()` (`build_cost`, `resource_build_cost[]`) and `placement_rules::k_extractable`, read by the tile Selection card rather than here.
+- **Per-building configuration** — `building_component::workforce_target`, `active_recipe_index` / `recipe`, `decommissioned`, written through `try_switch_recipe` and the workforce verbs from the building Selection card.
 
-**Maps to mock `buildings.csv`:** `type`, `output`, `active`, `exhausted`, `corp`/`body` — enough to mock a **built-inventory / Manage roster** table (filter to player corp = 30310 Genom Systems). Note the CSV rows are the *built* estate, not a queue.
-
-**Plumbing gaps (flag explicitly):**
-- **Construction QUEUE is not authored** (BL-029). `draw_queue_section` always shows "No active construction." — there is no `w.construction_queue`, no progress %, no ticks-left, no cost-remaining. Any queue table in the mock is **owed data**, not live. This is the single biggest gap.
-- **`buildings.csv` has no per-building `workforce_target` / `recipe` / `decommissioned` / `maintenance` column** — the Manage tab's live fields aren't in the export, so a Power BI "manage roster" can't show them yet. Export gap.
-- **No `opportunity`/`production` per-tile margin data in mockdata** — if the lens ships, it needs a per-tile net-margin/output export that doesn't exist.
-- **`exhausted` flag is exported but unused in the panel** — the code shows no exhaustion state; deposit-exhaustion surfacing is owed.
+**Maps to mock `buildings.csv`:** `type`, `output`, `active`, `exhausted`, `corp` / `body` — enough to mock a built-inventory roster (filter to player corp = 30310 Genom Systems). The CSV rows are the *built* estate, not a queue; it carries no `workforce_target` / `recipe` / `decommissioned` / `maintenance` column and no progress or ticks-left, so neither the live queue nor a Buildings roster can be reproduced from it without extending the exporter. There is no per-tile margin or output export for an `opportunity` / `production` mock either.
 
 ## 5. Close / toggle semantics
-Rail slot 6 icon toggles the whole Construction ledger open/closed. Inside, re-clicking the **currently-active tab** (`Build` while on Build, etc.) **closes the ledger entirely** (releases the column), per the universal toggle rule — not "collapse to Build". Switching to a *different* tab just changes view. The in-view selectors (target, recipe, workforce, body/resource combos) are exempt. A new entity selection also closes the ledger (mutual-exclusion with Selection in the same column, BL-122/123).
-
-One friction point to note: **Manage depends on the current selection**, which is the same state that closing-for-Selection consumes. If the player selects a building to manage it, that selection wants to *drive* the Manage tab — but a selection also closes any open ledger. Ben needs to rule on how "select a building → manage it" survives the mutual-exclusion (see open questions).
+Rail slot 6 icon toggles the whole Construction ledger open/closed. With a single view the toggle is the icon alone; once a second tab exists, re-clicking the **currently-active tab closes the ledger entirely** (releases the column), per the universal toggle rule — not "collapse to Construction". Switching to a *different* tab just changes view. In-row selectors (recipe, workforce) are exempt. Opening Construction closes whichever other ledger held the column (accordion, `close_all_panels`); the Selection band is independent of the column and stays where it is.
 
 ## Open questions for Ben
-- **Manage-vs-Selection collision.** Manage reads `state.selected_entity`, but a new selection closes the ledger to show the Selection element. Should selecting a building **auto-open Construction/Manage** instead of the Selection card, or should Manage's controls migrate *into* the Selection element (and Construction lose its Manage tab)? This is a real overlap between two column tenants.
-- **Does Sell Orders belong here at all?** The code itself flags it as a candidate to move to the **Market** ledger. Keep it in Construction (place → sell as one workflow) or move it out so Construction is purely build+manage?
-- **Queue placement.** When BL-029 lands, does the Queue stay a subsection under Build, or become its own **4th tab** ("Queue")? It currently shares the Build view but answers a distinct "what's in flight?" question.
-- **Lens per sub-view or fixed `opportunity`?** Confirm the follow-the-view mapping (Build→opportunity / Manage→production / Sell→market), or pin one lens for the whole ledger.
+- **Does a Buildings roster earn a tab?** Configuration lives per building on the Selection card. Is an all-buildings roster (sortable, with the same controls inline) a broad overview that earns a second view here, or does it duplicate the card and belong nowhere?
+- **Queue table shape.** Per row: building type, tile, progress %, ETA in quarters, status (on schedule / scarce / paused), and cost remaining — or a leaner three-column read? The progress colour bands (25 / 75 %) are a strawman.
+- **Lens: follow-the-view or fixed `opportunity`?** Confirm the mapping (Construction→opportunity / Buildings→production), or pin one lens for the whole ledger.

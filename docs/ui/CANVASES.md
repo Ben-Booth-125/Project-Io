@@ -22,10 +22,10 @@ specifications for each rung are in their own documents:
 
 The Planetary canvas additionally draws two always-on chrome layers, neither lens-gated: **civic
 chrome** — tiered population-centre conurbation markers, sized by scale and labelled at City+
-(BL-083; model in [`../economy/POPULATION.md`](../economy/POPULATION.md), glyph in
+(BL-083, civic markers; model in [`../economy/POPULATION.md`](../economy/POPULATION.md), glyph in
 [`ICONS.md`](ICONS.md)) — and **player-presence chrome** — a home-cluster ring + HQ star on
-`home_body` (BL-085), echoed by a home halo around the body on the Solar rung. Full detail in
-[PLANETARY.md](PLANETARY.md) and [SOLAR.md](SOLAR.md).
+`home_body` (BL-085, player presence), echoed by a home halo around the body on the Solar rung.
+Full detail in [PLANETARY.md](PLANETARY.md) and [SOLAR.md](SOLAR.md).
 
 ---
 
@@ -34,7 +34,7 @@ chrome** — tiered population-centre conurbation markers, sized by scale and la
 The game window is divided into two regions:
 
 - **Primary region** — the majority of the window. The active canvas fills this space.
-- **Minimap region** — a fixed inset in the bottom-right corner, framed by its own chrome (a title bar above, and the **lens mode bar** along its bottom edge — BL-093 moved the overlay-lens toggles onto the minimap itself; see `MINIMAP.md` / `LENSES.md`). The neighbouring canvas renders in the inset beneath it.
+- **Minimap region** — a fixed inset in the bottom-right corner, framed by its own chrome (a title bar above, and the **lens mode bar** along its bottom edge — the overlay-lens toggles live on the minimap itself; see `MINIMAP.md` / `LENSES.md`). The neighbouring canvas renders in the inset beneath it.
 
 **Default state.** The app opens on the **main menu**, not a canvas: main menu →
 New World wizard → "Begin" hands over to `in_game` (the `app_screen` flow —
@@ -51,18 +51,16 @@ The minimap is **context**: it always shows the rung one step *out* (zoom-out)
 from the primary, never the rung you drill into. Movement along the ladder has
 two clear directions:
 
-> **Click-model change (Selection info element).** A *single* click now
-> **selects** the clicked entity (filling the Selection info element, no view
-> change); **descend/navigate moves to a double-click**. The "click to descend"
-> wording below describes the navigate gesture, now bound to double-click. The
-> minimap ascend gesture stays a single click (the minimap has no selection).
-> See [SELECTION.md](SELECTION.md).
+> **Click model (Selection info element).** A *single* click **selects** the
+> clicked entity (filling the Selection info element, no view change);
+> **descend/navigate is a double-click**. The minimap ascend gesture is a single
+> click (the minimap has no selection). See [SELECTION.md](SELECTION.md).
 
 - **Descend (zoom in) by double-clicking a body in the primary canvas.** This is
   the load-bearing navigation interaction.
-  - Solar primary, click a **planet** → its **Circumplanetary** view becomes primary.
-  - Solar primary, click a **moon** → the **parent planet's** Circumplanetary view becomes primary, with the moon selected.
-  - Circumplanetary primary, click the **planet or a moon** → that body's **Planetary** surface becomes primary.
+  - Solar primary, double-click a **planet** → its **Circumplanetary** view becomes primary.
+  - Solar primary, double-click a **moon** → the **parent planet's** Circumplanetary view becomes primary, with the moon selected.
+  - Circumplanetary primary, double-click the **planet or a moon** → that body's **Planetary** surface becomes primary.
   - Planetary is the bottom rung; tile clicks select a tile, they do not descend.
 - **Ascend (zoom out) by clicking the minimap.** A minimap click promotes the
   zoom-out neighbour it is showing to primary (Planetary→Circumplanetary,
@@ -101,40 +99,38 @@ ImGui is capturing the keyboard (a text field has focus).
 
 | Primary | Minimap (zoom-out neighbour) | Minimap title |
 |---|---|---|
-| Solar | *no rung above* — game branding | the game name (`Project Io`) |
+| Solar | *no rung above* — the galaxy seen from the homeworld | `Galaxy` |
 | Circumplanetary | Solar | the **star name** |
 | Planetary | Circumplanetary (parent planet) | the **planet name** |
 
 The minimap title (chrome) is described in `MINIMAP.md`. The top rung (Solar) has
-no zoom-out neighbour, so its minimap is a non-interactive branding placeholder
-showing the game name rather than a canvas.
+no zoom-out neighbour, so its minimap is a non-interactive sky view rather than a
+canvas (MINIMAP.md § The top rung).
 
 ---
 
 ## Shared selection / view state
 
 The shared struct is `ui_state` in `src/ui/ui_state.hpp` — the code is the
-reference; no snippet is mirrored here (an earlier copy drifted badly). The
-load-bearing members for the canvases: the `active_body`
-navigation anchor, `selected_entity` (the Selection state, SELECTION.md),
-`primary_level` (`canvas_level` — which rung fills the window), `overlay`
-(`overlay_mode` — **fourteen** values: `none` plus thirteen lenses, LENSES.md;
-the early `faction` mode was renamed **`country`**), and per-canvas pan/zoom.
-The struct has since grown hover-card, construction, vision, and drill-down
-state — see the header itself.
+reference; no snippet is mirrored here. The load-bearing members for the
+canvases: the `active_body` navigation anchor, `selected_entity` (the Selection
+state, SELECTION.md), `primary_level` (`canvas_level` — which rung fills the
+window), `overlay` (`overlay_mode` — **fourteen** values: `none` plus thirteen
+lenses, LENSES.md; the nation lens is named **`country`**), and per-canvas
+pan/zoom. The struct also carries hover-card, construction, vision, and
+drill-down state — see the header itself.
 
 Selection, hover, and pinning are drawn through a shared **highlight convention**
 (`src/ui/highlight.hpp`) so they read the same on every canvas: white for the
-selected entity, light blue for hover, amber for pinned (pinning not yet wired),
-with `selected > pinned > hover` precedence. When several entities satisfy the
-same condition at once (overlapping markers under the cursor), each canvas first
-resolves a **single** choice — the candidate nearest the cursor, with entity id
-breaking exact ties — so a tie highlights one entity, arbitrarily but stably,
-rather than several. A reusable **focus helper**
+selected entity, light blue for hover, amber for pinned (a tier no surface sets —
+`EXPLORER.md`), with `selected > pinned > hover` precedence. When several
+entities satisfy the same condition at once (overlapping markers under the
+cursor), each canvas first resolves a **single** choice — the candidate nearest
+the cursor, with entity id breaking exact ties — so a tie highlights one entity,
+arbitrarily but stably, rather than several. A reusable **focus helper**
 (`src/ui/view_nav.hpp`) jumps the view to any entity — selecting it, choosing the
-rung that frames it, and centring that rung — for the opening view (and any future
-jump-to affordance; the Explorer that first motivated it is superseded, see
-`EXPLORER.md`).
+rung that frames it, and centring that rung — for the opening view and any
+jump-to affordance.
 
 `active_body` drives both lower rungs: the Circumplanetary view centres on
 `active_body`'s planet (the body itself if it orbits the star directly, or its
@@ -144,12 +140,12 @@ navigation pane; the canvases do not touch it.
 
 ---
 
-## Terrain channels — composition and landform (BL-231)
+## Terrain channels — composition and landform
 
-This section is the **shared-ladder spec** for the landform render — it lives here, not
-in PLANETARY.md, because the implementation is `hex_render` and serves two surfaces (the
-canvas and the Selection band's neighbourhood view); PLANETARY.md § Layers points back
-here (2026-07-31).
+This section is the **shared-ladder spec** for the landform render (BL-231, landform
+channels; BL-232, bridged runs) — it lives here, not in PLANETARY.md, because the
+implementation is `hex_render` and serves two surfaces (the canvas and the Selection band's
+neighbourhood view); PLANETARY.md § Layers points back here.
 
 A tile's character has two axes ([TILES.md](../economy/TILES.md)), and the Planetary
 canvas draws them on **two separate channels**. Both are **always-on chrome**, not an
@@ -163,10 +159,10 @@ movement-cost multiplier applies whether or not a lens is active.
 
 **Why two channels rather than one.** Lens tints composite over the terrain hue at
 0.6–0.80 alpha, so a second signal carried *in that hue* is obliterated exactly when a
-lens is on. This is the rule BL-226 established for the Continent lens's plate
-boundaries and it applies here unchanged: the relief is composited **after** every lens
-branch, and the glyphs are drawn over the finished fill in a contrasting ink
-(`ui::contrast_ink`, picked by the fill's luminance so it reads over the whole palette).
+lens is on. This is the rule the Continent lens's plate boundaries established and it
+applies here unchanged: the relief is composited **after** every lens branch, and the
+glyphs are drawn over the finished fill in a contrasting ink (`ui::contrast_ink`, picked
+by the fill's luminance so it reads over the whole palette).
 
 **Why the landform channel splits in two.** The measured mix (`world_audit` § S3) decided
 it. Plains and valley alone are ~95 % of land tiles, while every dramatic landform is
@@ -182,26 +178,25 @@ it. Plains and valley alone are ~95 % of land tiles, while every dramatic landfo
   would be far denser than any other glyph family and would fight the building silhouette
   for the hex centre.
 
-**Contiguous runs are bridged (BL-232).** A run of the same linear landform draws as **one**
+**Contiguous runs are bridged.** A run of the same linear landform draws as **one**
 spanning marker rather than the same glyph repeated per tile — mountain as a chain of peaks, rift
-as one continuous fissure, canyon as paired rims — reusing BL-172's road span/symmetry idiom (each
+as one continuous fissure, canyon as paired rims — reusing the road span/symmetry idiom (each
 tile draws its own half of the shared edge, so halves meet at the midpoint with no cross-tile state
 and the survey fog clips cleanly). A lone tile keeps its centred glyph, the role the road's centre
-cap plays. Crater never spans. Contiguity was measured before the render was built (`world_audit`
-§ S4): 71% of mountain and 81% of rift tiles have such a neighbour, so bridging fires on the
-majority — while **no** tile in the system has all four, which cancelled the designed
-"filled interior" case before it was written.
+cap plays. Crater never spans. Contiguity was measured before the render was designed
+(`world_audit` § S4): 71% of mountain and 81% of rift tiles have such a neighbour, so bridging
+fires on the majority — while **no** tile in the system has all four neighbours, which is why there
+is no "filled interior" case.
 
 **The glyphs are named where the player looks.** Every tile hover card states
-`composition · landform` and, on the plain canvas, the landform's movement cost. Before BL-232 the
-hover named only the composition, so the glyph vocabulary could be learned only by clicking each
-tile through to the Selection panel — which is not learning. Plains stays unnamed: it is the
-untouched baseline in both channels.
+`composition · landform` and, on the plain canvas, the landform's movement cost — a glyph
+vocabulary learnable only by clicking each tile through to the Selection panel is not learnable.
+Plains stays unnamed: it is the untouched baseline in both channels.
 
 **Suppression rules.** The glyph is skipped on a **built** tile (which already carries an
 enlarged silhouette plus a corp emblem tag, and whose cost is already spent — elevation
 matters when *siting*) and under the **Population/Opportunity** lenses (which claim the hex
-centre for their own value mark, BL-135). The relief tint is likewise skipped on a built
+centre for their own value mark). The relief tint is likewise skipped on a built
 tile, whose hex is swapped wholesale for its owner plate as an identity signal.
 
 Both channels also render in the Selection band's zoomed tile-neighbourhood view, which is
@@ -247,16 +242,15 @@ function still draws unconditionally; it just skips hover/click handling when
 
 ---
 
-## What is deferred
+## Where the lenses draw
 
-Little, on the lens front: **twelve of the thirteen lenses render today** —
-Corporation, Country, Resource, Market, Population, Opportunity, Production,
-Scarcity, Industry, Reach, Continent, and Supply-routes all draw real geometry
-in the Planetary canvas's draw pass (`body_surface_canvas.cpp`, keyed on
-`ui_state::overlay`; catalogued in LENSES.md). Only the original **Supply**
-lens remains gated, on Layer-5 supply-route rendering. The lens *controls* are
-the eight-glyph mode bar on the minimap (`draw_overlay_controls`,
-`src/ui/overlay.cpp`) plus keyboard cycling; no lens is active on load — the
-canvas opens unskinned. The vestigial `draw_canvas_overlay` pass in
-`overlay.cpp` still renders nothing — the lens geometry grew inside the canvas
-draw functions instead, which is where per-tile compositing had to happen.
+All thirteen lenses — Supply, Corporation, Country, Resource, Market, Population,
+Opportunity, Production, Scarcity, Industry, Reach, Continent, and Supply-routes —
+draw their geometry inside the canvas draw passes (`body_surface_canvas.cpp` and,
+for the Supply and Market lenses, the Solar and Circumplanetary canvases too),
+keyed on `ui_state::overlay` and catalogued in LENSES.md. The geometry lives in
+the canvas functions because per-tile compositing has to happen there; the
+`draw_canvas_overlay` pass in `overlay.cpp` renders nothing and is an unused
+extension point. The lens *controls* are the eight-glyph mode bar on the minimap
+(`draw_overlay_controls`, `src/ui/overlay.cpp`) plus keyboard cycling; no lens is
+active on load — the canvas opens unskinned.

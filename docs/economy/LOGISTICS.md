@@ -9,11 +9,6 @@ runs on it** (convoys).
 > tile, the path it takes, how long that takes, and whether the leg is admissible at all are this
 > document's.
 
-> **Status: written 2026-08-22 as capture, not design.** § Build status is transcribed from the
-> code. § Logistic Points is a *designed and unbuilt* system whose rulings are settled — it is here
-> because BL-464 has been ruled on twice and had two first cuts rejected, and that reasoning was
-> reachable only by reading a backlog item. § Open questions are calls nobody has made.
-
 ---
 
 ## The one ruling everything else hangs off
@@ -51,55 +46,56 @@ the map is not automatically sitable. Placement stops being a lookup.
 **What it opens:** distant markets (arbitrage is *source price + haulage < destination price*),
 distant deposits, and — under the one-network ruling — the ability to put an army anywhere at all.
 
-**What it caps you at, and this is the important one:** reach is currently binary. The network says
-*can this be reached*, never *how much can move*. **Logistic Points is the designed answer to that
-ceiling**, and it is the rung that would make the chain continue rather than plateau.
+**What it caps you at:** reach says *can this be reached*; **Logistic Points** say *how much can
+move*. Reach is the door; throughput is the ceiling that makes the chain continue rather than
+plateau.
 
 ---
 
-## Build status
+## The network
 
 ### 1. Traversal cost — one weight function, shared by everything
 
 `tile_traversal_cost` is the per-node weight used by **A\*, the reach-field Dijkstra, and a marching
-unit alike.** It was deliberately promoted out of an anonymous namespace so `run_unit_march` spends
-march points against *the same cost function* rather than a second invented model.
+unit alike.** It is a named, public function rather than an anonymous-namespace helper precisely so
+`run_unit_march` spends march points against *the same cost function* rather than a second invented
+model.
 
 Landform multipliers, from TILES.md: plains 1.0, valley 1.1, highland 1.25, crater 1.3, canyon 1.5,
-rift 1.6, mountain 2.0. Ocean is crossable at a higher **sea-leg** cost, so a path exists on any
-connected body — and **whether the cheapest path touches ocean is what selects sea vs land mode**.
+rift 1.6, mountain 2.0. Water is crossable at a higher **sea-leg** cost, so a path exists on any
+connected body — and **whether the cheapest path touches water is what selects sea vs land mode**.
 
 Roads discount it: `road_traversal_multiplier` = `1 / (1 + 0.5 × tier)`.
 
 An **edge** cost is the mean of its two nodes, which is what makes a path symmetric.
 
-### 2. Pathfinding — `intra_body_path` (BL-077)
+### 2. Pathfinding — `intra_body_path`
 
 Terrain-weighted A\* over a body's tile grid, respecting the **east-west cylinder wrap**. Grid
 topology matches `nation_generation.cpp`: 4-cardinal neighbours, raster index
-`grid_y × grid_width + grid_x`.
+`grid_y × grid_width + grid_x`. The core pathing design is BL-077 (intra-body pathfinding).
 
 Results cache on `world.astar_cost_cache` under a **canonicalised endpoint key**, so the per-tick
 dispatch loop pays each search once.
 
 > **A trap worth carrying forward.** Because the cache key is canonicalised, a caller reading a
 > cached path must apply its own orientation. `body_surface_canvas.cpp` copies and conditionally
-> reverses it. BL-458's design flagged this precisely: get the orientation wrong and a convoy's head
-> lands at the wrong end of the lane half the time — **invisible on screen, fatal to interdiction.**
+> reverses it. Get the orientation wrong and a convoy's head lands at the wrong end of the lane half
+> the time — **invisible on screen, fatal to interdiction.**
 
-### 3. Reach — the placement constraint (BL-323 S2)
+### 3. Reach — the placement constraint
 
-**The problem it solves:** before reach, placement had no distance rule of any kind. A corp could
-site a building arbitrarily far from anything at no cost and with no refusal, which makes optimal
-siting *"the richest tile anywhere"* — **a lookup rather than a decision, and the first thing an AI
-on the command seam finds.**
+**The problem it solves:** without a distance rule, a corp can site a building arbitrarily far from
+anything at no cost and with no refusal, which makes optimal siting *"the richest tile anywhere"* —
+**a lookup rather than a decision, and the first thing an AI on the command seam finds.** Reach as a
+placement constraint is BL-323 (buildings rework) S2.
 
 `body_reach_field` is one multi-source Dijkstra from every **supply anchor**, giving each tile its
 weighted cost to the nearest one. Infinity where none is reachable.
 
-**An anchor is a city, or a built and active port or inland logistics hub.** These are exactly
-BL-148/149's logistics nodes — the places a convoy can already start cheaply — *"so reach inherits
-that vocabulary rather than introducing a rival one."*
+**An anchor is a city, or a built and active port or inland logistics hub.** These are exactly the
+logistics nodes of BL-148/BL-149 (logistics nodes) — the places a convoy can already start cheaply —
+*"so reach inherits that vocabulary rather than introducing a rival one."*
 
 **The first-anchor bootstrap:** on a body with no anchor at all, an anchor-type placement skips the
 reach rule; committing that first anchor immediately makes the body anchored, so the exemption
@@ -109,81 +105,88 @@ cannot be used twice while the first hub is still building.
 unreachable"** — a distinction a UI holding a `const world&` needs, because it must not trigger the
 Dijkstra itself.
 
-### 4. Roads — generated, then extended by hand (BL-146, BL-172)
+### 4. Roads — generated, then extended by hand
 
-Generated per nation after population, deterministically from the campaign seed. Five passes: local
-streets (every centre's own tile gets at least a Track), a weighted graph over centre pairs, a
-**Kruskal MST backbone** plus relative-neighbour redundancy edges for realistic loops, a three-tier
-assignment, and rasterisation along each edge's A\* path taking the **max** `road_level` on overlap.
+Generated per nation after population, deterministically from the campaign seed (BL-146 /
+BL-172, road generation). Five passes: local streets (every centre's own tile gets at least a
+Track), a weighted graph over centre pairs, a **Kruskal MST backbone** plus relative-neighbour
+redundancy edges for realistic loops, a three-tier assignment, and rasterisation along each edge's
+A\* path taking the **max** `road_level` on overlap.
 
 **Three tiers** (Ben, 2026-07-11): **Highway** (3) between two major centres, **Road** (2) when at
 least one endpoint is Town+, **Track** (1) otherwise. Then one Track border link between the nearest
 centre pair of each territorially-adjacent nation pair, so the lattice connects across the continent.
 
-**Roads are a land feature.** Ocean tiles are skipped, and an edge whose route crosses *open* ocean
+**Roads are a land feature.** Water tiles are skipped, and an edge whose route crosses *open* ocean
 is not stamped at all — that is a sea route, and stamping it would scatter fragments on distant
-shores. Territorial adjacency tolerates a short unowned gap, so an island or coastal nation is
-reachable rather than silently left off the lattice.
+shores. A short crossing made of shore (a strait, TILES.md § Water kinds) does get a road.
+Territorial adjacency tolerates a short unowned gap, so an island or coastal nation is reachable
+rather than silently left off the lattice.
 
 The player extends the lattice with `place_road`; rivals do too, through the same verb.
 
+**Roads do not decay** (Ben, 2026-08-22): *"Roads do not decay, but nations have to pay tax to
+support them. If a nation runs into too much debt supporting infrastructure, it can go bankrupt
+with major penalties. But between these states nothing changes."* The cost is **binary, not
+graduated**: a solvent nation's roads behave exactly as built; a bankrupt one suffers major
+penalties; there is no middle band where a strained network degrades. A graduated version would
+be a second decay model wearing a budget's clothes, which the first half of the ruling rejects.
+This is the sink the *logistics maintenance* line of the national budget (BL-538, national budget)
+pays into, and it gives a nation its first failure state — BL-550 (national insolvency).
+
 ### 5. Physical scale and travel time (Ben, 2026-08-12)
 
-**What was missing:** the codebase had no tile scale at all and no intra-body travel time. Convoy
-speed was `1 / distance_in_AU` — an *interplanetary* calibration — and two markets on the same body
-return distance 0, so speed clamped to 1.0 and **every intra-body convoy arrived in exactly one econ
-tick whether it crossed one tile or all 312.** Distance cost money and never cost time.
+**Scale is derived, not authored.** Planetology generates `home_mass`; a rocky planet's radius
+follows roughly `R ∝ M^0.27`, so tile width falls out of a scalar the generation chain has already
+settled. At Earth mass on the 312-column grid that is **~128 km per tile** — which puts a day's
+march at about a fifth of a tile and makes a tile **a region-sized unit rather than a field.**
 
-> That is why tripling the map could not on its own make distance feel bigger: with travel time
-> constant, a bigger map means the same 90 days buys three times the reach.
-
-**Scale is derived, not authored.** Planetology already generates `home_mass`; a rocky planet's
-radius follows roughly `R ∝ M^0.27`, so tile width falls out of a scalar the generation chain
-already settled. At Earth mass on the 312-column grid that is **~128 km per tile** — which puts a
-day's march at about a fifth of a tile and makes a tile **a region-sized unit rather than a field.**
+Without a tile scale, convoy speed would be an *interplanetary* calibration (`1 / distance_in_AU`)
+and every intra-body convoy would arrive in one econ tick whether it crossed one tile or all 312 —
+distance would cost money and never cost time, and tripling the map could not make distance feel
+bigger.
 
 **Two speeds, and the gap between them is a design lever:** caravan **25 km/day**, coastal vessel
 **130 km/day**. Roughly five times, *"and that difference is the whole reason coastal trade is worth
-designing"* (BL-188, parked).
+designing"* — BL-188 (coastal ports) owns the sea-trade design that reaches the faster speed.
 
 **Terrain cost doubles as a time multiplier** — the A\* weights do double duty rather than needing a
 parallel table. Travel is quantised to whole econ ticks (minimum 1), because the economy resolves
 quarterly.
 
-### 6. Cache invalidation — narrowed once, for a real reason
+### 6. Cache invalidation — narrowed, for a real reason
 
 `invalidate_logistics_caches` clears both caches together. An over-clear costs one Dijkstra; **a
 missed clear is a reach field that lies.**
 
 Ben's 2026-08-08 ruling chose a simple every-event rule because *"each of these is rare against the
-per-frame reads."* **The 0 CE world broke that premise:** with the corp AI building every tick and
-hundreds of generated sites completing through the warm start, the caches cleared essentially every
-econ tick, and the rebuilds — per-pair Dijkstras over 45,240 tiles plus the reach field — *became*
-the tick. That was the AppHangB1 stall.
+per-frame reads."* That premise fails in a world where the corp AI builds every tick and hundreds of
+generated sites complete through the warm start: the caches clear every econ tick, and the rebuilds
+— per-pair Dijkstras over 45,240 tiles plus the reach field — *become* the tick.
 
-Sim-rate call sites now gate on `building_affects_logistics`: **only a port or inland hub can change
+So sim-rate call sites gate on `building_affects_logistics`: **only a port or inland hub can change
 the anchor set**, and no building type changes traversal cost (that is `road_level`, and
-`place_road` still clears unconditionally). Player-rate UI sites keep the unconditional clear —
+`place_road` clears unconditionally). Player-rate UI sites keep the unconditional clear —
 over-clearing at click rate is free.
 
-### 7. Interdiction — the network can be cut (BL-458)
+### 7. Interdiction — the network can be cut
 
-A hostile unit standing on a convoy's tile **intercepts it**. The check is deliberately narrow and
-one-directional: the tile's holder must have **declared** hostility toward the cargo's owner —
-*"a corp that has been declared against but has not answered is a victim, not a raider."* Your own
-escort is never your ambusher.
+A hostile unit standing on a convoy's tile **intercepts it** (BL-458, interdiction). The check is
+deliberately narrow and one-directional: the tile's holder must have **declared** hostility toward
+the cargo's owner — *"a corp that has been declared against but has not answered is a victim, not a
+raider."* Your own escort is never your ambusher. The lowest-id hostile unit on a contested tile is
+the interceptor, so the outcome is order-independent.
 
-**And since 2026-08-22, a friend is never an interceptor** (Ben, design register — friendship now
-permits *immunity from interdiction*). The check is safe rather than contradictory because
-`declare_hostile` **dissolves a friendship row atomically**, so the two states cannot both hold: the
-friendship test is an early-out on a pair hostility has already excluded, not a competing predicate.
-*Owned by BL-549.*
+**A friend is never an interceptor** (Ben, 2026-08-22, design register — friendship permits
+*immunity from interdiction*, BL-549 (friendship permits two things)). The check is safe rather than
+contradictory because `declare_hostile` **dissolves a friendship row atomically**, so the two states
+cannot both hold: the friendship test is an early-out on a pair hostility has already excluded, not
+a competing predicate.
 
-**One consequence of a separate ruling belongs here.** A rival's hostility declaration is now
-**signalled** to the player, overturning NR-350's discovered-on-contact rule. Interdiction therefore
-becomes **a known risk rather than a surprise** — the ambush property `stance.hpp`'s directed
-hostility was built for still holds between rivals, but the player's first lost convoy is no longer
-the player's first news.
+**A rival's hostility declaration is signalled** to the player (Ben, 2026-08-22, overturning
+NR-350's discovered-on-contact rule). Interdiction is therefore **a known risk rather than a
+surprise** — the ambush property `stance.hpp`'s directed hostility exists for still holds between
+rivals, but the player's first lost convoy is never the player's first news.
 
 **Capture, with destruction as the fallback** (Ben, 2026-08-17). Cargo leaves the source pool at
 dispatch, so the goods are already committed and either answer conserves. On interception the cargo
@@ -192,25 +195,33 @@ destroyed instead, and the outcome says which. **An interceptor holding goods it
 legitimate outcome that is not special-cased away.**
 
 *Why capture rather than destroy:* destroy-only gives an interception a payoff of zero, so a
-scored-utility rival would correctly never rank it — interdiction would ship and only ever fire when
-the player did it. **Capture gives the scorer a number.**
+scored-utility rival would correctly never rank it — interdiction would only ever fire when the
+player did it. **Capture gives the scorer a number.**
 
-It also earns BL-315's third name. Army, mercenary and pirate are three *derived* readings of one
-company; taking cargo is what makes "pirate" the honest one.
+It also earns BL-315's (armed house conflict spine) third name. Army, mercenary and pirate are three
+*derived* readings of one company; taking cargo is what makes "pirate" the honest one.
 
-> **It ships silent (NR-407).** Interdiction works and nothing tells the player it happened. The
-> designed surfaces — a comms message naming the lane and the interceptor, the convoy's row leaving
-> the Convoys tab with a stated cause, the tile marked for a few ticks — are not built.
-> **An interception is the most consequential thing that can happen to a player's economy without
-> them pressing anything, so silence is the wrong default.**
+**An interception is announced in the same change that resolves it.** A comms message names the
+lane and the interceptor, the convoy's row leaves the Convoys ledger (BL-453, convoys ledger) with
+a stated cause, and the tile is marked for a few ticks. An interception is the most consequential
+thing that can happen to a player's economy without them pressing anything, so silence is the
+wrong default (NR-407).
+
+**A convoy is cargo and cannot be defended.** Assigning a unit to a convoy — turning interception
+into a real battle — is named in BL-458's design and deliberately excluded from it.
+
+### 8. Inter-body distance
+
+Space distance is Euclidean body-centre to body-centre; there are no orbital mechanics in the
+prototype, by design (`TECH_FOUNDATIONS.md` § Prototype scope).
 
 ---
 
-## Logistic Points — designed, ruled twice, not built
+## Logistic Points
 
-BL-464. Ben, 2026-08-18: *"Let's begin codifying Logistic Points in this sprint. It's an important
-layer for military and goods transport."* Recorded here because the reasoning has survived two
-rulings and two rejected first cuts, and was reachable only inside a backlog item.
+BL-464 (logistic points) owns the design. Ben, 2026-08-18: *"Let's begin codifying Logistic Points
+in this sprint. It's an important layer for military and goods transport."* The reasoning below has
+survived two rulings and two rejected first cuts, and is recorded so the next cut starts from it.
 
 ### What it is
 
@@ -230,28 +241,29 @@ LP is the pipe; the tanks are separate.
 | Drawn by | the market's own flow | **militaries draw active only** |
 | Owned? | ambient — the network's | **owned**, and not a rival's to use |
 
-**Cities generate it.** That answers two of the seven findings at once: finding 4 said a
-node-generated rate would be fictional because no corp is seeded a hub — cities are generated in
-the hundreds, so the rate is real from turn one; and finding 2 said LP had no spatial locus — a
-city is one.
+**Cities generate it.** That answers two constraints at once: a node-generated rate is real from
+turn one because cities are generated in the hundreds, where no corp is seeded a hub; and a city is
+a spatial locus — LP is *"how much can move through HERE"*, never a per-corp haul allowance.
 
 **The split is what stops free-riding.** Ben, on whether rivals should build hubs: *"the passive /
 active split explains how we would be unable to use rival active LP."* Ambient throughput serves
-everyone; directed throughput is yours. It also dissolves finding 5's asymmetry, since the half
-that serves trade is not owned by anybody.
+everyone; directed throughput is yours. It also dissolves the asymmetry of a rival paying LP it
+cannot generate, since the half that serves trade is not owned by anybody.
 
 ### Active use costs credits — and that is not a reversal of "a cap, not a price"
 
 > *"It should cost actual money to resolve LP usage. This can be in the form of moving units, or
 > supplying items."*
 
-The cap/price split holds. What changes is **which side of the game pays**. A convoy already pays
-credits per unit-distance. **A marching unit pays nothing at all today** — it spends march points
-against traversal cost and no money changes hands.
+The cap/price split holds. What changes is **which side of the game pays**. A convoy pays credits
+per unit-distance. A marching unit spends march points against traversal cost, and **that march is
+priced in credits by active LP** — so moving an army is not free, which was never a decision anyone
+made.
 
-So: **passive LP caps trade, which is already priced; active LP caps force, which this ruling now
-prices.** Read that way it is a widening of the existing rule rather than an exception to it — and
-it closes a real gap, because moving an army being free is not a decision anyone made either.
+So: **passive LP caps trade, which is already priced; active LP caps force, which this ruling
+prices.** Read that way it is a widening of the existing rule rather than an exception to it. The
+credit cost of active resolution is argued against BL-543's (value anchor) unit-cost anchor rather
+than guessed.
 
 Three consequences, all in Io's favour: a rate crosses no tick boundary, so it needs no `state_hash`
 entry and no serialisation; a stock that accumulates while never binding is the `military_points`
@@ -271,93 +283,50 @@ free-distance envelope expressed as a cost field. Importing a second parallel di
 what BL-325 ruling 3 forbids outright.
 
 **3. It lands with its consumer, in the same batch.** Non-negotiable. `military_points` was deleted
-in 2026-08-17 for being a write-only accumulator and five resources were deleted a day earlier for
-the same reason. **A Logistic Point generated and never spent — or spent and never felt — is the
-identical defect with a new name.**
+for being a write-only accumulator and five resources were deleted for the same reason. **A
+Logistic Point generated and never spent — or spent and never felt — is the identical defect with a
+new name.**
 
-### The seven findings that rejected the first cut
+### Seven constraints a cut must satisfy
 
-Recorded so the next attempt does not re-run into them. Two are structural.
+Each rejected an earlier cut. Two are structural.
 
-1. **The inertness proof is unachievable as sequenced.** Two-pass allocation reorders float
-   subtractions on a hashed field, so a "rate-zero, byte-identical" commit cannot pass *at any
-   rate*. The pattern BL-409 and BL-454 used does not transfer, and pretending it does is how a
-   golden gets blessed dishonestly.
-2. **LP as drafted had no spatial locus.** Justified as *"how much can move through HERE"* — a node
-   — then pooled per `(corp, body)`. That is a per-corp haul allowance, **the exact abstraction
-   `military_points` was deleted for.**
-3. The LP cost formula is never specified, yet the allocation sort key is a function of it. If cost
-   is proportional to distance, LP *is* haulage cost again; if flat, the sort degenerates.
-4. **The base allowance would be the whole mechanic** — no corp is seeded a hub, so "your own nodes
-   decide how much you may move" is fictional at the shipped generator.
-5. **The AI pays LP and cannot build the generator** — `corp_ai.cpp` has no port or hub candidate,
-   so the rate would be an asymmetric tax on rivals.
-6. **A reserved military share deletes the coupling it exists to create.** Two budgets means guns
-   and butter stop competing, which was the whole point.
-7. `supply_decay_permille` would ship a one-way ratchet, since recovery is also zero.
+1. **Do not promise an inertness proof the sequencing cannot deliver.** Two-pass allocation
+   reorders float subtractions on a hashed field, so a "rate-zero, byte-identical" commit cannot
+   pass *at any rate*. The pattern BL-409 and BL-454 used does not transfer, and pretending it does
+   is how a golden gets blessed dishonestly.
+2. **LP must have a spatial locus.** A rate justified as *"how much can move through HERE"* and
+   then pooled per `(corp, body)` is a per-corp haul allowance — **the exact abstraction
+   `military_points` was deleted for.** Cities are the locus.
+3. **Specify the LP cost formula before the allocation sort key**, which is a function of it. If
+   cost is proportional to distance, LP *is* haulage cost again; if flat, the sort degenerates.
+4. **The base allowance must not be the whole mechanic.** No corp is seeded a hub, so "your own
+   nodes decide how much you may move" is fictional; city generation is what makes the rate real.
+5. **A rival must be able to build the generator.** `corp_ai.cpp` carries a port / inland-hub build
+   candidate (Ben, 2026-08-22: yes, and before LP lands; BL-447 (scorer never demolishes or roads)
+   is the scorer's missing-verb item), so the rate is not an asymmetric tax on rivals.
+6. **No reserved military share.** Two budgets means guns and butter stop competing, which is the
+   whole point of one rate.
+7. **No one-way ratchet.** A `supply_decay_permille` with zero recovery is a stock, not a rate.
 
 ### The finding worth keeping above all the others
 
-> **Goods-vs-force priority is currently decided invisibly, by tick phase order.** Convoys claim
+> **Goods-vs-force priority is otherwise decided invisibly, by tick phase order.** Convoys claim
 > before armies on every code path. So *"the army goes unsupplied"* is an **inherited default nobody
 > chose** — not a design.
 
-That is the thing LP would make explicit, and it is the strongest argument for building it.
+LP is what makes that priority explicit, and it is the strongest argument for it.
 
-### Determinism
+### Refusal, surface and determinism (Ben, 2026-08-22, design register)
 
-Allocation under contention must be **order-independent** — a deterministic priority rule over a
-sorted set, never first-come by iteration order.
-
----
-
-## What is absent, and known to be
-
-- **Throughput.** The network answers *can this be reached*, never *how much can move*. Roads
-  discount cost and nothing else; ports have no throughput meaning; the Reach lens shows a binary
-  field; convoys queue without contention. **Four shipped systems are waiting on the same consumer.**
-- **Interdiction is silent** (NR-407) — see above.
-- **No sea routes.** Roads are land-only by ruling, and coastal ports (BL-188) are parked. The
-  five-times speed gap between caravan and coastal vessel is authored and unreachable.
-- **No inter-body logistics beyond a straight line.** Space distance is Euclidean body-centre to
-  body-centre; there are no orbital mechanics in the prototype, by design.
-- **Nothing generates a hub.** No corp is seeded an `inland_logistics_hub` and the rival scorer has
-  no build candidate for one, so the anchor set in a played game is essentially *the generated
-  cities*, unchanged forever.
-- **No escort.** A convoy is cargo and cannot be defended. Assigning a unit to a convoy — turning
-  interception into a real battle — is named in BL-458's design and deliberately excluded from it.
-
----
-
-## Open questions
-
-All five were settled on 2026-08-22 (Ben, design register).
-
-1. ~~**What generates LP?**~~ **Cities**, and LP is **bifold** — see § Logistic Points above. Still
-   owed before code: the rates for both halves, which consumer lands first, the order-independent
-   allocation rule, and the credit cost of active resolution, which should be argued against
-   BL-543's value anchor rather than guessed.
-2. ~~**Fail, queue, or degrade?**~~ **Fail — refused outright, and the player is told why.** A
-   refused leg is legible; a queued one is not. The cost is that LP reads as a wall, which is the
-   honest trade. **It also makes surfacing non-optional** — a refusal nobody sees is BL-458's silent
-   interdiction again, and the same mistake twice is a pattern rather than an oversight.
-3. ~~**A number, a lens, or a refusal?**~~ **A lens**, extending Reach. The Reach lens already shows
-   a binary field; throughput is that field with a magnitude, so this is a small step from something
-   built rather than a new surface.
-4. ~~**Should a hub be buildable by a rival?**~~ **Yes — add the build candidate to `corp_ai.cpp`
-   before LP lands**, which closes finding 5.
-5. ~~**What does the network cost to maintain?**~~ **Nothing decays; nations pay tax to support it,
-   and a nation that over-extends can go bankrupt.** Ben: *"Roads do not decay, but nations have to
-   pay tax to support them. If a nation runs into too much debt supporting infrastructure, it can go
-   bankrupt with major penalties. **But between these states nothing changes.**"*
-
-   The last clause is the load-bearing one: the cost is **binary, not graduated**. A solvent
-   nation's roads behave exactly as they do today; a bankrupt one suffers major penalties; there is
-   no middle band where a strained network degrades. A graduated version would be a second decay
-   model wearing a budget's clothes, which is what the first half of the ruling rejects.
-
-   **This is what BL-538's *logistics maintenance* line actually buys** — the line had no sink, and
-   this is the sink. It also gives a nation its **first failure state**. *Owned by BL-550.*
+- **A leg over the cap fails — refused outright, and the player is told why.** A refused leg is
+  legible; a queued one is not. The cost is that LP reads as a wall, which is the honest trade.
+  **Surfacing is non-optional** — a refusal nobody sees is silent interdiction again.
+- **Throughput is a lens**, extending Reach. The Reach lens shows a binary field; throughput is
+  that field with a magnitude, so it is a small step from an existing surface rather than a new one.
+- **Allocation under contention is order-independent** — a deterministic priority rule over a
+  sorted set, never first-come by iteration order.
+- Still to be argued before code: the rates for both halves, and which consumer lands first.
 
 ---
 
@@ -375,10 +344,10 @@ All five were settled on 2026-08-22 (Ben, design register).
 **Related authorities.** [`SUPPLY.md`](SUPPLY.md) (convoys — the flow on this network),
 [`../military/MILITARY.md`](../military/MILITARY.md) (BL-325 ruling 3 in its military reading),
 [`TILES.md`](TILES.md) (the landform multipliers), [`../politics/RELATIONS.md`](../politics/RELATIONS.md)
-(stance and friendship, which are interdiction's two predicates), [`PRODUCTION.md`](PRODUCTION.md) (§ Logistics and
-transport capacity, an older open note this document supersedes).
+(stance and friendship, which are interdiction's two predicates), [`PRODUCTION.md`](PRODUCTION.md)
+(§ Logistics and transport capacity, which this document supersedes).
 
-**Backlog.** **BL-464 (logistic points)** is the live design, `design-owed`, A. BL-458
-(interdiction) shipped without its surfaces. BL-188 (coastal ports) is parked and holds sea trade.
-BL-452 (convoy verbs) and BL-453 (convoys ledger) are the player-facing halves. BL-323 (buildings
-rework) landed reach; BL-146/BL-172 landed roads; BL-077 landed the core.
+**Owning items.** BL-464 (logistic points) — throughput. BL-458 (interdiction) — the cut network.
+BL-188 (coastal ports) — sea trade. BL-452 (convoy verbs) and BL-453 (convoys ledger) — the
+player-facing halves. BL-323 (buildings rework) — reach. BL-146 / BL-172 (road generation) — roads.
+BL-077 (intra-body pathfinding) — the core. BL-550 (national insolvency) — what the network costs.

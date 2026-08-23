@@ -1,446 +1,202 @@
 # Project Io — Claude Reference
 
-Project Io is a near-future space-based grand strategy game. The player starts as a corporate entity
-competing through resource extraction, trade, and military conflict across an earth-like solar system.
+Project Io is a near-future space-based grand strategy game: a solar system of earth-like
+bodies, generated with a simulated pre-campaign history, in which corporations extract, trade
+and fight. Solo-developed in C++ with Lua scripting. `docs/CONCEPT.md` owns who the player is
+and what the game should feel like; `docs/SYSTEMS.md` owns the system map; `docs/GLOSSARY.md`
+owns the words. Read those three before anything else on a first visit.
 
-**Who the player is has moved twice, and is not settled.** BL-094 (player-identity pivot) replaced the
-corporation with a **national private militia** on 2026-08-10 — armed and national in allegiance but not
-the state, *procuring* force rather than producing it. The 2026-08-12 two-arcs split then parked that
-whole space arc for DLC and put a **mercenary company** in the live seat (`docs/development/ROADMAP.md`
-§ The two arcs) — the same shape one era earlier. The older **governing body** framing is superseded;
-do not design against it.
+**The docs are the authority, and they are state-independent.** An authority doc says what is
+true of the game's design — never whether a piece is built, when it landed, or which backlog
+item did it. Whether a thing is built is a backlog fact: `node tools/session/backlog_query.js
+--touches <doc>`. If a doc and the code disagree, one of them is wrong and the fix is work,
+not a footnote. Full rule: `.claude/rules/io-standing-rules.md` § Terms & docs.
 
-**Ownership is being separated from identity — BL-524 (syndicate tier), designed 2026-08-21, not built.**
-Ben's framing: *not all companies are public, and company ownership is completely divorced from player
-identity* — the player holds, trades and invests in firms, and takes profit from them. This splits the two
-jobs `corporation_component` does at once, and **the terminology is settled** (Ben, 2026-08-21, NR-492):
-
-- A **corporation** is the **operating firm** — buildings, recipes, stockpiles, orders. **This meaning is
-  unchanged**, across `corporation_component`, `generate_corporations`, `corp_ai`, `corp_command` and the
-  Corporation lens. Roughly 88 of them, each *already* self-running on the full `corp_ai` scorer.
-- A **syndicate** is the new **ownership tier** above it — holds equity, allocates capital, decides, and
-  owns no buildings at all. **Seven of them**, the player one of the seven (Ben, NR-493). The word is
-  NR-497, confirmed by Ben and cheap to change until `syndicate_component` reaches the serialisation seam.
-
-**Equity confers operating control above a > 50% majority (Ben, 2026-08-21, NR-491)** — overturning an
-earlier call taken on his behalf that equity was never a control seam. So the standing rule's subject is
-now a derived predicate: a corporation whose **controlling holder** is the player's syndicate **is** the
-player's corp and is never auto-acted on; every other corporation runs itself on `corp_ai` as today.
-**Below the threshold equity stays purely financial** — a claim on profit and nothing more.
-
-Two consequences worth carrying: **control costs attention** (majorities held, not corporations in the
-world, is the bound on what the player must manage — which is the mechanic's central trade-off), and
-`corp_ai`'s uniform iteration now **forks** on a control gate, which must not shift any other corp's
-cadence slot. Control is **derived from the equity relation, never a stored flag**. The mechanism design
-lives in BL-524 and its six children, BL-525 (equity data model) through BL-530 (portfolio ledger).
-
-The scope has grown past the original 4X-economy prototype and now spans four load-bearing strands: the **economy loop** (shipped, playable end-to-end); **world generation with a simulated pre-campaign history** (the Era −1 institutional ladder and collapse metagame — `docs/lore/`, `docs/generation/`); a **military layer** (units, muster, two battle resolvers — partially built, `docs/military/MILITARY.md`); and the **AI direction** (deterministic scored-utility rivals today, a local-model opponent through the word interface as the v0.2.0 goal — `docs/ai/`). Nations act too, under the 2026-08-18 grant, in the same deterministic shape. The project is in prototype phase, solo-developed in C++ with Lua scripting.
-
-The documents below are the authoritative source for all design and technical decisions. Read the
-ones your request touches — **not all of them**: the set is now ~650K tokens (measure it with
-`node tools/doc_weight.js`), so "read everything first" stopped being an instruction anyone could
-follow. Read for **traversal**: find the doc that owns the question and read that. Where a doc has
-an index or a query tool — `DEVLOG_INDEX.md`, `backlog_query.js`, `actions_query.js`,
-`ACTIONS_INDEX.json`, `requirements_query.js` — use it instead of loading the file.
-
-## Response style
-
-Keep responses terse: **max 2 sentences per paragraph**, **max 15 words per clause**. Break longer
-thoughts into more (short) paragraphs rather than longer ones.
-
-**Never refer to a backlog item by bare id.** A bare `BL-229` forces Ben to go and look it up
-(his words, 2026-07-30: "it takes me a while to decipher what BL-229 refers to"). Always pair the
-id with a short human handle — `BL-229 (building selection)` — in prose, headings, lists and
-status summaries alike. Every item in `backlog.json` carries a `short_name` for exactly this;
-use it, or a plainer few-word gloss where the `short_name` is itself cryptic. Commit messages and
-code comments are the one exception: there the surrounding text already supplies the context.
+This file is a **router**. It tells you which mode the session is in, which doc owns your
+question, and which tool answers it. It does not restate what the docs say.
 
 ---
 
-## Documents
+## 1. Decide the session mode first
 
-**`docs/CONCEPT.md`**
-The player identity, core mechanics, and campaign design. Start here for questions about what the game is and how it should feel.
+Say the mode in your first line. Everything else — what to read, whether to file, whether to
+build — follows from it.
 
-**`docs/SYSTEMS.md`**
-Every game system, how they relate to one another, and which are load-bearing. Read this for questions about scope, system design, or how a feature fits into the whole.
+| Mode | Signal | Deliverable | Read |
+|---|---|---|---|
+| **Design** | Ben is thinking aloud, asks *should / why / how would*, or raises an idea with no "do it". | An assessment, or a settled design **written into the owning authority doc** plus a backlog item pointing at it. No code. Rule 0a applies: offer *A) backlog* / *B) build now* before acting on an idea. | The owning doc, `backlog_query.js --grep`, the relevant `NEEDS_REVIEW.json` entries. |
+| **Delivery — Light** | A one-line fix, an obvious cleanup, a doc tweak. | Make it, check it, say what you did. No tasks, no requirements. | The file and its owning doc. |
+| **Delivery — Full** | Touches the economy / save-format / integration seam, spans >~2 logic files, or carries determinism risk. | The DELIVERY.md lifecycle: requirement → tasks in `REFINED.md` → build → verify → one commit per item. | `docs/development/DELIVERY.md`, then the owning docs only. |
+| **Corpus** | Sweeps, reconciliations, index regeneration, doc-vs-code truth checks. | Edited docs/stores plus a `NEEDS_REVIEW.json` entry per call taken. Fan out by file group. | `DELIVERY.md` § Batch Delivery; the stores' own `_note` blocks. |
+| **Review / verify** | "Does this work", "review this", a failing harness, a visual check. | A verdict with evidence — harness output, a capture, a diff. Fix only when asked. | The `verifier-*` skills; `docs/development/REVIEW_AUTOMATION.md`. |
+| **Rival** | Anything under `Project-Rival/`. | Per `Project-Rival/CLAUDE.md`; never writes Io source. | That file only. |
 
-**`docs/GLOSSARY.md`**
-Canonical definitions for all project terms. Use these terms consistently. If a term is defined here, do not substitute alternatives.
+Default to **Design** when Ben is describing or asking, **Light** when he is instructing.
+Full is *earned*, not assumed. If the mode changes mid-session, say so.
 
-**`docs/META_LAYER.md`**
-The **predicate and effect substrate** every rule in the game is built out of — the project's own name for it, from `modifier_set.hpp`. Two closed vocabularies: **`condition_set`** (BL-342, the predicate — nine subjects, five comparators, a **flat AND-list with no OR or nesting**, and an **empty set is TRUE** because unconditional is the common case) and **`modifier_set`** (BL-479, the effect — six scalar subjects, three ops). Both are **data, not callbacks**, which is what keeps a rule deterministic, serialisable and legible in a ledger line; both are **append-only once serialised**. A law, a tech gate and an embargo are each a predicate plus an effect, so **a new rule family costs an enumerator, not a subsystem**. Read it for the asymmetry it is the only place to see: the predicate side has 9 subjects, all wired, and 3 consumers; the effect side has 6, of which **1 is wired**, and 2 includers — and `modifier_set`'s stated purpose (one vocabulary shared by tech *and* law) is **not met**, since BL-480 landed `law_effect_kind` as a separate enum. There is a defensible reason (a levy is a money flow, not a simulation scalar) that nothing had written down. Also owns the principle that appears twice unnamed in the code — *a shape is only proven by an instance* — and the note that `science` is **reached, not spent**, which is what BL-478 is blocked on. Read before adding a condition subject, a modifier subject, a law effect, a tech effect, or any new rule family.
+**Session start.** If the last commit on `main` is ≥ 3 days old, `git fetch origin` and integrate
+`origin/main` before any work. Before minting a backlog id, run `node tools/session/next_id.js`.
+`tools/status.ps1` (the `status` skill) is the "what's left / what shipped" dashboard. **Check
+`git status` before committing: this checkout is shared with other sessions**, and an
+uncommitted edit here can be wiped by another session's commit path.
 
-**`docs/PEOPLE.md`** — *design-owed*
-**Named individuals holding specific roles**, opened 2026-08-22 from Ben's ask. Io generates a world full of institutions and **not one person**: every quantity is held by a corporation, a nation or a unit, and nobody holds anything. The argument is that *a person is what makes an institutional relation legible* — sentiment is a number, a person is who holds it. The rule that keeps it from being decoration: **a person exists only where a role exists, and every role must gate or bias something**, or it is the `military_points` defect with a face. Proposes a **cast, not a population** (a person is generated when someone would plausibly know their name, gated by BL-089's activity fog), **one bias not a trait sheet**, expressed as a `scalar_modifier` so it costs an enumerator rather than a subsystem. Five candidate roles, each mapped to shipped machinery — company head (BL-370, Ben's own earlier ask, and the one to ship first), counsel (BL-207, already fully designed), commander (doctrine, an all-zero stub), **minister** (the highest-value: it gives BL-539's lobbying a target), contact. Everything past § Precedent is a **proposal awaiting Ben's ruling**; its six § Open questions are the point. Owned by BL-547.
+## 2. Response style
 
-**`docs/EVENTS.md`** — *design-owed*
-**Things that happen to the player rather than because of them**, opened 2026-08-22 from Ben's ask. The interesting problem is the word *random*: Io is deterministic, so a truly random event is prohibited — **except the game already solved this once**, in BL-315 ruling 4's battle resolver, which draws from a seeded stream folded from the battle's own identity. **Uncertain to the player, deterministic to the engine.** That ruling transfers wholesale. The other finding is that **the meta layer already supplies two thirds of an event**: `condition_set` is the predicate, `modifier_set` is the effect, and **only the trigger is new** — and it is the consumer `collapse_strain` has been waiting for, so it turns an unwired vocabulary entry into a mechanic rather than adding a sixth. Four families ranked by existing machinery, of which **political is already half-built and does not know it** (BL-537/BL-539/BL-541 produce dateable changes with no notification layer). Adopts one rule outright from BL-458's silent shipping: **an event lands with its message, in the same change**. Owned by BL-548.
+Terse: **max 2 sentences per paragraph, max 15 words per clause**; more short paragraphs over
+long ones. **Never cite a backlog item by bare id** — always `BL-229 (building selection)`;
+every item carries a `short_name` for this. Commit messages and code comments are exempt.
+Stay the advisor: state uncertainty and options with trade-offs; Ben makes the calls.
 
-**`docs/tech/TECH_FOUNDATIONS.md`**
-All settled technical decisions: language, framework, architecture, tick model, data model, UI approach, and serialisation. Read this before writing any code or making any architectural suggestion. It also defines the prototype scope and what is explicitly excluded.
+## 3. Where each question lives
 
-**`docs/development/ROADMAP.md`**
-The milestone map from the current state through v0.1.0 (the finished prototype), the post-prototype arc (laws, tech, the v0.2.0 AI opponent, the v0.3.0 governing-body pivot + its folded-in Era −1 mil-sim/diplomacy groundwork, the v0.4.0 political layer), and on to **v1.0.0** — the playable-game cut, named 2026-08-08 with its own done-definition alongside v0.1.0's. Forward-facing and lean — it sits above the backlog and worklist, naming which theme each minor carries, not the individual items. Read this for questions about sequence, what comes when, or whether a feature belongs in the prototype's remaining arc.
+Read for **traversal**: find the doc that owns the question and read that one. The corpus is
+~650K tokens (`node tools/doc_weight.js`); reading it all is not an instruction anyone can
+follow. Where a store has a query tool, use the tool, never load the file.
 
-**`docs/development/DEVELOPMENT_PRACTICES.md`**
-Testing via headless C++ harnesses (no unit-test framework — Catch2 was evaluated and *not* adopted), naming conventions, documentation standards, the per-milestone ImGui panel rule, the standing development constraints, the tone/approach guidance, and how to cut a release. Read this alongside TECH_FOUNDATIONS when working on implementation.
+### Game — what it is
+| Doc | Owns |
+|---|---|
+| `docs/CONCEPT.md` | Player identity, core loop, campaign shape, how it should feel. |
+| `docs/SYSTEMS.md` | Every system, how they relate, which are load-bearing. |
+| `docs/GLOSSARY.md` | Canonical terms. If a word is defined here, use it. |
+| `docs/META_LAYER.md` | The predicate/effect substrate every rule is built from: `condition_set`, `modifier_set`. Read before adding any rule family. |
+| `docs/PEOPLE.md` | Named individuals holding roles — a person exists only where a role gates something. |
+| `docs/EVENTS.md` | Things that happen *to* the player; seeded uncertainty on the meta layer. |
+| `docs/MANUAL.md` | The player-facing manual. |
 
-**`docs/development/DEVLOG_INDEX.md`** and **`docs/development/DEVLOG.md`**
-Running session log — chronological record of what was built each session and
-in-session decisions. Consult when asked about prior work, open items, or why
-a specific implementation choice was made.
+### Economy
+| Doc | Owns |
+|---|---|
+| `docs/economy/RESOURCES.md` | The resource list, tiers, terrain affinity, era split. |
+| `docs/economy/PRODUCTION.md` | Buildings, recipes, placement, workforce, stockpile flow. |
+| `docs/economy/MARKETS.md` | Market centres, clearing, price resolution, the order book. |
+| `docs/economy/FINANCE.md` | The money loop: income, expenditure, maintenance, wages, interest, debt. |
+| `docs/economy/CONTRACTS.md` | Promises between named parties: procurement and the mercenary contract — the income loop. |
+| `docs/economy/LOGISTICS.md` | The network: traversal cost, reach, roads, scale/travel time, interdiction, Logistic Points. *Logistics is the road.* |
+| `docs/economy/SUPPLY.md` | The flow: convoys — cargo, dispatch, cost, arrival. *Supply is the traffic.* |
+| `docs/economy/TILES.md` | Two-axis terrain, deposit profiles, amenity tiles. |
+| `docs/economy/POPULATION.md` | Population centres, agglomeration, habitability. |
+| `docs/economy/ERAS.md` | The era ladder and the gate into space. |
+| `docs/economy/SPACE_ASSETS.md` | Off-body assets (stub). |
 
-**Start at the index, not the log.** `DEVLOG_INDEX.md` is one generated line per session
-(date, title, the `BL-` ids it touched, which volume holds it) across every volume — find the
-session you want there, then open only that entry. `DEVLOG.md` holds the live sessions;
-sessions before 2026-08 live in `docs/development/archive/DEVLOG-2026.md`. Regenerate the
-index with `node tools/session/devlog_index.js` after adding an entry; roll older entries out
-with `--rollover <YYYY-MM>`.
+### Military, politics, relations
+| Doc | Owns |
+|---|---|
+| `docs/military/MILITARY.md` | How force works: two resolvers, units, muster, terrain, march, battles, upkeep, one reach field. |
+| `docs/politics/NATIONS.md` | The nation as actor: territory, treasury, law, lobbying, the national budget. |
+| `docs/politics/RELATIONS.md` | Sentiment (derived), stance (declared), reputation, embargo, standing — which quantity answers which question. |
 
-**`docs/development/sprints.json`** and **`docs/development/SPRINTS.md`**
-Weekly goal + retro rhythm layered over the backlog — a goal stated at the week's start, a retro
-comparing what landed against it. Feedback for Ben, not a new authority. Split 2026-08-19 on the
-same shape as backlog.json/BACKLOG.md: **`sprints.json`** is the canonical substance store —
-every sprint's goal, plan, retro prose, rulings and audit tables; **`SPRINTS.md`** is a thin
-header (the format convention plus a regenerated status table) pointing into it. No query tool
-exists for `sprints.json` yet — read/grep it directly. Read/update when starting or closing out
-a week's work.
+### Generation & lore
+| Doc | Owns |
+|---|---|
+| `docs/generation/GENERATION_STRATEGY.md` | Map of the generation layer and the economic premise. Start here for cross-doc questions. |
+| `docs/generation/PLANETOLOGY.md` | Body-level atmosphere, chemistry, biosphere history. |
+| `docs/generation/CONTINENTS.md` | Plates, drift, `height_bias`, the Continent lens. |
+| `docs/generation/TILE_GENERATION.md` | The six-pass tile pipeline. |
+| `docs/generation/PROVINCES.md` | The spatial unit of consequence: partition rules, three domains, walk order. |
+| `docs/generation/NATION_GENERATION.md` | Territory placement, resource profile, character, naming. |
+| `docs/generation/CORPORATION_GENERATION.md` | Nation assignment, focus, starting assets, finances. |
+| `docs/generation/GENERATION_LEDGER.md` | The why-did-this-tile-generate surface. |
+| `docs/lore/HISTORY.md` | The institutional ladder that drives the Era −1 sim. |
+| `docs/lore/COLLAPSE.md` | Polity strategies and culminating events for Era −1. |
+| `docs/lore/CREEDS.md` | Pantheons per cradle-culture, generated tongues. |
 
-**`docs/development/backlog.json`**, **`docs/development/BACKLOG.md`**, **`docs/development/REFINED.md`**, and **`docs/development/DELIVERY.md`**
-The backlog and delivery system. **`backlog.json`** is the canonical **metadata index and design
-prose store** — status (`designed` ✓ / `design-owed` ~), priority, difficulty, sequencing, a
-**version goal** (every new item names the minor it targets — DELIVERY.md § Priority, difficulty
-& version goal), file scope, and the **`design` field** holding each item's prose. **`BACKLOG.md`** is a
-**drained legacy file** (drain completed 2026-07-31): every body has migrated to `backlog.json`'s
-`design` field; the file keeps only a tombstone note plus seven one-line stubs that old
-`@BACKLOG.md` design pointers still resolve to. New items get **no** `BACKLOG.md` body. Authority time-slices: `backlog.json` while the item is open; the
-subject's authority doc once the work lands. **`REFINED.md`** is the *active worklist*: a `designed`
-item is **promoted** into file-scoped tasks when we act on it. **`DELIVERY.md`** is the method
-authority — the Delivery lifecycle, design-state model, depth verbs, and worktree sub-agent model.
-Read DELIVERY.md before promoting or executing backlog work.
+### AI & tech
+| Doc | Owns |
+|---|---|
+| `docs/ai/AI_OPPONENT.md` | The whole AI direction: scored-utility rivals, the word interface, the local-model goal, the no-cloud invariant, the MCP server. |
+| `docs/ai/ACTIONS.json` → `ACTIONS.md` | The action dictionary — every control as press/args/preconditions. Query with `tools/session/actions_query.js`; never hand-edit the mirror. **Any control change updates its entry.** |
+| `docs/ai/STRATEGIES.md` | The meta, authored ahead of the game — research, not authority. |
+| `docs/ai/LANGUAGE_POLICY_FEASIBILITY.md` | Research note: does a language-driven opponent compress and run locally. |
+| `docs/tech/TECH_FOUNDATIONS.md` | Settled technical decisions and the prototype scope/exclusions. Read before any code or architecture suggestion. |
+| `docs/multiplayer/MULTIPLAYER_PRINCIPLES.md` | Which settled decisions keep multiplayer cheap later. Non-binding. |
+| `docs/research/*.md` | Research scaffolding (tech effects, ancient ladder, Era 1 landscape). Not authority. |
 
-**Query the backlog; do not load it.** `backlog.json` is ~700 KB. Use
-`node tools/session/backlog_query.js` — it defaults to index fields only (id, short_name, status,
-priority, version_goal) over open items, and takes `--status`, `--priority`, `--version`,
-`--category`, `--touches <path>`, `--grep`, `--fields`, `--table`, `--count`. Add `--full` (or name
-an id) to pull one item's prose. That time-slice above is now **physical**: when an item lands, its
-design/resolution/completion prose moves to `docs/development/archive/backlog-design-<quarter>.json`
-via `tools/session/archive_designs.js`, and the item keeps a pointer. `--full` and `backlog_view.js`
-resolve it transparently; amend a landed item's prose **in the cold file**, not in `backlog.json`.
-Since 2026-08-23 the cold set also takes a landed item's `summary` and any ad-hoc prose key;
-`--grep` and `--fields summary` resolve it. The same move exists for the review queue:
-`node tools/session/archive_reviews.js` moves resolved `NEEDS_REVIEW.json` entries into
-`archive/needs-review-<quarter>.json`, so the hot file carries open entries only.
+### UI
+| Doc | Owns |
+|---|---|
+| `docs/ui/LAYOUT.md` | The application shell — how regions are arranged around the canvases. |
+| `docs/ui/CANVASES.md` → `SOLAR.md`, `CIRCUMPLANETARY.md`, `PLANETARY.md`, `MINIMAP.md` | The zoom-ladder canvases and the minimap chrome. |
+| `docs/ui/SELECTION.md` | The Selection element; the Active/Focus/Selection click model. |
+| `docs/ui/TOOLTIP.md` | The shared hover-card primitive. |
+| `docs/ui/LENSES.md` | The map-lens system and roster. |
+| `docs/ui/ICONS.md` | The glyph vocabulary (`src/ui/icons.*` is the source of truth). |
+| `docs/ui/DISCOVERY.md` | The two fogs: survey (geographic) and activity (commercial), competitor visibility, trade routes. |
+| `docs/ui/STARTUP.md` | Menu → wizard → generation → in-game. |
+| `docs/ui/MENU.md`, `HEADER.md`, `PROFILE.md`, `TIME_CONTROLS.md`, `CHAT.md`, `EXPLORER.md` | The shell's fixed panels, one each. |
+| `docs/ui/ledgers/*.md` | One design Q&A per fold-out ledger (`README.md` gives the five axes). |
+| `docs/ui/question_log.json` → `QUESTION_LOG.md` | Every surface's question, justification and demanding item. **Required on every surface**; regenerate with `render_question_log.js`; never build a check against it (Ben, 2026-08-01). |
 
-**`docs/development/user_stories.json`** and **`docs/development/USER_STORIES.md`**
-The user-story catalogue — the game decomposed by **player intent** (what the player is *trying to
-do*), the axis neither the design docs (system/surface) nor the backlog (feature) provides. It is
-the **second route from docs to code**: each story traces *upward* to the systems/pillars that give
-it meaning and *downward* to the UI surface + backlog item + requirement that realise and verify it,
-turning intent into a coverage check (a story no surface serves is a gap; a feature no story needs
-is scope to justify). **`user_stories.json`** is canonical (mirrors `backlog.json`'s `_schema`/
-`_note`/coverage conventions); **`USER_STORIES.md`** is the readable mirror. Companion to — not a
-duplicate of — the backlog; it is the artifact **BL-098**'s UX-review activity consumes. Read
-before UX-review work, coverage audits, or when reasoning about whether a player goal has a home.
-
-**`docs/ui/CANVASES.md`**
-Overview of the three primary canvases — Solar, Circumplanetary, and Planetary — arranged as a **zoom ladder** (descend by clicking a body in the primary, ascend by clicking the minimap). Covers the shared layout, selection/view state, and implementation approach. Per-canvas detail lives in `SOLAR.md`, `CIRCUMPLANETARY.md`, and `PLANETARY.md`; the minimap chrome and ladder navigation are in `MINIMAP.md`. Authoritative reference for Layer 2 and for later work that adds overlays to these canvases.
-
-**`docs/ui/SELECTION.md`**
-The Selection info element — a pinned, polymorphic panel showing detail of the current selection. Defines the three interaction states (Active / Focus / Selection) and the single-click-selects / double-click-navigates click-model change shared across all canvases. Read before any work on selection state, canvas click handling, or the shared per-entity content builders (which the Tile Ledger and the hover card also use).
-
-**`docs/ui/LAYOUT.md`**
-Surface-level description of the application shell — how the screen regions (navigation pane, canvas area, time column, comms dock, Selection band, fold-out ledgers) are arranged around the canvases. Read for questions about overall UI layout; CANVASES.md covers the canvas internals.
-
-**`docs/ui/STARTUP.md`**
-The app's entry screens — the `app_screen` state machine (menu / generating / in_game), the main menu, the New World wizard (preferences in, `world_params` out), the staged generation screen, and the `start_new_game` handoff. Written 2026-07-31; these are the first screens a player (and a fresh session) sees. Read before any work on the title screen, the wizard, or campaign initialisation.
-
-**`docs/ui/question_log.json`** and **`docs/ui/QUESTION_LOG.md`**
-The UI justification store (BL-260) — every information surface declares **the question it
-answers**, **why it earns its space**, and **the backlog item that demanded it**. A two-way
-provenance index: surface → item (why does this exist) and item → surface (what did this item
-actually put on screen). It exposes the two gaps neither `backlog.json` nor `user_stories.json`
-can — a surface no item demanded, and an item claiming a UI outcome that owns no surface — the
-same coverage argument USER_STORIES.md makes on the *intent* axis, applied to the *surface* axis.
-**`question_log.json`** is canonical; **`QUESTION_LOG.md`** is the generated mirror
-(`node tools/session/render_question_log.js`; never hand-edit it). The pair is **required** on
-every surface, and enforcement is **authorship, not machinery** — Ben, 2026-08-01: *"the docs are
-the audit, we don't need an audit method"*, so **do not build a verify check against this file**.
-Entries marked `drafted` are awaiting Ben's wording and are open questions, not settled prose.
-Read/update it whenever you add or materially change a UI surface.
-
-**`docs/ui/ICONS.md`**
-The icon vocabulary — every hand-drawn vector glyph in the `ui::icons` namespace (`src/ui/icons.{hpp,cpp}`, the source of truth): building markers, resource pips, unit markers, nav-rail affordances, and the map-lens glyphs. Catalogues each glyph's shape, meaning, usage, and colour source, the shared `(dl, centre, r, colour)` contract, and the recipe for adding one. Read before adding or changing any on-canvas/strip glyph; identity *colours* live in `presentation.hpp`, not here.
-
-**`docs/ui/LENSES.md`**
-The map-lens system — the overlay modes (`overlay_mode` in `src/ui/ui_state.hpp`) selectable from the minimap lens bar. The lens family is built: the eight bar lenses (**Corporation, Country, Resource, Market, Population, Opportunity, Production, Continent**) plus the off-bar **Scarcity, Industry, Reach**, and **Supply-routes** — a current-roster table opens the doc. Only the **Supply** flow lens remains gated. Read before any work on overlay modes, lens rendering, or the lens icon vocabulary (which propagates to ICONS.md).
-
-**`docs/ui/DISCOVERY.md`**
-The discovery & intelligence model — how the player *learns about the world*. Owns the two independent "fogs": the **geographic fog** (the Survey system, BL-067 — bodies start unsurveyed; a paid survey reveals tiles + deposit bands region-by-region) and the **activity fog** (the commercial sphere, BL-089 — a body-level Unknown/Known/Stale/Visible tier lit by the player's own trade routes + presence, `body_activity_visibility`), plus the **competitor-visibility rule** (BL-068 — rival buildings visible, internals private, markets public) and **persistent trade routes** (BL-088, the substrate the activity fog reads). The two fogs are independent axes (a body can be Known-but-unsurveyed). Read before any work on survey, competitor intelligence, trade-route recording, or the activity fog; the canvas rendering lives in SOLAR/PLANETARY/SELECTION, the glyphs in ICONS.
-
-**`docs/ai/AI_OPPONENT.md`**
-The AI-opponent authority — the design of the rival that carries the competition, and the doc that
-owns the **whole AI direction**. The shipped core is a deterministic scored-utility layer over the
-corp-command seam (BL-202/BL-203, `src/world/corp_ai.cpp`). Above it, § 10 sets the direction
-settled 2026-08-03: a **small local model** playing through the word interface, socketed by the
-**Io MCP server** (BL-278, landed — `ProjectIo --serve` plus `tools/mcp/`), with cloud models
-generating the fine-tuning corpus (BL-279) rather than playing. The hard invariant: the engine
-ships no HTTP client, no API key, no cloud dependency. Read before any AI, MCP, or agent-seam work.
-
-**`docs/ai/ACTIONS.json`** and **`docs/ai/ACTIONS.md`**
-The action dictionary (BL-270) — every control in the game as `{press, typed args, preconditions, expected_output, reason_to_select}`, in five families (gameplay / canvas / lens / ledger / chrome). **`ACTIONS.json`** is canonical and machine-consumable — the third leg of the word interface an AI player uses (blackboard export BL-206 = read, corp-command seam = write, dictionary = meaning); **`ACTIONS.md`** is the generated mirror (`node tools/session/render_actions.js` — also the store's parse/shape check; never hand-edit the mirror, which also emits **`ACTIONS_INDEX.json`**, the compact `[id, surface]` table of contents a language agent holds in context, fetching full entries via **`tools/session/actions_query.js`** — entries deliberately carry no urgency/importance; the live AI scores those on a 2D urgency × importance map at decision time, AI_OPPONENT.md § 6a). The gameplay family is *transcribed* from `src/world/corp_command.hpp`, not authored — where dictionary and seam disagree, the dictionary is wrong. **Any change to a control, binding, lens, ledger or panel must update its entry** — a stale entry misleads the AI player the way a stale golden misleads a visual check. Sibling axes: `user_stories.json` (intent), UX_QUESTIONS/BL-260 (information).
-
-**`docs/economy/RESOURCES.md`**
-The canonical resource list: **38** resources organised into three tiers (raw → refined → product) — their terrain affinity and body availability, the Era 0 / Era 1 split, and the seven-resource prototype subset. (Was 42 until 2026-08-16, when NR-257 removed five of BL-286's logistics goods that had sat produced-by-nothing and consumed-by-nothing since they were added; back to 38 on 2026-08-17, when BL-457 appended **ordnance** — the roster's first *military* terminal good, admitted because BL-454's unit upkeep gives it a consumer.) Read before any work involving resource types, tile deposits, or market goods.
-
-**`docs/economy/LOGISTICS.md`**
-**The network** — how far anything is from anything else, what it costs to cross, how long it takes, and what the network permits. Split from `SUPPLY.md` on 2026-08-22 with the line stated once: ***Logistics is the road; Supply is the traffic.*** Owns **BL-325 ruling 3** in its general form — *there is one reach field, and economic reach IS military reach*, so a `military_base` anchors nothing and projecting force means extending the same road network everyone uses. Also owns: the **one traversal-cost function** A\*, the reach Dijkstra and a marching unit all share; **reach as the placement constraint** (without it, optimal siting is *the richest tile anywhere* — a lookup, not a decision); **roads** and their three tiers, generated by MST-plus-redundancy and land-only by ruling; **physical scale and travel time** (~128 km/tile, derived from `home_mass` rather than authored — before it, every intra-body convoy arrived in one tick whether it crossed one tile or 312); the **cache-invalidation narrowing** that fixed the AppHangB1 stall; and **interdiction** (BL-458, which ships *silent*). Its largest section is **Logistic Points** (BL-464) — designed, ruled twice, not built: **a per-tick rate not a stock, a cap not a price, the node half only**, plus the seven findings that rejected the first cut and the one worth keeping above all — **goods-vs-force priority is currently decided invisibly by tick phase order, so "the army goes unsupplied" is an inherited default nobody chose**. Read before any work on reach, roads, pathing, travel time, throughput or interdiction.
-
-**`docs/economy/CONTRACTS.md`**
-**A promise between two named parties, priced, paced and refusable** — the alternative to the market, which is anonymous, instant and price-only. Carved out of `MARKETS.md` on 2026-08-22, where the game's **income loop had been a subsection of the market doc**. Owns both siblings and the reason they are siblings rather than one record: **procurement** (BL-350, shipped — the buy side, seam-only with no UI and no AI user) and the **mercenary contract** (BL-377, designed, unbuilt, reopened 2026-08-22 after ten days wrongly marked complete). Its spine: ***a contract is a `condition_set` the client will pay to have become true, by a deadline*** — so the whole variety of contract kinds is authored data in the predicate, and adding one is a Lua change. Records the stronger reuse — **an offer is a campaign a polity wants and cannot win alone**, taken from `history_sim`'s existing scorer, which makes offers deterministic, legible, and rhythmic rather than a spawn timer — and the four settled answers, of which **the player chooses the force** is the one keeping it a strategy game rather than a mission list. Read before any work on procurement, contracts, or the player's income.
-
-**`docs/economy/PRODUCTION.md`**
-All extraction and processing buildings: placement rules, valid terrain, output resources, and full recipe tables. Also covers the workforce scalar model, stockpile flow, and the Layer 3 prototype scope. Read before any work involving buildings, recipes, or production logic.
-
-**`docs/economy/MARKETS.md`**
-The market model — how market centres are seeded (BL-096, resource-carved), the clearing tick, price resolution (`resolve_price`, the price band, EMA smoothing), the sell/buy order book with preferred-seller routing (BL-037), and the honest current limitations. Carved out 2026-07-31; previously the clearing model had no doc home. Read before any work on markets, prices, orders, or the exchange-policy arc (BL-160/BL-161).
-
-**`docs/economy/FINANCE.md`**
-The money loop — `apply_budget`'s five flows (income / expenditure / maintenance / wages / interest), the BL-049 wage/maintenance split, debt interest (BL-073), and the surfaces that read it (budget ledger, header runway, per-building profitability). Carved out 2026-07-31. Read before any work on corporate balances, operating costs, or the budget surfaces.
-
-**`docs/economy/ERAS.md`**
-The Era system — the formal phase structure of the game's industrial arc. Era 0 (Terrestrial) starts at the campaign epoch; Era 1 (Early Space) is unlocked by the Rocketry research + Launchpad + propellant gate. Designed, **not implemented** — the doc opens with a status banner; in code, space access is gated on launchpad presence only. Read for questions about what is accessible when, and how the transition to space is structured.
-
-**`docs/economy/TILES.md`**
-Tile classification: the two-axis terrain model (composition × landform), resource deposit profiles per terrain type, ambient resource guarantee, and amenity tile concept. Read before any work involving terrain types, tile generation, or the `terrain_composition`/`terrain_landform` enums. Includes an implementation note recording that the two-axis split is now implemented.
-
-**`docs/economy/POPULATION.md`**
-Population centres, scale/agglomeration mechanics, land-use trade-offs, and habitability feedback. Deferred from the prototype but designed here so the data model positions correctly. Read for questions about workforce, habitability, or population demand.
-
-**`docs/military/MILITARY.md`**
-The military-layer authority — how force works, as opposed to how the rival *decides* (that stays in `docs/ai/AI_OPPONENT.md`). Owns the **two battle resolvers** and why there are two: `resolve_battle` (`src/world/combat.cpp`, nation-scale, one scored evaluation, called only by the Era −1 history sim) and `resolve_campaign_battle` (`src/world/campaign_battle.cpp`, campaign-scale, seeded rounds and priced withdrawal — called by `run_battles` in the live economy tick since BL-467, 2026-08-21). Also owns the unit model (`unit_component`, tile-canonical position), the era-keyed roster and its two gate paths, the muster interface (the `military_base` building plus hire-at-base), terrain defence/attrition, and **BL-325's ruling 3 — one reach field, economic reach *is* military reach**, so projecting force means extending the same road/hub network everyone else uses. It carries a **Build status** section and an explicit **what is absent** list — now a list of *named holes* rather than of missing spine: the engagement trigger, the battle card and the dispatch stream landed 2026-08-21 (BL-467/BL-468/BL-469), and what remains absent is doctrine (an all-zero stub), season (hardcoded), reinforcement (membership snapshots at open), the upkeep *rate*, and any consequence to holding the field. Hostility/friendship landed 2026-08-19 and now gate something. Read before any work on units, combat, muster, or military supply.
-
-**`docs/politics/NATIONS.md`**
-The **nation as an actor** — what a nation is once generation has finished making it, as opposed to how it is made (that stays in `docs/generation/NATION_GENERATION.md`, which explicitly declines the question in its own line 7). Owns the three things that are live: **identity and territory** (generation output, plus `world::tile_to_nation`, the index that gives a law its jurisdiction); the **treasury** (`nation_component::treasury` — credited by the extraction levy and the import tariff, both transfers rather than mints, and spent by nothing); and **law authorship** (a `law` is a `condition_set` plus an effect plus an author, and only a nation can enact one). Carries the settled **enforcement seam** — *a law is a modifier over the market, never an override of it*, so the levy applies where a flow is accounted and never where a price is resolved. Written 2026-08-22 as **capture, not design**, then **settled the same day**: its § What is absent names the holes (no nation actor exists at all — no `nation_ai`, no verb; no spend side; no authoring path for any law; one effect family of four; no serialisation) and now points each at the item that owns it. Its **§ Settled** records Ben's rulings of 2026-08-22, which closed all six questions the doc originally posed and added the system he raised alongside them: a **two-way channel between corporations and nations** — **lobbying** forward (a law subject's only reach on law: *you do not pass it, you pay someone who does*) and the **national budget** in reverse (a weighted allocation over priority lines, every credit out a direct transfer, so corporations are funded by taxes). The load-bearing rulings: **actor-to-actor transfers conserve exactly and the market deliberately does not**; a nation's objective is **positional, not accumulative** — niche fit and conflict avoidance under historical grudges; and value is anchored by **a unit's annual equipment costing twice its annual salary**, which also sets the unit upkeep rate MILITARY.md lists as absent. The v0.1.24 cluster is BL-537 (national budget) through BL-542 (nation scorer), plus BL-543 (value anchor) at v0.1.21. Two calls stay open in § Still open, both in NR-517. Read before any work on nations, law, tax, tariffs, lobbying, or the 2026-08-18 nation-behaviour grant (whose exact terms live in `.claude/rules/io-standing-rules.md`).
-
-**`docs/politics/RELATIONS.md`**
-The **relational layer** — how actors feel about, rate, and gate each other. Its first job is to say **which quantity answers which question**, because the code carries four and three share overlapping names: **stance** (declared — directed hostility, symmetric friendship, BL-448), **reputation** (earned — one float per buyer/supplier pair, BL-350), **embargo** (authored — a `condition_set` with no author, so it gates nothing), and **standing**, which is *not a relation at all* but BL-262's coarse public read of how strong a corp is. `stance.hpp`'s own line is the keeper: *stance is how a corp feels about another; standing is how strong it is.* Owns stance's HYBRID reading (Ben, 2026-08-17 — hostility directed so a corp can be at war and not know it; friendship symmetric so a row is always evidence both chose it) and its three invariants. Records that **hostility now gates three things** — interdiction, battle engagement, the march queue — so "stance gates nothing yet" is stale, while **friendship still permits nothing**. Its § What is absent names the holes: no serialiser exists (`serialization.cpp` is in no repo), no rival has ever declared anything despite the 2026-08-18 grant, and no sentiment layer exists at all. **Settled 2026-08-22 (Ben, on NR-520): sentiment is the SUBSTRATE**, and its § The settled model is the part to read first. Three designs were independently converging on one continuous derived quantity — CONCEPT.md's never-built sentiment, BL-540's nation→corp Access/Trust, and `corp_reputation` — so the model is now **two layers**: *sentiment* derived and continuous (one directed value from an observer to a subject, corps and nations alike), *stance* declared and discrete on top. The invariant is non-negotiable and preserves Ben's 2026-08-17 ruling: **sentiment informs a declaration and may never make one** — no threshold flips a stance table by itself. It also dissolves BL-391's reputation deadlock rather than fixing it, since a quantity that decays has no permanent floor. BL-545 (substrate) and BL-546 (reputation migration) own it; BL-540, BL-541 and BL-391 are reshaped onto it. Read before any work on hostility, friendship, reputation, embargo, standing bands, sentiment, or diplomacy.
-
-**`docs/generation/GENERATION_STRATEGY.md`**
-The map of the generation layer — how the per-subject generation docs (planetology / tile / nation / corporation / ledger) relate, and the home of the **economic premise**: a saturated, earth-like base whose broad industry **real background corporations** own and run (BL-365 — not a nation actor, and not the abstract substrate that preceded them), with the player and major AI as **specialist** space-interested corporations. Read first for questions spanning more than one generation doc, or about why corporations start lean. Cross-cutting open items (building tiers, allied-corp/franchise origin, post-WW2 grounding) live here.
-
-**`docs/generation/PLANETOLOGY.md`**
-Design-owed authority for the body-level Planetology pass (BL-167) — generated atmosphere/chemistry and a simulated abiogenesis/evolution history, ahead of tile generation, explicitly modelled on Shadow Empire's planet generation. Framed as a first-impression pillar, not a nice-to-have. Read before designing or implementing atmosphere generation, body history, or anything that would consume a body's biosphere-richness outcome.
-
-**`docs/generation/TILE_GENERATION.md`**
-The procedural tile generation strategy and six-pass pipeline used in `hard_coded_world.cpp`. Covers solar parameters (temperature class, atmosphere class, hydrological state, geological activity), prototype body profiles, the hybrid terrain / noise-banded ocean / cluster landform approach, and deposit generation rules. Read before any work on tile generation or the terrain enum expansion.
-
-**`docs/generation/CONTINENTS.md`**
-The Continents/Drift pass (`src/world/continents.{hpp,cpp}`) — plate derivation from the planetology outputs, the `height_bias` contract into tile Pass 1, `plate_id` retention for the Continent lens (BL-226), and the biography lines it appends. Written 2026-07-31; replaces the stale authority pointer in `continents.hpp`. Read before any work on plates, landmass shape, or the Continent lens.
-
-**`docs/generation/NATION_GENERATION.md`**
-The procedural nation generation strategy: Voronoi BFS territory placement over the tile map, resource profile derivation, political character assignment, and naming. Nation system behaviour is an open item; this document covers generation only. Read before any work on the world political layer or campaign setup.
-
-**`docs/generation/CORPORATION_GENERATION.md`**
-The procedural corporation generation strategy: nation assignment, industrial focus, starting asset placement, and financial profile. Covers the player corporation marker, the deferred corporation selection screen, and open design items (franchising, nation-seeded privatisation, tax, Era-based sovereignty). Read before any work on faction setup or campaign initialisation.
-
-**`docs/generation/PROVINCES.md`**
-**The game's spatial unit of consequence** — a tile is where a building stands; a **province** is where a battle happens, where a unit *is*, what the map is coloured by, and what a building ceiling counts against. Written 2026-08-22; the design had been spread across four documents and a 936-line source file. Owns the restraint that is the design: **a province is NOT a region** — no name, no owner, no culture, no economy — because it exists only because BL-467 needed an engagement envelope with a stable identity. Owns the **four rulings** the partition implements (grown from population centres, *a road binds and is never a divider*, hinterland seeded from the least-accessible tile, and size as a **growth budget not a clamp** — *"don't reject tiny provinces"*); the **three size constants** and why there are three (7 soft / 12 preferred / **20 hard, asserted rather than imposed**, because clamping would contradict the cheapest-edge rule the growth model is expressed in); the **three domains** that never mix (land, coastal water, open ocean — sea provinces are *addressable empty space*, built without inventing the naval model); and the two contracts downstream code depends on — **ascending `province::id` is the walk order**, and **the partition versions with generation and is never patched in place**, because a change re-rolls every battle in every world. Read before any work on the partition, unit position, battle envelopes, or per-lens reduction.
-
-**`docs/generation/GENERATION_LEDGER.md`**
-The Generation Ledger (design only) — a tuning/analysis surface that explains *why* a tile generated as it did, reading the per-pass intermediates exposed by `generate_body_tiles`'s optional `generation_record`. Covers the per-tile derivation breadcrumb (height/ocean → band/moisture → composition → landform → deposits), per-body histograms, the regenerate-on-demand (don't-persist) data lifetime, and surfacing as a Ledger window plus a Planetary field-overlay lens. Read before building the generation ledger or any heightmap/moisture/band overlay.
-
-**`docs/lore/HISTORY.md`**
-Design-owed authority for the **institutional history ladder** — why the campaign world of 1960 is market-based and non-hegemonic, as a seven-stage causal ladder (agrarian surplus → the enforceable promise / Charter Age → fragmentation-with-connectivity → capital disciplines the sovereign → the energy transition → the averted rupture → saturation). It picks up where `PLANETOLOGY.md` stops (the civilisation gate) and generates what `NATION_GENERATION.md` / `GENERATION_STRATEGY.md` currently assume. The ladder is **driven, not narrated** (Ben, 2026-07-30): it produces fragmentation, nation count, industrialisation timing and drawdown rather than describing an already-generated world. Promoted into **BL-220** (timestamp foundation), **BL-221** / **BL-222** / **BL-223** (the stages) and **BL-224** (the non-hegemony invariant). Read before any work on settlement, industrialisation, or the campaign premise's historical claims. **Stages 5–6 as written are superseded** — see BL-223.
-
-**`Project-Rival/CLAUDE.md`**
-The AI-player research discipline — live 0 A.D. play under NR-040 (the computer-use steer), refining the Pantheon oral history toward the v0.2.0 AI opponent. Its mission, campaign rite, annals and conformance rules live under `Project-Rival/`; it never writes Io source. Findings return as review-queue entries and proposed notes for BL-207 (persona packs), BL-210 (oral-history pivot), BL-271 (Era −1 sim) and BL-274 (era-keyed rosters). Read before any Rival campaign session.
-
----
-
-## Delivery pipeline
-
-The lifecycle for acting on a backlog **item**. **Full authority lives in
-`docs/development/DELIVERY.md`**; this is the condensed reference. The method answers to the
-game's own standard: each change feeds something, composes cleanly, reads legibly.
-
-### Session start — check origin if the last local session is stale
-
-If the previous local session was **≥ 3 days ago** (judge by the date of the last commit on `main`),
-run `git fetch origin` and compare `origin/main` **before starting work**. Under the push policy
-`main` is kept current locally and pushed only at major releases — but origin can still move ahead
-independently (work from other machines or cloud sessions). Integrate any upstream commits
-(fast-forward, or rebase our branch onto `origin/main`) *before* committing new work, so a stale base
-doesn't cause the divergence + backlog-ID-renumber churn it otherwise does. And before authoring a
-new backlog item, allocate its id with **`node tools/session/next_id.js`** (scans all branches for the
-true max — don't mint off the local file). Full method: DELIVERY.md § Parallel worktree coherence;
-see also the push-policy and backlog-ID-collision memories.
-
-### Rule 0 — size the effort to the job
-
-Every non-trivial task states its **mode**:
-
-- **Light (default).** A one-line fix, an obvious cleanup, a doc tweak — make it, check it, say
-  what you did. No tasks, no requirements, no ceremony. The small win stays whole.
-- **Full (earned).** Work whose coordination cost it repays — touches the economy / save-format /
-  integration seam, spans more than ~2 files of real logic, or carries determinism risk. Run the
-  Delivery lifecycle below.
-
-**Rule 0c — log reviews as you go; do not save them for a closing summary.** Anything that
-wants Ben's judgement — an open question, a call taken on his behalf, an observation he
-should see — goes into **`docs/development/NEEDS_REVIEW.json`** *at the moment it arises*,
-not into the end-of-session message. A closing summary is read once and then gone; the
-session ends, the context is dropped, and an unrecorded delegated decision becomes
-indistinguishable from a decision Ben made. Write the entry when the decision is taken,
-while the reasoning is still in hand.
-
-The end-of-session message then **points at** the log rather than reproducing it: say what
-landed, and that the review notes carry N entries. Keep the prose summary short — the
-durable record is the file. (Ben, 2026-08-01.) The three homes, per their own `_note`
-blocks: `NEEDS_REVIEW.json` = questions, decisions-taken and observations (non-blocking);
-`review.json` = blocked on a visual artifact only Ben can produce; `backlog.json` = actual
-work. If an answer creates work, file the backlog item and resolve the entry with its id.
-
-**Rule 0b — ambiguous measurements: report the current numbers first.** When a sizing or layout
-request has more than one reading ("a bit smaller", "3/5 the size" — of the width, the height, or
-both?), do **not** guess and do **not** ask an open question. State the **exact current
-measurements with units** for every element in scope — and what they are derived from — then ask.
-Ben can say what he was picturing far faster against real numbers than against prose. Pair this
-with the existing rule to **open the live app** whenever asking him to weigh in on visuals.
-
-**Rule 0a — ad-hoc ideas.** When the user raises an unscoped idea with no explicit "do it now",
-offer two options **before acting**, without first asking clarifying questions: **A) save to the
-backlog**, or **B) implement now** (smoke-test, then ask before committing).
-
-### Source of truth — where each thing lives
-
-| Concern | Authority | Notes |
+### Development — method and state
+| Store | Owns | Tool |
 |---|---|---|
-| Backlog **metadata** (status, priority, sequencing, version goal, files) | `docs/development/backlog.json` | Queryable; the JSON wins over any prose/glyph. |
-| Backlog **design prose** for an open item | `docs/development/backlog.json` (`design` field) | Design authority *while the item is open*; `BACKLOG.md` is drained (pointer stubs only, 2026-07-31). |
-| **Active worklist** (promoted tasks) | `docs/development/REFINED.md` | Transient; empty between work blocks. |
-| **Blocker triage** (items awaiting a UI/visual artifact from Ben) | `docs/development/review.json` | Companion to the backlog, not a replacement — see its own `_note`. |
-| **Review log** (open questions, decisions taken on Ben's behalf, observations) | `docs/development/NEEDS_REVIEW.json` | Non-blocking. Written **as work happens** (Rule 0c), never deferred to a closing summary. |
-| **Ben's review queue** (open questions + decisions taken on his behalf) | `docs/development/NEEDS_REVIEW.json` (view: `NEEDS_REVIEW.md`) | Not work and not blocking. **Append here rather than dropping a judgement call** — especially a `decision-taken`, since an unrecorded delegated decision is indistinguishable from one Ben made. |
-| **Player-intent coverage** (user stories) | `docs/development/user_stories.json` (view: `USER_STORIES.md`) | The second route — intent axis; companion to the backlog, consumed by BL-098's review. |
-| **Method** (lifecycle, depth verbs, batch, worktrees) | `docs/development/DELIVERY.md` | The long-form of this section. |
-| **Requirements** (data + history) | `docs/development/req/requirements.json` (policy `docs/development/req/REQUIREMENTS.md`) | Queryable — `tools/session/requirements_query.js`; resolved groups' rows/resolution live cold in `archive/requirements-<quarter>.json` via `archive_requirements.js`. Amend landed groups **in the cold file**. |
-| **Standing invariants** | `.claude/rules/io-standing-rules.md` | Always-on; the "do not" rules. |
-| Backlog **design prose** for a **landed** item | `docs/development/archive/backlog-design-<quarter>.json` | The cold store. Moved there on landing by `archive_designs.js`; amend it **here**, not in `backlog.json`. |
-| What was built / why | `docs/development/DEVLOG_INDEX.md` → `DEVLOG.md` (live) / `archive/DEVLOG-<year>.md` | Find the session in the index; open only that entry. |
-| **Weekly goal / retro** (feedback for Ben) | `docs/development/SPRINTS.md` | Not an authority — pacing signal only. |
+| `docs/development/DELIVERY.md` | The method: lifecycle, design state, depth verbs, batch, worktrees. Read before Full mode. | — |
+| `docs/development/DEVELOPMENT_PRACTICES.md` | Harness testing (no unit framework), naming, doc standards, release cutting. | — |
+| `docs/development/ROADMAP.md` | Milestone sequence through v1.0.0. The only place that says *when*. | — |
+| `docs/development/backlog.json` | Open work: metadata + work prose. ~1.2 MB — **query, never load.** | `backlog_query.js` (`--status --priority --version --touches --grep --full`), `backlog_view.js`, `next_id.js`, `backlog_lint.js` |
+| `docs/development/archive/backlog-design-*.json` | Landed items' prose (design, summary, completion). Amend landed prose **here**. | `archive_designs.js` |
+| `docs/development/REFINED.md` | The active worklist — promoted tasks. Empty between work blocks. | — |
+| `docs/development/req/requirements.json` | Requirements and their verification record. | `requirements_query.js`, `archive_requirements.js` |
+| `docs/development/NEEDS_REVIEW.json` → `.md` | Ben's review queue: questions, decisions taken on his behalf, observations, novelty flags. Write **as things arise**, not at close. Resolved entries go cold in `archive/needs-review-<quarter>.json`. | `render_needs_review.js`, `archive_reviews.js` |
+| `docs/development/review.json` | Blocked on a visual artifact only Ben can produce. | — |
+| `docs/development/sprints.json` → `SPRINTS.md` | Weekly goal + retro. Pacing feedback, not authority. | grep directly |
+| `docs/development/user_stories.json` → `USER_STORIES.md` | Player-intent coverage — the second route from docs to code. | `story_check.js` |
+| `docs/development/DEVLOG_INDEX.md` → `DEVLOG.md` / `archive/DEVLOG-*.md` | What was built each session and why. **Start at the index.** | `devlog_index.js` (`--rollover`) |
+| `docs/development/PHANTOMS.md` | Scan of designed-but-undocumented features; pointers to design sessions. | — |
+| `docs/development/NEXT_SESSION.md` | A handoff note when one exists. Read at session start if present. | — |
+| `docs/development/REVIEW_AUTOMATION.md` | How the review/merge loop is automated without losing the human. | `code-reviewer` agent |
+| `KNOWN_BUGS.md`, `REVIEW_LOG.md`, `BACKLOG.md` | Retired. Do not add to them. | — |
+| `.claude/rules/io-standing-rules.md` | The always-on invariants: determinism, scope, the AI-behaviour grants, terms. | — |
+| `Project-Rival/CLAUDE.md` | The AI-player research discipline. | — |
 
-### The Delivery lifecycle (Full mode)
+## 4. Working method (condensed — DELIVERY.md is the authority)
 
-0. **Item-spanning requirement (gate — if the item changes `src/`).** Write one requirement
-   covering the whole item in its `docs/development/req/requirements.json` group (usually a `visual` check), first,
-   so decomposition is shaped by it. Doc-only items exempt.
-1. **Create tasks** — promote the item into `REFINED.md`: smallest independently-buildable steps
-   (foundation first), each scoped to its files, dependencies marked.
-2. **Create requirements** — append the item's requirement group to `docs/development/req/requirements.json`.
-3. **Plan parallelisation** — build the file **collision map**; it *informs how to split focused
-   sub-agents* (see below), no longer gates them.
-4. **Complete tasks** — implement, review, verify against requirements. Blocked/out-of-scope tasks
-   are **cancelled** (intent returned to the backlog), not left in flight.
-5. **Commit** — once all tasks are terminal, one commit per item:
-   ```
-   <item title>
+- **Rule 0a — ad-hoc ideas.** Offer *A) backlog* / *B) build now (smoke-test, ask before
+  commit)* before acting; no clarifying questions first.
+- **Rule 0b — ambiguous measurements.** Report the exact current numbers with units, then ask.
+  Open the live app whenever asking Ben to weigh in on visuals.
+- **Rule 0c — log as you go.** Anything wanting Ben's judgement goes into `NEEDS_REVIEW.json`
+  *when it arises*. The closing message points at the log; it does not reproduce it.
+- **Novelty flag.** If no doc owns the task or it would quietly grow scope, file a
+  `kind: "novel-work"` entry and continue.
+- **Timestamp every new item**; newest-dated wins on conflict.
 
-   Tasks: <N completed>, <N cancelled>
-   Requirements: <N completed>, <N pending>, <N failed>
-   ```
+### The Full lifecycle
+0. Item-spanning requirement (if `src/` changes) → 1. tasks in `REFINED.md` → 2. requirement
+group → 3. collision map (a *splitting heuristic*, not a gate) → 4. build, review, verify — every
+task terminal before any commit; a UI requirement needs a **live click**, not just a capture →
+5. one commit per item:
+```
+<item title>
 
-**Batch Delivery** runs the steps as **barriers across the whole set** (breadth-first); step 4 is
-the load-bearing barrier (all tasks terminal before any commit). It also runs the
-**documentation-coverage discipline** (per-item doc collision map, transient `> ⟳` change notes, a
-standing `S`-tier review item per changed doc, a closing design-direction Q&A when non-trivial
-calls were made) and emits a **coarse `%` progress marker** between tool calls. **Timestamp every
-new item**; newest-dated wins on conflict (a dated item outranks undated prose; no retroactive
-refactor). Full detail in `DELIVERY.md`.
+Tasks: <N completed>, <N cancelled>
+Requirements: <N completed>, <N pending>, <N failed>
+```
+Pausing a group clean is a legitimate outcome.
 
-**Proportionality & pausing.** The lifecycle is proportional to the work (Rule 0); a Light change
-skips steps 1–2. Pausing a group is a legitimate outcome — leave it clean and resumable rather
-than forcing completion or cancelling. Left clean, it resumes without archaeology.
+### Sub-agents
+Concurrent agents run in **separate worktrees** (`isolation: "worktree"`) when they write code;
+disjoint doc edits may run in place. Brief each on a **tight block** with the one or two docs it
+needs. Agents build and commit on their branch; **the main session merges, builds, verifies** —
+assume nothing about self-reported success. An agent blocks on its own long waits and stops once
+it has a decision; say so in the brief. Integration wiring stays in the main session.
 
-### Sub-agents & worktrees (the parallelism model)
-
-**Worktrees are the primary isolation mechanism.** Concurrent sub-agents each run in their own git
-worktree (`isolation: "worktree"`), so two agents touching the same file no longer corrupt each
-other. This **replaces** the old hard rule that sub-agents must have disjoint file write-sets.
-
-- **The collision map is now a *splitting heuristic*, not a gate** — use it to carve **focused,
-  meaningful agents** (each a coherent vertical slice), not to prove disjointness.
-- **Keep each agent on a tight block of code, reading minimal documentation** — give it the task
-  text, its files, and the one or two docs it actually needs, not the whole design corpus. A
-  narrow, well-scoped agent is the unit that pays back.
-- **Agents build and commit on their own worktree branch; the main session merges** them in
-  dependency order, runs the integrating build, and verifies. Verify retroactively — assume
-  nothing about an agent's self-reported success.
-- **Hotspot/integration wiring stays in the main session.**
-- **Fan-out is a discretionary call made *after* the tasks and collision map** — state the call
-  and its reason rather than asking permission each time.
+Saved agents: `economy-dev`, `generation-dev`, `ui-dev` (focused implementers, one layer each)
+and `code-reviewer` (cold adversarial review, author ≠ reviewer, for Full-mode/seam work).
 
 ### Skills
+`verifier-visual` (headless `--verify` captures against `scripts/verify/*.lua`) ·
+`verifier-headless` (`tools/verify/*.cpp` harnesses over `world/*`) · `verifier-review` (static
+pre-compile gate after slice merges) · `scoped-commit` (stage only this task's files — the usual
+path here) · `commit` (clean tree only) · `status` (the dashboard).
 
-These skills exist and should be used proactively rather than reinventing their steps:
+**Tool creation is skill creation.** A check without a tool: author it (`tools/verify/*.cpp`,
+`scripts/verify/*.lua`, a script), then wrap it in a `.claude/skills/<name>/SKILL.md` — which
+needs Ben's permission. Denied → run it once, note "ad hoc" in the requirement.
 
-- **`verifier-visual`** — runs the headless `ProjectIo --verify <script>` harness, inspects
-  PNG captures, and reports against requirements. Authorising a new visual check means adding
-  a `scripts/verify/<feature>.lua` and invoking this skill. Use for any `visual`-class
-  requirement.
-- **`verifier-headless`** — compiles and runs a `tools/verify/<name>.cpp` harness over the
-  SDL/Lua-free `world/*` logic and reports its PASS/FAIL assertions. Use for any `headless`-class
-  requirement (economy arithmetic, tile generation, placement audits). Authorising a new check
-  means adding a `tools/verify/*.cpp` harness and naming it in the skill.
-- **`verifier-review`** — static, no-compile review over an integrated diff; reports a verdict on
-  cross-item symbol consistency, compile-by-inspection, standing invariants, the serialisation
-  seam, and requirement coverage. The cheap pre-compile gate: run it in a Batch Delivery after
-  slice merges and **before** the integrating build (DELIVERY.md step 4a). A filter, not a
-  substitute — always still compile.
-- **`scoped-commit`** — stages exactly the files belonging to the current task and commits
-  with the correct format, without bundling unrelated working-tree changes. Use whenever
-  committing, especially on the default branch or when the tree has pre-existing edits.
-- **`status`** — the project status dashboard (`tools/status.ps1`): open items by priority with
-  blocked ones flagged, plus recent deliveries and commits, read live from `backlog.json` and
-  `git log`. The natural session-start move for "what's left" or "what shipped recently".
-- **`commit`** — the plain commit path, for a clean tree with no unrelated edits. Prefer
-  `scoped-commit` when the tree carries someone else's work in progress, which here it usually does.
-
-#### Tool creation is skill creation
-
-When a check or automation does not yet have a tool, **author the tool, then push it to a
-skill** — a skill is a permanent, reusable, discoverable asset; a loose tool or bespoke
-procedure is forgotten. The check committed today catches next month's regression. **Creating or modifying a skill requires user permission**, so the
-workflow is:
-
-1. **Attempt to author the tool** (a `tools/verify/*.cpp` harness, a `scripts/verify/*.lua`
-   check, a script, or a documented procedure).
-2. **Push it to a skill** — wrap the capability in a `.claude/skills/<name>/SKILL.md` (the
-   `verifier-*` skills are the model), asking the user to authorise it.
-3. **If skill creation is denied, request running the tool as a one-off** — execute it this
-   session without promoting it, and note in the requirement's Notes that the method was run
-   ad hoc rather than saved.
-
-For a larger or speculative skill that needs design rather than a quick wrap, **propose it as
-a backlog item** (category: Documentation or the relevant system category) instead of improvising.
-
-#### settings.json permissions (slimmed model — confirmed 2026-06-16)
-
-`.claude/settings.json` now uses **broad prefix allows + a `deny` safety net** rather than a
-per-command mapping table. The allow-list covers routine read/build/git/worktree commands; the
-`deny` list blocks the genuinely dangerous (`rm -rf`, `git push`, `git reset --hard`,
-`git clean`) outright. This is the lighter model adopted from Project-Fulcrum's process, and the
-allow/deny split is **confirmed**.
-
-When in doubt, tighten an allow rule rather than broaden it. `deny` takes precedence over `allow`,
-so a denied command is blocked even if an allow rule would match.
-
-Verify-harness exes are covered by one path-scoped rule, `Bash(& ".\build_gen*)`, rather than a
-per-harness entry each. This replaces the old per-binary allows (`econ_harness`, `world_audit`,
-etc.), which assumed a repo-root `/Fe:` and are now removed. The rule stays narrow by being
-anchored to a **directory**: `verifier-headless` builds every harness to
-`build_gen\verify\<full_harness_name>.exe`, so a new harness runs prompt-free without editing
-this file. `%TEMP%` is banned as a harness output target — see that skill's Procedure § for why
-(unsigned exes in user-writable staging are indistinguishable from a dropper, and whitelisting
-`%TEMP%` in a virus scanner to work around it would defeat the scanner).
+### Build & permissions
+`build_app.bat` is the build; `build/` is real, `build_live/` a copy. Harnesses build to
+`build_gen\verify\<name>.exe` under one path-scoped allow rule; `%TEMP%` is banned as a harness
+target (unsigned exes there are indistinguishable from a dropper). `.claude/settings.json` is
+broad prefix allows plus a `deny` net (`rm -rf`, `git push`, `git reset --hard`, `git clean`);
+tighten rather than broaden. Git writes from native only, never the Cowork shell.

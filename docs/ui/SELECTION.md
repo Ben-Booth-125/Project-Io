@@ -9,27 +9,26 @@ selection kind, dominant; a slim line of decision-relevant **facts**; a
 **'go to'** for the deep ledger where reference detail actually lives.
 
 It is **not** reachable from the navigation rail — the only way to open it is
-to select something — and it is **not** the stat-block encyclopedia it once
-was (see § Removed: the stat-block polymorphism below); full per-entity detail
-lives in the Tile Ledger, Market Ledger, Balance Ledger, etc., one 'go to' away.
+to select something — and it is **not** a stat-block encyclopedia (see § Not a
+stat block below); full per-entity detail lives in the Tile Ledger, Market
+Ledger, Balance Ledger, etc., one 'go to' away.
 
 See also: [LAYOUT.md](LAYOUT.md) (where it sits in the shell), [CANVASES.md](CANVASES.md)
-(the click model it revises), [TOOLTIP.md](TOOLTIP.md) (the hover card — built), and
+(the click model), [TOOLTIP.md](TOOLTIP.md) (the hover card), and
 `src/ui/view_nav.hpp` (`focus_on_entity`, the 'go to' target).
 
 ---
 
 ## The three interaction states
 
-This element forces us to name three distinct, previously-conflated pointer
-states. They are independent: an entity can be any combination of active,
-focused, and selected at once.
+Three distinct pointer states, independent of one another: an entity can be any
+combination of active, focused, and selected at once.
 
 | State | Meaning | Lifetime | Drives | Backing |
 |---|---|---|---|---|
-| **Active** | The navigation **anchor** — which body/tile the canvas rungs are framed around. | Persists until you navigate. | Which Circumplanetary/Planetary rung renders, and around what. | `ui_state.active_body` (a never-read `active_tile` was removed, BL-363). |
-| **Focus** | The entity **under the pointer** right now. | Transient, per-frame. | The hover tooltip / hover card (see [`TOOLTIP.md`](TOOLTIP.md)). | **Stored** since the hover card landed: `ui_state.hovered_entity` + `hover_ticks` (stable-hover detection), plus the `hover_card_*` fields (subject, glance/stuck phase, anchor, last rect). |
-| **Selection** | The entity the player **single-clicked** to inspect. | Persists until you select something else (or clear). | The Selection info element's contents and its 'go to' target. | **New:** `ui_state.selected_entity`. |
+| **Active** | The navigation **anchor** — which body/tile the canvas rungs are framed around. | Persists until you navigate. | Which Circumplanetary/Planetary rung renders, and around what. | `ui_state.active_body`. |
+| **Focus** | The entity **under the pointer** right now. | Transient, per-frame. | The hover card (see [`TOOLTIP.md`](TOOLTIP.md)). | `ui_state.hovered_entity` + `hover_ticks` (stable-hover detection), plus the `hover_card_*` fields (subject, glance/stuck phase, anchor, last rect). |
+| **Selection** | The entity the player **single-clicked** to inspect. | Persists until you select something else (or clear). | The Selection info element's contents and its 'go to' target. | `ui_state.selected_entity`. |
 
 Key consequence: **Selection is distinct from Active.** Selecting a body in the
 Solar view fills the panel but does **not** move or re-anchor the canvas. Only
@@ -37,19 +36,18 @@ Solar view fills the panel but does **not** move or re-anchor the canvas. Only
 
 ---
 
-## Click model (revises CANVASES.md)
+## Click model
 
-The canvases today use **single-click-descends**. This element splits that into
-two gestures, applied uniformly across all three canvases:
+Two gestures, applied uniformly across all three canvases:
 
 - **Single-click an entity → select it.** Sets `selected_entity`, opens (or
   re-points) the Selection info element. **No view change** — same rung, same
   pan, same zoom. *On the Planetary canvas, a click that hits no marker selects
-  the **province** rather than the tile (BL-511) — see § The province element.*
-- **Double-click an entity → navigate to it.** The old descend/focus behaviour:
-  routes through `ui::focus_on_entity`, which resolves the entity to its most
-  informative view (descend a rung, focus a surface/tile, or — for non-spatial
-  entities — open the relevant ledger).
+  the **province** rather than the tile — see § The province element.*
+- **Double-click an entity → navigate to it.** Routes through
+  `ui::focus_on_entity`, which resolves the entity to its most informative view
+  (descend a rung, focus a surface/tile, or — for non-spatial entities — open
+  the relevant ledger).
 - **Single-click empty space → clear the selection.** The band stays open and
   returns to its resting state — the player's own corporation (see § Always
   open below).
@@ -57,342 +55,282 @@ two gestures, applied uniformly across all three canvases:
 The 'go to' button on the panel is exactly equivalent to a double-click on the
 current selection.
 
-> **Superseded — dwell-to-open RETIRED (2026-07-30, BL-228/BL-230).** BL-200's
-> second opener — holding the pointer still filled a progress bar in the hover
-> tooltip and then opened the Selection surface — is removed. Hovering never
-> opens the Selection band; **clicking is the only opener** — one gesture, one
-> meaning (`hover_card.hpp`'s header comment is the code-side record). Hover
-> now drives only the two-phase glance→stick card, TOOLTIP.md § The landed
-> model. The original design, for the record: alongside the single-click,
-> holding the pointer **still** over an entity filled a thin progress bar in
-> the transient hover tooltip and then opened the card on that entity — the
-> same open a click there produces. The click still opened instantly; dwell was
-> an *addition*, not a replacement (Ben, 2026-07-23), scoped to the Planetary
-> surface, the dwell bar hosted by the hover tooltip, never the opened card's
-> header.
+**Clicking is the only opener.** Hovering never opens the Selection band — one
+gesture, one meaning (`hover_card.hpp`'s header comment is the code-side record).
+Hover drives only the two-phase glance→stick card, TOOLTIP.md. A dwell-to-open
+opener is ruled out (Ben, 2026-07-30).
 
-This is a deliberate behavioural change: a single click no longer descends the
-zoom ladder. CANVASES.md and the minimap ascend gesture are updated to match.
-(Minimap ascend stays a single click — the minimap has no selection semantics.)
+A single click never descends the zoom ladder. The minimap ascend gesture stays
+a single click — the minimap has no selection semantics.
 
 ---
 
-## Action + Facts — content by selection type (BL-093)
+## Action + Facts — content by selection type
 
-The panel is **polymorphic by selection kind**, but no longer as a stat block.
-The entity's kind is resolved by probing the `world` maps (the same
-discrimination `focus_on_entity` already does: `w.tiles`, `w.buildings`,
-`w.units`, `w.markets`, `w.bodies`, and later nations / corporations /
-logistics vessels), and each kind renders through the same two-column split:
+The panel is **polymorphic by selection kind**, but not as a stat block. The
+entity's kind is resolved by probing the `world` maps (the same discrimination
+`focus_on_entity` does: `w.tiles`, `w.buildings`, `w.units`, `w.markets`,
+`w.bodies`, nations and corporations), and the kinds without a dedicated layout
+render through the same two-column split:
 
 - **Action** (left, dominant, ~58% of the content width) — the ONE primary
   move for this kind, via `draw_selection_action` (`src/ui/selection_panel.cpp`).
 - **Facts** (right, muted) — only what informs that action, via
   `draw_selection_facts`. Everything encyclopedic (orbit, composition,
-  deposits, prices) has moved to the ledgers.
+  deposits, prices) lives in the ledgers.
 
 Each kind routes its 'go to' to the right place:
 
 | Selection kind | Action (hero) | Facts (muted) | 'Go to' target |
 |---|---|---|---|
-| **Tile** | *(Superseded by the vertical tile layout, BL-123 — see § The tile element's layout below. The two-column action/facts split no longer renders for a tile.)* | | **No-op for now.** A tile is selected from the surface it lives on, so 'go to' has nothing to descend to; pan-to-tile is out of scope. |
-| **Body** (planet/moon/asteroid/station/star) | Unsurveyed → **Dispatch Survey** (BL-067). Surveyed → **Go to surface** (descends via `focus_on_entity`). The star carries neither. | **Commercial activity** pulse (activity fog, BL-089) — see below. | Canvas: `focus_on_surface` — descend to the body's **Planetary tile surface**, the most informative rung. (Not `focus_on_body` / the orbital framing: landing on a sparse circumplanetary view reads as "nothing happened", which was the *only-works-for-Kepler* symptom.) |
-| **Building** (any) | *(Superseded — see § The building element's layout below. Both player-owned and rival buildings take the 3-column band, not the action/facts split.)* | | Canvas: `focus_on_tile` (host tile). |
-| **Market / Unit** | **Go to** — locate on the canvas. | (none yet; stubbed) | Canvas: `focus_on_surface` / entity's position. |
-| **Nation / Corporation** | None — **"Open its ledger via [>]."** | (none yet; stubbed) | A ledger (no canvas of its own). |
+| **Tile** | Dedicated three-column band — § The tile element's layout. | | **No-op.** A tile is selected from the surface it lives on, so 'go to' has nothing to descend to; pan-to-tile is out of scope. |
+| **Body** (planet/moon/asteroid/station/star) | Unsurveyed → **Dispatch Survey**. Surveyed → **Go to surface** (descends via `focus_on_entity`). The star carries neither. | **Commercial activity** pulse (activity fog) — see below. | Canvas: `focus_on_surface` — descend to the body's **Planetary tile surface**, the most informative rung. (Not `focus_on_body` / the orbital framing: landing on a sparse circumplanetary view reads as "nothing happened".) |
+| **Building** (any) | Dedicated three-column band — § The building element's layout. Player-owned and rival buildings alike. | | Canvas: `focus_on_tile` (host tile). |
+| **Unit** | Dedicated three-column band — § The unit element's layout. | | Canvas: entity's position. |
+| **Market** | **Go to** — locate on the canvas. | (none) | Canvas: `focus_on_surface`. |
+| **Nation / Corporation** | None — **"Open its ledger via [>]."** | (none) | A ledger (no canvas of its own). |
 
 So 'go to' is itself polymorphic: spatial entities navigate a canvas;
-non-spatial entities (nation, corporation) open the relevant ledger. For the
-prototype the spatial kinds (body, tile, building) are wired first; the rest are
-designed here and stubbed.
+non-spatial entities (nation, corporation) open the relevant ledger.
 
-### The tile element's layout (BL-123, reshaped BL-213)
+### The tile element's layout
 
-A selected **Tile** does **not** use the two-column action/facts split above — it takes a
-dedicated layout (`draw_tile_selection`, `src/ui/selection_panel.cpp`). Since the band widened
-into three horizontal columns (Ben, 2026-07-28), the layout runs **left to right** rather than
-top to bottom:
+A selected **Tile** takes a dedicated layout (`draw_tile_selection`,
+`src/ui/selection_panel.cpp`) running **left to right** across the band's three
+horizontal columns (Ben, 2026-07-28):
 
 1. **Left quarter — zoomed hex neighbourhood.** A bordered render of the selected tile and its
-   immediate ring (`draw_tile_neighbourhood`, radius 2), the selected tile picked out — this is
-   the actual terrain render, not a placeholder image.
-2. **Centre half — a paged metric ACCORDION**, one titled graph at a time (‹ Name (i/N) ›
-   pager). Pages: every resource **deposited on the tile** (this tile's hazard-adjusted
-   production vs. the top-decile tile for that resource, a **clustered column pair** sharing a
-   baseline — "Tile" green, "Top 10%" muted, nice 1/2/5-rounded ceiling, dotted gridlines), THEN
-   the tile's own **Habitability** and **Hazard** scalars (vs. this body's average — "Body avg"
-   muted) so a barren tile still has something to page through. Only the deposited-resource pages
-   are click-drillable into a time-series history (BL-196); habitability/hazard have no
-   per-tile history tracked yet, so their chart is not a click target. Atmospheric pollution and
-   per-tile population are **not modelled** today (population lives on population centres, not
-   arbitrary tiles) and so have no page — a real content gap, not an oversight.
-3. **Right quarter — a 2×3 action button grid** (2 columns × 3 rows; tried 3×2 first but the
-   quarter-width column was too narrow for 3-across to read as "bigger" than the old icon strip —
-   2 wide gives chunkier buttons in the same 6-slot count): **Construct Buildings** (opens the
-   **tile construction ledger**, BL-162 — `draw_construction_ledger`, which lists the placeable
-   building types for this tile and actually builds; see below), **Manage Buildings** (disabled
-   unless a building occupies the tile; routes to the management panel), **History** and
-   **Supply** (not yet wired — History has no surface yet, real Supply routing is Layer-5-gated
-   per LENSES.md), plus **two reserved slots** so the grid's shape doesn't have to change when a
-   fifth/sixth action lands.
+   immediate ring (`draw_tile_neighbourhood`, radius 2), the selected tile picked out — the
+   actual terrain render, not a placeholder image.
+2. **Centre half — a paged accordion of three VIEWS** (‹ Name (i/3) › pager,
+   `ui_state::card_tile_view`). The three views are **Terrain**, **Resources** and **Available
+   buildings** — the set Ben named on 2026-08-22; Province and Ownership were offered and
+   not picked, so the array is the ruling, not a starting point to grow.
+   - **Terrain** — the tile's own **Habitability** and **Hazard** scalars, each charted against
+     this body's average ("Body avg" muted), so a barren tile still has something to read.
+   - **Resources** — one chart per resource **deposited on the tile**, chosen through a
+     **dropdown** rather than paged (reading the seventh deposit must not cost six presses):
+     this tile's hazard-adjusted production vs. the top-decile tile for that resource, a
+     **clustered column pair** sharing a baseline — "Tile" green, "Top 10%" muted, nice
+     1/2/5-rounded ceiling, dotted gridlines. `ui_state::card_resource_page` selects the
+     resource. Only these pages are click-drillable into a time-series history (BL-196,
+     resource drill-down); habitability/hazard carry no per-tile history, so their chart is not
+     a click target. Both views draw through one `tile_metrics` list — the full-canvas fold
+     charts the same pages by index, so the split is a filter, not a second builder.
+   - **Available buildings** — a table **per province throughout** (Ben, 2026-08-22), the
+     selected tile serving only to name which province is meant: the province's total
+     building count against its ceiling (`-1` is UNKNOWN and is said, never rendered as room),
+     then one row per workable resource with **Built** (extraction sites in the province
+     targeting it) and **Max** (the province's placement capacity for it — summed
+     `stack_capacity` over member tiles that would accept an extraction site, computed through
+     the same `can_place_in_world` the placement seam uses so the table cannot disagree with the
+     build button). No chart: the question is a comparison of small integers.
 
-### Multi-building tiles (BL-367)
+   Atmospheric pollution and per-tile population are **not modelled** (population lives on
+   population centres, not arbitrary tiles) and so have no view.
+3. **Right quarter — a 2×3 action button grid** (2 columns × 3 rows — the quarter-width
+   column is too narrow for 3-across to read as bigger than an icon strip): **Construct
+   Buildings** (opens the **tile construction ledger** — `draw_construction_ledger`, see below;
+   drawn with a "primed" accent ring when something is placeable and nothing is under way),
+   **Manage Buildings** (disabled unless a building occupies the tile; routes to the
+   management surface), **History** and **Supply** (both drawn disabled — History has no
+   surface; supply routing is the Supply lens's subject, LENSES.md), plus **two reserved
+   slots** so the grid's shape never changes when a fifth or sixth action arrives.
 
-BL-366 lifted the capacity-1 rule for non-extraction building types, so a tile can carry a
-heterogeneous set — several extraction stacks against different deposits, several processors,
-plus infrastructure. Three questions this raised, resolved 2026-08-11 from shipped precedent
-rather than a new mockup:
+### Multi-building tiles
 
-- **Grouped by stack, not a flat list.** `placement_rules::stack_members` already groups a tile's
+A tile can carry a heterogeneous set — several extraction stacks against different deposits,
+several processors, plus infrastructure (only extraction carries a capacity rule). Three
+consequences, settled 2026-08-11:
+
+- **Grouped by stack, not a flat list.** `placement_rules::stack_members` groups a tile's
   buildings by `(type, target)`; the management surface (`draw_selected_section`,
-  `src/ui/construction_panel.cpp`) mirrors that grouping instead of inventing a second one. A tile
-  with more than one stack (or one stack with more than one member) shows a list — one row per
-  stack, e.g. *"Extraction: Iron Ore x3"*, *"Processing: Steel Mill x2"* — before the single-building
-  detail. A tile with exactly one building still routes straight to its detail, zero extra clicks
-  for the common case.
+  `src/ui/construction_panel.cpp`) mirrors that grouping. A tile with more than one stack (or
+  one stack with more than one member) shows a list — one row per stack, e.g. *"Extraction:
+  Iron Ore x3"*, *"Processing: Steel Mill x2"* — before the single-building detail. A tile with
+  exactly one building routes straight to its detail, zero extra clicks for the common case.
 - **Click model: the tile selects the aggregate; drilling into a row selects that stack.**
-  Extends the single-click-selects model above rather than replacing it. On canvas, only ONE
-  marker still renders per built tile (BL-231's dominant-silhouette convention) — for exactly one
-  building the click still lands on that installation directly (Ben's 2026-07-22 "whole hex
-  belongs to the installation" ruling, unchanged); for more than one it now falls through to the
-  **tile**, whose Manage Buildings action opens the grouped list above. Selecting a row there sets
-  the same `selected_entity` a canvas building-marker click would, so a single-building tile and a
+  On canvas, only ONE marker renders per built tile (the dominant-silhouette convention) — for
+  exactly one building the click lands on that installation directly (Ben, 2026-07-22: the
+  whole hex belongs to the installation); for more than one it falls through to the **tile**,
+  whose Manage Buildings action opens the grouped list. Selecting a row there sets the same
+  `selected_entity` a canvas building-marker click would, so a single-building tile and a
   drilled-into stack reach the identical detail view either way. A **"‹ this tile's buildings"**
   back link on that detail view returns to the list when the tile carries siblings.
-- **On-canvas marker: dominant-stack glyph + a "+N" count badge.** No new glyph shape — the
-  marker keeps rendering the tile's lowest-id (dominant) building's silhouette, and a tile with
-  more than one building gains a small "+N" text badge (N = additional buildings), lower-right,
-  staggered past the existing BL-090 corp-identity tag which already sits there — the same k/N
-  text-overlay idiom the Solar-canvas survey badge uses for region progress. See ICONS.md.
+- **On-canvas marker: dominant-stack glyph + a "+N" count badge.** The marker renders the
+  tile's lowest-id (dominant) building's silhouette, and a tile with more than one building
+  gains a small "+N" text badge (N = additional buildings), lower-right, staggered past the
+  corp-identity tag that sits there — the same k/N text-overlay idiom the Solar-canvas survey
+  badge uses. See ICONS.md.
 
-The whole band widened to make room for this (`shell_column_width` narrowed from its BL-124
-~[480,576] range to ~[380,460] — see LAYOUT.md § The shell column; the BL-124 widening was
-explicitly to host the Selection sidebar, which no longer lives in that column at all since
-BL-213, so the extra width belongs to the band instead).
+### The tile construction ledger
 
-This **supersedes**, for tiles: the tile's action/facts row in the table above; the *Build front
-door* and *affordance readout* subsections immediately below (their placement-suitability logic —
-BL-071 Thrives/Valid/Invalid — is **not** shown on this panel and moves to the owed tile-construction
-panel); and the BL-139 building sub-element (a building on the tile is now reached via **Manage
-Buildings**, not an inline "On this tile" row). The other selection kinds are unaffected and keep the
-action/facts form until they get their own mockups.
+**Construct Buildings** opens the **tile construction ledger** (BL-162, tile construction
+panel; `draw_construction_ledger`): a fold-out-column list of every building type placeable
+on the selected tile, folded by family (Extraction / Processing / Infrastructure / Military —
+Ben rejected a profit-ranked flat list) — each row its type glyph (`icons::building`), full
+cost (budget + materials), a reason-coded validity read (e.g. *"A port must sit on the
+coast"*), an **expected-profit** bar (`estimate_prospective_profit`, one ceiling shared across
+the list so the bars compare directly), and a **Build** action that enqueues the construction
+on the tile (the `construction.pending_tile` seam `app::render` executes). A processing row
+stands for its group, showing the best-expected-profit recipe (PRODUCTION.md § Sub-facility
+groups). This is the deliberate choice that **building on one tile is a
+targeted action reached through the tile Selection element**, not a reserved menu — the
+nav-rail construction surface stays a broad overview (`docs/ui/MENU.md`). The equivalent
+placement-mode canvas click enqueues the same request.
 
-> The **tile construction ledger** (BL-162, `draw_construction_ledger`) is the surface "Construct
-> Buildings" opens: a fold-out-column list of every building type placeable on the selected tile —
-> placeholder image, full cost (budget + materials), a reason-coded validity read (e.g. *"A port must
-> sit on the coast"*), and a **Build** action that enqueues the construction on the tile (the
-> `construction.pending_tile` seam app executes). **First pass** — a follow-on adds the per-candidate
-> **expected-profit** chart BL-162 calls for; today's images are placeholders.
+Placeability is gated by `placement_rules::can_place`, and a type's cost is **budget *and*
+materials** (e.g. `100 cr · 20 Steel`, from the registry `build_cost` + `resource_build_cost`).
+Affordability is gated on both: the player corporation's balance *and* its material pool on
+that body (`corp_body_pools`) — `construct_building` returns `insufficient_materials` when the
+resources are absent, so the requirement is surfaced up front rather than only on a failed
+click.
 
-### The tile element's action is the build front door *(superseded for tiles by BL-123 — see above; retained as the design of the owed tile-construction panel)*
-
-> The "owed tile-construction panel" this and the next subsection point at is now owned by
-> **BL-162 (tile construction panel)** — still open; its first pass, `draw_construction_ledger`,
-> landed (the blockquote above). The nav-rail Building ledger's own slimming to
-> Construction/Buildings tabs (BL-143, building ledger redesign) landed separately and does not
-> absorb this per-tile logic.
-
-The **Tile** selection's hero action is **"Build here"** — the player's primary construction
-entry point (`draw_build_front_door`). It lists the building types placeable on the selected
-tile (gated by `placement_rules::can_place`) with their **full construction cost — budget *and*
-materials** (e.g. `100 cr · 20 Steel`, from the registry `build_cost` + `resource_build_cost`,
-BL-044). A type is affordability-gated on **both**: the player corporation's balance *and* its
-material pool on that body (`corp_body_pools`) — `construct_building` returns
-`insufficient_materials` when the resources are absent, so the requirement is surfaced up front
-rather than only on a failed click. Choosing an affordable type enqueues a construction request
-that the mutable-world pass executes (`construct_building`). This is the deliberate design choice that
-**building on one tile is a targeted action reached through the tile Selection element**, not a
-reserved menu — the nav-rail construction surface stays a broad overview (see `docs/ui/MENU.md`,
-BACKLOG § Ledger). The equivalent placement-mode canvas click enqueues the same request.
-
-### The tile element's facts are its affordance readout (BL-071) *(superseded for tiles by BL-123 — this readout no longer renders on the Selection panel; it moves to the owed tile-construction panel)*
-
-In the Facts column, a selected tile carries an **always-on affordance readout**
-(`draw_tile_affordances`) — the *inverse* of the placement-suitability surface (`LENSES.md`,
-BL-010). That surface answers "given an armed building, which tiles?"; this answers "given this
-tile, which buildings?", **without arming anything**, so the player can read a tile before
-committing to a build — the decision fact the Build action needs. It shows the tile's
-**territory owner** and a **Thrives / Valid / Invalid** grouping over the prototype-buildable
-types (extraction per deposited resource, processing, port), reading the same `placement_rules`
-seam the front door and the armed canvas ghost use.
-
-Rejection is **reason-coded, not silent**. `placement_rules::can_place[_in_world]` return a
+**Rejection is reason-coded, not silent.** `placement_rules::can_place[_in_world]` return a
 `placement_result` — a `placement_reason` enum plus human string, implicitly convertible to
-`bool` so existing boolean call sites are untouched — so an invalid type shows *why*
-(`Cannot build on water`, `No extractable deposit here`, `A port must sit on the coast`, …). The
-same reason string enriches the build front door (replacing the former bare "Cannot build on
-water") and follows the cursor as a **"why not here"** label under the armed placement ghost on
-the Planetary canvas. One vocabulary, three surfaces.
+`bool` — so an invalid type shows *why* (`Cannot build on water`, `No extractable deposit
+here`, `A port must sit on the coast`, …). The same reason string follows the cursor as a
+**"why not here"** label under the armed placement ghost on the Planetary canvas, and the
+placement-suitability surface (LENSES.md § Placement-suitability surface) reads the same
+`placement_rules` seam. One vocabulary, three surfaces.
 
-**Placement-time coexistence with the Construction panel (BL-082).** These affordance surfaces are
-read *while a build is armed* — exactly when the Construction panel is open. Now that the Selection
-element occupies the fold-out column rather than the bottom-left corner, the two no longer share the
-corner; the Construction panel keeps its top-left anchor (see `LAYOUT.md` § Construction-panel
-exception). The fix is **reposition, not fold** — folding the reason string into the Construction
-panel would have rescued only the reason line, leaving the Thrives/Valid affordance readout
-occluded; both must stay visible at the placement moment.
+**Placement-time coexistence with the Construction panel.** These readouts are read *while a
+build is armed* — exactly when the Construction panel is open. The Selection element occupies
+the bottom band and the Construction panel keeps its fold-out column, so both stay visible at
+the placement moment; the reason string is never folded into the Construction panel, which
+would rescue only the reason line.
 
-### The building element's layout (supersedes BL-074/BL-431, 2026-08-15 rework)
+### The building element's layout
 
-A selected **Building** — player-owned or rival — no longer takes the action/facts split at all.
-It takes the **same 3-column band shape as the tile element** (§ below), just at different
-proportions (`draw_building_selection_body`, `src/ui/selection_panel.cpp`), reached through the
-Selection element's shared header (icon/title/kind/'go to' — unlike the tile element, the building
-does not draw its own header):
+A selected **Building** — player-owned or rival — takes the **same 3-column band shape as the
+tile element** at different proportions (`draw_building_selection_body`,
+`src/ui/selection_panel.cpp`), reached through the Selection element's shared header
+(icon/title/kind/'go to' — unlike the tile element, the building does not draw its own
+header):
 
-1. **Left quarter — a generic placeholder image, keyed by building type** (2026-08-15). Was the
-   zoomed hex-neighbourhood render; Ben's call was "generic per building type" over one flat image
-   for everything. Draws `ui::icons::building` — the SAME type-keyed glyph vocabulary the Build door
-   and the on-canvas markers use — enlarged to fill the panel. Identity (which named silhouette a
-   `processing_facility` draws) resolves the same way the on-canvas marker does
-   (`body_surface_canvas.cpp`): the active recipe's primary output, falling back to
-   `target_resource` for extraction sites and infrastructure types the glyph ignores. Drawn for a
-   rival building too — the type is already public (BL-068).
+1. **Left quarter — a generic placeholder image, keyed by building type** (Ben: generic per
+   building type, not one flat image for everything). Draws `ui::icons::building` — the SAME
+   type-keyed glyph vocabulary the construction ledger and the on-canvas markers use — enlarged
+   to fill the panel. Identity (which named silhouette a `processing_facility` draws) resolves
+   the same way the on-canvas marker does (`body_surface_canvas.cpp`): the active recipe's
+   primary output, falling back to `target_resource` for extraction sites and infrastructure
+   types the glyph ignores. Drawn for a rival building too — the type is public
+   (DISCOVERY.md, the competitor-visibility rule).
 2. **Centre 5/12 — a paged accordion** (‹ Name (i/N) › pager, the same `disclosure_controls`
-   full-canvas hook as the tile element's, `detail_surface::building_metric`). **Playtest rework,
-   2026-08-15** (supersedes the 2026-08-15 BL-431 page split described above in earlier revisions
-   of this doc): Chain and Depth are gone as pages — Chain's content folded into Profitability;
-   Depth was cut outright — and Lifecycle is gone as a page too, its two controls moved onto the
-   action grid (§ 3 below). `building_pages()` now builds a shorter list per building, in order:
+   full-canvas hook as the tile element's, `detail_surface::building_metric`).
+   `building_pages()` builds the list per building, in order:
    - **Profitability** (`building_page_kind::profitability`, wrapping `draw_building_profit`) —
-     now **chart-based**, not text: no title line ("Profitability (est. / qtr)" is gone; the
-     charts speak for themselves). **Reflowed to one screen (2026-08-15 playtest pass)** — no
-     scrollbar: a top ROW holds the bars and the line chart side by side (left third / right
-     two-thirds) rather than the earlier fully-stacked layout, and the vertical budget is derived
-     from `ImGui::GetContentRegionAvail().y` at the top of the function (the accordion page body's
-     real remaining height, not a guess — logged `NEEDS_REVIEW.json` NR-250 on the specific clamp
-     numbers chosen). Three elements:
-     - **Left third — Revenue vs a SEGMENTED Expenses bar** (`draw_revenue_expense_bars`, hand-drawn
-       rather than `ui::charts::draw_bars` since draw_bars has no stacked-column notion). Revenue is
-       one plain bar; Expenses stacks `input_cost` / `maintenance` / `wages` as three shaded
-       segments in one column — the finest split `building_profit.hpp` tracks, since no revenue
-       sub-breakdown exists to chart separately (logged NR-248). **Hovering a segment** shows a
-       tooltip naming that segment ("Input cost: 12.4", etc.), mirroring the Inputs chart's
-       hover-legend idiom below.
+     **chart-based**, no title line, laid out to **one screen** with no scrollbar: the vertical
+     budget is `ImGui::GetContentRegionAvail().y` at the top of the function (the accordion
+     page body's real remaining height; NR-250 records the clamp numbers). Three elements:
+     - **Left third — Revenue vs a SEGMENTED Expenses bar** (`draw_revenue_expense_bars`,
+       hand-drawn since `ui::charts::draw_bars` has no stacked-column notion). Revenue is one
+       plain bar; Expenses stacks `input_cost` / `maintenance` / `wages` as three shaded
+       segments in one column — the finest split `building_profit.hpp` tracks (NR-248).
+       **Hovering a segment** shows a tooltip naming it ("Input cost: 12.4", etc.).
      - **Right two-thirds — a "Net, 6 mo." line chart** (`ImGui::PlotLines`) — no per-building
        profit HISTORY is tracked, so this is a smooth deterministic series anchored to the live
-       net-profit estimate, 6 points for "6 months" (the same honest-placeholder idiom the
-       Workforce trend graph already used, just with 6 points instead of 9; logged NR-249).
-     - **Below the row — an "Inputs" bar chart** (`draw_input_basket_chart`) — the former Chain
-       page's content, folded in: the active recipe's input quantities as bars, with a **hover
-       tooltip** naming each input resource rather than a permanent legend. Absent for a building
-       with no recipe (`extraction_site`), in which case the row above gets the full page height.
+       net-profit estimate, 6 points for "6 months" — the honest-placeholder idiom (NR-249).
+     - **Below the row — an "Inputs" bar chart** (`draw_input_basket_chart`): the active
+       recipe's input quantities as bars, with a **hover tooltip** naming each input resource
+       rather than a permanent legend. Absent for a building with no recipe
+       (`extraction_site`), in which case the row above takes the full page height.
      Included only once the building is complete (`ticks_remaining <= 0`) **and**
-     `estimate_building_profit` reports `has_data`; a still-building building has nothing here yet
-     (its **Status** page below covers it instead).
+     `estimate_building_profit` reports `has_data`; a still-building building has nothing here
+     (its **Status** page covers it).
    - **Method** (`building_page_kind::method`, `draw_production_method_section`) — "Which way
-     should this building make its output?" Only for `processing_facility`. **Tiled grid layout**
-     (2 columns) since the playtest rework, superseding the former single-column list: each
-     era-allowed recipe gets its own bordered tile with just the recipe name and its expected
-     profit (`estimate_prospective_profit`, priced at the building's real staffing) set in a
-     **larger font** — the input-basket / wage-rate detail line under the profit figure is **gone**
-     (2026-08-15 playtest pass; that detail is now implied by the Profitability page's Inputs chart
-     and labelled Expenses segments instead) — and, for every recipe but the active one, a **big
-     glyph Switch button** (`glyph_swap`, a two-arrow swap icon) sized to be the tile's dominant
-     visual element. Calls `try_switch_recipe` exactly as `construction_panel.cpp`'s management
-     dropdown does. A single-recipe building still gets the page (reads "Only one method
-     available.").
+     should this building make its output?" Only for `processing_facility`. A **tiled grid**
+     (2 columns): each era-allowed recipe gets its own bordered tile with the recipe name and
+     its expected profit (`estimate_prospective_profit`, priced at the building's real staffing)
+     in a **larger font**, and, for every recipe but the active one, a **big glyph Switch
+     button** (`glyph_swap`, a two-arrow swap icon) sized as the tile's dominant visual element.
+     Calls `try_switch_recipe` exactly as `construction_panel.cpp`'s management dropdown does. A
+     single-recipe building still gets the page ("Only one method available.").
 
-     **BL-434 note (2026-08-15): no group label added here, by design.** The tile grid still lists
-     every era-allowed recipe regardless of `group` — both the cheap intra-group switch and the
-     pricier cross-group retool go through the same `try_switch_recipe` seam and the same Switch
-     button, and `try_switch_recipe` already refuses (or silently prices) whichever the corp cannot
-     afford. The Build door is where GROUP membership is the organizing axis (PRODUCTION.md § Sub-
-     facility groups — one row per group, not per recipe); here on an existing building the axis is
-     "every method this specific building could run", which a group label would not sharpen. Revisit
-     only if playtest shows a player surprised by a cross-group switch's cost — the fix then is
-     pricing the tile's Switch button, not adding a group tag to the grid.
+     **No group label here, by design.** The grid lists every era-allowed recipe regardless of
+     `group` — the cheap intra-group switch and the pricier cross-group retool both go through
+     `try_switch_recipe`, which refuses (or prices) whichever the corp cannot afford. The
+     construction ledger is where GROUP membership is the organising axis (PRODUCTION.md § Sub-
+     facility groups); on an existing building the axis is "every method this building could
+     run". If a player is surprised by a cross-group switch's cost, the fix is pricing the
+     Switch button, not adding a group tag.
    - **Workforce** (`building_page_kind::workforce`, `draw_building_workforce_page`) — "How much
-     workforce, and by whose hand?" **Further trimmed (2026-08-15 playtest pass)**: the Auto button
-     is **gone from this page** — moved to the action grid (§ 3 below) alongside a real bug fix (see
-     there) — leaving just the placeholder trend graph (unchanged, still no per-building
-     history — NR-249) and a single **horizontal 1% slider** (`ImGui::SliderInt`, 0–100) — editing
-     it sets `workforce_target` directly and clears `workforce_auto`, the same "manual edit pins the
-     target" semantic the old tier buttons and Auto button both had. Applies to any player-owned
-     building regardless of type.
+     workforce, and by whose hand?" A placeholder trend graph (no per-building history —
+     NR-249) and a single **horizontal 1% slider** (`ImGui::SliderInt`, 0–100): editing it sets
+     `workforce_target` directly and clears `workforce_auto` — a manual edit pins the target.
+     Any player-owned building, regardless of type. The Auto control lives on the action grid.
    - **Status** (`building_page_kind::status`) — the fallback: construction rate/ETA for a
-     still-building building, "Operating." otherwise. **Rival buildings get ONLY this page** — the
-     public building type plus (via `draw_rival_building_summary`) owner name, tile, and explicit
-     `private` rows for production/stockpile (BL-068); nothing above would resolve for a rival
-     without leaking withheld data, so `building_pages()` short-circuits to a single Status page
-     for any non-player-owned building rather than testing each page's guard against data it must
-     not show.
+     still-building building, "Operating." otherwise. **Rival buildings get ONLY this page** —
+     the public building type plus (via `draw_rival_building_summary`) owner name, tile, and
+     explicit `private` rows for production/stockpile; `building_pages()` short-circuits to a
+     single Status page for any non-player-owned building rather than testing each page's
+     guard against data it must not show.
 
    `building_pages()` / `draw_building_page()` are the shared list+dispatch pair the in-band
    accordion and the full-canvas takeover (`draw_building_page_expanded`, `selection_card.cpp`)
    both read — the same precedent as the tile element's `tile_metrics` / `draw_tile_metric_chart`.
-3. **Right quarter — a 2×3 action grid**, mirroring the tile element's grid. **Manage is gone**
-   (playtest rework, 2026-08-15) — Ben's call was he no longer wants this link now that every
-   control it used to route to lives on this card already (NR-245, resolved). Its slot plus one
-   former reserved slot now hold the former Lifecycle page's two controls, moved here as
+3. **Right quarter — a 2×3 action grid**, mirroring the tile element's grid. There is no
+   Manage link — every control it would route to lives on this card (Ben, NR-245). Three
    building-level actions:
-   - **Mothball** (`glyph_mothball`, a box with a line through it) — the old Close/Reopen toggle,
-     relabelled: flips `decommissioned` (reversible — no output, no wages while closed) and
-     invalidates the logistics anchor cache. A **toggle button** per the standing Toggle rule — its
-     own active state (`decommissioned`) is what re-clicking undoes; the tooltip reads
-     "Mothball..."/"Un-mothball..." depending on state.
-   - **Dismantle** (`glyph_dismantle`, a simple X) — permanent, asks once via a confirm popup, then
-     defers through `ui_state::construction.pending_demolish` for `app::render` to execute
-     (`demolish_building`) — erasing mid-draw would dangle the `building_component&` the grid is
-     reading.
-   - **Auto** (`glyph_auto`, an open circular-arrow "refresh" primitive) — **relocated here from the
-     Workforce page (2026-08-15 playtest pass)**, in Mothball's column, one row down: sets
-     `b.workforce_auto = true` on press, the same one-way semantic the old page button had (a
-     manual slider edit on the Workforce page is what clears it, unchanged). Active state
-     (`workforce_auto == true`) is shown with the same accent-ring idiom the tile card's "primed"
-     Construct button uses, rather than baking the state into the button's label text — **this was
-     the fix for a real bug**: the old Workforce-page button built its label as
-     `"Auto  (%d%%)"` with no `##` separator, so ImGui derived the button's identity from that
-     text — which changed every tick while autosolving was live (`solve_workforce_target` re-solves
-     `workforce_target` continuously), churning the button's ImGui ID frame over frame and
-     corrupting its hover/active/focus state. The new grid button's id (`"##bld_auto"`) is stable;
-     the percentage is not shown on this button at all (the Workforce page's own trend chart and
-     slider still read it).
+   - **Mothball** (`glyph_mothball`, a box with a line through it) — flips `decommissioned`
+     (reversible — no output, no wages while closed) and invalidates the logistics anchor
+     cache. A **toggle button** per the standing Toggle rule — its own active state
+     (`decommissioned`) is what re-clicking undoes; the tooltip reads "Mothball..." /
+     "Un-mothball..." by state.
+   - **Dismantle** (`glyph_dismantle`, a simple X) — permanent, asks once via a confirm popup,
+     then defers through `ui_state::construction.pending_demolish` for `app::render` to execute
+     (`demolish_building`) — erasing mid-draw would dangle the `building_component&` the grid
+     is reading.
+   - **Auto** (`glyph_auto`, an open circular-arrow "refresh" primitive), in Mothball's column
+     one row down: sets `b.workforce_auto = true` on press, one-way (a manual slider edit on
+     the Workforce page is what clears it). Active state (`workforce_auto == true`) is shown
+     with the same accent-ring idiom the tile card's "primed" Construct button uses, never
+     baked into the label text: the button's id (`"##bld_auto"`) is **stable** — a label that
+     carried the live percentage would change every tick while `solve_workforce_target`
+     re-solves, churning the ImGui ID and corrupting hover/active/focus state. The percentage
+     is read on the Workforce page, not here.
    Mothball, Dismantle and Auto are all disabled with "Competitor building - intel only" for a
-   rival, same as Manage used to be. **Three slots remain reserved** (`glyph_reserved`).
+   rival. **Three slots are reserved** (`glyph_reserved`).
 
-`ui_state::selection_building_page` is the pager index — the sole survivor of the former
-`selection_method_open` / `selection_chain_open` / `selection_chain_target` / `selection_depth_open`
-quartet, reset to 0 alongside `card_resource_page` on every new selection (`app.cpp`).
+`ui_state::selection_building_page` is the pager index, reset to 0 alongside
+`card_resource_page` on every new selection (`app.cpp`).
 
-### The unit (Soldier) element's layout (placeholder, 2026-08-15)
+### The unit element's layout
 
 A selected **Unit** (`selection_kind::unit`) takes the **same 3-column band shape** as the
-building/tile elements (`draw_unit_selection_body`, `src/ui/selection_panel.cpp`) instead of the
-generic action/facts split — explicit scaffolding: BL-393 notes units are largely inert in the live
-economy today, but Ben's direction was to build the card's shape now rather than wait for combat to
-land.
+building/tile elements (`draw_unit_selection_body`, `src/ui/selection_panel.cpp`) — the
+card's shape is built ahead of units carrying much in the live economy (Ben's direction).
 
-1. **Left quarter — a generic humanoid placeholder glyph** (`glyph_soldier`): a filled circle head
-   over a triangle body. No unit-type-keyed glyph vocabulary exists yet (unlike buildings'
+1. **Left quarter — a generic humanoid placeholder glyph** (`glyph_soldier`): a filled circle
+   head over a triangle body. There is no unit-type-keyed glyph vocabulary (unlike buildings'
    `ui::icons::building`), so this is an honest placeholder rather than a faked per-type icon.
 2. **Centre half — a paged accordion** (`unit_pages()` / `draw_unit_page()`, the same
    list+dispatch-pair precedent as `tile_metrics` and `building_pages`), reading real
    `unit_component` fields only:
-   - **Strength** — `strength` and `count`. NOTE: `unit_component::strength` is documented in
-     `components.hpp` as a "fixed-point combat strength scalar (BL-157)", but every current writer
-     (`corp_command.cpp`'s `hire_unit`, `corporation_generation.cpp`, `hard_coded_world.cpp`) sets
-     it equal to the raw manpower count with no scale factor, and the existing hover-card reader
-     (`entity_summary.cpp::draw_unit_summary`) already prints it raw — so this page prints the raw
-     value too rather than guess a divisor that would disagree with the one other UI surface that
-     shows this number. Logged to `NEEDS_REVIEW.json`.
-   - **Roster** — `type` resolved through `unit_roster_table()` (real name: `hire_unit` sets
-     `unit_component::type` from that table's own index, so this is a genuine lookup, not a guess;
-     an out-of-range index falls back to `"Type %u"`) and `owner` resolved via the same corp-name
-     lookup the building card's rival summary uses.
-3. **Right quarter — a 2×3 action grid**: only **Go to** (`focus_on_entity`) is wired; the other
-   five slots are reserved (`glyph_reserved`), matching the tile/building cards' own pattern.
+   - **Strength** — `strength` and `count`. `unit_component::strength` is documented in
+     `components.hpp` as a fixed-point combat strength scalar, but every writer
+     (`corp_command.cpp`'s `hire_unit`, `corporation_generation.cpp`, `hard_coded_world.cpp`)
+     sets it equal to the raw manpower count with no scale factor, and the hover-card reader
+     (`entity_summary.cpp::draw_unit_summary`) prints it raw — so this page prints the raw
+     value too, rather than guess a divisor that would disagree with the other surface.
+   - **Roster** — `type` resolved through `unit_roster_table()` (`hire_unit` sets
+     `unit_component::type` from that table's own index; an out-of-range index falls back to
+     `"Type %u"`) and `owner` resolved via the same corp-name lookup the building card's rival
+     summary uses.
+3. **Right quarter — a 2×3 action grid**: **Go to** (`focus_on_entity`) plus five reserved
+   slots (`glyph_reserved`), matching the tile/building cards' pattern.
 
 `ui_state::selection_unit_page` is the pager index, mirroring `selection_building_page`.
 
-### The province element (BL-511, 2026-08-21)
+### The province element
 
-**On the Planetary canvas the selected unit is the PROVINCE, not the tile.** A click that hits no
-marker glyph now lands on the hovered tile's province (`world/province.hpp` — the small
-multi-tile cell BL-466 builds; the partition owns its size and may change it, so no surface here
-assumes a member count). The tile is **not retired**: deposits, terrain, buildings and richness all stay
-tile-keyed, and Ben's ruling is explicit that tiles "are just going to be rendered differently, but
-still instrumental unit values". What changed is which of the two the player *presses*.
+**On the Planetary canvas the selected unit is the PROVINCE, not the tile** (BL-511, province
+selection). A click that hits no marker glyph lands on the hovered tile's province
+(`world/province.hpp` — the small multi-tile cell of `docs/generation/PROVINCES.md`; the
+partition owns its size and may change it, so no surface here assumes a member count). The
+tile is **not retired**: deposits, terrain, buildings and richness all stay tile-keyed, and
+Ben's ruling is explicit that tiles "are just going to be rendered differently, but still
+instrumental unit values". What differs is which of the two the player *presses*.
 
 A province is not an entity, so it cannot travel in `selected_entity`. It has its own field:
 
@@ -411,23 +349,21 @@ in one place beats adding a clear-me duty to every selecting surface.
 
 `draw_selection_content` therefore **resolves** `selected_province` **before** `selection_kind_of`.
 It has to: the band substitutes the player's corporation whenever the entity selection is empty
-(BL-266, § Always open), which is exactly the state a province selection leaves behind, so a later
-test would be swallowed by the substitution. A province id that no longer resolves (a regenerated
+(§ Always open), which is exactly the state a province selection leaves behind, so a later test
+would be swallowed by the substitution. A province id that no longer resolves (a regenerated
 world) clears itself there and the element falls through to the ordinary kind resolution — the
 fallback is a normal selection, never a broken card.
 
 #### It is a BODY of the one element, not a second element (Ben, 2026-08-21)
 
-The province first shipped as its own card, dispatched ahead of everything and drawing its own
-header and chrome. Ben read that for what it was: *"We don't need another selection element, we
-can just use the same one as we used for tiles."* It was refolded the same day.
-
-A province is now **one more thing the single polymorphic panel can be showing**. Resolving it
-early chooses only *what* the element shows; from there it runs the same code every other kind
-runs — the shared header (icon / title / muted trailing label / right-aligned `>`), the separator,
-and then `draw_province_selection_body`, which takes the **same three-column band** as
-`draw_building_selection_body` and `draw_unit_selection_body`. It borrows the **tile** kind for its
-header icon: a province is a cluster of tiles, not a new kind of thing.
+*"We don't need another selection element, we can just use the same one as we used for
+tiles."* A province is **one more thing the single polymorphic panel can be showing**.
+Resolving it early chooses only *what* the element shows; from there it runs the same code
+every other kind runs — the shared header (icon / title / muted trailing label / right-aligned
+`>`), the separator, and then `draw_province_selection_body`, which takes the **same
+three-column band** as `draw_building_selection_body` and `draw_unit_selection_body`. It
+borrows the **tile** kind for its header icon: a province is a cluster of tiles, not a new kind
+of thing.
 
 Two header slots are filled from the province rather than from `selection_title` /
 `selection_kind_name` (which key off an entity id): the title is `Province [x, y]`, anchored on the
@@ -444,18 +380,17 @@ shape; the body un-blends them:
   bar** runs along the bottom of the same panel — one band per member tile, in the province's own
   ascending-tile-id order, each in exactly the colour the canvas gives that tile. This is the
   blend's legend, so it stays permanently visible beside the gradient it explains rather than
-  living on a page you have to reach: "what did that gradient just average?" is answered at a
-  glance instead of by zooming in and counting.
+  living on a page you have to reach.
 - **Centre half — a paged accordion** (`ui_state::selection_province_page`), same pager chrome as
   every other card:
   - **Tiles** — every member tile as a press. Selecting one clears the province and hands over the
     full tile card (deposits, the neighbourhood hex view, the Construct door). **Building placement
-    did not move to province grain**, so this list is also the route to building.
+    is tile-grain**, so this list is also the route to building.
   - **Deposits** — summed across the province. A deposit is a stock, and for a player deciding
     whether a locality is worth a mine, several tiles each holding a little iron is one province
     holding that much iron.
   - **Buildings** — the roll-up of what already stands here, each a press that selects the
-    building. A locality question that used to mean clicking every hex in turn.
+    building. A locality question answered without clicking every hex in turn.
 - **Right quarter — a 2×3 action grid**, `Go to` plus five reserved slots, exactly as the unit card.
   Construct is deliberately **not** here: placement is tile-grain, so the Construct door stays on
   the tile card and the Tiles page is the route to it.
@@ -466,13 +401,13 @@ indexed against a constant — so a repartition changes only how many bands the 
 An ocean or otherwise unpartitioned tile has no province and still selects as a **tile**, so
 clicking water selects something rather than nothing.
 
-### The battle element (BL-469, 2026-08-21)
+### The battle element
 
-**A live battle selects ahead of everything else.** `draw_battle_selection` is dispatched
-**first** — before the province resolution, before `selection_kind_of` — because a battle is the
-only selection in the game whose subject is *spending an asset the player cannot re-buy this tick*
-while they watch. Everything else answers a standing question about a thing that will still be
-there next tick; this answers a decision that expires.
+**A live battle selects ahead of everything else** (BL-469, battle card). `draw_battle_selection`
+is dispatched **first** — before the province resolution, before `selection_kind_of` — because a
+battle is the only selection in the game whose subject is *spending an asset the player cannot
+re-buy this tick* while they watch. Everything else answers a standing question about a thing that
+will still be there next tick; this answers a decision that expires.
 
 Like a province, a battle is not an entity, so it travels in its own fields:
 
@@ -484,19 +419,19 @@ Like a province, a battle is not an entity, so it travels in its own fields:
 
 `has_battle_selection()` / `clear_battle_selection()` are the accessors; the canvas reconciles a
 stale battle selection on the same arm it reconciles a stale province one, and the battle sits at
-**rung 0** of the repeat-click cycle (widened from 4 rungs to 5 — see below).
+**rung 0** of the repeat-click cycle (see below).
 
 **More than one battle can stand in one province.** A third corp arriving opens its **own** battles
 against each existing participant rather than joining theirs, so "the battle here" is a choice.
 `first_battle_in()` makes it deliberately: **the player's own fight first**, then sorted
 `(province, attacker, defender)` order when none of them is the player's — the fight you are in is
-the one you need the card for. Flagged for Ben (NR-468).
+the one you need the card for (NR-468).
 
 #### What the card carries, and why each part earns its place
 
 - **The phase word** — `battle_phase_word(read_battle_phase(…))`. Rounds are mechanically uniform;
   the phase is a *reading* of one. It is derived **once, in the world layer**, precisely so this
-  card and the Field-channel dispatch stream (BL-468) cannot describe the same fight differently.
+  card and the Field-channel dispatch stream (CHAT.md) cannot describe the same fight differently.
 - **Per-unit strength bars, both sides.** "I am at 60%" does not say whether that is one broken
   formation or five even ones, which is the difference between staying and leaving.
 - **The withdrawal price, with its three terms separated** — base, per-round, pursuit — quoted from
@@ -506,41 +441,37 @@ the one you need the card for. Flagged for Ben (NR-468).
 - **A confirm popup on the withdraw press.** The press is irreversible and priced; it is the one
   action on any Selection element that spends men.
 
-**Rival-vs-rival redaction (BL-068).** A fight that is not the player's shows the phase, the round
-and each side's *aggregate* strength, but each side's composition reads *"Composition unknown — a
-rival's forces are not yours to count"*, and the Withdraw press is **disabled with a reason rather
-than hidden**, so the rule reads as a rule instead of as a missing button. Spectator god view lifts
-the redaction in the UI only, on BL-408's existing pair-test. Whether the *aggregate* should be
-redacted too is open (NR-469) — and it is the opposite call to the one the dispatch stream makes,
-which skips rival fights entirely (NR-470). One question, two surfaces.
+**Rival-vs-rival redaction.** A fight that is not the player's shows the phase, the round and each
+side's *aggregate* strength, but each side's composition reads *"Composition unknown — a rival's
+forces are not yours to count"*, and the Withdraw press is **disabled with a reason rather than
+hidden**, so the rule reads as a rule instead of as a missing button. Spectator god view lifts the
+redaction in the UI only, on the spectator pair-test. Whether the *aggregate* should be redacted too
+is open (NR-469) — and it is the opposite call to the one the dispatch stream makes, which skips
+rival fights entirely (NR-470). One question, two surfaces.
 
-### Tile repeat-click selection cycle (placeholder, 2026-08-15; retargeted BL-511)
+### Tile repeat-click selection cycle
 
 `body_surface_canvas.cpp`'s click handler cycles **Battle → Soldier → Building → Province → Battle**
 on a **repeat** click at the same tile the selection already sits on, skipping any stage with nothing
 there (no unit on the tile skips straight to Building; no building skips to Province).
-
-> **BL-469 added the battle rung at position 0**, widening the stage tables from 4 entries to 5. It
-> leads because a live battle is the time-limited reading of that ground; the other three rungs are
-> standing facts about it. The rung is live only when `first_battle_in()` finds a fight in the
-> tile's province, so on peaceful ground the cycle is exactly what it was.
 `ui_state::selection_cycle_tile` / `selection_cycle_stage` track the anchor tile and current stage.
 
-> **BL-511 changed the terminal stage from Tile to Province.** Because a province is expressed as
-> `selected_entity = null_entity` **plus** a province id, the stage table's "nothing here, skip it"
-> test can no longer be a null check on the last stage — the handler carries an explicit
-> `stage_live[]` alongside the entity table. On a tile with no province (ocean) the stage falls back
-> to the tile, so the cycle never strands on an empty rung.
+The battle rung leads because a live battle is the time-limited reading of that ground; the other
+rungs are standing facts about it. It is live only when `first_battle_in()` finds a fight in the
+tile's province, so on peaceful ground the cycle runs Soldier → Building → Province.
 
-A click on a **different** tile (or the first click anywhere) leaves the existing marker-hit
-precedence (BL-031: building > market_centre) completely untouched — it only additionally seeds the
-cycle anchor so a follow-up repeat click knows where to advance from. This is scaffolding ahead of
-units mostly existing in the live economy (BL-393) — deliberately built now per Ben's direction,
-not gated on combat landing first.
+Because a province is expressed as `selected_entity = null_entity` **plus** a province id, the
+stage table's "nothing here, skip it" test cannot be a null check on the last stage — the handler
+carries an explicit `stage_live[]` alongside the entity table. On a tile with no province (ocean)
+the stage falls back to the tile, so the cycle never strands on an empty rung.
+
+A click on a **different** tile (or the first click anywhere) goes through the marker-hit precedence
+(`resolve_marker_hit`: building > market_centre, nearest wins) and only additionally seeds the cycle
+anchor so a follow-up repeat click knows where to advance from.
 
 ### The body element's action is the survey front door (then go-to-surface)
 
-An unsurveyed **Body**'s hero action is its **Survey section** (survey system, BL-067),
+An unsurveyed **Body**'s hero action is its **Survey section** (the survey system, BL-067),
 keyed on the body's survey phase (`draw_survey_section`, called from `draw_selection_action`).
 See [DISCOVERY.md](DISCOVERY.md) for the model authority (the geographic fog this section reads).
 
@@ -557,7 +488,7 @@ mutable-world pass in `app::render` performs the upfront debit and arms the sche
 (`dispatch_survey`), exactly as construction requests are executed — the UI surfaces hold a
 `const world&`. The star carries neither the survey action nor the go-to-surface action.
 
-### The body element's fact is its commercial activity pulse (BL-089)
+### The body element's fact is its commercial activity pulse
 
 A selected **Body**'s (not the star's) Facts column carries a **Commercial activity**
 section (`draw_activity_section`) keyed on `body_activity_visibility` (the activity fog,
@@ -568,118 +499,87 @@ the tier derivation).
 - **`unknown`** — "Outside your trade network - no market data." No further content.
 - **`known` / `visible`** — a coarse **market pulse** (`busy` / `steady` / `quiet`, derived from
   the body's aggregate market throughput); `visible` additionally notes "Live lane / your
-  presence." No per-building production or stockpiles — competitor internals stay private
-  (BL-068).
+  presence." No per-building production or stockpiles — competitor internals stay private.
 - **`known_stale`** — greyed: "Route gone cold - last market read is stale."
 
 ---
 
-## Removed: the stat-block polymorphism (BL-093)
+## Not a stat block
 
-The panel's earlier form (pre-2026-07-04) rendered a **50/50 split** — an encyclopedic per-kind
-stat block (`draw_summary`, dispatching to `draw_body_summary` / `draw_tile_summary` /
-`draw_building_summary` / … in `entity_summary.hpp`) beside a **lens supplement**
-(`draw_lens_supplement`) that re-rendered overlay-keyed market price / production rate /
-population-workforce rows inline — literally duplicating the Market / Production / Population
-ledgers. Both **are removed**: `draw_summary` and `draw_lens_supplement` no longer exist in
-`src/ui/selection_panel.cpp`. Facts and actions carried equal weight and everything read as
-uniform flat text, so the panel had no clear reason to exist — it read as "an amalgamation of
-all the menu ledgers" (Ben's playtest finding, 2026-07-04). All that reference detail — orbit,
-parent, composition, deposits, prices — now lives in the ledgers, one `go to` away; the header
-identity line (name · type) is the only trace of it left in the panel itself.
+The panel is not an encyclopedic per-kind stat block beside a lens supplement that re-renders
+overlay-keyed market price / production rate / population rows — that shape duplicates the
+Market / Production / Population ledgers, gives facts and actions equal weight, and reads as
+"an amalgamation of all the menu ledgers" (Ben's playtest finding, 2026-07-04). Reference
+detail — orbit, parent, composition, deposits, prices — lives in the ledgers, one `go to`
+away; the header identity line (name · type) is the only trace of it in the panel itself.
 
 The shared per-entity content builders in `entity_summary.hpp` (`draw_body_summary`,
-`draw_tile_summary`, `draw_building_summary`, …) are unaffected by this removal — they remain
-the Tile Ledger's content and the future hover card's planned content; only the Selection
-element stopped calling them.
+`draw_tile_summary`, `draw_building_summary`, …) are the Tile Ledger's content; the Selection
+element does not call them.
 
 ---
 
 ## Layout & chrome
 
-**Current shape (BL-213, 2026-07-28) — the Selection band.** The element lives in a **fixed
-band at the bottom of the screen**. Its left neighbour is the **comms dock** (BL-227,
-2026-07-30 — the comms log moved from the right column to the bottom-left tile of this same
-strip, `comms_dock_rect` in `src/ui/foldout_column.{hpp,cpp}`); its right neighbour is the
-right chrome column (time panel + minimap). Dock and band share one top edge and one height,
-so the screen's bottom row reads as a single solid strip. This superseded two earlier shapes in turn: the original
-BL-065 full-width bottom bar, then the BL-124 shell-column sidebar, then the BL-194/195
-**click-anchored "sticky card"** that froze at the click position and centred there (canvas-
-confined, clamped so it stayed on-screen). Ben's 2026-07-28 call retired the click-anchoring:
-*"menus that are to do with doing/building need space at the bottom of the screen, rather than
-floating with the cursor."* The band is now:
+**The Selection band.** The element lives in a **fixed band at the bottom of the screen**. Its
+left neighbour is the **comms dock** (`comms_dock_rect` in `src/ui/foldout_column.{hpp,cpp}`);
+its right neighbour is the right chrome column (time panel + minimap). Dock and band share one
+top edge and one height, so the screen's bottom row reads as a single solid strip. Ben's
+ruling (2026-07-28): *"menus that are to do with doing/building need space at the bottom of
+the screen, rather than floating with the cursor."* The band is:
 
 - **Fixed, not click-anchored.** Always the same rect — left edge at the **comms dock's right
   edge** (the dock takes three quarters of the fold-out column's width; the band takes the
-  quarter it gives back, BL-227), right edge at the right chrome column, bottom-anchored at
+  quarter it gives back), right edge at the right chrome column, bottom-anchored at
   `selection_band_height` tall (`app.cpp`'s band block; the frame is
   `src/ui/selection_card.{hpp,cpp}`) — regardless of where the selecting click landed. The
   player's eye never has to re-find it.
-- **Not mutually exclusive with the ledgers.** Because it no longer shares the shell column,
+- **Not mutually exclusive with the ledgers.** Because it does not share the shell column,
   selecting an entity **leaves whatever fold-out ledger is open untouched** — both are visible
-  at once. (This reverses the BL-124 sidebar's rule, which closed the ledger on a new selection
-  because the two competed for the same column.)
-- **Height is display-derived, not a constant** (2026-07-30). `selection_band_height(disp_x,
-  disp_y)` = minimap height + `chrome_margin` (`src/ui/foldout_column.{hpp,cpp}`), so the
-  band's top edge lands exactly on the minimap's and the bottom row reads as one band. The
-  flat 340 px it replaced overhung the minimap by 80 px at 1720×1080 — "discordant", Ben's
-  word — with the main canvas practically blocked.
-- **Content unchanged in kind.** `draw_selection_content` (selection_panel.cpp) is still the
-  shared per-kind dispatcher; only its container moved. The tile's vertical layout (hex render +
-  accordion, § below) and the action|facts split (other kinds) render exactly as before, just in
-  a wide-short band instead of a narrow-tall sidebar or a small floating card.
+  at once.
+- **Height is display-derived, not a constant.** `selection_band_height(disp_x, disp_y)` =
+  minimap height + `chrome_margin` (`src/ui/foldout_column.{hpp,cpp}`), so the band's top edge
+  lands exactly on the minimap's and the bottom row reads as one band. A flat height overhangs
+  the minimap — "discordant", Ben's word — with the main canvas practically blocked.
+- **One dispatcher.** `draw_selection_content` (selection_panel.cpp) is the shared per-kind
+  dispatcher; the container frames it.
 - **Header row:** a small coloured **kind icon** (`draw_selection_icon` — circle for body,
-  square for building, outlined square for tile, pentagon otherwise; a first pass ahead of a
-  richer per-entity icon), then the title line (name · type), then a right-aligned **`[>]`**
-  ('go to') button. There is no close button (see § Always open).
-- **Always open — dismissal retired (BL-266, 2026-08-09).** The band never hides:
-  the `[x]` button, the Esc hide rung, and the `selection_hidden_for` state are
-  all removed. Dismissal was right for the BL-194/195 floating card over an open
-  canvas; with the shell filling the perimeter, a hidden band reads as a hole in
-  the frame (Ben, NR-017).
+  square for building, outlined square for tile, pentagon otherwise), then the title line
+  (name · type), then a right-aligned **`[>]`** ('go to') button. There is no close button
+  (see § Always open).
+- **Always open.** The band never hides: there is no `[x]` button, no Esc hide rung, and no
+  hidden state. With the shell filling the perimeter, a hidden band reads as a hole in the
+  frame (Ben, NR-017).
 
-  Being selection-driven with no rail slot, the element is still **not** governed
-  by the universal toggle rule: that rule toggles the rail's ledgers, not this
-  element.
-- **Resting state — the player's own corporation.** With nothing selected
-  (fresh session, or after clicking empty space) the band rests on the player
-  corp, through the same `selection_kind::corporation` builder any selection
-  uses. Deselecting means "stop looking at that, back to looking at yourself".
+  Being selection-driven with no rail slot, the element is **not** governed by the universal
+  toggle rule: that rule toggles the rail's ledgers, not this element.
+- **Resting state — the player's own corporation.** With nothing selected (fresh session, or
+  after clicking empty space) the band rests on the player corp, through the same
+  `selection_kind::corporation` builder any selection uses. Deselecting means "stop looking at
+  that, back to looking at yourself".
 
-  `selected_entity` stays null while resting, so deselect remains representable;
-  the band substitutes the player corp at draw time and never renders
-  `selection_kind::none`. The player corp exists before the first frame, so
-  there is no bootstrap gap.
-- **Esc ends at the system menu.** With the hide rung gone, Esc's ladder is:
-  exit-confirm → close system menu → pop a drill level → corp roll-up →
-  fold overlay → open the system menu. The "pause screen" IS `show_system_menu`
-  (settled 2026-08-02); nothing new was built for it.
+  `selected_entity` stays null while resting, so deselect remains representable; the band
+  substitutes the player corp at draw time and never renders `selection_kind::none`. The
+  player corp exists before the first frame, so there is no bootstrap gap.
+- **Esc ends at the system menu.** Esc's ladder is: exit-confirm → close system menu → pop a
+  drill level → corp roll-up → fold overlay → open the system menu. The "pause screen" IS
+  `show_system_menu` (settled 2026-08-02).
 
 **Click-through.** The band draws as an ordinary ImGui window over the canvas; ImGui's
-`WantCaptureMouse` flag (already how every other chrome window — nav rail, header, minimap —
-prevents the canvas from receiving clicks underneath it) covers the band the same way, so no
-special-case hit-testing was needed.
+`WantCaptureMouse` flag (how every other chrome window — nav rail, header, minimap — prevents
+the canvas from receiving clicks underneath it) covers the band the same way, so no
+special-case hit-testing is needed.
 
-### Lens strip relocation (BL-093)
-
-The overlay-lens control strip (`ui::draw_overlay_controls`, `src/ui/overlay.cpp`) no longer
-lives beneath the Selection element — it moved onto the **minimap**, reprising its pre-BL-013
-location. A lens mode bar now occupies the bottom row of the minimap box (chrome fill drawn in
-`app.cpp`'s minimap block; the interactive glyph row is `draw_overlay_controls(ui, x, top_y, w)`
-positioned over it), leaving the Selection element the full height it needs. The strip itself
-also trimmed from 9 lenses to a single row — **eight** since BL-226 (Continent lens) joined
-the original seven: Corporation, Country, Resource, Market, Population, Opportunity,
-Production, Continent. **Scarcity** and **Industry** stay off the on-screen row (joining
-**Supply**, **Reach**, and **Supply-routes**) as keyboard-cycle only — the minimap bar does
-not fit them all. The Resource/Market/Scarcity resource-selector, formerly a 140px inline
-combo, moved again: it now lives in the **on-canvas lens legend** (BL-134, lens selector in
-legend), not on the bar. Full detail: [LENSES.md](LENSES.md), [MINIMAP.md](MINIMAP.md).
+**The lens bar is not here.** The overlay-lens control strip (`ui::draw_overlay_controls`,
+`src/ui/overlay.cpp`) lives on the **minimap**, leaving the Selection element the full height it
+needs; the Resource/Market/Scarcity good selector lives in the lens legend. Full detail:
+[LENSES.md](LENSES.md), [MINIMAP.md](MINIMAP.md).
 
 ---
 
 ## Lens-driven hover & selection resolution (settled 2026-06-15, [F4])
 
-A single pointer position overlaps a **stack** of entities — a building sits *on* a tile sits *on*
+Owned by BL-372 (lens-keyed selection). A single pointer position overlaps a **stack** of entities — a building sits *on* a tile sits *on*
 a body. Both Focus (hover) and Selection (click) resolve that stack to exactly one entity. The
 rule has two parts: a fixed stack order, and a lens-evaluated validity filter over it.
 
@@ -695,10 +595,11 @@ building → market → unit  →  tile  →  body
 
 **Lowest *valid* entity.** Resolution walks the stack from most-specific and returns the **first
 entity the active lens deems valid**. Validity is not fixed: it is **the active lens's question**
-(§ Per-lens validity in LENSES.md). With **no lens** every drawn kind is valid, so resolution
-returns the literal lowest entity (a building over a tile resolves to the building; bare terrain
-resolves to the tile). Under a lens, kinds the lens does not care about are *skipped*, so the same
-pointer position can resolve to a **different entity per lens**.
+(§ Per-lens selection validity in LENSES.md). With **no lens** every drawn kind is valid, so
+resolution returns the literal lowest entity (a building over a tile resolves to the building; bare
+terrain resolves to the tile — or its province, on the Planetary canvas). Under a lens, kinds the
+lens does not care about are *skipped*, so the same pointer position can resolve to a **different
+entity per lens**.
 
 **The lens names the ledger the selection drives.** Resolving the entity and choosing its 'go to'
 ledger are the *same* decision — the lens that validates the entity also routes it:
@@ -709,20 +610,15 @@ ledger are the *same* decision — the lens that validates the entity also route
 | **Corporation** | the owning **corporation** of the hovered tile/building | Balance Ledger |
 | **Resource** | the hovered tile's **deposit** | Tile Ledger (deposit detail) |
 | **Market** | the body's **market** / listing | Market Ledger |
-| **Country** *(was Faction)* | the owning **nation** | Nation ledger |
-| **Supply** *(Layer 5)* | the **route / stockpile** under the pointer | (Supply surface, when it exists) |
+| **Country** | the owning **nation** | Nation ledger |
+| **Supply** | the **route / stockpile** under the pointer | Supply surface |
 
 This couples the Selection element's Focus state to the lens system (LENSES.md) and the ledger
-family (BACKLOG § Ledger): the 'go to' dispatch seam (`focus_on_entity`) is unchanged — the lens
-only changes *which entity id and which target* are handed to it. The same dispatch carries the
-non-spatial 'go to' routing (nation/corporation → ledger) already specified above.
+family: the 'go to' dispatch seam (`focus_on_entity`) is unchanged — the lens only changes *which
+entity id and which target* are handed to it. The same dispatch carries the non-spatial 'go to'
+routing (nation/corporation → ledger) specified above.
 
-**Wiring order.** This is the design rule; it lands once its prerequisites exist — canvas
-hit-testing for the marker kinds (§ Open questions below) and the per-lens ledgers (the [A4]
-family). Until then the rule is dormant: with no lens and no marker hit-testing, resolution
-degrades to today's tile/body behaviour, which is the `none`-lens row above.
-
-## Open questions / deferred
+## Open questions
 
 - **Multi-select.** Out of scope; the model is single-selection. A future
   drag-box or shift-click would extend `selected_entity` to a set.
@@ -730,7 +626,3 @@ degrades to today's tile/body behaviour, which is the `none`-lens row above.
   navigation (it is independent of Active). Whether a stale selection (entity
   destroyed) auto-clears is an implementation detail — treat a missing id as
   "no selection".
-- **Hit-testing non-body entities on the canvas.** Buildings, units, and markets
-  are not yet independently click-selectable on the surface canvas (they appear
-  as Tile Ledger rows). Canvas hit-testing for them is its own task; until then
-  those kinds are selected only from within ledgers.

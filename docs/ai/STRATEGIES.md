@@ -1,23 +1,24 @@
 # Strategies — the meta, authored ahead of the game
 
-> **Status: research scaffolding — the design conversation's home, not authority.** Written
-> 2026-08-06 from Ben's ask: *develop strategies and meta ahead of the game, to make it easier
-> for AI to play properly — we will have to compress strategy to a local machine.* Sits on
+> **Status: research scaffolding — the design conversation's home, not authority.** From Ben's
+> ask (2026-08-06): *develop strategies and meta ahead of the game, to make it easier for AI to
+> play properly — we will have to compress strategy to a local machine.* Sits on
 > `AI_OPPONENT.md` § 10 (the small-local-model direction), `docs/research/ERA1_TECH_LANDSCAPE.md`
 > (the Era 1 tree draft and its danger model) and `docs/research/TECH_EFFECTS.md` (the effect
 > vocabulary). Siblings: **BL-279** (trace corpus — consumes the strategy labels), **BL-207**
 > (persona packs — become weightings over this roster), **BL-210** (oral-history pivot — the
-> loop where new strategies get minted). A backlog item for the library itself is minted when
-> this lands. Nothing is transcribed into a data store yet, deliberately — the roster review
-> shouldn't review something that already looks settled (the Era 1 tree draft's own rule).
+> loop where new strategies get minted). The deck is deliberately not transcribed into a data
+> store ahead of the invention loop — the roster review shouldn't review something that already
+> looks settled (the Era 1 tree draft's own rule).
 >
-> **Resolved 2026-08-06 (§ Resolutions, below):** the deck is **AI-invented**, the schema is
-> authored; cards ride in context at runtime; no telepathy; meta is judged by the existing
+> **Resolved (Ben, 2026-08-06 — § Resolutions, below):** the deck is **AI-invented**, the schema
+> is authored; cards ride in context at runtime; no telepathy; meta is judged by the existing
 > reward schema. Where earlier prose reads as an authored roster, the resolution wins.
 >
-> **Honesty markers:** every card is tagged by the vocabulary it runs on — **[shipped]**
-> (today's engine), **[draft-tree]** (references the Era 1 first draft, which Ben has not yet
-> reviewed). A **⚠** marks a signal the blackboard cannot yet express (§ The design-gap yield).
+> **Vocabulary markers:** every card is tagged by the vocabulary it runs on — **[engine]** (the
+> engine's own blackboard and dictionary vocabulary), **[era1-tree]** (references the Era 1 tree
+> draft in `docs/research/ERA1_TECH_LANDSCAPE.md`). A **⚠** marks a signal the card needs that the
+> blackboard does not carry (§ The design-gap yield).
 
 ---
 
@@ -28,7 +29,7 @@ differently in their light.
 
 - **The deck is invented; the schema is authored.** *"I prefer a deck of cards which the AI
   invents."* Authored content shrinks to the card contract (schema, vocabulary discipline,
-  token ceiling, lint) plus seed hypotheses; the shipped deck is minted by the invention loop
+  token ceiling, lint) plus seed hypotheses; the live deck is minted by the invention loop
   (§ below). The rationale is player-facing: *"if we use cards, then they have to be in the
   tutorial"* — an authored card library would be canonical game content the tutorial owes the
   player. An invented, private deck keeps meta *discovered*, symmetrically, by AI and player.
@@ -42,11 +43,10 @@ differently in their light.
   never by a bespoke success metric. Signature metrics demote to *compliance labels*.
 - **Runtime shape: cards in context**, as recommended — the fine-tune learns to follow cards,
   so a deck patch is a data update, not a retrain.
-- **first_footing stays: race the player.** Side-effect for the tree review: a race needs a
-  single trophy, so this leans tree Q2 toward **world-scoped** keystone deeds.
-  **Superseded 2026-08-06 (NR-069/NR-070):** tree Q2 actually settled **personal**, killing the
-  single-trophy premise. ST-10 was reworked into a tempo race (fire your own deed before a
-  rival fires theirs) rather than cut — see its card below.
+- **first_footing stays, as a tempo race.** Ben's first answer was *race the player*; the tree's
+  Q2 then settled keystone deeds as **personal** (NR-069), so there is no single trophy to
+  contest. ST-10 is a tempo race instead (NR-070) — fire your own deed before a rival fires
+  theirs — see its card below.
 - **The deterministic layer stays unbound.** The `weights` line remains in the schema but does
   not compile into `corp_ai` until the invention loop has validated the deck.
 
@@ -67,8 +67,8 @@ That makes the word interface **four legs**, not three:
 
 | leg | artifact | answers |
 |---|---|---|
-| read | blackboard export (BL-206) | what is |
-| meaning | action dictionary (BL-270) | what can be done |
+| read | blackboard export (BL-206, blackboard export) | what is |
+| meaning | action dictionary (BL-270, action dictionary) | what can be done |
 | **intent** | **the strategy library (this doc)** | **what to want** |
 | write | corp-command seam | do it |
 
@@ -80,17 +80,17 @@ play (§ Resolutions), the way a player's own meta is.
 1. **The runtime model.** The index rides in every decision prompt; the *active* card rides in
    full. The model executes a named plan instead of improvising one — goal persistence as data,
    the § 10c.5 fix ranked cheapest-but-one.
-2. **The trace corpus (BL-279).** Every logged decision carries its strategy id. That factorises
+2. **The trace corpus (BL-279, trace corpus).** Every logged decision carries its strategy id. That factorises
    the learning problem: `select(strategy | state-digest)` is a small classification;
    `execute(action | state, card)` is generation at far lower entropy than
    `action | state` with strategy latent. The factorisation **is** the compression to a local
    machine — the fine-tune learns to *follow* cards, not to contain them, so a meta patch is a
    data update, not a retrain.
-3. **The deterministic layer.** `corp_strategy` (BL-203) is today a three-value alias of
+3. **The deterministic layer.** `corp_strategy` (`src/world/corp_ai.hpp`) is an alias of
    `industrial_focus`. Each card carries a `weights` line that compiles to focus/bucket biases —
-   the library *extends* the shipped enum rather than rivalling it, and the algorithmic corps
-   could run the same deck without a model in the loop. **Deferred** (§ Resolutions): the
-   compilation stays uncoupled until the invention loop has validated the deck.
+   the library *extends* the engine enum rather than rivalling it, and the algorithmic corps
+   could run the same deck without a model in the loop. The compilation stays uncoupled until
+   the invention loop has validated the deck (§ Resolutions).
 4. **The eval harness.** Each card names trace-checkable *compliance* signatures
    (§ The invention loop), so "is the AI actually playing its card" is a mechanical question —
    the same move `corp_command_result`'s typed rejections make for legality. Success is never
@@ -102,7 +102,7 @@ The library only compresses if these hold; they are rules, not aspirations.
 
 1. **Closed and small.** A capped deck, ~10 live cards. The runtime model never invents a card
    mid-campaign; minting happens *offline*, in the invention loop — cloud post-mortems and the
-   Project-Rival oral-history discipline (BL-210) — and ships as pack updates. The meta evolves
+   Project-Rival oral-history discipline (BL-210, oral-history pivot) — and ships as pack updates. The meta evolves
    between releases, not mid-campaign.
 2. **Two-tier context.** A `STRATEGY_INDEX` (one line per card, ~20 tokens each) always in
    context; the full card fetched by id — the `ACTIONS_INDEX.json` / `actions_query.js` pattern,
@@ -155,10 +155,10 @@ its slot; the loop may rewrite or kill any of them. Lines marked **⊘** carry a
 verdict the no-telepathy rule bars from shipping — the loop must rediscover them or they die
 with the seed.
 
-### Era 0 — the economic base *(all three run on shipped vocabulary)*
+### Era 0 — the economic base *(all three run on engine vocabulary)*
 
 ```
-ST-01 · deep_seam — economy · [shipped]
+ST-01 · deep_seam — economy · [engine]
 thesis:  own the richest ground before rivals know it is rich; sell raw, bank the rent.
 when:    surveyable regions remain (survey) · cash clears survey cost + reserve floor
 opening: gameplay.survey best-affinity region → gameplay.build extractors on top tile_deposit
@@ -172,7 +172,7 @@ weights: corp_strategy=extraction; survey_expand ↑ · extractor builds ↑
 ```
 
 ```
-ST-02 · mill_gate — economy · [shipped]
+ST-02 · mill_gate — economy · [engine]
 thesis:  the margin lives between raw and refined; stand at the gate and take it.
 when:    price spread raw→refined clears input + wage cost · a supplied hub exists (supply)
 opening: gameplay.build processors at the hub → gameplay.set_recipe to the widest live margin
@@ -187,7 +187,7 @@ weights: corp_strategy=processing; recipe dials ↑ · hub builds ↑
 ```
 
 ```
-ST-03 · long_haul — economy · [shipped]
+ST-03 · long_haul — economy · [engine]
 thesis:  the map is a price surface; carry goods across its gradients, and the fog lifts
          as a side effect.
 when:    cross-market price gaps exceed haul cost · cash clears road capex floor
@@ -202,10 +202,10 @@ wins_by: arbitrage + the widest activity-fog picture in the game — it sees eve
 weights: corp_strategy=trade; convoy dispatch ↑ · road builds ↑
 ```
 
-### The Era 1 arc *(all [draft-tree] — written against the unreviewed first draft)*
+### The Era 1 arc *(all [era1-tree] — written against the Era 1 tree draft)*
 
 ```
-ST-04 · propellant_first — space · [draft-tree · reworked 2026-08-06 per NR-071]
+ST-04 · propellant_first — space · [era1-tree · NR-071]
 thesis:  the space economy has no customer until propellant is made off-world; fire your OWN
          First Tank before rivals fire theirs, and be the demand sink everyone else sells into.
 when:    Era 1 quests open ⚠ · launch capacity owned · a volatile-bearing body surveyed
@@ -226,7 +226,7 @@ weights: volatiles-sector builds ↑ · ice-band survey ↑
 ```
 
 ```
-ST-05 · cadence — space · [draft-tree]
+ST-05 · cadence — space · [era1-tree]
 thesis:  cost-to-orbit is the master variable and it falls with flight rate; fly often,
          sell lift, let the curve do the work.
 when:    launch capacity owned · lift demand visible ⚠ (no space-market predicate yet)
@@ -244,7 +244,7 @@ weights: launchpad builds ↑ · refit dials ↑
 ```
 
 ```
-ST-06 · bedrock — space · [draft-tree]
+ST-06 · bedrock — space · [era1-tree]
 thesis:  pay once, lift forever — fixed infrastructure beats cadence past the knee, if the
          world lets you finish it.
 when:    deep cash reserves · a qualifying site surveyed · alarm low and stable ⚠ · runway
@@ -262,7 +262,7 @@ weights: single-site capex ↑ · everything else ↓
 ```
 
 ```
-ST-07 · quiet_foothold — survival · [draft-tree]
+ST-07 · quiet_foothold — survival · [era1-tree]
 thesis:  more advanced is not better; arrive in orbit slightly late, into a world that still
          exists, ahead of rivals who spent their era on alarm.
 when:    aggregate alarm trending toward ceiling ⚠ · rivals visibly escalating
@@ -283,12 +283,12 @@ weights: trade routes ↑ · mitigation nodes ↑ · escalator nodes vetoed
 
 > **Why ST-07 justifies the whole library:** a step-wise greedy policy can never find it —
 > every local move scores below the escalating alternative, and the payoff arrives only at the
-> seeded date. It exists because someone wrote it down after a world burned — authored today as
+> seeded date. It exists because someone wrote it down after a world burned — authored as
 > a seed, re-derivable by the loop from any lost campaign's post-mortem. It is the § 10c myopia
 > finding answered in one card, and the invention loop's argument in miniature.
 
 ```
-ST-08 · yard_master — space · [draft-tree]
+ST-08 · yard_master — space · [era1-tree]
 thesis:  whoever owns the yard taxes the whole space economy; structure is the second demand
          sink after fuel.
 when:    lift available, owned or bought · the Yards sector open ⚠
@@ -296,7 +296,7 @@ opening: Orbital Rendezvous → Modular Assembly → fire The First Truss ⚠ �
          the port joins the trade graph
 doctrine: Orbital Assembly beside a cadence lifter; Surface Assembly beside on-body extraction
 posture: mid-capex, alliance-shaped — this card wants a partner card in the world
-watch:   rival orbital classes (rival_building_type ⚠ designed-only) · lift price rising
+watch:   rival orbital classes (rival_building_type ⚠) · lift price rising
          against you
 abandon: no lift partner and no owned lift — the yard starves
 pivot:   propellant_first (fuel is the other sink) · iron_belt inverted (feed your own yard)
@@ -305,11 +305,11 @@ weights: yards-sector builds ↑ · orbital-site access ↑
 ```
 
 ```
-ST-09 · iron_belt — space · [draft-tree]
+ST-09 · iron_belt — space · [era1-tree]
 thesis:  off-world metal is worthless on Earth and priceless at a yard; mine for the yard
          that exists, never for the market you imagine.
-when:    a VISIBLE space-side buyer — an operating yard or port with demand ⚠ (no space-market
-         predicate exists; this card is currently unwritable, which is a finding)
+when:    a VISIBLE space-side buyer — an operating yard or port with demand ⚠ (needs a
+         space-market predicate; without it this card is unwritable, which is a finding)
 opening: Regolith Excavation → Metallic Body Working → feed the yard's input chain
 posture: the disciplined version of the oversupply trap — Platinum-Group Separation only for
          in-space use; returning PGM Earth-side crashes its own price
@@ -322,11 +322,11 @@ weights: space-extraction builds ↑, gated hard on visible demand
 ```
 
 ```
-ST-10 · first_footing — tempo race · [draft-tree · reworked 2026-08-06 per NR-070]
+ST-10 · first_footing — tempo race · [era1-tree · NR-070]
 thesis:  firsts are tempo, not territory. Deeds are personal (NR-069) — there is no shared
          trophy — but firing your keystone deed before a rival fires theirs still buys an
          early-mover lead on your chosen fork's economy, ahead of theirs coming online.
-when:    rival programme maturity is visible (BL-068) · a deed is contestable at low cost
+when:    rival programme maturity is visible (BL-068, competitor visibility) · a deed is contestable at low cost
 opening: minimal viable probes — the smallest landing, tank, truss that fires your OWN deed,
          paced against the visible maturity of rivals' programmes rather than contesting them
 posture: asset-light, tempo-pure, benchmarked openly against rivals' visible programmes
@@ -343,14 +343,15 @@ note:    Ben (2026-08-06, NR-070): reworked from a world-scoped race to a tempo 
          reads as a real strategy, just against your own clock instead of a shared one.
 ```
 
-**Military family — reserved.** L-MIL is unenumerated until BL-157 (units) is mapped; the tree
-doc's own rule holds here. A card written against a stub would be fiction wearing a schema.
+**Military family — reserved.** No military card is seeded. The family is enumerated once the
+military layer (`docs/military/MILITARY.md`) has tells the blackboard carries — a card written
+against signals it cannot observe would be fiction wearing a schema, the tree doc's own rule.
 
 ---
 
 ## Reading the rival
 
-BL-068 makes buildings visible and internals private, and the blackboard already carries
+BL-068 (competitor visibility) makes buildings visible and internals private, and the blackboard already carries
 `rival_building_owner/tile/type`. So every card has a **visible signature**, and strategy
 inference is a lookup, not a mind-read — this table is itself card content (`watch` lines):
 
@@ -381,7 +382,7 @@ resolution this loop is not the validator of an authored roster, it is the **onl
    what the tells were; it never hints at traps (no telepathy).
 4. **The reward gate.** A card earns or keeps its slot only by **same-seed superiority on the
    game's own scoreboard** — net-worth trajectory, era entry, rupture survival — against two
-   baselines: the deterministic corp AI (BL-202/203) and the same model playing deck-less. No
+   baselines: the deterministic corp AI (`corp_ai.cpp`) and the same model playing deck-less. No
    bespoke success metric: if meta works, the existing reward schema shows it (Ben, 2026-08-06).
 5. **Freeze per release.** The surviving deck is the SFT conditioning corpus and the local
    model's runtime deck. Post-release, the same loop is the patch cycle.
@@ -406,47 +407,47 @@ never *whether it worked*:
 A card that never wins its own favourable scenario is underpowered or fiction; a card that wins
 everywhere flattens the meta — both are reward-gate readings, visible in the existing numbers.
 
-> ⟳ 2026-08-19 (BL-411, emergent-strategy readout — landed): the loop's **measuring instrument
-> now exists in-engine**. The Strategy readout ledger (`src/ui/strategy_readout.{hpp,cpp}`, nav
-> rail slot 12) aggregates the corp_decision stream per corp over a rolling 64-quarter window —
-> verb mix, spend split across the must/should/nice priority buckets, reason-code tally, and the
-> bucket split quarter-by-quarter as a stacked band. Same-seed comparison (step 4's reward gate)
-> can now point at a *distribution shift* rather than asserting "the card worked". Two fences it
-> keeps deliberately: **no score/margin aggregates** (candidates sort by priority bucket before
-> score — NR-226 — so raw margins do not aggregate honestly), and **no strategy labels** — the
-> readout shows the mix and lets the shape speak, preserving this doc's discovered-not-authored
-> position.
+**The measuring instrument** is the Strategy readout ledger (BL-411, emergent-strategy readout —
+`src/ui/strategy_readout.{hpp,cpp}`, nav rail slot 12). It aggregates the corp_decision stream per
+corp over a rolling 64-quarter window — verb mix, spend split across the must/should/nice
+priority buckets, reason-code tally, and the bucket split quarter-by-quarter as a stacked band.
+Same-seed comparison (step 4's reward gate) points at a *distribution shift* rather than
+asserting "the card worked". Two fences it keeps deliberately: **no score/margin aggregates**
+(candidates sort by priority bucket before score — NR-226 — so raw margins do not aggregate
+honestly), and **no strategy labels** — the readout shows the mix and lets the shape speak,
+preserving this doc's discovered-not-authored position.
 
-**Personas (BL-207)** are weightings over this roster — a persona is a prior over cards plus a
+**Personas (BL-207, persona packs)** are weightings over this roster — a persona is a prior over cards plus a
 caution dial, not new strategy content. Distinguishable styles then come from selection bias,
 which the Vox result says is enough (§ 10c.3).
 
 ## The design-gap yield
 
-Writing strategy against the real vocabulary is cheap playtesting — every ⚠ above is a place
-the game cannot yet *observe* what play needs. The blackboard speaks 24 predicates today; the
-roster needs, and lacks:
+Writing strategy against the real vocabulary is cheap playtesting — every ⚠ above is a signal
+play needs that the game does not *observe*. The blackboard speaks a small fixed predicate set;
+the roster requires these further signals of it, each owned by the design named:
 
-| missing signal | needed by | arrives with |
+| signal the roster needs | needed by | owning design |
 |---|---|---|
 | `deed` facts (fired firsts + tick) | ST-04/05/08/10 | the deed primitive (tree draft) |
 | launch cadence / count | ST-05, rival table | launch dispatch system |
-| `alarm_own` / `alarm_total` / `ceiling` | ST-05/06/07 | the danger model (BL-223 extension) |
+| `alarm_own` / `alarm_total` / `ceiling` | ST-05/06/07 | the danger model (BL-223, averted rupture) |
 | rupture countdown | ST-05/06/07 | Era-event mechanics (v0.2.0 design) |
-| `tech_unlocked` / `doctrine_taken` | all [draft-tree] cards | BL-156 unlocked set |
+| `tech_unlocked` / `doctrine_taken` | all [era1-tree] cards | BL-156 (tech tree) unlocked set |
 | space-market `supply`/`demand` | ST-09 (unwritable without it) | propellant `resource_type` — the tree draft's own flagged blocker |
-| import-dependence / interdependence | ST-07 | trade-route substrate reads (BL-088) |
+| import-dependence / interdependence | ST-07 | trade-route substrate reads (BL-088, persistent trade routes) |
 | unrest | danger model's destabiliser row | POPULATION.md arc |
 
-Two findings worth stating plainly. **ST-09 (iron_belt) cannot currently be expressed at all** —
-the oversupply-paradox abandon line, the single most documented lesson in the research corpus,
-has no observable to fire on. And **nothing in the danger model is observable yet** — a player
-(or model) skilled at avoiding danger needs the alarm surfaces before that skill can exist.
+Two findings worth stating plainly. **ST-09 (iron_belt) cannot be expressed without a
+space-market predicate** — the oversupply-paradox abandon line, the single most documented lesson
+in the research corpus, has no observable to fire on. And **the danger model needs its alarm
+surfaces on the blackboard** — a player (or model) skilled at avoiding danger needs them before
+that skill can exist.
 
 ## Open questions
 
-*(The 2026-08-06 session answered the draft's original five — trap knowledge, runtime shape,
-roster status, first_footing, deterministic binding; see § Resolutions. These are the successors.)*
+*(Ben's 2026-08-06 answers settled trap knowledge, runtime shape, roster status, first_footing
+and deterministic binding — § Resolutions. These are the successors.)*
 
 1. **Deck cap.** How many live cards may the loop keep — a hard ~10, or elastic per era? The
    context budget argues hard; a rich meta argues elastic.
@@ -461,15 +462,15 @@ roster status, first_footing, deterministic binding; see § Resolutions. These a
    of tutorial scope — but any post-release "strategy guide" surface would re-trigger the
    conditional. Flag before ever surfacing it.
 
-## Landing shape (when this earns a data store)
+## Landing shape
 
 Mirrors the action dictionary end to end, with one inversion: **`strategies.json`** is written
 **by the loop, not by hand** (seeds excepted — hand-editing a live card is the exception that
 needs a reason). **`STRATEGY_INDEX.json`** (`[id, one-line]`) generated for standing context,
 **`tools/session/strategy_query.js`** for full cards, and a **lint** — every predicate in
 `when`/`watch`/`abandon` ∈ blackboard predicates ∪ the declared ⚠ list; every opening id ∈
-`ACTIONS_INDEX.json`; every tech node ∈ the tree store once it lands; no ⊘ verdict lines;
+`ACTIONS_INDEX.json`; every tech node ∈ the tree store; no ⊘ verdict lines;
 ≤ 400 tokens per card. MCP grows `get_strategy` / `list_strategies` plus a `strategy_state`
-resource; the harness owns the persistence protocol (§ The card contract); and BL-279's
+resource; the harness owns the persistence protocol (§ The card contract); and the trace corpus's (BL-279)
 pipeline gains the post-mortem protocol as a versioned, neutrality-reviewed artifact. The lint
 is authored as a tool and pushed to a skill, per the standing rule.

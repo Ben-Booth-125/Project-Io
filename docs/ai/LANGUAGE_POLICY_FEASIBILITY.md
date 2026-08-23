@@ -4,15 +4,14 @@
 
 Research note, 2026-08-08. Companion to [`AI_OPPONENT.md`](AI_OPPONENT.md) § 10.
 
-> **⟳ Awaiting review.** This note **does not supersede `AI_OPPONENT.md` § 10d**, which remains
-> the accepted direction (MCP transport; small local runtime model; cloud inference as corpus
-> generator, never as runtime). It answers the two feasibility questions Ben set — *can it be
-> compressed?* and *is it technically possible on our machines?* — and both are answered in the
-> affirmative (§ 4, § 5). It then argues that a third question, not asked, changes what should be
-> built: § 7 finds the diplomatic capability motivating the C-route is **separable from action
-> generation**, and § 9 recommends revising which layer the model occupies. That recommendation
-> is a call made on Ben's behalf and has not been reviewed. The § 4–5 feasibility findings stand
-> independently of it.
+> **Ruled.** Ben adopted the recommendation in § 9 — the Cicero configuration — as Stage C's
+> concrete shape (2026-08-08, NR-094; `AI_OPPONENT.md` § 10g). `AI_OPPONENT.md` § 10d stays the
+> direction (MCP transport; small local runtime model; cloud inference as corpus generator, never
+> as runtime); this note answers Ben's two feasibility questions — *can it be compressed?* and *is
+> it technically possible on our machines?* — in the affirmative (§ 4, § 5), and § 7 argues that
+> the diplomatic capability motivating the C-route is **separable from action generation**. The
+> goal-layer recommendation in § 9 is parked as BL-336 (goal layer, myopia mitigation) pending
+> evidence that the scorer exhibits the myopia the literature predicts.
 
 ---
 
@@ -45,22 +44,15 @@ This note evaluates C1 and C2 on the evidence, then argues that the decision the
 
 Project Io is a solo-developed C++/Lua 4X strategy game in which the player controls a corporation rather than a nation. Its AI-opponent architecture (documented in `docs/ai/AI_OPPONENT.md`) has already reached a state unusually well prepared for a language policy. Four components are relevant, all verified against the source at time of writing.
 
-**The write channel.** `src/world/corp_command.hpp` defines the AI's action surface as a **fixed-arity flat record**:
+**The write channel.** `src/world/corp_command.hpp` defines the AI's action surface as a **fixed-arity flat record** over an append-only `corp_verb` enum — `build`, `demolish`, `set_recipe`, `set_workforce`, `idle`, `resume`, `place_road`, `survey`, `hire_unit`, the order-book pair, the procurement triple, the convoy pair, the four stance verbs, the three unit-march verbs and `withdraw_from_battle`; `corp_verb_count` is always the last enumerator plus one.
 
-```cpp
-enum class corp_verb : uint8_t {
-    build, demolish, set_recipe, set_workforce,
-    idle, resume, place_road, survey
-};
-```
-
-`corp_command` carries eight verbs and eight typed fields (`subject`, `tile`, `type`, `target`, `recipe`, `workforce`, `road_tier`), of which at most four are meaningful for any given verb. Application is through `apply_corp_command`, which routes to the same player-grade validation seams and returns one of seven enumerated outcomes (`applied`, plus six typed rejections: `rejected_no_corp`, `rejected_not_owner`, `rejected_invalid`, `rejected_placement`, `rejected_funds`, `rejected_state`).
+`corp_command` carries typed fields (`subject`, `tile`, `province`, `type`, `target`, `recipe`, `workforce`, `road_tier`, `unit_type`, `quantity`, `floor_price`, `order`, `counterparty`), of which at most four are meaningful for any given verb. Application is through `apply_corp_command`, which routes to the same player-grade validation seams and returns one `corp_command_result`: `applied`, or a typed rejection (`rejected_no_corp`, `rejected_not_owner`, `rejected_invalid`, `rejected_placement`, `rejected_funds`, `rejected_state`, the three lock rejections, the four procurement declines and `rejected_cooldown`). A rejection mutates nothing.
 
 **The read channel.** `export_corp_blackboard` produces a visibility-honest, schema-versioned, deterministically ordered list of `corp_fact` records — tuples of `(tick, subject, predicate, value, confidence, provenance)`. It is, structurally, a flat fact list.
 
-**The meaning channel.** `docs/ai/ACTIONS.json` catalogues 115 controls as `{press, typed args, preconditions, expected_output, reason_to_select}`. The eleven gameplay entries are transcribed from `corp_command.hpp` rather than authored independently.
+**The meaning channel.** `docs/ai/ACTIONS.json` catalogues every control as `{press, typed args, preconditions, expected_output, reason_to_select}`. The gameplay entries are transcribed from `corp_command.hpp` rather than authored independently.
 
-**The transport.** An MCP server (BL-278) wrapping all three legs landed 2026-08-03, exposing six tools over a headless `ProjectIo --serve` mode.
+**The transport.** An MCP server (BL-278, Io MCP server; `tools/mcp/`) wraps all three legs, exposing its tools over the headless `ProjectIo --serve` mode.
 
 Additionally, `src/world/corp_ai.cpp` implements a deterministic scored-utility policy with priority buckets and predictive spending, emitting `corp_decision` records of the form `{command, winning_score, runner_up, reason}` into a 256-entry ring buffer.
 
@@ -208,7 +200,7 @@ If, after this, one-shot action generation is still wanted — for personality v
 
 - The rival-corporation count *N* was not determined from source; §5's per-decision budgets scale as 1/*N*.
 - The target machine's specification was unavailable; §5 uses published consumer-GPU benchmarks as a proxy.
-- The ~300-token decision estimate is an assumption, not a measurement. It should be validated against a real trace through the existing MCP server before any training commitment — which BL-278 already makes possible at essentially zero cost.
+- The ~300-token decision estimate is an assumption, not a measurement. It should be validated against a real trace through the existing MCP server before any training commitment — which the MCP server makes possible at essentially zero cost.
 - Several sources were reachable only via search summaries and secondary hosts, as `arxiv.org` was blocked by network egress policy during preparation. Primary-source verification is advised before any of the quantitative claims in §4 and §6 are relied upon for a build decision.
 - Cicero's dialogue model was trained on a large human corpus of *Diplomacy* messages. Io has no such corpus, and the transfer of the Cicero architecture to a domain without human dialogue data is an assumption, not a demonstrated result. Richelieu's self-play-without-human-data approach is the relevant mitigation and should be assessed separately.
 
@@ -264,7 +256,7 @@ If, after this, one-shot action generation is still wanted — for personality v
 - `src/world/corp_ai.hpp` / `.cpp` — scorer parameters, priority buckets, blackboard export
 - `src/core/sim_loop.hpp` / `.cpp` — calendar constants and speed-multiplier curve
 - `docs/ai/AI_OPPONENT.md` — architecture, staged path, prior research sweeps
-- `docs/ai/ACTIONS.json` — the 115-entry action dictionary
+- `docs/ai/ACTIONS.json` — the action dictionary
 
 ### Prior work
 

@@ -42,19 +42,20 @@ Three of the engine's settled decisions are exactly the primitives lockstep need
 
 - **Fixed simulation tick, independent of frame rate** (`TECH_FOUNDATIONS.md` § Simulation tick
   architecture). Lockstep advances all clients in agreed tick steps; a real-time-coupled sim cannot
-  do this. Already true.
+  do this.
 - **Inputs batched as discrete actions applied at the step boundary.** The render loop accumulates
   input and applies it in batch at the start of each simulation step. Networked play replaces "local
   input" with "the set of all players' commands for tick N", applied at the same boundary — the same
   seam, a different source.
-- **Full state snapshot at the economy-tick boundary** (the save model) — **planned, not built.**
-  No save/load path is wired in `world/*` (TECH_FOUNDATIONS.md § Save model); `history_log.{hpp,cpp}`
-  is the one component that serialises, with an `"IOHL"` magic and a version word. When the snapshot
-  exists it doubles as the **resync / late-join / desync-recovery** payload. What *does* exist today
-  is the thing you would checksum against it — see § Landed below.
+- **Full state snapshot at the economy-tick boundary** (the save model). The world half is
+  `write_world_snapshot` / `read_world_snapshot` (`src/world/world_save.{hpp,cpp}`, magic `"IOSV"`
+  plus a version word, mismatch rejected); the app-layer envelope lives in
+  `src/core/save_game.{hpp,cpp}` (TECH_FOUNDATIONS.md § Save model). The snapshot doubles as the
+  **resync / late-join / desync-recovery** payload, and the thing to checksum against it is the
+  state hash — see § The deterministic state hash below.
 
-In other words: the tick model and the input model are load-bearing pieces of a lockstep netcode
-that does not exist yet; the save system is the piece still missing.
+In other words: the tick model, the input model and the snapshot are load-bearing pieces of a
+lockstep netcode that does not exist; only the netcode itself is missing.
 
 ---
 
@@ -69,12 +70,12 @@ maintain today and are expensive to recover once lost. They are framed as constr
    are reproducible" to "clients stay in sync" — so treat any new non-determinism in the simulation
    as a correctness bug, not a cosmetic one.
 
-2. **Keep player actions expressed as discrete, serialisable commands.** This has since arrived:
+2. **Keep player actions expressed as discrete, serialisable commands.**
    **`corp_command`** (`src/world/corp_command.hpp`) is exactly the lockstep primitive —
-   `{tick, corp, verb, args}` over eight verbs, with rejections returned as data
-   (`corp_command_result`) rather than thrown. Its sibling `canvas_command` stays
-   **navigation-only**; `corp_command` is the sim-mutating one (AI_OPPONENT.md § 6). Favour routing
-   any new player action through that seam over ad-hoc mutation of simulation state.
+   `{tick, corp, verb, args}` over an append-only `corp_verb` enum, with rejections returned as
+   data (`corp_command_result`) rather than thrown. Its sibling `canvas_command` is
+   **navigation-only**; `corp_command` is the sim-mutating one (AI_OPPONENT.md § 6). Route any
+   new player action through that seam rather than mutating simulation state ad hoc.
 
 3. **Keep the C++/Lua boundary narrow, hot-path simulation in C++.** Cross-machine determinism of
    scripted logic is fragile; data-definition Lua is fine. This is already the settled boundary
@@ -114,38 +115,35 @@ listing them is to confirm they sit *beside* the simulation rather than requirin
 restructured:
 
 - **A netcode layer** — transport, lockstep tick scheduling, input-delay buffering, and reconnection.
-  Entirely absent today; entirely additive. It wraps the existing sim loop, feeding it the merged
-  command set per tick.
+  Entirely additive: it wraps the existing sim loop, feeding it the merged command set per tick.
 - **Save-schema versioning.** The prototype's flat-binary serialisation is correct for
-  single-player (`TECH_FOUNDATIONS.md` § Tile and body data model). It is no longer strictly
-  *unversioned*: `write_history_log` / `read_history_log` carry an `"IOHL"` magic plus a
-  `uint32_t` version and reject a stale stream — the BL-107 rule honoured once already. Networked clients must agree on
-  the exact byte layout, so a protocol/schema version handshake becomes necessary — but this is
-  already a deliberately deferred decision, not a reversal of one.
+  single-player (`TECH_FOUNDATIONS.md` § Tile and body data model). Every stream carries a magic
+  plus a `uint32_t` version and rejects a mismatch rather than reinterpreting it (`"IOHL"`,
+  `"IOOB"`, `"IOPC"`, `"IOSV"`). Networked clients must agree on the exact byte layout, so a
+  protocol/schema version handshake becomes necessary — but migration and forward compatibility
+  are a deliberately deferred decision, not a reversal of one.
 - **Multiple simultaneous actors.** Multiplayer means several corporations acting at once. The data
   model is already required not to preclude multi-faction play (`TECH_FOUNDATIONS.md` § Factions),
-  and units/factions exist as data-model stubs, so this extends the existing model rather than
-  replacing it.
+  and every corporation is an equal `corporation_component` acting through the same seam, so this
+  extends the existing model rather than replacing it.
 
 None of these is load-bearing on a decision being made now. They are named here only so a future
 reader can see the whole shape.
 
 ---
 
-## Landed: the deterministic state hash
+## The deterministic state hash
 
-*(This section was written as a parked idea. It has since been built — updated 2026-08-04.)*
+**`world::state_hash(int tick)`** (`src/world/world.{hpp,cpp}`) folds the fields a tick may mutate
+into one `uint64_t`; it is sampled by `tools/verify/ai_skill_harness.cpp`, `determinism_harness.cpp`
+and `save_roundtrip.cpp` among others. It has value in *both* worlds, which is why it is worth
+recording here. As a single-player tool it is a save/regression aid: two runs of the same seed hash
+identically. In a lockstep context it is exactly the **desync-detection** primitive — clients
+exchange and compare the hash each tick, and a mismatch localises the divergence immediately.
 
-**`world::state_hash(int tick)`** — `src/world/world.cpp:39`, declared at `world.hpp:299` — landed
-under **BL-204** (AI skill harness) and is sampled by `tools/verify/ai_skill_harness.cpp`. It has
-value in *both* worlds, which is why it is worth recording here. Today it is a save/regression
-debugging aid: two runs of the same seed hash identically. In a future lockstep context it is
-exactly the **desync-detection** primitive — clients exchange and compare the hash each tick, and a
-mismatch localises the divergence immediately.
-
-Note what it hashes: live world state at a tick, not a serialised snapshot, because no snapshot
-exists yet. When the save model lands, the two want reconciling so the hash covers what is actually
-written.
+Note what it hashes: live world state at a tick, not the serialised snapshot. The snapshot
+serialises the authoritative containers and rebuilds derived caches on load, so the two agree on
+what is authoritative; any field added to one should be weighed for the other.
 
 ---
 

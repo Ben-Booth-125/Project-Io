@@ -12,14 +12,7 @@ Io has two, and they are **siblings rather than one record used twice**:
 | Deliverable | `resource + quantity` — fungible | **a fact about the world** — a `condition_set` |
 | Completes when | `ticks_elapsed` reaches lead time | **the predicate becomes true** |
 | Terminal states | completed, cancelled | completed, **failed**, cancelled |
-| Status | **shipped** (BL-350) | **designed, not built** (BL-377) |
-| Item | BL-350 | BL-377 |
-
-> **Status: written 2026-08-22.** § Procurement is capture — transcribed from shipped code, moved
-> here out of MARKETS.md where it had been a subsection of the market doc. § The mercenary contract
-> is a *settled design that has never left the backlog*, recorded here because it is the player's
-> **income** and was reachable only inside a backlog item — one that spent ten days wrongly marked
-> `complete`.
+| Item | BL-350 (procurement seam) | BL-377 (mercenary contract seam) |
 
 ---
 
@@ -44,10 +37,11 @@ company can price itself out of its own business.
 
 ---
 
-## Procurement — the buy side (BL-350, shipped)
+## Procurement — the buy side
 
 **A layer over the market, not a second market.** Request a quote from a named supplier; accept it
-to open a contract; pay a deposit plus a paced remainder; take delivery on completion.
+to open a contract; pay a deposit plus a paced remainder; take delivery on completion. The three
+verbs are `request_quote`, `accept_quote` and `cancel_contract` on the corp-command seam.
 
 **The supplier can decline, with a stated reason** — no capacity, no input access, an embargo, or
 your standing being too low. **Refusal is not payable-through.** You route around it.
@@ -55,30 +49,32 @@ your standing being too low. **Refusal is not payable-through.** You route aroun
 Asking for a quote also tells you something real about the supplier's capacity, which makes the
 question itself an intelligence act rather than only a transaction.
 
-**Split payment** — deposit on acceptance, remainder across the term — reuses BL-095's construction
-pacing rather than inventing a second model.
+**Split payment** — deposit on acceptance, remainder across the term — reuses BL-095's (construction
+pacing) model rather than inventing a second one.
 
-**It is on the serialisation seam.** `procurement.cpp` is the fourth flat-binary stream in
-`world/*`, after `history_log` and `order_book`: leading magic + version, count-prefixed records,
+**It is on the serialisation seam.** `procurement.cpp` is a flat-binary stream in `world/*`,
+alongside `history_log` and `order_book`: leading magic + version, count-prefixed records,
 **rejection rather than reinterpretation**, and a `static_assert` on record size as the tripwire.
 
-> **What is missing is the UI (BL-445).** Every procurement verb — `request_quote`, `accept_quote`,
-> `cancel_contract` — is **seam-only**. A grep of `src/ui` returns nothing. BL-350 landed the seam,
-> its world state, its serialisation and its harness, and **no player-facing press**. It is
-> reachable only through the corp-command seam: an out-of-process agent, or a harness.
->
-> The rival scorer does not emit them either (BL-446) — `corp_ai.cpp` enumerates no procurement
-> candidate. So a mechanism that exists to give the player a counterparty currently has **no human
-> and no AI using it**.
+**Both a human and a rival use it.** The player reaches the three verbs through a procurement
+surface in the app (BL-445, procurement UI), and the rival scorer enumerates a procurement
+candidate alongside build, survey and hire (BL-446, scorer procures). A counterparty mechanism with
+no human and no AI user is a seam with no subject.
+
+**Reputation is readable before a refusal.** The blackboard export carries the pair's reputation
+(BL-390, seam read-back), so neither a player nor an agent meets the standing floor as a surprise.
+Reputation is a view of the sentiment substrate (BL-545, sentiment substrate; BL-546, reputation
+becomes a sentiment view), and because sentiment decays there is no permanent floor: falling below
+the procurement threshold is recoverable (BL-391, reputation floor).
 
 ---
 
-## The mercenary contract — the sell side (BL-377, designed)
+## The mercenary contract — the sell side
 
 > **A contract is a `condition_set` the client will pay to have become true, by a deadline.**
 
 That is the whole spine, and it is short because [`../META_LAYER.md`](../META_LAYER.md)'s predicate
-machinery is already generic, pure and deterministic — and procurement already evaluates one for its
+machinery is generic, pure and deterministic — and procurement already evaluates one for its
 embargo decline, so using a predicate as *contract terms* is precedent rather than invention.
 
 A record carries: the client, the company, a **success predicate**, a **deadline in ticks**, a fee,
@@ -86,7 +82,7 @@ a deposit fraction, and accrued state.
 
 **The variety of contract types is authored data in the predicate, not a type enum in C++.** Take
 this province, hold that one, break a siege, escort a convoy, deny a road — **adding a contract kind
-is a Lua change.**
+is a Lua change**, to the contract-template table.
 
 ### Why it is a sibling record and not procurement reused
 
@@ -110,9 +106,9 @@ reputation scalar.
 Offers must be deterministic. The answer is already in the tree.
 
 `history_sim.cpp` scores four verbs per polity per year, one of which is **campaign** — a pure,
-integer, argmax scorer that already decides *which neighbouring province a polity wants and how
-badly*. It also already computes the **stall**: a campaign whose arriving force falls short because
-the objective is too far or the defender too strong.
+integer, argmax scorer that decides *which neighbouring province a polity wants and how badly*. It
+also computes the **stall**: a campaign whose arriving force falls short because the objective is
+too far or the defender too strong.
 
 > **A contract offer is a campaign the polity wants and cannot win alone.**
 
@@ -157,88 +153,69 @@ a contract against a client you also serve is legal, resolves normally, and cost
 the injured party on completion. Making it *illegal* would need a faction-alignment model the game
 does not have; making it *free* would delete the only interesting thing about being a mercenary.
 
-*This is the one answer taken on design judgement rather than derived from a shipped mechanism, and
+*This is the one answer taken on design judgement rather than derived from an existing mechanism, and
 it is recorded as reversible.*
 
 **Q4 — Offers are private per client**, visible only where the activity fog already reaches
-(`body_activity_visibility`, BL-089). **A polity you have never dealt with and cannot see does not
-offer you work.** This gives the discovery layer a second job for free, and gives reputation a
-**reach** dimension: standing opens the map, not just the price.
+(`body_activity_visibility`, BL-089 (activity fog)). **A polity you have never dealt with and cannot
+see does not offer you work.** This gives the discovery layer a second job for free, and gives
+reputation a **reach** dimension: standing opens the map, not just the price.
 
-### The client, and the money — settled 2026-08-22
-
-BL-377 was designed before the nations session, and two of its open ends now have answers:
+### The client, and the money
 
 - **The client is a nation with a treasury.** [`../politics/NATIONS.md`](../politics/NATIONS.md)
-  settles that a nation holds money and spends it down weighted priority lines; BL-538's
-  **contracted-force** line is where a fee comes from. Before that ruling, offers had no funded
-  counterparty.
+  settles that a nation holds money and spends it down weighted priority lines; the
+  **contracted-force** line of BL-538 (treasury priority lines) is where a fee comes from.
+- **Fees come from the budget, never minted** (Ben, 2026-08-22, design register). A nation cannot
+  offer what it cannot pay, and **offers dry up when treasuries do** — which couples offer generation
+  to BL-537 (national budget) and preserves the conservation rule with no exception. It gives the
+  contract market a second source of rhythm besides political tension: a war-poor nation stops hiring.
 - **The relationship rides on sentiment's Trust dimension**, not on a parallel axis
-  ([`../politics/RELATIONS.md`](../politics/RELATIONS.md) § The settled model). Under BL-545,
-  `corp_reputation` becomes a view of the same substrate — so the reputation this loop moves and the
-  Trust a nation reads are **one quantity**, and BL-391's floor deadlock stops existing.
+  ([`../politics/RELATIONS.md`](../politics/RELATIONS.md) § The settled model). `corp_reputation` is
+  a view of the same substrate — so the reputation this loop moves and the Trust a nation reads are
+  **one quantity**.
+
+### Rivals bid for the same work (Ben, 2026-08-22)
+
+**Rivals compete for the same contracts, and losing a bid is a real outcome** — BL-551 (contract
+bidding). An offer is not addressed to the player; it is **contested**. Reputation therefore bites
+in a second direction: it gates whether you may *request* work, and under bidding it decides whether
+you *win* it. A rival taking contracts is also what keeps the mechanism exercised rather than built
+and idle.
+
+### On screen (Ben, 2026-08-22)
+
+**A ledger and the map** — offers, active contracts and terminal states in the fold-out column, with
+the objective province marked. And a third thing:
+
+> *"Contracts consume resources, I believe we should be able to render moving contracts
+> (convoys)."*
+
+So a contract is not only an agreement, it is **materiel in motion**: fulfilment draws goods, and
+those goods move on the logistics network as convoys. **The contract layer and the supply layer
+share a surface**, and a player watching a convoy is watching a contract being delivered. That
+couples this document to [`LOGISTICS.md`](LOGISTICS.md) tightly, and is the strongest argument that
+a contract is a *logistics* object rather than only a financial one.
 
 ### Serialisation
 
-A fifth flat-binary stream, following procurement exactly. **The `condition_set` in the record is
-the one novel question** — it is a structured predicate, not a scalar. Two options: store it inline,
-or store an **index into an authored contract-template table** and keep the predicate in Lua.
+A flat-binary stream, following procurement exactly. The `condition_set` in the record is a
+structured predicate, not a scalar, and it is stored as an **index into the authored
+contract-template table** with the predicate itself in Lua (Ben, 2026-08-22). The record stays
+fixed-size, contract kinds stay data, and a save that outlives a template-table change **rejects
+rather than reinterprets** — which the version bump gives.
 
-*Recommend the template index:* it keeps the record fixed-size, it makes contract kinds data, and a
-save that outlives a template-table change should **reject rather than reinterpret** — which the
-version bump already gives.
+### Verification
+
+The item's requirement demands one observed instance of *each* terminal state, written that way
+because a verb can ship correct and never be observed firing across five seeds (NR-121, `hire_unit`).
+An offer that never fires is indistinguishable from a mechanism that does not exist.
 
 ### Explicitly out of scope
 
-The combat that resolves a contract (BL-315 — this owns what is *at stake*, never how a fight
-resolves). Multi-round fee haggling — take-it-or-leave-it in this cut. Contracts between the player
-and another *corporation* rather than a polity. Any narrative or dialogue layer.
-
----
-
-## What is absent, and known to be
-
-- **The whole sell side.** BL-377 has no code. Its named files were never created, `corp_verb`
-  carries no contract verb, and the item spent ten days marked `complete` in error before being
-  reopened 2026-08-22 (NR-510). **This is the player's income under the ancient arc.**
-- **Procurement has no UI** (BL-445) and **no AI user** (BL-446). See above.
-- **No contract templates.** The Lua table that would make contract kinds data does not exist.
-- **Reputation is invisible** (BL-390) — no blackboard predicate exports it, so neither a player nor
-  an agent can see its standing before a refusal.
-- **Nothing verifies an offer ever fires.** BL-377's requirement sketch demands one observed
-  instance of *each* terminal state, written that way because `hire_unit` shipped correct and was
-  never observed firing across five seeds (NR-121).
-
----
-
-## Open questions
-
-All four were settled on 2026-08-22 (Ben, design register).
-
-1. ~~**Budget or minted?**~~ **From the budget.** A nation cannot offer what it cannot pay, and
-   **offers dry up when treasuries do** — which couples offer generation to BL-537 and preserves
-   the conservation rule with no exception. It also gives the contract market a second source of
-   rhythm besides political tension: a war-poor nation stops hiring.
-2. ~~**Inline or template index?**~~ **Template index.** The record stays fixed-size, contract kinds
-   stay data, and a save outliving a template change rejects rather than reinterprets.
-3. ~~**Should rivals take contracts?**~~ **Yes — they compete for the same work, and losing a bid is
-   a real outcome.** An offer stops being addressed to the player and becomes **contested**. It also
-   forecloses BL-446's *shipped and unexercised* defect before it can repeat at a larger scale, and
-   it makes reputation bite in a second direction: today it gates whether you may *request* work,
-   under bidding it decides whether you *win* it. *Owned by BL-551.*
-4. ~~**What does it look like on screen?**~~ **A ledger and the map** — offers, active contracts and
-   terminal states in the fold-out column, with the objective province marked. Ben added a third
-   thing neither option named:
-
-   > *"Contracts consume resources, I believe we should be able to render moving contracts
-   > (convoys)."*
-
-   So a contract is not only an agreement, it is **materiel in motion**: fulfilment draws goods, and
-   those goods move on the logistics network as convoys. **The contract layer and the supply layer
-   share a surface**, and a player watching a convoy is watching a contract being delivered. That
-   couples this document to [`LOGISTICS.md`](LOGISTICS.md) far more tightly than the original design
-   assumed — and is the strongest argument yet that a contract is a *logistics* object rather than
-   only a financial one.
+The combat that resolves a contract (BL-315 (conflict spine) — this owns what is *at stake*, never
+how a fight resolves). Multi-round fee haggling — take-it-or-leave-it in this cut. Contracts between
+the player and another *corporation* rather than a polity. Any narrative or dialogue layer.
 
 ---
 
@@ -250,18 +227,16 @@ All four were settled on 2026-08-22 (Ben, design register).
 | Procurement serialisation | `src/world/procurement.{hpp,cpp}` |
 | The three procurement verbs | `src/world/corp_command.cpp` |
 | The predicate a contract is made of | `src/world/condition_set.{hpp,cpp}` |
-| The scorer offers would come from | `src/world/history_sim.cpp` § campaign |
-| The mercenary contract | **nowhere — BL-377 is unbuilt** |
+| The scorer offers come from | `src/world/history_sim.cpp` § campaign |
 
 **Related authorities.** [`MARKETS.md`](MARKETS.md) (the anonymous alternative, and where
 procurement's clearing-side interaction lives), [`../politics/NATIONS.md`](../politics/NATIONS.md)
 (the client and its treasury), [`../politics/RELATIONS.md`](../politics/RELATIONS.md) (reputation,
-and the sentiment substrate it becomes), [`../META_LAYER.md`](../META_LAYER.md) (the predicate),
+and the sentiment substrate it is a view of), [`../META_LAYER.md`](../META_LAYER.md) (the predicate),
 [`../military/MILITARY.md`](../military/MILITARY.md) (the force a contract is won with),
 [`../ui/DISCOVERY.md`](../ui/DISCOVERY.md) (the fog that decides who offers you work).
 
-**Backlog.** **BL-377 (mercenary contract seam)** is the sell side — `designed`, A, v0.1.15,
-reopened 2026-08-22 and on Sprint 16's critical path. BL-350 (procurement) shipped the buy side;
-BL-445 (procurement has no UI) and BL-446 (scorer cannot procure) are its missing halves.
-BL-391 (reputation floor) and BL-392 (what a contract is worth) are the economics.
-BL-315 (conflict spine) resolves what a contract puts at stake.
+**Owning items.** BL-377 (mercenary contract seam) — the sell side. BL-350 (procurement seam) — the
+buy side; BL-445 (procurement UI) and BL-446 (scorer procures) its two users. BL-551 (contract
+bidding) — contested offers. BL-391 (reputation floor) and BL-392 (what a contract is worth) — the
+economics. BL-315 (conflict spine) — what a contract puts at stake.

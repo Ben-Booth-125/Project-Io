@@ -1,20 +1,20 @@
 # Kepler — Creeds
 
 One pantheon per cradle-culture, each in its own generated tongue, and the
-globalisation that renders the record in the player's language. Implemented in
-`src/world/creeds.{hpp,cpp}` (BL-235, written 2026-07-31); verified by
+globalisation that renders the record in the player's language. The pass is
+`src/world/creeds.{hpp,cpp}` (BL-235, creeds), verified by
 `tools/verify/creeds_harness.cpp` (C1–C4). Companion to `HISTORY.md` (the
 ladder this pass interleaves with) and `../generation/NATION_GENERATION.md`
 (the political map it drives).
 
 ## The rule: one pantheon, one tongue
 
-Each agrarian cradle (HISTORY.md Stage 0, BL-221) becomes a **culture**. A
-culture rolls a small phonology — its own consonant and vowel inventory — and
-every proper noun it coins (its own name, its gods) is built from that
-inventory. **One pantheon per culture** (Ben, 2026-07-31): the tongue and the
-creed are the same act of self-description, which is why two cultures' gods
-*sound* different rather than being restyled from a shared list.
+Each agrarian cradle (HISTORY.md Stage 0) becomes a **culture**. A culture
+rolls a small phonology — its own consonant and vowel inventory — and every
+proper noun it coins (its own name, its gods) is built from that inventory.
+**One pantheon per culture** (Ben, 2026-07-31): the tongue and the creed are
+the same act of self-description, which is why two cultures' gods *sound*
+different rather than being restyled from a shared list.
 
 The archetype table is distilled from the Pantheon content base (the sibling
 Pantheon project): gods carry two temperament axes — **zeal** (how much the
@@ -36,51 +36,62 @@ god's zeal floor: mountains breed harder creeds.
 
 ## The creed drives — the tribal-conflict stage
 
-Inherited from BL-221's rule: **it drives, it does not narrate.** A culture
-whose aggression (derived from its war god's zeal and dominion) clears its
-neighbour's defence *plus the ladder's conquest cost* marches; a won war
-**welds** two cradles and lowers `fragmentation_q` before
-`nation_params_from_ladder` reads it. Warlike creeds therefore grow fewer,
-larger polities — the war simulation Ben deferred nation-count consolidation
-to, in its first honest form. Welding is floored at half the incoming
-fragmentation, so creeds alone cannot manufacture a hegemon (BL-224's
-invariant is respected, not resolved, here).
+Inherited from the ladder's rule: **it drives, it does not narrate.** A
+culture's `aggression_q` is derived from its war god's zeal and dominion and
+its chief god's zeal. A culture whose aggression clears its neighbour's
+defence *plus the ladder's conquest cost* marches; a won war **welds** two
+cradles and lowers `fragmentation_q` before `nation_params_from_ladder`
+reads it. Peaceable creeds (aggression at or below 550) farm instead.
+Warlike creeds therefore grow fewer, larger polities — the first, cradle-grain
+form of the war simulation nation-count consolidation is left to. Welding is
+floored at half the incoming fragmentation, so creeds alone cannot
+manufacture a hegemon (BL-224's non-hegemony invariant is respected, not
+resolved, here).
+
+The tribal marches are single-round pairwise comparisons at cradle grain —
+a scalar attack against a scalar defence, seeded. They are the one place a
+war in Kepler resolves that way: Ben overturned abstract war for **simulated
+history** on 2026-08-02, so once the Era −1 sim takes over (HISTORY.md § The
+Era −1 sim) every war fights with real typed units and doctrine through
+`resolve_battle`. The creeds hand that sim its input — a polity's doctrine
+is read off its culture's `aggression_q` — rather than fighting its wars.
+
+## Where a pantheon sits on the ground
+
+The culture unit is the **cradle**; settlement refines it into **regions**
+(`src/world/settlement.cpp`) without replacing it. A region inherits its
+nearest cradle's culture, so a pantheon is mapped onto specific ground and
+specific ancient deposits, and the distribution of gods across the map is a
+record of who walked where.
+
+Pantheons do three things: write history, drive fragmentation, and **bias
+industrialisation timing** — a forge culture's ore regions light up earlier,
+and the charter culture's oath god buys a smaller bonus. Each bias is the
+same fact as the endowment read one stage apart: a forge god only exists
+where the cradle window held ore (HISTORY.md § Settlement).
+
+**Conquest spreads a pantheon.** A won war plants the victor's gods on the
+regions it takes and rededicates their shrines — and destroys part of the
+loser's written record in the process. The gods travel with the border. A
+conquered region records its founders in `founding_culture` and its
+conquerors in `culture`, which is the pair a religion or diplomacy layer
+needs to describe a grievance. The Population lens and the diplomacy layer
+are that pair's intended readers; a live religion mechanic — creed axes that
+bias which culmination a strained polity falls toward, and the myth bank that
+tells it — is BL-487 (polity creed axes) and BL-300 (myth/theology), designed
+in `COLLAPSE.md` § Telling the story.
 
 ## Globalisation and the common tongue
 
-Generation closes with one fixed event (1951): the common trade tongue
-spreads. From that hinge the record is rendered in **the player's language**
-— English for now, as the development language (Ben, 2026-07-31: the common
-tongue is whatever the player picks to play in). Proper names stay native:
-the old tongues survive in the names of gods.
+For a modern-era epoch, generation closes with one fixed event (1951): the
+common trade tongue spreads (`record_globalisation`). From that hinge the
+record is rendered in **the player's language** — English for now, as the
+development language (Ben, 2026-07-31: the common tongue is whatever the
+player picks to play in). Proper names stay native: the old tongues survive
+in the names of gods.
 
-> **Reconciliation owed (2026-07-31):** the 1951 date and single-wave mechanism are
-> provisional — a common tongue spreading while the rupture *threat* stands must square with
-> BL-223 (averted rupture)'s bloc structure. HISTORY.md § "Where the rupture sits" carries the
-> same note; BL-223 owns the answer.
-
-## Honest scope
-
-- The culture unit is the **cradle**; BL-218 refined it into **provinces**
-  (landed 2026-08-02, `src/world/settlement.cpp`) rather than replacing it — a
-  province inherits its nearest cradle's culture, so a pantheon is now mapped
-  onto specific ground and specific ancient deposits. See `HISTORY.md`
-  § Implementation — Stages 3–4.
-- Pantheons now do three things: write history, drive fragmentation, and — since
-  BL-218 — **bias industrialisation timing** (a forge culture's ore provinces
-  light up earlier, the charter culture's oath god buys a smaller bonus). Still
-  no live religion mechanic and no player surface. The Population lens /
-  diplomacy layer are the intended future readers, and BL-218 hands them the
-  pair they need: a conquered province records its founders in
-  `founding_culture` and its conquerors in `culture`.
-- **Conquest spreads a pantheon.** A won rupture-war plants the victor's gods on
-  the provinces it takes and rededicates their shrines — and destroys part of
-  the loser's written record in the process. The gods travel with the border.
-- The tribal wars are single-round pairwise marches, not a campaign
-  simulation; BL-219's sweep is the tuning window for how often they weld.
-- **Abstract war is on notice (2026-08-02).** Ben overturned the
-  scalar-comparison half of the war rule: simulated history is to fight with
-  **real typed units and real tactics**, the same engine the main era later
-  inherits — BL-272 (unit/doctrine combat model) owns the replacement, and
-  BL-271 (Era −1 sim) is where these one-shot marches become a running
-  campaign simulation. "Drives, not narrates" survives untouched.
+Under the ancient epoch (0 CE — HISTORY.md § The epoch and the run) there is
+no globalisation hinge: the record is rendered in the player's language
+throughout, and proper names stay native exactly as above. How a common
+tongue squares with the bloc structure of the averted rupture belongs to
+BL-223 (averted rupture) with the rest of the post-epoch world.

@@ -11,22 +11,22 @@ shared selection state, implementation approach).
 
 The star sits at the centre. Each body orbits it at a position derived from `orbital_radius_au` and `orbital_angle_rad`. Orbital rings mark each body's distance from the star. Bodies are labelled.
 
-**Reference distance is rung-relative (2026-06-15; landed).** On the Solar rung the distance reference is the **star — 0 AU at the centre** (as today), so a body's surfaced distance is its distance from the star. This is the Solar-rung case of the shared rung-relative rule; on the Circumplanetary rung the reference is the parent body instead (see CIRCUMPLANETARY.md). The rung-aware read lives in the canvas-aware `draw_body_summary(const world&, const ui_state&, entity_id)` overload in `entity_summary.cpp` (the body hover card's builder), which switches on `ui_state::primary_level`; the legacy single-argument overload keeps the plain star-referenced orbit line (re-targeted 2026-07-31).
+**Reference distance is rung-relative (2026-06-15).** On the Solar rung the distance reference is the **star — 0 AU at the centre**, so a body's surfaced distance is its distance from the star. This is the Solar-rung case of the shared rung-relative rule; on the Circumplanetary rung the reference is the parent body instead (see CIRCUMPLANETARY.md). The rung-aware read lives in the canvas-aware `draw_body_summary(const world&, const ui_state&, entity_id)` overload in `entity_summary.cpp`, which switches on `ui_state::primary_level`; the single-argument overload keeps the plain star-referenced orbit line.
 
 The **star is a body entity** (`body_type::star`) at the system centre
 (`orbital_radius_au = 0`, no parent, stationary) — not a hard-coded circle. It
 carries a `name`, which the canvas labels and which the minimap shows as its
 title when the Solar screen is the minimap (see `MINIMAP.md`). The star is drawn
 through the same body-draw pass as every other body, with a star style (large,
-yellow). It has no Circumplanetary view, so clicking it does nothing.
+yellow). It has no Circumplanetary view, so double-clicking it does nothing.
 
-At Layer 2, this canvas communicates:
+This canvas communicates:
 
 - Which bodies exist and where they are in the system
 - Which body is currently selected (Planetary screen target)
 - Body type at a glance via colour
 
-Economic and military data (supply routes, faction presence, convoy paths) are added in later layers as overlays on this canvas.
+Economic and military data (supply routes, faction presence, convoy paths) are overlays on this canvas.
 
 ---
 
@@ -42,13 +42,14 @@ Economic and military data (supply routes, faction presence, convoy paths) are a
 | Body (moon) | Filled circle, radius 5 px. Colour: `(148, 145, 140)` grey. |
 | Body (asteroid) | Filled circle, radius 4 px. Colour: `(140, 110, 80)` brown. |
 | Body (station) | Filled circle, radius 4 px. Colour: `(80, 180, 160)` teal. |
-| Body label | Body name, drawn just below the body circle. Colour: white. **Planets and asteroids are labelled permanently; moons are labelled only while hovered**, to keep the crowded inner system readable. The label tracks the live body position every frame; it stays crisp because the UI font atlas is loaded with horizontal oversampling (the former sub-pixel shimmer is fixed — see `src/ui/fonts.hpp`). |
-| Selection / hover ring | Ring drawn around a body via the shared highlight convention (`src/ui/highlight.hpp`): white for the selected body, light blue for the hovered body, amber for a pinned body (pinning not yet wired). 3 px outside the body radius, constant pixel size. When markers overlap the cursor, **only one** body highlights — the nearest centre wins, with body id breaking exact ties (arbitrary but stable); a hit-test pass resolves the single hovered body before drawing. |
+| Body label | Body name, drawn just below the body circle. Colour: white. **Planets and asteroids are labelled permanently; moons are labelled only while hovered**, to keep the crowded inner system readable. The label tracks the live body position every frame; it stays crisp because the UI font atlas is loaded with horizontal oversampling (see `src/ui/fonts.hpp`). |
+| Selection / hover ring | Ring drawn around a body via the shared highlight convention (`src/ui/highlight.hpp`): white for the selected body, light blue for the hovered body; the amber `pinned` tier exists in the convention but no surface sets it (`EXPLORER.md`). 3 px outside the body radius, constant pixel size. When markers overlap the cursor, **only one** body highlights — the nearest centre wins, with body id breaking exact ties (arbitrary but stable); a hit-test pass resolves the single hovered body before drawing. |
 | Hover tooltip | Body name, type string, orbital radius in AU. Shown while mouse is over a body circle (the single resolved body). |
-| Survey badge | Per-body survey-status glyph at the body's upper-right (survey system, BL-067). **Unsurveyed (`hidden`)**: a dimmed `?` (`icons::unknown`). **In progress (`in_transit` / `scanning`)**: a magnifying glass (`icons::survey_badge`) in cyan, with a `k∕N` revealed-region count drawn beside it while scanning. **Surveyed** (the home planet, the star, or a completed survey): no badge. Tracks the live body position every frame. This is the **geographic** fog badge — see [`DISCOVERY.md`](DISCOVERY.md). |
-| Activity badge | Per-body commercial-activity glyph at the body's **lower-left** — the **activity** fog (commercial sphere, BL-089), deliberately offset from the survey badge so the two fogs read apart. A concentric pulse (`icons::activity`) coloured by tier: `known` (`palette::activity_known`), `known_stale` (greyed), `visible` (`palette::activity_visible`). **Unknown** bodies and the **home body** (which carries its own presence halo) show no badge. Derived from `body_activity_visibility` (routes + live convoys + ownership + tick). See [`DISCOVERY.md`](DISCOVERY.md). |
+| Survey badge | Per-body survey-status glyph at the body's upper-right (the survey system, BL-067). **Unsurveyed (`hidden`)**: a dimmed `?` (`icons::unknown`). **In progress (`in_transit` / `scanning`)**: a magnifying glass (`icons::survey_badge`) in cyan, with a `k∕N` revealed-region count drawn beside it while scanning. **Surveyed** (the home planet, the star, or a completed survey): no badge. Tracks the live body position every frame. This is the **geographic** fog badge — see [`DISCOVERY.md`](DISCOVERY.md). |
+| Activity badge | Per-body commercial-activity glyph at the body's **lower-left** — the **activity** fog (the commercial sphere, BL-089), deliberately offset from the survey badge so the two fogs read apart. A concentric pulse (`icons::activity`) coloured by tier: `known` (`palette::activity_known`), `known_stale` (greyed), `visible` (`palette::activity_visible`). **Unknown** bodies and the **home body** (which carries its own presence halo) show no badge. Derived from `body_activity_visibility` (routes + live convoys + ownership + tick). See [`DISCOVERY.md`](DISCOVERY.md). |
 | Home halo | An always-on player-identity ring around `home_body` (player presence, BL-085), drawn behind the body — a soft player-blue glow + ring, distinct from the survey/activity badges and the selection highlight. |
-| Trade corridors | The player's persistent trade routes (BL-088) drawn as lit lanes between endpoint bodies (primary view only): fresh routes glow (`palette::activity_corridor`), stale routes fade to grey. Commercial reach made visible; see [`DISCOVERY.md`](DISCOVERY.md). |
+| Trade corridors | The player's persistent trade routes (BL-088, persistent trade routes) drawn as lit lanes between endpoint bodies (primary view only): fresh routes glow (`palette::activity_corridor`), stale routes fade to grey. Commercial reach made visible; see [`DISCOVERY.md`](DISCOVERY.md). |
+| Convoys | The Supply lens draws a line per live convoy (`w.convoys`, `supply_system.cpp`), with the convoy vision beams of the activity fog. |
 | Scale bar + zoom slider | Bottom-centre overlay (primary view only): a fixed-width scale bar reporting the AU it spans at the current zoom, and a logarithmic zoom slider where **right = zoomed in, left = zoomed out**. Factored into the shared `ui::draw_scale_zoom_overlay` (`src/ui/canvas_scale.hpp`), used by the Circumplanetary canvas too. |
 
 ---
@@ -82,13 +83,12 @@ so the band pans and zooms with the view, and the fixed seed keeps the pattern
 still between frames (no flicker).
 
 Within the band sit one or more **notable asteroids** — ordinary
-`body_type::asteroid` body entities (currently just Pallas in the prototype) at
-radii inside the belt. They are drawn *over* the band in the normal body pass, so
-they remain individually hoverable, labelled, and selectable (clicking one
-descends to its Circumplanetary view). They carry small tile grids so their
-surfaces are explorable like the planets. This is the chosen relationship between
-the notable asteroids and the ring: **separate bodies drawn over the band**, not
-markers embedded in it.
+`body_type::asteroid` body entities at radii inside the belt. They are drawn
+*over* the band in the normal body pass, so they remain individually hoverable,
+labelled, and selectable (double-clicking one descends to its Circumplanetary
+view). They carry small tile grids so their surfaces are explorable like the
+planets. This is the chosen relationship between the notable asteroids and the
+ring: **separate bodies drawn over the band**, not markers embedded in it.
 
 ---
 
@@ -96,7 +96,7 @@ markers embedded in it.
 
 - **Hover** a body circle: show tooltip.
 - **Single-click a body — select.** Sets `selected_entity` and fills the Selection band. The view rung does not change (`solar_system_canvas.cpp`).
-- **Double-click a body — descend (zoom in).** Sets `active_body` and drills the primary down one rung to that body's **Circumplanetary** view. A **planet** opens its own view; a **moon** opens its **parent planet's** view with the moon selected. The **star** does not descend — it has no Circumplanetary view — but it does select, Helios being a selectable entity.
+- **Double-click a body — descend (zoom in).** Sets `active_body` and drills the primary down one rung to that body's **Circumplanetary** view. A **planet** opens its own view; a **moon** opens its **parent planet's** view with the moon selected. The **star** does not descend — it has no Circumplanetary view — but it does select, the star being a selectable entity.
 
   *(Single-click-selects / double-click-navigates is the shared model across all three canvases; `docs/ui/SELECTION.md` owns it.)*
 - **Click the Solar minimap — ascend.** When the Solar screen is the minimap (i.e. the Circumplanetary screen is primary), any click promotes the Solar screen back to primary.
@@ -117,15 +117,11 @@ Bodies orbit continuously. Each `body_component` carries an `orbital_angular_vel
 
 ---
 
-## What is deferred
+## Lens surfaces on this rung
 
-*(Pruned 2026-07-31: the two Layer-5 rows this table used to carry landed —
-trade corridors are drawn per § Visual elements (BL-088/BL-089), the Supply lens
-draws a line per live convoy (`w.convoys`, `supply_system.cpp`), and the convoy
-vision beams landed with BL-150/BL-152/BL-154.)*
-
-| Item | Deferred to |
+| Lens | Solar surface |
 |---|---|
-| Market price indicators on bodies | None intended — prices are per-body-market with no Solar surface (LENSES.md § rung table) |
-| Faction colour coding on bodies | Post-prototype (diplomacy) |
-| Reach / Supply-routes lens Solar surfaces (connected-body glow; aggregated lane graph) | Owed — BL-011 (reach lens) / BL-014 (supply-routes lens) shipped Planetary keys only |
+| Market | None — prices are per-body-market with no Solar surface (LENSES.md § rung table). |
+| Supply | A line per live convoy, plus the convoy vision beams (above). |
+| Reach / Supply-routes | Planetary keys only; a connected-body glow and an aggregated lane graph are the designed Solar surfaces (BL-011, reach lens; BL-014, supply-routes lens). |
+| Faction colour coding on bodies | Post-prototype (diplomacy). |

@@ -4,14 +4,13 @@ The **minimap** is a fixed inset in the bottom-right corner of the shell. It sho
 a **neighbouring canvas at reduced scale** and is the player's "you are here, in
 the bigger picture" readout and the control for stepping *out* one zoom level.
 
-Historically the minimap was one half of a binary swap between two canvases
-(Solar ⇄ Planetary). Layer 2's introduction of a third canvas — the
-**Circumplanetary** view — turns that pair into a three-rung **zoom ladder**, so
-the minimap is no longer a simple toggle. This document is the authoritative
-spec for the minimap's chrome and navigation; the canvases it frames are
-specified in [SOLAR.md](SOLAR.md), [CIRCUMPLANETARY.md](CIRCUMPLANETARY.md) *(to
-be written)*, and [PLANETARY.md](PLANETARY.md). See [LAYOUT.md](LAYOUT.md) for
-placement in the shell and [CANVASES.md](CANVASES.md) for the shared drawing path.
+The three canvases — Solar, **Circumplanetary**, Planetary — form a three-rung
+**zoom ladder**, so the minimap is not a toggle between two views but the rung
+above the one being played. This document is the authoritative spec for the
+minimap's chrome and navigation; the canvases it frames are specified in
+[SOLAR.md](SOLAR.md), [CIRCUMPLANETARY.md](CIRCUMPLANETARY.md), and
+[PLANETARY.md](PLANETARY.md). See [LAYOUT.md](LAYOUT.md) for placement in the
+shell and [CANVASES.md](CANVASES.md) for the shared drawing path.
 
 ---
 
@@ -31,11 +30,11 @@ Three canvases form a single vertical ladder from widest to narrowest view:
 ```
 
 Each rung has at most one rung **above** it (zoom out) and one **below** it
-(zoom in). The **Circumplanetary** canvas is the new middle rung: a planet drawn
-at the centre with its moons orbiting it and the immediate local space around it
-(stations, and later, traffic). A planet with no moons is still a valid
-circumplanetary view — it is the natural stepping stone between picking a planet
-out of the system and dropping to its surface.
+(zoom in). The **Circumplanetary** canvas is the middle rung: a planet drawn at
+the centre with its moons orbiting it and the immediate local space around it
+(stations, traffic). A planet with no moons is still a valid circumplanetary
+view — it is the natural stepping stone between picking a planet out of the
+system and dropping to its surface.
 
 ---
 
@@ -46,24 +45,23 @@ The rule is deliberately asymmetric and simple:
 - **The minimap always shows the rung one step *out* (zoom-out) from the primary.**
   It is pure context — "where does the thing I'm looking at sit in the larger
   view." It is never the place you drill *into*.
-- **You descend by clicking a body in the primary canvas**, not by clicking the
-  minimap. A body click navigates the primary *down* one rung.
+- **You descend by double-clicking a body in the primary canvas**, not by
+  clicking the minimap. A body double-click navigates the primary *down* one
+  rung (single-click selects — SELECTION.md owns the click model).
 - **You ascend by clicking the minimap.** A minimap click promotes the zoom-out
   neighbour it is showing to primary.
 
-### Descending (click a body in the primary)
+### Descending (double-click a body in the primary)
 
-| Primary | Click… | Primary becomes |
+| Primary | Double-click… | Primary becomes |
 |---|---|---|
 | Solar | a **planet** | that planet's **Circumplanetary** view |
 | Solar | a **moon** | the **parent planet's** Circumplanetary view, with the moon highlighted |
 | Circumplanetary | the **planet** or one of its **moons** | that body's **Planetary** surface |
 | Planetary | — | (bottom rung; nothing to descend into) |
 
-This generalises the original idea — "click a planet, get its circumplanetary
-view; the moon shows its parent's circumplanetary view" — and folds the
-old solar→surface jump into a two-step drill (system → local → surface) that
-always reads the same way.
+A solar→surface jump is always a two-step drill (system → local → surface) that
+reads the same way every time.
 
 ### Ascending (click the minimap)
 
@@ -76,19 +74,15 @@ always reads the same way.
 ### The top rung (Solar primary) — **the ladder wraps**
 
 Solar has no zoom-out neighbour, so the "context" slot has no canvas to show.
-It used to display the game name over a plain dark fill, as a branding
-placeholder.
-
-Since 2026-08-04 it shows **the galaxy, seen from the surface of the
-homeworld** — titled **Galaxy**. Rather than invent a further rung, the ladder
-**loops back to where the player is standing**: zoom all the way out and you are
-looking up from the ground again.
+It shows **the galaxy, seen from the surface of the homeworld** — titled
+**Galaxy**. Rather than invent a further rung, the ladder **loops back to where
+the player is standing**: zoom all the way out and you are looking up from the
+ground again.
 
 That is deliberate, and it is what keeps this panel a *minimap* rather than a
 fourth canvas. There is nothing to navigate here and no rung to ascend to; it
-exists to be looked at. The player still descends from here by clicking a body
-in the Solar primary, exactly as before — the panel itself stays
-**non-interactive**.
+exists to be looked at. The player still descends from here by double-clicking a
+body in the Solar primary — the panel itself stays **non-interactive**.
 
 What it draws (`src/ui/star_map_view.cpp`, over the authored table in
 `src/world/star_map.hpp`):
@@ -123,10 +117,8 @@ smeared across the panel.
 
 The minimap is framed by its own chrome — a **title bar** above the inset
 canvas and a **lens mode bar** below it — so it reads as a deliberate panel
-rather than a floating thumbnail. The lens controls briefly lived in a
-bottom-left overlay control strip; BL-093 moves them back onto the minimap
-itself, this time as a compact glyph bar rather than the old mode-bar dots
-(see *Overlay controls* below).
+rather than a floating thumbnail. The minimap box is three tiers: **title bar**
+(top) → **inset canvas** (middle) → **lens mode bar** (bottom).
 
 ```
 ┌─────────────────────────┐
@@ -150,86 +142,67 @@ neighbour), which depends on the primary rung:
   doubles as the system name.
 - Primary **Planetary** → minimap shows **Circumplanetary** → title is the
   **planet name** (the circumplanetary anchor, e.g. `Kepler`).
-- Primary **Solar** → minimap shows branding → title is the **game name**
-  (`Project Io`).
+- Primary **Solar** → minimap shows the sky → title is **`Galaxy`**.
 
 The title bar is part of the minimap chrome, not the in-canvas title, so it is
 **always shown** — including below the ~320 px threshold at which the *in-canvas*
 title/labels are suppressed for clutter. The two should not both draw; when the
 minimap chrome owns the title, the inset canvas suppresses its own.
 
-### Overlay controls (back on the minimap — BL-093)
+### Overlay controls — the lens mode bar
 
-The overlay-lens toggles briefly moved to a bottom-left overlay control strip;
-BL-093 (Selection element redesign + lens strip relocated to the minimap)
-brings them back onto the minimap, this time as a **lens mode bar** running
-along the bottom of the minimap box, under the inset canvas. This reverses the
-earlier "moved off the minimap" note below — the minimap box is now three
-tiers: **title bar** (top) → **inset canvas** (middle) → **lens mode bar**
-(bottom).
+The lens toggles live on the minimap (BL-093, Selection element redesign + lens
+strip on the minimap) as a **lens mode bar** running along the bottom of the
+minimap box, under the inset canvas.
 
 The bar is a single row of **8 lens glyphs**: **Corp, Country, Resource,
 Market, Population, Opportunity, Production, Continent** — single-select with a
-null state (clicking the active glyph clears the lens). The eighth glyph is
-BL-226 (continent lens, 2026-07-30), the first addition to BL-093's row of
-seven. This is a curated subset of the full lens family in
-[LENSES.md](LENSES.md); **Scarcity** and **Industry** are keyboard-cycle only,
-joining **Supply**, **Reach** and **Supply-routes** off the strip (Layer 5 has
-since shipped — the off-strip status is now purely a width call, not a data
-gate). The **resource/good selector** — needed by the Resource, Market and
-Scarcity lenses — was briefly a popup button on this bar; **BL-134**
-(2026-07-09) moved it into the **on-canvas lens legend** (see below), so the
-bar carries glyphs only.
+null state (clicking the active glyph clears the lens). This is a curated subset
+of the full lens family in [LENSES.md](LENSES.md); **Scarcity** and **Industry**
+are keyboard-cycle only, joining **Supply**, **Reach** and **Supply-routes** off
+the strip — the off-strip status is purely a width call, not a data gate. The
+**resource/good selector** — needed by the Resource, Market and Scarcity lenses
+— lives in the **on-canvas lens legend** (BL-134, legend-hosted selector; see
+below), so the bar carries glyphs only.
 
 The bar is `draw_overlay_controls(ui, x, top_y, w)` in `src/ui/overlay.hpp`,
 called from the minimap block in `src/core/app.cpp` rather than from a
-standalone bottom-left window. The lens *rendering* lives inside each canvas's
-own draw pass, keyed by `ui_state::overlay` (`body_surface_canvas.cpp` and
-friends) — `overlay.cpp`'s `draw_canvas_overlay` hook itself still renders
-nothing and remains an unused extension point (corrected 2026-07-31; the old
-"renders nothing until later layers" reading is now false of the lenses, true
-only of that hook). The active lens is named by the bar's glyph highlight +
+standalone window. The lens *rendering* lives inside each canvas's own draw
+pass, keyed by `ui_state::overlay` (`body_surface_canvas.cpp` and friends) —
+`overlay.cpp`'s `draw_canvas_overlay` hook renders nothing and is an unused
+extension point. The active lens is named by the bar's glyph highlight +
 tooltip, not an on-canvas chip. (The zoom-ladder navigation lives in the
 body / minimap clicks described above, **not** in these controls.) See
-[SELECTION.md](SELECTION.md) for the paired change to the Selection element
-that shipped alongside this relocation in BL-093.
+[SELECTION.md](SELECTION.md) for the paired Selection element design.
 
 ### Lens legend (folds out from the minimap's left edge)
 
 The on-canvas **lens key** — the swatch legend for the field lenses (Resource,
-Market, Production, Opportunity, Population, Scarcity, Industry) — no longer sits
-against the canvas *left* edge. It now anchors **flush-left of the minimap**: its
-right edge meets the minimap's left edge and it is vertically centred on the
-minimap, so it reads as a drawer folding out from the minimap's left side. `app.cpp`
-passes the render pass a `lens_key_anchor` derived from the minimap rect. This also
-clears the widened Selection / ledger fold-out column the legend would otherwise
-have overlapped. Since BL-134 (2026-07-09) the legend also hosts the shared
+Market, Production, Opportunity, Population, Scarcity, Industry) — anchors
+**flush-left of the minimap**: its right edge meets the minimap's left edge and
+it is vertically centred on the minimap, so it reads as a drawer folding out from
+the minimap's left side. `app.cpp` passes the render pass a `lens_key_anchor`
+derived from the minimap rect. This keeps it clear of the Selection / ledger
+fold-out column it would otherwise overlap. The legend also hosts the shared
 **resource/good selector** for the Resource / Market / Scarcity lenses
-(`draw_lens_resource_combo`, `body_surface_canvas.cpp`) — it is no longer on the
-lens bar.
+(`draw_lens_resource_combo`, `body_surface_canvas.cpp`).
 
 ---
 
 ## Star as an entity
 
-The Solar title needs a star name, and the star currently has none — the solar
-canvas draws it as a hard-coded yellow circle at the centre with no backing data.
+The Solar title needs a star name, so the **star is a real body entity**:
 
-The chosen approach is to make the **star a real body entity**:
-
-- Add `body_type::star` to the `body_type` enum (`src/world/components.hpp`).
-- Create a star entity in `make_hard_coded_world` at the system centre
-  (`orbital_radius_au = 0`, `parent = null_entity`, stationary), with a `name`.
+- `body_type::star` is a `body_type` enumerator (`src/world/components.hpp`).
+- `make_hard_coded_world` creates a star entity at the system centre
+  (`orbital_radius_au = 0`, `parent = null_entity`, stationary), with a `name`;
+  `world.star_body` points at it.
 - The solar canvas reads the star entity for its name and position instead of
   hard-coding the centre, and exposes the name to the minimap title.
 
 Making the star an entity (rather than a loose `world.star_name` string) keeps it
-uniform with every other body, lets it carry a title and — later — anchor the
-Circumplanetary ladder or become selectable. **The star's name is still TBD**
-(the system is "a loose approximation of Sol" with original body names — Cinder,
-Kepler, Selene, …; the star wants a name in the same register). This is a small
-code/data change that this UI work depends on; it is tracked as a follow-up, not
-done in this doc.
+uniform with every other body, lets it carry a title and be selectable. Its name
+is in the same invented register as every other body name.
 
 ---
 
@@ -244,17 +217,17 @@ Unchanged from `CANVASES.md` (authoritative there), with the chrome accounted fo
 - Anchored bottom-right with an 8 px margin.
 - In-canvas labels/title suppressed below ~320 px on the shorter edge; the chrome
   title bar and lens mode bar are exempt (always shown).
-- **Coupling (2026-07-31 note):** the bottom strip's `selection_band_height` is
-  **derived from the minimap height** — `minimap_height + chrome_margin` in
-  `foldout_column.cpp` — so the Selection band and comms dock (BL-227) top-align
-  with the minimap by construction. A future minimap sizing change ripples into
-  the whole bottom strip; do not break this derivation by hard-coding either side.
+- **Coupling:** the bottom strip's `selection_band_height` is **derived from the
+  minimap height** — `minimap_height + chrome_margin` in `foldout_column.cpp` —
+  so the Selection band and comms dock top-align with the minimap by
+  construction. A minimap sizing change ripples into the whole bottom strip; do
+  not break this derivation by hard-coding either side.
 
 ---
 
 ## Selection / view state
 
-A three-rung ladder needs a level, not the old binary `surface_is_primary` flag.
+A three-rung ladder needs a level, not a binary `surface_is_primary` flag.
 `ui_state` carries:
 
 ```cpp
@@ -268,7 +241,7 @@ canvas_level primary_level = canvas_level::solar; // which rung fills the window
 ```
 
 The minimap's level is derived as one rung *out* from `primary_level` (with the
-Solar top rung showing game branding instead of a canvas). Pan/zoom view fields
+Solar top rung showing the galaxy instead of a canvas). Pan/zoom view fields
 stay per-canvas (`solar_*`, `circum_*`, `planetary_*`) and apply only when that
 canvas holds the primary slot; the minimap always renders the default framing.
 
@@ -276,14 +249,12 @@ canvas holds the primary slot; the minimap always renders the default framing.
 
 ## Open questions
 
-- **Lens bar width ceiling — answered (2026-07-30, BL-226).** The eighth glyph
-  (Continent) fit the existing bar without widening the minimap or adding a
-  second row; goldens re-blessed. A *ninth* on-screen lens would reopen the
-  question.
+- **Lens bar width ceiling.** Eight glyphs fit the bar without widening the
+  minimap or adding a second row. A *ninth* on-screen lens reopens the question.
 - **Circumplanetary framing** for a planet with many vs. zero moons — how much
   local space to show, and at what scale, is for `CIRCUMPLANETARY.md`.
-- **Overlays.** Once supply routes / units land on the canvases, does the minimap
-  mirror them, and is that what the lens mode bar selects?
+- **Overlays.** Does the minimap mirror supply routes / units on the canvases,
+  and is that what the lens mode bar selects?
 
 ---
 
@@ -293,6 +264,5 @@ canvas holds the primary slot; the minimap always renders the default framing.
 - `SOLAR.md`, `CIRCUMPLANETARY.md`, `PLANETARY.md` — the three rungs.
 - `LAYOUT.md` — placement in the shell.
 - `LENSES.md` — the full lens family, each mode's surface and key; the minimap
-  bar surfaces an 8-lens curated subset of it (BL-226 added Continent).
-- `SELECTION.md` — the Selection element redesign (BL-093) that shipped
-  alongside this relocation.
+  bar surfaces an 8-lens curated subset of it.
+- `SELECTION.md` — the Selection element (BL-093).

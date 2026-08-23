@@ -1,46 +1,28 @@
 # Collapse — polity strategies and culminating events for Era −1
 
-> **Status: AUTHORITY since 2026-08-22 (Ben's ruling, design register).** It carried a
-> *"research scaffolding — not authority"* banner while **nineteen open backlog items named it as
-> their authority doc** — so a reader following the pointer landed on a page telling them it settles
-> nothing. Nineteen dependants is what an authority document looks like, and the banner is
-> withdrawn. Its five sibling scaffolding docs (`ai/STRATEGIES.md`, `research/TECH_EFFECTS.md`,
-> `research/ERA1_TECH_LANDSCAPE.md`, `research/ANCIENT_TECH_LADDER.md`,
-> `ai/LANGUAGE_POLICY_FEASIBILITY.md`) keep theirs until their own work lands.
->
-> **One thing it now owns outright.** Ben ruled on 2026-08-22 that campaign events *express* the
-> collapse metagame rather than driving it ([`../EVENTS.md`](../EVENTS.md)), so **the strain
-> accumulator stays here and in BL-477** — this document holds the mechanic, and the event layer
-> reads it.
->
-> *Provenance, kept:* written
-> 2026-08-20 from Ben's ask: *consider different high-level strategies / metagames for
-> surpassing the Era −1 Collapse*, extended same session to *different culminating events —
-> the British empire gave away its colonies; there are tonnes of examples of cultures facing
-> imminent doom.* Sits on Sprint 30 ("Collapse", the arc's central mechanic —
-> `docs/development/sprints.json`), `docs/lore/HISTORY.md` (the institutional ladder this
-> plays out inside), and `docs/ai/STRATEGIES.md` (the sibling roster at corp grain — this doc
-> reuses its discipline, not its content). Consumers: Sprint 29 (character inheritance —
-> NEW-13), Sprint 30 (the strain accumulator and the collapse verb), BL-277 (Era −1 military
-> strategy), BL-300 (myth/theology), BL-299 (great-power seed).
->
-> **Grain note (Ben, 2026-08-20):** each era spans a long period, so there is little need to
-> compress — strategies and culminations are defined at full markdown fidelity here, not as
-> a card schema. If the sim later needs a compact encoding, derive it from this doc.
->
-> **Promoted 2026-08-20** into nineteen backlog items, all v0.1.16: **BL-504** (strain
-> accumulator) → **BL-505** (fragmentation verb) → **BL-506** (hegemony measure), **BL-507**
-> (Release verb), **BL-508** (readable strain), **BL-509** (strain transfer on conquest),
-> **BL-510** (reach-fed slow strain), **BL-483**–**BL-486** (the E4/E5/E6/E7 culminations),
-> **BL-487** (creed axes), **BL-488** (strategy weightings), **BL-489** (narration bank),
-> **BL-490** (attractor sweep), and the perf ladder **BL-491**–**BL-493** closing in
-> **BL-494** (the 4000-year ladder itself). This doc stays the design conversation's home;
-> the items carry the actionable prose.
->
-> **Naming rule applies in full.** Every historical name below — Rome, Britain, the Meiji
-> pivot — is a **mechanism reference for the reader**, never content for the game
-> (`.claude/rules/io-standing-rules.md` § Terms). Nothing here enters generation as a proper
-> noun; polities and successors are named by the seeded phoneme generator.
+This document is the authority for the Era −1 collapse metagame: the strain a major polity
+accumulates, the strategies a polity plays against it, and the culminating events that resolve
+it. It sits on `docs/lore/HISTORY.md` (the institutional ladder this plays out inside) and
+`docs/ai/STRATEGIES.md` (the sibling roster at corp grain — this doc reuses its discipline, not
+its content). Campaign events *express* the collapse metagame rather than driving it (Ben,
+2026-08-22, [`../EVENTS.md`](../EVENTS.md)), so **the strain accumulator lives here** — this
+document holds the mechanic, and the event layer reads it.
+
+*Provenance:* written from Ben's ask (2026-08-20) — *consider different high-level strategies /
+metagames for surpassing the Era −1 Collapse*, extended the same session to *different
+culminating events — the British empire gave away its colonies; there are tonnes of examples of
+cultures facing imminent doom.* Consumers: character inheritance into the campaign nations
+(posture, creed, grudges), BL-277 (Era −1 military strategy), BL-300 (myth/theology), BL-299
+(great-power seed).
+
+**Grain note (Ben, 2026-08-20):** each era spans a long period, so there is little need to
+compress — strategies and culminations are defined at full markdown fidelity here, not as a
+card schema. If the sim needs a compact encoding, derive it from this doc.
+
+**Naming rule applies in full.** Every historical name below — Rome, Britain, the Meiji pivot —
+is a **mechanism reference for the reader**, never content for the game
+(`.claude/rules/io-standing-rules.md` § Terms). Nothing here enters generation as a proper noun;
+polities and successors are named by the seeded phoneme generator.
 
 ---
 
@@ -52,17 +34,17 @@ differently in their light.
 - **Four allegories, not two or three.** The pre-game generation hones in on all four
   mechanism-references: the **Rome arc** (rise → overextension → fragmentation; Pulse/E1),
   **British devolution** (managed release; Hydra/E2), the **dynastic cycle** (mandate reset;
-  Temple/E4), and the **Bronze-Age systemic collapse** (the cascade; E7). E7's
-  defer-until-E1–E4-land caution stands as *sequencing*, not scope — it is in.
+  Temple/E4), and the **Bronze-Age systemic collapse** (the cascade; E7). E7 follows E1–E4 as
+  *sequencing*, not scope — it is in.
 - **Tuned attractors, not templates.** One parameter space; the allegories are the outcomes
   the sweep asserts occur at stated, reported rates. Nothing seeds an arc directly; fully
   driven-not-narrated. This makes the § matrix the literal tuning target.
 - **All four play out sequentially per world, over 4000 years.** The run is long enough to
   chain arcs — a fragmentation whose Phoenix later devolves; a systemic cascade as one epoch
-  among them. **Ruled 2026-08-20 (resolves NR-357):** the shipped ~400-year band *was a
-  placeholder*; the aim is the 4000-year ladder, and generating over it is acknowledged as a
-  hard problem — the optimisation task is considered **here** (§ The 4000-year problem), not
-  deferred to BL-320 (Era −1 sim perf) alone.
+  among them. **Ruled 2026-08-20 (resolves NR-357):** a 400-year band is a placeholder; the
+  run is the 4000-year ladder, and generating over it is acknowledged as a hard problem — the
+  optimisation task is considered **here** (§ The 4000-year problem), owned by BL-494
+  (four-thousand-year ladder) with BL-320 (Era −1 sim perf).
 - **Reach feeds strain (resolves NR-356).** *"Logistics should be capable of determining
   reach. By that I mean reach feeds strain."* The Metropole's inevitability hole (§ 5) is
   closed by option A — a second, slower inflow on the same accumulator, reading the same
@@ -72,11 +54,11 @@ differently in their light.
   *seeing it in the game*; don't overload the player with easy-access information on
   everything the game does. The focus is playing — deep-dig is optional, for the players who
   want it. So: creed data and culmination bias land as sim substance; narration is a
-  history-tab layer (and the Sprint 31 playback), never chrome pushed at the player.
+  history-tab layer (and the history playback), never chrome pushed at the player.
 
 ## The framing ruling
 
-Sprint 30 holds collapse **inevitable for a major** — a deterministic consequence of upstream
+Collapse is **inevitable for a major** — a deterministic consequence of upstream
 scalars, never a die roll. So "surpassing" cannot mean *avoiding*.
 
 The metagame therefore lives in three questions, not one:
@@ -99,9 +81,10 @@ Two invariants bound the whole space:
 
 ## The strategy roster
 
-Six shapes. Each names its verb weighting (over the shipped verbs — Campaign, Settle, Invest,
-Consolidate — plus verbs the strategy *demands*), what it needs from Sprint 30's accumulator,
-and its natural culmination.
+Six shapes. Each names its verb weighting (over the sim's verbs — Campaign, Settle, Invest,
+Consolidate, Build Work — plus verbs the strategy *demands*), what it needs from the strain
+accumulator, and its natural culmination. The weightings themselves are authored data — BL-488
+(polity strategy weightings).
 
 ### 1. The Tortoise — never become a major
 
@@ -109,7 +92,7 @@ Stay under the burden knee (`holdings_burden_q`); win by Invest density, not bre
 Surpasses collapse by refusing its precondition.
 
 - **Weighting:** Invest ≫ Consolidate > Settle; Campaign only defensively-adjacent.
-- **Needs:** nothing new — expressible today.
+- **Needs:** nothing beyond the four base verbs.
 - **Culmination:** none of its own. The Tortoise's ending is written by its neighbours —
   it is prime Absorption prey (§ E3) when a Pulse major peaks next door.
 - **Balance role:** the baseline every other strategy is priced against. Must be *viable but
@@ -123,8 +106,8 @@ Dies later and bigger, never differently.
 
 - **Weighting:** phase-alternating — Campaign-heavy while strain is low, Consolidate-heavy
   above a strain threshold. The threshold is the strategy's one tunable.
-- **Needs:** the strain **accumulator** (Sprint 30 NEW-6). The current stateless burden
-  (`burden = (held − 40) × 4`, recomputed from current holdings) actively punishes pulsing —
+- **Needs:** the strain **accumulator** (BL-504). A stateless burden recomputed from current
+  holdings (`holdings_burden_q` over holdings past `free_holdings`) actively punishes pulsing —
   shrinking helps immediately, digestion pays nothing. The roster is thus a spec for the
   accumulator's shape: **digestion must retire strain; loss must not.**
 - **Culmination:** Fragmentation (§ E1) at the largest scale the map has seen — the Pulse is
@@ -141,8 +124,8 @@ intact.
 - **Weighting:** Pulse-like rise, then a **Release** verb fired above a strain threshold but
   below the break point.
 - **Needs:** a fifth verb (Release / Partition), scored like the others; a client-polity or
-  successor-seeding path — the same fragmentation machinery as Sprint 30 NEW-7, triggered
-  voluntarily. This is the cheapest second consumer of that code.
+  successor-seeding path — the same fragmentation machinery as E1 (BL-505), triggered
+  voluntarily. This is the cheapest second consumer of that code. Owned by BL-507 (Release verb).
 - **Culmination:** Devolution (§ E2) — this strategy *is* the British-empire mechanism made
   playable.
 - **Design note:** the most interesting shape, because it turns collapse from an ending into
@@ -156,14 +139,14 @@ then absorbs fragments when the neighbour breaks.
 
 - **Weighting:** Invest + Settle toward the major's border; Campaign gated on the
   neighbour's collapse event (an observable, not telepathy — the fragmentation is on the map).
-- **Needs:** the eliminated-polity / `owner_none` emission (Sprint 30 NEW-7) as a scoreable
+- **Needs:** the eliminated-polity / `owner_none` emission (BL-505) as a scoreable
   signal; the tech-ladder regression rule already supports the economics — collapse burns
   *capacity*, never *awareness*, so successors rebuild faster than inventors
   (`docs/research/ANCIENT_TECH_LADDER.md` § diffusion rule 4).
 - **Culmination:** it *consumes* culminations rather than having one — until it becomes a
   major itself and re-enters the wheel.
 - **Payoff:** the strategy that makes collapse **generative** — the map's next age is
-  authored by who played Phoenix. Sprint 29's grudge scalar is largely Phoenix residue.
+  authored by who played Phoenix. The campaign nations' grudge scalar is largely Phoenix residue.
 
 ### 5. The Metropole — hegemony by reach, not holdings
 
@@ -171,16 +154,15 @@ Dominate through trade lanes and dependency rather than owned provinces. Burden 
 holdings, so reach-based power carries no strain — and economic reach *is* military reach
 (BL-325, ruling 3), so this is already the design's grain.
 
-- **Weighting:** Invest + road/route verbs (Lane B/D vocabulary) ≫ Campaign; Settle for
+- **Weighting:** Invest + road/route verbs ≫ Campaign; Settle for
   entrepôts, not depth.
-- **Needs:** nation-grain trade/tariff verbs (Lane D) before it is expressible at all.
-- **The hole (ruled closed — NR-356, 2026-08-20):** as first stated, the Metropole
-  **dodged inevitability** — a major-by-influence with 30 holdings never trips a
-  holdings-fed accumulator. Ben ruled the lean: reach feeds a *separate, slower* strain
-  inflow on the same accumulator (over-commitment abroad), read from the logistics network
-  itself per BL-325 ruling 3 — so the Metropole is the longest-lived shape and still
-  breaks. Filed as BL-510 (reach-fed slow strain); HISTORY.md Stage 5 becomes a
-  parameterisation of it, not a second system.
+- **Needs:** nation-grain trade/tariff verbs before it is expressible at all.
+- **Inevitability (NR-356, Ben, 2026-08-20):** a major-by-influence with 30 holdings never
+  trips a holdings-fed accumulator, so a holdings-only strain would let the Metropole dodge
+  the wheel. It does not: reach feeds a *separate, slower* strain inflow on the same
+  accumulator (over-commitment abroad), read from the logistics network itself per BL-325
+  ruling 3 — so the Metropole is the longest-lived shape and still breaks. BL-510 (reach-fed
+  slow strain); HISTORY.md's Stage 5 is a parameterisation of it, not a second system.
 - **Culmination:** Devolution (§ E2) or the Slow Fade (§ E6).
 
 ### 6. The Temple — raise the ceiling
@@ -190,7 +172,7 @@ myth/theology (BL-300) — to move the strain threshold itself. Collapse timing 
 institutions race rather than a geometry problem.
 
 - **Weighting:** Consolidate + works-construction ≫ Campaign.
-- **Needs:** a coupling only — works and `cohesion_q` both exist; the Temple is the strategy
+- **Needs:** a coupling only between works and `cohesion_q`; the Temple is the strategy
   that gives BL-300 (myth/theology) a mechanical reason to exist.
 - **Culmination:** Transformation (§ E4) — institutions strong enough to outlive the polity
   re-found it rather than fragment it.
@@ -203,11 +185,11 @@ The refocus (Ben, 2026-08-20): fragmentation is **one** culmination, not the def
 History offers a family of ways a culture meets imminent doom, and the sim is richer if the
 strain accumulator can resolve through more than one exit. Each event below names its
 mechanism, its reader-analogy, its trigger shape, and — critically — **what it writes onto
-the survivors** (Sprint 29's character payload: posture, creed, grudges).
+the survivors** (the character payload the campaign nations inherit: posture, creed, grudges).
 
 ### E1. Fragmentation — the break
 
-The default, Sprint 30 NEW-7. Strain exceeds cohesion; the polity shatters into successor
+The default (BL-505, fragmentation verb). Strain exceeds cohesion; the polity shatters into successor
 polities along province/culture seams; `owner_none` where nothing coheres.
 
 - **Analogy:** the western-Roman break; the warlord interregnum.
@@ -265,8 +247,8 @@ people in motion who re-settle elsewhere.
 - **Trigger:** absorption or fragmentation *with an open frontier* — Settle fired as a
   survival verb rather than a growth verb.
 - **Writes:** a small, high-cohesion survivor far from home with a maximal grudge; frontier
-  regions gain population and capacity they did not earn. Feeds the map texture Sprint 29
-  wants — capitals in strange places, with reasons.
+  regions gain population and capacity they did not earn. Feeds the map texture the campaign
+  wants — capitals in strange places, with reasons. BL-484 (Exodus).
 
 ### E6. The Slow Fade — senescence
 
@@ -293,8 +275,8 @@ each break severs the trade and tribute its neighbours' cohesion rested on.
 - **Writes:** a dark-age band — broad `owner_none`, deep capacity regression, awareness
   intact. The most expensive culmination and the most dramatic; candidate for a *rare*
   outcome band, asserted by sweep, never scripted.
-- **Scope caution:** this is the one event that couples every polity's state; hold it until
-  E1–E4 are landed and measured.
+- **Sequencing:** this is the one event that couples every polity's state; it follows E1–E4,
+  as sequencing rather than scope (§ Rulings). BL-486 (cohesion interdependence).
 
 ---
 
@@ -325,7 +307,7 @@ writes it onto, what the sim reads back from it).
   aimed at sibling successors, not just predators.
 - **The declinist mirror.** The culture narrates its own fall in advance — moral corruption,
   lost virtue of the ancestors — often for generations before any material break. *Seat:*
-  a narrated-history line that *precedes* the culmination (Sprint 31): strain past a band
+  a narrated-history line that *precedes* the culmination (BL-489, narration bank): strain past a band
   emits "their own chroniclers wrote of decay" years before the break. The player should be
   able to read the doom coming the way the culture's own writers did.
 - **The apocalypse reframed as test.** Imminent doom read as trial or purification — the
@@ -354,14 +336,14 @@ These are not flavour. Two mechanical returns:
    remnant/test-creeds toward E5, stewardship-creeds toward E2. Same strain, different
    story, different ending — which is precisely how the real cases diverged. Deterministic
    throughout: creed is seeded data, the bias a scored term.
-2. **The story is the Sprint 29 payload.** Posture, creed and grudge are exactly "the way
+2. **The story is the inherited character.** Posture, creed and grudge are exactly "the way
    the culture tells its story" carried to 0 CE. The pattern library gives the phoneme/
    template banks a second vocabulary to mint from — so a generated nation doesn't just
    have a name, it has an account of itself, traceable to a culmination the player can
    find in the history log.
 
-BL-300 (myth/theology) is the natural home for the authored bank; Sprint 31 (watch it fall)
-is where the narration surfaces. The discipline stays HISTORY.md's: **driven, not
+BL-300 (myth/theology) is the natural home for the authored bank; BL-489 (narration bank)
+and the history-tab playback are where the narration surfaces. The discipline stays HISTORY.md's: **driven, not
 narrated** — the story is emitted by what happened, never scripted over it.
 
 ## The matrix — strategy × culmination
@@ -380,61 +362,65 @@ in lifespan, fragment count, and successor share — and each culmination should
 reported (never clamped) rate. Two strategies with indistinguishable histories mean one is
 dead weight; a culmination that never fires is scope to cut.
 
-## What the sim must grow (consolidated)
+## The machinery, and who owns each part
 
-1. **The strain accumulator** (Sprint 30 NEW-6) — stateful; digestion retires strain, loss
-   does not. Already asserted by the arc's adversarial pass.
-2. **The Release verb** — voluntary fragmentation; second trigger on NEW-7's machinery.
-3. **Strain readability** — rivals score against observable weakness (E3), no telepathy.
-4. **Strain transfer on conquest** — absorption is never free (E3).
-5. **A reach-fed slow strain** — closes the Metropole inevitability hole (⚠ § 5).
-6. **A transformation path** — regime reset without map change (E4); cheapest first landing
-   after E1.
-7. **(Deferred)** cohesion interdependence — E7's substrate; explicitly later.
+| Mechanism | What it is | Owner |
+|---|---|---|
+| **The strain accumulator** | stateful; digestion retires strain, loss does not | BL-504 (strain accumulator) |
+| **The fragmentation verb** | E1 — successors along province/culture seams, `owner_none` where nothing coheres | BL-505 (fragmentation verb) |
+| **The hegemony measure** | the in-engine read BL-224's invariant is asserted against | BL-506 (hegemony measure) |
+| **The Release verb** | voluntary fragmentation; a second trigger on E1's machinery | BL-507 (Release verb) |
+| **Strain readability** | rivals score against observable weakness (E3), no telepathy | BL-508 (readable strain) |
+| **Strain transfer on conquest** | absorption is never free (E3) | BL-509 (strain transfer) |
+| **A reach-fed slow strain** | the Metropole's inevitability (§ 5) | BL-510 (reach-fed slow strain) |
+| **The transformation path** | regime reset without map change (E4); the cheapest culmination after E1 | BL-483 (Transformation) |
+| **Exodus, Slow Fade** | E5, E6 | BL-484, BL-485 |
+| **Cohesion interdependence** | E7's substrate — a real design decision, not free | BL-486 (cohesion interdependence) |
+| **Creed axes, weightings, narration** | the ideological axis, the strategy table, the story bank | BL-487, BL-488, BL-489 |
+| **The attractor sweep** | the § matrix as a harness | BL-490 (attractor sweep) |
 
 ## The 4000-year problem — making the run affordable
 
 **The budget.** The sim runs inside world generation; its budget is the generating screen's
-wait (BL-317's constraint). The known numbers: ~2.1s for a 400-year run at ~749 provinces
-(BL-320, harness), 1.2–1.8s per world at /O2 (the 2026-08-18 re-measure) — and the critical
-profile fact from that re-measure: **cost tracks the province table, not the fighting** (a
-seed with fewer battles ran 3× longer). Naive 10× years is therefore not 10× cost — Settle
-keeps growing the table, so late years cost more than early ones. Unoptimised, expect tens
-of seconds of sim plus a recording cost BL-425 (ages lazy sim) already showed can dwarf it.
+wait (BL-317's constraint). The critical profile fact: **cost tracks the province table, not the
+fighting** — a seed with fewer battles can run 3× longer. Naive 10× years is therefore not 10×
+cost — Settle keeps growing the table, so late years cost more than early ones. Unoptimised, a
+4000-year run is tens of seconds of sim plus a recording cost that can dwarf it (BL-425, ages
+lazy sim).
 
 **The shape of the fix — in priority order.** Each rung is independent; measure after each
-(BL-403's profiling harness is the instrument, per the BL-425/427 block note).
+(BL-403's profiling harness is the instrument).
 
-1. **Kill the O(provinces) scans first (BL-320's own direction).** A cell → province
+1. **Kill the O(provinces) scans first (BL-320, Era −1 sim perf).** A cell → province
    spatial index removes Settle's occupancy scan; per-polity holdings and aggregates
    maintained incrementally on change, never rebuilt per year. This converts per-year cost
    from O(provinces) toward O(changes) — the prerequisite for everything below.
-2. **Event-driven quiet provinces.** Most of 4000 years, most provinces do nothing. Give
+2. **Event-driven quiet provinces** (BL-491, quiet-province fast path). Most of 4000 years, most provinces do nothing. Give
    stable interior provinces a fast path: they wake on events (border change, strain band
    crossing, route loss), not per year. Deterministic — wake conditions are state-derived,
    never time-sliced by wall clock.
-3. **Banded year grain.** The era's own premise (rulings, grain note) is that ages are
+3. **Banded year grain** (BL-492, banded year grain). The era's own premise (rulings, grain note) is that ages are
    *long and quiet* punctuated by arcs. Simulate quiet bands at coarse grain (5–10 year
    steps with scaled verb effects) and drop to yearly grain when any polity's strain, war
    state, or culmination proximity crosses a band. The grain switch must be a **pure
-   function of sim state** — seeded, replayable, asserted by the determinism case (NEW-1) —
+   function of sim state** — seeded, replayable, asserted by the determinism harness —
    or it is a die roll wearing a timestep.
-4. **Record on change, at the reader's grain.** Sprint 31's playback and the history tab
-   scrub decades in practice (BL-425's own observation). Snapshot ownership on
-   `owner_changes` (already exists) and per-decade otherwise; narrated lines are events,
-   not per-year state. The BL-427 world-snapshot cache is the natural home for the memoised
-   record so `--verify` pays nothing.
+4. **Record on change, at the reader's grain** (BL-493, record on change). The playback and
+   the history tab scrub decades in practice. Snapshot ownership on `owner_changes` and
+   per-decade otherwise; narrated lines are events, not per-year state. The BL-427
+   world-snapshot cache is the natural home for the memoised record so `--verify` pays
+   nothing.
 5. **Do not parallelise the sim.** Threading the polity loop trades a measured seconds
    problem for a determinism problem the standing rules forbid. Single-threaded plus
    algorithmic fixes is the whole toolbox.
 
-**What not to trade away.** BL-320's own rule stands: never fix by capping provinces —
-table growth *is* the history running longer. And BL-462's caution governs every number
-here: measure the shipped sim at /O2, not a harness divergence, before and after each rung.
+**What not to trade away.** Never fix by capping provinces — table growth *is* the history
+running longer. And every number here is measured on the sim that generates a world, at /O2,
+through the same parameter derivation (`era_minus_one.cpp`), never on a harness divergence.
 
 **Fit check.** Rungs 1–2 target the dominant cost (the table); rung 3 targets year count;
-rung 4 targets the recording half BL-425 measured as the real hang. If all four land and
-4000 years still misses the generation budget, the honest fallback is NR-357's option C —
+rung 4 targets the recording half. If all four rungs together still miss the generation budget
+at 4000 years, the honest fallback is NR-357's option C —
 2–3 completed arcs per world, all four attractors asserted across the sweep — degrading
 density, never determinism or legibility.
 
@@ -448,5 +434,4 @@ density, never determinism or legibility.
 3. How much of this vocabulary survives into campaign-era nations? Ruling 4 grants both
    grains; the strategies are polity-agnostic, but the culminations assume the sim's
    verb set.
-4. Do culminations E2/E4 need their own narrated line in the history log (Sprint 31, watch
-   it fall)? Almost certainly — a devolution that plays back as silence looks like a bug.
+4. Do culminations E2/E4 need their own narrated line in the history log? Almost certainly — a devolution that plays back as silence looks like a bug.

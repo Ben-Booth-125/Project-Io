@@ -2,37 +2,30 @@
 
 **How actors in Io feel about, rate, and gate each other.** This document owns the whole relational
 layer, and its first job is to say **which quantity answers which question** — because the code
-carries four of them, three share overlapping names, and none of them was documented anywhere
-before 2026-08-22.
+carries several, and three of them share overlapping names.
 
-> **Status: written 2026-08-22 as capture, not design.** § Build status is transcribed from the
-> code and is true today. § What is absent names holes. § Open questions are calls nobody has made.
-> Companion to [`NATIONS.md`](NATIONS.md) — nations are actors in this layer too, and BL-540 adds
-> the fifth quantity below.
+Companion to [`NATIONS.md`](NATIONS.md) — nations are actors in this layer too, and their read of a
+corporation is one grain of the substrate below.
 
 ---
 
-## The four quantities, and the one that is not what its name suggests
+## The quantities, and the one that is not what its name suggests
 
 This table is the reason the document exists. Read it before touching any of them.
 
 | Quantity | Question it answers | Shape | Origin | Gates |
 |---|---|---|---|---|
-| **Stance** | *How does A feel about B?* | hostile (directed) / friend (symmetric) | **declared** | interdiction, battle, march |
-| **Sentiment** | *What has B's conduct earned with A?* | two floats (Access, Trust) per (observer, subject) | **derived** | procurement quotes, via the Reputation view |
+| **Stance** | *How does A feel about B?* | hostile (directed) / friend (symmetric) | **declared** | interdiction, battle, march; passage and immunity |
+| **Sentiment** | *What has B's conduct earned with A?* | two floats (Access, Trust) per (observer, subject) | **derived** | procurement quotes via the Reputation view; territory via Access |
 | **Reputation** | *Will B do business with A again?* | **a VIEW of sentiment's Trust**, not a store | **earned** | procurement quotes |
-| **Embargo** | *Is A forbidden to trade in B's terms?* | a `condition_set` per corp | **authored** | **nothing — no author exists** |
+| **Embargo** | *Is A forbidden to trade in B's terms?* | a `condition_set` per corp | **authored** | procurement quotes |
 | **Standing** | *How strong is A?* | five bands on three axes | **derived** | nothing — it is a readout |
 
-> **Settled 2026-08-22 (Ben, ruling on NR-520): sentiment is the substrate.** The target is
-> **two layers, not four quantities**, and the first two rows are now the layers rather than
-> siblings. See § The settled model directly below — read it before extending anything here.
->
-> **Landed 2026-08-23 (BL-545, BL-546).** `src/world/sentiment.{hpp,cpp}` is the substrate;
-> `world::corp_reputation` is **gone**, and the Reputation row above is a read of
-> `world::sentiment` on Trust (`world::procurement_reputation`). It is listed as its own row
-> because it is still the question procurement asks — but it is no longer a place anything is
-> stored, and there is no second table it can disagree with.
+**Settled 2026-08-22 (Ben, ruling on NR-520): sentiment is the substrate.** The model is **two
+layers, not four quantities**, and the first two rows are the layers rather than siblings. See
+§ The settled model directly below — read it before extending anything here. Reputation is listed
+as its own row because it is still the question procurement asks — but it is not a place anything
+is stored, and there is no second table it can disagree with.
 
 **Standing is the odd one and the naming is a known hazard.** It is not a relation at all: it is a
 coarse public read of how powerful a corporation is, with no second party anywhere in it. NR-304
@@ -46,23 +39,23 @@ feels about another; standing is how strong it is."**
 
 ## The settled model — two layers
 
-Ben's ruling on NR-520, 2026-08-22. Putting all four quantities in one table made visible what none
-of them showed individually: **three designs were converging on the same continuous derived
-quantity and none knew about the other two** — CONCEPT.md's sentiment, BL-540's nation→corp
-Access/Trust, and `corp_reputation`.
+Ben's ruling on NR-520, 2026-08-22. Putting every quantity in one table made visible what none of
+them showed individually: **three designs were converging on the same continuous derived quantity
+and none knew about the other two** — CONCEPT.md's sentiment, the nation→corp Access/Trust read,
+and procurement's reputation.
 
-They converge deliberately now:
+They converge deliberately:
 
     stance      DECLARED, discrete    — an act, always attributable to an ACTOR
     sentiment   DERIVED,  continuous  — a reading, attributable to CONDUCT
 
 **Sentiment** is one directed, continuous, derived value from an **observer** to a **subject**,
-where an actor is a corporation or a nation. Directed, because every existing use already needs it
-— reputation is keyed (buyer, supplier), a nation reads a corp and never the reverse, a grudge is
-asymmetric by nature. Continuous, with bands as a *presentation* choice (the BL-262 precedent),
-never the storage.
+where an actor is a corporation or a nation. Directed, because every use needs it — reputation is
+keyed (buyer, supplier), a nation reads a corp and never the reverse, a grudge is asymmetric by
+nature; symmetry, where a consumer wants it, is a read that asks twice. Continuous, with bands as a
+*presentation* choice (the BL-262 precedent), never the storage.
 
-**Stance stays exactly as it is**, sitting on top as the declared layer.
+**Stance sits on top as the declared layer**, unchanged by the substrate beneath it.
 
 ### The invariant: sentiment must never become hostility on its own
 
@@ -71,36 +64,106 @@ Ben ruled on 2026-08-17 that hostility is **a declared state a corp opts into**,
 not quietly overturn it.
 
 So **sentiment informs a declaration; it never makes one.** A scorer may read sentiment and choose
-to `declare_hostile`. **No threshold anywhere may flip a stance table by itself.** A harness row
-asserts it directly: driving sentiment to any extreme, in either direction, mutates no stance table.
+to `declare_hostile`. **No threshold anywhere may flip a stance table by itself.** This is enforced
+structurally: `sentiment.cpp` is never handed a `world&` — it operates on a `sentiment_table` and
+nothing else, so it has no reach to `corp_hostile_pairs`, `corp_friend_pairs` or
+`corp_friend_offers`. The signature is the claim. `sentiment_harness` R1 asserts it anyway, since a
+structural argument nobody checks is one refactor from being false.
 
-### What the ruling dissolves
+The one direction that *is* legal is the reverse: an observed declaration is an input to sentiment
+(`sentiment_factor_kind::hostility_declared`). Declarations move sentiment; sentiment never moves
+declarations.
 
-| Was | Becomes |
+### What one substrate dissolves
+
+| Separate design | Becomes |
 |---|---|
-| `corp_reputation`, its own serialised map | a **view** of sentiment at buyer→supplier grain (BL-546) |
-| BL-540's Access / Trust, a new per-nation table | **dimensions** of sentiment at nation→corp grain |
-| Era −1 grudges, read by BL-541 with nowhere to live | **seeded** nation→nation sentiment |
-| CONCEPT.md's sentiment, designed and never built | **the layer itself** |
+| procurement reputation, its own serialised map | a **view** of sentiment at buyer→supplier grain |
+| nation→corp Access / Trust, a per-nation table | **dimensions** of sentiment at nation→corp grain |
+| Era −1 grudges, with nowhere to live | **seeded** nation→nation sentiment |
+| CONCEPT.md's sentiment | **the layer itself** |
 
-**BL-391's deadlock stops existing rather than getting fixed.** The reputation floor is
-unrecoverable because its only two writers are contract completion and cancellation, so the recovery
-path is a cycle with no entry. A continuous quantity that **decays toward neutral has no permanent
-floor by construction** — a burned relationship heals, and "wait" becomes a legitimate strategic
-move. The fix is a property of the substrate rather than a patch on procurement.
+**The reputation deadlock (BL-391) stops existing rather than getting fixed.** A reputation floor
+with only two writers — contract completion and cancellation — is unrecoverable, because the
+recovery path runs: raise reputation → complete a contract → accept a quote → obtain a quote → *be
+above the floor.* A cycle with no entry. A continuous quantity that **decays toward neutral has no
+permanent floor by construction** — a burned relationship heals, and "wait" becomes a legitimate
+strategic move. The fix is a property of the substrate, not a patch on procurement.
 
-*Owned by BL-545 (sentiment substrate) and BL-546 (reputation migration, which is the one relational
-quantity that IS serialised, so its migration is a save-format change rather than a rename).
-BL-540, BL-541 and BL-391 are reshaped onto it and all three now `require` it.*
+*Owned by BL-545 (sentiment substrate) and BL-546 (reputation migration). BL-540 (nation→corp
+stance), BL-541 (directional tariffs) and BL-391 (reputation floor deadlock) are shaped onto it.*
 
 ---
 
-## Build status
+## The substrate — `src/world/sentiment.{hpp,cpp}`
 
-### 1. Stance — *shipped, and it gates three things*
+`world::sentiment` is a `sentiment_table`: a `std::map` keyed on the ordered pair (observer,
+subject), holding two floats per row. Four properties, all load-bearing:
 
-`src/world/stance.{hpp,cpp}` (BL-448, landed 2026-08-19). Three tables on `world`, four verbs on
-the corp-command seam.
+1. **Directed.** A→B is not B→A.
+2. **Two dimensions — Access and Trust — at every grain** (Ben, NR-522: not one, not per-grain).
+   *A substrate whose shape varies by grain is not a substrate.* They move independently and decay
+   independently. A third dimension must gate something before it is added.
+3. **Derived from conduct, folded through authored factors.** A row is written only by
+   `world::note_conduct(params, observer, subject, factor)`: one occurrence of one
+   `sentiment_factor_kind`, multiplied by that factor's authored weight on each dimension. The
+   factor is the unit of authorship — **a new way to affect sentiment is a table row, never a code
+   branch**, because anything else makes Ben's *"tonnes of realistic ways to affect sentiment"*
+   (2026-08-22) unaffordable.
+4. **Decays toward neutral, and neutral is erased.** Each tick a dimension sheds an authored
+   fraction of its remaining distance to zero; a row that reaches neutral (within an epsilon that
+   makes neutral *reachable*) is removed, so a fully-forgotten pair is indistinguishable from one
+   that never dealt.
+
+### The factors
+
+`sentiment_factor_kind`, append-only — it is the array bound the fold indexes with:
+
+| Factor | Conduct |
+|---|---|
+| `contract_completed` | a procurement contract delivered as promised |
+| `contract_cancelled` | a procurement contract cancelled by the counterparty |
+| `trade_conducted` | goods actually moved between the pair — commerce as its own slow warming |
+| `equity_taken` | the observer wanted a firm and the subject took it — BL-524's syndicate tier; Ben's own worked example, *"buying a background firm that they wanted"*. Sentiment is where an acquisition's *political* cost lands |
+| `hostility_declared` | the subject declared hostility toward the observer |
+| `friendship_accepted` | a friendship offer from the subject was accepted — both parties observe it, each in their own row |
+| `levy_charged` | the observer was charged under a law the subject authored — the corp→nation grain's bread and butter |
+| `embargo_imposed` | the subject refused to deal with the observer at all |
+| `lobbied_against` | the subject spent to move a nation against the observer — BL-539's political grain |
+| `force_used` | force was used against the observer's interest — the sharpest input, and still only an input |
+
+### The authored numbers
+
+Decay lives in `scripts/economy.lua` § `economy.sentiment`, as a **rate, not a half-life** —
+deriving it in-engine would put a `std::pow` on the tick. Ben's anchor (NR-568, 2026-08-23): *a
+cancellation is forgotten in nine quarters.* One tick is one quarter, so that is a half-life of
+nine ticks, and
+
+    rate = 1 − 2^(−1 / 9) = 0.074125
+
+is `trust_decay_per_tick`. `access_decay_per_tick` is the same value — there is no separate ruling
+for Access. The loader (`recipe_registry.cpp`) rejects either rate unless it is a finite number in
+[0, 1]; an authored rate is never clamped silently.
+
+The factor weights for `contract_completed` and `contract_cancelled` are **seeded from the
+procurement rates** (`seed_procurement_sentiment`, `recipe_registry.hpp`: `reputation_on_complete`
+1.0, `reputation_on_cancel` −2.0 on Trust) and may be overridden by `economy.sentiment.factors`.
+Every other factor's weight is authored at zero — each is a named seat for its emitter, and a
+factor whose emitter has nothing to say moves nothing.
+
+The table crosses the serialisation seam in full: `write_sentiment` / `read_sentiment` for the
+substrate's own stream, and the per-pair record in the world snapshot. The procurement stream
+carries no reputation of its own — a copy there would be the second store the substrate exists to
+delete.
+
+---
+
+## The quantities in turn
+
+### 1. Stance — declared, and it gates
+
+`src/world/stance.{hpp,cpp}` (BL-448, corp stance). Three tables on `world`, four verbs on the
+corp-command seam.
 
 **The hybrid reading is the design, settled by Ben on 2026-08-17 (NR-302):**
 
@@ -122,87 +185,79 @@ the corp-command seam.
 
 A rejected mutation leaves every table untouched — the command-seam rule from
 `.claude/rules/io-standing-rules.md`: validate before mutating, reject the whole command, never
-partial-apply.
+partial-apply. Stance is in the world snapshot (`w_enum` / `r_enum` against a named maximum, so an
+out-of-range byte is rejected rather than cast): a declared war outlives the session.
 
-**What it gates, as of 2026-08-21** *(this list was empty when stance landed — the doc note that
-"stance gates nothing yet" is now stale)*:
+**What hostility gates:**
 
 | Consumer | What hostility does |
 |---|---|
-| `supply_system.cpp` | A hostile unit on a convoy's tile **intercepts it** (BL-458) |
-| `battle_system.cpp` | Hostile pairs are what **open a battle** (BL-467) |
+| `supply_system.cpp` | A hostile unit on a convoy's tile **intercepts it** (BL-458, interdiction) |
+| `battle_system.cpp` | Hostile pairs are what **open a battle** (BL-467, engagement trigger) |
 | `economy_system.cpp` | War **flips the march queue** (BL-470, NR-344) |
 
 Note the care taken in the interdiction check: it tests `is_hostile(unit_owner, cargo_owner)`, in
 that direction only. *"A corp that has been declared against but has not answered is a victim, not
 a raider."*
 
-### 2. Reputation — *a view of sentiment, and no longer deadlocked*
+**What friendship permits — two things** (Ben, 2026-08-22): **passage through territory** and
+**immunity from interdiction**. Both consumers read an existing predicate at an existing site.
+Immunity is the cheap half and the invariant makes it safe: `declare_hostile` dissolves a
+friendship row atomically, so a friendship check in the interception path is not a competing
+predicate but an early-out on a pair hostility has already excluded. Passage is the larger half and
+needs a reading: a friend's anchors counting toward your reach field (recommended — it makes
+friendship a *logistics* fact, and cannot be confused with Access), or placement permission (which
+overlaps Access at a different grain). *Owned by BL-549 (friendship permits two things).*
 
-**Landed 2026-08-23 (BL-546), and BL-391 landed through it.**
+**Who declares.** A rival scores stance and may declare hostility toward any corp, the player's
+included — BL-450 (rivals score stance), granted 2026-08-18 on the standing terms: deterministic,
+seeded, scored-utility, legal verbs only. Hostility stays a declared state a corp opts into; a
+rival may score and declare it, never acquire it ambiently.
+
+**A declaration against the player is SIGNALLED** (Ben, 2026-08-22). This overturns NR-350, which
+had a declaration *"stay silent, discovered on contact rather than announced"*; newest-dated wins,
+and the reversal is recorded rather than quietly applied. The cost is real: directed hostility
+exists so *"a corp can be at war and not know it yet"* — the ambush property interdiction was
+designed around — and signalling removes that property *for the player*. Interdiction becomes a
+known risk rather than a surprise. Directedness itself is untouched — hostility still needs no
+reciprocation. Whether rival-vs-rival declarations are equally visible is a BL-068
+(competitor-visibility) question this ruling does not settle. The surface is BL-449 (stance needs
+a surface).
+
+### 2. Reputation — a view of sentiment
 
 Reputation is the **Trust dimension of `world::sentiment` at (buyer, supplier) grain.** There is
-one read point, `world::procurement_reputation(buyer, supplier)`, and two writes, both of them one
-occurrence of authored conduct folded into the substrate:
+one read point, `world::procurement_reputation(buyer, supplier)`, and two writes, both one
+occurrence of authored conduct folded into the substrate — `contract_completed` from
+`economy_system.cpp` on delivery, `contract_cancelled` from `corp_command.cpp` on cancellation.
 
-| Conduct | Factor | Weight |
-|---|---|---|
-| A contract completes | `sentiment_factor_kind::contract_completed` | `procurement.reputation_on_complete` |
-| A contract is cancelled | `sentiment_factor_kind::contract_cancelled` | `procurement.reputation_on_cancel` |
+**The floor is a temporary state, and every consumer must read it that way.** `request_quote`
+declines a buyer below `reputation_floor` (−5.0), and treats "below the floor" as a condition of
+today rather than a verdict: a −2 cancellation halves in nine ticks and its row is erased inside
+~130, with no new verb, no reparations mechanic, no special case (`sentiment_harness` R3h–R3m;
+`procurement_harness` R2 asserts both halves). That reading must hold for every later consumer of
+the axis — BL-377's contract seam reads the same one.
 
-The two weights are **seeded from the procurement rates** (`seed_procurement_sentiment`, in
-`recipe_registry.hpp`) and overridden by `economy.sentiment.factors` in `scripts/economy.lua`. That
-seeding is what makes the migration a substrate swap rather than a balance change: on the day it
-landed, every procurement number was **bit-identical** to the pre-migration build, asserted against
-values captured from that build (`procurement_harness` § R1).
+**The floor and the current standing must be VISIBLE.** A player reasoning about a number they
+cannot see is the deadlock's other half; the seam's read-back is BL-390 (the seam has no
+read-back).
 
-**What it was, and why that mattered.** Until this landed it was its own serialised map, and it
-carried a live priority-A design fault — **BL-391 (reputation floor is a deadlock)**. The recovery
-path from below the floor ran: raise reputation → complete a contract → accept a quote → obtain a
-quote → **be above the floor.** A cycle with no entry. A player measured it at −6 against a floor of
-−5 and found no mechanic anywhere that could move it back: a permanent, unrecoverable,
-per-counterparty blacklist earned by an ordinary in-game action, invisible until you hit it and
-unsignalled when you did.
+### 3. Embargo — an authored refusal
 
-**The deadlock does not have a fix; it has nowhere to live.** Sentiment decays toward neutral, and
-a row that reaches neutral is *erased*, so a fully-forgotten pair is indistinguishable from one that
-never dealt. **A quantity that decays has no permanent floor by construction.** The same 64-tick
-span that moved the pre-migration value by exactly zero bits (`0xC0C00000` in, `0xC0C00000` out,
-still refused) now carries it back above the floor and the corp is quoted again — no new verb, no
-reparations mechanic, no special case. `procurement_harness` § R2 asserts both halves.
+`world::corp_embargo_conditions` — a `condition_set` per corp, checked by `request_quote` in
+`corp_command.cpp`, serialised in the world snapshot. When the predicate fires the supplier refuses
+the buyer outright, and the refusal is conduct: `embargo_imposed` is its sentiment factor.
 
-**The floor is now a temporary state, and every consumer must read it that way.** There is exactly
-one today — `corp_command.cpp`'s `request_quote` — and it treats "below the floor" as a condition of
-today rather than a verdict. That sweep will not stay small once BL-377's contract seam reads the
-same axis.
+The read path proves `condition_set` reaches procurement for free. An embargo's **author** is a
+law — it is the relationship family of BL-155's four-family taxonomy, and which embargoes the
+company must route around is BL-399 (company answerability). A per-counterparty allow/deny at the
+corp's own hand is BL-161 (counterparty allow/deny).
 
-**Two of BL-391's demands remain open**, and neither is supplied by the substrate:
+### 4. Standing — a readout, read by one surface
 
-1. **The floor and the current standing must be VISIBLE** — pair with BL-390 (the seam has no
-   read-back). A player reasoning about a number they cannot see is the defect's other half.
-2. ~~**The decay rate needs a reason.**~~ **AUTHORED 2026-08-23 (Sprint N3, NR-568).** Ben's
-   anchor: *a cancellation is forgotten in nine quarters* — a nine-tick half-life, so
-   `economy.sentiment.trust_decay_per_tick = 1 − 2^(−1/9) = 0.074125` in `scripts/economy.lua`,
-   with the derivation in the comment beside it. Access decays at the same rate until BL-540 emits
-   into it. The deadlock is now dissolved *in play*: a −2 cancellation halves in nine ticks and its
-   row is erased inside ~130 (`sentiment_harness` R3h–R3m).
-
-### 3. Embargo — *a read path with no writer*
-
-`world::corp_embargo_conditions` — a `condition_set` per corp, checked by procurement.
-
-The mechanism is real and it works. **Nothing authors an entry.** Its own comment is honest about
-why: the read path exists to prove `condition_set` reaches procurement *for free*, and content — an
-enacted law that populates it — is a follow-on.
-
-This is the same shape as the import tariff in [`NATIONS.md`](NATIONS.md): built, proved, and with
-no actor able to reach it. Both are waiting on the same thing — a nation that can enact.
-
-### 4. Standing — *shipped, honest, and read by one surface*
-
-`src/world/standing.{hpp,cpp}` (BL-262 first slice). Five bands — negligible, minor, notable,
-major, dominant — on three axes: **reach** (distinct bodies with a building), **capital** (balance),
-**market share** (this corp's clearing income over the total).
+`src/world/standing.{hpp,cpp}` (BL-262, scoring system). Five bands — negligible, minor, notable,
+major, dominant — on three axes: **reach** (distinct bodies with a building), **capital**
+(balance), **market share** (this corp's clearing income over the total).
 
 Two design properties worth keeping:
 
@@ -219,49 +274,9 @@ correct rather than lazy.
 rival's true output needs their recipe and workforce dial, both private under BL-068 — there is no
 honest visible-information source for it, so the axis is left out rather than faked.*
 
----
+### 5. The nation's read of a corporation
 
-## What is absent, and known to be
-
-- ~~**Nothing survives a save.**~~ **CORRECTED 2026-08-23 — a save exists now.** BL-536 (world
-  snapshot save) landed `src/world/world_save.{hpp,cpp}` and `binary_io.hpp`, and **stance is in it**
-  — `w_enum(o, d.stance)`, read back through `r_enum` against a named maximum so an out-of-range
-  byte is rejected rather than cast. A declared war now outlives the session. NR-349's finding, that
-  no `serialization.cpp` existed, was true when written and is superseded rather than wrong.
-  ~~What is still owed is the *reputation* half once BL-546 migrates it onto sentiment.~~
-  **CLOSED 2026-08-23 (BL-546).** The relational half is on the seam in full: `write_sentiment` /
-  `read_sentiment` for the substrate's own stream, and the widened per-pair record in the world
-  snapshot (`world_save_version` 1 → 2, because one float per pair became two). The procurement
-  stream stopped carrying reputation entirely (`procurement_version` 2 → 3) — keeping a copy there
-  would have recreated the second store the migration exists to delete.
-- ~~**Decay is authored nowhere, so the substrate is inert in the shipped build.**~~ **CLOSED
-  2026-08-23 (Sprint N3).** `scripts/economy.lua` now carries `economy.sentiment` with both decay
-  rates at the nine-tick half-life (NR-568), so the two procurement factors decay and BL-391's fix
-  is *in play*. Every factor weight but those two is still zero — each waits on its emitter. The
-  migration was byte-identical on the day it landed because decay was zero then; it is not now.
-  See § 2 above.
-- **No rival ever declares anything.** BL-450 (rivals score stance) was **granted on 2026-08-18**
-  and `corp_ai.cpp` contains no stance scoring at all. So every hostility in a played game is one
-  the player declared. The grant is a permission nobody has used — the same state
-  [`NATIONS.md`](NATIONS.md) records for the nation grant.
-- **Friendship permits nothing.** Hostility now gates three things. Friendship gates zero. It can be
-  offered, accepted and dissolved, and no consumer reads it. *What friendship permits was explicitly
-  left as "a later call" when BL-448 landed, and it is still later.*
-- **No sentiment layer.** `docs/CONCEPT.md` § Sentiment-based diplomacy describes each faction
-  holding a sentiment value toward every other, shaped by trade history, territorial conflict and
-  ideological alignment. `MANUAL.md` § 5 lists it `[OWED]`. Nothing in code holds it — the only
-  `sentiment` reference in `src/` is a comment.
-- **No nation in the layer at all.** Every quantity above is corp-to-corp. BL-540 (nation→corp
-  stance) is designed and unbuilt; see below.
-- **Reputation is invisible.** No blackboard predicate exports it (BL-390), so a corp cannot see its
-  standing with anyone — before or after a refusal. A player below the floor is reasoning about a
-  number they cannot read.
-
----
-
-## The fifth quantity, designed 2026-08-22
-
-**BL-540 (nation→corp stance)** adds a nation's read of a corporation, settled in the
+**BL-540 (nation→corp stance)** is a nation's read of a corporation, settled in the
 [`NATIONS.md`](NATIONS.md) design session. It differs from corp-to-corp stance on every axis Ben
 named, and the differences are the design:
 
@@ -276,66 +291,23 @@ ambiently* (Ben, 2026-08-17). A nation's stance is the opposite by construction:
 of what a company has actually done inside the jurisdiction, never stored as a flag.
 
 **Which makes it the same kind of object as Standing, not as Stance** — derived, honest, no hidden
-state — despite sharing the word. That is the fifth entry in the table at the top of this document
-and the second time the vocabulary has collided.
+state — despite sharing the word. It is the nation→corp grain of the substrate: Access gates who
+may operate inside the borders, and `levy_charged`, `embargo_imposed` and `lobbied_against` are
+the factors that move it. Its emitters are the first writers into the Access dimension.
 
 ---
 
 ## Open questions
 
-1. ~~**Is one relational substrate right, or four?**~~ **Settled 2026-08-22** — see § The settled
-   model. Two layers: sentiment derived and continuous, stance declared and discrete. What remains
-   open is **how many dimensions sentiment carries** (NR-522): BL-540 needs Access and Trust
-   expressible separately, reputation reads as one, and a third must gate something before it
-   is added.
+1. **How many dimensions does sentiment carry?** (NR-522) Two — Access and Trust — at every grain
+   is the ruling; the open half is the admission rule for a third, which must gate something before
+   it is added.
 
-2. ~~**What does friendship permit?**~~ **Settled 2026-08-22: passage through territory, and
-   immunity from interdiction.** Friendship finally gates something, and both consumers read an
-   existing predicate at an existing site.
+2. **Which reading does passage take** — reach-field contribution (recommended) or placement
+   permission? Owned by BL-549 (friendship permits two things).
 
-   **Immunity is the cheap half and the invariant makes it safe.** `declare_hostile` already
-   dissolves a friendship row *atomically*, so the two states cannot both hold — a friendship check
-   in the interception path is not a competing predicate, it is an early-out on a pair hostility has
-   already excluded.
-
-   **Passage is the larger half** and needs a reading: friend's anchors counting toward your reach
-   field (recommended — it makes friendship a *logistics* fact, and cannot be confused with BL-540's
-   Access), or placement permission (which overlaps Access at a different grain). *Owned by BL-549.*
-
-3. ~~**Does sentiment replace stance, or sit under it?**~~ **Settled 2026-08-22: under it**, and
-   never able to reach up into it on its own. The invariant above is the whole answer.
-
-4. ~~**At what rate does sentiment decay?**~~ **Settled 2026-08-22: anchored, not authored** — the
-   rate takes BL-543's treatment, expressed against something the player already understands.
-
-   Ben widened the question while answering it, and the widening matters more than the rate:
-
-   > *"Certain actions might make a rival wary, such as buying a background firm that they wanted.
-   > There are tonnes of realistic ways to affect sentiment."*
-
-   That is a ruling about **factors**, not decay. Two consequences for BL-545: a factor must be
-   **authored data, not a code branch** — weights in `economy.lua`, a new factor is a table row,
-   because anything else makes *"tonnes of realistic ways"* unaffordable. And **acquisition is a
-   named factor from the start**: buying a firm a rival wanted is BL-524's equity purchase, and
-   sentiment is where an acquisition's *political* cost lands. Nothing else in the design has a
-   place for it.
-
-5. ~~**Does a rival get to declare hostility on the player?**~~ **Settled 2026-08-22: yes, and it
-   is SIGNALLED.**
-
-   > **This overturns NR-350.** That entry had a declaration *"stay silent, discovered on contact
-   > rather than announced"*, and BL-448 shipped on it. Newest-dated wins, and the reversal is
-   > recorded rather than quietly applied.
-
-   **The cost is real and is worth naming.** `stance.hpp`'s directed hostility exists so *"a corp
-   can be at war and not know it yet"* — the **ambush property** BL-458's interdiction was designed
-   around. Signalling removes that property *for the player*: interdiction becomes a known risk
-   rather than a surprise, and the first lost convoy stops being the first news.
-
-   Directedness itself is untouched — hostility still needs no reciprocation, and a rival can still
-   be declared against without answering. What changes is that the player is **told**. Whether
-   rival-vs-rival declarations are equally visible is a BL-068 question this ruling does not
-   settle.
+3. **Are rival-vs-rival declarations visible to the player?** A BL-068 (competitor-visibility)
+   question the signalling ruling leaves open.
 
 ---
 
@@ -346,23 +318,23 @@ and the second time the vocabulary has collided.
 | Stance tables, verbs, invariants | `src/world/stance.{hpp,cpp}` |
 | The three tables on the world | `src/world/world.hpp` § `corp_hostile_pairs`, `corp_friend_pairs`, `corp_friend_offers` |
 | The relational substrate | `src/world/sentiment.{hpp,cpp}`; the table on `world.hpp` § `sentiment` |
-| Reputation (a **view**, BL-546) | `src/world/world.hpp` § `procurement_reputation` / `note_conduct`; written from `economy_system.cpp` (completion) and `corp_command.cpp` (cancellation) |
-| The authored factor weights | `src/world/recipe_registry.hpp` § `seed_procurement_sentiment`, `sentiment()`; loaded from `economy.sentiment` |
-| Embargo | `src/world/world.hpp` § `corp_embargo_conditions` |
+| Reputation (a **view**) | `src/world/world.hpp` § `procurement_reputation` / `note_conduct`; written from `economy_system.cpp` (completion) and `corp_command.cpp` (cancellation) |
+| The authored factor weights and decay | `src/world/recipe_registry.hpp` § `seed_procurement_sentiment`, `sentiment()`; loaded from `economy.sentiment` in `scripts/economy.lua` |
+| Embargo | `src/world/world.hpp` § `corp_embargo_conditions`; read in `corp_command.cpp` § `request_quote` |
 | Standing bands | `src/world/standing.{hpp,cpp}` |
 | Interdiction gate | `src/world/supply_system.cpp` |
 | Battle engagement gate | `src/world/battle_system.cpp` |
 | The Stance column | `src/ui/corporation_panel.cpp` |
+| Checks | `tools/verify/sentiment_harness.cpp`, `stance_determinism.cpp`, `procurement_harness.cpp` |
 
-**Related authorities.** [`NATIONS.md`](NATIONS.md) (the nation as an actor, and BL-540),
-`docs/military/MILITARY.md` (what hostility permits militarily),
+**Related authorities.** [`NATIONS.md`](NATIONS.md) (the nation as an actor, and its read of a
+corp), `docs/military/MILITARY.md` (what hostility permits militarily),
 `docs/ui/DISCOVERY.md` (BL-068, the competitor-visibility rule both stance and standing obey),
 `docs/economy/MARKETS.md` (§ Procurement, where reputation is spent),
-`docs/ai/AI_OPPONENT.md` (the scorer that will one day declare).
+`docs/ai/AI_OPPONENT.md` (the scorer that declares).
 
-**Backlog.** **BL-545 (sentiment substrate)** is the spine, filed 2026-08-22 on Ben's NR-520
-ruling; **BL-546** migrates reputation onto it. **BL-540** (nation→corp stance), **BL-541**
-(directional tariffs) and **BL-391** (reputation floor deadlock) are all reshaped onto BL-545 and
-`require` it. BL-450 (rivals score stance) holds the unused 2026-08-18 grant; BL-449 (stance needs
-a surface) is the UI half; BL-390 (the seam has no read-back) owns making the value visible.
-BL-158 (politics datamodel stub) and BL-345 (politics relationship axis) are the older neighbours.
+**Owning items.** BL-545 (sentiment substrate) is the spine; BL-546 (reputation migration) is the
+view. BL-540 (nation→corp stance), BL-541 (directional tariffs) and BL-391 (reputation floor
+deadlock) sit on it. BL-450 (rivals score stance) owns the rival's declaration; BL-449 (stance
+needs a surface) is the UI half; BL-390 (the seam has no read-back) owns making the value visible;
+BL-549 (friendship permits two things) owns passage and immunity.

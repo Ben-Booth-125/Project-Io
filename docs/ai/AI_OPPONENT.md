@@ -1,31 +1,28 @@
 # Project Io — AI Opponent
 
-Authority doc for the AI-opponent thread (BL-199). Ben's 2026-07-23 call: AI-opponent
-development may now proceed **alongside** the basic mechanics rather than waiting. This
-document opens with the **state-of-the-art research** BL-199 mandates as its first
-activity; the architecture proposal, data strategy, and follow-on backlog decomposition
-build on it.
+Authority doc for the AI-opponent thread (BL-199, AI opponent research). Ben's 2026-07-23 call:
+AI-opponent development proceeds **alongside** the basic mechanics rather than waiting. This
+document opens with the **state-of-the-art research** BL-199 mandates as its first activity; the
+architecture, data strategy, and decomposition build on it.
 
-**Status.** SOTA map + shortlist + staged path + data strategy: drafted 2026-07-23 (deep-research
-harness). **Architecture accepted by Ben 2026-07-26** (§ 5) — the A → B utility core is the
-target. The decision decomposition (§ 5), the corp-command seam + state export (§ 6), the
-communication/diplomacy principle (§ 7), and the follow-on decomposition (§ 8) landed the same
-session. The standing-rule relaxation is now earned **for the scoped path only**: AI-corp
-strategic actions via the corp-command seam (BL-202 onward); the player's corp stays untouched
-beyond the BL-181 workforce dial.
+**The architecture is accepted (Ben, 2026-07-26 — § 5):** the A → B utility core — a
+deterministic scored-utility layer over the corp-command seam, then Victoria-3-style predictive
+spending — is the rival. The standing-rule relaxation is earned **for the scoped path only**: AI-corp
+strategic actions via the corp-command seam (`src/world/corp_ai.cpp`); the player's corp stays
+untouched beyond the workforce dial.
 
-**Direction set 2026-08-03 (§ 10).** A second research sweep — the public LLM-grand-strategy
-field — settled the C-route's transport and target. The interface is **MCP** (an out-of-process
-protocol wrapper over the three legs Io already has: blackboard export, action dictionary,
-corp-command seam); the runtime model is **small and local**; **cloud inference is a corpus
-generator, not a runtime**, producing the supervised traces a small model is fine-tuned on.
-Read § 10 before any work on the LLM planner — it supersedes § 7's 2026-08-02 note and answers
-NR-040.
+**The direction above the core (Ben, 2026-08-03 — § 10):** the interface to any language model is
+**MCP** (an out-of-process protocol wrapper over the three legs Io has: blackboard export, action
+dictionary, corp-command seam); the runtime model is **small and local**; **cloud inference is a
+corpus generator, not a runtime**, producing the supervised traces a small model is fine-tuned on.
+**The model occupies Stage C — a dialogue layer over the scorer's decisions — and never the
+action-generating seat (Ben, 2026-08-08 — § 10g).** Read § 10 before any work on the language
+layer.
 
-**The goal (unchanged from BL-199).** A computer opponent of **roughly human skill** — a
-genuine rival across Io's loop (extraction, trade, later conflict), **beatable** by a decent
-human, and **legible** (moves read as sensible, not alien or scripted). Explicitly *not* a
-superhuman optimiser and *not* a handicap-only fake.
+**The goal.** A computer opponent of **roughly human skill** — a genuine rival across Io's loop
+(extraction, trade, conflict), **beatable** by a decent human, and **legible** (moves read as
+sensible, not alien or scripted). Explicitly *not* a superhuman optimiser and *not* a handicap-only
+fake.
 
 ---
 
@@ -95,7 +92,7 @@ model is the directly transferable idea.
   BC. The learning family that fits Io's assets — a deterministic sim can generate huge logged
   datasets cheaply — but a significant engineering lift and research risk for a solo dev.
 - **LLM-planner-over-scored-primitives / hybrid.** The most exciting recent direction and
-  **directly aligned with Io's proposed out-of-process-policy-over-compact-state architecture.**
+  **directly aligned with Io's out-of-process-policy-over-compact-state architecture.**
   *Vox Deorum* (Civ V + Vox Populi) puts an LLM on *macro-strategic reasoning* and delegates
   tactics to algorithmic subsystems; across 2,327 games open-source LLMs reached "competitive
   end-game play" with **human-varied play styles**. Broader hybrid work (LLM planner over
@@ -128,17 +125,17 @@ non-deterministic parts).
 
 ## 2. Shortlist for THIS codebase
 
-### A. Scored utility AI over the existing local-agency seam — **recommended first build**
-Extend the background-corp per-building triggers (BL-079) into a **strategic scoring layer**:
-enumerate candidate actions (build X on tile T, switch recipe, set workforce dial, open/close a
-trade route), score each with tunable weighted heuristics, apply hysteresis, execute top-N within
-a per-tick action budget.
+### A. Scored utility AI over the existing local-agency seam — **the first build**
+Extend the background-corp per-building triggers (BL-079, background-corp agency) into a
+**strategic scoring layer**: enumerate candidate actions (build X on tile T, switch recipe, set
+workforce dial, list surplus), score each with tunable weighted heuristics, apply hysteresis,
+execute top-N within a per-tick action budget.
 - **Dev cost:** low–medium (natural extension of what exists). **Determinism:** perfect (pure
   function of world state; seed the tie-break RNG). **Legibility:** excellent. **Skill ceiling:**
   medium — enough for a genuine, beatable rival with good weights + predictive spending.
   **Data needs:** none.
 
-### B. Layered utility with a predictive economic model (Victoria-3-style) — **recommended second**
+### B. Layered utility with a predictive economic model (Victoria-3-style) — **the second**
 Add a **strategy layer** (extraction specialist vs trade arbitrageur), **priority buckets**
 (Must-Have solvency vs Nice-to-Have expansion), and **spending variables** that forecast the
 market impact of queued buildings before committing. This is what makes the AI *solvent* rather
@@ -146,35 +143,34 @@ than needing a cheat.
 - **Dev cost:** medium. **Determinism:** perfect. **Legibility:** high. **Skill ceiling:** high
   for economic play. **Data:** none.
 
-### C. Out-of-process LLM planner over scored primitives (Vox-Deorum-style) — **later, optional differentiator**
-The external policy reads Io's compact JSON state export; the LLM picks **strategy / goals** among
-an explicit legal-primitive set (masked to prevent hallucination); the utility layer (A/B) executes
+### C. Out-of-process language layer over scored primitives (Vox-Deorum-style) — **the differentiator**
+The external policy reads Io's compact state export; the model works among an explicit
+legal-primitive set (masked to prevent hallucination); the utility layer (A/B) executes
 tactically. Gives varied, legible, human-like *personalities* per corp.
-- **Dev cost:** medium glue, but adds latency, non-determinism, API cost/dependency.
-  **Determinism:** poor unless the LLM call is cached/replay-logged per decision — mitigate by
-  making the LLM choose only coarse strategy occasionally, not per-tick. **Legibility:** high (can
-  self-explain). **Skill ceiling:** competitive end-game. **Data:** none (zero/few-shot).
-- **Updated 2026-08-03 (§ 10):** transport is **MCP**, and "API cost/dependency" no longer applies
-  to the shipped runtime — the target model is **local**. Cloud play is a one-off corpus-generation
-  activity (BL-279), not a per-decision dependency. The "Data: none" line still holds for the
-  zero-shot path, but the direction now *chooses* to collect data, to shrink the model.
+- **Dev cost:** medium glue, plus latency. **Determinism:** protected by keeping the model
+  out-of-process, coarse-grained, replay-logged — never per-tick, never in the sim. **Legibility:**
+  high (can self-explain). **Skill ceiling:** competitive end-game. **Data:** none for the
+  zero-shot path; the direction *chooses* to collect data, to shrink the model (§ 10d).
+- Transport is **MCP**, and the runtime target is **local** — cloud play is a corpus-generation
+  activity (BL-279, trace corpus), not a per-decision dependency. Which seat the model occupies is
+  § 10g's ruling: the dialogue layer, not the action generator.
 
 ### D. Offline RL over logged self-play — **furthest out; only if A–C plateau**
 Deterministic seeds generate massive logged datasets; train an offline-RL policy (CQL-class) as an
-out-of-process policy over the JSON state.
+out-of-process policy over the state export.
 - **Dev cost:** high + research risk. **Determinism:** good (greedy inference). **Legibility:** low
   (the weakness — risks alien play). **Skill ceiling:** potentially super-human (must be *capped*).
   **Data:** large, but self-generable.
 
-### Recommended staged path
-1. **Now:** build **A** — scored utility over the local-agency seam. The load-bearing 80%.
-2. **Next:** layer **B** — strategy selection + priority buckets + predictive spending, so the AI
-   is genuinely solvent and needs no cheat. Add a **seed-set skill-regression harness** (bot-vs-bot
+### The staged path
+1. **A** — scored utility over the local-agency seam. The load-bearing 80%.
+2. **B** — strategy selection + priority buckets + predictive spending, so the AI is genuinely
+   solvent and needs no cheat, with a **seed-set skill-regression harness** (bot-vs-bot
    solvency/net-worth goldens) alongside.
 3. **Difficulty knobs:** transparent, small, gradual economic multipliers only — never info/rule
    cheats.
-4. **Later / optional:** **C** for personality and variety once the utility core is solid; keep it
-   out-of-process, coarse-grained, replay-logged to protect determinism.
+4. **C** for personality and variety above the utility core; out-of-process, coarse-grained,
+   replay-logged to protect determinism.
 5. **Only if needed:** **D**, capped, as a top-difficulty tier.
 
 ---
@@ -184,6 +180,7 @@ out-of-process policy over the JSON state.
 - **Benchmark seed-set (golden):** freeze N seeds spanning body/terrain/market diversity; the AI's
   economic outcomes become regression goldens (net-worth curve, survival rate, win-rate vs a
   reference AI). Re-run headlessly on every AI change — the direct analogue of `verifier-headless`.
+  `tools/verify/ai_skill_harness.cpp` is that harness.
 - **Bot-vs-bot rollouts** as the primary skill signal.
 - **Deterministic offline policy evaluation:** same seed, two policies, exact A/B.
 - **Scenario generation for weakness-hunting:** search seeds for insolvency/thrash; those become
@@ -211,8 +208,8 @@ skill** better than any shipped 4X — a genuine advantage a solo dev should exp
 Legibility (an Io requirement) also favours utility scoring: every move is a top-scoring choice with
 a readable reason, the opposite of AlphaStar's alien play.
 
-The **LLM-planner-over-scored-primitives** route (Vox Deorum) is the one modern approach worth
-keeping on the roadmap — it maps cleanly onto Io's out-of-process-policy-over-JSON architecture and
+The **LLM-over-scored-primitives** route (Vox Deorum) is the one modern approach worth keeping on
+the roadmap — it maps cleanly onto Io's out-of-process-policy-over-state-export architecture and
 adds legible *personality* — but it sits **on top of** a solid utility core, kept coarse-grained and
 replay-logged, not as the first build.
 
@@ -225,138 +222,112 @@ learning; do **not** ship resource cheats as a substitute for competence.
 ## 5. Accepted architecture — the decision decomposition (Ben, 2026-07-26)
 
 Ben accepted the **A → B staged path** (scored utility over the BL-079 seam, then Victoria-3-style
-predictive spending). This section is the concrete decomposition the acceptance unlocks.
+predictive spending). This section is the concrete decomposition, implemented in
+`src/world/corp_ai.{hpp,cpp}` with its tunables in `corp_ai_params`.
 
 ### Cadence — where the AI thinks
 
 The AI evaluates at the **econ-tick boundary inside `run_economy_step`**, in the slot the BL-079
-agency block occupies today; that block folds in as the scorer's **reflex tier** (tier 0: recipe
-rescue, idle-a-loser — unchanged behaviour, now emitting commands). Strategic evaluation is
-**staggered**: corp `c` evaluates every `K` ticks at offset `id(c) % K` (Victoria-3's tick-task
-idea — bounded per-tick cost, fully deterministic).
+agency block occupies; that block is the scorer's **reflex tier** (tier 0: recipe rescue,
+idle-a-loser). Strategic evaluation is **staggered**: corp `c` evaluates every `cadence_k` (4)
+ticks when `tick % k == index(c) % k`, the index taken over the **sorted corp set** (Victoria-3's
+tick-task idea — bounded per-tick cost, fully deterministic). Admitting or removing a corp from
+evaluation never shifts another corp's slot, because the index is over the sorted set.
 
 ### The candidate-action set (legal primitives)
 
 The AI's verbs are exactly the player's, through the same validation — **no bypass, no cheats by
-construction**:
+construction**. Every verb is a `corp_verb` on the corp-command seam (§ 6); the scorer's
+candidate set is this subset of it:
 
-| Verb | Engine seam | Notes |
+| Candidate | Engine seam | Notes |
 |---|---|---|
-| `build(type, tile, target, recipe)` | `construct_building` (placement_rules, build cost, `stack_capacity`) | The big decision; candidate sites bounded (below) |
-| `demolish(building)` | `demolish_building` | Rare; scored against salvage vs sustained loss |
-| `set_recipe(building, recipe)` | direct component write (BL-079 idiom) | Tier-0 rescue generalises to margin-chasing |
-| `set_workforce(building, target)` | `solve_workforce_target` (BL-181) | AI corps simply run `workforce_auto` on |
-| `idle(building)` / `resume` | `decommissioned` flag | Tier-0 loss-streak rule, now reversible |
-| `dispatch_convoy(src, dst, res, qty, mode)` | `dispatch_convoys` seam | Strategic hauls beyond the shortfall auto-dispatch |
-| `place_road(a, b, tier)` | `place_road` | Infrastructure investment; scored on route throughput |
-| `survey(body, region)` | survey_system | The AI pays for discovery like the player |
-| `set_exchange_policy` / `set_counterparty` | BL-160 / BL-161 once landed | The AI authors the same policy tables |
+| `build(type, tile, target, recipe)` | `construct_building` (placement_rules, build cost, `stack_capacity`) | The big decision; three types — extraction site, processing facility, military base; candidate sites bounded (below) |
+| `set_recipe(building, recipe)` | `apply_corp_command` → component write | Tier-0 rescue generalises to margin-chasing |
+| `set_workforce(building, target)` | `solve_workforce_target` | The solver reports its own modelled gain, so the dial is scoreable in both directions |
+| `idle(building)` / `resume` | `decommissioned` flag | Tier-0 loss-streak rule, reversible |
+| `survey(body)` | survey_system | The AI pays for discovery like the player |
+| `hire_unit(tile, unit_type)` | `hire_unit` at the corp's own completed `military_base` | Availability gated on stockpile/market access, never on cash; spend subject to the solvency gate |
+| `place_sell_order(body, target, quantity, floor)` | the order book | § 2C |
+
+The seam carries further verbs the scorer does not enumerate — `demolish`, `place_road`, the
+convoy pair, the procurement triple, the stance verbs, the unit verbs and `withdraw_from_battle`
+— which an agent on the seam (§ 10) issues directly. Scoring roads and demolition is BL-447
+(scorer never demolishes or roads); scoring stance is BL-450 (rivals score stance).
 
 **Candidate enumeration is bounded**: build sites come from **surveyed tiles the corp can see**
-(its own fog state), pre-filtered to the top-M by static suitability (terrain affinity × deposit
-richness), M small; recipes and dials enumerate per owned building; routes enumerate over
-known-body pairs. Bounded enumeration is what keeps the per-tick cost flat.
+(its own fog state), pre-filtered to the top-M (`top_m_sites = 8`) by static suitability (terrain
+affinity × deposit richness × an **input-demand pull**, `input_demand_pull`, that weights a
+tile's extractable deposits by what the economy's recipes want and cannot get — divided by the
+sites already targeting that resource, so the pull decays as the shortage is answered); recipes
+and dials enumerate per owned building. Bounded enumeration is what keeps the per-tick cost flat.
 
-> **`build` ranges over three types, and until 2026-08-17 it ranged over two (BL-439).** The table
-> above lists `build(type, tile, target, recipe)`, which reads as though the scorer picks a type.
-> For most of the project's life it did not: `corp_ai.cpp` emitted `corp_verb::build` from exactly
-> two sites, each setting the type to a literal — the `ranked_sites` loop (always
-> `extraction_site`) and one `military_base` candidate. **There was no `processing_facility`
-> candidate anywhere in the scorer**, so a rival owned only the processors it was generated with,
-> for the whole campaign. The *seam* was never the limit: `corp_command.cpp` builds a processor
-> with its recipe when a command asks for one (BL-388). The scorer simply never asked.
->
-> Two claims rested on that not being true, and both are corrected: "the AI prefers mines" was
-> **structural**, not an artefact of the scoring curve (which is why BL-417 step 2 could never have
-> fixed it — NR-265), and BL-428's chain-depth gate, climbed by operating deeper processors, had
-> **no AI player** (NR-267).
-
-**The processing-facility candidate** (BL-439, landed 2026-08-17). It runs on the same score curve
+**The processing-facility candidate** (BL-439, AI builds processors) runs on the same score curve
 and the same solvency, glut and reserve-floor gates as the extraction candidate, and differs only
 where a processor genuinely differs from a mine:
 
 - **Siting.** No deposit ranks a processor, so `ranked_sites` offers it nothing. It is sited on the
   **corp's own asset tiles** — the same body, so the same stockpile pool its extraction feeds; the
   same tile, so the same market. Cheap (`O(assets)`, not another `O(tiles)` scan) and legible.
-  Nothing caps buildings per tile except the launchpad, so this is a real placement. One processor
-  per tile, or a corp would stack them on its best tile every evaluation.
+  One processor per tile, or a corp would stack them on its best tile every evaluation.
 - **Recipe choice.** Walks the **browse** space (this era's roster) and crosses to the **absolute**
-  id through `recipe_id(name)` — the two id spaces `recipe_registry.hpp` keeps apart, and the exact
-  crossing NR-254 caught the build door getting wrong. The recipe travels **with** the command,
-  because `construct_building` substitutes steel for `no_recipe` (BL-388's trap).
-- **Reachability.** Two gates a mine never needs: BL-428's **chain depth** (asked here rather than
+  id through `recipe_id(name)` — the two id spaces `recipe_registry.hpp` keeps apart. The recipe
+  travels **with** the command, because `construct_building` substitutes steel for `no_recipe`.
+- **Reachability.** Two gates a mine never needs: the **chain-depth** gate (asked here rather than
   discovered as a seam rejection), and **input access** — pool + local market inventory measured
   against the production tick's own coverage threshold, since a processor with no reachable input
   is an immediate loss-maker.
-- **Pricing.** Unlike the extraction candidate, it is priced by `estimate_prospective_profit`
-  (BL-162) rather than the inline revenue-minus-wages sum. That inline model survives above **only**
-  because switching it would move every blessed golden for no player-visible gain; a new candidate
-  has no golden to protect and no reason to inherit the weaker model.
+- **Pricing.** Priced by `estimate_prospective_profit` rather than the extraction candidate's
+  inline revenue-minus-wages sum. The inline model survives on the extraction side because
+  switching it would move every blessed golden for no player-visible gain; a new candidate had no
+  golden to protect and no reason to inherit the weaker model.
 
-> **What it immediately found, and why the goldens are red (NR-269).** Rivals now build 10–16
-> processors per seed (69 across the benchmark set, against 0 before) — and **three of five seeds
-> go insolvent**, seed 0 falling from 498k to −295k. The estimator was ruled out rather than
-> assumed innocent: scoring the candidate with the inline model and with
-> `estimate_prospective_profit` picks the same recipes and the same counts. The new per-building
-> read shows processors realising **−6 to −12 per tick against a predicted −0.4 to +0.1**, on the
-> same buildings, with extraction realising +22.8 where it sampled at all.
->
-> Sprint 19 wrote its success criterion down in advance: these bands were re-blessed *downward* on
-> 2026-08-16 and should **rise** when BL-436 lands. They fell. Under that rule this is a finding,
-> not a bless, so `ai_skill_harness` is deliberately **left red** and the substrate defect
-> (BL-436) is where it gets fixed — not in the scorer that merely stopped hiding it.
+The candidate exposes the economy it runs in: processors realise far less than the estimator
+predicts on the same buildings, which is a substrate defect owned by BL-436 (processing
+under-earns extraction) and deliberately not hidden by the scorer.
 
 ### Scoring
 
-`score(action) = expected_net_per_tick / payback_ticks × strategy_weight`, terms computed from
-**existing functions only** (`estimate_building_profit`, placement affinities, live market prices,
-wage rate, logistics cost to nearest market, build-cost amortisation) — no new oracles. The
-`strategy_weight` biases toward the corp's generated **industrial focus** (specialist premise,
+The design intent is `score(action) = expected_net_per_tick / payback_ticks × strategy_weight`,
+terms computed from **existing functions only** (`estimate_building_profit`, placement
+affinities, live market prices, wage rate, logistics cost to nearest market, build-cost
+amortisation) — no new oracles. With `payback = capex / net` the build score is **`net² / capex`**,
+and `corp_ai.cpp` writes it out that way. It reads as capital efficiency and behaves as a
+**margin bias**: doubling the margin quadruples the score, doubling the cost only halves it.
+**The bias is retained, deliberately**: `focus_weight`, `jitter` and the glut multiplier are tuned
+against this curve, and every blessed golden records a world evolved under it. Replacing it with
+an explicit linear metric is a re-tune plus a golden reshuffle — BL-417 (build score is
+quadratic), Ben's call.
+
+The `strategy_weight` biases toward the corp's generated **industrial focus** (specialist premise,
 CORPORATION_GENERATION.md), giving distinct-but-legible personalities for free. A **solvency
-gate** (cash − committed spend > reserve floor) vetoes any spend that breaks the floor; stage B
-replaces this crude floor with priority buckets + predictive spending (landed 2026-07-31, see
-§ 2B below).
+gate** (cash − committed spend > reserve floor, `corp_reserve_floor`) vetoes any spend that breaks
+the floor; stage B layers priority buckets and predictive spending over it (§ 2B).
 
-> **What the build score actually is (BL-417 step 1, 2026-08-17).** The formula above is the
-> design intent; the shipped code spelled it `net / payback` with `payback = capex / net`, which
-> is **`net² / capex`**. It reads as capital efficiency and behaves as a **margin bias**: doubling
-> the margin quadruples the score, doubling the cost only halves it. Nobody chose that — it was an
-> artefact of the two-step spelling. `corp_ai.cpp` now writes it out as `net * net / capex`.
->
-> **The bias is retained, deliberately.** `focus_weight`, `jitter` and the glut multiplier were all
-> tuned against this curve, and every blessed golden records a world evolved under it. Replacing it
-> with an explicit linear metric is a re-tune plus a golden reshuffle — BL-417 step 2, still open,
-> Ben's call. The rewrite itself was measured, not assumed, to be behaviour-preserving (float
-> rounding makes the two forms genuinely different): `ai_skill_harness` and `spectator_determinism`
-> are byte-identical across the change on the pinned MSVC build.
-
-### 2B. Stage B — strategy, priority buckets, predictive spending (BL-203, landed 2026-07-31)
-
-Implemented in `src/world/corp_ai.{hpp,cpp}`, extending BL-202's scorer rather than replacing it:
+### 2B. Stage B — strategy, priority buckets, predictive spending
 
 - **Strategy layer.** `corp_strategy` is a named alias of `industrial_focus` — the corp's
   generated specialist premise (extraction / processing / trade) IS its strategy, kept as its
   own concept so the bias is legible and can diverge from the generation-time focus later
-  without a signature break. `focus_weight` (BL-202) already biases build/survey scores by this
-  strategy; stage B does not change that mechanism, only names it.
+  without a signature break. `focus_weight` biases build/survey scores by this strategy.
 - **Priority buckets** (`corp_priority_bucket`: `must_have` / `should_have` / `nice_to_have`),
-  derived deterministically from each candidate's existing `corp_decision_reason` via
-  `bucket_for_reason` — `dial_idle` is Must-Have (stops a sustained loss's wage/maintenance
-  bleed); `dial_recipe` / `dial_workforce` / `dial_resume` are Should-Have (tune or restore a
-  running asset); `best_build` / `survey_expand` are Nice-to-Have (expansion). Candidates sort
-  bucket-ascending before score-descending, so a Must/Should-Have action is never starved by a
-  higher-scoring Nice-to-Have one. Concretely, only Nice-to-Have candidates carry capex in this
-  codebase (dials are free), so the "never starve a higher bucket" rule is enforced by gating
-  build/survey spend against a **stricter** floor: `corp_should_have_buffer` sums
-  `estimate_building_profit(...).input_cost` over the corp's own running processing facilities
-  — the cash needed to keep feeding them this tick — and `nice_to_have_floor = reserve_floor +
-  should_have_buffer` is the gate a build/survey must clear, on top of (not instead of) BL-202's
-  existing reserve floor.
+  derived deterministically from each candidate's `corp_decision_reason` via `bucket_for_reason`
+  — `dial_idle` is Must-Have (stops a sustained loss's wage/maintenance bleed); `dial_recipe` /
+  `dial_workforce` / `dial_resume` / `trade_surplus` are Should-Have (tune or restore a running
+  asset, or bring cash in); `best_build` / `survey_expand` / `hire_available` are Nice-to-Have
+  (expansion). Candidates sort bucket-ascending before score-descending, so a Must/Should-Have
+  action is never starved by a higher-scoring Nice-to-Have one. Only Nice-to-Have candidates carry
+  capex (dials are free), so the "never starve a higher bucket" rule is enforced by gating
+  build/survey/hire spend against a **stricter** floor: `corp_should_have_buffer` sums
+  `estimate_building_profit(...).input_cost` over the corp's own running processing facilities —
+  the cash needed to keep feeding them this tick — and `nice_to_have_floor = reserve_floor +
+  should_have_buffer` is the gate a build must clear, on top of (not instead of) the reserve
+  floor.
 - **Predictive spending.** `forecast_glut_multiplier` forecasts a candidate build's added supply
   (`base_rate × richness × workforce × (1 − hazard)`) over a horizon of
-  `build_duration_ticks + forecast_clearing_ticks` (1 by default — "one clearing pass") against
-  the **local market's PUBLIC `supply`/`demand` aggregates only** — the same facts
-  `export_corp_blackboard` would show a rival (BL-068/DISCOVERY.md), never a private read. No
+  `build_duration_ticks + forecast_clearing_ticks` (1 — "one clearing pass") against the **local
+  market's PUBLIC `supply`/`demand` aggregates only** — the same facts `export_corp_blackboard`
+  would show a rival (BL-068, competitor visibility; DISCOVERY.md), never a private read. No
   public demand signal (`demand <= 0`) yields no penalty (the AI cannot forecast against a fact
   it cannot see); the projected supply/demand ratio is unpenalised at or below
   `glut_taper_ratio` (1.0), tapers the build's score linearly to zero at `glut_veto_ratio` (2.0),
@@ -366,10 +337,10 @@ Implemented in `src/world/corp_ai.{hpp,cpp}`, extending BL-202's scorer rather t
 Verified by `tools/verify/corp_ai_predictive_harness.cpp` (R1: the reason→bucket mapping; R2: the
 Should-Have buffer is well-defined and never loosens the floor; R3: the forecast is
 visibility-honest, monotone, tapers, and vetoes at the documented ratios; R4: an end-to-end
-saturated-market scene actually vetoes a build the plain BL-202 scorer would have taken) and
-regression-checked against `corp_ai_harness.cpp` (BL-202), all green.
+saturated-market scene vetoes a build the plain stage-A scorer would have taken) and
+regression-checked against `corp_ai_harness.cpp`.
 
-### 2C. Trading (BL-293, landed 2026-08-08)
+### 2C. Trading
 
 Ben, 2026-08-07, resolving NR-083: *"Order book needs to be a background process, the AI must be
 able to trade as a player does."* A player-only fence over the trade verbs was proposed and
@@ -379,8 +350,8 @@ explicitly rejected, so the scorer reaches the order book exactly as it reaches 
 **This is a grant of reach, not of skill, and the distinction is the design.** "Can trade" is not
 "trades well": a scorer that dumps stock at the floor price is genuinely *worse* than one that
 does not trade, because it drags the resolved price down for everyone including itself — and the
-auto-surplus path was already clearing that stock at the reference price anyway. So the first cut
-is the narrowest thing that is still trading:
+auto-surplus path clears that stock at the reference price anyway. So the rule is the narrowest
+thing that is still trading:
 
 - **Candidate**: for each `(corp, body)` pool, each resource the local market prices, stock above
   `trade_hold_threshold` (50 units) — well clear of any processor's per-tick draw, so listing can
@@ -388,8 +359,10 @@ is the narrowest thing that is still trading:
 - **Quantity**: `trade_release_fraction` (0.5) of the excess. It meters its release rather than
   emptying the pool into one quarter's clearing.
 - **Floor**: `trade_floor_multiple` × the market's `base_price` — the rarity-derived value floor,
-  the closest per-resource cost reference the world exposes. At 1.0 the corp simply refuses to
-  sell below it.
+  the closest per-resource cost reference the world exposes. The authored value is **0.25**,
+  which is the price band's own floor (the lowest price a glutted market can resolve), so surplus
+  always clears at whatever the market resolves; anything above 0.25 makes the corp hold on a
+  deep glut — a strategy call, not a default.
 - **Score**: expected cash valued *at the floor*, not at the current price. The conservative
   estimate, so a listing on a crashed market cannot outscore a genuinely profitable dial.
 - **Bucket**: Should-Have. Listing accumulated stock carries no capex — it brings cash *in* — so
@@ -398,12 +371,12 @@ is the narrowest thing that is still trading:
   at most `max_trades` (1) order-book command per evaluation. A trade command's subject is a body,
   not a building, so it takes no dial slot and records no building cooldown.
 
-All three numbers are `corp_ai_params` fields, so tuning is a data change. **Two honest gaps**,
-both follow-on work rather than defects here: `base_price` is a rarity floor and not a production
-cost, so on a resource whose real cost sits above its rarity floor the AI will sell at a loss;
-and the book is one-sided — `buy_order` has world state and a save format but no verb, so the AI
-can release stock and cannot bid for it. A real strategy (price trend, timed release, targeting a
-rival's shortage) is later work.
+All three numbers are `corp_ai_params` fields, so tuning is a data change. Two limits are part of
+the shape: `base_price` is a rarity floor and not a production cost, so on a resource whose real
+cost sits above its rarity floor the AI will sell at a loss (the blackboard's lack of a reference
+price is BL-385, blackboard exports no reference price); and the book is **one-sided** — a corp
+can release stock and cannot bid for it, the dormant buy side being BL-383 (remove dormant buy
+side). A real strategy (price trend, timed release, targeting a rival's shortage) is later work.
 
 Verified by `tools/verify/order_book_harness.cpp` § R5, which asserts the conservatism as
 behaviour rather than as intent: never below the rarity floor, never on a pool under the
@@ -411,71 +384,44 @@ threshold, never a duplicate, and never on the player's own corp.
 
 ### Hysteresis & action budget
 
-- **Do-nothing bias**: a candidate must beat the incumbent (or doing nothing) by a relative
-  margin θ (~15%) — the anti-thrash rule. Applied inside the **dial** enumeration only; build,
-  survey, hire and trade candidates pass through no hysteresis test.
-- **Cooldowns**: a building that changed recipe/workforce/state holds for C evaluations; reversals
-  ride loss/gain streaks (the BL-079 `loss_streak` idiom, generalised).
-
-> **Measured 2026-08-13 — this section described an intent the code did not implement.**
-> `ai_skill_harness`'s action tally showed `resume` outnumbering every other verb about 10:1
-> (134–255 resumes per 30-tick rollout against 12–17 idles and 3–6 builds). The rule above was
-> being defeated in two places at once. First, the **reflex tier owns the same flag and set no
-> cooldown**: BL-079's block idles a building directly on `building_component`, so the strategic
-> tier could reverse an eight-tick-loss idling on its very next evaluation — two tiers owning
-> `decommissioned`, neither aware of the other. Second, **the two sides used different
-> estimators**: idle scored on `estimate_building_profit`, while resume hand-rolled
-> revenue-minus-wages with no maintenance, no input cost, no stack decay and no depletion taper,
-> so it read high on exactly the buildings the reflex tier had just idled.
->
-> Both are fixed. The reflex tier sets the cooldown its own state change always warranted, and
-> resume now scores on `estimate_prospective_profit` — which also makes idled *processors*
-> resumable, something the extraction-only branch never allowed.
->
-> **Reaching for that estimator was right; reaching for it naively was not.** An adversarial review
-> of the first cut found three compounding errors in how it was being called, and fixing them is
-> what actually closed the loop:
->
-> 1. **It was pricing a hypothetical building, not this one.** The function authors a fresh probe
->    at `construct_building`'s defaults (0.5 assigned, target 100). A site the scorer had dialled
->    to 200 — or to 0 — was therefore priced at a staffing level it would not come back at. It now
->    takes an optional `existing` building and reads the real dial.
-> 2. **It counted the building as an extra member of its own stack.** `stack_members` filters on
->    tile/type/target only, so an existing site is already in that list, and the default
->    `size() + 1` rank charged it one further step of BL-193 decay against itself — 0.8× for a lone
->    site, 0.512× at rank 3. It now takes the rank it actually holds.
-> 3. **"Maintenance is paid either way" is false.** BL-049 splits maintenance into a fixed material
->    share that survives decommissioning and a labour share that does not, so idling saves 70% of
->    it. Crediting the full running figure overstated every resume by 0.7 × maintenance — a
->    systematic bias toward running, in the one estimate whose purpose is to stop the AI resuming
->    what it should leave idle. The idle side carried the mirror-image error and is corrected with
->    it; the two were self-consistent, which is why neither ever produced a single-tick flip and
->    why both went unnoticed.
->
-> **Measured, and the result is categorical rather than incremental.** `resume` goes
-> 134/178/193/153/255 → **0/0/0/0/1** across the five benchmark seeds, and the reflex tier's own
-> idlings — the buildings it was idling only for the scorer to resume them straight back into
-> losses — go 67/137/132/93/198 → **9/8/7/6/7**. Net worth is **up on every seed**, so none of the
-> churn was profitable. Solvency, survival and determinism are unchanged (R0 byte-identical).
->
-> The harness now also counts the reflex tier's idlings, which issue no command and so appeared in
-> no `action[]` row; without that the oscillation was not readable from this instrument at all.
-> The dial-thrash ceilings have been tightened from 230–410 to 40–69 accordingly — they had been
-> blessed from runs containing the very oscillation they exist to detect.
-
-**A separate defect in the same block, also fixed 2026-08-13: the workforce dial could only ever
-move one way per building.** Its gain was estimated as `variable × (proposed − target) / target`
-with `variable = revenue − inputs − wages`, which takes its **sign** from `variable` rather than
-from the model — so a profitable building could only be scored for *raising* its target and a
-loss-maker only for *cutting* one, and the interior optimum `solve_workforce_target` exists to
-find scored negative in both directions and was discarded. The solver now reports its own modelled
-gain (an optional out-param; it already computed both endpoints), and dial actions roughly doubled
-across the benchmark seeds as the previously-unreachable direction became scoreable.
-- **Budget**: per evaluation, at most **1 construction + a small number of dial changes + 1
-  order-book command** per corp; total committed spend capped by the solvency gate.
+- **Do-nothing bias**: a dial candidate must beat the incumbent (or doing nothing) by a relative
+  margin `theta` (0.15) — the anti-thrash rule. Applied inside the **dial** enumeration only;
+  build, survey, hire and trade candidates pass through no hysteresis test.
+- **Cooldowns**: a building that changed recipe/workforce/state holds for `cooldown_evals` (4)
+  evaluations. **Both tiers set it** — the reflex tier idles a building directly on
+  `building_component` and records the cooldown its state change warrants, so the strategic tier
+  cannot reverse an eight-tick-loss idling on its next evaluation. Two tiers own the
+  `decommissioned` flag; the cooldown is what keeps them from fighting.
+- **One estimator for both directions.** Idle and resume score on the same model —
+  `estimate_prospective_profit`, which also makes idled *processors* resumable. Three details make
+  that call honest: it takes the **existing** building and reads its real workforce dial rather
+  than pricing a fresh probe at construction defaults; it takes the **stack rank the building
+  actually holds** rather than charging one further step of stack decay against itself; and it
+  credits only the **labour share** of maintenance as saved by idling, since the fixed material
+  share survives decommissioning (the BL-049 wage/maintenance split). The idle side carries the
+  mirror image. `ai_skill_harness` counts the reflex tier's idlings alongside commands, so
+  idle/resume oscillation is readable from the instrument, and its dial-thrash ceilings are
+  blessed from runs without it.
+- **The workforce dial is scoreable both ways.** `solve_workforce_target` reports its own
+  modelled gain (an out-param; it computes both endpoints), so a profitable building can be
+  scored for cutting its target and a loss-maker for raising it; a sign taken from the building's
+  current variable margin would only ever find one direction.
+- **Budget**: per evaluation, at most `max_builds` (1) construction + `max_dials` (3) dial
+  changes + `max_trades` (1) order-book command + one hire per corp; total committed spend capped
+  by the solvency gate, each accepted candidate reserving its spend against the later ones in the
+  same evaluation.
 - **Determinism**: stable iteration (sorted `corp_ids`, stored asset order, tile-index order);
-  ties break on lowest entity id; the only randomness is a per-corp hash of the world seed used
-  as a fixed personality jitter on weights — constant per campaign, deterministic by construction.
+  ties break on lowest entity id; the only randomness is `corp_personality_jitter` — a per-corp
+  hash of `personality_seed` in [0.9, 1.1] used as a fixed personality jitter on weights —
+  constant per campaign, deterministic by construction.
+
+**The decision record.** Each applied command is a `corp_decision` — `{tick, corp, command,
+winning_score, runner_up, reason}` — in `corp_decision_ring`, a 256-entry ring that is derived
+observability, not save-format state. `runner_up` is **the best candidate the corp did not take**
+in that evaluation (rejected by a budget, the one-touch rule, the solvency gate or the seam), the
+same value on every decision from one evaluation — the foregone option belongs to the evaluation,
+not the command (NR-232). Because candidates sort by bucket before score, `runner_up` can
+legitimately exceed `winning_score` (NR-226); aggregators must not treat the two as a contest.
 
 ---
 
@@ -485,8 +431,8 @@ The scorer does not mutate the world directly. It emits **`corp_command`** recor
 `{tick, corp, verb, args}` — applied at the tick boundary through the player-grade validation
 above. This is deliberate triple-duty:
 
-- **AI**: the command stream *is* the decision log. A ring buffer of commands + score rationale
-  (winning score vs runner-up) is the AI's legibility surface, its replay artifact, and the
+- **AI**: the command stream *is* the decision log. The ring of commands + score rationale
+  (winning score vs best foregone) is the AI's legibility surface, its replay artifact, and the
   skill-harness's input.
 - **Multiplayer**: `MULTIPLAYER_PRINCIPLES.md` § Preserve now #2 — lockstep exchanges exactly
   this: small serialisable intents tagged with their tick. An AI corp is a local command source;
@@ -495,32 +441,36 @@ above. This is deliberate triple-duty:
 - **Out-of-process policies (C/D)**: an external policy consumes the state export and returns
   commands — the same contract, across a process boundary.
 
-**State export (schema designed now, implemented with BL-202).** A compact, tick-tagged,
-per-corp JSON view that is **visibility-honest**: it contains only what that corp could see under
-the BL-068 rules and its own fog state — own buildings/pools/cash in full; public market
-prices/aggregates; rival *buildings* but not their internals; its own routes and survey state.
-The AI reads through the same information asymmetry the player does; anything else is the fog
-cheat the calibration research warns against. Version the schema from day one.
+**State export** (`export_corp_blackboard`, `--export-blackboard <corp|all>`; BL-206, blackboard
+export). A compact, tick-tagged, per-corp view of `corp_fact` records — `(tick, subject,
+predicate, value, confidence, provenance)`, schema-versioned, deterministically ordered
+(subject-kind section, then entity id, then predicate), emitted as JSONL — that is
+**visibility-honest**: it contains only what that corp could see under the BL-068 rules and its
+own fog state — own buildings/pools/cash in full; public market prices/aggregates; rival
+*buildings* but not their internals; its own routes and survey state. The AI reads through the
+same information asymmetry the player does; anything else is the fog cheat the calibration
+research warns against.
 
-**The session actor (BL-387/BL-397, 2026-08-14).** `--serve` turned this seam into an external
-input surface, and validation written for the trusted in-process caller did not transfer:
-`cmd.corp` and BLACKBOARD's `corp=` were caller-supplied, so an agent could command any rival and
-read any rival's private view. Authority now lives at the **protocol layer**, not in
-`apply_corp_command` (the in-process scorer legitimately commands every rival and must keep
-doing so): a serve session has one **actor** (`--as <corp>`, default the player corp), COMMAND
-refuses any other corp with `rejected_not_owner`, and BLACKBOARD serves only the actor's
-visibility-honest view. `--as any` is the explicit research opt-in (bot-vs-bot, the BL-279
-corpus) — permissive mode exists but must be asked for and is visible in the invocation. The
-general rule this instance produced lives in the standing rules: **an AI-facing seam is an
-untrusted input boundary; validate the value that lands in the field, at the boundary.**
+**The session actor.** `--serve` turns this seam into an external input surface, and validation
+written for the trusted in-process caller does not transfer to it. Authority lives at the
+**protocol layer**, not in `apply_corp_command` (the in-process scorer legitimately commands every
+rival and must keep doing so): a serve session has one **actor** (`--as <corp>`, default the
+player corp), `COMMAND` refuses any other corp with `rejected_not_owner`, and `BLACKBOARD` serves
+only the actor's visibility-honest view. `--as any` is the explicit research opt-in (bot-vs-bot,
+the trace corpus) — permissive mode exists but must be asked for and is visible in the
+invocation. Every wire field is range-checked **as the value that lands in the destination**
+before any narrowing cast, and a violation rejects the whole command with nothing mutated
+(`verb=` is gated to `[0, corp_verb_count)`). The general rule lives in the standing rules: **an
+AI-facing seam is an untrusted input boundary; validate the value that lands in the field, at the
+boundary.**
 
 ---
 
-## 6a. The action dictionary (BL-270, 2026-08-02) — the word interface's third leg
+## 6a. The action dictionary — the word interface's third leg
 
 The seam above gives an out-of-process policy its **write** channel and the state export
 its **read** channel. What neither states is *meaning*: which press to choose, and why.
-**`docs/ai/ACTIONS.json`** (readable mirror `ACTIONS.md`, generated by
+**`docs/ai/ACTIONS.json`** (BL-270, action dictionary; readable mirror `ACTIONS.md`, generated by
 `tools/session/render_actions.js`) closes that gap — every control in the game, catalogued
 as `{press, typed args, preconditions, expected_output, reason_to_select}` across five
 families (gameplay / canvas / lens / ledger / chrome).
@@ -531,19 +481,20 @@ Two properties matter for the AI use:
   mirror `corp_command.hpp`'s verbs and `corp_command_result` rejections exactly; where the
   dictionary and the seam disagree, the dictionary is wrong and the fix is mechanical.
 - **`reason_to_select` is the policy prior.** It states, in words, why a press exists —
-  the design intent an LLM policy conditions on before world state ever enters the picture.
-  This is what makes word-based play (and later word-driven generation, and the
-  difficulty-level work — Ben, 2026-08-02) a prompt-assembly problem rather than a
-  fine-tuning one: blackboard (read) + dictionary (meaning) + command seam (write).
+  the design intent a language model conditions on before world state ever enters the picture.
+  This is what makes word-based play (and word-driven generation, and the difficulty-level
+  work — Ben, 2026-08-02) a prompt-assembly problem rather than a fine-tuning one: blackboard
+  (read) + dictionary (meaning) + command seam (write).
 
 The catalogue axes, for orientation: `user_stories.json` = player **intent**;
-`UX_QUESTIONS` (BL-260) = what a readout **answers**; `ACTIONS` = what a press **does**.
+`question_log.json` (BL-260, UI justification store) = what a readout **answers**; `ACTIONS` =
+what a press **does**.
 
 **Consumption model (Ben, 2026-08-02).** A language agent never absorbs the store
 whole: it holds the generated **`ACTIONS_INDEX.json`** (`[id, surface]` per action)
 in context and fetches full entries on demand via
 `tools/session/actions_query.js` (by id, family, or keyword) — the lookup the
-word-play harness wraps as the LLM's dictionary tool.
+MCP server wraps as the model's dictionary tool.
 
 **Priority is NOT dictionary material (Ben, 2026-08-02).** Entries deliberately
 carry no urgency or importance score. The live AI scores each *candidate* action
@@ -564,56 +515,48 @@ diplomacy is *legible messaging*, not behind-the-scenes flags. This is a better 
 principle than invisible opinion modifiers — and in multiplayer the same channels carry human
 players, so the medium is actor-agnostic.
 
-- **Surface**: a **chat log window replaces the Explorer placeholder** (right shell band, middle
-  slot — the Explorer's pinning concept was never wired and is superseded; LAYOUT.md updated).
-  Channels: **Public** (every corp), plus **arbitrary groups** (any subset of corps, created from
-  the panel). The player reads Public and any group they belong to.
-- **Stage A (now)**: messages are **templated, deterministic renderings of the decision log** —
-  the BL-079 reflex events today ("Meridian idled Ironworks — sustained losses"), the BL-202
-  command stream when it lands. The chat is the AI-observability surface first; personality
-  prose comes later.
-- **Stage C (later)**: the LLM planner speaks in-character in channels; AI↔AI private groups
-  form plans the player cannot read — which is principled, because the *medium* is uniform and a
-  future intelligence mechanic (Discovery-model extension) can expose intercepts as content.
-- **Determinism**: stage-A message text derives purely from deterministic events. Free-text LLM
+- **Surface**: the **chat panel** (`src/ui/chat_panel.{hpp,cpp}`; BL-205, corp chat log) in the
+  right shell band, middle slot. Channels: **Public** (every corp), plus **arbitrary groups** (any
+  subset of corps, created from the panel). The player reads Public and any group they belong to.
+- **Stage A**: messages are **templated, deterministic renderings of the decision log** — the
+  reflex-tier agency events ("Meridian idled Ironworks — sustained losses") and the strategic
+  tier's command stream. The chat is the AI-observability surface first; personality prose is
+  Stage C's.
+- **Stage C** (BL-334, Stage C dialogue layer): a small model speaks in-character in channels,
+  conditioned on the scorer's decisions (§ 10g); AI↔AI private groups form plans the player
+  cannot read — which is principled, because the *medium* is uniform and an intelligence mechanic
+  (Discovery-model extension) can expose intercepts as content.
+- **Determinism**: stage-A message text derives purely from deterministic events. Free-text model
   chat arrives only under the C-route rules (out-of-process, coarse-grained, replay-logged).
-- **Player input**: a message box posts to the selected channel. It has **no mechanical effect
-  yet** — it is the hook the C-route consumes (the player negotiating with AI corps in language).
-
-> **2026-08-02 note, superseded 2026-08-03 — see § 10.** A design pass explored C-route as a
-> shipped in-process feature (a live Anthropic API call per corp per econ tick) and got as far as
-> a full decomposition before Ben clarified that isn't the intent — see NR-039/NR-040 in
-> `NEEDS_REVIEW.json` for the walk-back. The interim reading was that the near-term plan meant
-> computer-use play (Claude driving the game visually via mouse/keyboard); the "what plumbing is
-> missing" question NR-040 left open is **answered in § 10**: an MCP server over the three legs
-> that already exist. Stage C's *shape* (out-of-process, coarse-grained, over legal primitives)
-> stands unchanged; its *transport* is now MCP and its *target model* is small and local.
+- **Player input**: a message box posts to the selected channel. It has **no mechanical effect**
+  — it is the hook Stage C consumes (the player negotiating with AI corps in language).
 
 ---
 
-## 8. Follow-on decomposition (filed 2026-07-26)
+## 8. Decomposition
 
-BL-199 closes with this decomposition; the build work is carried by:
+The build work of BL-199 is carried by:
 
-| Item | Carries | Requires |
-|---|---|---|
-| **BL-202** `CORP_AI_SCORED_UTILITY` | Stage A: the scorer, the corp-command seam + decision log, state-export implementation | — |
-| **BL-203** `CORP_AI_PREDICTIVE_SPENDING` | Stage B: strategy layer, priority buckets, spending forecast — the solvency answer (**landed 2026-07-31**, § 2B) | BL-202 |
-| **BL-204** `AI_SKILL_HARNESS` | Seed-set skill-regression harness (bot-vs-bot goldens: solvency, net-worth curves) + the tick-boundary **state hash** (doubles as the multiplayer desync primitive) | BL-202 |
-| **BL-205** `CORP_CHAT_LOG` | The § 7 surface: chat window replacing the Explorer, channels + groups, agency-event feed (first slice lands with the item's filing) | — |
+| Item | Carries |
+|---|---|
+| **BL-202** (corp AI scored utility) | Stage A: the scorer, the corp-command seam + decision log, the state export |
+| **BL-203** (corp AI predictive spending) | Stage B: strategy layer, priority buckets, spending forecast — the solvency answer (§ 2B) |
+| **BL-204** (AI skill harness) | Seed-set skill-regression harness (bot-vs-bot goldens: solvency, net-worth curves) + the tick-boundary **state hash** (doubles as the multiplayer desync primitive) |
+| **BL-205** (corp chat log) | The § 7 surface: chat panel, channels + groups, agency-event feed |
 
-Economics the scorer prices, settled alongside (same session): **BL-153** (convoy freight
-premium) and **BL-193** (stack diminishing returns); **BL-160/161** confirmed as the AI's trade
-primitives (the AI authors the same policy objects via commands).
+Economics the scorer prices, settled alongside: **BL-153** (convoy pay by distance) and
+**BL-193** (stack diminishing returns); **BL-160** (auto exchange policy) / **BL-161**
+(counterparty allow/deny) are the AI's trade-policy primitives — the AI authors the same policy
+objects via commands.
 
 ---
 
-## 8a. The world history log (BL-208, landed 2026-08-02)
+## 8a. The world history log
 
-The project's first flat-binary serialisation seam (`src/world/history_log.{hpp,cpp}`),
-answering backlog.json § BL-208's settled design: a **single interleaved, append-only, tagged,
-serialised** world log — not per-body/per-corp logs, which fail the moment a corporation acts on
-a body (every interesting event) and would need a join with no shared ordering.
+The project's first flat-binary serialisation seam (`src/world/history_log.{hpp,cpp}`; BL-208,
+world history log): a **single interleaved, append-only, tagged, serialised** world log — not
+per-body/per-corp logs, which fail the moment a corporation acts on a body (every interesting
+event) and would need a join with no shared ordering.
 
 **The shape**, in `src/world/world.hpp`:
 
@@ -634,42 +577,41 @@ std::vector<world_history_entry> history_log;  // on `world`
 
 **Timestamp is topic-scoped, deliberately.** `genesis`/`checkpoint` entries reuse
 `history_event::years_before_epoch` exactly (positive = the deep/historical past, 0 = the 1960
-epoch) — no conversion, per the item's own settled design. `decision`/`agency`/`trade_route`
-entries — which only ever occur during the live simulation, strictly after the genesis chapter's
-one-time bulk-insert at world setup — instead carry the sim day tick. A reader branches on
-`topic` to know which clock it is reading; nothing needs the two to compare numerically, because
-the vector's append order is already the true chronological order end-to-end.
+epoch) — no conversion. `decision`/`agency`/`trade_route` entries — which only ever occur during
+the live simulation, strictly after the genesis chapter's one-time bulk-insert at world setup —
+instead carry the sim day tick. A reader branches on `topic` to know which clock it is reading;
+nothing needs the two to compare numerically, because the vector's append order is already the
+true chronological order end-to-end.
 
-**The four sources, all additive to their existing consumers** (no behaviour change to anything
-that already read `ai_decisions`, `agency_events`, or `trade_routes`):
+**The four sources, all additive to their existing consumers** (`ai_decisions`, `agency_events`
+and `trade_routes` keep their own readers unchanged):
 
 - **genesis** — `seed_genesis_history(world&, const generation_report&)` copies each body's dated
   `history_event` lines into the log at world setup (`app::setup_world`, right after
-  `make_hard_coded_world`), tagged by that body's entity id. This is the first bridge from
+  `make_hard_coded_world`), tagged by that body's entity id. This is the bridge from
   `generation_report` (presentation-only; per `hard_coded_world.hpp` it never otherwise reaches
   `world`) into world state.
 - **checkpoint** — the same call migrates `planetology_state::checkpoints` alongside genesis, per
   body, merged and stable-sorted into one chronological run. `checkpoint_record` carries no
   timestamp of its own; the resolution rule (a documented simplification, not an exact per-line
-  pairing — see `history_log.cpp`'s `resolve_checkpoint_timestamp` and the NEEDS_REVIEW entry it
-  cites) takes the LAST dated history line at or before the checkpoint's own chain stage.
-- **decision** — `corp_ai.cpp`'s strategic-tier push site additionally logs a one-line narration of
-  each applied `corp_decision` (verb + reason + score). `corp_decision_ring` (the existing 256-cap
-  ring) is untouched.
-- **agency** — both the BL-079 reflex tier (`economy_system.cpp`'s recipe-rescue and idle-a-loser
-  sites) and the BL-202 strategic tier (`corp_ai.cpp`) additionally log a narrated `agency` entry.
-  `economy_report::agency_events` (the chat feed's existing source) is untouched.
+  pairing — `history_log.cpp`'s `resolve_checkpoint_timestamp`) takes the LAST dated history line
+  at or before the checkpoint's own chain stage.
+- **decision** — `corp_ai.cpp`'s strategic-tier push site logs a one-line narration of each
+  applied `corp_decision` (verb + reason + score). `corp_decision_ring` is untouched.
+- **agency** — both the reflex tier (`economy_system.cpp`'s recipe-rescue and idle-a-loser sites)
+  and the strategic tier (`corp_ai.cpp`) log a narrated `agency` entry. The narration knows every
+  verb; verbs the chat feed has no vocabulary for (the procurement triple, the convoy pair) are
+  logged here and pushed to no feed event, rather than mis-narrated as the feed's kind 0.
 - **trade_route** — `supply_system.cpp`'s `credit_arrived_convoys` logs only when a body-pair lane
-  is **first established** (the `rit == w.trade_routes.end()` branch), never on a repeat completion
-  (which only bumps the existing `trade_route`). `world::trade_routes` and
-  `body_activity_visibility` are untouched, byte-for-byte.
+  is **first established**, never on a repeat completion (which only bumps the existing
+  `trade_route`). `world::trade_routes` and `body_activity_visibility` are untouched.
 
-  **Two entries per establishment (BL-282, landed 2026-08-09).** A new route is a *two-body* event
-  but `world_history_entry` carries one body tag, so tagging only the destination made a
-  body-scoped "what happened at X" filter miss the route from its **source** side. The branch now
-  pushes **two** entries — one tagged `src_body`, one tagged `dest_body` — carrying the *same*
-  narration naming both endpoints. Order within the tick is fixed **source then destination**, not
-  iteration-dependent, so replays stay byte-identical.
+  **Two entries per establishment** (BL-282, route log tags both bodies). A new route is a
+  *two-body* event but `world_history_entry` carries one body tag, so tagging only the
+  destination would make a body-scoped "what happened at X" filter miss the route from its
+  **source** side. The branch pushes **two** entries — one tagged `src_body`, one tagged
+  `dest_body` — carrying the *same* narration naming both endpoints. Order within the tick is
+  fixed **source then destination**, not iteration-dependent, so replays stay byte-identical.
 
   *Why not widen the struct.* A `body_b` field would change a struct four other call sites depend
   on, for one topic's need, and would leave every other topic carrying a field it never sets. Two
@@ -683,21 +625,18 @@ that already read `ai_decisions`, `agency_events`, or `trade_routes`):
   let the renderer de-duplicate on `(tick, event)` when it is *not* filtering by body.
 
 **Serialisation** (`write_history_log`/`read_history_log`): a leading 4-byte magic (`"IOHL"`) plus
-a `uint32_t` version (BL-107's "first thing to add when the serialiser lands" rule), then an entry
-count, then each entry length-prefixed. `read_history_log` rejects — rather than misreads — a
-wrong magic, an unsupported version, an unknown topic byte, or a truncated stream, leaving the
-destination world's `history_log` untouched on any rejection. Round-trip is field-identical.
-Verified by `tools/verify/history_log_harness.cpp` (mirrors `history_ladder_harness.cpp`'s style:
-built over the real generated world, not hand-fabricated entries) and an added determinism check
-in `tools/verify/determinism_harness.cpp` (two identical-seed generations produce an identical
+a `uint32_t` version (BL-107's magic-and-version rule), then an entry count, then each entry
+length-prefixed. `read_history_log` rejects — rather than misreads — a wrong magic, an
+unsupported version, an unknown topic byte, or a truncated stream, leaving the destination
+world's `history_log` untouched on any rejection. Round-trip is field-identical. The whole-world
+snapshot (`world_save.cpp`) embeds this stream whole, nested magic and all, rather than
+re-defining its bytes. Verified by `tools/verify/history_log_harness.cpp` (built over the real
+generated world, not hand-fabricated entries) and a determinism check in
+`tools/verify/determinism_harness.cpp` (two identical-seed generations produce an identical
 genesis+checkpoint chapter).
 
-Not built (deliberately out of scope, per the item's brief): a save-game menu/UI. The serialiser
-is a library function a harness exercises; the one live hook is the genesis-chapter bridge at
-world setup.
-
-BL-218 (nations rewrite) and BL-219 (corporations rewrite) are expected to write into this same
-log — the substrate this item exists to hand them, per the item's own resequencing rationale.
+The nation and corporation generation passes write into this same log — the substrate it exists
+to hand them.
 
 ---
 
@@ -723,24 +662,18 @@ Sources gathered by the deep-research harness (2026-07-23). Each supports the cl
 - Toward Automated Game Balance: self-play bots reduce manual testing / assess difficulty. https://www.researchgate.net/publication/355109124
 - AgentAssay — Regression Testing for Non-Deterministic Agents: Pass/Fail/Inconclusive statistical verdicts. https://arxiv.org/pdf/2603.02601
 
-**Two specifics the research could not pin down:** Vox Deorum's exact state-export schema, per-decision
-latency, and token cost (the architecture and results are confirmed; the low-level interface numbers
-are not); and a numeric per-tick AI CPU budget from Paradox (the tick-task *mechanism* is documented,
-concrete budget values are not published). Both matter for designing Io's option C and should be
-resolved from full-text sources before committing to an LLM-planner build.
-
-> **Resolved 2026-08-03 (§ 10).** The Vox Deorum numbers are now published: **~1 minute per
-> decision** (model-dependent) and **20.35M input / 555k output tokens per complete game** for
-> `gpt-oss-120b`. The Paradox per-tick CPU budget remains unpublished and is now moot for the
-> C-route — the planner runs out-of-process and off the sim's tick budget entirely.
+**Two numbers the C-route sizing rests on.** Vox Deorum's per-decision latency and token cost are
+published: **~1 minute per decision** (model-dependent) and **20.35M input / 555k output tokens per
+complete game** for `gpt-oss-120b`. Paradox's per-tick AI CPU budget is not published (the
+tick-task *mechanism* is) and is moot for the C-route — the model runs out-of-process and off the
+sim's tick budget entirely.
 
 ---
 
-## 10. The 2026-08-03 refresh — MCP, the public field, and the small-local-model direction
+## 10. MCP, the public field, and the small-local-model direction
 
-A wide survey of publicly available LLM-grand-strategy work, run 2026-08-03. It supersedes
-§ 7's 2026-08-02 note, answers NR-040's open "what plumbing?" question, and states the
-direction Ben set on reading it.
+A wide survey of publicly available LLM-grand-strategy work (2026-08-03), and the direction Ben
+set on reading it. It answers NR-040's "what plumbing?" question.
 
 ### 10a. What MCP is, and why it is the answer here
 
@@ -761,30 +694,29 @@ Four properties are what make it the right seam for Io:
 
 1. **The model side stays entirely out of process.** `ProjectIo.exe` ships **no HTTP client, no
    API key, no cloud dependency**. The MCP server is a local process; with no client attached
-   the game is byte-identical to today. This is the exact thing NR-039's walk-back rejected —
-   a live API call inside the econ tick — avoided by construction rather than by discipline.
-2. **Model-agnostic by design.** The same server serves a cloud frontier model today and a
-   locally-hosted small model tomorrow, with no change on the Io side. That swap *is* the
-   direction in § 10d, so the interface must not care which model is attached.
+   the game is byte-identical. This is the exact thing NR-039's walk-back rejected — a live API
+   call inside the econ tick — avoided by construction rather than by discipline.
+2. **Model-agnostic by design.** The same server serves a cloud frontier model and a
+   locally-hosted small model, with no change on the Io side. That swap *is* the direction in
+   § 10d, so the interface must not care which model is attached.
 3. **Fair by construction.** Tools are the only write channel, so the model plays through the
    same validation and the same visibility rules as the player. The field converged on this
    independently — `civ6-mcp` routes every agent action through Civilization VI's own
    rule-enforcing Lua APIs rather than mutating state.
-4. **It is now the field standard.** Vox Deorum, `civ6-mcp`, `civStation` and CivBench all
+4. **It is the field standard.** Vox Deorum, `civ6-mcp`, `civStation` and CivBench all
    arrived at an MCP wrapper over a fixed verb list, separately. Adopting it costs nothing in
    originality and buys every existing client for free.
 
-**Io is unusually close to MCP-ready**, because BL-270 (action dictionary) and BL-206
-(blackboard export) already built the hard parts. The mapping is near-mechanical:
+**Io's three legs fill the primitives near-mechanically:**
 
-| MCP primitive | The Io asset that already fills it |
+| MCP primitive | The Io asset that fills it |
 |---|---|
-| **tools** | `corp_command.hpp`'s verbs — already typed, already validated, already rejection-enumerated (`corp_command_result`) |
+| **tools** | `corp_command.hpp`'s verbs — typed, validated, rejection-enumerated (`corp_command_result`) |
 | **resources** | `--export-blackboard` JSONL (BL-206) — visibility-honest, deterministic ordering, schema-versioned |
 | **prompts** | `reason_to_select` in `ACTIONS.json` (BL-270) — the design-intent prior, in words |
-| the lookup | `ACTIONS_INDEX.json` + `actions_query.js` — already the hold-the-index, fetch-on-demand pattern an MCP tool wraps |
+| the lookup | `ACTIONS_INDEX.json` + `actions_query.js` — the hold-the-index, fetch-on-demand pattern an MCP tool wraps |
 
-The honest read of NR-040: the plumbing that was missing is **one wrapper**, not a subsystem.
+The plumbing NR-040 asked about is **one wrapper**, not a subsystem.
 
 ### 10b. The public field
 
@@ -792,7 +724,8 @@ The honest read of NR-040: the plumbing that was missing is **one wrapper**, not
 |---|---|---|
 | **Cicero** (Meta, 2022) | LLM dialogue + strategic planner for full-press *Diplomacy*; top-10% on webDiplomacy | Language and planning as **separate modules** with the planner controlling the language model — still the reference architecture for negotiation |
 | **Vox Deorum** | LLM macro-strategy over Civ V + Vox Populi; **2,327 full games** | The load-bearing result — see § 10c.1 |
-| **civ6-mcp / CivBench** | MCP server (76 tools) over Civ VI's FireTuner debug protocol; open benchmark over frontier models | Names the two dominant failure modes (§ 10c.3) |
+| **civ6-mcp / CivBench (Civ VI)** | MCP server (76 tools) over Civ VI's FireTuner debug protocol; open benchmark over frontier models | Names the two dominant failure modes (§ 10c.3) |
+| **CivBench (Civ V)** | A different project of the same name, from the Vox Deorum authors: victory-probability estimators trained on turn-level state across 307 games | Progress-based evaluation — scoring a game before it ends |
 | **civStation** | Voice-commanded Civ VI agent over a layered MCP | Human-sets-strategy / agent-executes — the counsel model, not the autopilot model |
 | **CivAgent** (fuxiAIlab) | LLM digital player inside *Unciv*; explicitly built as a **data flywheel** | The play-to-collect-traces pattern Io's § 10d adopts |
 | **CivRealm** (BIGAI) | Freeciv-web env with a server-proxy-client harness, RL *and* LLM agent interfaces | Turn-based pacing suits LLM latency; a proxy is the clean isolation seam |
@@ -819,9 +752,9 @@ not a capability problem.
 
 **2. The LLM should hold only the macro layer.** Every project that worked delegated tactics to
 algorithmic subsystems. Vox Deorum "decapitates" the game's algorithmic AI — replaces its
-top-level strategic module and leaves every micro-tactical system in place. This is exactly the
-A → B utility core with a coarse planner above it that § 2 already recommends; it now has
-2,327 games of evidence behind it rather than one paper.
+top-level strategic module and leaves every micro-tactical system in place. This is the A → B
+utility core with a coarse layer above it that § 2 recommends, with 2,327 games of evidence
+behind it rather than one paper.
 
 **3. Personality is emergent and free.** Vox Deorum's two models developed distinguishable
 styles unprompted — `gpt-oss-120b` leaned domination (**+31.5% domination victories** vs
@@ -836,12 +769,12 @@ keeping the strategy prompt thin and letting `focus_weight` (§ 5) supply the bi
   recovered from. The stated minimum fixes are **explicit future evaluation, backward value
   propagation, and limited commitment** — and even *one-step lookahead* escapes traps where all
   step-wise strategies provably fail.
-- **The sensorium effect** (CivBench). Agents miss information they never think to query. A
-  purely *pull*-based tool interface silently punishes an agent for not knowing what to ask.
-- **The knowing-doing gap** (CivBench). Models articulate the right strategy and then fail to
-  execute it. The worked example: Opus-controlled Portugal spent 50 turns planning and executing
-  a nuclear campaign to stop a French cultural victory, struck twice — and lost anyway, to a
-  *diplomatic* victory it had stopped tracking.
+- **The sensorium effect** (CivBench, Civ VI). Agents miss information they never think to query.
+  A purely *pull*-based tool interface silently punishes an agent for not knowing what to ask.
+- **The knowing-doing gap** (CivBench, Civ VI). Models articulate the right strategy and then fail
+  to execute it. The worked example: Opus-controlled Portugal spent 50 turns planning and
+  executing a nuclear campaign to stop a French cultural victory, struck twice — and lost anyway,
+  to a *diplomatic* victory it had stopped tracking.
 - **The observation-belief and belief-action gaps** (studied on Llama-3.1, Qwen3 and `gpt-oss` —
   precisely the open-weight class Io is targeting). Models' *internal* beliefs about hidden state
   are measurably **more accurate than their own verbal reports**; those beliefs degrade with
@@ -855,15 +788,17 @@ keeping the strategy prompt thin and letting `focus_weight` (§ 5) supply the bi
 **5. What measurably improves play, cheapest first.** This is the actionable ranking:
 
 1. **Push state to the model rather than making it pull** — kills the sensorium effect outright.
-   Io's blackboard export is already a push artifact; the MCP server should lead with it rather
-   than making the model discover it.
+   Io's blackboard export is a push artifact; the MCP server leads with it rather than making the
+   model discover it.
 2. **Pre-render context into words**, including spatial relations (SAGA's scene graph). Io's
-   `expected_output` / `reason_to_select` fields are this, already written.
+   `expected_output` / `reason_to_select` fields are this.
 3. **Mask to legal primitives.** Universal across every project; Io gets it free from
    `corp_command`'s validation.
 4. **Add goal persistence with periodic re-evaluation, plus cross-game post-mortem** — SAGA's
    dual-horizon loop, Richelieu's memory-and-reflection, Agents-of-Change's self-rewriting
-   prompts. This is the documented answer to both myopia and the knowing-doing gap.
+   prompts. This is the documented answer to both myopia and the knowing-doing gap
+   (`STRATEGIES.md` carries Io's version; a goal layer above the scorer is BL-336, goal layer /
+   myopia mitigation, parked until the scorer is observed exhibiting the failure mode).
 5. **Only then, a bigger model.** Every project reports the scaffolding mattering more than the
    model tier.
 
@@ -884,9 +819,9 @@ tokens of decision trace. A few hundred logged games is a serious supervised cor
 
 ### 10d. The accepted direction (Ben, 2026-08-03)
 
-**MCP is sanctioned.** Io gets an MCP server over the three legs that already exist — blackboard
-export (read), action dictionary (meaning), corp-command seam (write). This replaces the
-computer-use reading NR-040 recorded as the interim plan.
+**MCP is sanctioned.** Io has an MCP server over the three legs — blackboard export (read),
+action dictionary (meaning), corp-command seam (write). This replaces the computer-use reading
+NR-040 recorded as the interim plan.
 
 **The runtime target is a small, local model.** Not a cloud dependency, not a frontier model —
 a model that runs on Ben's own machine, playing through text. Cloud inference is **not** the
@@ -894,10 +829,10 @@ shipped runtime and never becomes one.
 
 **Cloud's only role is corpus generation.** A frontier model plays Io through the *same* MCP
 interface; every decision is logged as an input/output pair — the blackboard state and dictionary
-slice that went in, the `corp_command` and its rationale that came out. Those pairs are the
-supervised fine-tuning corpus for the local model. This is CivAgent's data-flywheel pattern and
-Richelieu's no-human-data self-play, applied to a game whose deterministic seeds can generate the
-scenarios for free (§ 3).
+slice that went in, the command and its rationale that came out. Those pairs are the supervised
+fine-tuning corpus for the local model. This is CivAgent's data-flywheel pattern and Richelieu's
+no-human-data self-play, applied to a game whose deterministic seeds can generate the scenarios
+for free (§ 3). Which layer that corpus trains is § 10g's ruling.
 
 **The goal remains "fair, beatable, legible", not "strong".** § 10c.1 is what makes this
 credible: parity with a tuned algorithmic 4X AI was reached *without any fine-tuning at all*, so
@@ -909,87 +844,64 @@ commands still apply at the tick boundary through player-grade validation, and N
 determinism carve-out stays reverted. Trace logging gives replay for free — the corpus and the
 replay log are the same artifact.
 
-### 10e. Follow-on items
+### 10e. The MCP server and the serve protocol
 
-| Item | Carries |
-|---|---|
-| **BL-278** `IO_MCP_SERVER` — **landed 2026-08-03** | The MCP server over blackboard export + action dictionary + corp-command seam — the § 10a wrapper |
-| **BL-279** `AI_TRACE_CORPUS` | Trace logging, corpus format, and the cloud-play → SFT-dataset pipeline for the small local model (§ 10d) |
+Two items carry the direction: **BL-278** (Io MCP server) — the § 10a wrapper — and **BL-279**
+(trace corpus) — trace logging, corpus format, and the play → SFT-dataset pipeline (§ 10d, as
+rescoped by § 10g).
 
-**BL-278, as built.** `ProjectIo --serve [--ticks N]` (`src/main.cpp`) is the new persistent
-headless mode: it builds the canonical world once, then reads one request per line from stdin
-(`TICK`, `BLACKBOARD corp=<id> ticks=<n>`, `COMMAND corp=<id> verb=<0-7> ...`, `SHUTDOWN`) and
-writes one response per line, reusing the existing `export_corp_blackboard`/`to_jsonl` (BL-206)
-and `apply_corp_command` (no bypass) underneath. `tools/mcp/server.js` spawns that process and
-speaks MCP-over-stdio to it — hand-rolled JSON-RPC 2.0 (no SDK dependency; none was installed in
-this repo) covering `initialize`, `tools/list`, `tools/call` (`get_blackboard`, `issue_command`,
-`advance_tick`, `lookup_action`, `list_actions`, `list_corps`), `resources/templates/list` and
-`resources/read` (`blackboard://<corp>`). `get_blackboard` always returns the full current-tick
-blackboard — the push-not-pull call from § 10c.5. Smoke-tested end-to-end (tool list, blackboard
-read, a `set_workforce` command applying, a resource read) 2026-08-03; no golden/visual requirement
-applies (doc-only surface, no rendering). Prompts (the `reason_to_select` leg) are not yet
-exposed as MCP `prompts/*` — `lookup_action`/`list_actions` cover the same data via tools for now;
-left as a follow-on rather than blocking the first attach.
+**The serve mode.** `ProjectIo --serve [--ticks N] [--as <corp-id|any>]` (`src/main.cpp`) is the
+persistent headless mode: it builds the canonical world once, then reads one request per line
+from stdin and writes one response per line. The opcodes — `TICK`, `BLACKBOARD corp=<id>
+ticks=<n>`, `COMMAND corp=<id> verb=<n> ...`, `CORPS`, `BODIES`, `SHUTDOWN` — live in
+`src/core/agent_protocol.{hpp,cpp}`, shared verbatim with the live seam (§ 10j), and reuse
+`export_corp_blackboard`/`to_jsonl` and `apply_corp_command` (no bypass) underneath. `COMMAND`
+parses every argument key every verb reads, and every `corp_command_result` has a name on the
+wire, so a business decline ("the supplier holds no capacity", "you are embargoed") is never
+reported as a syntax error — typed, enumerated failure is the property § 10a leans on for
+self-correction. A `TICK` runs the whole tick sequence, surveys included, so a dispatched survey
+progresses and reveals tiles an agent can then build on.
 
-**`list_corps` (added 2026-08-04, BL-306).** The seam had no way to enumerate corps or identify
-the player — `get_blackboard`/`issue_command` both require a corp id, and corp ids in a generated
-world are non-obvious. Read-only export from a new `CORPS` opcode in `run_serve`: one JSON line
-per corp (`id`, `name`, `is_player`, `home_nation`), then `END`. Six tools, not five (NR-061).
+**Enumeration.** `CORPS` returns one JSON line per corp (`id`, `name`, `is_player`,
+`home_nation`) then `END`, because corp ids in a generated world are non-obvious (NR-061).
+`BODIES` is its sibling: `survey`, `place_sell_order` and `request_quote` all take a body id as
+`subject`, and the blackboard keys pool facts by the corp's own `(corp, body)` pool and market
+facts by **market** id — so without `BODIES` an agent could never name a body it has no pool and
+no activity on, which is every body worth surveying.
 
-**Repaired and made runnable 2026-08-13.** BL-278 was smoke-tested once by hand on the day it
-landed and never again, and by 2026-08-13 the seam it describes had drifted badly from the seam
-that existed. Five defects, none of which had ever failed a run because nothing re-ran it:
+**The wrapper.** `tools/mcp/server.js` spawns that process and speaks MCP-over-stdio to it —
+hand-rolled JSON-RPC 2.0 (no SDK dependency) covering `initialize`, `tools/list`, `tools/call`,
+`resources/templates/list` and `resources/read` (`blackboard://<corp>`). Seven tools:
+`get_blackboard`, `issue_command`, `advance_tick`, `lookup_action`, `list_actions`, `list_corps`,
+`list_bodies`. `get_blackboard` always returns the full current-tick blackboard — the
+push-not-pull call from § 10c.5. The `reason_to_select` leg is served through
+`lookup_action`/`list_actions` rather than as MCP `prompts/*`. `server.js` resolves the binary
+across the Linux (`ProjectIo`) and MSVC (`ProjectIo.exe`) layouts; `--attach <port>` connects to a
+live session instead of spawning a child (§ 10j).
 
-- **Five of the fifteen verbs could not be issued at all, and a sixth only ever did one thing.**
-  The `COMMAND` opcode parsed nine argument keys and the enum had grown three verb families past
-  it — BL-324's `hire_unit`, BL-293's order book, BL-350's procurement. Their arguments were never
-  read, so `place_sell_order` always arrived with `quantity = 0` (rejected outright) and
-  `remove_sell_order` / `accept_quote` / `cancel_contract` always named order `0`, while
-  `request_quote` named a null supplier. `hire_unit` is the partly-supported sixth: `unit_type`
-  defaulted to 0, a valid roster index, so it worked but could only ever raise roster row 0.
-  `ACTIONS.json` and this document described all of them as available.
-- **Four of the twelve result codes were reported as `rejected_invalid`.** `corp_command_result_name`
-  had no cases for BL-350's four declines, so "the supplier holds no capacity", "your inputs are
-  unreachable", "you are embargoed" and "your reputation is too low" all reached the agent as
-  *your arguments are malformed*. Typed, enumerated failure is the property § 10a leans on for
-  self-correction; collapsing four business outcomes into a syntax error removes it.
-- **The MCP wrapper could not start on Linux.** `tools/mcp/server.js` spawned
-  `build/ProjectIo.exe`; the primary dev target builds `ProjectIo`. It now resolves across the
-  Linux and MSVC layouts.
-- **`survey` was an applicable verb whose effect never arrived.** `run_serve` never called
-  `advance_surveys`, so a dispatched survey never progressed, no tile was ever revealed, and
-  `build` / `place_road` had no discoverable target. The tick sequence was also duplicated
-  verbatim between the warm-up loop and the `TICK` opcode, which is how the step came to be
-  missing from both; it is now one lambda.
-- **A body could not be named unless the agent was already there.** `survey`, `place_sell_order`
-  and `request_quote` all take a body id as `subject`. The blackboard is not silent about bodies —
-  `pool:<resource>` facts are keyed by the corp's own `(corp, body)` pool and `body_activity` by a
-  known body — so an agent could recover the ids of bodies it already trades on. What it could not
-  do is name a body it has no pool and no activity on, which is **every body worth surveying**, and
-  it could never recover a name or a survey phase for any of them. Market facts do not help: they
-  are keyed by **market** id, so a price is legible on a body the agent cannot address. Fixed by a
-  `BODIES` opcode and a `list_bodies` tool, the sibling of NR-061's `list_corps`.
+**The committed checks.** `tools/mcp/smoke.js` drives `--serve` over the raw line protocol and
+asserts the *shape* rather than the economics: every opcode answers, every verb reaches the seam
+and returns a code that is actually in `corp_command_result`, a well-formed sell order is
+distinguishable from a malformed one, and `SHUTDOWN` is acknowledged. It asserts nothing about
+whether a given command *should* succeed — that is the `tools/verify/` harnesses' business.
+`tools/mcp/session.js` is its sibling for play (§ 10h). The rule both encode: **a seam nobody
+exercises is a seam nobody can trust.**
 
 ### 10h. AI play as a bug-finding instrument (Ben, 2026-08-13)
 
-Ben, on reading the 2026-08-13 seam repair and its findings: *"It seems like pushing for AI play
-will expose more bugs and give us actionable improvements now."*
+Ben: *"It seems like pushing for AI play will expose more bugs and give us actionable
+improvements now."*
 
 **This is a reframe of why the word interface matters, and it is worth stating separately from
 § 10d's runtime argument.** § 10d justifies MCP and a local model as the road to a *rival*. This
 says the interface pays before any of that ships, because **an agent playing the game is a test
-oracle no harness replicates**.
+oracle no harness replicates**. Three sources of defects, in ascending order of yield:
 
-The evidence for it is the session that prompted it. Every defect found on 2026-08-13 came from
-one of three sources, and they are in ascending order of yield:
-
-1. **Running an existing instrument** — the skill harness's action tally, once it could name every
-   verb, exposed the idle/resume oscillation that had been the AI's dominant behaviour for an
-   unknown number of sprints.
-2. **Reading the seam** — five defects in BL-278's protocol, none of which had ever failed a run,
-   because nothing re-ran it.
-3. **Asking what a player would actually try** — which is how the survey verb's missing effect, the
-   unnameable body, and the four collapsed decline codes surfaced. Nobody had played it.
+1. **Running an existing instrument** — the skill harness's action tally, once it names every
+   verb, reads an oscillation that had been the AI's dominant behaviour.
+2. **Reading the seam** — protocol defects that never fail a run because nothing re-runs it.
+3. **Asking what a player would actually try** — how a verb whose effect never arrives, an
+   unnameable body, or a collapsed decline code surfaces. Nobody had played it.
 
 A harness asserts what its author already suspected. A player discovers what nobody thought to
 assert — and an *agent* player does it repeatably, at machine speed, and writes down what it tried.
@@ -999,39 +911,27 @@ before extending it.
 
 **The instrument is `tools/mcp/session.js`**, alongside `smoke.js`. The division is deliberate:
 `smoke.js` asks whether the protocol *answers* (shape, every verb, typed results), `session.js`
-asks what happens when someone *plays* (agenda, consequence, surprise). Both are committed, because
-the standing lesson of BL-278 is that an unexercised seam is an untrusted one.
+asks what happens when someone *plays* (agenda, consequence, surprise). Both are committed.
 
-**What this does NOT change.** The § 10g ruling stands unaltered: the deterministic scorer remains
-the action generator for the shipped rival, and an agent playing a corp is still the research use
-of BL-278 that § 10g explicitly preserved. What changes is the *value* assigned to that research
-use — it was filed as spectacle, and it is turning out to be diagnostics.
+**What this does NOT change.** The § 10g ruling stands: the deterministic scorer remains the
+action generator for the shipped rival, and an agent playing a corp is the research use of the
+MCP server that § 10g preserves. What changes is the *value* assigned to that research use — it
+is diagnostics, not spectacle.
 
----
-
-**Seven tools now, and a committed check.** `tools/mcp/smoke.js` drives `--serve` over the raw
-line protocol and asserts the shape rather than the economics: every opcode answers, every one of
-the fifteen verbs reaches the seam and returns a code that is actually in `corp_command_result`,
-a well-formed sell order is distinguishable from a malformed one, and `SHUTDOWN` is acknowledged.
-It asserts nothing about whether a given command *should* succeed — that is the `tools/verify/`
-harnesses' business. Run it with `node tools/mcp/smoke.js`. The lesson is the general one: a seam
-nobody exercises is a seam nobody can trust, and all five defects above were found by reading
-rather than by failing.
-
-### 10i. Spectator mode — the seat, not the exception (BL-409, landed 2026-08-14)
+### 10i. Spectator mode — the seat, not the exception (BL-409, spectator mode)
 
 Ben, 2026-08-14, asked for a way to **watch the AI play in real time** and discover what
 strategies emerge — explicitly as a way to describe and explain the project's aims, not as
-a feature. Most of what that needs already existed: the clock runs to 16× (a quarter every
-~11 real seconds), rivals already act through `corp_command`, and every decision already
-records `winning_score` / `runner_up` / `reason`. What was missing was a **window**, and one
-rule.
+a feature. Most of what that needs exists: the clock runs to 16× (a quarter every ~11 real
+seconds), rivals act through `corp_command`, and every decision records `winning_score` /
+`runner_up` / `reason`. What it adds is a **window** (the decision feed, BL-407, and the Strategy
+readout, BL-411), and one rule.
 
-**The rule is not excepted; its subject is removed.** The draft of this item asked whether the
-scorer could be granted the player's corp under a spectate flag — a fourth narrow exception
-alongside BL-079's reflexes, BL-181's workforce dial and BL-202/BL-203's rival tier. Ben
-rejected the framing: *"In spectator mode, there is no need to mark a corp as played by a
-human. 'Who plays your corp' collapses as a question."*
+**The rule is not excepted; its subject is removed.** The item's draft asked whether the scorer
+could be granted the player's corp under a spectate flag — a fourth narrow exception alongside
+the reflex tier, the workforce dial and the rival tier. Ben rejected the framing: *"In spectator
+mode, there is no need to mark a corp as played by a human. 'Who plays your corp' collapses as a
+question."*
 
 That is the better model and a smaller change. The standing prohibition protects a corp
 **because a human owns it**. A spectated session has no human owner, so the precondition is
@@ -1043,48 +943,36 @@ corp on the same staggered cadence.
 
 **Two properties keep it honest**, both asserted by `tools/verify/spectator_determinism.cpp`:
 
-- The flag **defaults false**, and an unspectated run is byte-identical to the pre-BL-409
-  build — verified by stashing the guard changes and re-running against the genuine prior
-  code, not assumed: `state_hash 3CBAD1D44EE71EDE` both sides. The spectated run hashes
-  `E4933538DDB2A28C`, so "spectating moves the world" has teeth too.
+- The flag **defaults false**, and an unspectated run is byte-identical to a build without the
+  guards — the harness carries the dated `state_hash` provenance, and a spectated run hashes
+  differently, so "spectating moves the world" has teeth too.
 - Admitting one more corp **shifts no rival's cadence slot**, because the cadence index is
   over the sorted corp set, which does not change.
 
-**What the first run found.** The decision feed (BL-407) was pointed at a real 144-tick world
-and immediately surfaced two things no harness had. First, `runner_up` can legitimately
-**exceed** `winning_score`: it is `cands[i+1].score` and `candidate_before` sorts by priority
-bucket before score, so the next candidate may out-score the winner from a worse bucket
-(NR-226 — it matters because BL-411 and BL-279 are both about to aggregate that field).
-Second, the build score `(net / payback)` with `payback = capex / net` collapses to
-**`net² / capex`** — quadratic in margin, only inversely linear in capital — which is why real
-runs score in the billions (NR-230). Neither is a defect in the feed. Both are § 10h's thesis
-paying out on its first day: *a harness asserts what its author already suspected; a player
-discovers what nobody thought to assert.*
+Two companions complete the seat: player-press affordances (construction placement, order entry,
+workforce dials) are disabled under spectate — BL-413 (spectate disables player presses) — and
+the spectated viewpoint opens on a corp worth watching rather than whichever corp the player would
+have been — BL-418 (spectate viewpoint default).
 
-Still owed: player-press affordances are not yet disabled under spectate (the item's R4), and
-the spectated viewpoint still inherits whichever corp the player would have been — which on
-seed 0 is insolvent and asset-less (NR-231).
+### 10j. The live agent control seam (BL-412, live agent control seam)
 
-### 10j. The live agent control seam (BL-412, landed 2026-08-19)
-
-BL-278's `--serve` is headless-only by construction: `main.cpp` branches to the line-protocol
-loop *instead of* `app::run`, so an MCP-attached agent plays invisibly and the only way to
-observe its play is to read a transcript afterwards. Spectating the deterministic scorer
-(§ 10i) and spectating a *language model* were therefore different jobs. BL-412 is the second
-one: the **rendered app can now host an agent**, so a human watches an external model play a
-corp on the live canvas.
+`--serve` is headless-only by construction: `main.cpp` branches to the line-protocol loop
+*instead of* `app::run`, so an MCP-attached agent plays invisibly and the only way to observe its
+play is to read a transcript afterwards. Spectating the deterministic scorer (§ 10i) and
+spectating a *language model* are therefore different jobs. This seam is the second one: the
+**rendered app hosts an agent**, so a human watches an external model play a corp on the live
+canvas.
 
 **Transport.** `ProjectIo --host-agent [port]` (default 7717, composes with
 `--autostart-play`) opens a loopback TCP listener once a campaign is running —
 `src/core/agent_seam.{hpp,cpp}`, polled non-blocking from the frame loop, no worker thread.
 The engine only **listens**: no outbound connection, no HTTP client, no API key — the § 10
-invariant, untouched. The protocol is `--serve`'s line protocol *verbatim*: the opcode
-handlers moved to `src/core/agent_protocol.{hpp,cpp}` and both hosts (`run_serve`, which
-stays for headless use, and the seam) call the same parser, the same BL-396 field
-validation, the same BL-387/BL-397 actor gate. The session actor is the player corp — the
-seat the agent occupies (this is *not* BL-409's no-seat mode; the seat is occupied, just not
-by a human). Client side, `tools/mcp/server.js --attach <port>` connects to a live session
-instead of spawning a child.
+invariant, untouched. The protocol is `--serve`'s line protocol *verbatim*: both hosts
+(`run_serve` for headless use, and the seam) call the same parser in `agent_protocol.cpp`, the
+same field validation, the same actor gate. The session actor is the player corp — the seat the
+agent occupies (this is *not* § 10i's no-seat mode; the seat is occupied, just not by a human).
+Client side, `tools/mcp/server.js --attach <port>` connects to a live session instead of spawning
+a child.
 
 **Clock ownership — the agent gates the clock.** Attaching pauses the sim; a `TICK` request
 releases exactly one econ tick (`sim_loop::advance_days(90)` through the same
@@ -1106,20 +994,13 @@ client frames responses exactly as it does against `--serve`.
 
 **Scope.** § 10g stands: the deterministic scorer remains the shipped rival's action
 generator. This seam is the research and diagnostics configuration § 10h argues for —
-frontier-or-local models playing a corp interactively, now watchable.
+frontier-or-local models playing a corp interactively, watchable.
 
-### 10f. Sources added 2026-08-03
+### 10f. Sources for § 10
 
 - Vox Deorum — hybrid LLM architecture for 4X, 2,327 games, open-weight parity, per-game token cost. https://arxiv.org/abs/2512.18564 · https://github.com/CIVITAS-John/vox-deorum
-- CivBench — MCP-driven Civ VI benchmark; the sensorium effect and the knowing-doing gap. https://tasolabs.com/blog/ai/introducing-civbench-season-001
-  > **Citation corrected 2026-08-13.** This line previously also carried
-  > `arxiv.org/html/2604.07733v1`, which is a **different project of the same name**:
-  > *CivBench: Progress-Based Evaluation for LLMs' Strategic Decision-Making in Civilization V*,
-  > from the Vox Deorum authors, which trains victory-probability estimators on turn-level state
-  > across 307 games. The sensorium-effect and knowing-doing-gap findings § 10c.4 attributes to
-  > "CivBench" come from the **Civ VI / `civ6-mcp`** one, not from that paper. Two unrelated works
-  > share the name; § 10b's table row conflates them under one heading and should be split when
-  > that section is next touched.
+- CivBench (Civ VI, `civ6-mcp`) — MCP-driven Civ VI benchmark; the sensorium effect and the knowing-doing gap. https://tasolabs.com/blog/ai/introducing-civbench-season-001
+- CivBench (Civ V) — *Progress-Based Evaluation for LLMs' Strategic Decision-Making in Civilization V*, from the Vox Deorum authors; a different project sharing the name. https://arxiv.org/html/2604.07733v1
 - civ6-mcp — MCP server over Civ VI's FireTuner protocol; rule-enforcing API as the write channel. https://github.com/lmwilki/civ6-mcp
 - civStation — layered MCP, human-sets-strategy/agent-executes. https://github.com/NomaDamas/civStation
 - CivAgent — LLM digital player in Unciv; the data-flywheel framing. https://github.com/fuxiAIlab/CivAgent · https://arxiv.org/html/2502.20807v1
@@ -1137,56 +1018,52 @@ frontier-or-local models playing a corp interactively, now watchable.
 
 ### 10g. Ruling on the C-route feasibility note (Ben, 2026-08-08 — NR-094)
 
-A cloud research session (`docs/ai/LANGUAGE_POLICY_FEASIBILITY.md`) ran the two feasibility gates
-§ 10d implicitly set — can the runtime model be compressed, and does it run in budget — and both
-pass (3–8B compresses to Vox Deorum's already-open-weight-parity bar; the per-decision budget is
-~90s at 1×, ~5.6s at 16× for 8 rivals, computed from `sim_loop`'s own constants, against ~3–7s of
-measured 8B-Q4 decode). Neither gate disqualifies the local-model runtime target.
+`docs/ai/LANGUAGE_POLICY_FEASIBILITY.md` ran the two feasibility gates § 10d implicitly set — can
+the runtime model be compressed, and does it run in budget — and both pass (3–8B compresses to
+Vox Deorum's already-open-weight-parity bar; the per-decision budget is ~90s at 1×, ~5.6s at 16×
+for 8 rivals, computed from `sim_loop`'s own constants, against ~3–7s of measured 8B-Q4 decode).
+Neither gate disqualifies the local-model runtime target.
 
-**But the note is right that § 10d, as written, drifted from this doc's own Stage A/B/C
-decomposition (§ 7).** § 10d's MCP-attached "small local model plays through text" framing reads
-as the model calling `issue_command` directly — i.e. the model AS Stage A/B, replacing or
-augmenting the scorer's action-emission. That was never the plan `list_corps`/`issue_command`'s
-sibling framing in § 7 set: **Stage A/B (the deterministic scorer, BL-202/203) is the action
-generator; Stage C is the LLM speaking in-character in channels** — a dialogue layer over the
-decision stream, not a replacement for it. § 10d's drift is corrected here, not by walking back
-MCP or the local-model target (both stand), but by being explicit about which Stage the model
-occupies.
+**The note also fixed which seat the model occupies.** A "small local model plays through text"
+framing reads as the model calling `issue_command` directly — the model AS Stage A/B, replacing
+the scorer's action-emission. That was never the plan § 7 set: **Stage A/B (the deterministic
+scorer) is the action generator; Stage C is the model speaking in-character in channels** — a
+dialogue layer over the decision stream, not a replacement for it. MCP and the local-model target
+both stand; the ruling is explicit about the Stage.
 
 **Ruling: adopt the Cicero configuration the note recommends, as Stage C's concrete shape.**
 
 - **Stage A/B stays the action generator, indefinitely.** `corp_ai.cpp`'s scored-utility core
-  (or a future RL policy, § 8 of the note — not disqualified, just not chosen yet) keeps emitting
-  `corp_command`. This was never seriously in question once the note's § 9.1 point lands:
-  distilling `corp_ai.cpp` yields, at best, `corp_ai.cpp` — there is no skill upside to buy, only
-  legibility and determinism to lose, and both are named requirements (§ "The goal";
-  `docs/development/DEVLOG.md` inherits nothing from a policy with no rationale to show).
+  (or a future RL policy, § 8 of the note — not disqualified, just not chosen) keeps emitting
+  `corp_command`. Distilling `corp_ai.cpp` yields, at best, `corp_ai.cpp` — there is no skill
+  upside to buy, only legibility and determinism to lose, and both are named requirements
+  (§ "The goal").
 - **Stage C is a conditioned dialogue layer over the `corp_decision` ring**, not an independent
   planner. Cicero's shape exactly: the scorer's winning command + reason code IS the "intent" a
   small (Cicero's own reference point: 2.7B) model is conditioned on to speak in Public/private
-  channels (§ 7). This is where the diplomacy capability § 10d was actually reaching for lives —
-  separable from action generation, per the note's § 7.
-- **A goal layer above the scorer stays a live, separate option** — not decided here, filed as
-  its own open question in BL-334 below — for when/if step-wise myopia (§ 10c.4's documented
-  failure mode) is actually observed rather than assumed.
+  channels (§ 7). This is where the diplomacy capability lives — separable from action
+  generation, per the note's § 7. BL-334 (Stage C dialogue layer) owns it.
+- **A goal layer above the scorer stays a live, separate option** — BL-336 (goal layer, myopia
+  mitigation), for when/if step-wise myopia (§ 10c.4's documented failure mode) is actually
+  observed rather than assumed.
 - **The constraint tax (the note's § 6) is the reason this isn't merely a style preference.**
   Small models measured dropping from 91.5% to 48.0% executable accuracy under a hard schema,
   with the damage entering where instructions suppress deliberation — exactly the failure mode a
   model-emits-`corp_command`-directly design sits on. Keeping the scorer as the action generator
   avoids the risk instead of mitigating it.
-- **BL-279 is rescoped, not cancelled.** Its corpus still gets bootstrapped from `corp_ai.cpp`'s
+- **The trace corpus (BL-279) trains Stage C.** Its corpus is bootstrapped from `corp_ai.cpp`'s
   own decision ring first (free, no cloud spend, exactly the note's § 9 "bootstrap from the
-  scorer" instruction) — but the corpus now trains the **Stage C dialogue layer** (BL-334), not
-  an action-emitting model. Cloud play through the MCP server remains valuable for a DIFFERENT
-  reason: an external agent (frontier or otherwise) playing a corp interactively is a research/
-  spectacle use of BL-278, not the shipped rival AI's architecture — that capability is
-  unaffected by this ruling and needs no rescoping.
-- **MCP, BL-278, and the local-model-as-runtime-target all stand exactly as § 10d states.** This
-  ruling changes which Stage the model occupies, not the transport or the no-cloud-dependency
-  invariant.
+  scorer" instruction) and trains the **dialogue layer**, not an action-emitting model. Cloud
+  play through the MCP server remains valuable for a DIFFERENT reason: an external agent
+  (frontier or otherwise) playing a corp interactively is the research and diagnostics use of the
+  server (§ 10h), not the shipped rival AI's architecture.
+- **MCP, the server, and the local-model-as-runtime-target all stand exactly as § 10d states.**
+  This ruling changes which Stage the model occupies, not the transport or the
+  no-cloud-dependency invariant.
 
 **What this does not settle.** Whether Stage C ships before or after the v0.2.0 corp-AI arc
 closes, and the model size/quantisation for Stage C specifically (Cicero's 2.7B is a reference
-point, not a spec) — both left inside BL-334's design-owed remainder. The goal-layer question and
-the unmeasured token-cost assumption are filed as their own items (BL-336, parked pending
-observed evidence; BL-335, a cheap independent measurement) rather than carried as footnotes.
+point, not a spec) — both inside BL-334's remainder. The note's ~300-token-per-decision assumption
+was measured separately (BL-335, measure decision token cost): a minimal decision round is
+~19–20K input tokens, a naive one ~26K, with output under 300 tokens; the compact encoding that
+brings a round to ~1.5–5K tokens is BL-481 (compact blackboard encoding).

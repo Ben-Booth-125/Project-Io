@@ -1,40 +1,43 @@
 # Kepler — Historical Foundations
 
 Why the campaign world is market-based and non-hegemonic, told as a stage ladder the
-generation stack can hang dated history lines off. Companion to `../generation/PLANETOLOGY.md`
+generation stack hangs dated history lines off. Companion to `../generation/PLANETOLOGY.md`
 (which ends at the civilisation gate) and `../generation/NATION_GENERATION.md` /
 `../generation/GENERATION_STRATEGY.md` (which assume the world this document explains).
 
-> **THE CAMPAIGN EPOCH IS 0 CE, NOT 1960 (Ben, 2026-08-12).** Read every "1960" below as "the
-> campaign epoch", and the epoch as **0 CE**. The project refocused to the ancient era (NR-177),
-> so this ladder no longer runs up to an industrial start — it runs up to an ancient one.
->
-> **What this costs the ladder, stated plainly.** Stages 1–4 (agrarian surplus, the enforceable
-> promise, fragmentation-with-connectivity, capital disciplines the sovereign) are pre-industrial
-> and land inside the pre-epoch run intact. **Stages 5 and 6 — the energy transition and
-> saturation — are past the new epoch entirely** and are no longer campaign backstory; they
-> become DLC-era material alongside the parked space arc. They were already flagged superseded
-> by BL-223, so this narrows a doc that was already known to be wrong there rather than
-> overturning settled prose.
->
-> **THE RUN IS 400 YEARS IN ONE BAND, NOT 4000 IN SIX (verified against source 2026-08-18).**
-> Ben's ruling that day: the code is right, this doc was wrong. Generation simulates
-> **400 BCE → 0 CE at 4 years a tick — one band, 100 decision rounds.** The span comes from
-> `world_params::prehistory_years = 400` (`src/world/hard_coded_world.hpp:65`) and the band is
-> flattened at the call site: `hp.tick_bands[0] = {epoch_year, 4}; hp.tick_band_count = 1;`
-> (`src/world/hard_coded_world.cpp:532-536`).
->
-> The 4000-year, 100 → 50 → 20 → 10 → 5 → 1 ladder survives only as the **struct default** in
-> `history_sim_params` (`src/world/history_sim.hpp:119-140`). Generation overrides it on every
-> world it builds; only the tile inspector and the harnesses run the default. Do not read the
-> default as the shipped run.
->
-> `prehistory_years` is a **scope knob, not a tuning dial** — set it to 0 and the pass is skipped
-> entirely, which is how the harnesses that do not test the era avoid paying for it.
->
-> The one-shot pass this document describes is driven by that stepped year-tick sim
-> (`src/world/history_sim.{hpp,cpp}`). A settle-dominated run is the intended shape (NR-205,
-> ruled 2026-08-12) — that ruling was made of the long span and still holds of the short one.
+## The epoch and the run
+
+**The campaign epoch is 0 CE** (Ben, 2026-08-12; the refocus to the ancient era, NR-177). The
+ladder runs up to an ancient start, not an industrial one. Stages 0–4 — agrarian surplus, the
+enforceable promise, fragmentation-with-connectivity, capital disciplines the sovereign, the
+energy transition — are pre-industrial in mechanism and sit inside the pre-epoch run. The old
+Stages 5 and 6 (the rupture and saturation) lie past the epoch entirely and are DLC-era material
+alongside the parked space arc; what replaces them is § Stage 5 below.
+
+The pre-epoch history is **produced by a running simulation, not narrated over a finished map.**
+The one-shot passes (`history_ladder`, `creeds`, `settlement`) found the cradles, the cultures and
+the regions; the Era −1 sim (`src/world/history_sim.{hpp,cpp}`, BL-271) then plays the polities
+forward from `start_year` to the epoch on a stepped year-tick clock, and the wars, borders and
+collapses the campaign inherits are its output. Under an antiquity epoch the pre-computed
+modern-era hinges — pre-resolved ruptures, a Charter Act written after the political map, the
+globalisation event — do not run; the sim produces that history live.
+
+**The span is a parameter, and the derivation lives in one place.** `era_minus_one.cpp` derives
+`history_sim_params` from `world_params`: `start_year = epoch_year − prehistory_years`,
+`stop_year = epoch_year`, and the tick bands. `prehistory_years` is a **scope knob, not a tuning
+dial** — set to 0 it skips the pass entirely, which is how harnesses that do not test the era
+avoid paying for it. Every harness derives its parameters through the same helpers, so no check
+measures a different run from the one that generates a world (BL-462).
+
+The clock is **stepped**: `history_sim_params::tick_bands` is a ladder of (until-year, years per
+tick) pairs whose struct default is Ben's (2026-08-12) — 100 → 50 → 20 → 10 → 5 → 1 over 4000
+years, with boundaries chosen so resolution concentrates near the epoch, 136 decision rounds
+against 4000 on a flat tick. Generation's configuration flattens it to **one 4-year band
+over `prehistory_years = 400`** — 100 rounds. The 4000-year ladder is the target (Ben, 2026-08-20:
+the 400-year band is a placeholder, and the four allegories of `COLLAPSE.md` need the long run to
+chain); making it affordable is BL-494 (four-thousand-year ladder) and `COLLAPSE.md` § The
+4000-year problem. A settle-dominated run is the intended shape (NR-205, ruled 2026-08-12), at
+either span.
 
 ## Purpose
 
@@ -43,39 +46,25 @@ The campaign premise makes three big historical claims:
 1. **Markets, not command.** Every body hosts independent markets with dynamic prices; the
    background economy is saturated and privately legible.
 2. **No hegemon.** ~45 nations coexist; none can conquer the rest; power projection happens
-   through firms, not armies. *(The invariant itself is owned by **BL-224 (non-hegemony
-   invariant, open)** — the "none can conquer the rest" half is asserted, not yet enforced.
-   The landed `terrain_combat` scalars — `terrain_defence` / `terrain_attrition` /
-   `terrain_resistance`, `src/world/terrain_combat.cpp`, BL-233 measurement landed
-   2026-07-31 — are its intended input.)*
+   through firms, not armies. The invariant is owned by **BL-224 (non-hegemony invariant)**, which
+   turns "none can conquer the rest" from an assertion into an enforced property; its intended
+   input is the `terrain_combat` scalars (`terrain_defence` / `terrain_attrition` /
+   `terrain_resistance`, `src/world/terrain_combat.cpp`).
 3. **Corporations as first-class actors.** An immortal legal fiction can own, trade, and expand
-   across borders — and nations tolerate it.
-
-> **Caution (2026-07-31): claims 2 and 3 are only partly settled.** Ben rejected this
-> document's Stage 5–6 account on 2026-07-30 (recorded in BL-223, averted rupture): the
-> rupture was **averted, not past**, and the player identity is
-> **nation-with-chartered-corps** (BL-094, player-nation pivot — designed), not a free-floating
-> corporation. Claim 3's mechanism — the enforceable promise, the charter — stands; the
-> *why-the-player-is-a-corporation* framing that Stages 5–6 built on it does not. Do not read
-> the corporation-player premise below as settled.
+   across borders — and nations tolerate it. The *mechanism* — the enforceable promise, the
+   charter — is settled. The *player* is not a free-floating corporation: the live seat is a
+   mercenary company (`docs/CONCEPT.md`), and the rupture is **averted, not past** (Ben,
+   2026-07-30, BL-223). Do not read any "why the player is a corporation" framing as settled.
 
 None of these are natural defaults. Each is the residue of specific historical stages. This
 document names those stages, states the causal lesson each one carries, and marks the hooks
 where the generator's endowment variables (oxygen, ocean fraction, arable land, fossil fuels,
-ore accessibility) should bend the story per seed.
+ore accessibility) bend the story per seed.
 
 ## The stage ladder
 
-Stages are ordered and causal: each consumes the output of the one before. The planetology
-gate chain hands off at Stage 0. Era 0 gameplay begins at the top of the ladder.
-
-> **Stages 0–2 are BUILT** (BL-221, landed 2026-07-30) — `src/world/history_ladder.{hpp,cpp}`,
-> verified by `tools/verify/history_ladder_harness.cpp` (H1–H5). **Stages 3–4 are now BUILT too**
-> (BL-218 nations rewrite + BL-219 corporations rewrite, landed 2026-08-02) —
-> `src/world/settlement.{hpp,cpp}`, verified by `tools/verify/settlement_harness.cpp` (S1–S8);
-> see § Implementation — Stages 3–4. **Stages 5–6 as written are SUPERSEDED** — rejected
-> 2026-07-30, replacement owed to BL-223 (averted rupture, design-owed); see their banners.
-> See § Implementation (after Stage 6) for what the code actually does and what it stands in for.
+Stages are ordered and causal: each consumes the output of the one before. The planetology gate
+chain hands off at Stage 0. Campaign play begins at the top of the ladder.
 
 ### Stage 0 — Agrarian surplus (hand-off from planetology)
 
@@ -99,10 +88,12 @@ strangers. Corporate personhood is this stage's apex, and the game's core rule �
 corporation persists while it holds any asset* — is that legal doctrine made mechanical.
 
 **Kepler divergence — the Charter Age.** Kepler needs a founding myth for corporate personhood,
-its VOC moment, and it should come *early* relative to Earth. The registered-in-a-home-nation
-but operationally-free compromise in `../generation/CORPORATION_GENERATION.md` is exactly the
+its VOC moment, and it comes *early* relative to Earth. The registered-in-a-home-nation but
+operationally-free compromise in `../generation/CORPORATION_GENERATION.md` is exactly the
 bargain sovereigns strike with chartered companies: taxability and seizability in exchange for
-freedom of operation.
+freedom of operation. The charter cradle raises a **sealed-oath god** (`CREEDS.md`), and that
+creed buys its regions an industrialisation-date bonus — contract law reaching capital one stage
+early.
 History line: `"YYYY: The {nation} Charter Act — first perpetual company registered."`
 
 ### Stage 2 — Fragmentation with connectivity (the non-hegemony ingredient)
@@ -115,17 +106,14 @@ suppressed. Forty-five rivals cannot: a capability banned in one polity re-emerg
 **Competition among states is the market mechanism applied to governance itself.**
 
 **Kepler divergence — no unification epoch.** Kepler never had a Rome or a Ming. Its geography
-(mountain ranges landing on borders via the weighted Voronoi pass) kept conquest expensive and
-exit cheap. This is the single cheapest lore assertion with the largest downstream payoff: it
-explains why 1960-Kepler is more multipolar than 1960-Earth.
+(mountain ranges landing on borders) kept conquest expensive and exit cheap. This is the single
+cheapest lore assertion with the largest downstream payoff: it explains why Kepler at the epoch is
+more multipolar than Earth ever was.
 
-**Generator hook.** Nation count is already an outcome of landmass. The history pass should
-read the final nation count back into the narrative: more nations → earlier and harder
+**Generator hook.** Nation count is an outcome of landmass and of the ladder. The history pass
+reads the final nation count back into the narrative: more nations → earlier and harder
 Stages 3–4.
 History line: `"YYYY: The {range} Peace — {n} realms confirm mutual borders."`
-
-> **Implementation status:** Stages 0–2 are built (BL-221, landed 2026-07-30) —
-> `src/world/history_ladder.{hpp,cpp}`. Full detail in § Implementation, moved below Stage 6.
 
 ### Stage 3 — Capital disciplines the sovereign
 
@@ -134,18 +122,18 @@ merchants and bond markets → forced into credible commitment. States that defa
 confiscate lose the next war.
 
 **Lesson.** This is how the state that *serves* markets (rather than merely taxing them) is
-born. It is also why the campaign's nations respect corporate property in 1960: their
-ancestors that didn't were outcompeted.
+born. It is also why the campaign's nations respect corporate property: their ancestors that
+didn't were outcompeted.
 
 **Game-mechanical echo.** Asset seizure exists but is costly to the seizing nation (sentiment,
 credit access). Progressive loss instead of a lose screen mirrors the historical norm:
 sovereigns squeezed companies far more often than they destroyed them.
 
-**Built, partially (BL-218, 2026-08-02).** The stage's *mechanism* — credit disciplining the
-sovereign — is not simulated. What landed is its two legible consequences: the charter culture's
-**sealed-oath god** buys its regions an industrialisation-date bonus (contract law reaching
-capital, one stage early), and the **war** rupture branch costs both belligerents abundance
-rather than paying the winner. The seizure-cost half is still owed to BL-223 (averted rupture).
+**What the generator carries of it.** The stage's *mechanism* — credit disciplining the sovereign
+— is not simulated as such. Its two legible consequences are: the charter culture's sealed-oath
+god buys its regions an industrialisation-date bonus (Stage 1), and the **war** rupture branch
+costs both belligerents abundance rather than paying the winner. The seizure-cost half belongs to
+BL-223 (averted rupture), alongside the diplomacy origin it defines.
 
 ### Stage 4 — Energy transition
 
@@ -156,75 +144,42 @@ stops being zero-sum land.
 conquest's return-on-investment collapses relative to trade's, which changes what war is *for*.
 
 **Generator hook.** This is the stage most sensitive to the endowment vector. Fossil fuel and
-ore accessibility on owned tiles should let the history pass *name* which nation industrialised
-first, purely from tile data. Each seed gets its own Britain.
+ore accessibility on owned tiles let the history pass *name* which nation industrialised first,
+purely from tile data. Each seed gets its own Britain.
 History line: `"YYYY: {nation} lights the first coke furnaces of the {region} basin."`
 
-**BUILT (BL-218, landed 2026-08-02).** The hook is closed: `run_settlement` scores each
-region's ancient fuel endowment against the world's own mean, gates industrialisation on
-*above-average* fuel, and `derive_national_character` names the three earliest furnaces once
-nations exist. Each seed does get its own Britain, chosen from tile data alone. The creed sits
+**How it is closed.** `run_settlement` scores each region's ancient fuel endowment against the
+world's own mean, gates industrialisation on *above-average* fuel, and
+`derive_national_character` names the three earliest furnaces once nations exist. The creed sits
 on top of the endowment rather than beside it — a people who raised a forge god did so because
 their cradle held ore (`CREEDS.md`), so that god's regions light up earlier. Endowment, not
-virtue, in both directions.
+virtue, in both directions. Under an ancient epoch the furnace date is past the stop year, and
+the industrial clock the sim *does* run is the capacity ladder (§ The works roster).
 
-### Stage 5 — The Rupture (hegemony fails its final audition)
+### Stage 5 — The averted rupture
 
-> **SUPERSEDED (2026-07-31).** Ben rejected this stage as written on 2026-07-30 (recorded in
-> BL-223, averted rupture): the rupture was **averted, not past** — the campaign opens under
-> the *threat*, not the residue, of the catastrophe — and the player identity heads for
-> **nation-with-chartered-corps** (BL-094, player-nation pivot; corp now, nation at the
-> v0.2.0 era), so the "framing rule" below
-> (corporations as the only intact actors, why the player is a corporation) is dead as
-> written. The replacement design is **owed to BL-223** — it is not written here, and this
-> section must not be built against. Kept for the record only.
+The original Stages 5–6 placed a WW3-scale rupture in the **past** — hegemony failing its final
+audition, leaving corporations the only intact actors, discrediting conquest and forcing ambition
+into economic channels — and then a saturated post-hegemonic economy as the campaign's starting
+condition. Ben rejected that account on 2026-07-30: **the rupture is averted, not past.** The
+campaign opens under the *threat* of the catastrophe, not its residue, and the saturation
+economics survive on their own merits only as a restatement of `GENERATION_STRATEGY.md`.
 
-**What happens.** The WW3-scale global rupture that closes Era 0's backstory. Every claimant to
-hegemony fights; every one is exhausted, winners included.
-
-**Lesson.** Non-hegemony is not chosen — it is the residue of hegemony failing repeatedly and
-expensively. On Earth this took two world wars and a nuclear ceiling; on Kepler the Rupture
-compresses it into one discrediting catastrophe.
-
-**Framing rule (load-bearing).** The Rupture should not merely *permit* space expansion — it
-should be the event that:
-
-- discredits territorial conquest as an instrument of policy,
-- leaves corporations as the only actors with intact capacity and cross-border legitimacy,
-- creates the deterrence ceiling under which ambition is forced into economic channels.
-
-That single framing answers, in one stroke: why the player is a corporation, why nations
-tolerate it, and why rivals compete through markets rather than armies.
-
-### Stage 6 — Saturation and the last frontier (campaign start, 1960)
-
-> **SUPERSEDED (2026-07-31), with Stage 5.** The saturation economics below survive on their
-> own merits (they restate `../generation/GENERATION_STRATEGY.md`), but the "post-hegemonic
-> condition" framing hangs on Stage 5's past rupture, which was rejected 2026-07-30.
-> Replacement owed to BL-223 (averted rupture, design-owed).
-
-**What happens.** Kepler's markets are old, margins thin, frontiers closed. The saturated
-background economy of `../generation/GENERATION_STRATEGY.md` — with its live "opportunity
-gap" — is the *post-hegemonic condition*, not a neutral starting state.
-
-**Lesson.** Expansion happens from saturation, not strength. The specialists who go to space go
-because the terrestrial pie is fully claimed, and the Rupture cracked open the only frontier
-left: upward.
-
-### Where the rupture sits — three docs disagree *(reconciliation owed to BL-223)*
-
-Noted 2026-07-31: three documents currently place the rupture at three different points in
-time. This doc's Stage 5 put it in the **past** (now superseded); `docs/CONCEPT.md` treats it
-as the **Era 0 exit**; `docs/research/ERA1_TECH_LANDSCAPE.md` frames it as a **visible
-countdown**. **BL-223 (averted rupture, design-owed) owns the reconciliation** — none of the
-three should be built against until it lands.
+The replacement — the bloc structure the threat produces, the diplomacy origin, the seizure cost
+of Stage 3, and the reconciliation of where the rupture sits across `docs/CONCEPT.md` (the Era 0
+exit) and `docs/research/ERA1_TECH_LANDSCAPE.md` (a visible countdown) — is **owned by BL-223
+(averted rupture, diplomacy origin)**. `COLLAPSE.md` supplies the mechanism the pre-epoch version
+of the same idea runs on: strain, culminations, and the reach-fed slow strain that BL-510 makes
+Stage 5's parameterisation rather than a second system. The compact thesis's closing corollary
+("learned this one catastrophe earlier than Earth did") is BL-223's to restate.
 
 ---
 
-## Implementation — Stages 0–2 *(BL-221, landed 2026-07-30)*
+## The ladder pass — Stages 0–2
 
-`src/world/history_ladder.{hpp,cpp}`, a sibling pass that runs after the tile pipeline and
-**interleaves with** nation generation:
+`src/world/history_ladder.{hpp,cpp}` (BL-221), a sibling pass that runs after the tile pipeline
+and **interleaves with** nation generation; verified by `tools/verify/history_ladder_harness.cpp`
+(H1–H5):
 
 ```
 generate_body_tiles                 terrain exists
@@ -235,130 +190,139 @@ record_institutional_history  ->    Stages 1-2, which need the outcome
 ```
 
 Two entry points rather than one, because the Charter Act names a nation and the border accord
-counts them — neither exists until the political pass has run.
+counts them — neither exists until the political pass has run. `record_institutional_history`
+runs for a modern epoch; under an antiquity epoch those lines are the sim's to write.
 
 **It drives, it does not narrate** (Ben, 2026-07-30). Stage 0's cradle count and Stage 2's
 fragmentation are computed *before* the political map and shape it: a fragmented world seeds
-more densely and lets smaller nations survive the merge. Retiring Voronoi outright is BL-218's;
-this is the honest hook until then. Asserted, not assumed — harness group H2.
+more densely and lets smaller nations survive the merge. Asserted, not assumed — harness group H2.
 
-**Nation count: 14 → 43.** Settled by Ben, 2026-07-30: *"Ignore the previous assertions. We will
-simulate war to narrow down the count if needed. Just let naturally different cultures emerge
-here."* That effectively meets this document's own "~45 nations" claim, which BL-224 had flagged
-as an unowned 3× gap — but note it was met by **letting cultures emerge**, with consolidation
-deferred to a future war/conflict stage, *not* by tuning to hit 45. `world_audit`'s BL-053 R1/R3
-were repointed accordingly: R1 now asserts the ladder's construction guarantee (the derived floor
-can never fall below half the base) instead of a literal that is no longer constant, and R3's
-ceiling became a runaway guard rather than a target.
+**Nation count emerges; it is not tuned to a target.** Ben, 2026-07-30: *"Ignore the previous
+assertions. We will simulate war to narrow down the count if needed. Just let naturally different
+cultures emerge here."* `world_audit`'s R1 asserts the ladder's construction guarantee (the
+derived floor can never fall below half the base) rather than a literal, and R3's ceiling is a
+runaway guard rather than a target. Consolidation is the war stages' job — the creeds' tribal
+marches and the Era −1 sim — never a dial.
 
-**Substituted inputs, named rather than faked.** Two designed inputs do not exist in `src/` yet:
-river connectivity (BL-170) and domesticable clades (BL-217). Stage 0 scores cradles from arable
-terrain, landform, habitability, coastal access and the biosphere's generated `endemics` instead.
-Both items **refine** this score when they land rather than replacing it, so nothing needs
-rewiring. `agrarian_score` marks exactly where each missing term slots in.
+**The cradle score.** `agrarian_score` scores cradles from arable terrain, landform,
+habitability, coastal access and the biosphere's generated `endemics`. It marks where river
+connectivity and domesticable clades slot in as refining terms.
 
-**Determinism.** Fresh stage tags (`0x5A11` / `0xC4A7` / `0xF2A6` — none collides, and
-PLANETOLOGY.md's warning about `0x4A71012u` being folded twice still stands). All scoring is
-integer with an explicit tie-break by tile index; the cradle argmax keeps the lowest index on a
-tie. No transcendentals, and the nation walk is over a sorted key list rather than raw
-`unordered_map` order.
+**Determinism.** Stage tags `0x5A11` / `0xC4A7` / `0xF2A6` (none collides; PLANETOLOGY.md's
+warning about `0x4A71012u` being folded twice stands). All scoring is integer with an explicit
+tie-break by tile index; the cradle argmax keeps the lowest index on a tie. No transcendentals,
+and the nation walk is over a sorted key list rather than raw `unordered_map` order.
 
-**Known tuning gap, honestly recorded.** Across a 12-seed spread every world produced the
-multipolar accord and none produced a hegemon, so Stage 2's failure branch is currently written
-but unreached. Ben asked to *see* failure cases, so this is a tuning target for BL-219's sweep
-(rarity tuning), not a defect to hide — the harness prints the split every run.
+**Stage 2 has a failure branch** — a hegemon instead of the multipolar accord — and the harness
+prints the accord/hegemon split every run. Ben asked to *see* failure cases, so the rate at which
+the branch is reached is a tuning target for the rarity sweep, not a number to hide.
 
 ---
 
-## Implementation — Stages 3–4 *(BL-218 + BL-219, landed 2026-08-02)*
+## Settlement — Stages 3–4
 
-`src/world/settlement.{hpp,cpp}`, sequenced between the creeds and the political map:
+`src/world/settlement.{hpp,cpp}` (BL-218, nations rewrite; BL-219, corporations rewrite),
+sequenced between the creeds and the political map; verified by
+`tools/verify/settlement_harness.cpp` (S1–S8):
 
 ```
 run_history_ladder            ->  cradles, fragmentation
 run_creeds / tribal conflict  ->  one pantheon per cradle; welding
-run_settlement                ->  PROVINCES: culture, ancient endowment, furnaces
+run_settlement                ->  REGIONS: culture, ancient endowment, furnaces
+run_history_sim               ->  the polities play forward to the epoch
 generate_nations                  seeded on the region anchors
 derive_national_character     ->  the three axes, as outputs
-resolve_historical_ruptures   ->  collapse / war / revolution, and the erasure
 generate_corporations         ->  focus from the corp's home region
 ```
 
-**The region is the new unit, and it exists to carry two things at once.** A cradle was a
-*people*; a nation is a *territory*; neither can say "these particular fields, under these
-particular gods, sitting on this particular ore". The region can, which is why belief,
-endowment and industrial timing all hang off it and why BL-219 could read corporate focus
-straight out of it without a new mechanism.
+**The region is the unit, and it exists to carry two things at once.** A cradle is a *people*; a
+nation is a *territory*; neither can say "these particular fields, under these particular gods,
+sitting on this particular ore". The region can, which is why belief, endowment and industrial
+timing all hang off it and why corporate focus reads straight out of it without a new mechanism.
 
-**Pantheons are mapped, not re-rolled.** A region inherits its nearest cradle's culture, so
-the distribution of gods across the map is a record of who walked where. That mapping then feeds
-back into the material history: a forge god only exists where the cradle window held ore, so
-"the forge god's country industrialises early" is not flavour laid over the data — it is the
-same fact read twice, one stage apart.
+**Pantheons are mapped, not re-rolled.** A region inherits its nearest cradle's culture, so the
+distribution of gods across the map is a record of who walked where. That mapping then feeds back
+into the material history: a forge god only exists where the cradle window held ore, so "the
+forge god's country industrialises early" is not flavour laid over the data — it is the same fact
+read twice, one stage apart.
 
 **Scores are world-relative.** Every endowment class scores 500 at the world's mean and 1000 at
-twice it. An absolute gain either saturates one class or never fires another (the first
-implementation classified all 75 regions `farm`); relative scoring also survives the
-`deposit_scalar` abundance tier without re-tuning.
+twice it. An absolute gain either saturates one class or never fires another; relative scoring
+also survives the `deposit_scalar` abundance tier without re-tuning.
 
-**Seeding changes, expansion does not.** `nation_params::seed_tiles` carries the region
-anchors into Pass 1 and the BL-053-tuned growth machinery is reused untouched. The size variance
-now emerges from where people settled instead of being dialled in — and the cheap alternative
-(keep Voronoi, narrate over it) was rejected as the lying-figure problem: prose asserting a
-settlement history the territory does not reflect.
+**Seeding changes, expansion does not.** `nation_params::seed_tiles` carries the region anchors
+into Pass 1 and the growth machinery is reused untouched. The size variance emerges from where
+people settled instead of being dialled in — the cheap alternative (keep Voronoi, narrate over it)
+is the lying-figure problem: prose asserting a settlement history the territory does not reflect.
+
+**The political axes are outputs.** `derive_national_character` sets expansionism from the
+border-contest integral, economic focus from the resource class of the regions settled during
+industrialisation, and ideology from industrialisation timing against neighbours, overwriting
+the seeded Pass 4 draw, which remains the fallback for a body with no settlement.
 
 **The record is destructible, and the hole is visible.** A won war plants the victor's pantheon
 on the regions taken and erases the lines naming them, leaving a dated lacuna with a count of
-what was lost (Ben, 2026-08-02). A conquered region keeps its founders in `founding_culture`
-and its conquerors in `culture` — the erasure is of the record, never of the fact, which is the
-pair a later religion or diplomacy layer needs to describe a grievance. Across a six-seed spread,
-four worlds lost part of their record to a war.
+what was lost (Ben, 2026-08-02). A conquered region keeps its founders in `founding_culture` and
+its conquerors in `culture` — the erasure is of the record, never of the fact, which is the pair a
+religion or diplomacy layer needs to describe a grievance.
 
-**BL-217's mechanism, reused unchanged.** The ruptures are the second checkpoint class, drawing
-through `resolve_checkpoint` with eligibility as a filter and never a weight — exactly what
-BL-217 predicted this pass would need, so no second branch mechanism was written.
+**Ruptures draw through the checkpoint model.** The modern-epoch ruptures (collapse, war,
+revolution — `resolve_historical_ruptures`) are a second checkpoint class, drawing through
+`resolve_checkpoint` with eligibility as a filter and never a weight (BL-217's mechanism, reused
+unchanged). They are bounded to the six most-contested nations, so their count is a property of
+the design rather than of the map size. Under an ancient epoch the sim's culminations
+(`COLLAPSE.md`) are the ruptures.
 
-**Honest scope.** A green harness means the pass is self-consistent, deterministic and wired
-into the political map — *not* that its dates or thresholds are calibrated against anything.
-Rarity tuning is still BL-219's sweep. The ruptures are bounded to the six most-contested
-nations, so their count is a property of the design rather than of the map size.
-
-> **Successor filed (2026-08-02): the Era −1 history sim.** Ben's steer, same day this landed:
-> promote this one-shot pass to a **running year-tick simulation from 0 CE to the campaign
-> epoch**, as the proving ground for the nation AI and the mil-sim, tuned against a seed spread
-> of earth-like worlds. And an **overturned decision**: simulated wars stop resolving as
-> abstract scalar comparisons and fight with **real typed units and doctrine-parameter tactics**
-> — the same combat engine the main era inherits ("drives, not narrates" survives; the *abstract*
-> half does not). Filed as **BL-271 (Era −1 sim)** · **BL-272 (unit/doctrine combat — records
-> the overturn)** · **BL-273 (region demography)** · **BL-274 (era-keyed unit rosters)** ·
-> **BL-275 (history sweep — BL-210's batch-sweep payload)**; Sprint 5's theme.
+**Calibration is the sweep's, not the harness's.** A green harness means the pass is
+self-consistent, deterministic and wired into the political map — *not* that its dates or
+thresholds are calibrated against anything. `history_sweep` (BL-275) reports the distributions
+across a seed spread, and that is where every magnitude in this layer is argued.
 
 ---
 
-## Implementation — the Era −1 works roster *(BL-321, S1 2026-08-07; S2–S4 2026-08-13)*
+## The Era −1 sim
 
-**What a pre-history polity builds, and what those works do.** The Era −1 layer had a noun axis
-with one half built: `unit_roster` said what a polity could **field**, and nothing said what it
-could **build**. This is the other half — an authored, endowment-gated table of works, each a
+Ben's steer, 2026-08-02: the one-shot settlement becomes a **running year-tick simulation** to the
+campaign epoch, the proving ground for the nation AI and the mil-sim, tuned against a seed spread
+of earth-like worlds. And an **overturned decision**: simulated wars do not resolve as abstract
+scalar comparisons; they fight with **real typed units and doctrine-parameter tactics** — the same
+combat engine the main era inherits (`resolve_battle`, `docs/military/MILITARY.md`). "Drives, not
+narrates" survives; the *abstract* half does not.
+
+The sim is a polity loop over regions with **scored verbs** — Campaign, Settle, Invest,
+Consolidate, and Build Work — priced in one shared currency (the round each consumes) and chosen
+by a deterministic scored-utility layer under the 2026-08-18 nation grant: pure, seeded,
+replayable, never a planner. Its objective weights (`w_farm`, `w_ore`, `w_port`, …) live in
+`history_sim_params`. Breadth costs: a polity is charged supply for every region held past
+`free_holdings` (`holdings_burden_q`, the burden of breadth), and the strain that burden feeds,
+how it resolves, and the strategies that play it are `COLLAPSE.md`'s. Region demography
+(BL-273), era-keyed unit rosters (BL-274) and the sweep (BL-275) are its siblings.
+
+The registry of works below is a **parameter, not a global**: `run_history_sim` takes
+`const works_registry*`, null meaning works disabled. The app passes its startup-loaded table; a
+harness hand-builds one — the same dependency-injection seam `clear_markets` uses for the recipe
+registry.
+
+---
+
+## The works roster
+
+**What a pre-history polity builds, and what those works do** (BL-321, Era −1 works). The Era −1
+layer has a noun axis with two halves: `unit_roster` says what a polity can **field**, and the
+works roster says what it can **build** — an authored, endowment-gated table of works, each a
 small id held by the **region**.
 
 **It is not `building_component`.** That struct is the campaign-era building: a tile entity with a
 recipe index, a workforce target, credit and resource build costs, per-tick maintenance and wages,
 decommission state. Era −1 has no credits, no market, no recipe registry and no economy tick — it
-has a year loop over regions. Sharing the struct would have dragged the campaign economy into
-the generation layer to satisfy fields nothing sets.
+has a year loop over regions. Sharing the struct would drag the campaign economy into the
+generation layer to satisfy fields nothing sets.
 
 **Where the table lives.** In `scripts/works.lua`, loaded by `src/world/works_registry.cpp` — the
 one translation unit that pulls sol2 for it (Ben's call, 2026-08-07). `works_roster.hpp` stays
 pure data and `works_roster.cpp` stays Lua-free, so the headless harnesses that are this sim's
-only verification still link without Lua. Validation moved **into the loader**, because moving the
-table out of the compiler's reach meant a typo'd band or a duplicated name became runtime data;
-the loader throws at startup instead.
-
-**The consequence for the sim: the registry is a parameter, not a global.** `run_history_sim`
-takes `const works_registry*`, null meaning works disabled. The app passes its startup-loaded
-table; a harness hand-builds one. Same dependency-injection seam `clear_markets` already uses for
-the recipe registry.
+verification link without Lua. Validation lives **in the loader**: a typo'd band or a duplicated
+name is runtime data, and the loader throws at startup.
 
 ### The rows
 
@@ -383,11 +347,10 @@ different columns.
 
 ### Reach is the row that matters
 
-BL-314 charged a polity supply for every region held past `free_holdings` — **the burden of
-breadth**. Before this item there was nothing to buy with it, so the only answer to the charge was
-to stop expanding, which makes the frontier stall a **ceiling**. Works make it a **decision**: a
-polity that spends its rounds on Way Stations and Cut Canals administers the same breadth more
-cheaply.
+The burden of breadth charges a polity supply for every region held past `free_holdings`. With
+nothing to buy against it, the only answer to the charge is to stop expanding, which makes the
+frontier stall a **ceiling**. Works make it a **decision**: a polity that spends its rounds on Way
+Stations and Cut Canals administers the same breadth more cheaply.
 
 Relief is proportional and capped below 1000 in both places it applies, so building buys a
 discount and never an exemption. The stall still arrives; it arrives later, and by the polity's
@@ -398,42 +361,32 @@ own choice. BL-224's non-hegemony stays emergent.
 | Effect | Consumer |
 |---|---|
 | `capacity_mod` | `region_carrying_capacity(farm_q, mod)` — raises the **asymptote** the logistic growth term climbs toward, so it changes trajectory rather than granting a step growth would re-flatten. Read by `advance_region_demography` and by the Settle verb's pressure test, which must divide by the same K. |
-| `manpower_mod` | `manpower_ceiling(population, mod)`, read by `replenish_manpower` — so every existing caller gets the effect without being told works exist. |
+| `manpower_mod` | `manpower_ceiling(population, mod)`, read by `replenish_manpower` — so every caller gets the effect without being told works exist. |
 | `reach_mod` | Two places: the **staging hub's** own works discount the terrain-weighted term of `supply_here` (scorer) and `supply_raw` (execution) — the two must agree, or a polity decides on one supply figure and fights on another — and the polity's **mean** reach relieves the burden of breadth. Mean, not total, so conquest alone cannot make an empire count itself as well-roaded. |
 | `defence_mod` | Readiness on the defender's stack, which `roster_stack` turns into an additive per-mille offset on `type_power_mod` — the same channel cohesion uses, and for the reason `combat.hpp` gives: the engine scores whatever stack it is handed and knows nothing about walls. Also visible to the **scorer**, so a polity does not walk into a bastion it could not see. A Bastion Fort at +640 is worth ~+64 against row power values of 90–380: it tilts a fight, never decides one. |
-| `industrial_mod` | **A recorded divergence from the item's own words.** The design calls it a pull-forward on the Stage 4 furnace date — but Stage 4 runs inside `run_settlement`, which has finished before this loop starts, so there is no furnace date left to pull. What the sim *has* as an industrial clock is the capacity ladder, so the polity's mean industrial investment accelerates Invest's progress up it. Same claim, expressed against the mechanism that exists. |
+| `industrial_mod` | The polity's mean industrial investment accelerates Invest's progress up the capacity ladder. The sim's industrial clock is that ladder — Stage 4's furnace date is `run_settlement`'s and is fixed before the loop starts — so the pull-forward is expressed against the mechanism that runs. |
 
 ### The verb
 
-`build_work` is the fifth scored candidate, priced in BL-309's shared currency alongside campaign,
+`build_work` is the fifth scored candidate, priced in the shared currency alongside campaign,
 settle, invest and consolidate — **not in a treasury Era −1 does not have, but in the round it
 consumes**. Building a Way Station competes directly with raising an army because both spend the
 polity's one action that round, which is the whole point of putting it on the shared scale rather
 than beside it.
 
-A work's benefit splits honestly by who receives it: local effects are valued against the
-region's own endowment, reach against the polity's **mean** holding. Scoring reach against the
-*total* made it worth ~40× every local effect and reduced the roster to its five road rows.
+A work's benefit splits by who receives it: local effects are valued against the region's own
+endowment, reach against the polity's **mean** holding. Scoring reach against the *total* makes it
+worth ~40× every local effect and reduces the roster to its five road rows.
 
 **Bounded by construction**, like the other four verbs. Two candidate regions per polity per
 round — the capital, plus one rotated through the holdings by a hash of (polity, year, slot).
 Scoring every holding would be O(held × rows) inside the most expensive pass in generation; the
-rotation still reaches every region over a run, because the round count is large against any
-one polity's holdings.
+rotation still reaches every region over a run, because the round count is large against any one
+polity's holdings.
 
-> **Round count corrected 2026-08-18.** This paragraph read "136 on the default stepped-clock
-> ladder". That is the `history_sim_params` default, not the shipped run: **generation runs 100
-> rounds** (400 years, one 4-year band — see the epoch note at the top of this document). The
-> bounded-rotation argument is unchanged at 100; the number was.
->
-> The cost figure this paragraph used to carry (~23 s of a ~25 s world) was measured on the
-> 4000-year run and is **not re-measured here**. `hard_coded_world.cpp` now carries two
-> disagreeing cost comments of its own — one says ~110 ms for the 100-round pass, one still says
-> ~23 s. Treat both as unverified until someone times it.
-
-**A work saturates.** `apply_work_to_region` refuses to build the same row twice, so a
-region's works are a finite investment and the polity is eventually forced to spend its rounds
-on something else. Without that refusal the scorer would re-raise the same Granary every round it
+**A work saturates.** `apply_work_to_region` refuses to build the same row twice, so a region's
+works are a finite investment and the polity is eventually forced to spend its rounds on
+something else. Without that refusal the scorer would re-raise the same Granary every round it
 stayed the best candidate.
 
 ### Storage
@@ -448,14 +401,13 @@ impossible to build.
 Works are **physical**: conquest transfers them with the region rather than razing them, which
 is what makes a developed region worth taking.
 
-### Honest scope
+### Magnitudes
 
 The magnitudes in `works.lua` and every `w_work_*` weight in `history_sim_params` are **authored
 by judgement, not calibrated** — placeholders in the same sense as the surrounding `w_*` weights,
-put at plausible magnitudes so works land in the same band as the other verbs. Calibrating them is
-BL-275's sweep. `history_sweep` now carries the roster on every run and reports works raised per
-world, which is what makes that calibration possible; whether the frontier stall actually moved
-from ceiling to decision is a question for that sweep's numbers, not for this doc.
+put at plausible magnitudes so works land in the same band as the other verbs. `history_sweep`
+carries the roster on every run and reports works raised per world; whether the frontier stall
+moves from ceiling to decision is a question for that sweep's numbers.
 
 ---
 
@@ -464,37 +416,19 @@ from ceiling to decision is a question for that sweep's numbers, not for this do
 > **Markets scale where no one can dominate, and no one dominates where exit is cheap** — a
 > rival state next door, a rival market next planet.
 
-The thesis itself stands — Stages 0–2 generate it. But its closing corollary as previously
-written here ("learned this one catastrophe earlier than Earth did") leaned on Stage 5's past
-rupture and is **superseded with it** (2026-07-31, pending BL-223 — averted rupture). What
-Kepler learned, and when, is BL-223's to restate.
-
-## Integration checklist *(status 2026-07-31)*
-
-- [x] Planetology history pass emits Stage 0 lines from the endowment vector — **landed**
-  (BL-221): `run_history_ladder` writes the granary-cities line from arable share + cradles.
-- [x] Nation generation reads final nation count back into Stage 2 narrative text — **landed**
-  (BL-221): `record_institutional_history` counts surviving realms into the accord line.
-- [x] History pass names the first-industrialiser nation from tile fossil/ore data (Stage 4) —
-  **landed** (BL-218): `derive_national_character` names the three earliest furnaces from the
-  region endowment scores. BL-222 (industrial ladder) is thereby substantially overtaken.
-- [ ] Charter Age line names the player corporation's home-nation legal tradition (Stage 1) —
-  the nation-naming half landed with BL-221 (the Charter Act names the charter cradle's
-  nation), and BL-218 added the creed half (the charter culture's sealed-oath god buys its
-  regions an industrialisation bonus); the *player-corp* linkage remains owed, and is
-  complicated by **BL-094 (player-nation pivot)**.
-- [ ] Rupture event text (Era 0 → Era 1 transition) — the Stage 5 framing rule it referenced
-  is superseded; owed to **BL-223 (averted rupture, design-owed)**.
-- [ ] Asset-seizure mechanics carry a sentiment/credit cost consistent with Stage 3 — owed to
-  **BL-223** alongside the diplomacy origin it defines.
+Stages 0–2 generate it. What Kepler learned from its averted catastrophe, and when, is BL-223's
+to state.
 
 ## Open questions
 
-- Should the Rupture's belligerents and outcome be seeded (varying per campaign) or canonical?
-  Seeded is consistent with the rest of the generation stack; canonical is cheaper to write
-  quest/tech fiction against. *(Question survives the Stage 5 supersession in altered form —
-  an averted rupture still has claimants; now BL-223's to answer.)*
-- Does Kepler get a nuclear-equivalent deterrence ceiling explicitly, or is the Rupture's
-  memory alone the ceiling? (Affects Era 1+ conflict design.)
+- Should the averted rupture's claimants and outcome be seeded (varying per campaign) or
+  canonical? Seeded is consistent with the rest of the generation stack; canonical is cheaper to
+  write quest/tech fiction against. *BL-223's to answer.*
+- Does Kepler get a nuclear-equivalent deterrence ceiling explicitly, or is the threat's memory
+  alone the ceiling? (Affects Era 1+ conflict design.)
 - How much of this ladder surfaces to the player — a codex, generated history lines only, or
-  ambient flavour in quest text?
+  ambient flavour in quest text? `COLLAPSE.md`'s ruling that the story surfaces in the history
+  tab, quietly, answers the pre-epoch half.
+- Does the Charter Age line name the player company's home-nation legal tradition? The Charter
+  Act names the charter cradle's nation; whether the player's company is bound to it depends on
+  the player-identity question `docs/CONCEPT.md` owns.

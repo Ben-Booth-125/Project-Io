@@ -1,12 +1,14 @@
 # Project Io — Resources
 
-Resources are the goods that flow through the economy: extracted from tiles, refined by processing buildings, assembled into products, and bought and sold through markets. A tradeable resource has a base price derived from rarity; local supply and demand shift the market price each Tick (the clearing model is `docs/economy/MARKETS.md`; which resources actually carry a base price is § What actually trades below).
+Resources are the goods that flow through the economy: extracted from tiles, refined by processing buildings, assembled into products, and bought and sold through markets. A tradeable resource has a base price derived from rarity; local supply and demand shift the market price each Tick (the clearing model is `docs/economy/MARKETS.md`; which resources carry a base price is § What trades below).
+
+The roster is **38** values of `resource_type` (`src/world/components.hpp`), and every one of them is held to the **admission rule** (`docs/economy/PRODUCTION.md`): a value earns its place by being consumed by an authored recipe or contracted for by a named actor, and nothing else gets in. A base price is not a behaviour — a good that is priced but produced by nothing and consumed by nothing is an orphan, and `tools/verify/chain_depth.cpp`'s R1 row (no orphan resources) and R1b row (producer and consumer reachable in the *same* era band) hold the line.
 
 ---
 
 ## Resource categories
 
-Resources fall into three **production tiers** and two **value tracks**. The tiers reflect the manufacturing chain; the tracks reflect the purpose of the good.
+Resources fall into three **production tiers** and four **value tracks**. The tiers reflect the manufacturing chain; the tracks reflect the purpose of the good.
 
 ### Production tiers
 
@@ -29,31 +31,32 @@ Price volatility and trade margins increase with tier. Raw materials are abundan
 
 Ambient and habitability resources exist at the edges of the market. They are worth producing and trading, but rarely the primary profit driver. Their value is to ensure every tile is economically meaningful in some way and that population welfare has a supply chain behind it.
 
-### Deposit rarity & scarcity (implemented — BL-040)
+### Deposit rarity & scarcity
 
 Deposit authoring covers the full raw-material set, driven by a **per-resource rarity scalar** — a
-**seeded decimal in `[0, 1]`** (0 = effectively absent / trace, 1 = near-universal ambient). Rules:
+**seeded decimal in `[0, 1]`** (0 = effectively absent / trace, 1 = near-universal ambient). The
+design is BL-040 (full-set deposit authoring). Rules:
 
 - **Raw-tier (Tier 1) resources only carry a rarity scalar.** Refined and product resources are
   *made, not mined* — they receive no tile deposits, so scarcity does not apply to them.
-- The scalar **modulates deposit frequency and magnitude** on top of the existing terrain
-  affinity: a low scalar (e.g. platinum-group metals ≈ rare) keeps deposits sparse and small even
-  on affine terrain; a high scalar (ambient stone/sand) approaches the every-tile ambient floor.
+- The scalar **modulates deposit frequency and magnitude** on top of the terrain affinity: a low
+  scalar (e.g. platinum-group metals ≈ rare) keeps deposits sparse and small even on affine
+  terrain; a high scalar (ambient stone/sand) approaches the every-tile ambient floor.
 - The scalar is **seeded**, so a campaign's exact distribution varies but the rarity *ordering*
   (rare goods rare, ambient goods abundant) is stable, matching each resource's base-price
-  rarity already noted in the Tier 1 tables.
+  rarity in the Tier 1 tables.
 
 **Implementation (`src/world/tile_generation.cpp`).** `build_rarity_profile()` builds the per-body
-scalar field: the v0.0.4 seven-resource subset is pinned at `1.0` (the ambient-floor end — its
-hand-calibrated authoring and the economy tuned on it are left bit-for-bit unchanged), and the
-full-set additions (silica, coal, iron-nickel ore, copper ore, rare-earth ore, platinum-group
-metals) carry fixed base rarities ordered by base price plus a small seeded jitter that varies the
-campaign without disturbing the ordering. The additions are drawn on an **independent rng stream**
-so they cannot perturb the calibrated subset or the derived environment — preserving determinism.
-The distribution is guarded by the `world_audit` headless harness (BL-040 R1: all additions
-authored; R2: PGM strictly rarer than copper). Metallic-only goods (iron-nickel, PGM) appear only
-where metallic terrain exists — in Era 0 that is the asteroid belt, so they read as scarce until
-space access opens.
+scalar field: the seven-resource prototype subset is pinned at `1.0` (the ambient-floor end — its
+hand-calibrated authoring and the economy tuned on it stay bit-for-bit fixed), and the full-set
+additions (silica, coal, iron-nickel ore, copper ore, rare-earth ore, platinum-group metals) carry
+fixed base rarities ordered by base price plus a small seeded jitter that varies the campaign
+without disturbing the ordering. The additions are drawn on an **independent rng stream** so they
+cannot perturb the calibrated subset or the derived environment — preserving determinism. The
+distribution is guarded by the `world_audit` headless harness (all additions authored; PGM
+strictly rarer than copper). Metallic-only goods (iron-nickel, PGM) appear only where metallic
+terrain exists — in Era 0 that is the asteroid belt, so they read as scarce until space access
+opens.
 
 ---
 
@@ -61,13 +64,13 @@ space access opens.
 
 Raw materials are extracted by buildings placed on tiles with matching deposits.
 
-> **Which terrain axis a deposit follows (BL-519, 2026-08-21).** Tiles carry three axes —
-> `terrain_substrate` (what the ground is made of), `terrain_cover` (what sits on it, graded by
-> `cover_density`) and `terrain_landform` (its shape). **Ore follows the substrate; timber and
-> produce follow the cover.** Before the split there was one slot for both, so naming a forest cost
-> you the geology underneath it — which meant a forested metallic mountain could carry timber *or*
-> ore and never both. It now carries both. The "Terrain affinity" columns below name the axis they
-> mean; `docs/economy/TILES.md` is the authority for the axes themselves.
+> **Which terrain axis a deposit follows.** Tiles carry three axes — `terrain_substrate` (what
+> the ground is made of), `terrain_cover` (what sits on it, graded by `cover_density`) and
+> `terrain_landform` (its shape). **Ore follows the substrate; timber and produce follow the
+> cover.** Because the two are separate slots, a forested metallic mountain carries timber *and*
+> ore, never one at the expense of the other. The "Terrain affinity" columns below name the axis
+> they mean; `docs/economy/TILES.md` is the authority for the axes themselves (BL-519,
+> substrate/cover split).
 
 ### Earth-sourced
 
@@ -75,131 +78,77 @@ Available in Era 0 and all subsequent eras. Found predominantly on habitable or 
 
 | Resource | Terrain affinity | Notes |
 |----------|-----------------|-------|
-| Iron ore | **Substrate**: barren, rocky, volcanic, metallic; also sedimentary under scrub (surface iron — the old `tundra` row) | Most common structural mineral; the backbone of early industry. |
+| Iron ore | **Substrate**: barren, rocky, volcanic, metallic; also sedimentary under scrub (surface iron) | Most common structural mineral; the backbone of early industry. |
 | Coal | **Substrate**: barren. Ore-field siting additionally wants low, wet, **vegetated** ground — a **cover** test (grass, forest or marsh; scrub is excluded, sparse woody cover is not the swamp that lays down a seam) | Carbon-rich energy source; consumed as fuel and reagent in smelting. |
 | Petroleum | **Substrate**: barren (marine legacy — ore-field siting wants ground that sat low) | Liquid hydrocarbon; chemical feedstock and fuel precursor. |
 | Silica | **Substrate**: barren, rocky | Silicon dioxide; raw input for semiconductor-grade silicon and bulk construction. |
 | Copper ore | **Substrate**: rocky, volcanic | Primary conductive metal ore. |
 | Rare earth ore | **Substrate**: volcanic, rocky | Suite of critical minerals used in electronics and high-performance magnets. Low deposit concentration; high base price. |
-| Agricultural produce | **Cover**: grass, forest or marsh — scaled by `cover_density` — on **substrate** sedimentary | Food crop output. Only viable on planets with substantial surface water and habitability above a settlement threshold. Three producers as of BL-166/BL-168: the Farm (terrain deposit), the Hydroponics Bay (a processing_facility recipe, only where the Farm's deposit was NOT seeded), and the Fishing Wharf (an extraction_site gated on coastal adjacency instead of a deposit) — see `docs/economy/PRODUCTION.md` § Extraction / § Processing. |
+| Agricultural produce | **Cover**: grass, forest or marsh — scaled by `cover_density` — on **substrate** sedimentary | Food crop output. Only viable on planets with substantial surface water and habitability above a settlement threshold. Three producers: the Farm (terrain deposit), the Hydroponics Bay (a processing_facility recipe, only where the Farm's deposit was NOT seeded), and the Fishing Wharf (an extraction_site gated on coastal adjacency instead of a deposit) — see `docs/economy/PRODUCTION.md` § Extraction / § Processing. |
 
 ### Space-sourced
 
-Available in Era 1 and beyond. Found predominantly on moons, asteroids, and outer bodies.
+Found predominantly on moons, asteroids, and outer bodies; reachable in Era 1 and beyond.
 
-> **Water is not actually Era-gated (corrected 2026-07-31).** It trades on the home-body markets
-> from tick 0 — an authored base price (1.5) in the Kepler market template — and sits in the
-> substrate demand basket (weight 0.40). The "space-sourced / Era 1" framing describes where its
-> *deposits* concentrate (icy terrain), not when it enters the economy.
+> **Water is not Era-gated.** It trades on the home-body markets from tick 0 — an authored base
+> price (1.5) in the Kepler market template — and sits in the substrate demand basket (weight
+> 0.40). The "space-sourced" framing describes where its *deposits* concentrate (icy terrain),
+> not when it enters the economy.
 
 | Resource | Terrain affinity | Notes |
 |----------|-----------------|-------|
 | Water | **Substrate**: icy | Deposits on icy ground, extracted as liquid water; also the baseline life-support input for off-world populations. Trades terrestrially from tick 0 — see note above. |
-
-### Logistics goods (BL-286, 2026-08-04) — five of the eight REMOVED 2026-08-16
-
-> **Removed 2026-08-16 (Ben's call, NR-257 option B).** **Grain, fodder, salt, transport capacity
-> and bullion are gone from `resource_type`.** They were added here with "behaviour unfiled" and
-> twelve days later were still produced by nothing, yielded by no deposit and consumed by nothing.
-> `chain_depth`'s R1 orphan row is what found them, and it now runs green. `resource_count` fell
-> 42 → 37, and the ids after them shifted down by five.
->
-> The three that stayed — **charcoal**, **iron blooms** and **trade goods (misc)** — earned their
-> place in the meantime: BL-429's ancient chain gave the first two real recipes (Charcoal Burner /
-> Peat Kiln, Bloomery) and the third a producer (Potter & Weaver, Glassworks). That difference is
-> exactly what the admission rule names, and it is why this section is kept as a cautionary record
-> rather than deleted.
->
-> **Re-adding one is an append at the END of the enum, with its behaviour filed in the same
-> change** — never a re-insertion at the old position, which would repoint every id after it. The
-> five rows below are a record of what was intended, not a statement of what exists.
-
-Eight resources added for the army/unit logistics family. This entry is **BL-286 only** — enum +
-serialisation + authored base price. None of the consumption, range-cap, shelf-life or purchase
-mechanics are implemented, and **their follow-on items are not yet filed**. Allocate ids with
-`node tools/session/next_id.js` when they are; do not cite one before it exists.
-
-*(Corrected 2026-08-04. This section previously cited "BL-286–291" and named BL-287/288/289/290 as
-the follow-ons. Those ids belong to unrelated items — BL-287 is the verify-tier build change,
-BL-288 is the Release-only test failures — and BL-289–291 do not exist. BL-286's own design said
-"not yet filed"; the caveat was dropped in transcription. The same bad ids are copied into a
-`components.hpp` comment.)*
-
-| Resource | Tier | Notes |
-|----------|------|-------|
-| ~~Grain~~ *(removed)* | 1 (raw) | Human ration staple. Per-tick army/unit draw is a follow-on, unfiled. |
-| ~~Fodder~~ *(removed)* | 1 (raw) | Draft-animal/cavalry feed, drawn down alongside grain. Follow-on, unfiled. |
-| ~~Salt~~ *(removed)* | 1 (raw) | Preservative. Intended to gate ration shelf-life. Follow-on, unfiled. |
-| ~~Transport capacity~~ *(removed)* | 1 (abstract) | Logistics-train throughput good; intended to cap supply range. Follow-on, unfiled. |
-| Charcoal | 2 (refined) | Refined fuel-wood; pre-coal smelting/heating input. No recipe yet. |
-| Iron blooms | 2 (refined) | Bloomery-refined iron intermediate — distinct from raw iron ore / iron-nickel ore. No recipe yet. |
-| ~~Bullion~~ *(removed)* | 2 (refined) | Minted precious-metal specie; intended as a local purchase medium via `resolve_price`. Follow-on, unfiled. |
-| Trade goods (misc) | 1 (endemic, placeholder) | Generic endemic-luxury-class placeholder. Not a specific named luxury — that naming is a separate design step. |
-
-~~All eight carry an authored mid-tier `base_price` in the Kepler market template
-(`src/world/world_gen_config.hpp`). **They are priced but inert** — none has a tile deposit
-(`generate_deposits` never emits them), a recipe (`recipes.lua` holds four, none producing them),
-or a `demand_basket` entry. A good with no supply and no demand never clears, so no market will
-ever price one in play; the base price is scaffolding for when the behaviour lands.~~
-
-**Superseded 2026-08-16.** "Priced but inert" is precisely the state that got five of these
-deleted — a base price is not a behaviour, and scaffolding that nothing ever stands on is
-indistinguishable from an orphan two weeks later. The three survivors are now priced *and* wired:
-charcoal 4.0 and iron blooms 9.0 sit in `world_gen.lua`'s ancient tier with real recipes on both
-sides, and trade goods (misc) 8.0 has two producers. The `world_gen_config.hpp` defaults for the
-removed five went with the enum values.
 | Iron-nickel ore | Rocky (metallic asteroid) | Found in metallic asteroids; feeds the same smelting chain as iron ore and eliminates dependence on Earth-side steel once accessible. |
-| Platinum group metals | Rocky, volcanic (asteroid) | Ultra-rare catalytic and industrial metals. Very low deposit concentration; extremely high base price. The primary high-value trade good of the asteroid belt. |
-| Regolith | All terrain (airless bodies) | Loose surface dust and broken rock. Used for bulk construction in-situ; not typically traded (high mass, low unit value). Included in the resource model but excluded from market tables; see note below. |
+| Platinum group metals | Rocky, volcanic (asteroid) | Ultra-rare catalytic and industrial metals. Very low deposit concentration; extremely high base price (40.0). The primary high-value trade good of the asteroid belt — a good to be *sold*. It also has one consumer, `electronics_contact_grade`, a contact-grade/catalytic route to electronics at 0.5 PGM per unit: at base price 40 a premium alternative rather than a cheap bypass, so the belt export remains the obvious use. |
+| Regolith | All terrain (airless bodies) | Loose surface dust and broken rock, present on every tile of every airless body at deposits of 20–50. Its purpose is **in-situ construction** — the route for building where you already are, not a trade good. |
 
-**Regolith note.** Regolith is present on every tile of every airless body and serves as a local construction material rather than a tradeable commodity. It has no base price and does not appear in market supply or demand tables. It is defined in the resource enum so that building cost formulas referencing it are consistent with the rest of the model.
+**Regolith pricing and its one consumer are one decision (Ben, 2026-08-16, NR-257).** Regolith
+carries a `base_price` of **0.6** — the cheapest good in the table, below the stone/sand bulk floor
+of 1.0, which is what "high mass, low unit value" means for something on every airless tile. It is
+priced because it is consumed: `steel_from_regolith` "In-Situ Smelter" (`scripts/recipes.lua`)
+reduces regolith to steel at a deliberately poor **12:1**, and a recipe input pulls the good into
+market demand at the tiles that run one — an unpriced input stalls the building forever. The ratio
+and the price are coupled: at 8:1 a bulk-low price would have made the deliberately poor route the
+most profitable steel in the game (clearing 3.2 against the Smelter's 1.0). At 12:1 it clears 0.8,
+the worst of the three industrial steel routes, which is the authored intent.
 
-> **Amended 2026-08-16 (NR-257).** The claim above about building cost formulas was never true in
-> code — no cost formula ever referenced regolith, so it sat obtainable and consumed by nothing,
-> which is how `chain_depth`'s R1 orphan row found it. Ben's call was to give it a consumer, so
-> `steel_from_regolith` "In-Situ Smelter" (scripts/recipes.lua) now reduces regolith to steel at a
-> deliberately poor 12:1. The **in-situ intent above is unchanged and is what the recipe encodes** —
-> it is the route for building where you already are, not a trade good.
->
-> **Regolith now carries a `base_price` of 0.6** (Ben's call, same date), so the "no base price /
-> excluded from market tables" sentence above is superseded: a recipe input pulls the good into
-> market demand at the tiles that run one, and an unpriced input stalls the building forever — the
-> same minable-but-unsellable asymmetry BL-340 closed for the space chain and BL-429 for the ancient
-> one. 0.6 is the cheapest good in the table, below the stone/sand bulk floor of 1.0, which is what
-> "high mass, low unit value" should mean for something on every tile of every airless body.
->
-> The recipe ratio moved from 8:1 to 12:1 **with** the price, and had to: at 8:1 a price low enough
-> to read as bulk would have made the deliberately poor route the most profitable steel in the game
-> (clearing 3.2 against the Smelter's 1.0). At 12:1 it clears 0.8, the worst of the three industrial
-> routes, which is the authored intent. The two numbers are one decision.
-
-> **Amended 2026-08-16 (NR-257).** **Platinum group metals** likewise had no consumer — `world_gen.lua`
-> tags it `terminal: the belt's high-value trade good`, i.e. a good to be *sold*. It now also has
-> `electronics_contact_grade`, a contact-grade/catalytic route to electronics at 0.5 PGM per unit.
-> At base price 40 this is a premium alternative rather than a cheap bypass, so the belt export
-> remains the obvious use and the terminal framing above still holds for most play.
-
-### Ambient raw materials (Tier 1)
+### Ambient raw materials
 
 Ambient resources are present at low deposit values on almost every eligible tile type. They ensure that every tile has at least one resource that can be extracted, even if it is not economically compelling to do so. They feed local construction and low-value production chains.
 
-| Resource | Found on | Extraction building | Notes |
-|----------|----------|---------------------|-------|
-| Stone | **Substrate**: everything except ocean and icy | Quarry | Universal construction aggregate; base price very low. |
-| Timber | **Cover**: forest or marsh, scaled by `cover_density` — on ANY substrate, which is the BL-519 payoff: a forested crag now yields timber without giving up its ore | Lumber Camp | Construction material and fuel; base price low. |
-| Sand | Barren plains, barren canyon | Quarry | Glass precursor; construction aggregate. |
-| Clay | **Cover**: marsh; or the valley **landform** on any ground | Quarry | Ceramics and construction; base price low. |
-| Peat | **Pair**: scrub cover on sedimentary substrate (the old `tundra`), plains or valley | Mine (surface layer) | Fuel; pre-industrial energy source. |
+| Resource | Found on | Extraction building | Base price | Notes |
+|----------|----------|---------------------|-----------|-------|
+| Stone | **Substrate**: everything except ocean and icy | Quarry | 1.0 | Universal construction aggregate. |
+| Timber | **Cover**: forest or marsh, scaled by `cover_density` — on ANY substrate, so a forested crag yields timber without giving up its ore | Lumber Camp | 1.5 | Construction material and fuel. |
+| Sand | Barren plains, barren canyon | Quarry | 1.0 | Glass precursor; construction aggregate. |
+| Clay | **Cover**: marsh; or the valley **landform** on any ground | Quarry | 1.2 | Ceramics and construction. |
+| Peat | **Pair**: scrub cover on sedimentary substrate, plains or valley | Mine (surface layer) | 1.2 | Fuel; pre-industrial energy source. |
 
-Ambient resources feed into construction material chains (stone → building materials, timber → processed lumber) that reduce construction costs locally and support habitability-track production.
+Ambient goods are priced as bulk commons: cheap, heavy, worth something only in volume or after
+work. Stone and timber sit below iron ore (2.5) because they are everywhere; peat below both,
+being the poor fuel. They feed the **ancient chain** (`docs/economy/PRODUCTION.md` § The ancient
+chain) and the habitability-track producers.
+
+### Ancient intermediates
+
+Three Tier 2 goods belong to the ancient (pre-coal) chain rather than the industrial one. Each has a producer and a consumer on the ancient roster; see `docs/economy/PRODUCTION.md` § The ancient chain.
+
+| Resource | Tier | Base price | Produced by | Notes |
+|----------|------|-----------|-------------|-------|
+| Charcoal | 2 (refined) | 4.0 | Charcoal Burner / Peat Kiln | Refined fuel-wood; pre-coal smelting/heating input. Dearer than the timber it comes from — a burn takes days and loses mass. |
+| Iron blooms | 2 (refined) | 9.0 | Bloomery | Bloomery-refined iron intermediate — distinct from raw iron ore / iron-nickel ore. Carries the charcoal plus the ore. |
+| Trade goods (misc) | 1 (endemic, placeholder) | 8.0 | Potter & Weaver, Glassworks | Generic endemic-luxury-class placeholder, priced as a modest trade good, not a treasure. A specific luxury name is a separate design step. |
+
+**Adding a resource is an append at the END of the enum, with its behaviour filed in the same
+change** — never an insertion at an interior position, which would repoint every id after it.
 
 ---
 
-## Mercantile — endemic trade goods (Tier 1, BL-191)
+## Mercantile — endemic trade goods
 
-Implemented. Tier 1 raws like any other, but on a different **value track**: an industrial good is
-worth something because it is *useful*; an endemic good is worth something because it only grows
-**there**.
+Tier 1 raws like any other, but on a different **value track**: an industrial good is worth
+something because it is *useful*; an endemic good is worth something because it only grows
+**there**. The design is BL-191 (endemic trade goods).
 
 That distinction is the whole mechanic. It is also real history — nutmeg, cinchona and tobacco were
 worth crossing oceans for not because they were useful like iron, but because you could not grow them
@@ -215,7 +164,7 @@ worlds can both have temperate grassland and only one of them grow tobacco.
 | Tobacco | Temperate / subtropical | **Cover**: grass | Cured leaf crop; the archetypal colonial cash crop. |
 | Spices | Tropical | **Cover**: marsh or forest | Aromatics; the highest value-to-mass good in the set. |
 | Coffee | Subtropical | **Cover**: forest (highland-favouring) | Stimulant bean; typically the scarcest, and so the widest-margin. |
-| Furs | Subpolar / polar | **Cover**: scrub — tundra is gone as a terrain (BL-519); scrub is the ground the trapping happens on | Pelts; the one good that comes from the cold end of the map. |
+| Furs | Subpolar / polar | **Cover**: scrub — the ground the trapping happens on | Pelts; the one good that comes from the cold end of the map. |
 
 **A world only carries the ones its own biosphere produced** — roughly 2–3 of the four, rolled per
 world. A world with no land biosphere carries none at all, because the C → D stage sits downstream of
@@ -223,9 +172,11 @@ B → C: no forests, no cash crops.
 
 ### Pricing by distance
 
-**No change to the clearing engine.** `market_component::base_price` is already per-market and
-authored at world creation, so an endemic good is simply cheap at its origin and dear far from it;
-supply and demand then push around that base exactly as for any other resource.
+**No change to the clearing engine.** `market_component::base_price` is per-market and authored at
+world creation, so an endemic good is simply cheap at its origin and dear far from it; supply and
+demand then push around that base exactly as for any other resource. The constants are
+`endemic_pricing_params` (`src/world/world_gen_config.hpp`, authored under
+`world_gen.kepler_market.endemic`).
 
 ```
 base_price = 1.5 x (1 + 7.0 x normalised_distance_to_nearest_source)
@@ -238,13 +189,12 @@ coffee than for structural alloy, which is the point.
 **The scarcest good commands the widest margin, and that is emergent rather than authored:** coffee
 had 30 source tiles against tobacco's 179, so it is further from more markets. Nobody tuned that.
 
-**Distance is physical for now.** "Geopolitical" earns its meaning when diplomacy and AI behaviour
-land (Ben, 2026-07-22) — at which point the multiplier gains a political term rather than being
-replaced.
+**Distance is physical.** "Geopolitical" earns its meaning through diplomacy and AI behaviour
+(Ben, 2026-07-22) — the multiplier gains a political term there rather than being replaced.
 
 ### Why this exists
 
-Every market previously traded the same industrial goods, so there was no structural reason to trade
+If every market traded the same industrial goods there would be no structural reason to trade
 *between* markets — only local shortage. Endemic goods create trade that exists because of **where
 things are**.
 
@@ -259,21 +209,19 @@ out there.
 
 Refined goods are the primary goods in inter-body trade during the early game.
 
-> **Steel, refined fuel, food rations, silicon, refined copper and REE alloy** exist in
-> `resource_type` (silicon/refined copper/REE alloy landed 2026-08-11, BL-340). Liquid oxygen
-> stays an unmodelled design target — it is folded into the Chemical Plant's two propellant
-> recipes (BL-308) rather than given its own enum value, since nothing outside the plant would
-> ever hold it.
+| Resource | Primary inputs | Processing building | Base price |
+|----------|---------------|---------------------|-----------|
+| Steel | Iron ore or iron-nickel ore (+ coal as reagent) | Smelter | 8.0 |
+| Refined fuel | Petroleum | Refinery | 10.0 |
+| Silicon | Silica | Refinery | 5.0 |
+| Refined copper | Copper ore | Smelter | 7.5 |
+| REE alloy | Rare earth ore | Refinery | 16.0 |
+| Food rations | Agricultural produce | Food Processor | 6.0 |
 
-| Resource | Primary inputs | Processing building |
-|----------|---------------|---------------------|
-| Steel | Iron ore or iron-nickel ore (+ coal as reagent) | Smelter |
-| Refined fuel | Petroleum | Refinery |
-| Silicon | Silica | Refinery |
-| Refined copper | Copper ore | Smelter |
-| REE alloy | Rare earth ore | Refinery |
-| Liquid oxygen | Atmospheric air (Era 0) or water (Era 1) | Chemical Plant |
-| Food rations | Agricultural produce | Food Processor |
+**Liquid oxygen has no enum value of its own.** It is folded into the Chemical Plant's two
+propellant recipes — separated cryogenically from the local air on the Era 0 route, electrolysed
+from water on the Era 1 route — because nothing outside the plant would ever hold it
+(`docs/economy/PRODUCTION.md` § Chemical Plant).
 
 ---
 
@@ -281,41 +229,35 @@ Refined goods are the primary goods in inter-body trade during the early game.
 
 Products are the highest-value goods and the primary driver of market price divergence. Most require multiple refined-good inputs.
 
-> **Machinery, alloys, electronics and spacecraft components** exist in `resource_type`
-> (landed 2026-08-11, BL-340); **propellant** already existed (BL-308). The whole tier is
-> modelled — the "unmodelled design target" banner is retired.
+| Resource | Primary inputs | Processing building | Base price |
+|----------|---------------|---------------------|-----------|
+| Machinery | Steel + refined copper | Fabricator | 22.0 |
+| Electronics | Silicon + refined copper + REE alloy | Electronics Lab | 29.0 |
+| Propellant | Refined fuel + liquid oxygen | Chemical Plant | — (unpriced; consumed by the Launchpad, never sold) |
+| Alloys | Steel + REE alloy | Fabricator | 34.0 |
+| Spacecraft components | Alloys + electronics | Assembly Plant | 140.0 |
+| **Ordnance** | **Steel + machinery** | **Fabricator**; also the **Smithy** on the ancient roster | 43.0 |
 
-| Resource | Primary inputs | Processing building |
-|----------|---------------|---------------------|
-| Machinery | Steel + refined copper | Fabricator |
-| Electronics | Silicon + refined copper + REE alloy | Electronics Lab |
-| Propellant | Refined fuel + liquid oxygen | Chemical Plant |
-| Alloys | Steel + REE alloy | Fabricator |
-| Spacecraft components | Alloys + electronics | Assembly Plant |
-| **Ordnance** | **Steel + machinery** | **Fabricator** |
+The margin ladder widens up the tiers — spacecraft components sits 56× iron ore — which is the
+value gradient the space-equipment premise rests on. Propellant and spacecraft components are the
+key outputs enabling space access. Propellant is the operating cost of any launch; spacecraft
+components are consumed by infrastructure construction in orbit and on remote bodies.
 
-Propellant and spacecraft components are the key outputs enabling space access. Propellant is the operating cost of any launch; spacecraft components are consumed by infrastructure construction in orbit and on remote bodies.
+### The two terminal goods
 
-### The two terminal goods (BL-457, 2026-08-17)
+The tier ends in **two** places rather than one, and the pair is the point.
 
-The tier now ends in **two** places rather than one, and the pair is the point.
+**Spacecraft components** is the *space* terminal — the object procurement contracts buy
+(BL-350, procurement), with deliberately no background demand so the militia is its only buyer.
+**Ordnance** is the *military* terminal, drawn per tick by unit upkeep (BL-454) rather than bought
+as a lump. The player's trade is *"coloured directly with military use, and space equipment"*
+(NR-120), and the roster carries one object for each half of that sentence. Ordnance is BL-457
+(ordnance).
 
-**Spacecraft components** is the *space* terminal — the object BL-350's procurement contracts buy,
-with deliberately no background demand so the militia is its only buyer. **Ordnance** is the
-*military* terminal, drawn per tick by unit upkeep (BL-454) rather than bought as a lump.
-
-Until BL-457 only the space road existed. The 2026-08-10 refocus (NR-120) put the player as a
-militia whose trade is *"coloured directly with military use, and space equipment"*, and the
-military half of that sentence had **no object in the roster at all** — no ordnance, no munitions,
-no small arms. It went unnoticed for a week because nothing consumed one, which is precisely the
-admission rule working in reverse: a good with no consumer does not get in, so the good that
-*should* have existed never announced its absence.
-
-**One value, not three.** Ben's words were "supplies, rations, weapons". `food_rations` already
-covers rations; `medical_supplies` exists but is a habitability good a population centre competes
-for, so borrowing it would put an army and a city on one price. A distinct field ration or medical
-draw later is an **append with its behaviour filed in the same change** — never a re-insertion,
-which would repoint every id after it.
+**One value, not three.** Ben's words were "supplies, rations, weapons". `food_rations` covers
+rations; `medical_supplies` is a habitability good a population centre competes for, so borrowing
+it would put an army and a city on one price. A distinct field ration or medical draw is an
+**append with its behaviour filed in the same change** — never an interior insertion.
 
 **Its price is derived, not picked.** The processing roster marks an output up over its input
 basket by a strikingly tight ratio — machinery 1.419, alloys 1.417, electronics 1.415, spacecraft
@@ -323,16 +265,13 @@ components 1.443. Ordnance draws steel 8.0 + machinery 22.0 = 30.0, so its `base
 is a ratio of **1.433**, inside that band rather than beside it. Re-derive if either input's price
 or the recipe quantities move.
 
-**BL-460 (2026-08-19): the Fabricator route above was industrial-only, and BL-454's upkeep draw is
-not.** The Fabricator recipe carries `era = "industrial"`, so an ancient campaign (the shipped
-default, `epoch_year = 0`) masked its only producer out while unit upkeep kept drawing ordnance
-every tick regardless of band — a good that passed the admission rule's *consumer exists* test and
-still could not be made. The fix is a second producer, not a second good: the Smithy — the same
-ancient building that already turns `iron_blooms + charcoal` into steel — gained an alternate
-recipe to `ordnance` at the identical basket (`docs/economy/PRODUCTION.md` § The ancient chain).
-`tools/verify/chain_depth.cpp`'s R1 row (no orphan resources) only checked that *a* consumer
-existed; it now carries an **R1b** row checking producer and consumer are reachable in the *same*
-concrete era band, which would have caught this before it shipped.
+**It has a producer in every era band.** The Fabricator recipe carries `era = "industrial"`, and
+unit upkeep draws ordnance every tick regardless of band, so an ancient campaign (the default,
+`epoch_year = 0`) needs an ancient producer too: the Smithy — the same building that turns
+`iron_blooms + charcoal` into steel — carries an alternate recipe to `ordnance` at the identical
+basket (`docs/economy/PRODUCTION.md` § The ancient chain). `chain_depth`'s R1b row (producer and
+consumer reachable in the *same* concrete era band) is the check that a good admitted on its
+consumer can also be made wherever it is drawn.
 
 ---
 
@@ -340,36 +279,30 @@ concrete era band, which would have caught this before it shipped.
 
 Habitability goods are consumed by population centres for welfare rather than production. They do not feed industrial chains, but their supply raises local habitability, which raises workforce efficiency, which indirectly raises production throughput. Their profit margins are lower than industrial products, but they are load-bearing for any body that hosts a significant population.
 
-> **Three of five landed (BL-368, 2026-08-11).** Clean water, Consumer goods and Medical supplies
-> — the three population centres actually consume as tradeable goods — are now real `resource_type`
-> values with recipes and market demand. **Building materials and Utilities are deliberately still
-> absent**: Building materials feeds construction cost, a different consumption path
-> (`docs/economy/PRODUCTION.md`'s concern, not population demand); Utilities is an abstracted budget
-> cost with no resource identity of its own, and stays that way by design.
+Three habitability goods are tradeable `resource_type` values — the three population centres
+consume as goods (BL-368, habitability tranche). **Building materials and Utilities are
+deliberately not resources**: Building materials feeds construction cost, a different consumption
+path (`docs/economy/PRODUCTION.md`'s concern, not population demand); Utilities is an abstracted
+budget cost with no resource identity of its own.
 
-| Resource | Primary inputs | Building | Effect if undersupplied |
-|----------|---------------|----------|------------------------|
-| Clean water | Water | Water Treatment Plant | Reduces habitability; suppresses population growth |
-| Building materials | Stone + timber | Construction Yard | Increases construction cost of all buildings if scarce (still absent — see above) |
-| Consumer goods | Food rations + steel | Consumer Goods Factory | Reduces workforce efficiency |
-| Medical supplies | Water + agricultural produce | Pharmaceutical Lab | Reduces habitability; raises mortality (long-term) |
-| Utilities | — (abstracted as budget cost) | Power Plant, Sanitation | Habitability floor drops without continuous supply (still absent — see above) |
+| Resource | Primary inputs | Building | Base price | Effect if undersupplied |
+|----------|---------------|----------|-----------|------------------------|
+| Clean water | Water | Water Treatment Plant | 3.0 | Reduces habitability; suppresses population growth |
+| Consumer goods | Food rations + steel | Consumer Goods Factory | 12.0 | Reduces workforce efficiency |
+| Medical supplies | Water + agricultural produce | Pharmaceutical Lab | 14.0 | Reduces habitability; raises mortality (long-term) |
 
-The three landed goods carry real recipes (`scripts/recipes.lua` ids 14-16, all on the generic
-`processing_facility` — no new `building_type` enum values, matching the shipped set) and a real
-base price (`scripts/world_gen.lua`). Their demand comes from population centres directly
-(`inject_population_demand`, `docs/economy/MARKETS.md` § Population demand), not from the
-nation-substrate model. The undersupply *effects* named above (reduced habitability, workforce
-efficiency, growth) are **not yet wired** — landing the goods and their demand is BL-368's scope;
-consuming supply-shortfall into those effects is unbuilt follow-on. Building materials and
-Utilities remain unmodelled design targets with no enum values and no market demand slots (the
-arrays are sized by `resource_count`).
+The three carry recipes (`scripts/recipes.lua` ids 14–16, all on the generic
+`processing_facility` — no dedicated `building_type` enum values) and are priced modestly above
+their primary inputs — welfare goods, not high-margin industrial products. Their demand comes
+from population centres directly (`inject_population_demand`, `docs/economy/MARKETS.md`
+§ Population demand), not from the nation-substrate model. The undersupply effects belong to the
+habitability feedback model in `docs/economy/POPULATION.md`.
 
 ---
 
-## Prototype scope
+## Prototype subset
 
-The full resource list above is the design target. For the prototype (Layers 3–6), a representative subset of **seven resources** is live in code:
+A representative subset of **seven resources** is the hand-calibrated core the economy is tuned on:
 
 | Resource | Tier | Extraction building | Processing step |
 |----------|------|---------------------|-----------------|
@@ -381,57 +314,44 @@ The full resource list above is the design target. For the prototype (Layers 3�
 | Refined fuel | 2 | — | from Petroleum |
 | Food rations | 2 | — | from Agricultural produce |
 
-The `resource_type` enum (`src/world/components.hpp`) holds **42 values** as of BL-368
-(2026-08-11; 39 after BL-340, 32 after BL-308, 31 after BL-286, 23 before it). The three added by
-BL-368 are the habitability tranche — clean water, consumer goods, medical supplies — the only
-three habitability goods population centres actually consume as tradeable goods; Building
-materials and Utilities are deliberately still absent (§ Habitability goods above). See
-`docs/economy/PRODUCTION.md` § Chemical Plant / § Launchpad for propellant, and this file's Tier
-2/3 tables above for the BL-340 roster's recipes. Adding a resource changes `resource_count` and
-with it the width of every serialised `std::array<float, resource_count>` — tile deposits and
-reserves, market supply/demand/price/base-price, stockpiles, nation abundance and substrate
-capacity. **Extending the enum IS a save-format retrofit**, but every one of those arrays is
-already sized off `resource_count` rather than a hardcoded width, so BL-286's, BL-340's and
-BL-368's extensions each needed no manual per-array edit — only the enum + base-price/recipe
-authoring.
-
-The full design list including ambient and habitability goods is approximately **35–40 entries**
-— a design target now substantially covered. The shipped count is 42 (23 pre-BL-286 + 8 logistics
-goods + propellant + 7 processing-chain roster + 3 habitability tranche).
+The `resource_type` enum holds **38 values**: 7 Earth-sourced raws, 4 space-sourced raws, 5
+ambient raws, 4 endemic goods, 3 prototype refined goods, 3 ancient intermediates, propellant,
+7 processing-chain goods, 3 habitability goods, and ordnance. Adding a resource changes
+`resource_count` and with it the width of every serialised `std::array<float, resource_count>` —
+tile deposits and reserves, market supply/demand/price/base-price, stockpiles, nation abundance
+and substrate capacity. **Extending the enum IS a save-format retrofit**, but every one of those
+arrays is sized off `resource_count` rather than a hardcoded width, so an extension needs no
+per-array edit — only the enum value plus base-price and recipe authoring.
 
 ---
 
-## What actually trades (recorded 2026-07-31; updated 2026-08-11 for BL-340/BL-368)
+## What trades
 
-The load-bearing fact for any market work: of the 42 enum values, only a fraction carry a
-non-zero `base_price`, and `resolve_price` / the clearing pass ignore everything else
-(`docs/economy/MARKETS.md`). The tradeable set is:
+The load-bearing fact for any market work: only a value with a non-zero `base_price` is
+tradeable, and `resolve_price` / the clearing pass ignore everything else
+(`docs/economy/MARKETS.md`). Base prices are authored in `scripts/world_gen.lua` under
+`kepler_market.base_price` (the Kepler market template, loaded into `kepler_base_price` in
+`src/world/world_gen_config.hpp`). The tradeable set is:
 
-- **Seven authored base prices** (`world_gen_config.hpp`'s `kepler_base_price`, the Kepler
-  market template): iron ore 2.5, petroleum 3.5, water 1.5, agricultural produce 3.0, steel 8.0,
-  refined fuel 10.0, food rations 6.0.
-- **Eight logistics-goods base prices** (BL-286, same `kepler_base_price` table): grain 2.0,
-  fodder 1.2, salt 2.0, transport capacity 5.0, charcoal 4.0, iron blooms 6.0, bullion 50.0,
-  trade goods (misc) 15.0 — mid-tier authored placeholders; no consumption/gate mechanic reads
-  them yet (§ Logistics goods above).
-- **Endemic goods** (tobacco, spices, coffee, furs — BL-191, endemic trade goods) with
-  **distance-derived** per-market base prices: `1.5 × (1 + 7.0 × normalised distance to the
-  nearest source)` (§ Mercantile below). Only the 2–3 goods the world's biosphere actually
-  evolved get priced.
-- **Six raws, newly priced (BL-340)**: coal 2.0, silica 2.0, copper ore 3.0, rare earth ore 6.0,
-  iron-nickel ore 3.0, platinum-group metals 40.0 — closing the minable-but-unsellable asymmetry
-  below.
-- **Seven processing-chain goods (BL-340)**: silicon 5.0, refined copper 7.5, REE alloy 16.0,
-  machinery 22.0, alloys 34.0, electronics 29.0, spacecraft components 140.0 — a deliberately
-  widening margin ladder up the tiers (spacecraft components sits 56× iron ore).
-- **Three habitability-tranche goods (BL-368)**: clean water 3.0, consumer goods 12.0, medical
-  supplies 14.0 — priced modestly above their primary inputs, per § Habitability goods above;
-  demand comes from population centres directly (`inject_population_demand`), not the substrate.
+- **The prototype seven**: iron ore 2.5, petroleum 3.5, water 1.5, agricultural produce 3.0,
+  steel 8.0, refined fuel 10.0, food rations 6.0.
+- **The remaining industrial raws**: coal 2.0, silica 2.0, copper ore 3.0, rare earth ore 6.0,
+  iron-nickel ore 3.0, platinum-group metals 40.0. A raw with an authored deposit and no price is
+  minable-but-unsellable, and a processing building drawing on it stalls forever; every deposit
+  raw is therefore priced (BL-340, processing roster).
+- **The ambient raws and regolith**: stone 1.0, timber 1.5, sand 1.0, clay 1.2, peat 1.2,
+  regolith 0.6 — the same rule applied to the ancient chain (BL-429, ancient chain).
+- **The ancient intermediates**: charcoal 4.0, iron blooms 9.0, trade goods (misc) 8.0.
+- **Endemic goods** (tobacco, spices, coffee, furs) with **distance-derived** per-market base
+  prices: `1.5 × (1 + 7.0 × normalised distance to the nearest source)` (§ Mercantile). Only
+  the 2–3 goods the world's biosphere actually evolved get priced.
+- **The processing-chain goods**: silicon 5.0, refined copper 7.5, REE alloy 16.0, machinery
+  22.0, alloys 34.0, electronics 29.0, spacecraft components 140.0.
+- **The habitability tranche**: clean water 3.0, consumer goods 12.0, medical supplies 14.0.
+- **Ordnance** 43.0.
 
-Everything else has `base_price` 0 and is **never traded** — this no longer includes any BL-040
-(full-set deposit authoring) raw; all six are priced above. Pricing the remainder (Building
-materials, Utilities, most logistics goods) is part of the owed market-rework family (BL-130, real
-market inventory, and kin — MARKETS.md § Owed follow-ons).
+**Propellant is the one value with no base price.** It is made in a Chemical Plant and burned by
+a Launchpad, never mined and never sold, so it has no market presence.
 
 Water is in this tradeable set from tick 0: it carries an authored base price on the home-body
 markets and sits in the substrate demand basket (`scripts/economy.lua`, weight 0.40).

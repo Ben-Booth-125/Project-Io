@@ -1,7 +1,7 @@
 # Project Io — Startup (Entry Screens)
 
 The app's entry flow — everything between launch and the first frame of play.
-Code-derived from `src/core/app.{hpp,cpp}` (2026-07-31). See
+Written against `src/core/app.{hpp,cpp}` and `src/ui/startup_screens.cpp`. See
 [LAYOUT.md](LAYOUT.md) for the in-game shell and [CANVASES.md](CANVASES.md) for
 the opening view the flow hands over to.
 
@@ -18,7 +18,7 @@ menu  →  generating  →  building  →  choosing_corp  →  in_game
 
 `building` is the loading screen the world is carved on (CORPORATION_GENERATION.md
 § Corporate seeding is watched). `choosing_corp` is the starting-corp selection
-stage added by BL-435 — see § Starting-corp selection below.
+stage — see § Starting-corp selection below.
 
 **Only `in_game` simulates.** On the menu and wizard the loop just pumps events
 and draws — the world, economy, and sim clock are not built until the wizard's
@@ -31,7 +31,7 @@ never lands as elapsed in-game days. `run_verify()` jumps straight to `in_game`
 ## Main menu — `draw_main_menu`
 
 A dark, centred title card — deliberately spare, a launch entry point, not a
-settings hub (no Load/Save in the prototype). Contents:
+settings hub (no Load/Save on the menu; `--load` is a command-line path). Contents:
 
 - **Seed** — hex entry, a one-shot **Roll** (a `random_device` draw feeds *only*
   the seed value; generation stays a pure function of it), and **Copy seed**.
@@ -43,16 +43,16 @@ settings hub (no Load/Save in the prototype). Contents:
 - **New Game** → `open_new_world_wizard()` (commits nothing); **Quit**.
 
 Every widget edits `m_pending_world_params` (`world_params`), which the wizard
-continues to edit and `start_new_game()` finally consumes. The six Planetology
-sliders that once sat here moved into the wizard — a slider whose effect you
-cannot see is a slider you cannot judge.
+continues to edit and `start_new_game()` finally consumes. The Planetology
+sliders live in the wizard, not here — a slider whose effect you cannot see is a
+slider you cannot judge.
 
-## New World wizard — `draw_generation_screen` (BL-167)
+## New World wizard — `draw_generation_screen`
 
-**Three rounds** (`wizard_round_count`), batched thematically from the ten-stage
-Planetology chain (Ben, 2026-07-22: fewer rounds, too slow otherwise). Each
-round stacks its stages' charts and explanations, then takes that round's
-preferences.
+The wizard is BL-167 (planetology pass). **Three rounds** (`wizard_round_count`),
+batched thematically from the ten-stage Planetology chain (Ben, 2026-07-22: fewer
+rounds, too slow otherwise). Each round stacks its stages' charts and
+explanations, then takes that round's preferences.
 
 - **Preferences, not parameters** (`world_preferences`,
   `src/world/planetology.hpp`): a named lean per axis ("Dimmer", "Metal-rich"),
@@ -66,36 +66,33 @@ preferences.
 - **Rounds are causal** — rerolling round A re-draws B and C downstream, so
   Back is a plain revision with no per-round snapshot.
 - **Charts** come from `ui::generation_charts`, shared verbatim with the
-  History ledger's Chain view (BL-211) — the plots a player decided a world on
-  are the plots they can reopen mid-campaign.
+  History ledger's Chain view (BL-211, history ledger) — the plots a player
+  decided a world on are the plots they can reopen mid-campaign.
 
-### The globe (BL-256) — and why it does not take input
+### The globe — and why it does not take input
 
-The pane's right two-thirds is the world itself: round 0 draws the **system**
-(star colour and size, orbits, body sizes) so the screen is never empty while
-there is no body yet; rounds 1–2 draw the **homeworld**, from the real tile
-raster once one has been built. It is the primary view and the charts are the
-extras on top, which is the reorder BL-319 landed.
+The globe is BL-256 (wizard globe). The pane's right two-thirds is the world
+itself: round 0 draws the **system** (star colour and size, orbits, body sizes)
+so the screen is never empty while there is no body yet; rounds 1–2 draw the
+**homeworld**, from the real tile raster once one has been built. It is the
+primary view and the charts are the extras on top.
 
 **It spins on a clock, and it takes no mouse input. That is the design, not a
 gap** (Ben, 2026-08-10): the globe turns one revolution a minute on wall time,
 frozen to 0 under `--verify` so a golden capture never races the animation.
 
-BL-256 originally specified **pan**, clamped in latitude so the camera could not
-pass either pole. That requirement is **cut**, on Ben's call, for a reason worth
-keeping: *an uncontrollable globe tells the player that generation is slightly
-beyond their reach.* It says the same thing the preferences model already says —
-**you set conditions here, you do not steer** — so a draggable camera would have
-quietly contradicted the screen's own premise in order to add a control nobody
-needed. The wizard resolves leans against a seed; the globe should feel like
-something you are watching resolve, not something you are operating.
+There is **no pan**, on Ben's call, for a reason worth keeping: *an uncontrollable
+globe tells the player that generation is slightly beyond their reach.* It says
+the same thing the preferences model already says — **you set conditions here,
+you do not steer** — so a draggable camera would quietly contradict the screen's
+own premise in order to add a control nobody needed. The wizard resolves leans
+against a seed; the globe should feel like something you are watching resolve,
+not something you are operating.
 
-**Render technique note.** The globe is drawn as **48 meridian slices**, each
-subdivided in latitude, every cell a quad — not the per-pixel inverse projection
-into a texture that BL-256's design proposed. Both avoid the failure mode that
-design was written to dodge (projecting ~7,500 hexes as polygons against ImGui's
-16-bit draw indices); the slice path simply got there with less machinery. Noted
-because the item and the code otherwise read as disagreeing.
+**Render technique.** The globe is drawn as **48 meridian slices**, each
+subdivided in latitude, every cell a quad — not a per-pixel inverse projection
+into a texture. Both avoid projecting ~7,500 hexes as polygons against ImGui's
+16-bit draw indices; the slice path gets there with less machinery.
 
 ## Handoff — `start_new_game`
 
@@ -114,13 +111,13 @@ The wizard's "Begin", and the one and only generation call:
 Play opens on the corporation's home planet — the Planetary rung, home body
 selected (CANVASES.md § Default state).
 
-## Starting-corp selection — `draw_corp_choice_screen` (BL-435, 2026-08-16)
+## Starting-corp selection — `draw_corp_choice_screen`
 
-Which corporation the player runs used to be a lottery: the generator drew one and
-flagged it. Measured across 24 seeds, that handed the player a pure-extraction corp
-on 13 of them, so the chain-depth ladder and the Method page had nothing to stand
-on — while better openings sat unchosen in the same world. This stage converts the
-invisible draw into a stated choice.
+The stage is BL-435 (starting-corp choice). Which corporation the player runs is
+a **stated choice, not a lottery**: the generator's seeded draw is the fallback,
+never the only path. Measured across 24 seeds, a pure draw hands the player a
+pure-extraction corp on 13 of them, while better openings sit unchosen in the
+same world.
 
 **It lives in exactly one frame, and both constraints are hard.** `poll_worldgen`
 opens it the moment generation returns, which is (1) **after** the corps exist,
@@ -134,15 +131,15 @@ corp `corp_ai` excludes for all 80 warm ticks. No later frame satisfies all thre
 are seeded *by* the warm start, which has not run, so every corp reads 0.0 here.
 
 **What it must not claim.** A processor-bearing corp is the **deeper** opening, not
-the richer one: BL-436 measured a processing facility as currently earning *less*
-per tick than the extraction site it replaces. No copy on this screen ranks the
-openings, and none should until that is untrue.
+the richer one: BL-436 (processing profitability) measured a processing facility
+as earning *less* per tick than the extraction site it replaces. No copy on this
+screen ranks the openings, and none should until that is untrue.
 
-**"Surprise me"** takes the generator's own seeded pick, so it reproduces
-pre-BL-435 behaviour for that seed exactly. Selection **re-points**
+**"Surprise me"** takes the generator's own seeded pick, so it reproduces the
+pure-draw behaviour for that seed exactly. Selection **re-points**
 `is_player`/`player_entity` (`apply_corp_choice`) rather than replacing the draw,
 which is why every harness and golden that never opens this screen is
-bit-identical across the change. Both automated paths (`--autostart`, the verify
-harness) auto-take that fallback; a check reaches the screen through
-`verify.show_corp_choice` (`scripts/verify/corp_choice.lua`), and the headless
-properties it depends on are asserted by `player_seed_sweep --guard`.
+bit-identical whether or not the stage is shown. Both automated paths
+(`--autostart`, the verify harness) auto-take that fallback; a check reaches the
+screen through `verify.show_corp_choice` (`scripts/verify/corp_choice.lua`), and
+the headless properties it depends on are asserted by `player_seed_sweep --guard`.

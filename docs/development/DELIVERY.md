@@ -22,13 +22,19 @@ release, see `DEVELOPMENT_PRACTICES.md` § Cutting a release.)*
 
 Prose has **three** homes, split by the item's lifecycle:
 
-1. **Open item** → the `design` field in `backlog.json`. This is the design authority while the
-   item is open. Rich markdown tables in the string are fine.
-2. **Landed item** → `archive/backlog-design-<quarter>.json`, moved there by `archive_designs.js`
+1. **The subject's authority doc** → the design itself, written as what is true of the game
+   the moment it is settled. **Authority docs are state-independent** (Ben, 2026-08-23): they
+   say what the game *is*, never whether a piece is built, when it landed, or which item did it.
+2. **Open item** → the `design` field in `backlog.json` holds the item's *work* prose: the
+   problem, the open questions, the decomposition, the acceptance shape. Where the item settles
+   a design, the settled design goes into the authority doc **at once**, and the item points at
+   it. Rich markdown tables in the string are fine.
+3. **Landed item** → `archive/backlog-design-<quarter>.json`, moved there by `archive_designs.js`
    at close-out; the item keeps an `archived` pointer. **Amend a landed item's prose in the cold
    file**, not in `backlog.json` — editing the hot copy silently diverges from what readers see.
-3. **The subject's authority doc** → once the work lands and the design propagates. Authority
-   time-slices; see § Design state.
+
+**Whether a thing is built is a backlog fact, never a doc fact.** `backlog_query.js --touches
+<doc>` answers "what here is still open"; the doc itself does not.
 
 `BACKLOG.md` is **finished as a drain** (completed 2026-07-31). It holds no prose — only a
 tombstone and seven stubs that surviving `@BACKLOG.md` pointers resolve to. Those pointers name an
@@ -92,13 +98,16 @@ is whether its **design is settled**. The `status` field (in `backlog.json`) is 
 
 Status is orthogonal to **priority** (importance) and **difficulty** (size).
 
-**Design happens in the item, not mid-flight.** Pausing to settle a `design-owed` item beats
-redesigning during a Delivery (redesign in place is costly). **The backlog is the design authority
-while a design is open** — the settled design lives in the item's `design` field in
-`backlog.json`, which is by definition more
-current than any authority doc on that subject. Authority **time-slices**: the
-backlog while the item is open; the subject's authority doc once the work lands and the item is
-removed. Propagating the design into its authority doc is **part of landing the work**.
+**Design happens before the work, not mid-flight.** Pausing to settle a `design-owed` item beats
+redesigning during a Delivery (redesign in place is costly). **The authority doc is the design
+authority from the moment a design is settled** — a settled design is written into the subject's
+doc as present-tense truth *when it is settled*, not when the code lands, and the backlog item
+points at it. The item's own `design` field carries what is *work* (problem, questions,
+decomposition), not a second copy of the design.
+
+*(Superseded 2026-08-23 — Ben: "authority docs drive development and we should strive to make
+sure they are correct when authored." The earlier rule time-sliced authority — backlog while
+open, doc once landed — which made every doc a status snapshot that rotted between sessions.)*
 
 ### Item timestamping & precedence
 
@@ -206,9 +215,8 @@ large); for a `design-owed` item, **Design** is the implied first step.
    completion notes are frozen history: read when you look *at* that item, never when you look
    *across* the backlog. Run **`node tools/session/archive_designs.js`** to move them into
    `docs/development/archive/backlog-design-<quarter>.json`, leaving the item's `design` field as an
-   `@`-pointer and an `archived` field beside it. This is the physical form of the authority
-   time-slice CLAUDE.md already states — `backlog.json` owns the item while it is open, the subject's
-   authority doc owns it once the work lands. Nothing is lost: `backlog_query.js --full` and
+   `@`-pointer and an `archived` field beside it. The item's *work* prose is what
+   moves; the design itself already lives in the authority doc (§ Design state). Nothing is lost: `backlog_query.js --full` and
    `backlog_view.js` resolve the pointer transparently, `--restore` reverses the move, and
    `backlog_lint.js` fails on a pointer with no record behind it. The first run took `backlog.json`
    from 1.22 MB to 710 KB.

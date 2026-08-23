@@ -1,22 +1,18 @@
 # Ancient Tech Ladder — Mockup (0 CE → campaign epoch)
 
-> **Status: research scaffolding — mockup basis, not authority.** Captured 2026-08-04 on branch
-> `claude/ancient-tech-tree-mockup-m3fgk3`, from Ben's ask: *mock up an ancient tech tree as a
-> basis; consider the major advancements from 0 CE, and what differences are realistic by 1960.*
-> Tracked as **BL-296 (ancient tech ladder)**; consumed by **BL-271 (Era −1 sim)** and
-> **BL-274 (era-keyed rosters)**. Authority propagates into `docs/lore/HISTORY.md` (and the
-> sim's own doc) only when the work lands. Read as a basis for the design conversation, not a spec.
+> **Research scaffolding — mockup basis, not authority.** From Ben's ask: *mock up an ancient
+> tech tree as a basis; consider the major advancements from 0 CE, and what differences are
+> realistic by 1960.* Owned by **BL-296 (ancient tech ladder)**; consumed by **BL-271 (Era −1
+> sim)** and **BL-274 (era-keyed rosters)**. Authority is `docs/lore/HISTORY.md` (and the sim's
+> own doc). Read as a basis for the design conversation, not a spec.
 >
-> **Amended 2026-08-04 (same day, follow-up session):** § Geometry settles the constellation
-> shape (Ben's call, overturning BL-087's Q1 binary-tree resolution), and § Density test carries
-> the three-grain examples the detail-level call will be made against.
->
-> **Amended 2026-08-05:** § The industrial neighbourhood works the region's opposite end — rings
+> § Geometry settles the constellation shape (Ben's call, 2026-08-04, overturning BL-087's Q1
+> binary-tree resolution), and § Density test carries the three-grain examples the detail-level
+> call was made against. § The industrial neighbourhood works the region's opposite end — rings
 > T4–T5 and the T4/T5 crossings — at the settled medium grain, from Ben's ask for a second
-> pre-game tree centred on the industrial revolution. Seven techs, four vertex quests and two
-> keystones are new with that pass; Fuel Doctrine moves inward one ring.
+> pre-game tree centred on the industrial revolution.
 >
-> **Machine-readable store (2026-08-04, BL-307 — ladder data store):** every node, quest,
+> **Machine-readable store (BL-307 — ladder data store):** every node, quest,
 > keystone and crossing below is transcribed in `ancient_tech_ladder.json` beside this file.
 > `node tools/session/ladder_lint.js` cross-checks the two both ways — edit a table here,
 > update the store, run the lint.
@@ -78,7 +74,7 @@ Mirrored in `ancient_tech_ladder.json` as `roster_band` on each band plus a `ros
 
 | Domain | What it carries | Reads / feeds |
 |---|---|---|
-| **Agriculture** | food surplus per worker | province demography (BL-273 — landed), manpower budget |
+| **Agriculture** | food surplus per worker | province demography (BL-273), manpower budget |
 | **Materials** | metallurgy, chemistry | building/recipe availability, roster material gates |
 | **Energy** | prime movers: muscle → water/wind → coal → oil | the Stage 4 furnace date (already computed) |
 | **Transport** | reach and cost of movement | contact graph, trade routes, supply radii |
@@ -472,10 +468,10 @@ An effect is a pair, `(kind, target)`, plus a status marking how much of the tar
 
 62 effects across the region, and the distribution is the finding: **modifier 19, institution 11,
 unlock 10, upgrade 5, reach 4, retire 4, access 3, intel 3, resource 2, doctrine 1** —
-`shipped 15 / designed 29 / unbuilt 18`. Continuous modifiers outnumber unlocks two to one, which
+Continuous modifiers outnumber unlocks two to one, which
 is the class a straight unlock/upgrade reading of a tech tree misses entirely.
 
-Two nodes land on **shipped** machinery with no new mechanism required: **Railway → Inland
+Two nodes land on existing machinery with no new mechanism required: **Railway → Inland
 Logistics Hub** (BL-149's placeable haul-cost discount *is* a railway) and **Germ Theory → tile
 hazard penalty** (already a `(1 − hazard)` multiplier on every extraction building). Vertex quests
 carry no effects array — a quest's effect is always `open` → its `opens` field, per BL-156's
@@ -728,12 +724,11 @@ Per year-tick, per nation, per domain — all integer, seeded, deterministic:
 6. **Does the industrial region get its own surface?** (2026-08-05) The F9 mock viewer's era strip
    has one tab per era; this region is one *ring band* inside Era −1, not an era of its own. Two
    readings — an "Era −1 · Industrial" tab beside Antiquity, or one Antiquity web the reader zooms
-   within. Filed as NR-064; no code either way until BL-296 lands.
+   within. Filed as NR-064; open.
 7. **Does Works Doctrine gate corporation generation?** **SETTLED 2026-08-06 (Ben, NR-064): yes —
    generation input, not flavour.** A State-Arsenal nation may be one where a specialist
-   corporation cannot be chartered at all. Filed as **BL-311** (design-owed, blocked on BL-296
-   landing) — the exact charter rule against `CORPORATION_GENERATION.md`'s nation-assignment pass
-   is not yet worked out.
+   corporation cannot be chartered at all. **BL-311 (Works Doctrine charter gate)** owns the exact
+   charter rule against `CORPORATION_GENERATION.md`'s nation-assignment pass.
 8. **Does the T5/T6 Energy crossing want two vertices?** (2026-08-05) Electrification and internal
    combustion are two prime-mover shifts inside one band — the only crossing in the ladder where
-   the one-vertex-per-sector convention looks wrong. Deferred to the Machine-Age pass.
+   the one-vertex-per-sector convention looks wrong. Belongs to the Machine-Age pass.

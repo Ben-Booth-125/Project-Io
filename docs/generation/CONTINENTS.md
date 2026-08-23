@@ -1,11 +1,11 @@
 # Project Io — Continents / Drift
 
-The plate-drift pass — the **first landed slice of BL-210 (the oral-history pivot)**,
-shipped 2026-07-28. It answers "where did the land end up, and why?" by simulating a
+The plate-drift pass answers "where did the land end up, and why?" by simulating a
 small number of drifting plates rather than reading noise. Code:
 `src/world/continents.{hpp,cpp}` (`run_continents`). This document is the design
-authority for the pass; `continents.hpp` still names `GENERATION_STRATEGY.md` as its
-authority — this doc supersedes that pointer.
+authority for the pass; the fuller S1–S4 continents simulation (collision/rift
+history replacing the remaining noise machinery) belongs to BL-210 (oral-history
+pivot), of which this pass is the first slice.
 
 Position in the pipeline: **after Planetology's S3 Engine** (which decides
 `mobile_lid` and the thermal budget) and **before the six-pass tile pipeline** (its
@@ -54,12 +54,13 @@ that each generation file owns its stream.
    (`std::stable_sort`, because two boundaries can hash to the same year and a
    plain sort would leave tied order unspecified — a determinism hazard).
 
-## Rift-basin sea (BL-276, landed 2026-08-03)
+## Rift-basin sea
 
-Ben's call (2026-08-03): a Mediterranean-like enclosed sea should be **almost inevitable
-(~90% of worlds) but never guaranteed** — the rare world where forming a Rome is hard is a
-feature, and it must never be *impossible* to try. Two levers deliver this, both in this
-pass plus one gate in `hard_coded_world.cpp`:
+The enclosed sea is BL-276 (Mediterranean sea). Ben's call (2026-08-03): a
+Mediterranean-like enclosed sea should be **almost inevitable (~90% of worlds) but
+never guaranteed** — the rare world where forming a Rome is hard is a feature, and it
+must never be *impossible* to try. Two levers deliver this, both in this pass plus one
+gate in `hard_coded_world.cpp`:
 
 - **Rift basin (the mechanism).** After boundary classification, the divergent boundary
   between two **continental** plates with the longest *land-interior segment* (per-tile
@@ -74,8 +75,8 @@ pass plus one gate in `hard_coded_world.cpp`:
   continental plates — still a pure consequence of the plate layout, no draw.
 - **One biography line** per basin (`chain_stage::engine`): rift ("A continental rift
   foundered below the waterline.") or sag ("The craton's interior sagged into a broad
-  basin."), on a local RNG tag so no existing draw shifts.
-- **Acceptance gate (the backstop, `hard_coded_world.cpp`).** Kepler's tile seed is
+  basin."), on a local RNG tag so no other draw shifts.
+- **Acceptance gate (the backstop, `hard_coded_world.cpp`).** The homeworld's tile seed is
   attempt-folded (attempt 0 = the unfolded seed): three attempts to find an **arena**
   (enclosed sea ≥ 300 tiles), any of six for the **floor** (≥ 30 tiles); attempt 0 kept
   honestly on exhaustion — no clamping, the `resolve_preferences` idiom.
@@ -87,14 +88,13 @@ it in sync with `hard_coded_world.cpp` when either changes.
 
 ## Outputs and contracts
 
-`continent_state` carries **four** consumer-facing outputs *(this read "three things" until
-2026-08-04, when `convergent` was added)*:
+`continent_state` carries **four** consumer-facing outputs:
 
 - **`height_bias`** — per-tile float, roughly [−1, 1], always sized `gw×gh`
   (all-zero on a stagnant lid). Contract into tile Pass 1: **added to the raw noise
   heightmap *before* normalisation** (`generate_body_tiles`'s `continent_bias`
   parameter), so plate uplift shapes the same heightmap noise would otherwise
-  produce alone. A null pointer reproduces the pre-BL-210 surface bit-for-bit.
+  produce alone. A null pointer reproduces the unbiased noise surface bit-for-bit.
 - **`plate_id`** — per-tile plate index, **retained** on the generation report
   (`generation_report::body_entry::continents`, `hard_coded_world.hpp`) rather than
   discarded. The boundary that raised a mountain range is invisible once the bias
@@ -106,40 +106,40 @@ it in sync with `hard_coded_world.cpp` when either changes.
   convergent** boundary (the pairs that earned the +0.12 uplift). **Empty on a stagnant
   lid**, which has no boundaries at all. Written in the same loop that applies the bias.
 
-  It exists because the classification used to survive only as prose: `run_continents` knew
-  which boundaries collided, said so in a history line, folded the uplift into the heightmap
-  and then forgot. Pass 5 could not seed mountains where mountains actually form, so it fell
-  back to "high and rocky" — blobs on existing high ground rather than chains along the
-  boundary that raised them. Consumed as the first tier of `pick_seeds`
-  (TILE_GENERATION.md § Pass 5).
+  It exists because a classification that survives only as prose is lost to the
+  terrain: `run_continents` knows which boundaries collided, says so in a history line,
+  and folds the uplift into the heightmap — after which the boundary is indistinguishable
+  from any other high ground. Without the mask Pass 5 could only seed mountains as "high
+  and rocky" — blobs on existing high ground rather than chains along the boundary that
+  raised them. Consumed as the first tier of `pick_seeds` (TILE_GENERATION.md § Pass 5).
 
-  **Only Kepler receives it today** — `hard_coded_world.cpp:146` passes `&kepler_convergent`
-  and the other bodies fall through to the older height-preference path.
+  **Only the homeworld receives it** — `hard_coded_world.cpp` passes the homeworld's
+  mask into `generate_body_tiles`; the other bodies fall through to the
+  height-preference path.
 - **`history`** — dated `history_event` lines tagged `chain_stage::engine`. The
   caller (`plan()` in `hard_coded_world.cpp`) moves them into the body's biography
   (`planetology_state::history`) and re-sorts; they are not stored twice. This is
   the textual half of the "graphical + textual" rule every oral-history stage must
   carry (Ben, 2026-07-28).
 
-## Surface — the Continent lens (BL-226, built 2026-07-30)
+## Surface — the Continent lens
 
 `overlay_mode::continent` on the Planetary canvas: per-plate tint with boundary
 emphasis, read from the retained `plate_id` field; glyph `icons::continent` (two
 interlocking plates split by a jagged seam); on-canvas key via `draw_continent_key`.
-Full catalogue in `docs/ui/LENSES.md` § Continent lens; visual check
-`scripts/verify/continents_terrain.lua`.
+The lens is BL-226 (Continent lens); full catalogue in `docs/ui/LENSES.md`
+§ Continent lens; visual check `scripts/verify/continents_terrain.lua`.
 
-## Open follow-ons
+## Boundary seeding and relief
 
-- **BL-210 (oral-history pivot, design-owed)** — this pass is its first slice only;
-  the fuller S1–S4 continents simulation (collision/rift history replacing the
-  remaining noise machinery) stays with the parent item.
-- ~~Seeding tile Pass 5's mountain/rift clusters along the classified boundaries~~
-  **Mountains landed 2026-08-04** (`71e8a9b`) via the `convergent` mask above.
-  **Rifts are still deferred**, as is concentrating volcanic activity on boundaries.
+Mountain clusters seed along the classified convergent boundaries (the `convergent`
+mask above). Rift clusters and volcanic activity are **not** boundary-seeded: Pass 5
+places rift seeds by composition and latitude, and the volcanic overlay in Pass 4 reads
+only `geological_activity`.
 
-  Worth recording because it was counter-intuitive: boundary-seeding *lowered* relief
-  on its own, 17.5% → 9.9% of land. Convergent boundaries often run along coastlines,
-  and cluster growth is blocked by ocean, so a range seeded there loses most of its
-  rings to water. Raising the seed counts recovered it to ~14.0%. The mechanism was
-  right; the seeding budget had been tuned against a different placement rule.
+One measured consequence is worth keeping because it was counter-intuitive:
+boundary-seeding *lowers* relief on its own, 17.5% → 9.9% of land. Convergent
+boundaries often run along coastlines, and cluster growth is blocked by ocean, so a
+range seeded there loses most of its rings to water. The Pass 5 seed counts are sized
+against this placement rule (recovering ~14.0% of land) — the mechanism is right; the
+seeding budget has to be tuned against it, not against the older height rule.

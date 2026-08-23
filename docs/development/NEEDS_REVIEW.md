@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*237 entries — 237 open, 0 resolved.*
+*240 entries — 240 open, 0 resolved.*
 
 ---
 
@@ -2454,6 +2454,27 @@ run_nation_step now runs every tick in all three drivers (app, --serve, --export
 > **Recommendation:** D then A. (2) is the prerequisite — nothing spends without income — and it is the older gap (N1's 'scoreboard with no game'). Then (A) for the indivisibility, because it preserves Ben's whole-or-nothing earmark AND the weight model, at the cost of one serialised pot field. (B) fights the weight model; (C) is the biggest change. Either way the wiring stands.
 
 *Files: `src/world/nation_step.cpp`, `src/world/nation_budget.hpp`, `src/world/nation_ai.cpp`, `tools/verify/nation_wiring.cpp`*
+
+### NR-573 — Doc state-independence sweep: the rule applied, and the calls taken inside it
+*decision taken on your behalf · raised 2026-08-23 · from Ben, 2026-08-23: 'authority docs drive development and we should strive to make sure they are correct when authored'; the time-slice rule is wrong.*
+
+Every authority doc under docs/ (minus development/, the generated mirrors ACTIONS.md and QUESTION_LOG.md, and the critic/mockdata notes) was rewritten to state the design as present-tense fact. Rule: a BL id survives only as the OWNER of a design, with its short handle; dated rulings and NR pointers survive as provenance; 'landed/shipped/not yet/design-owed/Build status/What is absent' language and sections go. DELIVERY.md § Design state and the standing rules now say the authority doc owns a design from the moment it is settled, and the backlog item points at it. Calls taken without asking: (1) designs the code lacks are stated FLATLY, not hedged with 'when it exists' — the backlog is the only build-state record; (2) the research/ docs were swept lightly and keep their 'research, not authority' framing, since that is a kind-of-document fact, not a build-state fact; (3) MANUAL.md's designed/built marks were removed along with everything else — if Ben wants a player manual that describes the BUILT game, that is a different document and should say so.
+
+**Why it matters.** Every doc was a status snapshot that rotted between sessions; MILITARY.md alone carried two holes the code had already closed. The cost is that a doc no longer tells a reader what is missing — backlog_query.js --touches <doc> has to.
+
+### NR-574 — Orphan holes from the sweep were filed as backlog items AND gathered into one proposed sprint — reading 'authoring sprints comes first' as 'plan them, do not just pile them'
+*decision taken on your behalf · raised 2026-08-23 · from Ben, 2026-08-23: 'We should be filing items in the backlog, but I think authoring sprints comes first. We already have the problem of massive backlogs with items left behind for too long.'*
+
+Each 'What is absent' hole the sweep deleted was audited against the backlog. Holes with an owning open item were dropped from the doc (the item carries them). Holes with NO item were filed as backlog items so they have an id, and the whole set was written into sprints.json as one proposed sprint so they are planned rather than shelved. See the sweep's DEVLOG entry for the list.
+
+**Why it matters.** The alternative reading — author a sprint INSTEAD of filing items — would leave the holes with no id and no home once the sprint closes.
+
+### NR-575 — CLAUDE.md rewritten as a router: session-mode table first, complete doc map, condensed method — 7,578 → ~2,100 words
+*decision taken on your behalf · raised 2026-08-23 · from Ben, 2026-08-23: 'tonnes of information missing, trimming it to direct to authority docs, and determine which mode the session runs in is vital.'*
+
+Six session modes (Design / Delivery-Light / Delivery-Full / Corpus / Review-verify / Rival), each with its signal, deliverable and reading list; the rule 'say the mode in your first line'. The doc map now lists every doc under docs/ (24 were missing: SUPPLY, COLLAPSE, CREEDS, STRATEGIES, MANUAL, the research notes, the shell panels, the ledger Q&As, PHANTOMS, NEXT_SESSION, REVIEW_AUTOMATION, the retired files) as one line each. The 200-word state essays per doc are gone — the doc owns its own description. The player-identity and syndicate paragraphs left CLAUDE.md; CONCEPT.md and GLOSSARY.md must carry them (verified in the same sweep).
+
+**Why it matters.** CLAUDE.md is read by every session; a stale state essay there outranks a correct doc in practice.
 
 ---
 

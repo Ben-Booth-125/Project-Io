@@ -29,7 +29,7 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   See `src/world/economy_system.cpp` (run_economy_step § agency).
   **Rival-corp strategic exception (BL-202/BL-203, landed 2026-08-01/02; widened by
   BL-293, 2026-08-08):** background corporations run a **deterministic scored-utility**
-  layer over the corp-command seam — build, demolish, survey and road decisions scored
+  layer over the corp-command seam — build, dial, survey, hire and sell decisions scored
   each tick, plus predictive spending, **plus standing sell orders on the open market**
   (`src/world/corp_ai.cpp`). Determinism is the binding constraint, not simplicity: the
   scorer is pure, seeded and replayable, and it issues only legal `corp_command` verbs.
@@ -50,7 +50,7 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   beyond this one dial stays prohibited. See `solve_workforce_target` in economy_system.cpp.
   **Rival-corp hiring exception (BL-324, landed 2026-08-08):** background corporations may
   raise units through the same `hire_unit` corp_verb the player uses — scored alongside
-  build/demolish/survey/road in `corp_ai.cpp`'s candidate list, capped at one hire per
+  build/dial/survey/sell in `corp_ai.cpp`'s candidate list, capped at one hire per
   evaluation, gated on the corp's own stockpile/market access (never on cash). A deliberate
   widening of the BL-202/BL-203 exception, not a new category: hiring is one more legal verb
   on the same deterministic scored-utility layer, not a planner of its own.
@@ -137,9 +137,13 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   for the reader, not content for the game. **Project-Rival is the one exception and only
   outside Io**: it plays an actual RTS with actual civilisations, and hands Io *numbers and
   doctrine*, never names.
-- A settled design for an **open backlog item** lives in the item (BACKLOG.md / backlog.json)
-  until the work lands; it propagates into the subject's authority doc *as part of landing the
-  work*. Authority time-slices — do not edit the authority doc ahead of the work (see
+- **Authority docs are state-independent (Ben, 2026-08-23).** A doc says what is true of the
+  game's design — never whether a piece is built, when it landed, or which backlog item did it.
+  A settled design is written into the subject's authority doc **the moment it is settled**;
+  the backlog item points at it and carries only the work. Whether a thing is built is a
+  backlog fact (`backlog_query.js --touches <doc>`), not a doc fact. Cite a `BL-` id in a doc
+  only as the owner of a design, with its short handle; cite a dated ruling as provenance.
+  Never write "landed", "not yet built", "shipped" or a build-status section into one (see
   `docs/development/DELIVERY.md` § Design state).
 
 ## Working method (see DELIVERY.md for the full lifecycle)

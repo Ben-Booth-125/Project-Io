@@ -2,7 +2,9 @@
 
 Production converts tile resource deposits into tradeable goods through two stages: **extraction**, which harvests raw materials from tiles, and **processing**, which refines or manufactures higher-tier goods from those inputs. Workforce shapes throughput at both stages.
 
-See **`docs/economy/RESOURCES.md`** for the full resource list, tier definitions, and prototype scope. The market model production sells into — clearing, price resolution, the order book — is **`docs/economy/MARKETS.md`**.
+See **`docs/economy/RESOURCES.md`** for the full resource list, tier definitions, and prototype subset. The market model production sells into — clearing, price resolution, the order book — is **`docs/economy/MARKETS.md`**. The network goods move over — reach, roads, travel time, throughput — is **`docs/economy/LOGISTICS.md`**.
+
+**The admission rule.** A `resource_type` value earns its place by being consumed by an authored recipe or contracted for by a named actor, and nothing else gets in. A raw with an authored deposit and no price is *minable but unsellable* — a processing building drawing on it stalls forever — so every deposit raw carries a base price, and every priced good has a producer and a consumer reachable in the same era band. `tools/verify/chain_depth.cpp` (rows R1 and R1b) holds the line.
 
 ---
 
@@ -17,20 +19,21 @@ Output rate is the product of four factors:
 | Deposit richness | `tile_component.resource_deposit[r]` | Linear multiplier; richer tiles produce proportionally faster. |
 | Workforce fraction | `building_component.workforce_assigned` (0–1) | Linear scalar. Zero workforce produces nothing. |
 | Hazard penalty | `tile_component.hazard_level` (0–1) | Applied as `(1 − hazard)` multiplier. High-hazard tiles cost more to operate and yield less per worker. |
-| Stack rank (BL-193) | This site's place in the tile's stack | Applied as `0.8^(k−1)`. The first site on a deposit is undiminished; each later one yields less (§ Building stacks). |
+| Stack rank | This site's place in the tile's stack | Applied as `0.8^(k−1)`. The first site on a deposit is undiminished; each later one yields less (§ Building stacks). |
 
 i.e. `output = base_rate × richness × workforce × (1 − hazard) × 0.8^(k−1)`, where `base_rate` is a Lua-authored economic constant and `k` is the site's 1-based rank in its tile's stack.
 
-Deposits **deplete** (BL-079): `resource_deposit[r]` is the fixed **richness** (the rate multiplier above), while `resource_remaining[r]` is a finite reserve — seeded at generation to richness × a reserve factor — that extraction draws down each tick. As the reserve nears empty the output **tapers**, then the building reports the deposit **exhausted** and stops. Richness sets the rate; the reserve sets how long the tile pays out — the boom-bust arc a resource-dependent corporation rides (see `docs/development/backlog.json` § BL-079).
+Deposits **deplete** (BL-079, deposit depletion): `resource_deposit[r]` is the fixed **richness** (the rate multiplier above), while `resource_remaining[r]` is a finite reserve — seeded at generation to richness × a reserve factor — that extraction draws down each tick. As the reserve nears empty the output **tapers**, then the building reports the deposit **exhausted** and stops. Richness sets the rate; the reserve sets how long the tile pays out — the boom-bust arc a resource-dependent corporation rides.
 
 A tile can carry **several** extraction sites on one deposit. What that costs, and what it
 buys, is § Building stacks below — a fourth factor (stack rank) on the output above, and a
 depletion taper shared across the whole stack rather than computed per site.
 
-### Building stacks (BL-193, settled 2026-07-26; implemented)
+### Building stacks
 
 A tile is not a single build slot: several extraction sites may work the same deposit. Two rules
-govern the stack, and they are designed to pull against each other.
+govern the stack, and they are designed to pull against each other. The design is BL-193
+(building stacks, Ben's ruling of 2026-07-26).
 
 **1. Diminishing per-site output.** The *k*-th site of a stack — counted in **stored order,
 oldest first** — produces
@@ -66,19 +69,18 @@ their rank (they are the same population the placement ceiling counts) but contr
 the combined draw. The ordered walk is `placement_rules::stack_members`; reading rank off
 `world::buildings`' own unordered iteration would make the yield non-deterministic.
 
-**Capacity stays `max(1, richness / 50)`** — the 0–250 generation band maps to 1–5 sites
-(`k_richness_per_site`, `placement_rules.hpp`). Retained deliberately: with the decay curve
-carrying the economics, the ceiling is a **legibility** bound — how many markers a tile can host
-and a player can reason about — not the balance lever.
+**Capacity is `max(1, richness / 50)`** — the 0–250 generation band maps to 1–5 sites
+(`k_richness_per_site`, `placement_rules.hpp`). With the decay curve carrying the economics, the
+ceiling is a **legibility** bound — how many markers a tile can host and a player can reason
+about — not the balance lever.
 
-**Non-extraction stacking is answered by BL-366, not deferred any longer.** Every non-extraction
-type (processors, ports, hubs, admin, amenity, military base, research institute) is bounded in
-**aggregate** — all types on one tile combined, not per type — by a per-composition cap table
+**Non-extraction stacking** (BL-366, multi-building tiles) is bounded in **aggregate** — every
+non-extraction type on one tile combined, not per type — by a per-composition cap table
 (`non_extraction_stack_cap`, `placement_rules.cpp`; the table and rationale live in
 `docs/economy/TILES.md` § Urban transform). Filling the cap fires a one-way transform to the
 `urban` terrain composition, which raises the cap further (12) and blocks new extraction/ambient
-placement on that tile. Extraction stacking itself (`k_richness_per_site`, above) is untouched —
-a separate, richness-bound axis.
+placement on that tile. Extraction stacking (`k_richness_per_site`, above) is a separate,
+richness-bound axis.
 
 Implementation: the constants and the rank/curve helpers live in
 `src/world/placement_rules.{hpp,cpp}` (`k_stack_output_decay`, `stack_output_scalar`,
@@ -86,13 +88,13 @@ Implementation: the constants and the rank/curve helpers live in
 `run_economy_step` (`src/world/economy_system.cpp`), sized before any site draws so the sites
 that run first do not taper the sites that run after them. The Selection panel's "On this tile"
 block reports the count, the ceiling, this site's rank and its share. Extraction stacking is
-verified by `tools/verify/stack_capacity_harness.cpp`; the BL-366 non-extraction cap and urban
+verified by `tools/verify/stack_capacity_harness.cpp`; the non-extraction cap and urban
 transform by `tools/verify/multi_building_tile_harness.cpp`.
 
-### The province building ceiling (BL-513, 2026-08-21; implemented)
+### The province building ceiling
 
-A **second, independent limit**, at province grain. It does not replace the stack caps above —
-both must pass — because the two answer different questions:
+A **second, independent limit**, at province grain (BL-513, province building ceiling). It does
+not replace the stack caps above — both must pass — because the two answer different questions:
 
 | Limit | Grain | Asks | Answers from |
 |---|---|---|---|
@@ -123,62 +125,62 @@ ceiling       = max(1, round(k × sustain_units)),   k = 12.6468
   scale's own domain (1 = village … 5 = metropolis).
 
 Every band is read off a domain the codebase already defines, which leaves exactly **one** free
-coefficient — `k` — and it is **pinned by measurement**, following BL-463's discipline. It is set
-so the new ceiling's world total matches the capacity the world already grants under the pooled
-per-tile cap: the ceiling is a *redistribution* of existing capacity onto the four sustaining
-inputs, not a new tighter or looser regime. Across 8 seeds, `pooled per-tile cap ÷ sustain units`
-measured **11.4694 … 15.2588, aggregate 12.6468** (spread 28.36% of the mean); `k` is that
-aggregate, and at it the ceilings total **100.01%** of the pooled per-tile capacity.
+coefficient — `k` — and it is **pinned by measurement**. It is set so the ceiling's world total
+matches the capacity the world already grants under the pooled per-tile cap: the ceiling is a
+*redistribution* of existing capacity onto the four sustaining inputs, not a tighter or looser
+regime. Across 8 seeds, `pooled per-tile cap ÷ sustain units` measures **11.4694 … 15.2588,
+aggregate 12.6468** (spread 28.36% of the mean); `k` is that aggregate, and at it the ceilings
+total **100.01%** of the pooled per-tile capacity.
 
-**It refuses nothing today, and that is the expected outcome.** Measured post-background-firms
-across 8 seeds: 1049 buildings against 909,245 ceiling slots — **0.115% used**, and **zero**
-provinces at their ceiling on any seed. Its value is forward: it is the ceiling that makes
-"pack more productivity into a smaller space" a real trade-off once density rises, and the
-natural place for infrastructure to pay off into.
+**At generation density it refuses nothing, and that is the expected outcome.** Measured
+post-background-firms across 8 seeds: 1049 buildings against 909,245 ceiling slots — **0.115%
+used**, and **zero** provinces at their ceiling on any seed. Its value is forward: it is the
+ceiling that makes "pack more productivity into a smaller space" a real trade-off once density
+rises, and the natural place for infrastructure to pay off into.
 
 **It is computed on demand, never cached, and adds no persistent field** — the flat-binary
-save/load path is untouched by it. That matters because roads are built during play, so this
-ceiling **moves during play** — the first placement bound in the game that is not fixed at
-generation. Whether that dynamism is intended is an open question for Ben (NR-406); computing on
-demand keeps either answer cheap.
+save/load path is untouched by it. Because roads are built during play, this ceiling **moves
+during play** — the one placement bound in the game that is not fixed at generation. Whether
+that dynamism is intended is an open question for Ben (NR-406); computing on demand keeps either
+answer cheap.
 
 Implementation: `measure_province_sustain` / `province_building_ceiling` /
 `province_buildings_standing` in `src/world/province.{hpp,cpp}` (the constants and the pinning
 evidence live beside them in the header); the gate is the last check in
 `placement_rules::can_place_in_world`, refusing with `placement_reason::province_full`.
 Generation does not go through that entry point — it uses `can_place` directly — so generation
-output is unchanged. Measured by `tools/verify/province_capacity_probe.cpp`, which prints the
-ceiling alongside the capacity and re-derives the pin on every run.
+output is unaffected by it. Measured by `tools/verify/province_capacity_probe.cpp`, which prints
+the ceiling alongside the capacity and re-derives the pin on every run.
 
 ### Extraction buildings
 
-> **Design targets, not enum values (recorded 2026-07-31).** The named building types below are
-> **not** in the `building_type` enum (`src/world/components.hpp`), which has six values: `none`,
-> `extraction_site`, `processing_facility`, `port`, `launchpad`, `inland_logistics_hub`. The
-> prototype ships one **generic** extraction building: what an `extraction_site` *does* is its
-> `building_component.target_resource` field, authored at placement — a "Mine" and an "Oil
-> Platform" are the same type pointed at different deposits. The table stays as the design
-> vocabulary the named types would carve out of that generic building.
+> **Design vocabulary, not enum values.** The named building types below are **not** in the
+> `building_type` enum (`src/world/components.hpp`), which has eight values: `none`,
+> `extraction_site`, `processing_facility`, `port`, `launchpad`, `inland_logistics_hub`,
+> `military_base`, `research_institute`. There is one **generic** extraction building: what an
+> `extraction_site` *does* is its `building_component.target_resource` field, authored at
+> placement — a "Mine" and an "Oil Platform" are the same type pointed at different deposits. The
+> table is the design vocabulary the named types would carve out of that generic building.
 
 Each building type targets a specific class of resource. Placement is valid only on tiles with a non-zero deposit of the target type, or on terrain where that deposit type can occur.
 
 | Building | Target resources | Valid terrain | Era |
 |----------|-----------------|---------------|-----|
-| Mine | Iron ore, coal, silica, copper ore, rare earth ore, peat | Barren, rocky, volcanic, tundra | 0 |
+| Mine | Iron ore, coal, silica, copper ore, rare earth ore, peat | Barren, rocky, volcanic substrates; scrub-on-sedimentary for peat | 0 |
 | Oil Platform | Petroleum | Barren (geological deposit) | 0 |
 | Quarry | Stone, sand, clay | All non-water compositions | 0 |
-| Lumber Camp | Timber | Forest, wetland | 0 |
-| Farm | Agricultural produce | Grassland, wetland, forest-adjacent | 0 |
+| Lumber Camp | Timber | Forest or marsh cover | 0 |
+| Farm | Agricultural produce | Grass, marsh or forest cover on sedimentary substrate | 0 |
 | Ice Extractor | Water (from ice deposits) | Icy | 1 |
 | Surface Extractor | Regolith, iron-nickel ore, platinum group metals | Regolith, metallic | 1 |
-| Fishing Wharf (BL-168) | Agricultural produce | Coastal (any composition adjacent to ocean) | 0 |
+| Fishing Wharf | Agricultural produce | Coastal (any composition adjacent to ocean) | 0 |
 
-**Fishing Wharf (BL-168), implemented.** The extraction_site's target resource is again
+**Fishing Wharf** (BL-168, fishing wharf). The extraction_site's target resource is again
 `agricultural_produce`, but the placement gate is coastal adjacency rather than a deposit: valid on
 any tile with an ocean neighbour, deposit-agnostic. A tile can satisfy Farm's deposit rule, the
 Fishing Wharf's coastal rule, both, or neither — they are two independent ways the same generic
 extraction_site can reach agricultural_produce, not two building types (`placement_rules.cpp`
-`can_place` / `can_place_in_world`, mirroring the existing Port coastal check via `is_coastal`).
+`can_place` / `can_place_in_world`, mirroring the Port coastal check via `is_coastal`).
 
 The Mine covers all terrestrial hard-mineral deposits and adjusts its output to whatever the tile holds: the same building type on one volcanic tile yields rare earth ore and on another yields copper ore. The distinction between deposit types is in the tile data, not the building type. Off-world metallic deposits (iron-nickel ore, platinum group metals) are harvested by the Surface Extractor, the Era 1 airless-body counterpart to the Mine; both feed the same smelting chain, so the distinction is one of era and deployment environment, not of downstream product.
 
@@ -194,22 +196,17 @@ Processing buildings draw inputs from — and add outputs to — the shared per-
 
 When the inputs available cannot cover a full conversion, the building does **not** simply halt: it follows a **two-threshold partial run**. If the limiting input covers at least `T_full` of one conversion, the building runs at full rate; between `T_idle` and `T_full` it scales its output down to what the limiting input allows; below `T_idle` it idles. The two thresholds are tunable economic constants.
 
-> **The thresholds now govern every body uniformly (BL-130, 2026-08-11, superseding the
-> 2026-07-31 note this replaces).** A market body no longer bypasses the two-threshold model —
-> that special case existed only because the market's "supply" was an unconditional, infinite
-> auto-buy. Now that a market's stock is real and finite (`market_component.inventory`,
-> MARKETS.md), it earns its place in the SAME coverage calculation the no-market fallback always
-> used: coverage = `(pool + market inventory) / need` per input, full rate at/above `T_full`,
-> scaled between `T_idle`/`T_full`, idle below `T_idle`. The old `scripts/economy.lua` comment
-> mismatch this note used to flag no longer applies — there is only one model now.
+**The thresholds govern every body uniformly.** A market's stock is real and finite
+(`market_component.inventory`, MARKETS.md), so it earns its place in the SAME coverage calculation
+the no-market case uses: coverage = `(pool + market inventory) / need` per input, full rate
+at/above `T_full`, scaled between `T_idle`/`T_full`, idle below `T_idle`. There is one model, not
+a market special case.
 
 ### Recipes by building type
 
-> **Design targets, not shipped recipes (recorded 2026-07-31).** `scripts/recipes.lua` holds
-> **three** recipes: iron ore → steel, petroleum → refined fuel, agricultural produce → food
-> rations — all single-input, on the one generic `processing_facility`. The named processor
-> types below are not in the enum, and most of the goods in their tables have no `resource_type`
-> value (RESOURCES.md § Prototype scope). The tables stay as the recipe design target.
+Every recipe runs on the one generic `processing_facility`; the named processor types below are
+the design vocabulary for its **sub-facility groups** (§ Sub-facility groups), and the recipes
+are authored in `scripts/recipes.lua`.
 
 A building type may support multiple recipes. The active recipe for a given building is configured by the player (or defaulted at construction). Multiple buildings of the same type on the same body can run different recipes simultaneously.
 
@@ -217,14 +214,10 @@ A building type may support multiple recipes. The active recipe for a given buil
 
 | Inputs | Output | Era |
 |--------|--------|-----|
-| Iron ore + coal (reagent) | Steel | 0 |
-| Iron-nickel ore | Steel | 1 |
+| Iron ore ×2 + coal ×1 (reagent) | Steel | 0 |
+| Iron-nickel ore ×2 | Steel | 1 |
 
 Coal is consumed as a process fuel and reagent but does not appear as a separate intermediate product. The iron-nickel recipe requires no carbon addition because metallic asteroids are already reduced.
-
-> **Fixed 2026-08-11 (BL-340, closing NR-158).** `scripts/recipes.lua` id 0 now consumes
-> `{ iron_ore = 2.0, coal = 1.0 }`, matching the Era 0 row above. Coal joined the priced set the
-> same pass (`world_gen.lua`'s `base_price`), giving it a consumer per BL-340's admission rule.
 
 #### Refinery
 
@@ -239,19 +232,20 @@ Coal is consumed as a process fuel and reagent but does not appear as a separate
 
 | Inputs | Output | Era |
 |--------|--------|-----|
-| Refined fuel + liquid oxygen | Propellant | 0 |
-| Atmospheric air (no stockpiled input) | Liquid oxygen | 0 |
-| Water | Liquid oxygen | 1 |
+| Refined fuel ×2 (oxidiser separated from the local air — no stockpiled input) | Propellant | 0 |
+| Water ×3 + refined fuel ×1 (oxidiser by electrolysis) | Propellant | 1 |
 
-> **Implemented (BL-308).** The two propellant routes are `scripts/recipes.lua` id 4 (`propellant_atmospheric` — 2.0 refined fuel → 1.0 propellant; the oxidiser is separated from the local air, so it costs no stockpiled input) and id 5 (`propellant_electrolysis` — 3.0 water + 1.0 refined fuel → 1.0 propellant). The liquid-oxygen rows above stay *design* prose: LOX has no `resource_type` and is folded into each recipe.
+The two routes are `propellant_atmospheric` and `propellant_electrolysis` (BL-308, propellant).
+Liquid oxygen has no `resource_type`: it is folded into each recipe, because nothing outside the
+Chemical Plant would ever hold it.
 
-On a body with an atmosphere, liquid oxygen is produced in Era 0 by cryogenic air separation — the Chemical Plant draws oxygen from the local atmosphere and consumes no stockpiled input (energy cost only, abstracted into the recipe rate). Propellant is therefore an Era 0 capability anywhere refined fuel is available. On airless bodies there is no atmosphere to separate, so the Era 1 water-electrolysis recipe is the only liquid-oxygen route off-world; closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 1 logistical problem.
+On a body with an atmosphere, liquid oxygen is produced in Era 0 by cryogenic air separation — the Chemical Plant draws oxygen from the local atmosphere and consumes no stockpiled input (energy cost only, abstracted into the recipe rate). Propellant is therefore an Era 0 capability anywhere refined fuel is available. On airless bodies there is no atmosphere to separate, so the water-electrolysis recipe is the only liquid-oxygen route off-world; closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 1 logistical problem.
 
 #### Electronics Lab
 
 | Inputs | Output | Era |
 |--------|--------|-----|
-| Silicon + refined copper + REE alloy | Electronics | 0 |
+| Silicon + refined copper + REE alloy ×0.5 | Electronics | 0 |
 
 #### Fabricator
 
@@ -261,44 +255,42 @@ On a body with an atmosphere, liquid oxygen is produced in Era 0 by cryogenic ai
 | Steel + REE alloy | Alloys | 0 |
 | Steel + machinery | **Ordnance** | 0 |
 
-The ordnance route (BL-457, 2026-08-17) is the roster's **military terminal good** — see
-`RESOURCES.md` § The two terminal goods for why the tier now ends in two places. Three notes that
+The ordnance route is the roster's **military terminal good** (BL-457, ordnance) — see
+`RESOURCES.md` § The two terminal goods for why the tier ends in two places. Three notes that
 belong here rather than there:
 
 - It sits at the **same depth as alloys**, one step below the Assembly Plant, deliberately. Under
-  BL-428's chain-depth gate that makes it a real growth-track object rather than something a
+  the chain-depth gate that makes it a real growth-track object rather than something a
   starting corp can produce on tick one.
-- It is `machinery`'s **second** consumer, after the heavy spacecraft route below. That good spent
-  its first days orphaned, and a single consumer is one revert away from orphaning it again.
+- It is `machinery`'s **second** consumer, after the heavy spacecraft route below. A single
+  consumer is one revert away from orphaning a good.
 - Its `base_price` (43.0) is **derived** from this tier's own markup ratio, not authored — the
   derivation and the numbers are in RESOURCES.md, and it should be re-derived rather than
   re-guessed if either input's price moves.
 
-There is **no industrial ancient-arc SHORTCUT here** — the deliberate omission stands, and the
-comment explaining it is unchanged. But the `iron_blooms + charcoal` route it named DOES now exist,
-at the **Smithy** (see § The ancient chain below): BL-460 found that the omission had shipped
-without a tracking item, leaving `ordnance` — the good BL-454's unit upkeep draws every tick, in
-either arc — reachable only from an industrial recipe while the shipped default campaign runs the
-ancient band (`epoch_year = 0`). An ancient corp could never make the one good its own army needed.
+There is **no industrial ancient-arc shortcut here** — the deliberate omission stands. The
+ancient arc reaches ordnance through the **Smithy** (§ The ancient chain), because unit upkeep
+draws ordnance every tick in either arc, and a corp whose campaign runs the ancient band must be
+able to make the one good its own army needs.
 
 #### Assembly Plant
 
 | Inputs | Output | Era |
 |--------|--------|-----|
-| Alloys + electronics | Spacecraft components | 1 |
-| Machinery + steel | Spacecraft components | 1 |
+| Alloys ×2 + electronics | Spacecraft components | 1 |
+| Machinery ×2 + steel ×2 | Spacecraft components | 1 |
 
-The second route is the **heavy** one (NR-257, 2026-08-16): more structural mass and worked
-machinery, none of the refined-electronics chain. It is a *supply route* rather than an alternate
-method in BL-430's sense — its inputs are disjoint from the first's, so which one a corp runs is
-decided by what its industry already reaches, not by comparing two prices at one building. It is
-also the consumer that closed `machinery`'s orphan status: the Fabricator produced machinery and
-nothing in the roster wanted any.
+The second route is the **heavy** one (NR-257): more structural mass and worked machinery, none
+of the refined-electronics chain. It is a *supply route* rather than an alternate method in
+§ Alternate production methods' sense — its inputs are disjoint from the first's, so which one a
+corp runs is decided by what its industry already reaches, not by comparing two prices at one
+building. It is also `machinery`'s first consumer.
 
-#### In-situ and premium routes (NR-257)
+#### In-situ and premium routes
 
-Two further routes exist to give `regolith` and `platinum_group_metals` consumers. Both are
-deliberately **poor value per unit** — they are about reaching a *place*, not about efficiency.
+Two further routes exist to give `regolith` and `platinum_group_metals` consumers (NR-257). Both
+are deliberately **poor value per unit** — they are about reaching a *place*, not about
+efficiency.
 
 At authored prices the three industrial steel routes clear, per unit of steel: iron-nickel **2.0**,
 Smelter **1.0**, in-situ **0.8**. That ordering is the design, and it is why the regolith ratio and
@@ -314,34 +306,28 @@ recipe in `scripts/recipes.lua`.
 
 | Inputs | Output | Era |
 |--------|--------|-----|
-| Agricultural produce | Food rations | 0 |
+| Agricultural produce ×2 | Food rations | any |
 
-#### Hydroponics Bay (BL-166, implemented)
-
-| Inputs | Output | Era |
-|--------|--------|-----|
-| Water + steel | Agricultural produce | 0 |
-
-A processing_facility recipe (`scripts/recipes.lua` id 3, `hydroponics_bay`) that produces
-`agricultural_produce` from refined inputs instead of a terrain deposit — no "energy" resource
-exists in the prototype set, so water (irrigation) and steel (the bay's own structure) stand in for
-it. Feeds the same Food Processor -> Food rations chain the Farm feeds; no new market good.
-**Placement is terrain-gated the opposite way from the Farm:** only valid where the terrestrial
-Farm deposit was NOT seeded (`resource_deposit[agricultural_produce] == 0`), keyed off the
-processing_facility's target resource in `placement_rules::can_place` (mirror image of the
-extraction deposit check; `deposit_present` is the rejection reason on Farm-viable terrain).
-
-#### Assembly Plant
+#### Hydroponics Bay
 
 | Inputs | Output | Era |
 |--------|--------|-----|
-| Alloys + electronics | Spacecraft components | 1 |
+| Water ×1.5 + steel ×0.5 | Agricultural produce | 0 |
+
+A processing_facility recipe (`hydroponics_bay`, BL-166) that produces `agricultural_produce`
+from refined inputs instead of a terrain deposit — no "energy" resource exists in the roster, so
+water (irrigation) and steel (the bay's own structure) stand in for it. Feeds the same Food
+Processor → Food rations chain the Farm feeds; no new market good. **Placement is terrain-gated
+the opposite way from the Farm:** only valid where the terrestrial Farm deposit was NOT seeded
+(`resource_deposit[agricultural_produce] == 0`), keyed off the processing_facility's target
+resource in `placement_rules::can_place` (mirror image of the extraction deposit check;
+`deposit_present` is the rejection reason on Farm-viable terrain).
 
 ---
 
 ## Amenity and habitability buildings
 
-Amenity and habitability buildings do not produce tradeable industrial goods — they produce conditions. Their output is a change in the local habitability score or population growth rate, which feeds into workforce efficiency and long-term productive capacity. They are deferred from the prototype but designed here.
+Amenity and habitability buildings do not produce tradeable industrial goods — they produce conditions. Their output is a change in the local habitability score or population growth rate, which feeds into workforce efficiency and long-term productive capacity. The feedback model is `docs/economy/POPULATION.md`.
 
 ### Amenity buildings
 
@@ -355,99 +341,65 @@ Amenity buildings are placed on tiles and lock them to amenity land use — no e
 
 ### Habitability production buildings
 
-These produce habitability goods (see `docs/economy/RESOURCES.md`) consumed by population centres.
+These produce habitability goods (see `docs/economy/RESOURCES.md`) consumed by population centres. They use processing building mechanics (recipe, workforce scalar, stockpile) and differ from industrial processing buildings only in that their outputs feed population demand rather than further industrial chains. The three are the **Welfare Goods** group of `processing_facility` recipes (BL-368, habitability tranche):
 
-| Building | Inputs | Output | Era |
-|----------|--------|--------|-----|
-| Water Treatment Plant | Water | Clean water | 0 |
-| Construction Yard | Stone + timber | Building materials | 0 |
-| Consumer Goods Factory | Food rations + refined goods | Consumer goods | 0 |
-| Pharmaceutical Lab | Chemical outputs + agricultural produce | Medical supplies | 0 |
-| Power Plant | Coal or petroleum | Utilities (abstracted) | 0 |
+| Recipe | Inputs | Output | Era |
+|---|---|---|---|
+| Water Treatment Plant (`clean_water`) | Water ×2 | Clean water | 0 |
+| Consumer Goods Factory (`consumer_goods`) | Food rations ×1 + steel ×1 | Consumer goods | 0 |
+| Pharmaceutical Lab (`medical_supplies`) | Water ×1 + agricultural produce ×1 | Medical supplies | 0 |
 
-Habitability production buildings use processing building mechanics (recipe, workforce scalar, stockpile). They differ from industrial processing buildings only in that their outputs feed population demand rather than further industrial chains.
-
-> **Three of five implemented (BL-368, 2026-08-11).** Water Treatment Plant, Consumer Goods
-> Factory and Pharmaceutical Lab are all `processing_facility` recipes (`scripts/recipes.lua` ids
-> 14-16, mirroring the shipped set — no new `building_type` enum values), not the standalone
-> processor types the table above still names as design targets. Recipe quantities are first-cut
-> tuning values, matching every other shipped recipe:
->
-> | Recipe | Inputs | Output |
-> |---|---|---|
-> | `clean_water` (id 14) | Water × 2.0 | Clean water × 1.0 |
-> | `consumer_goods` (id 15) | Food rations × 1.0 + Steel × 1.0 | Consumer goods × 1.0 |
-> | `medical_supplies` (id 16) | Water × 1.0 + Agricultural produce × 1.0 | Medical supplies × 1.0 |
->
-> Consumer Goods Factory's input differs from the table's "refined goods (various)" — steel
-> stands in as the one already-shipped refined industrial input. Pharmaceutical Lab's input
-> differs from "chemical outputs" — no standalone chemical `resource_type` exists in the
-> prototype set, so water stands in as the process input, mirroring Hydroponics Bay's own
-> water-as-process-input precedent above. **Construction Yard and Power Plant remain unbuilt** —
-> Building materials and Utilities are deliberately still absent from `resource_type`
-> (RESOURCES.md § Habitability goods). The *effects* column (habitability, workforce efficiency,
-> growth) is also still unwired — landing the goods and population demand for them was this
-> item's scope; consuming a supply shortfall into those effects is unbuilt follow-on.
-> Verified by `tools/verify/habitability_tranche_harness.cpp`.
+Steel stands in as the Consumer Goods Factory's refined industrial input, and water as the
+Pharmaceutical Lab's process input — no standalone chemical `resource_type` exists, mirroring the
+Hydroponics Bay's water-as-process-input precedent. **Building materials and Utilities are not
+resources** (RESOURCES.md § Habitability goods): Building materials feeds construction cost,
+which is a different consumption path, and Utilities is an abstracted budget cost — so there is
+no Construction Yard and no Power Plant recipe. Verified by
+`tools/verify/habitability_tranche_harness.cpp`.
 
 ---
 
 ## Infrastructure buildings
 
-Infrastructure buildings affect logistical or economic capacity rather than extraction or processing directly. They are designed here and implemented in later layers.
+Infrastructure buildings affect logistical or economic capacity rather than extraction or processing directly.
 
-| Building | Function | Era | Layer |
-|----------|----------|-----|-------|
-| Port | Enables stockpile exchange and convoy dispatch on the body | 0 | 5 |
-| Launchpad | Required to dispatch convoys to off-world bodies; consumes propellant per launch | 0 (built), 1 (operational) | 5 |
-| Inland Logistics Hub | Land-mode logistics node: its tile discounts the A\* haul cost of any intra-body convoy routed through it (SUPPLY.md § Logistics-node discount). The player-placeable counterpart to a city's free-hub discount — extends the cheap land network out to remote sites. Produces nothing (0 workforce). | 0 | 5 |
-| Orbital Port | Receives off-world convoys; required on any non-terrestrial body to accept supply | 1 | 5 |
-| Warehouse | Increases the stockpile capacity of the body | Any | 5+ |
-| Storage Depot | Increases the throughput cap for a body's stockpile (see logistics note below) | 0 | 5+ |
+| Building | Function | Era |
+|----------|----------|-----|
+| Port | Enables stockpile exchange and convoy dispatch on the body; coastal placement (`is_coastal`) | 0 |
+| Launchpad | Required to dispatch convoys to off-world bodies; consumes propellant per launch | 0 (built), 1 (operational) |
+| Inland Logistics Hub | Land-mode logistics node (`building_type::inland_logistics_hub`, BL-149): its tile joins the population-centre set that discounts the A\* haul cost of any intra-body convoy routed through it (LOGISTICS.md). The player-placeable counterpart to a city's free-hub discount — extends the cheap land network out to remote sites. Produces nothing (0 workforce); cost in `economy.buildings.inland_logistics_hub`. | 0 |
+| Military Base | Unit muster building (`building_type::military_base`, BL-325). Produces nothing, staffs at zero, and is deliberately **not** a supply anchor — military reach IS the economic reach field. `docs/military/MILITARY.md`. | any |
+| Research Institute | The "how does tech get done" building (`building_type::research_institute`, BL-332). Passive: a flat per-tick credit to its owner's `corporation_component::science`, a market-invisible accumulator, not a resource. | any |
+| Orbital Port | Receives off-world convoys; required on any non-terrestrial body to accept supply | 1 |
 
-> **Implemented (BL-149, v0.1.1).** The **Inland Logistics Hub** is live as `building_type::inland_logistics_hub`: a placeable non-producing building whose tile joins the population-centre set that discounts intra-body haul cost (`dispatch_convoys`). Placement, cost (`economy.buildings.inland_logistics_hub`), the build-front-door affordance, and the hexagon marker glyph all landed; the discount reuses the BL-148 node scan.
+The Orbital Port is design vocabulary with no enum value. Storage capacity and per-node
+throughput are **Logistic Points** — `docs/economy/LOGISTICS.md` § Logistic Points (BL-464):
+a per-tick rate not a stock, a cap not a price, the node half only. There is no Warehouse or
+Storage Depot building; pools hold unbounded quantities, and the constraint on moving goods is
+the network.
 
-The Launchpad is the physical gate to space: a corp must hold one on the source body before any inter-body convoy can depart (`corp_has_launchpad_on`, `src/world/supply_system.cpp`). See **`docs/economy/ERAS.md`** for the designed Era 0→1 transition conditions and their implementation status.
+**The Launchpad is the physical gate to space**: a corp must hold one on the source body before
+any inter-body convoy can depart (`corp_has_launchpad_on`, `src/world/supply_system.cpp`), and
+the pad must be **fuelled** as well as present. `dispatch_convoys` gates the space lane on the
+corp's propellant stockpile on the *source* body and burns **1.0 unit per launch**
+(`propellant_per_launch`, `src/world/supply_system.cpp`): per launch, not per unit of cargo and
+not per AU — the pad is the thing being fuelled. An unfuelled pad is exactly as shut as no pad at
+all. A convoy exporting propellant itself cannot burn the cargo it carries; the gate subtracts
+the cargo first. Propellant is deliberately **left out of the market's base-price table**, so it
+is made and burned within a corp's own pool rather than traded. See **`docs/economy/ERAS.md`**
+for the Era 0→1 transition.
 
-> **Implemented (BL-308, v0.1.1).** Propellant is a real resource — `resource_type::propellant` — and the pad must be **fuelled** as well as present. `dispatch_convoys` gates the space lane on the corp's propellant stockpile on the *source* body and burns **1.0 unit per launch** (`propellant_per_launch`, `src/world/supply_system.cpp`): per launch, not per unit of cargo and not per AU — the pad is the thing being fuelled. An unfuelled pad is exactly as shut as no pad at all. A convoy exporting propellant itself cannot burn the cargo it carries; the gate subtracts the cargo first.
->
-> Both Chemical Plant routes below are authored in `scripts/recipes.lua` (ids 4 and 5). Liquid oxygen is folded into each recipe rather than given its own `resource_type` — nothing outside the Chemical Plant would ever hold it. Propellant is deliberately **left out of the Kepler starting market's base-price table**, so it is made and burned within a corp's own pool rather than traded; pricing it is a separate balance call.
->
-> *Save-format note.* Appending a `resource_type` value renumbers nothing but changes the length of every per-resource array. There is no serialisation layer today and **BL-107** (save magic + version header) has not landed, so this append was free. It stops being free the moment saves exist: from then on a new resource value is a save-format break needing a version bump and a migration.
-
----
-
-## Logistics and transport capacity (open design note)
-
-> **Superseded 2026-08-22 by [`LOGISTICS.md`](LOGISTICS.md)**, which owns the network in full, and
-> by **BL-464 (logistic points)**, which is the designed answer to transport capacity and carries
-> two rulings plus seven findings from a rejected first cut. This note predates both; read it as
-> history.
-
-Transport capacity is a constraint on supply throughput, not a direct modifier on market price. The intended behaviour is: **a body that cannot move its output does not accumulate surplus, rather than accumulating surplus at a suppressed price**.
-
-Concretely: if a mine produces iron ore faster than the body's port and convoy network can carry it away, the excess ore sits in the building's stockpile but does not flow into the market. The market sees normal or high iron ore prices (no supply glut) while production slows because the stockpile fills. This prevents unrealistically cheap goods appearing in landlocked markets, and makes transport infrastructure a genuine bottleneck rather than purely a cost reduction.
-
-Possible implementations:
-- **Storage cap per body:** each body has a maximum total stockpile. When full, extraction and processing buildings idle. Building Warehouses or Storage Depots raises the cap; building Ports raises the throughput rate at which stockpile drains to convoys.
-- **Throughput rate separate from capacity:** stockpile can hold X units; Port can ship Y units per quarter. Production above Y/quarter accumulates until cap is hit, then production idles.
-- **Implicit abstraction:** do not model storage separately; instead, market supply per quarter is capped at convoy throughput. Production that cannot be shipped simply does not enter the supply figures.
-
-This remains **open** — but against a *shipped* Layer 5, not an undesigned one (updated
-2026-07-31). BL-039 (supply convoys) is complete: `src/world/supply_system.cpp` moves goods
-between markets, and nothing in it caps storage or throughput — pools hold unbounded quantities
-and a dispatch pass moves whatever a shortfall wants. The storage-cap / throughput question above
-is therefore still a genuine design decision, now about *adding a constraint to* the live convoy
-layer rather than shaping an unbuilt one. The Storage Depot building is included in the
-infrastructure table as a placeholder. See `docs/economy/SUPPLY.md` for what actually shipped.
+*Save-format note.* Appending a `resource_type` value renumbers nothing but changes the length of
+every per-resource array; every such array is sized off `resource_count`, so the append costs a
+version bump and no per-array edit (BL-107, save-format header).
 
 ---
 
 ## Workforce model
 
-Landed as the per-`(corp, body)` pool model (rewritten 2026-07-31 to match
-`run_economy_step` in `src/world/economy_system.cpp` and `compute_building_opex` in
-`src/world/budget_system.cpp`; the design history is POPULATION.md § Workforce model).
+The per-`(corp, body)` pool model, as `run_economy_step` in `src/world/economy_system.cpp` and
+`compute_building_opex` in `src/world/budget_system.cpp` implement it; the design rationale is
+POPULATION.md § Workforce model.
 
 **Supply** derives from the body's population centres (BL-042, workforce supply derivation):
 each centre contributes labour by scale — `labour_by_scale` = 1 / 3 / 10 / 30 / 100 units for
@@ -456,121 +408,122 @@ with no centres falls back to the authored `world::workforce_supply` figure (def
 
 **Demand** is the sum of `workforce_assigned` over the corp's producing buildings on the body
 (extraction and processing only; ports and hubs demand no labour), capped by the body's
-habitability cap `min(1, mean_hab / 0.6)` (BL-041, habitability gates workforce — complete).
+habitability cap `min(1, mean_hab / 0.6)` (BL-041, habitability gates workforce).
 
 **Contention** is `min(1, supply / demand)` per `(corp, body)`, applied uniformly: an over-built
 corp sees *every* building throttled, none starved to zero. The scalar is then multiplied by
-`workforce_efficiency(hab)` (`src/world/workforce.hpp`, BL-069): full labour at habitability
-≥ 0.6, ramping linearly to 0.5× at 0. Effective workforce =
+`workforce_efficiency(hab)` (`src/world/workforce.hpp`, BL-069 workforce efficiency): full
+labour at habitability ≥ 0.6, ramping linearly to 0.5× at 0. Effective workforce =
 `workforce_assigned × contention`.
 
-**Cost** follows the BL-049 wage/maintenance split (`compute_building_opex`): maintenance
+**Cost** follows the wage/maintenance split (`compute_building_opex`, BL-049): maintenance
 carries a fixed **30 % material floor** charged even when decommissioned, plus a labour
 remainder scaled by the workforce target (zero when decommissioned); wages are
 `workforce_assigned × contention × base_wage × wt_scalar × hab` — paid on the labour actually
-allocated, not the request.
+allocated, not the request. `docs/economy/FINANCE.md` owns the money side.
 
 `workforce_assigned` itself is an authored constant set at placement (0.5 for producing types,
 0 for passive infrastructure) and is never player-edited. The **player lever is
-`workforce_target`** (0–200 %), auto-solved by default (BL-181, below).
+`workforce_target`** (0–200 %), auto-solved by default (below).
 
-### Workforce target and the auto-solver (BL-181)
+### Workforce target and the auto-solver
 
-On top of the assigned fraction sits a player-facing **workforce target** (`building_component.workforce_target`, 0–200 % of nominal, default 100 %) — a scalar on both output and the labour portion of wages/maintenance, applied identically in `economy_system` and `budget_system`.
+On top of the assigned fraction sits a player-facing **workforce target** (`building_component.workforce_target`, 0–200 % of nominal, default 100 %) — a scalar on both output and the labour portion of wages/maintenance, applied identically in `economy_system` and `budget_system`. The design is BL-181 (workforce auto-solver).
 
-By default a player building's target is **auto-solved** each economy tick (`workforce_auto = true`): `solve_workforce_target` (economy_system.cpp) picks the target that maximises that building's estimated net profit this tick. Because the model is otherwise *linear* in the target (output, wages, and the labour part of maintenance all scale with it), a fixed-price optimum would be degenerate bang-bang (0 % or max) — the **interior optimum comes from the local market price response**: more output raises local supply, which lowers the clearing price (`base · √(demand/supply)`, `docs/economy/MARKETS.md`). The solver reprices each candidate tier against that response and takes the best net. It is deterministic (reads last tick's market state), **player-corp only**, and applies only to producing types (extraction / processing).
+By default a player building's target is **auto-solved** each economy tick (`workforce_auto = true`): `solve_workforce_target` (economy_system.cpp) picks the target that maximises that building's estimated net profit this tick. Because the model is otherwise *linear* in the target (output, wages, and the labour part of maintenance all scale with it), a fixed-price optimum would be degenerate bang-bang (0 % or max) — the **interior optimum comes from the local market price response**: more output raises local supply, which lowers the clearing price (`base · √(demand/supply)`, `docs/economy/MARKETS.md`). The solver reprices each candidate tier against that response — inside the same authored price band the market clears in (`wf_target_price`, MARKETS.md § Where the band lives) — and takes the best net. It is deterministic (reads last tick's market state), **player-corp only**, and applies only to producing types (extraction / processing).
 
 The target is the *heuristic*, not a hard goal: a manual tier chosen in the building-management UI **pins** the value and clears `workforce_auto`; the **Auto** control re-enables the solver. This is the sole sanctioned auto-action on the player's corp (see `.claude/rules/io-standing-rules.md` § player-corp exception).
 
-*First-pass fidelity (BL-181):* labour contention is held at its current value, input-price response is ignored (inputs valued at the current price), and the tier search is coarse (10 % steps) — so the solved target can hunt by ±one step. A finer model, input-price response, and hysteresis are future work.
+*Fidelity:* labour contention is held at its current value, input-price response is ignored (inputs valued at the current price), and the tier search is coarse (10 % steps) — so the solved target can hunt by ±one step.
 
 ---
 
 ## Stockpile and output flow
 
-Extraction and processing outputs accrue into a shared stockpile pool held per `(corporation, body)` (a world-level map, not the per-building `stockpile_component`, which is unused in the prototype economy). At the economy tick boundary:
+Extraction and processing outputs accrue into a shared stockpile pool held per `(corporation, body)` (a world-level map, not the per-building `stockpile_component`, which the economy does not use). At the economy tick boundary:
 
-1. **Supply** is the goods each corporation lists for sale — its surplus above what its own processors will consume that tick.
-2. **Demand** is the total input shortfall auto-bought by processing buildings (inputs not covered by the corporation's own pool), plus any standing convoy cargo orders (from Layer 5 onward).
-3. **Transactions clear at the resolved market price (BL-078).** Sales credit, and purchases debit, the corporation's balance at `market_component.price`, resolved each Tick from the supply/demand ratio as `base × √(demand/supply)`, clamped to the `[0.25×, 4×]` band and EMA-smoothed. Demand and supply are no longer flat/deposit-flooded: the nation substrate is redefined into a **price-elastic per-capita basket demand** and an **abstract nation-capacity supply** that clears demand only partially, leaving a live margin (the fillable opportunity gap). See `docs/economy/MARKETS.md` for the clearing model and `scripts/economy.lua` § `substrate` for the tunables.
+1. **Supply** is the goods each corporation lists for sale — its surplus above what its own processors will consume that tick (auto-surplus), plus its standing sell orders.
+2. **Demand** is what processing buildings and construction sites set out to buy this tick (the *want*, net of the corp's own pool — MARKETS.md § Want and fill), plus population and background demand.
+3. **Transactions clear at the resolved market price.** Sales credit, and purchases debit, the corporation's balance at `market_component.price`, resolved each Tick from the supply/demand ratio as `base × √(demand/supply)`, clamped to the `[0.25×, 10×]` band and EMA-smoothed. Demand and supply come from real actors: population centres and the offstage economy on the demand side, real background firms on the supply side. See `docs/economy/MARKETS.md` for the clearing model.
 
 ---
 
-## Construction pacing (BL-095)
+## Construction pacing
 
-Construction is a **market-gated, pay-as-you-build** process, not an instant purchase.
-Placing a building gates only on affordability (the corp must be able to afford the whole
-build to commit to it) and does **not** debit up front. Each economy tick a building under
-construction:
+Construction is a **market-gated, pay-as-you-build** process, not an instant purchase (BL-095,
+construction pacing). Placing a building gates only on affordability (the corp must be able to
+afford the whole build to commit to it) and does **not** debit up front. Each economy tick a
+building under construction:
 
 - draws `resource_build_cost / build_duration_ticks` of its materials as **real market
   demand** (competing with population and other builds, bidding the local price up) and pays
   the resolved price for them, plus the same fraction of the flat `build_cost`;
 - progresses at a **rate set by how much of that per-tick material need the local market can
-  supply** — read from the market's recent throughput (`market_component.supply`, a *derived*
-  figure, not a stored inventory): market supplies the full need → full speed; supplies part →
-  **stretched** (up to `max_stretch ≈ 10×` the base duration); supplies less than
+  supply** — read from, and drained from, the market's real stock (`market_component.inventory`,
+  MARKETS.md § Real market inventory): market supplies the full need → full speed; supplies part
+  → **stretched** (up to `max_stretch ≈ 10×` the base duration); supplies less than
   `1/max_stretch` → **paused** until supply recovers.
 
 So a build in a thin market slows or stalls rather than completing instantly, and its cost is
 spread across the build. The front door shows the analog rate/ETA/paused status rather than a
-binary reject. Tunables live in `scripts/economy.lua` § `construction`. A depletable real
-market inventory (vs. the derived figure) is revisited in `backlog.json` § BL-130.
+binary reject. Tunables live in `scripts/economy.lua` § `construction`. A build stalled for want
+of an input registers that want as demand, so the stall is visible to the price signal.
 
-## The ancient chain (BL-429, first slice, 2026-08-15)
+## The ancient chain
 
-The ancient arc's production chains, authored in `scripts/recipes.lua` with `era = "ancient"`.
-**No new `resource_type` values were added.** Every input here was already in the enum with
-authored deposits and extraction rules, and — until this slice — no price and no consumer. That is
-BL-340's minable-but-unsellable asymmetry, which BL-340 closed for the space tier and left wide open
-for this one: `stone`, `timber`, `sand`, `clay` and `peat` could all be mined and none could be
-sold.
+The ancient arc's production chains, authored in `scripts/recipes.lua` with `era = "ancient"`
+(BL-429, ancient chain). **No `resource_type` values belong to it alone.** Every input is a raw
+with authored deposits and extraction rules — `stone`, `timber`, `sand`, `clay`, `peat` — and
+every one of them is priced and consumed, per the admission rule.
 
 | Recipe | Inputs → output | Depth |
 |---|---|---|
 | Charcoal Burner | 3 timber → 1 charcoal | 1 |
+| Peat Kiln | 2 peat → 1 charcoal | 1 |
 | Bloomery | 2 iron ore + 1 charcoal → 1 iron blooms | 2 |
 | Smithy | 2 iron blooms + 1 charcoal → 1 steel | 3 |
-| Smithy | 2 iron blooms + 1 charcoal → 1 **ordnance** (BL-460) | 3 |
-| Potter/Weaver | 2 clay + 1 timber → 1 trade goods | 1 |
+| Smithy | 2 iron blooms + 1 charcoal → 1 **ordnance** | 3 |
+| Potter & Weaver | 2 clay + 1 timber → 1 trade goods | 1 |
+| Glassworks | 2 sand → 1 trade goods | 1 |
 | Miller | 2 agricultural produce + 1 stone → 1 food rations | 1 |
 
-**The Smithy's second recipe (BL-460, 2026-08-19) is the ancient arc's route to `ordnance`** — the
-same building, same `iron_blooms + charcoal` basket as its steel recipe, switchable between the two
-(BL-430's alternate-recipe mechanic). It closes the gap the Fabricator's ordnance recipe comment
-named and deliberately left open: without it, an ancient campaign (the shipped default,
-`epoch_year = 0`) could never make the one good BL-454's unit upkeep draws every tick. See
-§ Fabricator above and `RESOURCES.md` § The two terminal goods.
+**The Smithy's second recipe is the ancient arc's route to `ordnance`** (BL-460, ancient
+ordnance) — the same building, same `iron_blooms + charcoal` basket as its steel recipe,
+switchable between the two (§ Alternate production methods). Unit upkeep draws ordnance every
+tick in either arc, so an ancient campaign (the default, `epoch_year = 0`) must be able to make
+it. See § Fabricator above and `RESOURCES.md` § The two terminal goods.
 
-**The load-bearing edit is the retag, not the additions.** The coal-fired `steel` recipe became
-`industrial`, so the ancient arc reaches steel only through timber → charcoal → blooms → steel.
-Without that, the shallow route stayed available (coal is a raw) and min-across-recipes correctly
-collapsed steel back to depth 1 — the chain would have existed and meant nothing. Ancient max depth
-went 1 → 3 on exactly that change.
+**The load-bearing authoring is the tag on the coal-fired `steel` recipe, not the additions.**
+That recipe is `industrial`, so the ancient arc reaches steel only through timber → charcoal →
+blooms → steel. Were the shallow route available (coal is a raw), min-across-recipes would
+correctly collapse steel back to depth 1 — the chain would exist and mean nothing. Ancient max
+depth is **3** on exactly that tag.
 
 Food is deliberately **not** gated behind an industry: the Miller is depth 1, because an ancient
 start that cannot feed itself until it has built a smelting chain is not a start.
 
-**A trap this created, and how it is closed.** Three call sites defaulted an unconfigured processing
-facility to `recipe_id("steel")`. That still *resolves* after the retag — the storage path is
-band-independent by design — so an ancient campaign would have silently seeded its processors with
-an industrial recipe, and nothing would have refused it, since the era gates browsing and placement
-rather than execution. They now call `recipe_registry::default_recipe_id()`, which returns the first
-recipe the current band allows. **Ask for a sensible default; do not name a recipe and hope.**
+**A trap, and how it is closed.** A call site that defaults an unconfigured processing facility
+to a named recipe such as `recipe_id("steel")` still *resolves* in an ancient campaign — the
+storage path is band-independent by design — so it would silently seed processors with an
+industrial recipe, and nothing would refuse it, since the era gates browsing and placement rather
+than execution. Every such site calls `recipe_registry::default_recipe_id()`, which returns the
+first recipe the current band allows. **Ask for a sensible default; do not name a recipe and
+hope.**
 
-Still owed on BL-429: the extraction/processing buildings that would give these chains named
-identities (quarry, woodcutter, kiln, smithy) with their placement rules and glyphs, and the
-remaining orphan raws — `sand` and `peat` are priced now but still have no consumer.
+The extraction/processing buildings that would give these chains named identities (quarry,
+woodcutter, kiln, smithy) with their own placement rules and glyphs are design vocabulary on the
+generic types, as for the industrial roster.
 
 ---
 
-## Chain depth — the growth track (BL-428, 2026-08-15)
+## Chain depth — the growth track
 
 **The growth spine is chain depth** (Ben's ruling, chosen over building tiers, the ancient tech
-ladder and settlement scale). How far down the production graph a corp can reach is what gates its
-next building, so progress is a *consequence of the economy it has built* rather than a parallel
-unlock system laid over it. The decisive argument: every alternative is a second system that must be
-kept in agreement with the economy, and depth is read off the recipe graph that has to exist anyway.
+ladder and settlement scale; BL-428, chain depth). How far down the production graph a corp can
+reach is what gates its next building, so progress is a *consequence of the economy it has built*
+rather than a parallel unlock system laid over it. The decisive argument: every alternative is a
+second system that must be kept in agreement with the economy, and depth is read off the recipe
+graph that has to exist anyway.
 
 Depth is **computed, never authored** (`recipe_registry::depth_of`):
 
@@ -581,24 +534,23 @@ depth(good) = min over producing recipes of ( 1 + max over that recipe's inputs 
 
 The two composition rules differ deliberately. **Max within a recipe**: you cannot run it until your
 deepest input exists, so its difficulty is its hardest input. **Min across recipes**: if two routes
-make the same good, you have reached it as soon as the *easier* route is open. That asymmetry only
-starts to matter when BL-430 lands alternate production methods — it is settled here rather than
-discovered there.
+make the same good, you have reached it as soon as the *easier* route is open. That asymmetry is
+what makes alternate production methods (below) compose with the ladder — it is settled here
+rather than discovered there.
 
-Depth is computed over the **era-allowed** recipes only (BL-433): a route the campaign's band masks
-out does not exist for that campaign, so it must not shorten anything. Masking can only ever *raise*
+Depth is computed over the **era-allowed** recipes only: a route the campaign's band masks out
+does not exist for that campaign, so it must not shorten anything. Masking can only ever *raise*
 depth or make a good unreachable, never lower it.
 
 **`-1` means unreachable** — no sequence of allowed recipes bottoms out in raws. That covers a cycle
 and an orphaned input with one code, because from the player's side they are the same fact: you
 cannot get there. Implemented as a bounded fixed point rather than a graph walk, so it terminates by
-construction, needs no recursion, and does not depend on traversal or container order (the BL-406
-lesson, where an unordered container decided a number the economy read).
+construction, needs no recursion, and does not depend on traversal or container order — an
+unordered container must never decide a number the economy reads.
 
-Measured on the shipped recipes, 2026-08-15: **industrial max depth 4, ancient max depth 3** — the
-ancient figure was **1** before BL-429's chain landed (one layer above raws and nothing beyond).
+Measured on the authored recipes: **industrial max depth 4, ancient max depth 3**.
 
-### The gate — what depth actually unlocks (BL-428 slice 2, 2026-08-16)
+### The gate — what depth unlocks
 
 Depth as a *readout* is only half the ruling. The half that makes it the **growth track** is the
 gate: a corporation may run a recipe only once it has already learned to make what that recipe
@@ -624,16 +576,16 @@ is set by the *event of making* something, not by holding it.
 The bit is set only where a good is genuinely produced, so **extraction seeds the ladder** — mining
 is how a corp reaches depth 0 goods in the first place, and every rung above is earned by processing.
 
-**Ancient roster only, for now** (Ben, 2026-08-16). The band check is on the **recipe**, not on the
-campaign: only content authored `era = "ancient"` opts into the ladder, so no existing industrial
-campaign changes shape. Refusals surface as `construction_result::depth_locked` /
+**Ancient roster only** (Ben, 2026-08-16). The band check is on the **recipe**, not on the
+campaign: only content authored `era = "ancient"` opts into the ladder, so an industrial campaign
+is unshaped by it. Refusals surface as `construction_result::depth_locked` /
 `corp_command_result::rejected_depth_locked` — a third lock distinct from both `tech_locked` (earned
 by research) and `era_locked` (never available at all), because this one is earned by **building**.
 The Build door filters locked methods out rather than offering what the gate would refuse.
 
 Guard: `tools/verify/chain_depth.cpp` (D1–D6 the metric, G1–G4 the gate — including the
-no-stranded-ancient-recipe row, which is BL-432's "an unplaceable building is the roster's orphan"
-assertion). Measured 2026-08-16: the ancient ladder climbs to **depth 3** with nothing stranded.
+no-stranded-ancient-recipe row: *an unplaceable building is the roster's orphan*, BL-432). The
+ancient ladder climbs to **depth 3** with nothing stranded.
 
 The gate is applied at **both** doors, and that is not redundancy. `construct_building` guards
 placement; `try_switch_recipe` guards retooling (`recipe_switch_result::depth_locked`). Guarding only
@@ -643,17 +595,17 @@ to the same `rejected_depth_locked` on the seam, so an agent cannot tell the two
 
 ---
 
-## The era band — which roster a campaign sees (BL-433, 2026-08-15)
+## The era band — which roster a campaign sees
 
 Every authored building type and recipe carries an optional **era band**: `any` (the default,
-shared by both arcs), `ancient`, or `industrial`. Authored as `era = "..."` in `scripts/economy.lua`
-and `scripts/recipes.lua`; an unknown string is a **load-time error**, not a silent fallback,
-because a typo would quietly re-admit a space-era entry to the ancient roster.
+shared by both arcs), `ancient`, or `industrial` (BL-433, era band). Authored as `era = "..."` in
+`scripts/economy.lua` and `scripts/recipes.lua`; an unknown string is a **load-time error**, not a
+silent fallback, because a typo would quietly re-admit a space-era entry to the ancient roster.
 
 The campaign's band is derived from `world_params::epoch_year` against the same 1700 threshold the
-antiquity branch already uses — below 1700 is ancient — and applied in `app::load_economy` right
-after the registry loads. This is why a 0 CE campaign is never offered a Launchpad, the petroleum
-and propellant chains, or the spacecraft chain.
+antiquity branch uses — below 1700 is ancient — and applied in `app::load_economy` right after the
+registry loads. This is why a 0 CE campaign is never offered a Launchpad, the petroleum and
+propellant chains, or the spacecraft chain.
 
 **The band masks; it never removes.** A recipe's id is its index in the authored list and that id
 is *stored* in `building_component.recipe`, so a filter that compacted the list would silently
@@ -665,38 +617,35 @@ paths, and the distinction matters to anyone adding a caller:
 | **Storage** | `get_recipe(id)`, `recipe_id(name)` | Absolute and band-independent. A stored id means the same recipe in every band. |
 | **Browse** | `recipe_count(bt)`, `recipe_at(bt, i)` | Era-masked. Walking `[0, recipe_count)` walks *this campaign's* recipes. |
 
-Every pre-existing caller of the browse path already meant "the recipes available to me", which is
-why none needed rewriting. `construct_building` is the authoritative gate (refusing with
-`construction_result::era_locked`, distinct from `tech_locked` because no research reaches it), and
-the Selection panel's build door filters on `building_available` so the door does not offer what the
-gate would refuse. Guard: `tools/verify/era_roster.cpp`.
+Every caller of the browse path means "the recipes available to me". `construct_building` is the
+authoritative gate (refusing with `construction_result::era_locked`, distinct from `tech_locked`
+because no research reaches it), and the Selection panel's build door filters on
+`building_available` so the door does not offer what the gate would refuse. Guard:
+`tools/verify/era_roster.cpp`.
 
 The band is **not** ERAS.md's Era 0 / Era 1 — that axis is per-corp progression *within* the
-industrial arc, gated on space access. See the note at the head of `ERAS.md`.
-
-The ancient roster is deliberately thin at this point — `steel`, `food_rations` and
-`refined_copper` are the only untagged processing chains. Filling it out is **BL-429** (ancient
-building roster), the next item in Sprint 17.
+industrial arc, gated on space access. The untagged (`any`) processing recipes shared by both
+arcs are `food_rations` and `refined_copper`; everything else is banded.
 
 ---
 
-## Alternate production methods (BL-430, 2026-08-15)
+## Alternate production methods
 
-**Ruling (Ben, 2026-08-15): alternates with real trade-offs, not tier upgrades.** The core data
-model already existed before this item — `recipes.lua` already lets several recipes share a
-primary output (the Charcoal Burner and the Peat Kiln both → `charcoal`), and
-`recipe_registry::recipe_at`/`recipe_count` already browse every era-allowed recipe for a
-`processing_facility`, so a building's Production dropdown (`construction_panel.cpp`) has always
-offered every era-allowed method interchangeably. What BL-430 added was the *cost of choosing*.
+**Ruling (Ben, 2026-08-15): alternates with real trade-offs, not tier upgrades** (BL-430,
+alternate production methods). `recipes.lua` lets several recipes share a primary output (the
+Charcoal Burner and the Peat Kiln both → `charcoal`), and `recipe_registry::recipe_at` /
+`recipe_count` browse every era-allowed recipe for a `processing_facility`, so a building's
+Production dropdown (`construction_panel.cpp`) offers every era-allowed method in its group
+interchangeably. What the mechanic adds is the *cost of choosing*.
 
 **Switching costs something.** Changing a `processing_facility`'s active recipe through the
 *player-grade* seam — the management UI's method dropdown, or `corp_command`'s `set_recipe` verb
-(which the AI's `dial_recipe` margin-chase also goes through, so it pays the same price) — now
+(which the AI's `dial_recipe` margin-chase also goes through, so it pays the same price) —
 debits a one-off credit cost and starts a cooldown, both authored in `economy.recipe_switch`
-(`scripts/economy.lua`; defaults `switch_cost = 12.0`, `cooldown_ticks = 6`). The single
-implementation is `try_switch_recipe` (`economy_system.{hpp,cpp}`); a refusal (on cooldown,
-insufficient funds, unknown/no-op recipe) mutates nothing. `building_component.recipe_switch_
-cooldown` carries the countdown, decremented once per economy tick.
+(`scripts/economy.lua`; `switch_cost = 12.0`, `cooldown_ticks = 6`). The single implementation is
+`try_switch_recipe` (`economy_system.{hpp,cpp}`); a refusal (on cooldown, insufficient funds,
+unknown/no-op recipe) mutates nothing. `building_component.recipe_switch_cooldown` carries the
+countdown, decremented once per economy tick.
 
 **The BL-079 reflex switch is deliberately exempt.** A building whose output has floored
 (`economy_system.cpp`'s loss-streak rescue) may still auto-switch to a healthier recipe for free
@@ -712,47 +661,44 @@ pair identical or split across the two axes is a real trade-off; a pair dominate
 content the moment its sibling is reachable. Wage and build-duration were considered and rejected
 as guard axes: those live on `building_economics` (the *building type*), not the recipe, and every
 `processing_facility` offers the same era-allowed recipe set — so those axes are identical across
-every sibling by construction and carry no discriminating information.
-
-**As of 2026-08-15 the guard fails against the shipped roster** — four sibling pairs (all
-pre-dating this item, from BL-340/BL-429/BL-433) are strictly dominated on both axes:
+every sibling by construction and carry no discriminating information. Four sibling pairs —
 `steel_from_iron_nickel` over `steel`, `propellant_atmospheric` over `propellant_electrolysis`,
-`peat_charcoal` over `charcoal`, and `glass` over `trade_goods`. Left failing rather than tuned
-silently — see `NEEDS_REVIEW.json` (NR-243) for the open call on whether these are genuine
-alternates needing a retune, or intended tier upgrades the guard should not compare at all.
+`peat_charcoal` over `charcoal`, and `glass` over `trade_goods` — are dominated on both axes;
+whether they are genuine alternates needing a retune, or intended tier upgrades the guard should
+not compare, is Ben's open call (NR-243), and the guard is left to report it rather than tuned
+silently.
 
 **AI scoring.** `corp_ai.cpp`'s `dial_recipe` candidate does not price `switch_cost` into its
-projected gain and does not pre-filter on `recipe_switch_cooldown`; the seam still enforces both
-at apply time, so a losing candidate is refused rather than mutating anything. Stated as a decision
-in `corp_ai.cpp` and recorded in `NEEDS_REVIEW.json` (NR-242) rather than silently deferred — a
-cost/cooldown-aware scorer is real new planner scope, not a small follow-on.
+projected gain and does not pre-filter on `recipe_switch_cooldown`; the seam enforces both at
+apply time, so a losing candidate is refused rather than mutating anything. A cost/cooldown-aware
+scorer is real planner scope, recorded as a decision (NR-242).
 
 ---
 
-## Sub-facility groups (BL-434, 2026-08-15)
+## Sub-facility groups
 
-**The generic split.** Every processing recipe still runs on the one `building_type::
-processing_facility` enum value — BL-434 does not add a new building type. What it adds is a
-`group` field on `recipe` (`recipe_registry.hpp`, authored as `group = "..."` in `recipes.lua`,
-alongside `era`/`display_name`): a sub-facility KIND — "Metal Foundry", "Food Processing" — so
-the generic building reads and behaves like several recognizable facility kinds without a second
-`building_type` axis. Absent means the literal `"General"` (a real group name, not empty string,
-so the switch-cost lookup below never needs a special case).
+**The generic split.** Every processing recipe runs on the one `building_type::processing_facility`
+enum value. What distinguishes them is a `group` field on `recipe` (`recipe_registry.hpp`,
+authored as `group = "..."` in `recipes.lua`, alongside `era`/`display_name`): a sub-facility
+KIND — "Metal Foundry", "Food Processing" — so the generic building reads and behaves like
+several recognizable facility kinds without a second `building_type` axis (BL-434, sub-facility
+groups). Absent means the literal `"General"` (a real group name, not empty string, so the
+switch-cost lookup below never needs a special case).
 
-**The taxonomy.** Every authored recipe as of this item has a named group with at least one
-sibling — nothing was left in the `"General"` catch-all:
+**The taxonomy.** Every authored recipe has a named group with at least one sibling — nothing
+sits in the `"General"` catch-all:
 
 | Group | Recipes (era) | Notes |
 |---|---|---|
-| Metal Foundry | `steel` (industrial), `steel_from_iron_nickel` (industrial), `steel_from_regolith` "In-Situ Smelter" (industrial, NR-257), `refined_copper` (any), `iron_blooms` "Bloomery" (ancient), `steel_from_blooms` "Smithy" (ancient) | Every route that smelts or shapes a structural metal — the industrial Smelter and the ancient Bloomery/Smithy chain both land here, since they reach the same terminal goods (steel, refined copper) by different roads. |
-| Refinery | `refined_fuel` (industrial) | Currently a singleton — a real, specific kind (distinct from Metal Foundry's smelting), not a forced catch-all; more refined-fuel-family recipes would join it rather than needing a rename. |
+| Metal Foundry | `steel` (industrial), `steel_from_iron_nickel` (industrial), `steel_from_regolith` "In-Situ Smelter" (industrial), `refined_copper` (any), `iron_blooms` "Bloomery" (ancient), `steel_from_blooms` "Smithy" (ancient), `ordnance_from_blooms` "Smithy" (ancient) | Every route that smelts or shapes a structural metal — the industrial Smelter and the ancient Bloomery/Smithy chain both land here, since they reach the same terminal goods by different roads. |
+| Refinery | `refined_fuel` (industrial) | A singleton — a real, specific kind (distinct from Metal Foundry's smelting), not a forced catch-all; more refined-fuel-family recipes would join it rather than needing a rename. |
 | Food Processing | `food_rations` (any), `hydroponics_bay` (industrial), `food_rations_milled` "Miller" (ancient) | Feeding the population, whether growing the produce (Hydroponics Bay) or milling it into rations (Food Processor, Miller). |
-| Chemical Works | `propellant_atmospheric` (industrial), `propellant_electrolysis` (industrial) | The Chemical Plant's two propellant routes (BL-308). |
-| Electronics | `silicon` (industrial), `ree_alloy` (industrial), `electronics` (industrial), `electronics_contact_grade` "Contact-Grade Electronics Lab" (industrial, NR-257) | The silicon/REE/electronics chain — named explicitly by this item's own design brief. |
-| Advanced Fabrication | `machinery` (industrial), `alloys` (industrial), `ordnance` (industrial, BL-457), `spacecraft_components` (industrial), `spacecraft_components_heavy` "Heavy Assembly Plant" (industrial, NR-257) | Fabricator + Assembly Plant: goods assembled from refined inputs rather than smelted from ore. |
-| Welfare Goods | `clean_water` (industrial), `consumer_goods` (industrial), `medical_supplies` (industrial) | The BL-368 habitability tranche — Water Treatment Plant, Consumer Goods Factory, Pharmaceutical Lab. |
-| Fuel Production | `charcoal` "Charcoal Burner" (ancient), `peat_charcoal` "Peat Kiln" (ancient) | Two independent producers of the same fuel good (`charcoal`) — an ordinary multi-producer economy fact (see the Alternate production methods section above), not itself an alternate-method pair since they're already grouped. |
-| Artisan Goods | `trade_goods` "Potter & Weaver" (ancient), `glass` "Glassworks" (ancient) | Two independent producers of `trade_goods_misc`, same shape as Fuel Production above. |
+| Chemical Works | `propellant_atmospheric` (industrial), `propellant_electrolysis` (industrial) | The Chemical Plant's two propellant routes. |
+| Electronics | `silicon` (industrial), `ree_alloy` (industrial), `electronics` (industrial), `electronics_contact_grade` "Contact-Grade Electronics Lab" (industrial) | The silicon/REE/electronics chain. |
+| Advanced Fabrication | `machinery` (industrial), `alloys` (industrial), `ordnance` (industrial), `spacecraft_components` (industrial), `spacecraft_components_heavy` "Heavy Assembly Plant" (industrial) | Fabricator + Assembly Plant: goods assembled from refined inputs rather than smelted from ore. |
+| Welfare Goods | `clean_water` (industrial), `consumer_goods` (industrial), `medical_supplies` (industrial) | The habitability tranche — Water Treatment Plant, Consumer Goods Factory, Pharmaceutical Lab. |
+| Fuel Production | `charcoal` "Charcoal Burner" (ancient), `peat_charcoal` "Peat Kiln" (ancient) | Two independent producers of the same fuel good (`charcoal`). |
+| Artisan Goods | `trade_goods` "Potter & Weaver" (ancient), `glass` "Glassworks" (ancient) | Two independent producers of `trade_goods_misc`, same shape as Fuel Production. |
 
 Judgment calls recorded in `NEEDS_REVIEW.json`: whether Hydroponics Bay (an agriculture
 *producer*, not a food *processor*) belongs in Food Processing or a standalone Agriculture group,
@@ -760,51 +706,43 @@ and whether Advanced Fabrication should instead split into a Fabricator group an
 group once more recipes land in either.
 
 **Build door: one row per group, not per recipe.** `draw_construction_ledger`
-(`selection_panel.cpp`) used to expand `processing_facility` into one candidate row per
-era-allowed recipe. It now collapses those rows to one per GROUP: the representative recipe is
-the highest-expected-profit era-allowed recipe in that group (ties keep the first in authored
-order), and the row is labelled with the group name rather than the recipe's own `display_name`.
-Placing it seeds the fresh building with that representative recipe
-(`construct_building`'s trailing `recipe` parameter, via `ui.construction.pending_recipe`, same
-seam as before). `recipe_registry::default_recipe_id(group)` gives any other caller (AI, a future
-seam) the same "this group's default recipe" lookup without duplicating the era-mask walk.
+(`selection_panel.cpp`) collapses `processing_facility` to one candidate row per GROUP: the
+representative recipe is the highest-expected-profit era-allowed recipe in that group (ties keep
+the first in authored order), and the row is labelled with the group name rather than the
+recipe's own `display_name`. Placing it seeds the fresh building with that representative recipe
+(`construct_building`'s trailing `recipe` parameter, via `ui.construction.pending_recipe`).
+`recipe_registry::default_recipe_id(group)` gives any other caller (AI, a future seam) the same
+"this group's default recipe" lookup without duplicating the era-mask walk.
 
 **Switching within a group stays cheap; switching across groups is refused outright.**
 `try_switch_recipe` (`economy_system.cpp`) looks up both the old and new recipe's `group` via the
-registry: same group pays the existing `switch_cost`/`cooldown_ticks` (`economy.recipe_switch`);
-different groups are REFUSED (`recipe_switch_result::cross_group`), not priced. This retracts a
-cross-group cost tier (`cross_group_multiplier`) that shipped in this same item and was pulled
-minutes later — Ben reconsidered: "switching methods can mean changing to a different building
-type — we should retire that completely. So the only way to access a different building type is
-fully dismantling the building, then using the tile selector to reselect and build a new
-building." The Method page's candidate list (`draw_production_method_section`, `selection_panel.cpp`)
-is filtered to the active recipe's own group for the same reason — a cross-group recipe is never
-even offered as a choice, not merely refused if picked. A recipe with no group tag (the
-empty-`b.recipe`/`no_recipe` case, e.g. mid-construction) falls back to permitting the switch at
-the intra-group cost rather than crashing or refusing on a data edge case — this seam must never
-crash on missing data.
+registry: same group pays `switch_cost`/`cooldown_ticks` (`economy.recipe_switch`); different
+groups are REFUSED (`recipe_switch_result::cross_group`), not priced. Ben's ruling: *"switching
+methods can mean changing to a different building type — we should retire that completely. So
+the only way to access a different building type is fully dismantling the building, then using
+the tile selector to reselect and build a new building."* The Method page's candidate list
+(`draw_production_method_section`, `selection_panel.cpp`) is filtered to the active recipe's own
+group for the same reason — a cross-group recipe is never even offered as a choice, not merely
+refused if picked. A recipe with no group tag (the empty-`b.recipe`/`no_recipe` case, e.g.
+mid-construction) falls back to permitting the switch at the intra-group cost rather than
+crashing or refusing on a data edge case — this seam must never crash on missing data.
 
 `tools/verify/recipe_switch_harness.cpp`'s `S6` asserts the refusal mechanically (three dummy
-recipes in two groups, in the same hand-built registry the `S1`-`S5` mechanism checks already use):
-an intra-group switch applies at the base cost, a cross-group switch is refused and mutates
-nothing.
+recipes in two groups, in the same hand-built registry the `S1`-`S5` mechanism checks use): an
+intra-group switch applies at the base cost, a cross-group switch is refused and mutates nothing.
 
 ---
 
-## Layer 3 prototype scope
+## The prototype core
 
-Layer 3 implements:
+The hand-calibrated core the economy is tuned on:
 
-- Extraction logic for Mine, Oil Platform, Farm, and Ice Extractor reading the seven prototype resources.
-- Processing logic for Smelter (iron ore → steel), Refinery (petroleum → refined fuel), and Food Processor (agricultural produce → food rations).
+- Extraction for the seven prototype resources (RESOURCES.md § Prototype subset) through the generic `extraction_site`.
+- Processing for iron ore → steel, petroleum → refined fuel, and agricultural produce → food rations.
 - Workforce scalar applied to both extraction and processing output.
 - The shared per-`(corporation, body)` stockpile pool, with quantities incrementing each economy tick.
-- Per-body market supply/demand aggregation with live price resolution — `base × √(demand/supply)`, banded and EMA-smoothed (`src/world/market_clearing.cpp`; the full model is `docs/economy/MARKETS.md`). The "price resolution deferred" note that stood here was stale (corrected 2026-07-31).
-- A running per-corporation balance: sales income less input purchases, maintenance, and wages.
-- The Layer 3 economy panel making all of the above observable.
+- Per-body market supply/demand aggregation with live price resolution — `base × √(demand/supply)`, banded and EMA-smoothed (`src/world/market_clearing.cpp`; the full model is `docs/economy/MARKETS.md`).
+- A running per-corporation balance: sales income less input purchases, maintenance, and wages (`docs/economy/FINANCE.md`).
+- The economy panel making all of the above observable.
 
-The `building_type` enum does **not** carry the named building set above (corrected 2026-07-31 —
-the previous claim here was false). It holds six values: `none`, `extraction_site`,
-`processing_facility`, `port`, `launchpad`, `inland_logistics_hub`. Introducing a named building
-type is an enum extension, not just an authoring pass; the named vocabulary above is design
-intent only until then.
+Introducing a named building type is an enum extension on `building_type`, not an authoring pass; the named vocabulary in this document is design intent carried by the generic types, their `target_resource`, and their recipe groups.

@@ -1,38 +1,17 @@
 # Project Io — Planetology
 
-**Status: implemented (first cut), some calls still owed.** This doc is the authority for [[BL-167]]
-(Planetology — generated atmosphere, chemistry, and a simulated evolution history).
-
-The **R&D pass landed 2026-07-21** (Sprint 1): a chemical model of the full chain from an input
-solar system to a human civilisation, researched across 13 domains with an adversarial fact-check on
-each. The **implementation landed the same day**, and the **homeworld was recalibrated 2026-07-22**
-from a hand-picked input box to a measured, strict floor with reject-and-reroll — see
-§ Implementation. What remains open is listed in § Open calls; those are still Ben's and are not
-settled.
-
-**Contents** *(status per section, 2026-08-02)*:
-
-| Section | Status |
-|---|---|
-| Why this exists | settled |
-| The chain — A → B → C (S0–S7) | settled |
-| S8 Legacy / S9 Spend | settled |
-| The homeworld rule | settled |
-| Archetypes | settled |
-| Mapping history onto Io's resource list | settled |
-| Presentation (biography, dated lines) | settled |
-| Determinism & cost | settled |
-| Implementation (incl. Continents, preferences, checkpoints, verification) | settled |
-| Open calls | open (3, 7, 8, 10 remain — 4 closed 2026-08-04, ore provinces) |
-| Known weaknesses | recorded — one half-closed 2026-07-30 |
+This document is the authority for BL-167 (Planetology — generated atmosphere, chemistry,
+and a simulated evolution history): a chemical model of the full chain from an input solar
+system to a human civilisation, researched across 13 domains with an adversarial fact-check on
+each, and the pass that realises it. § Open calls lists what is still Ben's and not settled.
 
 ---
 
 ## Why this exists
 
-A body's terrain (`TILE_GENERATION.md`) is generated against static, per-body solar parameters
-authored today (temperature class, atmosphere class, hydrological state, geological activity).
-Planetology replaces "authored atmosphere class" with a **generated one** — a body-level history
+A body's terrain (`TILE_GENERATION.md`) is generated against per-body solar parameters
+(temperature class, atmosphere class, hydrological state, geological activity). Planetology is
+where those come from — a **generated** profile rather than an authored one: a body-level history
 pass that runs *before* tile generation and answers: what is this world's air made of, and why?
 
 Ben's explicit reference is **Shadow Empire** (VR Designs/Slitherine): its planet generation runs
@@ -244,7 +223,7 @@ GOE:
   self-stabilising trap. Escape requires a tectonic nutrient shock.
 - **NOE** (850–540 Ma) reaches modern levels.
 
-#### Each gate is judged at its own epoch, not at present day *(2026-08-04)*
+#### Each gate is judged at its own epoch, not at present day
 
 The reductant flux "decays monotonically as radiogenic heat runs down" — which means the heat
 term in these gates is a **function of when the gate fires**, not of the body's age now. Radiogenic
@@ -262,13 +241,14 @@ than accidental. It is an *upper* bound (`theta < 2.4`) — heat only falls, so 
 conservative proxy — and, decisively, the 2.4 constant was calibrated against present-day theta.
 Re-siting it to the GOE epoch (where theta runs ~2× higher) without re-deriving that constant was
 measured: acceptance fell 78.5% → 60.2% and 69% of rejects became Mat Worlds. Closing the asymmetry
-properly needs an epoch-relative threshold, which is a calibration pass, not an edit. See NR-046.
+properly needs an epoch-relative threshold, which is a calibration pass, not an edit — BL-301
+(GOE epoch-relative calibration); see NR-046.
 
-Found by the **C1 rejection census** (`tools/verify/planetology_sweep.cpp`), which measures *which
-floor clause* rejects each homeworld. It is the instrument that made this visible: "cold and old"
-cost 2.52 draws against a ~1.24 baseline, for heat the world only lost *after* the gate it was being
-judged on. After the fix the worst preference is `oxygen_story=low` at 1.94 — a real design axis
-rather than a modelling artifact.
+The **C1 rejection census** (`tools/verify/planetology_sweep.cpp`) is the instrument for this:
+it measures *which floor clause* rejects each homeworld, so a preference that is expensive for
+a modelling reason ("cold and old" judged on heat the world only lost *after* the gate) shows up
+as a number distinct from one that is expensive for a design reason (`oxygen_story=low`, a real
+axis).
 
 ### S7 — Green *(land, and fire)*
 
@@ -354,7 +334,7 @@ Not a timer. Five concrete requirements, each traceable to something above:
 4. **Arable land plus climate stable enough to amortise cultivation** — the Holocene from 11,650 cal
    BP, after which agriculture arose independently on four continents within ~5,000 years.
 5. **Cheap bulk transport** — Diocletian's Price Edict implies sea : river : road cost ratios near
-   **1 : 4.9 : 34–42**. *(This is the same argument [[BL-170]]'s river logistics discount already
+   **1 : 4.9 : 34–42**. *(This is the same argument BL-170's river logistics discount
    encodes.)*
 
 **And the escape ceiling.** Δv is roughly linear in escape velocity while mass ratio is *exponential*
@@ -489,9 +469,10 @@ exactly one sentence a player reads.
 - **Copper** ~zero on any stagnant-lid world. Structural poverty, not a bad roll.
 - **Rare earths** never zero — lithophile, with a floor from one-shot magma-ocean fractionation (the
   lunar KREEP route, no tectonics required), rising with crustal reworking.
-- **Clay requires liquid water at some epoch** — clays are phyllosilicates from aqueous alteration.
-  *This is a live bug today:* `generate_deposits` puts clay on any wetland or valley tile, including
-  on airless Selene. Mars has abundant clay; the Moon has essentially none.
+- **Clay requires liquid water at some epoch** — clays are phyllosilicates from aqueous alteration,
+  so the `sedimentary` channel zeroes clay on any body with no liquid-water history — the wetland
+  and valley rule in `generate_deposits` only ever places it where the endowment allows.
+  Mars has abundant clay; the Moon has essentially none.
 - **Sand requires an atmosphere or liquid water** to sort and transport it. Airless bodies get impact
   regolith — unsorted, glass-rich, agglutinate-bearing. A different material.
 - **Water on airless bodies** comes from polar cold traps — LCROSS measured **5.6 ± 2.9 wt%** in
@@ -548,23 +529,22 @@ Five things make this work, each cheap:
    for an eon in the middle (*"and then nothing much for a billion years"* is a better beat than a
    gap), crowded and consequential at the end.
 
-### Dating a line — one field, both regimes *(BL-220, landed 2026-07-30)*
+### Dating a line — one field, both regimes
 
 A biography line is timestamped by **`history_event::years_before_epoch`, a signed integer count of
 years back from the campaign epoch** (1 January 1960 — `campaign_epoch_year`, mirrored by
 `ui::fmt::campaign_epoch_year` and cross-checked by a `static_assert` in `tile_inspector.cpp`).
+The timestamp model is BL-220 (timestamp foundation).
 
-It replaced a `float gya` for two reasons. **Display:** 1450 CE is 5.1e-7 Gya, so the ledger's
-`%.2f Gya` rendered every historical date as `0.00 Gya` — the whole of recorded history collapsed
-onto one string. **Arithmetic:** any date derived near the epoch from a deep-time baseline dies to
-cancellation, since `4.5f - 273yr` is exactly `4.5f`, and the historical ladder computes dates that
-way constantly. Integers also sort exactly and tie-break deterministically, which matters because a
-timestamp that participates in sorting is effectively a gate path (§ Determinism & cost).
-
-> Correcting a claim in BL-220 as filed: it also argued that float would make *"two events centuries
-> apart compare equal"*. That is overstated — float32 carries ~7 significant digits at any exponent,
-> so 1687 and 1688 stored directly as Gya do compare unequal and round-trip intact. The conclusion
-> stands on display and cancellation; the stated mechanism did not.
+It is an integer, not a `float gya`, for two reasons. **Display:** 1450 CE is 5.1e-7 Gya, so a
+`%.2f Gya` ledger renders every historical date as `0.00 Gya` — the whole of recorded history
+collapses onto one string. **Arithmetic:** any date derived near the epoch from a deep-time
+baseline dies to cancellation, since `4.5f - 273yr` is exactly `4.5f`, and the historical ladder
+computes dates that way constantly. Integers also sort exactly and tie-break deterministically,
+which matters because a timestamp that participates in sorting is effectively a gate path
+(§ Determinism & cost). (Float would *not* make two events centuries apart compare equal —
+float32 carries ~7 significant digits at any exponent, so 1687 and 1688 stored as Gya compare
+unequal; the case rests on display and cancellation.)
 
 **One field, not two**, because deep time and recorded history sort into a *single* ordered
 biography — that list is the whole presentation model, and a second field would mean the ledger
@@ -598,15 +578,14 @@ end to end. `planetology_harness` **R14** pins the
 conversions, every format band, total oldest-first ordering, and that a historical line interleaves
 correctly between deep time and the epoch.
 
-**One `chain_stage` enum too**, for the same reason (BL-220 residual call 2, settled here). The
-stages of the historical ladder (`docs/lore/HISTORY.md`, landing as BL-221/BL-222) join `chain_stage`
-rather than running a parallel enum — a second one would leave the ledger unable to sort its own
+**One `chain_stage` enum too**, for the same reason. The stages of the historical ladder
+(`docs/lore/HISTORY.md`) join `chain_stage` rather than running a parallel enum — a second one would leave the ledger unable to sort its own
 lines. Their causal position is **after `legacy`** (S8 leaves the endowment) and **before `spend`**
 (S9 draws it down, which is what industrialisation *does*), with a seam reserved ahead of settlement
 for a pre-settlement narrative stage. Note the consequence: `chain_stage` is **ordered by chain
 position and inserted into, not appended to** — the opposite of `body_archetype`'s append-only rule —
-because gates and R6 both compare stages with `>=`. That is safe only while no serialiser exists; if
-one lands, this enum needs a stable wire mapping before anything else is inserted.
+because gates and R6 both compare stages with `>=`. `chain_stage` has no wire mapping; a
+serialiser that writes it needs a stable mapping before anything else is inserted into the enum.
 
 **The diagnostic test, applied ruthlessly: for every generated value, name the decision it changes.
 Anything that fails is deleted, not tuned.** That test is what removes the magnetic dynamo, D/H
@@ -640,48 +619,44 @@ list, as `hard_coded_world.cpp`'s market seeding already does for `centre_ids`.
 **Compute is a non-issue** — ~90 flops and ~20 hashes per body, once, at generation. It should not be
 quoted as a virtue.
 
-**Code cost is the real number, and it is larger than "one multiplier."** A new sibling pass
-`src/world/planetology.{hpp,cpp}` invoked before `generate_body_tiles` (the settled BL-051
-architecture) — with `body_profile` becoming the pass's **return value** rather than four literals,
-which is the narrow waist. But then: a per-resource deposit weight vector (a **signature change** —
-today's `deposit_scalar` is a single float), a new condition and fallback rule in Pass 4's composition
-table, the clay/sand/cold-trap gates in `generate_deposits`, and a report surface.
-**"The pipeline itself is otherwise unchanged" will not survive implementation.**
+**Code footprint — larger than "one multiplier."** The sibling pass
+`src/world/planetology.{hpp,cpp}` is invoked before `generate_body_tiles` (the BL-051
+architecture), with `body_profile` as the pass's **return value** — the narrow waist. Around it:
+a per-resource `endowment` vector alongside the single-float `deposit_scalar`, the abiotic
+fallback rule in Pass 4's composition table, the clay/sand/cold-trap gates in `generate_deposits`,
+and the report surface. The tile pipeline is not "otherwise unchanged".
 
-**Save format.** No serialiser exists in the repo today, so the cost is zero now and a design
-constraint later. Bodies are few, so inline on `body_component` is right — `survey_state` is the
-precedent. ~120 bytes plus a ≤64-byte event array per body.
+**Save format.** Bodies are few, so the planetology state sits inline on the body —
+`survey_state` is the precedent. ~120 bytes plus a ≤64-byte event array per body.
 
-**Tuning surface.** ~40–60 named constants. The only thing that pins them is a committed
-`tools/verify/planetology.cpp` harness (per the tool-creation rule, authored *as part of* the item)
-running the chain over the ten real solar-system bodies and asserting each lands in its stated
-archetype — plus asserting the four prototype bodies' derived `body_profile` matches today's authored
-one. **Be honest in the harness comments: the model has more free parameters than calibration bodies,
-so a green check means the constants have not *moved*, not that they are right.**
+**Tuning surface.** ~40–60 named constants. What pins them is `tools/verify/planetology_harness.cpp`,
+running the chain over the prototype bodies and asserting each lands in its stated archetype and
+derives the expected `body_profile`. **The harness comments are honest about it: the model has
+more free parameters than calibration bodies, so a green check means the constants have not
+*moved*, not that they are right.**
 
 ---
 
 ## Implementation
 
 **The pass** is `src/world/planetology.{hpp,cpp}` — a body-level sibling pass invoked from
-`make_hard_coded_world` *before* `generate_body_tiles`, per BL-051's settled convention. It is a
+`make_hard_coded_world` *before* `generate_body_tiles`, per BL-051's convention. It is a
 pure function of `(campaign_seed, body_inputs, planetology_params)`.
 
-**It now derives the `body_profile`** that used to be four hand-authored literals. Checked against
-the previous authored values, **23 of 24 fields reproduce exactly** — Kepler is identical on all six,
-so the homeworld surface is unchanged. The single divergence is **Cinder's `geological_activity`,
-authored `high`, derived `low`**: Mercury is genuinely geologically dead, and the authored value was
-flavour. It costs Cinder some mountain and rift cluster seeds.
+**It derives the `body_profile`** the tile pipeline consumes; the prototype bodies' profiles
+(`TILE_GENERATION.md` § Prototype body profiles) are regression assertions on that derivation.
+One derived value is worth naming because it contradicts the flavour reading: **Cinder's
+`geological_activity` is `low`** — Mercury is genuinely geologically dead — which costs Cinder
+some mountain and rift cluster seeds.
 
-**The Continents/Drift sibling pass now runs between S3 and the tiles** (landed 2026-07-28,
-BL-210 first slice — `run_continents`, `src/world/continents.cpp`, authority `CONTINENTS.md`).
-It reads Engine's already-computed `mobile_lid`/`theta` — plate count, drift speed, everything a
+**The Continents/Drift sibling pass runs between S3 and the tiles** (`run_continents`,
+`src/world/continents.cpp`, authority `CONTINENTS.md`). It reads Engine's already-computed `mobile_lid`/`theta` — plate count, drift speed, everything a
 consequence, nothing an independent roll — feeds a per-tile height bias into tile Pass 1, and
 appends dated `chain_stage::engine` lines to the body's biography (collision → *"porphyry copper
 where it persists"*; a stagnant lid drifts as one immobile plate).
 
 **Two hooks into the tile pipeline**, both taking an optional `const planetology_state*` so a null
-state reproduces the pre-BL-167 surface bit-for-bit:
+state reproduces the unendowed surface bit-for-bit:
 
 - **Pass 4** — `life_stage < land` masks the biotic compositions out, falling back to
   `composition_abiotic`, which mirrors `composition_atmospheric`'s RNG consumption draw-for-draw so
@@ -696,9 +671,8 @@ inventing a knob.
 
 The bands below are the **measured always-viable spans**, not authored preferences —
 `earthlike_corridor` swept each axis and these are the spans where every seed clears the homeworld
-gates, widened at the wet end so Earth's own 0.71 ocean fraction stays reachable. Verified against
-`planetology.cpp:321-386` on 2026-08-04. *(This table previously read 0.80–1.20 / 3–9 / 0.40–2.00 /
-0.70–1.50 / 0.40–1.80 / 0.30–0.80 and 0–1 for oxygenation; every row had moved.)*
+gates, widened at the wet end so Earth's own 0.71 ocean fraction stays reachable. The bands live
+in `resolve_preferences` (`planetology.cpp`).
 
 | Stage | Knob | `any` band (measured) |
 |---|---|---|
@@ -721,11 +695,10 @@ applied after the lean's band is picked (`age_band.hi = min(hi, t_ms)`). If the 
 — a bright star *and* an ancient system — the star wins, being the harder physical limit, and the
 biography says so rather than the generator silently ignoring the request.
 
-That cap is also what finally gave `star` a job. T5 measured it **inert on all ten tile metrics**,
-which this doc elsewhere called "exactly right"; it was not — a knob the player can move that
-changes nothing is a dead control. Now a brighter star forces a younger system, a younger system has
-a shorter biosphere window, and through the age × radiogenic ridge the pair atlas mapped, that buys
-a leaner fossil endowment. Eclipse geometry is its second job.
+That cap is what gives `star` a job — a knob the player can move that changes nothing is a dead
+control, and without the cap `star` is inert on every tile metric. A brighter star forces a
+younger system, a younger system has a shorter biosphere window, and through the age × radiogenic
+ridge the pair atlas maps, that buys a leaner fossil endowment. Eclipse geometry is its second job.
 
 **`radiogenic` is deliberately independent of `metallicity`** — U and Th come from rare r-process
 events, so a metal-rich system is not automatically a geologically active one. Keeping them separate
@@ -738,18 +711,17 @@ decides against cannot drift from the world actually built.**
 
 The **physical facts** in that list are authored (mass and orbit are what a prototype body set
 *is*). The **names are not** — see § Body naming below. The literals still sitting in the
-`prototype_entry` table are placeholders that no longer reach the world; `make_hard_coded_world`
+`prototype_entry` table are placeholders that never reach the world; `make_hard_coded_world`
 overwrites `body_inputs::name` with the coined name before the chain runs.
 
-## Body naming *(BL-257, landed 2026-08-09)*
+## Body naming
 
-**Body names are generated, and a body's identity is its entity id.** The five bodies used to
-carry string literals — Helios / Cinder / Kepler / Selene / Pallas — which made the system read
-as authored rather than generated.
+**Body names are generated, and a body's identity is its entity id** (BL-257, body naming).
+Authored string literals would make the system read as authored rather than generated.
 
-**Identity first.** Several places compared a body's *name* to decide *which body it was*, so
-randomising names would have been a silent correctness bug rather than a cosmetic change.
-`generation_report::body_entry` now carries the world `entity_id` it describes plus an
+**Identity first.** Nothing may compare a body's *name* to decide *which body it is* — with
+generated names that would be a silent correctness bug rather than a cosmetic one.
+`generation_report::body_entry` carries the world `entity_id` it describes plus an
 `is_homeworld` flag, and every consumer reads one of those: the settlement merge in
 `hard_coded_world.cpp`, `seed_genesis_history`, the Tile Ledger's biography lookup and its Ages
 sim cache, the Continent lens's plate lookup, and the verify harnesses. **A body name is a display
@@ -758,7 +730,7 @@ string and nothing else.** Verify scripts address bodies by *role* — `home`, `
 
 **One tongue.** Names are coined by `src/world/body_names.{hpp,cpp}` from `world/tongue.hpp` —
 the same phoneme inventory and word builder every culture, nation and city name comes from
-(BL-290). Bodies are not a fourth naming bank; they are that sound system applied to the sky.
+(BL-290, one tongue). Bodies are not a fourth naming bank; they are that sound system applied to the sky.
 
 **Why a seed-rolled tongue rather than a culture's.** The cradle cultures do not exist until the
 creeds pass, which needs the homeworld's tiles, which needs the chain — and the chain *writes body
@@ -787,31 +759,30 @@ seed, same catalogue, run to run. No two bodies in a system share a name, moons 
 structural half of the register rule, and prints each catalogue — a name generator is judged by
 reading its output. `world_audit` prints and checks the canonical world's catalogue.
 
-**Charts** are drawn by `src/ui/charts.{hpp,cpp}`, extracted from the tile-selection deposit graphs
-(BL-123) so every chart in the app shares one implementation. At two bars `draw_bars` lays out
-pixel-identically to the original, which is what let the tile graphs move onto it.
+**Charts** are drawn by `src/ui/charts.{hpp,cpp}` — one implementation shared by every chart in
+the app, the tile-selection deposit graphs (BL-123, deposit graphs) included.
 
 ### The homeworld: preferences, a strict floor, and reject-and-reroll
 
-**Settled 2026-07-22 (Ben).** The first cut guaranteed the homeworld by clamping its inputs to a
-hand-picked box. That box was drawn around an answer already known, which is why generated Earths
-read as *forced*. Two calls replaced it:
+**Settled 2026-07-22 (Ben).** A homeworld guaranteed by clamping its inputs to a hand-picked box
+is drawn around an answer already known, which is why such Earths read as *forced*. Two calls
+govern instead:
 
 1. **The floor stays strict.** Every homeworld should be recognisably Earth.
 2. **A miss is rejected and rerolled, never clamped.** No value is ever silently overridden, so
    every world a player sees genuinely rolled and genuinely passed.
 
-**The measurement came first**, via `tools/verify/planetology_sweep.cpp`, and it found a modelling
-error rather than a tuning problem:
+**The orbit is derived from the star**, and `tools/verify/planetology_sweep.cpp` is the
+measurement that shows why it must be:
 
-> **The homeworld's orbit was pinned at 1 AU while the star's mass varied.** Luminosity goes as
-> M^3.5, so rolling a star across 0.6–1.5 M☉ swings instellation across **0.17–4.1** against a viable
-> window near **0.34–1.05**. Two thirds of all draws died at the Water gate — 51% Ovens, 16% Snowball
-> Locks.
+> **A homeworld orbit pinned at 1 AU while the star's mass varies is a modelling error, not a
+> tuning problem.** Luminosity goes as M^3.5, so rolling a star across 0.6–1.5 M☉ swings
+> instellation across **0.17–4.1** against a viable window near **0.34–1.05**. Two thirds of all
+> draws die at the Water gate — 51% Ovens, 16% Snowball Locks.
 
 A homeworld sits in its star's habitable zone **by construction, not by luck**. Deriving the orbit
 from the star (placed in the *continuously* habitable band, which is ~63% the width of the
-instantaneous one) eliminated that failure mode outright:
+instantaneous one) eliminates that failure mode outright:
 
 | | Acceptance | Draws to a viable homeworld |
 |---|---|---|
@@ -873,53 +844,43 @@ rather than one preference. **`abiogenesis_ease` is not a preference at all** �
 rare" and then rejecting every lifeless homeworld is pure waste, so life on the homeworld is a given.
 
 **No lean is a dead end.** A preference that reads as a choice but almost never yields a viable world
-is a lie in the UI. Measured per-lean cost, in mean draws:
-
-```
-star 1.24 / 1.24 / 1.24      ocean         1.17 / 1.17 / 1.43
-world_size 1.36 / 1.23 / 1.17  oxygen_story  1.86 / 1.17 / 1.15
-interior 2.57 / 1.12 / 1.19    coal_basins   1.24 / 1.24 / 1.24
-metal 1.24 / 1.24 / 1.24       drawdown      1.24 / 1.24 / 1.24
-```
-
-> **⚠ These figures are stale — superseded 2026-08-04, not re-measured here.** Three commits moved
-> them: `1a69621` (wizard bands become the measured spans), `fed808`/`fed8db` (arable floor) and
-> `5360ce5` (the star's age cap). Re-run `earthlike_lean_trace` before quoting any number in this
-> block. Two conclusions did change direction and are worth stating:
->
-> - **`interior = high` is now the worst lean, at ~2.97 draws** — not `interior = low` at 2.57.
-> - **"`star` costs nothing … which is exactly right" was the wrong reading.** A knob that costs
->   nothing *and* changes nothing is inert, not free; T5 measured `star` at 0.00 on all ten tile
->   metrics and it was treated as a defect. It now caps system age (see § the knob table).
+is a lie in the UI. Per-lean cost (mean draws to a viable homeworld) is measured by
+`earthlike_lean_trace`, and is the number to quote rather than anything remembered: the most
+expensive lean is `interior = high` at ~2.97 draws against a ~1.24 baseline.
 
 `metal`, `coal_basins` and `drawdown` cost nothing at any lean — they are pure character axes with
 no viability consequence. Where a lean *does* cost draws, the cost is **physically honest**: an old,
 radiogenically poor world loses its mobile lid, so the second oxygenation never fires and it stalls
 at a Boring Billion. The reroll absorbs it rather than the model hiding it.
 
-### Checkpoints — branch decisions as a first-class record (BL-217)
+**The sampling bands, not the viability floor, are the specification of Earth.**
+`earthlike_corridor` sweeps each axis (65 steps × 128 seeds), with `earthlike_pairs`,
+`earthlike_tile_census` and `earthlike_lean_trace` alongside; the corridor it measures is the
+*source* of the wizard's `any` bands. Ten of the fourteen floor clauses never fire — the floor
+does much less work than it appears to, and the bands do all of it.
+
+### Checkpoints — branch decisions as a first-class record
 
 **Settled 2026-08-02.** Preferences narrow a *sampling range* within one round; they never touch
-*which branch a checkpoint proposes*. BL-217 (GENERATION_CHECKPOINT_BRANCH_MODEL) generalises the
-mechanism so a lean can also narrow the **candidate set** at a genuine branch point — the S5–S8
-biological die-offs today, a second checkpoint class once BL-218's historical rupture lands — while
-keeping the same reject-and-reroll discipline this doc has used since the homeworld rule.
+*which branch a checkpoint proposes*. The checkpoint model is BL-217 (checkpoint branch model): it
+generalises the mechanism so a lean can also narrow the **candidate set** at a genuine branch
+point — the S5–S8 biological die-offs, and the settlement-stage historical rupture (BL-218,
+settlement rewrite) — while keeping the same reject-and-reroll discipline as the homeworld rule.
 
 **What counts as a checkpoint, and what does not.** A checkpoint is a point where the chain's
 *outcome distribution genuinely branches* — two runs from the same prior state can diverge into
 materially different worlds. It is **not** every point where something narratively interesting
 happens. An interesting event that does not change what the world *can become* is a history-log
-entry (BL-208, not yet built), not a checkpoint. Applying that rule: the S5–S8 mass-extinction
+entry (BL-208, world history log), not a checkpoint. Applying that rule: the S5–S8 mass-extinction
 die-offs qualify (Sterile vs. Microbial vs. Mat World are different worlds); a settlement-stage
-collapse/war/revolution will qualify (BL-218's job); a body's day-length or axial tilt rolling one
+collapse/war/revolution qualifies (BL-218's class); a body's day-length or axial tilt rolling one
 way or another does not, because nothing downstream reads it as a fork. Exactly **two** checkpoint
-classes exist today — **biological mass-extinction** (built, this item) and **historical rupture**
-(named, built by BL-218) — and no third is needed before those two land.
+classes exist — **biological mass-extinction** and **historical rupture** — and no third is needed.
 
 **The record.** `checkpoint_record { stage_id, branch_taken, seed_used, viability_result }`
 (`src/world/planetology.hpp`), held in an **append-only, ordered** `planetology_state::checkpoints`
 list. No random-access map keyed by stage, and no mutable last-branch-wins field — either would
-make a later move into BL-208's eventual world-history-log a conversion project instead of a move.
+make a move into BL-208's world history log a conversion project instead of a move.
 `seed_used` is mandatory: a branch that cannot be replayed in isolation from its own seed is not
 debuggable.
 
@@ -943,25 +904,24 @@ civilisation left to industrialise?") are not the same question, so each checkpo
 its own — but the *mechanism* invoking them is one function, uniform across classes. The homeworld
 rule still governs throughout: a floor rejects and rerolls; it never edits a result into viability.
 
-**The S5–S8 retrofit is legibility only.** The biology itself is unchanged — `run_planetology` still
-computes exactly the same abiogenesis/GOE/NOE/land/fire decisions it always did. What BL-217 adds is
+**The S5–S8 checkpoints are legibility only.** They do not change the biology — `run_planetology`
+computes the abiogenesis/GOE/NOE/land/fire decisions exactly as the gates above describe — and add
 a `checkpoint_record` push alongside each of those decisions (Spark's abiogenesis-or-not, Breath's
 GOE and NOE, Green's land colonisation and fire threshold), so the branch the biology already takes
-is now legible as data rather than only as a `died_at`/`archetype` read. No real lean filters a
-biology candidate today — the eligibility-filter half of the mechanism is proven by a synthetic
-checkpoint class in the harness, ready for BL-218 to be the first real second user.
+is legible as data rather than only as a `died_at`/`archetype` read. No lean filters a biology
+candidate — the eligibility-filter half of the mechanism is proven by a synthetic checkpoint class
+in the harness, and its real user is the settlement-stage class.
 
 **Nothing here hardcodes "four biology stages."** `resolve_checkpoint` takes a `chain_stage` value
 to tag its record, but never enumerates which stages exist or how many checkpoints a body has;
-BL-218 registers its own checkpoint (candidates, apply, floor) at the settlement stage without
-touching this item's code, which is the whole point of building the mechanism ahead of its second
-user.
+the settlement-stage checkpoint registers its own (candidates, apply, floor) without touching the
+mechanism.
 
 ### Verification
 
 `tools/verify/planetology_harness.cpp`, auto-registered as a CTest. The groups this doc owns (the
 harness also carries R9–R11, which belong to the endemic-goods and market items, and reserves R12
-for BL-209's molecular trace):
+for BL-209 (molecular trace)):
 
 | | Asserts |
 |---|---|
@@ -973,8 +933,8 @@ for BL-209's molecular trace):
 | R6 | **Wizard stability** — a decision at stage N never rewrites the history of a stage before N |
 | R7 | Every new knob demonstrably moves its own outcome |
 | R8 | **Preferences and reroll** — resolution is pure in (preferences, seed); a reroll redraws its own round and leaves earlier ones alone; **every** resolved homeworld clears the strict floor across 400 preference combinations; a dimmer star pulls the orbit inward |
-| R13 | **The checkpoint model** (BL-217) — same seed → identical `checkpoints`, different seed → different; the S5–S8 checkpoints mirror what `died_at`/`archetype` already encode; a synthetic checkpoint class proves an all-ineligible candidate set forces a reroll rather than a silent fallback |
-| R14 | **The dated timestamp** (BL-220) — the conversions from Gya and from a calendar year, every display band *and both edges of every band*, total oldest-first ordering, and a historical line interleaving between deep time and the epoch |
+| R13 | **The checkpoint model** — same seed → identical `checkpoints`, different seed → different; the S5–S8 checkpoints mirror what `died_at`/`archetype` already encode; a synthetic checkpoint class proves an all-ineligible candidate set forces a reroll rather than a silent fallback |
+| R14 | **The dated timestamp** — the conversions from Gya and from a calendar year, every display band *and both edges of every band*, total oldest-first ordering, and a historical line interleaving between deep time and the epoch |
 
 R6 is what makes the wizard's Back/Continue safe, and R8 is what makes the rejection sampling a
 generator rather than a slot machine. Both are asserted, not assumed.
@@ -983,87 +943,44 @@ A second harness, **`tools/verify/planetology_sweep.cpp`**, measures rather than
 rate, per-lean cost (so a dead preference shows up as a number rather than a mysteriously slow
 reroll), and the endowment spread across accepted worlds.
 
-**The harness earned its keep immediately** — it caught five real defects before the feature was ever
-seen: Selene's tidal heating overflowed to ~3×10¹¹ (raw AU fed into an a^-7.5 term), Cinder was
-mis-banded a whole temperature class by a wet-planet albedo on bare rock, Selene grew clay it cannot
-have, Pallas reported 0 K because it exited before instellation was computed, and the iron endowment
-saturated its clamp so both ends of the oxygenation dial returned the same number.
-
-**Known dormancy.** The biotic terrain mask is built and unit-tested but has **no body to fire on**
-in the shipped set: it only bites on a world that *has* an atmosphere yet never reached land, and
-Kepler is the only atmospheric body and always lives. It is exercised by a synthetic small-wet-world
-case in the harness. This is expected — one living world is the intended shape (Ben, 2026-07-21).
+**Dormancy by design.** The biotic terrain mask has **no body to fire on** in the prototype set:
+it only bites on a world that *has* an atmosphere yet never reached land, and the homeworld is the
+only atmospheric body and always lives. It is exercised by a synthetic small-wet-world case in the
+harness. One living world is the intended shape (Ben, 2026-07-21): the system is meant to read as
+one living world among dead ones, and the archetypes and S5–S8 rungs only the homeworld could
+otherwise reach are accepted as unreachable until `world_params::body_count` grows the set.
 
 ---
 
 ## Open calls — Ben's, not settled
 
-1. ~~**Scope of the first cut.**~~ **Settled 2026-07-21 — the full chain shipped**, including the
-   terrain mask and the biogenic deposit gates, not atmosphere-only. Original reasoning kept: This doc's earlier recommendation was atmosphere-only. But
-   atmosphere-only produces **no visible difference on the four shipping bodies** — three fail at
-   gate one and the fourth is authored — so it would be invisible against a feature billed as a first
-   impression. *The minimum that produces a visible difference is the biotic terrain mask plus the
-   biogenic deposit gates,* which is already past atmosphere-only.
-2. ~~**The dead-code problem.**~~ **Settled 2026-07-21 (Ben): 'One planet with life is much better for
-   what I'm imagining.'** The unreachable rungs are accepted — the system is meant to read as one
-   living world among dead ones. Original concern kept for the record: At current scope the feature produces **one
-   interesting body**. Cinder, Selene and Pallas all terminate at S1–S3; Kepler is the constrained
-   homeworld. Six of thirteen archetypes and the entire S5–S8 ladder — including the iron/coal
-   antagonism that justifies the model — are unreachable until `world_params::body_count` is
-   activated. *Either the body count grows first, or BL-167 ships scoped down.*
-3. **Resource-list expansion.** Five of the model's chemical chains terminate in resources Io has no
+1. **Resource-list expansion.** Five of the model's chemical chains terminate in resources Io has no
    slot for: limestone, bauxite, salt/potash, phosphate, uranium. **Limestone has the strongest case**
    — it is the flux for iron smelting and the binder for all masonry, and without it the carbonate
    half of the thermostat has nowhere to go. Each addition shifts `resource_count` and every
    `std::array` width in the model.
-4. ~~**Provinces or global scalars.**~~ **Closed — ore provinces landed 2026-08-04 (`613b78a`).**
-   The concern was right: a body-level "1.4× copper" smears evenly and reads as noise, where real ore
-   is province-scale. Tile Pass 6 now seeds `ore_province` records (`provinces_for`, `province_field`
-   in `tile_generation.cpp`) and redistributes a large share of each world's total into 2–3 of them:
-   copper 65%, petroleum 60%, iron 55%, coal 45%.
-
-   One implementation note worth keeping, because the measurement caught it: **conservation is over
-   the resource's *bearing set*, not over all land.** Conserving across land drained petroleum by 47%,
-   since most land bears none of it — the province took its share from tiles that never had any.
-5. ~~**`deposit_scalar` ownership.**~~ **Settled in implementation (marked resolved 2026-07-31):**
-   the levers are **pure post-multiplies** in tile Pass 6, and none draws RNG, so each is bit-exact
-   at its identity value and sparse/lean/standard stays interpretable as a flat tier over whatever
-   the endowment shaped. **There are now three, not two** (updated 2026-08-04): BL-114's
-   `deposit_scalar`, then this pass's per-resource `endowment`, then the **ore-province field**
-   (open call 4). The province multiply is skipped entirely when `pl == nullptr`, which is what
-   keeps the identity contract intact for bodies with no planetology. See `generate_body_tiles`
-   (`tile_generation.cpp`) and `TILE_GENERATION.md` § Post-multiplies. Original concern kept:
-   BL-114's per-body abundance multiplier already exists with the same semantics this pass
-   claims; two independent levers multiplying risked making the tiers uninterpretable.
-6. ~~**Do the four authored bodies become derived?**~~ **Settled — option (a) shipped:** authored
-   inputs, derived outputs, with the old values as regression assertions. 23 of 24 fields reproduce;
-   Cinder's geology is the one divergence. Original options kept: (a) authored inputs / derived outputs, with today's
-   values as regression assertions — cheapest, turns the four bodies into free tests; (b) accept
-   divergence and re-baseline every capture; (c) generate history and endowment only, leave profiles
-   hand-written. *Note the real regression risk:* Selene's `polar_frozen` + `cold` is load-bearing in a
-   documented comment in `band_for_row` (`tile_generation.cpp`), and a naive derivation would
-   classify it temperate.
-7. **Survey-gated or always visible?** `DISCOVERY.md`'s geographic fog means a body starts with only
+2. **Survey-gated or always visible?** `DISCOVERY.md`'s geographic fog means a body starts with only
    type, orbit and grid size known. Gating the timeline behind the survey gives the discovery system a
    real payload and makes the first impression a *sequence* — but the homeworld must show its full
-   history at campaign start, because that is literally the first thing the player sees.
-8. **Report surface.** A Tile/Generation Ledger section (free, already has a body selector, and
-   `GENERATION_LEDGER.md` already designs a "profile echo") versus a dedicated Planetology ledger (a
-   nav-rail slot and the toggle rule, but better framing for a pillar).
-9. ~~**Abiogenesis: preconditions or probability?**~~ **Settled — it became a player dial**
-   (`abiogenesis_ease`), so both positions are reachable per campaign rather than baked in.
-   Original framing kept: Gating on preconditions with near-certain firing
-   makes microbial worlds common; a low probability makes living worlds rare and precious. **This is a
-   pure game-design dial and the doc should label it as one.**
-10. **Fire threshold: hard gate or soft penalty?** A hard gate produces the memorable "green world that
-    cannot burn"; a soft penalty is more forgiving and less legible. It can only ever fire on
-    non-homeworld bodies, since humans need pO₂ ≥ ~0.16 to breathe.
-11. ~~**Whether the homeworld's joint iron/fuel floor is stated or hidden.**~~ **Settled 2026-07-22 —
-    STATED.** The floor is an explicit predicate (homeworld_viability), enforced by reject-and-reroll
-    rather than by a hidden clamp, and the wizard reports the attempt count when it exceeds one.
-    Original reasoning kept: A world with neither fuel
-    nor iron kills the premise at turn one, so *some* joint constraint is needed. **Players forgive a
-    stated constraint and never forgive a discovered one.**
+   history at campaign start, because that is literally the first thing the player sees. The History
+   slot's exploration gate is BL-211 (player-facing history ledger).
+3. **Fire threshold: hard gate or soft penalty?** A hard gate produces the memorable "green world that
+   cannot burn"; a soft penalty is more forgiving and less legible. It can only ever fire on
+   non-homeworld bodies, since humans need pO₂ ≥ ~0.16 to breathe.
+
+Calls that are settled and live in the body of this doc, with their rulings: the full chain
+ships including the terrain mask and the biogenic deposit gates (atmosphere-only would be
+invisible on the prototype bodies); one living world among dead ones is the intended shape
+(Ben, 2026-07-21); ore is province-scale, not a body-level scalar (§ Post-multiplies in
+`TILE_GENERATION.md` — a body-level "1.4× copper" smears evenly and reads as noise); the three
+deposit levers are pure post-multiplies, so the abundance tiers stay interpretable over whatever
+the endowment shaped; the prototype bodies are authored inputs with derived outputs and the old
+values as regression assertions; abiogenesis is a player dial (`abiogenesis_ease`) rather than a
+baked-in probability; the homeworld's joint iron/fuel floor is **stated** — an explicit predicate
+(`homeworld_viability`), enforced by reject-and-reroll, with the wizard reporting the attempt
+count when it exceeds one, because players forgive a stated constraint and never forgive a
+discovered one (Ben, 2026-07-22); and the report surface is the History slot's Story view plus
+the Generation Ledger's profile echo.
 
 ---
 
@@ -1082,52 +999,39 @@ Recorded so nobody later mistakes design choices for derived physics.
   hangs on; whether liquid water is strictly required for mobile-lid tectonics (a modelling
   convenience that reproduces Venus, not an established result); the fire minimum; and the abiogenesis
   probability. **The report screen must not imply more certainty than exists.**
-- ~~**The homeworld corridor's width is unmeasured.**~~ **Measured 2026-08-04.** The point stood —
-  for a seeded generator the measurement *is* part of the deliverable — so it was built:
-  `earthlike_corridor` sweeps each axis (65 steps × 128 seeds), with `earthlike_pairs`,
-  `earthlike_tile_census` and `earthlike_lean_trace` alongside. The corridor is now the *source* of
-  the wizard's `any` bands rather than an open question about them.
-
-  The finding that changed the model: **the sampling bands, not the viability floor, are the
-  specification of Earth.** Ten of the fourteen floor clauses never fire. The floor was doing much
-  less work than it appeared to, and the bands were doing all of it.
 - **The depletion inversion is a design assertion dressed as a finding.** Historically suggestive, but
   the constants are free parameters chosen for tension.
-- **The pass hands nothing to nation or corporation generation — now half-closed (2026-07-30,
-  BL-221 pre-national ladder).** The nation half is closed: `run_history_ladder` consumes the
-  planetology state (`life_stage` peak, `arable_share`, `endemics`) and
-  `nation_params_from_ladder` drives the seed budget from it, so the political map now knows the
-  world has a biography (`NATION_GENERATION.md` § Pass 0). The **corporation half stays open**:
-  corporate focus and asset mix still read nothing from the chain — that connection belongs to
-  BL-210 (oral-history pivot, design-owed).
+- **Corporation generation reads nothing from the chain.** The nation half is connected:
+  `run_history_ladder` consumes the planetology state (`life_stage` peak, `arable_share`,
+  `endemics`) and `nation_params_from_ladder` drives the seed budget from it, so the political map
+  knows the world has a biography (`NATION_GENERATION.md` § Pass 0). Corporate focus and asset mix
+  do not — that connection belongs to BL-210 (oral-history pivot).
 - **Shadow Empire's own cautionary bug is only half-fixed.** Its life→oil rule with no life→ore
   counterweight produces a documented, still-current imbalance ("oil is always abundant to an extreme,
   metal is always extremely rare"). BIF supplies the counterweight — but the BIF window *closes* on
   oxygenation success, so a Cradle homeworld is iron-poorer than a Mat World. Scientifically correct;
-  possibly economically annoying; not yet balance-tested.
+  possibly economically annoying; unmeasured against the economy.
 
 ---
 
 ## Relationship to other docs
 
 - **`TILE_GENERATION.md`** — Planetology's output *is* the `body_profile` input to the six-pass
-  pipeline (derived, no longer authored). It also **adds** a composition mask in Pass 4 and the
+  pipeline. It also **adds** a composition mask in Pass 4 and the
   endowment post-multiply in Pass 6.
 - **`CONTINENTS.md`** — the plate-drift sibling pass between S3 Engine and the tiles; consumes
   `mobile_lid`/`theta`, appends `chain_stage::engine` biography lines (see § Implementation).
 - **`GENERATION_STRATEGY.md`** — records Planetology as the first stage in generation ordering and the
   sibling-pass architecture convention (BL-051).
-- **`RESOURCES.md` / `PRODUCTION.md`** — the endowment mapping above is the seam; § Open calls 3 is a
+- **`RESOURCES.md` / `PRODUCTION.md`** — the endowment mapping above is the seam; § Open calls 1 is a
   potential expansion of the resource list.
-- **[[BL-114]]** — `deposit_scalar` ownership must be reconciled (§ Open calls 5).
-- **[[BL-170]]** — rivers already encode the bulk-transport argument S8 arrives at independently.
-- **[[BL-166]]** / **[[BL-168]]** — habitability and arable share are downstream of S7/S8.
-- **`DISCOVERY.md`** — the survey fog is the natural gate on the planet report (§ Open calls 7).
-- **[[BL-217]]** (§ Checkpoints — branch decisions as a first-class record) — the checkpoint/branch/
-  eligibility-filter foundation this session builds; the S5–S8 mass-extinction retrofit is its first
-  checkpoint class.
-- **[[BL-218]]** — the settlement-stage historical-rupture checkpoint, meant to register as this
-  mechanism's second class without changing BL-217's code.
-- **[[BL-208]]** (world-history-log, design-owed, v0.3.0) — `checkpoint_record`'s append-only,
-  ordered shape is deliberately identical to this future log, so migrating checkpoints into it is a
-  move, not a rewrite, once it lands.
+- **BL-114 (world descriptor)** — `deposit_scalar` is the first of the three Pass 6 post-multiplies.
+- **BL-170 (rivers)** — rivers encode the bulk-transport argument S8 arrives at independently.
+- **BL-166 / BL-168 (habitability, arable share)** — downstream of S7/S8.
+- **`DISCOVERY.md`** — the survey fog is the natural gate on the planet report (§ Open calls 2).
+- **BL-217 (checkpoint branch model)** — § Checkpoints; the S5–S8 mass-extinction retrofit is its
+  first checkpoint class.
+- **BL-218 (settlement rewrite)** — the settlement-stage historical-rupture checkpoint, the
+  mechanism's second class.
+- **BL-208 (world history log)** — `checkpoint_record`'s append-only, ordered shape is
+  deliberately identical to the log's, so migrating checkpoints into it is a move, not a rewrite.
