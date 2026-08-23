@@ -80,9 +80,10 @@ the same float and the same tick. The levy's conservation is asserted by
 `tools/verify/law_author_harness.cpp`; the tariff's by `tools/verify/money_conservation.cpp`,
 which covers it alongside BL-392's procurement flows and against control worlds.
 
-> **The treasury is not serialised and is not covered by `state_hash`.** Nations are hashed
-> nowhere. BL-107 (save format version) must pick this field up; until it does, a treasury
-> divergence is only detectable through the debit half, on corporation balances.
+> **The treasury is serialised (BL-107, 2026-08-22 — `world_save.cpp`'s nation record carries it)
+> but not yet covered by `state_hash`.** Nations are hashed nowhere as of this line; Sprint N3
+> (T8) folds treasuries into the hash only when non-trivial, on the battles precedent. Until that
+> lands, a treasury divergence is only detectable through the debit half, on corporation balances.
 
 ### 3. Law authorship — *one law, seeded, enacted*
 
@@ -236,10 +237,11 @@ Named so the absence is visible rather than discovered. Pattern borrowed from
   pretending otherwise would be dishonest. What the seam owes instead is that *nothing* in the law
   record or effect dispatch assumes an economic subject — the predicate is BL-342's, which already
   carries military subjects. The answer can become yes; it is not yes.
-- **No serialisation.** `nation_component::treasury` and `law::enacting_nation` have no serialiser.
-  Nations and laws are not saved, so a treasury survives nothing (NR-399). There is no game
-  save/load path at all today, so this costs nothing yet — and it is the first thing BL-107 must
-  pick up when there is one.
+- ~~**No serialisation.**~~ **CLOSED 2026-08-22 (BL-107, save format).** `nation_component::treasury`
+  and `law::enacting_nation` both cross the seam: `world_save.cpp` writes and reads the nation record
+  (treasury included) and the law record (author included), and `tools/verify/save_roundtrip.cpp`
+  asserts a law's author survives a round trip. NR-399's "a treasury survives nothing" is history.
+  What remains open is `state_hash` coverage — see § 2 above.
 - **No answerability.** BL-399 (company answerability) owns which law classes the company is
   *subject to* — an embargo it must route procurement around, basing rights it must be granted.
   It is `design-owed`. → **BL-540 (nation→corp stance)** supplies the Access dimension it needs.
