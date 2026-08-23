@@ -534,8 +534,12 @@ cost reaches the men and not only a number. A request naming no live battle, or 
 non-participant, returns false and mutates nothing — the seam rule for an AI-facing boundary.
 
 **The field.** A concluded battle names `field_held_by` — the side that stayed — and is erased at
-the end of the tick. What holding a province *does* is owned by BL-567 (province is the conquest
-unit). Battle state survives a save under BL-536 (world snapshot save).
+the end of the tick. `world::province_holder` is what tracks *who currently holds a province*
+across battles (BL-569, province holder): seeded at generation from the territorial plurality,
+moved by a decisive battle's `field_held_by`, and left untouched by a stalemate. It is deliberately
+narrow — a military fact a contract predicate can read, not a political one: `tile_to_nation` (the
+territorial map) does not follow the holder, so what holding a province does *beyond* that fact is
+still unowned work. Battle state survives a save under BL-536 (world snapshot save).
 
 ### Dispatches and the card
 
