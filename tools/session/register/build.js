@@ -2,11 +2,17 @@
 // build.js — regenerate the design register, the answer form for every OPEN
 // QUESTION across the authority docs (published as an Artifact for Ben to fill in).
 //
-//   node tools/session/register/build.js [out.html]
+//   node tools/session/register/build.js [out.html] [question-set.js]
 //
-// questions.js is the canonical question set: one entry per document, each with
-// its open questions, the evidence behind them, the options, and which option is
-// recommended. Edit THAT, not the HTML — the HTML is generated.
+// A question set is the canonical input: one entry per section, each with its open
+// questions, the evidence behind them, the options, and which option is recommended.
+// Edit THAT, not the HTML — the HTML is generated. Two sets ship:
+//
+//   questions.js     the design register — open calls across the authority docs
+//   review_queue.js  the review-queue form — what survived the 2026-08-23 purge
+//
+// A set exports either a bare array of sections (the original shape) or
+// { meta: {title, eyebrow, lead, blurb, store}, sections: [...] }.
 //
 // The published page is a LIVE DOC: radios and contenteditable fields are captured
 // as edits, so answers reach the watching session. Deliberately no <textarea> and no
@@ -15,7 +21,17 @@
 // Republish to the SAME artifact url to keep answers in place.
 const fs=require('fs');
 const path=require('path');
-const S=require(path.join(__dirname,'questions.js'));
+const setArg=process.argv[3]||'questions.js';
+const raw=require(path.isAbsolute(setArg)?setArg:path.join(__dirname,setArg));
+const S=Array.isArray(raw)?raw:raw.sections;
+const M=Object.assign({
+  title:'Io Design Register',
+  eyebrow:'Project Io &middot; 41 open calls &middot; 22 August 2026',
+  headline:'Every question the documents are still short of an answer on',
+  lead:'Eight authority documents were written this week. Each one ends in questions nobody has made a call on &mdash; and those questions are the point of the documents.',
+  store:'io-design-register-v1',
+  stamp:'Generated from the open questions of 22 August 2026.',
+}, Array.isArray(raw)?{}:(raw.meta||{}));
 const esc=s=>String(s).replace(/&(?!#?\w+;)/g,'&amp;');
 
 let nav='', body='';
@@ -60,7 +76,7 @@ ${opts}
   body += `</section>\n`;
 });
 
-const html=`<title>Io Design Register</title>
+const html=`<title>${M.title}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -175,9 +191,9 @@ i,em{font-style:italic}
 
 <div class="wrap">
   <header class="mast">
-    <p class="mast-eyebrow">Project Io &middot; 41 open calls &middot; 22 August 2026</p>
-    <h1>Every question the documents are still short of an answer on</h1>
-    <p class="lead">Eight authority documents were written this week. Each one ends in questions nobody has made a call on &mdash; and those questions are the point of the documents.</p>
+    <p class="mast-eyebrow">${M.eyebrow}</p>
+    <h1>${M.headline}</h1>
+    <p class="lead">${M.lead}</p>
     <p>Pick an option, or write your own words in the field below it &mdash; your words override the option. Nothing here is binding; the recommendation marks are mine and are meant to be overruled. When you are done, <b>Copy all answers</b> puts everything on the clipboard in one block.</p>
   </header>
 
@@ -193,7 +209,7 @@ ${body}  </main>
   <div class="bar-inner">
     <div class="prog">
       <div class="prog-track"><div class="prog-fill" id="fill"></div></div>
-      <span class="prog-text" id="ptext">0 of 41 answered</span>
+      <span class="prog-text" id="ptext">0 of ${S.reduce((n,x)=>n+x.qs.length,0)} answered</span>
     </div>
     <button class="btn ghost" id="clear" type="button">Clear all</button>
     <button class="btn" id="copy" type="button">Copy all answers</button>
@@ -204,7 +220,7 @@ ${body}  </main>
 <script>
 (function(){
   var SECS=${JSON.stringify(S.map(s=>({doc:s.doc,title:s.title,file:s.file,qs:s.qs.map(q=>({n:q.n,key:s.doc+'-'+q.n,q:q.q.replace(/<[^>]+>/g,''),ids:q.ids}))})))};
-  var LS='io-design-register-v1';
+  var LS=${JSON.stringify(M.store)};
 
   function answered(art){
     var checked=art.querySelectorAll('input:checked').length;
@@ -260,7 +276,7 @@ ${body}  </main>
     }catch(e){}
   }
   function text(){
-    var out=['Project Io - design register answers','Generated from the open questions of 22 August 2026.',''];
+    var out=[${JSON.stringify('Project Io - '+M.title+' answers')},${JSON.stringify(M.stamp)},''];
     SECS.forEach(function(sec){
       var lines=[];
       sec.qs.forEach(function(q){
@@ -309,4 +325,4 @@ ${body}  </main>
 `;
 const out=process.argv[2]||path.join(__dirname,'register.html');
 fs.writeFileSync(out,html);
-console.log('register: '+S.length+' sections, '+S.reduce((n,x)=>n+x.qs.length,0)+' questions -> '+out+' ('+(html.length/1024).toFixed(1)+'KB)');
+console.log(M.title+': '+S.length+' sections, '+S.reduce((n,x)=>n+x.qs.length,0)+' questions -> '+out+' ('+(html.length/1024).toFixed(1)+'KB)');
