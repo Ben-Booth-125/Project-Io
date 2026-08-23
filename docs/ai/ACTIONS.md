@@ -423,9 +423,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The universal de-escalation press — the only one of the four verbs usable from every non-neutral state, and the one that lets a corp exit hostility unilaterally even though it could not enter friendship unilaterally.
 
-### `gameplay.march_unit` — No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam.
+### `gameplay.march_unit` — The unit card's March press in the Selection element (BL-575, unit marker + march UI, landed 2026-08-23 — BL-471 was the placeholder item name; this batch folded it in). Select a unit (its own on-canvas marker, BL-575, or the repeat-click cycle), press March. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card.
 
-**Press.** No press exists. Over the seam: COMMAND corp=<id> verb=21 subject=<unit id> province=<province id>. The command is applied through apply_corp_command, which recomputes every precondition itself — a stale destination or a unit that has since been disbanded is refused, not applied.
+**Press.** Select a unit, press 'March' — this ARMS province-picking mode (the button shows the same accent-ring 'primed' state the building card's Auto press uses; pressing March again while armed CANCELS the pick, per the standing toggle rule), then click a province on the Planetary canvas to send the unit there. A click that misses every province (open ocean, off-body) is ignored and the mode stays armed. Over the seam: COMMAND corp=<id> verb=21 subject=<unit id> province=<province id>. The command is applied through apply_corp_command, which recomputes every precondition itself — a stale destination or a unit that has since been disbanded is refused, not applied.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -446,9 +446,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The only verb that moves a unit. Until it is issued, a hired unit is pinned to its muster tile forever. Two things an agent should weigh. First, movement is not free of the economy: a unit beyond the reach field loses supply_factor_permille each tick in the upkeep pass, which lowers its derived strength in the resolver — marching away from your road network makes an army measurably weaker, not merely further away. Second, ARRIVING NOW HAS A CONSEQUENCE (BL-467, 2026-08-21): standing in a province where a corp you are hostile to also has units opens a battle on the next tick, with no verb issued by anyone. Position is no longer free. And the reverse follows — this verb is REFUSED (rejected_state) for a unit already in contact, because leaving a fight is withdraw_from_battle, which is priced, not a march, which is not.
 
-### `gameplay.halt_unit` — No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam.
+### `gameplay.halt_unit` — The unit card's Halt press in the Selection element (BL-575, unit marker + march UI, landed 2026-08-23). Select a unit, press Halt. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card.
 
-**Press.** No press exists. Over the seam: COMMAND corp=<id> verb=22 subject=<unit id>. No other field is read.
+**Press.** Select a unit, press 'Halt'. Takes effect immediately — no province pick, no confirm popup (unlike Disband). Over the seam: COMMAND corp=<id> verb=22 subject=<unit id>. No other field is read.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -463,9 +463,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** You gave an order you no longer want, and the alternative — waiting for arrival — costs supply every tick out of reach. Note there is no 'resume': halting discards the path, so restarting means a fresh march_unit and a fresh route solve.
 
-### `gameplay.disband_unit` — No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam.
+### `gameplay.disband_unit` — The unit card's Disband press in the Selection element (BL-575, unit marker + march UI, landed 2026-08-23). Select a unit, press Disband, confirm in the popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card.
 
-**Press.** No press exists. Over the seam: COMMAND corp=<id> verb=23 subject=<unit id>. No other field is read.
+**Press.** Select a unit, press 'Disband' to open a confirm popup ('No refund. This cannot be undone.'), then press 'Disband' again to erase the unit or 'Keep' to back out — the same confirm-popup shape as the building card's Dismantle press. Over the seam: COMMAND corp=<id> verb=23 subject=<unit id>. No other field is read.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -723,7 +723,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `target` | `entity` | The entity under the cursor. Overlapping candidates resolve to one entity: the stack building > market > unit > PROVINCE > body is walked most-specific first, the active lens filters validity, and nearest-to-cursor (entity id breaking ties) picks a single stable winner. On the Planetary rung the ground itself resolves to the province containing the hovered tile (BL-511): the tile is still the data grain and the Selection card lists the province member tiles, their terrain and their summed deposits, but it is no longer what a plain click addresses. |
+| `target` | `entity` | The entity under the cursor. Overlapping candidates resolve to one entity: the stack UNIT > building > market > PROVINCE > body is walked most-specific first (BL-575, 2026-08-23, put the unit marker ahead of the building marker — a unit standing on a built tile must be reachable on the FIRST click, matching the repeat-click cycle's own precedence below, not only after cycling past the building), the active lens filters validity, and nearest-to-cursor (entity id breaking ties) picks a single stable winner. On the Planetary rung the ground itself resolves to the province containing the hovered tile (BL-511): the tile is still the data grain and the Selection card lists the province member tiles, their terrain and their summed deposits, but it is no longer what a plain click addresses. A unit marker (BL-575) is drawn once per (province, owner) GROUP at the province's anchor tile — the group's lowest-id unit is what a click on it resolves to; the Selection card is the same unit card either way. |
 
 **Valid when:**
 - The app is in-game (not the main menu or New World wizard).

@@ -46,14 +46,38 @@ enum class overlay_mode
 };
 
 /// A selectable on-canvas marker registered each frame by the Planetary canvas
-/// draw pass. Hit-test priority (highest first): building > market_centre > tile.
+/// draw pass. Hit-test priority (highest first): unit > building > market_centre
+/// > tile. Unit outranks building (BL-575) to match the repeat-click cycle's own
+/// order (battle, unit, province, building, tile — SELECTION.md), so a unit
+/// standing on a built tile is reachable on the FIRST click rather than only
+/// after cycling past the building.
 /// Cleared and rebuilt every frame by body_surface_canvas. See BL-059, BL-031.
 struct marker_hit_zone
 {
-    entity_id id = null_entity; ///< The entity this marker represents (building or market).
+    entity_id id = null_entity; ///< The entity this marker represents (building, market, or — for `kind::unit` — the lowest-id unit in the province/owner group the marker draws).
     enum class kind : uint8_t { building, market_centre, unit } kind = kind::building;
     ImVec2    centre{};         ///< Marker centre in screen pixels (this frame).
     float     radius = 0.0f;   ///< Hit-test radius in screen pixels.
+};
+
+/// One (province, owner) GROUP of units, built each frame for the Planetary
+/// canvas's unit marker (BL-575). Units sharing a province and an owner draw as
+/// ONE marker with a count badge rather than one per unit/tile — the province is
+/// now a unit's command grain (BL-511's march_unit retarget; corp_command.hpp),
+/// exactly as the existing building "+N" stack badge already groups several
+/// buildings sharing one tile.
+struct unit_marker_summary
+{
+    entity_id owner       = null_entity; ///< The corp/nation entity owning this group.
+    entity_id sample_unit = null_entity; ///< Lowest-id unit in the group — the marker's click/hover target (marker_hit_zone::id).
+    int       count       = 0;           ///< Number of unit ENTITIES in the group (not summed manpower).
+
+    /// Contract-committed stub (BL-575, wave 1). Always false — no writer sets
+    /// it true yet. BL-573 (wave 4 of the same batch) adds the real per-unit
+    /// committed flag this will fold from; left here now, with the ring already
+    /// wired to read it in icons::unit_marker, so BL-576 (the contracts ledger)
+    /// needs no further UI plumbing change once that flag exists.
+    bool      committed   = false;
 };
 
 /// Construction (building-placement) interaction state. When `active`, the
@@ -351,6 +375,37 @@ struct ui_state
     /// building rather than its province.
     entity_id selection_cycle_tile  = null_entity;
     int       selection_cycle_stage = 0;
+
+    // --- Unit march / halt / disband (BL-575) ---------------------------
+    // The unit card's three presses. Halt and Disband act on the unit ALREADY
+    // selected and take effect next frame (deferred like every other world
+    // mutation — UI surfaces hold only `const world&`; app::render applies
+    // them and clears the field). March is two-step: the press below only
+    // ARMS the destination pick, it does not move anything by itself.
+
+    /// Set by the unit card's March press. Non-null means the Planetary canvas
+    /// is in province-picking mode for THIS unit: the next left-click on a
+    /// province consumes the click (suppressing ordinary selection, exactly as
+    /// `construction.active` suppresses it for build placement) and fills
+    /// `pending_march_dest_province` instead. app::render dispatches
+    /// `corp_verb::march_unit {subject: pending_march_unit, province:
+    /// pending_march_dest_province}` once both are set, then clears both.
+    entity_id pending_march_unit         = null_entity;
+    /// The province id the canvas wrote on the qualifying click, or `0` while
+    /// nothing has been picked yet — the same "no province" sentinel
+    /// `selected_province` uses (a real province id is never 0, province.hpp).
+    /// Kept distinct from `selected_province`: picking a march destination
+    /// must NOT also change what the Selection element is showing.
+    uint32_t  pending_march_dest_province = 0;
+
+    /// Set by the unit card's Halt press — the unit to clear the movement
+    /// order of. `null_entity` = nothing pending.
+    entity_id pending_halt_unit    = null_entity;
+    /// Set by the unit card's Disband press — the unit to erase outright.
+    /// `null_entity` = nothing pending. No confirm step here; the seam gives
+    /// no refund either way (MILITARY.md § Marching), so a confirm popup, if
+    /// ever wanted, is the unit card's call, not this field's.
+    entity_id pending_disband_unit = null_entity;
 
     /// Spectator mode (BL-409): no human seat. Presentation-side flag only —
     /// `world/*` never reads it; the sim's copy travels as corp_ai_params

@@ -257,6 +257,18 @@ uint64_t world::state_hash(int tick) const
         }
     }
 
+    // Province holder (BL-569). UNLIKE `provinces` itself (generation output,
+    // never folded), this is live state a decisive battle mutates, so it is
+    // folded exactly like tiles/buildings/units above — unconditionally, in
+    // its own stored order, which IS ascending province::id (the positional
+    // alignment with `provinces.provinces` that `seed_province_holders` and
+    // `run_battles` both keep). No sort needed, and no "skip when empty"
+    // guard: unlike battles/nation_budgets there is no prior golden to
+    // protect, since a generated world always seeds this vector.
+    fnv1a_u32(h, static_cast<uint32_t>(province_holder.size()));
+    for (const entity_id holder : province_holder)
+        fnv1a_u32(h, holder);
+
     return h;
 }
 

@@ -101,26 +101,43 @@ supplier"* — is **wrong in the part that matters**, and stating why is what sh
 What genuinely transfers, and is worth having: the command seam, the split-payment pacing, and the
 reputation scalar.
 
-### Where offers come from — the stronger reuse
+### Where offers come from
 
-Offers must be deterministic. The answer is already in the tree.
+> **A contract offer is a want the client nation cannot meet alone.**
 
-`history_sim.cpp` scores four verbs per polity per year, one of which is **campaign** — a pure,
-integer, argmax scorer that decides *which neighbouring province a polity wants and how badly*. It
-also computes the **stall**: a campaign whose arriving force falls short because the objective is
-too far or the defender too strong.
+That framing is the original design and stands; what it runs on does not. `history_sim.cpp`'s
+campaign scorer is an Era −1 year-loop calculation over polity/region data — unreachable from the
+campaign tick and typed on data the campaign world does not carry — so it cannot be the live
+source. The campaign-tick mechanism runs on what IS live:
+[`../politics/NATIONS.md`](../politics/NATIONS.md)'s nation budget pass, whose `contracted_force`
+priority line is the treasury weight a threatened nation cannot spend on its own garrison
+(the budget scorer's threat term). `derive_contract_offers`, called from `run_nation_step` after
+the budget pass, turns that weight into named offers:
 
-> **A contract offer is a campaign the polity wants and cannot win alone.**
+- **Target.** Among provinces held by the nation's highest-grudge neighbour, the border province
+  with the **lowest garrison strength** — deterministic argmin, ties broken by ascending province
+  id. ([`../military/MILITARY.md`](../military/MILITARY.md) § Nation garrisons owns what a garrison
+  and its strength are.)
+- **Fee.** The `contracted_force` line's spendable share is a claim on *that tick's* budget, not a
+  pot — too thin, most ticks, to clear an indivisible offer in one pass. It accumulates instead into
+  a per-offer **`offer_escrow`**, a visible treasury line, until it clears the contract template's
+  minimum fee; the deadline runs from the template, independent of how long the escrow took to
+  fill.
+- **Cadence.** A nation may hold **several offers open concurrently**, one per threatened border
+  province (Ben, 2026-08-23, elicitation), rather than one at a time. Each still expires
+  independently after `offer_ttl_ticks` with no taker, returning its escrow to the treasury.
+  Because more than one offer can be filling at once, a tick's `contracted_force` share is applied
+  to open offers **in issued-tick order** (oldest first) until exhausted, so a younger offer waits
+  behind an older one rather than splitting the share — an offer's fill time reads off its place in
+  the queue, not a fraction of a fraction.
 
-Where the polity's projected force is insufficient but the objective's value is high, it does not
-launch — it **offers the objective as a contract**, at a fee derived from the value it scored.
-Where it can win alone, it campaigns and offers nothing.
+Three things this buys with no new machinery: offers are **deterministic**, because the budget
+scorer already is; **legible**, because the fee tracks a treasury weight the simulation actually
+computed; and the contract market gets a rhythm from the same source as the garrison it will
+fight — a nation threatened enough to garrison a border and unable to fund it alone is exactly a
+nation that offers the province as a contract.
 
-Three things this buys with no new machinery: offers are **deterministic**, because the scorer
-already is; **legible**, because the fee tracks a value the simulation actually computed rather than
-a designer's table; and the contract market gets **a natural rhythm** — offers appear when the
-political map is under tension and dry up when it is settled. **That is a reason for boom and
-drought rather than a spawn timer.**
+*Owner: BL-572 (contract offers).*
 
 ### The four settled answers
 
@@ -165,11 +182,11 @@ reputation a **reach** dimension: standing opens the map, not just the price.
 
 - **The client is a nation with a treasury.** [`../politics/NATIONS.md`](../politics/NATIONS.md)
   settles that a nation holds money and spends it down weighted priority lines; the
-  **contracted-force** line of BL-538 (treasury priority lines) is where a fee comes from.
+  **`contracted_force`** priority line is where a fee comes from (§ Where offers come from, above).
 - **Fees come from the budget, never minted** (Ben, 2026-08-22, design register). A nation cannot
-  offer what it cannot pay, and **offers dry up when treasuries do** — which couples offer generation
-  to BL-537 (national budget) and preserves the conservation rule with no exception. It gives the
-  contract market a second source of rhythm besides political tension: a war-poor nation stops hiring.
+  offer what it cannot pay, and **offers dry up when treasuries do**, preserving the conservation
+  rule with no exception. It gives the contract market a second source of rhythm besides political
+  tension: a war-poor nation stops hiring.
 - **The relationship rides on sentiment's Trust dimension**, not on a parallel axis
   ([`../politics/RELATIONS.md`](../politics/RELATIONS.md) § The settled model). `corp_reputation` is
   a view of the same substrate — so the reputation this loop moves and the Trust a nation reads are
@@ -227,16 +244,19 @@ the player and another *corporation* rather than a polity. Any narrative or dial
 | Procurement serialisation | `src/world/procurement.{hpp,cpp}` |
 | The three procurement verbs | `src/world/corp_command.cpp` |
 | The predicate a contract is made of | `src/world/condition_set.{hpp,cpp}` |
-| The scorer offers come from | `src/world/history_sim.cpp` § campaign |
+| Offer derivation from the nation budget | `src/world/nation_ai.cpp`, `nation_step.cpp` § `derive_contract_offers` |
 
 **Related authorities.** [`MARKETS.md`](MARKETS.md) (the anonymous alternative, and where
 procurement's clearing-side interaction lives), [`../politics/NATIONS.md`](../politics/NATIONS.md)
 (the client and its treasury), [`../politics/RELATIONS.md`](../politics/RELATIONS.md) (reputation,
 and the sentiment substrate it is a view of), [`../META_LAYER.md`](../META_LAYER.md) (the predicate),
-[`../military/MILITARY.md`](../military/MILITARY.md) (the force a contract is won with),
-[`../ui/DISCOVERY.md`](../ui/DISCOVERY.md) (the fog that decides who offers you work).
+[`../military/MILITARY.md`](../military/MILITARY.md) (the force a contract is won with; § Nation
+garrisons is what it fights), [`../ui/DISCOVERY.md`](../ui/DISCOVERY.md) (the fog that decides who
+offers you work).
 
 **Owning items.** BL-377 (mercenary contract seam) — the sell side. BL-350 (procurement seam) — the
 buy side; BL-445 (procurement UI) and BL-446 (scorer procures) its two users. BL-551 (contract
 bidding) — contested offers. BL-391 (reputation floor) and BL-392 (what a contract is worth) — the
-economics. BL-315 (conflict spine) — what a contract puts at stake.
+economics. BL-315 (conflict spine) — what a contract puts at stake. BL-572 (contract offers) — offer
+derivation, target, fee/escrow and cadence. BL-571 (nation garrisons) — the force a contract is won
+against. BL-569 (province holder) — what "held" means for targeting.

@@ -672,6 +672,54 @@ int province_building_ceiling(const world& w, uint32_t province_id);
 int province_buildings_standing(const world& w, uint32_t province_id);
 
 // ---------------------------------------------------------------------------
+// The province holder (BL-569, province holder) — a military fact, not a
+// political one
+// ---------------------------------------------------------------------------
+// `world::province_holder` tracks who currently holds a province ACROSS
+// battles, which `battle_dispatch::field_held_by` (erased with the battle it
+// concluded) cannot: seeded at generation from `tile_to_nation`'s plurality,
+// moved by a decisive battle's `field_held_by` (`run_battles`,
+// battle_system.cpp), left untouched by a stalemate. `no_entity` means "no
+// recorded holder" — a sea province, or a land province no nation's tiles
+// reached a plurality in.
+//
+// Deliberately NARROW: `tile_to_nation` (the territorial map) does NOT follow
+// the holder here — the political map changing hands is unowned work. A held
+// province is a fact `condition_subject::province_held` (BL-570) reads.
+//
+// TIES BREAK ON ASCENDING NATION ENTITY ID, the codebase's standing
+// convention (province.hpp's own id derivation, the terrain argmax in
+// MILITARY.md, etc.) — never on container order.
+// ---------------------------------------------------------------------------
+
+/// Seed `w.province_holder` from `w.tile_to_nation`'s plurality over each land
+/// province's tiles, called from `build_province_partition`'s CALLER once the
+/// partition and every tile's nation assignment both exist.
+///
+/// One entity_id per province, POSITIONALLY ALIGNED with
+/// `w.provinces.provinces` (ascending `province::id` order) — NOT indexed by
+/// the raw id, which is a derived tile id and not compact. `no_entity` for a
+/// non-land province (coastal water, open ocean) and for a land province none
+/// of whose tiles carry a `tile_to_nation` entry.
+///
+/// DETERMINISTIC: `province::tiles` is already ascending entity id (the
+/// partition's own contract), and the tally is walked in that order into an
+/// ordered `std::map` keyed on nation id, so the plurality winner — and its
+/// ascending-id tie-break — does not depend on any unordered container's
+/// layout.
+///
+/// @param w World whose `provinces` partition is already built and whose
+///          `tile_to_nation` is already populated; `province_holder` is
+///          replaced.
+void seed_province_holders(world& w);
+
+/// The current holder of the province with id @p province_id, or `null_entity`
+/// if there is no such province or no holder is recorded. O(log n): binary
+/// search for the province (mirroring `province_partition::find`), then a
+/// positional lookup into `w.province_holder`.
+entity_id province_holder_for(const world& w, uint32_t province_id);
+
+// ---------------------------------------------------------------------------
 // Serialisation — the trailing section of the world's flat-binary stream
 // ---------------------------------------------------------------------------
 // The history log (history_log.{hpp,cpp}) is the project's flat-binary seam.

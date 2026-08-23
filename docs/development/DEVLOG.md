@@ -10,6 +10,53 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — Sprint 16 Batch Delivery opens: BL-571/BL-572 ratified, the batch planned, Wave 1 lands (BL-569, BL-575) (2026-08-23, latest)
+
+**Runtime:** ~3 h wall-clock, mode Design then Full (Batch Delivery). Two worktree agents in
+Wave 1 (general-purpose for BL-569, ui-dev for BL-575), run concurrently.
+
+**Design ratification.** Ben ruled the BL-571/BL-572 elicitation forks: garrisons seed at the
+capital plus threatened borders, treasury-scaled; garrison upkeep is a `military_research`
+budget claim; contract offers target the weakest border province against the highest-grudge
+neighbour; and — overriding the proposed one-at-a-time shape — a nation may hold **several
+offers open concurrently**. Ratified into `MILITARY.md` § Nation garrisons and `CONTRACTS.md`
+§ Where offers come from (the latter rewritten off a stale history_sim claim onto the live
+nation-budget mechanism). The concurrent-offer tick-share split (oldest-issued-first) was a
+call taken on Ben's behalf — NR-576. Commit `28ecf209`.
+
+**Batch planning.** All ten Sprint 16 items promoted into `REFINED.md` as a six-wave dependency
+plan (an item's `requires` chain), each with an item-spanning requirement in
+`requirements.json` (batch `2026-08-23-sprint-16-mercenary-slice`). Commit `a2d73c4c`.
+
+**Wave 1 build.** BL-569 (province holder) and BL-575 (unit marker + march UI) — no
+dependencies, disjoint files — built concurrently in worktrees, merged, integrating-built, and
+independently re-verified (standing rule: never trust an agent's self-report). The
+re-verification found and fixed real fallout from BL-569's save-version bump (3→4): a
+`save_roundtrip.cpp` static_assert pinned to the old version, and `spectator_determinism`'s
+pinned state_hash golden (re-blessed with dated provenance, matching three prior legitimate
+moves already recorded in that file). Four other suite failures (`ai_skill_harness`,
+`tier_margin`, `nation_scorer_harness`, `history_conquest_gap`) are pre-existing and unrelated
+— confirmed by content (economic-balance/iteration-order/timeout, no reference to anything
+Wave 1 touched) and by `tier_margin` matching the already-archived BL-436 finding. Commit
+`e9c2c5ac`.
+
+**Live-click pass (BL-575).** Opened the built app, selected the starting unit, armed March,
+and clicked a confirmed-different province — the mode disarmed without falling through to
+normal selection, strong evidence the command dispatched; `corp_command.cpp`'s march_unit case
+reads correct on inspection and `unit_march_harness` independently passes. Did not confirm the
+unit's marker visibly moving — this build's economy/march tick is quarterly-cadence, only one
+quarter boundary elapsed during the pass, and relocating the marker afterward on an unfamiliar
+generated world proved impractical in the time spent. Recorded as NR-577, not a blocker.
+
+**One real design call surfaced in passing:** BL-575's marker hit-testing now ranks unit above
+building (previously building > market_centre only) — justified against `SELECTION.md`'s own
+repeat-click cycle, where Soldier already precedes Building. Ratified into that doc.
+
+Both items flipped `complete`, design prose archived, `REFINED.md` Wave 1 drained. Waves 2–6
+(BL-570 onward) are next, strictly sequential.
+
+---
+
 ## Session — The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575) (2026-08-23, latest)
 
 **Runtime:** ~2.5 h wall-clock, mode Corpus then Design. Fan-out: 11 doc-sweep agents in place

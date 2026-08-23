@@ -638,6 +638,29 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
                                 : (b.state.attacker_strength_permille
                                        > b.state.defender_strength_permille ? b.attacker
                                                                             : b.defender);
+
+            // BL-569 (province holder): a DECISIVE close moves the holder to
+            // whoever field_held_by already names — every ending except
+            // stalemate, mirroring MILITARY.md's "moved by a decisive
+            // battle's field_held_by, left untouched by a stalemate". Read
+            // straight off the dispatch's own field so the record and the
+            // holder can never disagree about who won. Reuses
+            // `province_partition::find` (province.hpp) to translate the
+            // province id into `province_holder`'s positional index; a world
+            // whose holder vector was never seeded (empty, or a fixture that
+            // skipped generation) is left untouched rather than indexed
+            // out of bounds.
+            if (b.state.end != campaign_battle_end::in_progress
+                && b.state.end != campaign_battle_end::stalemate)
+            {
+                if (const province* pr = w.provinces.find(b.province))
+                {
+                    const auto idx = static_cast<std::size_t>(pr - w.provinces.provinces.data());
+                    if (idx < w.province_holder.size())
+                        w.province_holder[idx] = d.field_held_by;
+                }
+            }
+
             out.dispatches.push_back(d);
         }
     }

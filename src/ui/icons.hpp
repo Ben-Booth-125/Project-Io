@@ -342,6 +342,24 @@ void readout(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour of both outlines.
 void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw a unit marker — a humanoid silhouette (a filled circle "head" over a
+/// triangle "body") in @p fill, with the standard dark outline — in @p fill.
+/// Echoes `glyph_soldier`, the unit card's left-column placeholder
+/// (`selection_panel.cpp`), so the canvas marker and the card read as the same
+/// vocabulary; distinct from every building silhouette (diamond/square/
+/// triangle/hexagon/shield) and from the market circle+cross.
+///
+/// @param dl        Draw list to render into.
+/// @param centre    Marker centre, screen pixels.
+/// @param r         Half-extent (radius) of the glyph, screen pixels.
+/// @param fill      Fill colour — the owning corp/nation's identity colour.
+/// @param committed BL-575 stub: when true, draws an additional outer ring
+///                  marking a contract-committed unit. No writer sets this
+///                  true yet (BL-573, a later wave of the same batch, adds
+///                  the real per-unit flag) — the ring is wired now so that
+///                  landing needs no further change here.
+void unit_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, bool committed);
+
 /// Draw a market-centre marker — a small circle with a centred cross (+) — in
 /// @p colour. Distinct from the building square/diamond/triangle glyphs.
 /// Used as an on-canvas selectable marker for market entities
