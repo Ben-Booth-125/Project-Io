@@ -160,12 +160,13 @@ int main()
             // same record would shift with it. The whole stream is refused
             // instead -- a v4 save is not migrated, it is rejected, and the
             // destination is not touched.
-            static_assert(world_save_version == 6,
-                          "P9/P10 name v4/v5 as refused predecessors; re-read these rows on a bump");
+            static_assert(world_save_version == 7,
+                          "P9/P10/P11 name v4/v5/v6 as refused predecessors; re-read these rows "
+                          "on a bump");
             std::string bad = bytes_once;
             const uint32_t v4 = 4;
             std::memcpy(&bad[4], &v4, sizeof v4);
-            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v6)");
+            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v7)");
         }
         {
             // Sprint 16, BL-571: the IMMEDIATE previous format (BL-570's v5,
@@ -179,7 +180,20 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v5 = 5;
             std::memcpy(&bad[4], &v5, sizeof v5);
-            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused (format is v6)");
+            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused (format is v7)");
+        }
+        {
+            // Sprint 16, BL-572: the IMMEDIATE previous format (BL-571's v6,
+            // the version this batch released before BL-572 bumped again). A
+            // v6 stream simply ENDS where the offers/next_offer_id trailing
+            // section now continues -- not a mid-record misalignment like
+            // P10's, but the read still must not accept a stream that is
+            // shorter than the reader now expects. Refused whole, same
+            // contract as every prior bump.
+            std::string bad = bytes_once;
+            const uint32_t v6 = 6;
+            std::memcpy(&bad[4], &v6, sizeof v6);
+            check(!from_bytes(bad, victim), "P11 a v6-versioned stream is refused (format is v7)");
         }
         {
             // Truncated mid-way through the tile store -- far enough in that a
@@ -198,6 +212,8 @@ int main()
         check(victim.nations.empty() && victim.nation_budgets.empty()
                   && victim.province_holder.empty(),
               "P9 the v4 refusal left nations, nation_budgets and province_holder untouched");
+        check(victim.mercenary_offers.empty() && victim.next_offer_id == 1,
+              "P11 every rejected load left mercenary_offers and its id counter untouched");
     }
 
     // -----------------------------------------------------------------------
@@ -411,6 +427,7 @@ int main()
             { "history_log", w.history_log.size(), loaded.history_log.size() },
             { "provinces", w.provinces.provinces.size(), loaded.provinces.provinces.size() },
             { "provinces.tile_province", w.provinces.tile_province.size(), loaded.provinces.tile_province.size() },
+            { "mercenary_offers", w.mercenary_offers.size(), loaded.mercenary_offers.size() },
         };
 
         bool all_match = true;
@@ -442,7 +459,8 @@ int main()
         check(loaded.next_entity_id() == w.next_entity_id()
                   && loaded.next_convoy_id == w.next_convoy_id
                   && loaded.next_order_id == w.next_order_id
-                  && loaded.next_procurement_id == w.next_procurement_id,
+                  && loaded.next_procurement_id == w.next_procurement_id
+                  && loaded.next_offer_id == w.next_offer_id,
               "P7 every id counter survives, allocator cursor included");
         check(loaded.belt.inner_radius_au == w.belt.inner_radius_au
                   && loaded.belt.outer_radius_au == w.belt.outer_radius_au,
@@ -456,6 +474,13 @@ int main()
         // why it is named here.
         check(w.nation_budgets.empty() && loaded.nation_budgets.empty(),
               "P9 an EMPTY nation_budgets map round-trips as empty (the inertness state)");
+
+        // BL-572: the same inertness proof one line over -- a generated world
+        // has never funded a contracted_force share (NR-580: every nation's
+        // treasury starts at 0.0), so derive_contract_offers has never run
+        // against a live one, and this vector must be empty on both sides.
+        check(w.mercenary_offers.empty() && loaded.mercenary_offers.empty(),
+              "P11 an EMPTY mercenary_offers vector round-trips as empty (the inertness state)");
     }
 
     // -----------------------------------------------------------------------
@@ -501,6 +526,20 @@ int main()
         nb2.reserve_fraction = 0.875f;
         f.nation_budgets[n1] = nb1;
         f.nation_budgets[n2] = nb2;
+
+        // BL-572: two offers from DIFFERENT clients, DISTINCT in every field --
+        // a reader that swapped two same-typed members (target_province and
+        // deadline are both plausible mixups; both are ints in the stream)
+        // would show here. One offer's escrow already clears its fee (the
+        // "ready to accept, nobody has yet" state); the other is still
+        // filling, so both live shapes round-trip, not just one.
+        f.mercenary_offers.push_back({ /*id*/ 12, /*client*/ n1, /*target_province*/ 4001,
+                                       /*template_index*/ 0, /*fee*/ 400.0f, /*deadline*/ 999,
+                                       /*issued_tick*/ 10, /*offer_escrow*/ 400.0f });
+        f.mercenary_offers.push_back({ /*id*/ 13, /*client*/ n2, /*target_province*/ 4002,
+                                       /*template_index*/ 1, /*fee*/ 500.0f, /*deadline*/ 1080,
+                                       /*issued_tick*/ 20, /*offer_escrow*/ 125.5f });
+        f.next_offer_id = 14;
 
         convoy_component cv;
         cv.source_market = 101; cv.dest_market = 202; cv.mode = convoy_mode::sea;
@@ -630,6 +669,25 @@ int main()
             check(budgets_exact,
                   "P9 nation_budgets round-trips exactly: nine weights + reserve for two "
                   "nations, the non-dyadic 0.3f included");
+
+            // BL-572: both offers, field by field -- including the fully-
+            // funded one (offer_escrow == fee) so a reader that clamped or
+            // re-derived escrow instead of storing it would show here.
+            check(back.mercenary_offers.size() == 2 && back.next_offer_id == 14,
+                  "P11 both mercenary_offers survive, allocator cursor included");
+            if (back.mercenary_offers.size() == 2)
+            {
+                const mercenary_offer& r1 = back.mercenary_offers[0];
+                const mercenary_offer& r2 = back.mercenary_offers[1];
+                check(r1.id == 12 && r1.client == n1 && r1.target_province == 4001
+                          && r1.template_index == 0 && r1.fee == 400.0f && r1.deadline == 999
+                          && r1.issued_tick == 10 && r1.offer_escrow == 400.0f,
+                      "P11 a fully-funded offer round-trips exactly");
+                check(r2.id == 13 && r2.client == n2 && r2.target_province == 4002
+                          && r2.template_index == 1 && r2.fee == 500.0f && r2.deadline == 1080
+                          && r2.issued_tick == 20 && r2.offer_escrow == 125.5f,
+                      "P11 a still-filling offer round-trips exactly, escrow < fee included");
+            }
         }
     }
 

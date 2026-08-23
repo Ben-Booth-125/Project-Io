@@ -396,6 +396,30 @@ bool r_contract(std::istream& i, procurement_contract& c)
         && r_i32(i, c.ticks_elapsed) && r_f32(i, c.deposit_paid) && r_f32(i, c.freight_cost);
 }
 
+/// BL-572: a mercenary contract offer. Rejects a non-finite `fee`/`offer_escrow`
+/// on the same grounds `r_nation_budget` does — the writer below cannot have
+/// produced one, so the stream is corrupt rather than odd.
+void w_offer(std::ostream& o, const mercenary_offer& m)
+{
+    w_u32(o, m.id);
+    w_id(o, m.client);
+    w_u32(o, m.target_province);
+    w_int(o, m.template_index);
+    w_f32(o, m.fee);
+    w_int(o, m.deadline);
+    w_int(o, m.issued_tick);
+    w_f32(o, m.offer_escrow);
+}
+
+bool r_offer(std::istream& i, mercenary_offer& m)
+{
+    if (!(r_u32(i, m.id) && r_id(i, m.client) && r_u32(i, m.target_province)
+          && r_int(i, m.template_index) && r_f32(i, m.fee) && r_int(i, m.deadline)
+          && r_int(i, m.issued_tick) && r_f32(i, m.offer_escrow)))
+        return false;
+    return std::isfinite(m.fee) && std::isfinite(m.offer_escrow);
+}
+
 void w_condition(std::ostream& o, const condition& c)
 {
     w_enum(o, c.subject);
@@ -767,6 +791,16 @@ void write_world_snapshot(const world& w, std::ostream& out)
     // it only reads a "clean end of stream" as the pre-BL-466 case, and there
     // is a well-formed section here, so that path is not the one taken.
     w_ids(out, w.province_holder);
+
+    // --- open mercenary-contract offers (BL-572), the v7 trailing section ---
+    // Same shape as province_holder above: live tick state, not generation
+    // output, so it gets its own section rather than riding inside any
+    // magic-guarded embedded stream. The allocator cursor travels with it,
+    // exactly like `next_convoy_id`/`next_order_id`/`next_procurement_id` do
+    // near the top of this function — a load that reset it to 1 would mint an
+    // id a live offer already holds.
+    w_u32(out, w.next_offer_id);
+    w_vec(out, w.mercenary_offers, w_offer);
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -924,6 +958,12 @@ bool read_world_snapshot(world& w, std::istream& in)
     // safe against that.
     if (!r_ids(in, s.province_holder))
         return false;
+
+    // BL-572: open mercenary-contract offers, format v7's trailing section.
+    uint32_t next_offer = 1;
+    if (!(r_u32(in, next_offer) && r_vec(in, s.mercenary_offers, r_offer)))
+        return false;
+    s.next_offer_id = next_offer;
 
     clear_derived_state(s);
     w = std::move(s); // replace only on full success

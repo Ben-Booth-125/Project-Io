@@ -111,6 +111,68 @@ struct world_history_entry
     std::string   consequence;              ///< Right column — what it left behind (may be empty).
 };
 
+// ---------------------------------------------------------------------------
+// mercenary_offer (BL-572) — a want the client nation cannot meet alone
+// ---------------------------------------------------------------------------
+// docs/economy/CONTRACTS.md § Where offers come from: `derive_contract_offers`
+// (nation_step.cpp), called from `run_nation_step` after the budget pass, turns
+// the `contracted_force` priority line's spendable share into named offers like
+// this one. Held in `world::mercenary_offers` — a VECTOR, because offers are
+// CONCURRENT: a nation may hold several open at once, one per threatened border
+// province, each filling independently.
+//
+// The province a `mercenary_contract`'s (BL-573) predicate is bound to is not
+// authored in a `contract_template` (contract_template.hpp's own comment) —
+// it is bound HERE, once, at offer derivation, so the same "take" row serves
+// every province any client ever offers.
+struct mercenary_offer
+{
+    /// Stable handle, allocated by `world::allocate_offer_id()`. Nonzero on any
+    /// offer that has been issued. Same "stable across a sibling's erase, unlike
+    /// a vector index" contract as `sell_order::id`.
+    uint32_t id = 0;
+
+    /// The nation whose budget funds this offer — CONTRACTS.md's "client".
+    entity_id client = null_entity;
+
+    /// The province this offer's eventual contract is FOR — the weakest border
+    /// province of `client`'s highest-grudge neighbour at the tick this offer
+    /// was issued (CONTRACTS.md § Where offers come from, "Which province").
+    uint32_t target_province = 0;
+
+    /// Index into `contract_template_registry` naming the kind of work this is
+    /// ("take", "hold", ...) — see contract_template.hpp. A plain int, not a
+    /// live lookup: `world/*` stays Lua-free, and the registry's Lua-backed
+    /// loader (contract_template.cpp) is excluded from that superset's build
+    /// for exactly that reason, the same separation recipe_registry.cpp draws.
+    int template_index = 0;
+
+    /// The fee this offer's escrow must clear before the contract it names is
+    /// postable — CONTRACTS.md's "the contract template's minimum fee". Fixed
+    /// at issuance; escrow fills toward it over however many ticks it takes
+    /// (§ Fee: "a claim on that tick's budget, not a pot").
+    float fee = 0.0f;
+
+    /// The econ tick the eventual contract's own deadline runs to, computed
+    /// ONCE at issuance from the template's `deadline_ticks` — "the deadline
+    /// runs from the template, independent of how long the escrow took to
+    /// fill" (CONTRACTS.md § Fee). NOT the offer's own expiry — see
+    /// `contract_offer_params::offer_ttl_ticks` (nation_step.hpp) for that.
+    int deadline = 0;
+
+    /// The econ tick this offer was created. The queue key for "oldest-issued-
+    /// first" funding (CONTRACTS.md § Cadence) and the base `offer_ttl_ticks`
+    /// counts an unanswered offer's expiry from.
+    int issued_tick = 0;
+
+    /// Credits accumulated toward `fee` so far — CONTRACTS.md's "a per-offer
+    /// `offer_escrow`, a visible treasury line". Whole-or-nothing per offer
+    /// (NR-568's earmark ruling, the same rule `line_takes_subject` names):
+    /// this never exceeds `fee`, and a partially-filled offer commits nobody
+    /// to anything until it clears.
+    float offer_escrow = 0.0f;
+};
+
 /// ECS registry. Entities are plain integer IDs; components are stored in
 /// per-type maps. The registry owns all component data for the lifetime of
 /// the simulation.
@@ -522,6 +584,21 @@ struct world
     /// contract as `next_order_id`).
     uint32_t next_procurement_id = 1;
     uint32_t allocate_procurement_id() { return next_procurement_id++; }
+
+    /// Open mercenary-contract offers (BL-572) — see `mercenary_offer`'s own
+    /// comment. A VECTOR, not a map: offers are concurrent and unordered by
+    /// anything but `issued_tick`/`id`, which `derive_contract_offers`
+    /// (nation_step.cpp) sorts by itself when it needs the funding queue.
+    /// EMPTY IN EVERY GENERATED WORLD — the inertness proof for this pass, the
+    /// same shape `world::nation_budgets` carries for the budget pass it rides
+    /// on: a world where no nation has ever been scored funds no offer either.
+    std::vector<mercenary_offer> mercenary_offers;
+
+    /// Next stable offer handle. Same "stable across a sibling's erase, unlike
+    /// a vector index" contract as `next_order_id` — a TTL expiry erases from
+    /// the middle of `mercenary_offers`, so an id must not come back.
+    uint32_t next_offer_id = 1;
+    uint32_t allocate_offer_id() { return next_offer_id++; }
 
     /// A supplier's standing embargo predicate (BL-350's Q2, the law/embargo
     /// decline condition) — keyed by the SUPPLIER corp; `request_quote`
