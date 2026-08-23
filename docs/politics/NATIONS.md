@@ -193,9 +193,33 @@ economic premise already assumes nations that act.
 Named so the absence is visible rather than discovered. Pattern borrowed from
 `docs/military/MILITARY.md` § What is absent.
 
-- **No nation actor.** There is no `nation_ai`, no `nation_verb`, no `nation_command` — a grep of
-  `src/` returns nothing for all three. The grant above is a permission nobody has used. A nation
-  decides nothing, ever, on any tick. → **BL-542 (nation scorer)** is the first use of it.
+- **A nation now has an opinion, and still no way to act on it (BL-542, landed 2026-08-23).**
+  `src/world/nation_ai.{hpp,cpp}` is the first use anyone has made of the 2026-08-18 grant. It
+  answers § Settled 5 — a nation's objective is **positional, not accumulative** — as a pure,
+  seeded, deterministic scorer over three terms in a fixed order: **niche fit** (complement what
+  the neighbours lack, read as output SHARES so a nation never scores by producing the most),
+  **conflict avoidance** (a negative term on expected war cost, read from force standing across
+  its own border and `stance.hpp`'s pair-state), and **grudges**, which bias the first two
+  multiplicatively and per-neighbour and contribute to no line of their own. It walks ~43 nations
+  on the `corp_ai` staggered cadence, keyed on the index into the **sorted** nation set, and its
+  horizon is strictly terrestrial: tile-edge neighbours, markets on its own bodies, force on its
+  own border. Every constant lives in `nation_ai_params`. Verified by
+  `tools/verify/nation_scorer_harness.cpp` (requirement group `nation-scorer`, R1–R8), whose rows
+  were each confirmed by mutating the thing they guard.
+
+  What is still absent is the **verb**. There is no `nation_verb` and no `nation_command`; the
+  scorer emits a `nation_budget` weight vector and **nothing in the shipped tick calls it**, so a
+  world runs bit-identical to the build before it. A nation still decides nothing on any tick that
+  anyone can observe — it now has an opinion nobody asks for. → wiring it into the economy tick,
+  and giving `run_national_budget` its author in place of a parameter, is the next step.
+
+  Two smaller debts it carries. The **grudge is a substitute**: NATIONS.md § Settled 4 puts the
+  real Era −1 pair outcomes behind **BL-541 (directional tariffs)**, and until they exist the
+  grudge is derived from the residue that does survive generation — contested border length plus
+  the pair's `expansionism` posture — in one function, `grudge_from_border`, so swapping the input
+  moves nothing else. And it deliberately does **not** read `ideology`, whose enumerator comments
+  already read as pair sentiment, because **BL-545 (sentiment substrate)** owns that and a second
+  sentiment model a week before it lands would be the fork this document exists to prevent.
 - **No spend side.** The treasury only ever rises. Nothing anywhere debits it, so a nation's
   balance is currently a scoreboard with no game attached. → **BL-537 (national budget)**,
   **BL-538 (treasury priority lines)**.
@@ -353,7 +377,9 @@ A well-played nation in Io mostly **stays out of fights**. That is unusual for a
 is much of the point — nations avoiding each other leaves the Conflict pillar to the companies,
 which is where the player lives.
 
-*Owned by BL-542 (nation scorer). It is the first use anyone has made of the 2026-08-18 grant.*
+*Owned by BL-542 (nation scorer). It is the first use anyone has made of the 2026-08-18 grant, and
+it landed 2026-08-23 as `src/world/nation_ai.{hpp,cpp}` — scorer only, called by nothing. See
+§ What is absent for what it does and what it still owes.*
 
 ### 6. A nation's stance toward a corporation — **graded, multi-dimensional, derived**
 

@@ -612,6 +612,35 @@ in `tools/verify/README.md`.
   low bit. Verified by mutation: without the sort, R6d–R6f fail. Links `world.cpp`, `sentiment.cpp`,
   `stance.cpp`. 41 assertions.
 
+- **`nation_scorer_harness`** — What a nation CARES ABOUT (BL-542, the requirement group
+  `nation-scorer`). `run_national_budget` consumes a weight vector and nothing authored one;
+  `src/world/nation_ai.{hpp,cpp}` authors it, and this is the check on the three terms — **niche
+  fit**, **conflict avoidance**, and **grudges that bias the first two and target nothing**.
+  Because it is the first use anyone has made of the 2026-08-18 nation grant, the rows that
+  matter most are the grant's own terms: R1 asserts the sweep is pure and produces bit-identical
+  weights across 11 distinct `w.units` walk orders and a reordered `w.nations`; R2 asserts the
+  cadence is an index over the **sorted** nation set, so a nation admitted with the highest id
+  shifts nobody's slot; R6 asserts the **terrestrial horizon** — a nation sharing no border is
+  outside it, each row paired with a control proving the same mutation on a real neighbour DOES
+  move the subject.
+
+  **Read R7 before trusting a green run.** It is the anti-vacuity block, and it earned its place
+  twice while this harness was being written: the border-force table was six units, whose sums
+  agree across almost every ordering, so the unit sort could be deleted with the suite still at
+  100%; and the scale-invariance row used an abundance mass that drove the mutant straight onto
+  its clamp, so it passed while the property was broken. R7 now asserts the fixture really
+  constrains the code — the terms sit strictly inside (0, 1), two nations differ, and the float
+  sum R1 guards is order-sensitive under two reorderings. **Every row was confirmed by mutation**
+  (14 of them: the sorts deleted, the share normalisation removed, the `lack` sign flipped, the
+  hostility read dropped, the deterrence divisor dropped, the grudge made additive and then given
+  a line of its own, the horizon widened to every nation, purity broken with a `const_cast`).
+
+  Nothing in the shipped tick calls the scorer, so this harness is the only caller and a world
+  runs bit-identical without it. **Run it under ASan/UBSan as well as plain** — the raster walk
+  and the six-side neighbour probe index raw vectors, and a wrap or bounds slip there is
+  invisible to a value assertion:
+  `g++ -std=c++20 -O0 -g -fsanitize=address,undefined -Isrc tools/verify/nation_scorer_harness.cpp ...`.
+
 ## Running the whole suite (CTest — BL-104)
 
 As of BL-104 every `tools/verify/*.cpp` is a registered CTest test, so the whole logic tier runs
