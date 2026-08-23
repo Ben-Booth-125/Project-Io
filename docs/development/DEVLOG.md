@@ -10,7 +10,90 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Ownership separates from identity: the syndicate tier (BL-524–BL-530, NR-491–NR-497) (2026-08-21, latest)
+## Session — Housekeeping, and the nation spines go live (BL-568, Sprint N3 slice 1; NR-566–NR-572) (2026-08-23, latest)
+
+Full mode. Opened as branch housekeeping, became a phantom-feature triage and a
+Sprint N3 delivery. Runtime ~4h (estimate); one understand-workflow (13 agents),
+three worktree build-agents, one main-session integration.
+
+**Housekeeping first.** Fast-forwarded `main` 45 commits to `origin/main`, deleted
+41 merged local branches and 61 merged remote branches, and pruned five merged
+agent worktrees. Two unmerged branches carried real work and were reconciled onto
+main: `quirky-fermat` (seven bug reports + Ben's rulings) and `bl-519-520`
+(Sprint 28 findings). Both had minted ids that collided with main's — renumbered
+BL-537–545 → BL-559–567 and NR-491–493 / NR-510–513 into free ranges, splicing
+by id rather than by text so nothing else moved.
+
+**The Sprint 28 T3 fix was NOT landed (NR-566).** `bl-519-520` carried a
+settle-feasibility gate whose "byte-identical at production params" claim predated
+BL-462's fixture correction. Re-measured on the corrected `history_conquest_gap`
+it moves every production seed and raises the silent-world count 1/8 → 3/8; parked
+on `feat/sprint28-settle-feasibility` for measurement alongside the weighting call
+(NR-565), not merged inside a housekeeping pass.
+
+**Phantom-feature triage.** Ben's read was right: the 08-22/08-23 commits authored
+invisible features. The national budget (BL-537) and nation scorer (BL-542) were
+built and green in isolation but **nothing in the tick called them**, and sentiment
+decayed at an authored zero. The design layer already knew — BL-555/BL-558/BL-556
+are the v0.1.25 surfaces it filed for exactly this. Recommended order: wire the
+spines live first, then draw them.
+
+**BL-568 — half the rivals never acted (`3a1aa21f`).** Scoping surfaced a real bug.
+corp_ai's cadence was keyed on `world::current_day_tick`, which is `90n` at every
+quarter boundary; `90n mod 4 ∈ {0,2}`, so rivals at sorted index 1 or 3 (mod 4)
+**never evaluated in a played game**, while every harness and `--serve` loop passed
+`1..N` and rotated all four slots — the suite certified a schedule the game never
+ran. Fixed by mirroring a per-campaign econ counter onto `world::current_econ_tick`
+(set by every driver beside the day tick) and keying the cadence on it.
+`tools/verify/cadence_schedule.cpp` guards it, mutation-checked (4 of 7 rivals go
+dark on the old key). Landed first, its own commit.
+
+**Sprint N3 slice 1 — the wiring (`f5d68ff1`).** Three worktree agents, disjoint
+by the collision map: S1 (`world::nation_budgets` + save v3 + `nation_ai` registry
+home), S2 (`budget_transfer` record, earmarked-claim rule 3a, the corp_ai claim
+producer), S3 (sentiment decay authored at a nine-quarter half-life, loader guard,
+stale comments). Integration in the main session: `run_nation_step`
+(`nation_step.{hpp,cpp}`) scores due nations → overwrites the weight map →
+`run_national_budget` → **dispatches each earmarked survey** (credit in, survey
+cost out, same tick, per Ben's NR-568 ruling; clawed back if dispatch fails).
+Wired into all three drivers after `apply_budget`, before the tech gates.
+`state_hash` folds treasuries + the weight map only when non-trivial, so every
+zero-nation fixture is byte-identical — spectator determinism's unspectated hash
+is unchanged (`A330346EFCEE78AA`, same before and after; its golden mismatch is
+the pre-existing NR-452 staleness).
+
+**The finding, measured not rigged — NR-572 (blocker).** `nation_wiring.cpp`
+proves the loop closes on a funded fixture (R1–R5: paid + dispatched same tick,
+conservation, inertness at zero treasury, replay determinism through the fold).
+But at the scorer's own ~1.3% exploration weight it does **not** close in a played
+game: an indivisible survey earmark (Ben's whole-or-nothing rule) cannot be met
+from a thin line's single-tick share (~89k cr treasury needed per cheapest
+survey), and the default world enacts no levy so treasuries are 0. The harness
+measures and prints the shortfall rather than seeding a treasury to force green.
+Options A–E filed; recommendation D (wire nation income first) then A (earmark
+lines accumulate). R9 stays pending Ben's ruling.
+
+**Ruling calls delegated (NR-568):** exploration credit is earmarked (not a
+fungible top-up), claim is the full survey cost, sentiment forgets a cancellation
+in 9 quarters, contracted force is slice 2. Delegated on the map's recommendation
+(NR-569): weight map on `world`, conditional hash fold, player corp not funded
+this cut, national pass runs under spectating.
+
+**Verification.** `nation_budget_harness` 49/49, `nation_wiring` all pass,
+`cadence_schedule`, `save_roundtrip`, `money_conservation`, `corp_ai_harness`,
+`sentiment_harness` 47/47, `world_determinism` green; app builds and `--verify`
+runs clean (economy.lua with the new sentiment table loads, 0 golden failures).
+Two pre-existing reds unchanged and confirmed at the parent commit
+(`spectator_determinism` golden NR-452; `nation_scorer` R1c MSVC/g++ fixture).
+
+**Open, and left clean.** NR-572 is the decision that unblocks the rest. R8 (live
+check) and R9 (realistic funding) are the two pending requirement rows. `main` is
+11 commits ahead of `origin` — left local per the push policy (development, not a
+release). Review queue carries NR-566 through NR-572.
+
+---
+
+## Session — Ownership separates from identity: the syndicate tier (BL-524–BL-530, NR-491–NR-497) (2026-08-21)
 
 Full mode, **design only** — no `src/` change, nothing started. Ben raised a framing idea; it
 became seven backlog items, a new canonical term, a named minor, and six review entries.

@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 176 entries across 2 volume(s).
+One line per session, newest first — 177 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-23 | [Housekeeping, and the nation spines go live (BL-568, Sprint N3 slice 1; NR-566–NR-572)](DEVLOG.md) | BL-462 BL-537 BL-542 BL-555 BL-556 BL-558 BL-559 BL-568 | DEVLOG.md |
 | 2026-08-21 | [Ownership separates from identity: the syndicate tier (BL-524–BL-530, NR-491–NR-497)](DEVLOG.md) | BL-094 BL-218 BL-219 BL-350 BL-365 BL-409 BL-524 BL-525 BL-526 BL-527 BL-528 BL-529 BL-530 BL-531 | DEVLOG.md |
 | 2026-08-21 | [Tiles gain a third axis, and a fight finally happens (NR-438/439, BL-519, BL-521, BL-520, BL-516, BL-467; Sprints P1 closed + C3)](DEVLOG.md) | BL-467 BL-516 BL-519 BL-520 BL-521 | DEVLOG.md |
 | 2026-08-20 | [The province becomes a thing you can see (BL-458, BL-513, BL-511, BL-466, BL-515, BL-517, BL-392, BL-463; Sprints 27/B2/B3/C3/D4 + P1)](DEVLOG.md) | BL-392 BL-458 BL-463 BL-466 BL-511 BL-513 BL-514 BL-515 BL-516 BL-517 BL-518 BL-519 BL-520 | DEVLOG.md |
