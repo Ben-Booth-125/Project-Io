@@ -274,7 +274,7 @@ Units live in `world::units`, an `unordered_map<entity_id, unit_component>`. Eve
 aggregates over it does so order-independently (integer sums, owner filters, or an explicit sort
 by entity id), which is what keeps the container's iteration order off the determinism seam.
 
-**Three writers exist**, and no other code creates a unit:
+**Four writers exist**, and no other code creates a unit:
 
 - `src/world/hard_coded_world.cpp` — the Kepler player stub, count 50, type 0. No `muster_base`
   (that world has none), so it is deliberately never orphaned.
@@ -284,6 +284,8 @@ by entity id), which is what keeps the container's iteration order off the deter
   base as its `muster_base`. BL-365 background firms are unarmed on purpose.
 - `src/world/corp_command.cpp` — the `hire_unit` verb, count `hire_batch_manpower` = 50. Records
   the tile's qualifying base, lowest entity id first.
+- `src/world/nation_generation.cpp` — a nation's garrisons, owner set to the nation entity, no
+  `muster_base` (a nation raises no base). See § Nation garrisons, below.
 
 **The bridge from a unit to the resolver** is `unit_to_stack_entry(w, u)`
 (`src/world/unit_roster.hpp`), the adapter that resolves a live unit into the value both resolvers
@@ -492,7 +494,9 @@ is deliberately no second disband mechanism.
 in a province where the target also has units. Directed suffices — the ambush property stance
 pays two tables for: the declarer attacks, the target is drawn in regardless of what it thinks.
 Two neutral corps sharing a province do not fight; the trigger is stance, not proximity. Friendship
-permits what BL-549 (friendship permits two things) names; it gates nothing here.
+permits what BL-549 (friendship permits two things) names; it gates nothing here. A corp-vs-nation
+second trigger, over an active mercenary contract rather than a declared hostility, is § Nation
+garrisons, below.
 
 **Identity is (province, attacker, defender).** A corp pair fights at most one battle per province
 at a time; mutual hostility opens the pair once, in the direction whose attacker sorts lower — a
@@ -530,8 +534,12 @@ cost reaches the men and not only a number. A request naming no live battle, or 
 non-participant, returns false and mutates nothing — the seam rule for an AI-facing boundary.
 
 **The field.** A concluded battle names `field_held_by` — the side that stayed — and is erased at
-the end of the tick. What holding a province *does* is owned by BL-567 (province is the conquest
-unit). Battle state survives a save under BL-536 (world snapshot save).
+the end of the tick. `world::province_holder` is what tracks *who currently holds a province*
+across battles (BL-569, province holder): seeded at generation from the territorial plurality,
+moved by a decisive battle's `field_held_by`, and left untouched by a stalemate. It is deliberately
+narrow — a military fact a contract predicate can read, not a political one: `tile_to_nation` (the
+territorial map) does not follow the holder, so what holding a province does *beyond* that fact is
+still unowned work. Battle state survives a save under BL-536 (world snapshot save).
 
 ### Dispatches and the card
 
@@ -563,6 +571,42 @@ the resolver's own arithmetic, never recomputed in the card, because a player sh
 charged another has been lied to about the only decision the fight contains. A crossed-blades
 marker sits on the province anchor tile. See [`docs/ui/SELECTION.md`](../ui/SELECTION.md) § The
 battle element.
+
+---
+
+## Nation garrisons
+
+> A contract offer is a want the client nation cannot meet alone; the thing the hired company
+> actually fights is the OPPOSING nation's own force. This is that force.
+
+Nations own units. `unit_component::owner` accepts a nation entity exactly as it accepts a corp's —
+the field was never corp-typed. A garrison is seeded at generation, not hired: one in the nation's
+capital province, plus one in each border province it shares with its highest-grudge neighbour
+(`nation_score_terms.mean_grudge`). This joins the existing three unit writers (§ The unit model)
+as a fourth, generation-time source, alongside the hard-coded stub, `seed_starting_military`, and
+`hire_unit`.
+
+**Sizing is treasury-scaled against the value anchor.** BL-543's (value anchor) unit-equipment-
+costs-twice-annual-salary anchor prices a garrison's count off the nation's own
+`nation_component::treasury`, so a rich nation fields a bigger standing force and a poor one a
+token one — no separate garrison-strength dial. Garrisons are **static** in this slice: they hold
+their seeded tile and do not march. A nation that wants ground *hires* — that is the whole point of
+the contract, and a garrison that marched would make the nation its own mercenary.
+
+**The trigger.** `run_battles` gains a second trigger, alongside corp-vs-corp directed hostility
+(§ Battles, above): a unit owned by a corp holding an ACTIVE mercenary contract, standing in the
+contract's target province, engages that province's garrison, owned by the contract's client
+nation. No `declare_hostile` row is authored for this pair — **the contract itself is the
+hostility**, live only for the contract's term. The pair's stance is a row keyed on the contract id,
+cleared at the contract's terminal state (completed, failed or cancelled), never by a corp verb.
+
+**Upkeep is a budget claim, not the corp vector.** A garrison does not draw the credits+goods
+vector `run_unit_upkeep` charges corp units (§ Upkeep, below) — its upkeep is a `military_research`
+line claim in the nation's own budget pass ([`../politics/NATIONS.md`](../politics/NATIONS.md) § A
+budget), paid the same way every other priority line is. A garrison whose nation cannot fund the
+line weakens by the ordinary budget-shortfall reading; there is no second mechanism.
+
+*Owner: BL-571 (nation garrisons).*
 
 ---
 

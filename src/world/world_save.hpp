@@ -70,7 +70,15 @@ inline constexpr uint32_t world_save_magic =
 /// its `tile_to_nation` count would be read as the map's count and everything
 /// after it misaligned; a v2 stream is therefore refused WHOLE, destination
 /// untouched (that is the existing rejection contract, not a new one).
-inline constexpr uint32_t world_save_version = 3;
+///
+/// Bumped to 4 by BL-569 (province holder): `world::province_holder` (one
+/// entity_id per province, positionally aligned with `provinces.provinces`)
+/// is written as a new TRAILING section, directly after the embedded history
+/// log + province partition stream (itself the previous last section). A v3
+/// stream simply ends where this one continues, so it is refused whole on the
+/// same strict-equality contract as every prior bump — there is no partial
+/// read of a v3 stream as a v4 with an empty holder vector.
+inline constexpr uint32_t world_save_version = 4;
 
 /// Write @p w as a complete world snapshot.
 ///

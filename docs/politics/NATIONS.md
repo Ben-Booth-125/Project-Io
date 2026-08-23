@@ -105,17 +105,19 @@ indexed by them):
 |---|---|
 | `logistics_maintenance` | keeping the road/hub network standing (LOGISTICS.md) |
 | `schooling` | population capability |
-| `military_research` | force-side research |
+| `military_research` | force-side research, and a nation's own garrison upkeep (MILITARY.md § Nation garrisons) |
 | `academic_research` | the civil tech ladder — `science` is reached, not spent, and this is the debit BL-478 (ancient research spend) is shaped around |
 | `public_exploration` | state-funded survey — DISCOVERY.md's geographic fog |
-| `contracted_force` | buying force the nation does not raise — CONTRACTS.md, the client BL-377 (mercenary contract seam) needs |
+| `contracted_force` | buying force the nation does not raise — CONTRACTS.md § Where offers come from (BL-572) derives an offer from this line's spendable share |
 | `strategic_reserve` | buying goods to **hold** — through BL-350's procurement seam from a named supplier, never on the market. Distinct from `reserve_fraction`, which withholds credits; this line spends them |
 | `public_works` | works a corporation builds and the nation pays for |
 | `charters` | paying a corporation to exist somewhere it otherwise would not |
 
 The first five are Ben's (2026-08-22); the last four were proposed alongside them and accepted.
-The spend mechanics are generic over the enum: **what a line buys is BL-538 (treasury priority
-lines)**, and a line no consumer claims on is simply skipped.
+The spend mechanics are generic over the enum, and a line no consumer claims on is simply skipped.
+Most lines take no subject — a flat weighted claim on the tick's spendable — but `line_takes_subject`
+(`nation_budget.hpp`) names the two that do: `public_exploration` and `contracted_force`, whose
+claims name a target (a survey site; an offer's escrow) rather than only an amount.
 
 ### 4. Law authorship
 
@@ -519,12 +521,14 @@ harness must say so where a reader would otherwise assume the channel's rule.
 **Related authorities.** `docs/generation/NATION_GENERATION.md` (how a nation is made),
 `docs/economy/FINANCE.md` (the money loop the levy is accounted in), `docs/economy/MARKETS.md`
 (§ Tariffs, the clearing-tick half), `docs/politics/RELATIONS.md` (sentiment, the substrate
-nation→corp stance reads), `docs/economy/CONTRACTS.md` (the contracted-force line's consumer),
-`docs/SYSTEMS.md` (§ Policy, § Conditions), `.claude/rules/io-standing-rules.md` (the grant's
-exact terms).
+nation→corp stance reads), `docs/economy/CONTRACTS.md` (§ Where offers come from, the
+`contracted_force` line's consumer), `docs/military/MILITARY.md` (§ Nation garrisons, the
+`military_research` line's other consumer), `docs/SYSTEMS.md` (§ Policy, § Conditions),
+`.claude/rules/io-standing-rules.md` (the grant's exact terms).
 
-**Owning items.** BL-537 (national budget, the spine) → BL-538 (priority lines), BL-539
-(lobbying), BL-540 (nation→corp stance), BL-541 (directional tariffs), BL-542 (nation scorer);
+**Owning items.** BL-539 (lobbying), BL-540 (nation→corp stance), BL-541 (directional tariffs);
 BL-543 (value anchor) and BL-544 (unit wage reference) for the price anchor; BL-155 (law/policy
 surface) for the four-family taxonomy and the ten-law list; BL-186 (laws ledger UI); BL-399
-(company answerability); BL-555 (who is paying me) for the earmark surface.
+(company answerability); BL-555 (who is paying me) for the earmark surface; BL-572 (contract
+offers) for the `contracted_force` line's derivation; BL-571 (nation garrisons) for the
+`military_research` line's garrison-upkeep consumer.

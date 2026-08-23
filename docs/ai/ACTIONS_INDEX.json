@@ -535,15 +535,15 @@
   ],
   [
    "gameplay.march_unit",
-   "No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam."
+   "The unit card's March press in the Selection element (BL-575, unit marker + march UI, landed 2026-08-23 — BL-471 was the placeholder item name; this batch folded it in). Select a unit (its own on-canvas marker, BL-575, or the repeat-click cycle), press March. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card."
   ],
   [
    "gameplay.halt_unit",
-   "No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam."
+   "The unit card's Halt press in the Selection element (BL-575, unit marker + march UI, landed 2026-08-23). Select a unit, press Halt. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card."
   ],
   [
    "gameplay.disband_unit",
-   "No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam."
+   "The unit card's Disband press in the Selection element (BL-575, unit marker + march UI, landed 2026-08-23). Select a unit, press Disband, confirm in the popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card."
   ],
   [
    "ledger.strategy_readout_open",
