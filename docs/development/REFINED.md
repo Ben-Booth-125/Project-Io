@@ -32,6 +32,38 @@ statistic folded Campaign's *winning* scores into the ceiling, conditioning it o
 explains; re-derived over lost rounds only it changes one cell in eight and no verdict, and the
 merge took the honest form.
 
+### ⚠ Lane N2-c's INTERPRETATION was refuted after the merge — the instrument stands, the conclusion does not
+
+An adversarial pass over the merged lane, plus an n=32 sweep the main session ran itself, agree
+seed for seed. **What survives** is the fork's answer, and it is worth having: *wherever a world in
+this fixture fights no battle, the campaign score CLEARS its threshold and LOSES the argmax on every
+round* — true on all 17 silent seeds at n=32.
+
+**What was withdrawn:**
+
+| Claim | Refutation |
+|---|---|
+| ceiling below floor on *exactly* the silent worlds | 3 of 17 silent seeds disjoint, 14 overlap; worst seed 18 by **142**, and not monotone with the outcome |
+| "no salt could have won those worlds a round" | true of seeds 0 and 4 (margins 37, 65 vs a 0–15 salt); silent seeds 18/20/27 have margins **6/7/8** |
+| "the defect is the LEVEL relative to Settle" | unsupported — seed 8 clears 27,452 and fights **676**; seed 30 clears 2,338,095 and fights **zero** |
+| "two of eight worlds" | **17 of 32 (53%)** in this fixture — zero-war is the *modal* outcome, which makes it more urgent, not less |
+| the 1–3 margin bucket | recorded as 13, and as "none" by the lane; the harness prints **39** (0 on both silent seeds — the only safe scoping) |
+
+**And the fixture is not the generated Era −1 at all.** Six divergences from
+`hard_coded_world.cpp`'s own invocation — 4000 years vs 400, six tick bands vs one, a bare seed vs
+`seed ^ 0x415C1E17`, null creeds, **no works (which gates `build_work` out of the contest entirely,
+so the harness scores four verbs where the app scores five)**, and the *post-sim* settlement state.
+Seed 0's generated era fights 8 battles. → **BL-554**, priority A, and the precondition for every
+later decision here: BL-384's premise, the conquest rate that refuted it, and this sprint's finding
+all came off this instrument.
+
+Two harness fixes landed with the correction: the sweep width is **decoupled** from the pinned
+regression table (`pinned[r.seed]` was indexed by a seed the sweep could exceed, so widening read
+out of bounds — *that coupling is the mechanical reason an n=2 claim was the best available*), and
+R3 now pins only the seeds it holds rows for and asserts it reached all 8. `growth-extinguishes-war`
+R4 is **re-opened**; it was closed on the false margin figure. NR-554 is rewritten, NR-555 files the
+cross-group row flips Rule 0c required.
+
 ### What N2 leaves owed
 
 - **Every spine still has no caller.** `run_national_budget` takes budgets as a parameter;

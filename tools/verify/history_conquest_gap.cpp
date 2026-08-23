@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <vector>
 
 namespace
@@ -178,7 +179,16 @@ struct seed_row
 /// moved them, every number this harness prints would describe a sim that no
 /// longer has the problem the sprint was scoped around.
 struct pinned_row { int64_t battles, conquests, foundings, contacts, scored, chosen; };
-constexpr pinned_row pinned[8] = {
+/// The PINNED REGRESSION SET is deliberately separate from the SWEEP WIDTH
+/// below, and they must stay separate. They were one number until 2026-08-23,
+/// when `pinned[r.seed]` was indexed by a seed the sweep could be widened past —
+/// so raising `seeds` read out of bounds, and the only safe sweep was the one the
+/// pinned table happened to be the same size as. That coupling is the mechanical
+/// reason the sprint's headline claim rested on n=8 with two silent worlds in it:
+/// the instrument could not be widened to test its own generalisation.
+/// R3 now pins only the seeds it holds rows for and says how many it checked.
+constexpr int pinned_seeds = 8;
+constexpr pinned_row pinned[pinned_seeds] = {
     {   0,    0, 786, 4972710,  9945420,   0},
     { 236,  210, 643, 6189696, 12379392, 241},
     { 435,  435, 543, 2620190,  5240380, 435},
@@ -204,11 +214,19 @@ constexpr int kgh = home_grid_height;
 
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
     std::printf("=== history_conquest_gap (BL-384) — report only, asserts nothing about the gap ===\n\n");
 
-    constexpr int seeds = 8;
+    // SWEEP WIDTH, independent of `pinned_seeds`. Override from the command line
+    // to falsify a claim drawn from the default sweep — which is exactly what
+    // n=32 did to this sprint's headline on 2026-08-23.
+    int seeds = pinned_seeds;
+    if (argc > 1)
+    {
+        const int want = std::atoi(argv[1]);
+        if (want > 0 && want <= 256) seeds = want;
+    }
     std::vector<battle_trace> all;
 
     // Determinism guard on the instrument itself: a traced run and an untraced
@@ -560,11 +578,16 @@ int main()
     check(r2_ok, "R2 every ZERO-BATTLE seed is classified from counters, not from an empty "
                  "battle set: scored > 0, chosen == 0, and exactly one fork branch fired");
 
-    // R3. The measured world is still the defective world.
+    // R3. The measured world is still the defective world. Pins only the seeds
+    // the table holds rows for, so widening the sweep adds coverage without
+    // weakening the regression — and reports how many it actually checked, so a
+    // sweep that pinned nothing cannot read as a pass.
+    int  r3_checked = 0;
     bool r3_ok = static_cast<int>(rows.size()) == seeds;
     for (const seed_row& r : rows)
     {
-        if (r.seed < 0 || r.seed >= seeds) { r3_ok = false; continue; }
+        if (r.seed < 0 || r.seed >= pinned_seeds) continue; // beyond the pinned set
+        ++r3_checked;
         const pinned_row& p = pinned[r.seed];
         if (r.battles != p.battles || r.conquests != p.conquests || r.foundings != p.foundings
             || r.contacts != p.contacts || r.scored != p.scored || r.chosen != p.chosen)
@@ -581,8 +604,12 @@ int main()
                         static_cast<long long>(r.chosen),    static_cast<long long>(p.chosen));
         }
     }
-    check(r3_ok, "R3 the instrumented sweep reproduces the pre-change table EXACTLY — seeds 0 "
-                 "and 4 still at zero battles, every seed's 6 counts unmoved");
+    std::printf("     R3 pinned %d of %d swept seeds against the regression table.\n",
+                r3_checked, seeds);
+    check(r3_ok && r3_checked == pinned_seeds,
+          "R3 the instrumented sweep reproduces the pinned table EXACTLY — seeds 0 and 4 "
+          "still at zero battles, every pinned seed's 6 counts unmoved, and all 8 pinned "
+          "seeds were actually reached");
 
     // R4. The instrument is inert AND gated.
     check(trace_is_inert && counters_are_gated && gating_seed >= 0,

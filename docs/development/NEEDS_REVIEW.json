@@ -3753,24 +3753,38 @@
     },
     {
       "id": "NR-554",
-      "title": "The measurement says a zero-war world is a LEVEL problem, and names what a fix may not be",
+      "title": "CORRECTED: the zero-war worlds are the MODAL outcome, and the fix direction I first reported was refuted",
       "raised": "2026-08-23",
       "kind": "question",
       "status": "open",
       "source": "Sprint N2 lane C (Sprint 28 lane A T1/T2), reproduced independently by the main session.",
-      "what": "Two of eight generated worlds fight no war in an entire Era -1. The fork is now answered: the campaign score CLEARS its threshold and LOSES the argmax, every round, on both silent worlds - 1,396,170 clearing candidates on seed 0 across 1,032 rounds, zero wins. Winner is Settle in ~93% of lost rounds. The margin was NOT the diagnostic quantity (13 rounds in the 1-3 bucket, zero in the 1001+ bucket across all eight seeds, so neither the weighting-nudge nor the incommensurability reading applies). The score LEVELS are: Campaign's ceiling sits below the winning verb's floor on exactly the two silent worlds and overlaps on all six fighting ones. No tie-break, salt or luckier target could have won those worlds a single round.",
-      "why_it_matters": "It bounds the fix from both sides, and the two bounds are in tension. Ben ruled 2026-08-21 that a zero-war world is a BUG, and his reason makes it a floor rather than a preference - 'many ancient tech quests would not be unlockable', so the failure is content reachability. But BL-224's non-hegemony invariant wants some worlds to stay multipolar, so the peaceful worlds must not be tuned away wholesale. The target is a war rate inside a stated band across seeds, reported and never clamped. What the measurement adds is that no threshold or tie-break change can reach it: the campaign score's LEVEL relative to Settle's, on worlds where Settle stays high, is the only thing that can.",
+      "what": "SUPERSEDES WHAT THIS ENTRY FIRST SAID, which was written from an n=8 sweep and was wrong in three of its four claims. WHAT HOLDS: wherever a world fights no battle, the campaign score CLEARS its threshold and LOSES the argmax on every round - never the case that it fails to clear. Confirmed on all 17 silent seeds at n=32. WHAT WAS REFUTED, by an adversarial pass and by the main session's own n=32 run, which agree seed for seed: (a) the ceiling-below-floor separation holds on only 3 of 17 silent seeds, worst counterexample seed 18 overlapping by 142, and is not monotone with the outcome; (b) 'no salt could have won those worlds a round' is true of seeds 0 and 4 (margins 37, 65 against a 0..15 salt) and false of silent seeds 18/20/27 (margins 6/7/8); (c) 'the defect is the LEVEL of the campaign score relative to Settle' is unsupported - seed 8 clears 27,452 and fights 676 battles while seed 30 clears 2,338,095 and fights zero; (d) the base rate is 17 of 32 (53%), not 2 of 8. AND the fixture is not the generated Era -1 at all - six divergences from the app's own invocation, one gating build_work out of the contest (BL-554), and seed 0's generated era fights 8 battles.",
+      "why_it_matters": "Zero-war being the MODAL outcome rather than a rare pathology changes the shape of the problem, and it makes Ben's 2026-08-21 ruling bite harder: if a zero-war world means 'many ancient tech quests would not be unlockable', then over half the worlds this fixture generates are unfinishable. But the counter-pressure is unchanged - BL-224's non-hegemony invariant wants some worlds multipolar - so the target is still a rate inside a stated band across seeds, reported and never clamped. What has changed is that NOBODY YET KNOWS WHAT MOVES THAT RATE. The two candidate diagnoses both failed on the wider sweep, and the instrument that produced them is measuring the wrong sim.",
       "options": [
-        "Raise the campaign score's level - risks tuning the peaceful worlds away and breaking BL-224.",
-        "Lower Settle's level on worlds where it stays high - narrower, but Settle's level is doing real work elsewhere.",
-        "Make the two commensurable rather than re-weighting either, which is the BL-318 answer to a class this file has already been bitten by twice.",
-        "Measure more seeds first: n=8 with 2 silent is a thin base for a rate."
+        "Fix the instrument first (BL-554), re-measure the GENERATED era, and only then choose a fix - the honest order, and the one that avoids tuning a scorer weight on a number from a simulation the game does not run.",
+        "Tune the campaign score's level now on the n=8 reading - explicitly rejected: it was refuted at n=32 and would be tuning on a wrong fixture as well as a wrong sample.",
+        "Treat the fork's answer as sufficient and go straight to making Campaign commensurable with Settle (the BL-318 shape) without re-measuring - cheaper, but it commits to a mechanism the measurement no longer supports."
       ],
-      "recommendation": "Measure more seeds before choosing. The separation is perfect at n=8 but that rests on two positive cases, and the base rate decides whether this is a rare pathology or a routine outcome - which changes which of the three fixes is proportionate. A falsification run at larger n is cheap next to a mis-aimed tuning pass.",
+      "recommendation": "The first, and the ordering is the whole recommendation. BL-554 is priority A for exactly this reason: every Era -1 number acted on so far - BL-384's premise, the conquest rate that refuted it, and this sprint's finding - came off an instrument running a 4000-year six-band sim with no creeds and no works on an already-simulated settlement. Re-pointing it at the app's own call is a day's work and it is the precondition for every later decision here.",
       "files": [
         "src/world/history_sim.cpp",
         "tools/verify/history_conquest_gap.cpp",
-        "docs/development/REFINED.md"
+        "src/world/hard_coded_world.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-555",
+      "title": "Decision taken on Ben's behalf: three rows in a requirement group Sprint 28 did not own were flipped to complete at merge",
+      "raised": "2026-08-23",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Sprint N2 lane C reported it; the main session accepted it at merge and did not file the entry Rule 0c requires. Caught by the adversarial pass.",
+      "what": "growth-extinguishes-war R3, R4 and R5 were flipped from pending to complete by the lane, on the grounds that this task's deliverable is precisely what those rows asked for. The main session read the three row texts, judged them satisfied, and carried the flips through the merge - WITHOUT filing a decision-taken entry, which is the exact case CLAUDE.md Rule 0c names. R4 has since been RE-OPENED: it was closed on a false metric (the 1-3 margin bucket recorded as empty; the harness prints 39). R3 and R5 stand - R3's question is genuinely answered by the fork, and R5's inertness claim is true even though the row that asserts it is weaker than its wording.",
+      "why_it_matters": "Two things, and the second is the reason this is filed rather than just fixed. An unrecorded delegated decision is indistinguishable from one Ben made - that is Rule 0c's whole argument, and it applied twice over here because the flips were cross-group, which is a stronger claim than closing your own rows. And the flip that turned out to be wrong is the one that would have been hardest to catch later: R4 closed with a confident-sounding note carrying a number nobody had recomputed.",
+      "recommendation": "No action beyond what is done - R4 re-opened, R3/R5 stand, entry filed. Worth noting the pattern for future briefs: a lane that closes rows in a group it does not own should be required to say so in its report AND to file the entry itself, rather than leaving the integrator to notice.",
+      "files": [
+        "docs/development/req/requirements.json"
       ],
       "resolution": null
     }
