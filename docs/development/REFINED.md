@@ -12,11 +12,38 @@ N1 landed two spines and a check, **all three inert**. An inert subsystem with n
 `military_points` defect with a new name, so N2 gives each one a consumer — and measures the one
 thing Lane A cannot fix until it is measured.
 
-| Lane | Item | Files (slice-owned) | Done when |
-|---|---|---|---|
-| **N2-a** | BL-542 (nation scorer) | `src/world/nation_ai.{hpp,cpp}` (new), `tools/verify/nation_scorer_harness.cpp` (new) | req group `nation-scorer` R1–R6 |
-| **N2-b** | BL-546 (reputation → sentiment) + BL-391 (the floor deadlock, landed through it) | `src/world/procurement.cpp`, `src/world/corp_command.cpp`, `src/world/sentiment.cpp`, `tools/verify/procurement_harness.cpp` | req group `reputation-becomes-sentiment` R1–R4 |
-| **N2-c** | Sprint 28 Lane A, T1+T2 — verb-competition **measurement** | `src/world/history_sim.{hpp,cpp}`, `tools/verify/history_conquest_gap.cpp` | req group `verb-competition-measurement` R1–R4 |
+| Lane | Item | Result |
+|---|---|---|
+| **N2-a** | BL-542 (nation scorer) | **MERGED** `02d2b64` — 60/60, req group `nation-scorer` R1–R8 complete |
+| **N2-b** | BL-546 (reputation → sentiment) + BL-391 through it | **MERGED** `983abad` — 66 PASS, `reputation-becomes-sentiment` R1–R4 complete |
+| **N2-c** | Sprint 28 Lane A, T1+T2 — verb-competition **measurement** | **MERGED** `e17d6a7` — 4/4, `verb-competition-measurement` R1–R4 complete |
+
+**All three merged and re-verified on the integrated tree**, not on their branches:
+`nation_scorer_harness` 60/60, `nation_budget_harness` 36/36, `sentiment_harness` 41/41,
+`value_anchor` 22/22, `procurement_harness` 66 PASS, `save_roundtrip` OK, `econ_harness`,
+`money_conservation`, `world_determinism`, `history_conquest_gap` 4/4 — plus zero ASan/UBSan
+diagnostics across four harnesses and warning-clean at `-Wall -Wextra`.
+
+**Two lane reports did not survive verification, and both are recorded rather than acted on.** A
+claimed layout-sensitive determinism violation in spectate does not reproduce on four clean trees
+(NR-551) — the likely cause, a stale object in a rebuilt archive, bit a sibling lane in the same
+run, so **delete `obj/` before a rebuild whose point is a comparison**. And the ceiling-vs-floor
+statistic folded Campaign's *winning* scores into the ceiling, conditioning it on the outcome it
+explains; re-derived over lost rounds only it changes one cell in eight and no verdict, and the
+merge took the honest form.
+
+### What N2 leaves owed
+
+- **Every spine still has no caller.** `run_national_budget` takes budgets as a parameter;
+  `score_national_budgets` returns them and nothing joins the two. BL-538 (what a line buys) is the
+  join, and it is the next item.
+- **`scripts/economy.lua` needs the sentiment block** — the decay rate that puts BL-391's fix in
+  play. **The number is Ben's call** and wants BL-543's treatment: a reason, not a value.
+- **`recipe_registry.cpp`'s new `economy.sentiment` reader is uncompiled** (sol2 absent, NR-264).
+  Its symbols check out against `sentiment.hpp` by inspection and its inline half in
+  `recipe_registry.hpp` *is* compiler-verified; the unverified surface is ~40 lines. The integrating
+  build on Ben's machine is what closes it.
+- **`docs/economy/CONTRACTS.md:178`** still describes BL-546 in the future tense — one line.
 
 **Hotspots stay with the main session**, as always: `scripts/economy.lua` (5 open items declare it),
 `src/world/components.hpp` (4), `src/world/world.hpp`, `CMakeLists.txt`. N2-b may legitimately need

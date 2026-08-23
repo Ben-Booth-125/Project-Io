@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*251 entries — 216 open, 35 resolved.*
+*256 entries — 221 open, 35 resolved.*
 
 ---
 
@@ -2137,6 +2137,70 @@ src/world/sentiment.cpp opens with private write_u32/read_f32 helpers over reint
 > **Recommendation:** Land BL-553 when something next touches one of those streams — which BL-546 is doing right now to procurement.cpp. Not worth a pass of its own.
 
 *Files: `src/world/binary_io.hpp`, `src/world/sentiment.cpp`, `src/world/procurement.cpp`, `src/world/history_log.cpp`*
+
+### NR-550 — requirements.json silently deleted a whole requirement group for a day, and a parse-and-rewrite made it permanent
+*observation · raised 2026-08-23 · from Found while integrating Sprint N2's lane B, which hit it independently.*
+
+BL-536's append on 2026-08-22 left out the `},{` between the world-save-snapshot and value-anchor group objects. That is still VALID JSON: the second object's keys land inside the first and JSON's last-key-wins rule discards the collisions. So value-anchor (BL-543, four rows) vanished from every consumer at once - `requirements_query.js value-anchor` answered 'nothing matched', and had been answering that since the day the group was written. The group stayed recoverable from the raw bytes until a parse-and-rewrite script loaded and re-saved the file, which erased it from the text too. THIS SESSION'S OWN SPRINT-SCAFFOLDING WRITE DID THAT. Recovered from 4262d66's raw text and re-inserted with its rows resolved. Also found and disambiguated two groups sharing the brief `battle-state-in-world`, which made every query for it answer for one of two different pieces of work.
+
+**Why it matters.** The store is canonical and it lied for a day, with no symptom a reader would notice: the query answered honestly that nothing matched, and every consumer agreed. What makes it worth machinery rather than care is the second half - the corruption ERASES ITS OWN EVIDENCE on the next write, so the window to recover it is however long until the next tool touches the file. backlog_lint now carries checkStoreIntegrity over both JSON stores (record count in the raw text vs after the parse, plus key uniqueness), mutation-tested three ways. It is the fourth check this session that exists because a defect had no view that could show it.
+
+> **Recommendation:** No action needed - repaired and guarded. Worth knowing that any future hand-edit of these stores should be followed by `node tools/session/backlog_lint.js`, which now catches this in under a second.
+
+*Files: `docs/development/req/requirements.json`, `tools/session/backlog_lint.js`*
+
+### NR-551 — A reported determinism violation in spectate does NOT reproduce - four clean trees give identical hashes
+*observation · raised 2026-08-23 · from Verifying Sprint N2 lane B (BL-546) before merge.*
+
+The lane reported that spectator_determinism's SPECTATED state_hash moves 042D88AB1C8701A2 -> BB2D94F63FC165E5 under its change, and that it had isolated the cause to struct layout by adding one empty std::map member to `world` on a pristine tree. It called this a real violation of the determinism invariant and asked for a review entry. IT DOES NOT REPRODUCE. Built from clean git archives with the same recipe and flags, main (41816d6), 4262d66, this branch after all three merges, and the lane's own tree ALL give the identical pair played=B4D09255AF346008 spectated=BB2D94F63FC165E5. And repeating the lane's own probe - one inert std::map member added to `world` at 4262d66 - moves NEITHER hash. The claimed baseline 042D88AB1C8701A2 matches no tree that can be built here.
+
+**Why it matters.** Two things. First, filing it as reported would have put a false determinism violation into the standing-rules space, and a future session would have spent a day chasing a ghost in the one invariant the project cannot compromise on. Second, the likely cause is worth naming because it bit a sibling lane in the same run: a stale object left in the static archive after a source was restored, so a 'clean' rebuild links a mixture. Lane A hit exactly that and said so ('my mutation runner left a mutated .o in the archive after restoring the source, so one green run was green against a mutant'). An `ar rcs` over a stale obj/ directory is a silent, reproducible way to measure a build that never existed.
+
+> **Recommendation:** No defect to fix. Worth adding to the build recipe in REFINED.md and the agent briefs: delete obj/ before rebuilding when the point of the rebuild is a comparison. If Ben wants certainty, the cheap confirmation is to re-run spectator_determinism on his own MSVC box, where the golden was taken.
+
+*Files: `tools/verify/spectator_determinism.cpp`, `docs/development/REFINED.md`*
+
+### NR-552 — BL-546 decision taken: procurement v3 drops the reputation block entirely rather than re-deriving it
+*decision taken on your behalf · raised 2026-08-23 · from Sprint N2 lane B (BL-546), reported by the lane and accepted at merge.*
+
+The procurement stream bumped 2 -> 3. The alternative considered was to keep writing a reputation-shaped block sourced from the Trust axis, so the format stayed recognisable. That was rejected: it recreates the second store the item exists to delete, and the two would diverge the first time anything other than procurement moved the axis. The relational value now rides write_sentiment/read_sentiment and the world snapshot (bumped 1 -> 2, with the pair map carrying two floats and rejecting a null id, a self pair, a non-finite value or a stored-neutral row). read_procurement's contract narrowed from four fields to three.
+
+**Why it matters.** It is a save-format change behind a strict version gate, so it is not reversible by editing a reader later - a v2 stream is refused, not migrated. That costs nothing today (NR-399 established there is no game save/load path yet) but BL-107 will make it cost something. The reasoning is sound and the harness proves the round trip; this is filed so the call is Ben's to revisit while it is still cheap.
+
+> **Recommendation:** Accept. Two stores for one quantity is the defect BL-546 exists to remove, and a compatibility-shaped block would have preserved the shape while losing the property.
+
+*Files: `src/world/procurement.cpp`, `src/world/procurement.hpp`, `src/world/world_save.cpp`*
+
+### NR-553 — BL-542 novelty: the grudge term has no data source, and corp-grain stance is being read as a nation-grain input
+*novel-work · raised 2026-08-23 · from Sprint N2 lane A (BL-542) raised both under the novelty flag; recorded at merge.*
+
+Two joints in the nation scorer that no authority doc owned. (1) THE GRUDGE HAS NO INPUT. NATIONS.md says the Era -1 residue biases the first two terms, but no campaign-era nation-pair state of any kind reaches `world` - the real pair outcomes sit behind BL-541 (directional tariffs). The lane substituted a derivation from the residue that DOES survive generation - contested border length plus the pair's `expansionism` posture, which NATION_GENERATION.md already derives from a border-contest integral - and isolated it in one function, `grudge_from_border`, so swapping the input when BL-541 lands moves nothing else. (2) NATIONS HOLD NO STANCE. `stance.hpp` is corp->corp only, so 'force standing near its borders' had no nation-grain reading. The lane bridged it: a border unit's owner is hostile toward corps registered in the threatened nation, weighted by the share it has declared against. That is the first place in the codebase where a corp-grain relation is read as a nation-grain input.
+
+**Why it matters.** Both are defensible and both are testable, and the lane flagged them rather than absorbing them, which is the point of the novelty rule. But the second is arguably BL-540's (nation-to-corp stance) to own, and BL-545's sentiment substrate - which landed the same day - is the thing that will eventually supply both readings properly. Deciding now which item owns the bridge is cheaper than discovering two of them later.
+
+- Leave both in nation_ai.cpp and let BL-541 and BL-540 replace them in place - the lane isolated them for exactly this.
+- Move the stance bridge into BL-540's scope now, before it is built on.
+- Reshape both onto BL-545's sentiment substrate directly, skipping the substitutes.
+
+> **Recommendation:** The first. Both substitutes are one function each and named as substitutes in the doc; replacing them is a smaller job than pre-deciding their home. But BL-540 should carry a note that the bridge already exists.
+
+*Files: `src/world/nation_ai.cpp`, `docs/politics/NATIONS.md`*
+
+### NR-554 — The measurement says a zero-war world is a LEVEL problem, and names what a fix may not be
+*question · raised 2026-08-23 · from Sprint N2 lane C (Sprint 28 lane A T1/T2), reproduced independently by the main session.*
+
+Two of eight generated worlds fight no war in an entire Era -1. The fork is now answered: the campaign score CLEARS its threshold and LOSES the argmax, every round, on both silent worlds - 1,396,170 clearing candidates on seed 0 across 1,032 rounds, zero wins. Winner is Settle in ~93% of lost rounds. The margin was NOT the diagnostic quantity (13 rounds in the 1-3 bucket, zero in the 1001+ bucket across all eight seeds, so neither the weighting-nudge nor the incommensurability reading applies). The score LEVELS are: Campaign's ceiling sits below the winning verb's floor on exactly the two silent worlds and overlaps on all six fighting ones. No tie-break, salt or luckier target could have won those worlds a single round.
+
+**Why it matters.** It bounds the fix from both sides, and the two bounds are in tension. Ben ruled 2026-08-21 that a zero-war world is a BUG, and his reason makes it a floor rather than a preference - 'many ancient tech quests would not be unlockable', so the failure is content reachability. But BL-224's non-hegemony invariant wants some worlds to stay multipolar, so the peaceful worlds must not be tuned away wholesale. The target is a war rate inside a stated band across seeds, reported and never clamped. What the measurement adds is that no threshold or tie-break change can reach it: the campaign score's LEVEL relative to Settle's, on worlds where Settle stays high, is the only thing that can.
+
+- Raise the campaign score's level - risks tuning the peaceful worlds away and breaking BL-224.
+- Lower Settle's level on worlds where it stays high - narrower, but Settle's level is doing real work elsewhere.
+- Make the two commensurable rather than re-weighting either, which is the BL-318 answer to a class this file has already been bitten by twice.
+- Measure more seeds first: n=8 with 2 silent is a thin base for a rate.
+
+> **Recommendation:** Measure more seeds before choosing. The separation is perfect at n=8 but that rests on two positive cases, and the base rate decides whether this is a rare pathology or a routine outcome - which changes which of the three fixes is proportionate. A falsification run at larger n is cheap next to a mis-aimed tuning pass.
+
+*Files: `src/world/history_sim.cpp`, `tools/verify/history_conquest_gap.cpp`, `docs/development/REFINED.md`*
 
 ---
 
