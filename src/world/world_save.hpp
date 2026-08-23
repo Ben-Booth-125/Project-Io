@@ -63,7 +63,14 @@ inline constexpr uint32_t world_save_magic =
 /// in place by `sentiment` (two floats per pair, Access and Trust). A v1
 /// snapshot's records are half the width, so every field after them would be
 /// misread — which is exactly the case strict version equality exists for.
-inline constexpr uint32_t world_save_version = 2;
+///
+/// Bumped to 3 by Sprint N3 T2: `world::nation_budgets` (the persistent
+/// per-nation weight map the national budget pass spends by) is written as a
+/// new section directly after `nations`. A v2 stream has no such section, so
+/// its `tile_to_nation` count would be read as the map's count and everything
+/// after it misaligned; a v2 stream is therefore refused WHOLE, destination
+/// untouched (that is the existing rejection contract, not a new one).
+inline constexpr uint32_t world_save_version = 3;
 
 /// Write @p w as a complete world snapshot.
 ///

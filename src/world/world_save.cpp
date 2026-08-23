@@ -226,6 +226,30 @@ bool r_nation(std::istream& i, nation_component& n)
         && r_enum(i, n.focus, max_econ_focus) && r_f32(i, n.treasury);
 }
 
+/// Sprint N3 T2: one nation's budget -- the nine line weights in authored enum
+/// order, then the reserve fraction. Fixed-width (`w_f32_array` writes no
+/// count), so `priority_count` is part of the format: appending a line to
+/// `budget_priority` widens every record and is a version bump.
+void w_nation_budget(std::ostream& o, const nation_budget& b)
+{
+    w_f32_array(o, b.weights);
+    w_f32(o, b.reserve_fraction);
+}
+
+/// Rejects a non-finite weight or reserve on the same grounds the sentiment
+/// record does: the writer above cannot have produced one, so the stream is
+/// corrupt rather than odd -- and a NaN weight would otherwise normalise the
+/// whole vector into a spend nobody could replay.
+bool r_nation_budget(std::istream& i, nation_budget& b)
+{
+    if (!(r_f32_array(i, b.weights) && r_f32(i, b.reserve_fraction)))
+        return false;
+    for (const float w : b.weights)
+        if (!std::isfinite(w))
+            return false;
+    return std::isfinite(b.reserve_fraction);
+}
+
 void w_corp(std::ostream& o, const corporation_component& c)
 {
     w_str(o, c.name);
@@ -659,6 +683,10 @@ void write_world_snapshot(const world& w, std::ostream& out)
     w_store(out, w.population_centre_name,
             [](std::ostream& s, const std::string& v) { w_str(s, v); });
     w_store(out, w.nations, w_nation);
+    // Sprint N3 T2 (format v3): the persistent weight map, directly after the
+    // nations it keys on. A `std::map`, so `w_map` writes it ascending as held.
+    w_map(out, w.nation_budgets, [](std::ostream& s, const entity_id& k) { w_id(s, k); },
+          w_nation_budget);
     w_id_store(out, w.tile_to_nation);
     w_store(out, w.corporations, w_corp);
 
@@ -775,6 +803,13 @@ bool read_world_snapshot(world& w, std::istream& in)
                  [](std::istream& st, std::string& v) { return r_str(st, v); }))
         return false;
     if (!r_store(in, s.nations, r_nation))
+        return false;
+    // Sprint N3 T2 (format v3). A null key cannot have been written -- a nation
+    // entity is never `null_entity` -- so one is a corruption and rejects the
+    // stream whole, like every other rejection here.
+    if (!r_map(in, s.nation_budgets,
+               [](std::istream& st, entity_id& k) { return r_id(st, k) && k != null_entity; },
+               r_nation_budget))
         return false;
     if (!r_id_store(in, s.tile_to_nation))
         return false;

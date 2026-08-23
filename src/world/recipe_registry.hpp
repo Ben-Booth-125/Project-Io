@@ -1,6 +1,7 @@
 #pragma once
 
 #include "components.hpp"
+#include "nation_ai.hpp"   // BL-542: nation_ai_params — the nation scorer's tunables (light: entity.hpp + nation_budget.hpp only)
 #include "sentiment.hpp"   // BL-545/BL-546: sentiment_params — the authored factor table
 #include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
 
@@ -604,6 +605,15 @@ public:
     /// by Lua — see `seed_procurement_sentiment`.
     const sentiment_params& sentiment() const { return m_sentiment; }
 
+    /// BL-542 nation-scorer tunables (economy.nation_ai in Lua). Defaults are
+    /// the accepted-design values in `nation_ai_params` itself; the Lua table,
+    /// where it exists, overrides field by field, and every value it names is
+    /// range-checked at load (finite; `cadence_k` >= 1; every float >= 0) and
+    /// REJECTED by key rather than clamped -- a scorer tuned by a NaN is a
+    /// scorer nobody can replay. Sprint N3 T1: no caller yet; the registry is
+    /// the home so that wiring the scorer (T6) reads one authored object.
+    const nation_ai_params& nation_ai() const { return m_nation_ai; }
+
     /// BL-430 player-facing recipe-switch cost/cooldown (economy.recipe_switch in Lua).
     const recipe_switch_params& recipe_switch() const { return m_recipe_switch; }
 
@@ -793,6 +803,7 @@ public:
     /// factor row). Call AFTER `set_procurement` — that one re-seeds the two
     /// `contract_*` Trust weights and would otherwise overwrite these.
     void set_sentiment(const sentiment_params& p) { m_sentiment = p; }
+    void set_nation_ai(const nation_ai_params& p) { m_nation_ai = p; }
     void set_recipe_switch(const recipe_switch_params& p) { m_recipe_switch = p; }
     void set_economics(building_type type, const building_economics& e)
     {
@@ -979,6 +990,11 @@ private:
         seed_procurement_sentiment(sp, procurement_params{});
         return sp;
     }();
+
+    /// BL-542 nation-scorer tunables (economy.nation_ai). Default-constructed,
+    /// so a hand-built harness registry scores exactly as the scorer's own
+    /// defaults do -- the registry adds a home, not a second set of numbers.
+    nation_ai_params m_nation_ai = {};
 
     /// BL-430 recipe-switch cost/cooldown. Defaults to free/instant so a
     /// hand-built harness registry that never sets this behaves as it always did.

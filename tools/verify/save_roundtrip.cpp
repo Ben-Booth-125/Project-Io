@@ -13,6 +13,11 @@
 //   P6  R4  A battle round-trips mid-fight and continues on the same RNG stream.
 //   P7  R1  Container coverage: every container the canonical world populates is
 //           non-empty on the far side, so an omitted section cannot pass vacuously.
+//   P8  R1  The containers a fresh world leaves empty, populated by hand.
+//   P9      Sprint N3 T2 -- `world::nation_budgets` (format v3): the map
+//           round-trips exactly (weights + reserve for two nations, a
+//           non-dyadic weight included), an EMPTY map round-trips as empty, and
+//           a v2-versioned stream is refused with the destination untouched.
 //
 // ON THE TWO KINDS OF CHECK IN P1. Byte-equality of a RE-serialisation
 // (write -> read -> write, compare the two streams) proves the read and write
@@ -30,6 +35,7 @@
 #include "world/history_log.hpp"
 #include "world/logistics.hpp"
 #include "world/modifier_set.hpp"
+#include "world/nation_budget.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
 #include "harness_params.hpp"
@@ -147,6 +153,19 @@ int main()
             check(!from_bytes(bad, victim), "P3 a mismatched version is rejected");
         }
         {
+            // Sprint N3 T2: the PREVIOUS format, by number. A v2 stream has no
+            // nation_budgets section, so a reader that accepted it would parse
+            // tile_to_nation's count as the map's count and misalign everything
+            // after. The whole stream is refused instead -- a v2 save is not
+            // migrated, it is rejected, and the destination is not touched.
+            static_assert(world_save_version == 3,
+                          "P9 names v2 as the refused predecessor; re-read this row on a bump");
+            std::string bad = bytes_once;
+            const uint32_t v2 = 2;
+            std::memcpy(&bad[4], &v2, sizeof v2);
+            check(!from_bytes(bad, victim), "P9 a v2-versioned stream is refused (format is v3)");
+        }
+        {
             // Truncated mid-way through the tile store -- far enough in that a
             // naive reader would already have replaced several containers.
             const std::string bad = bytes_once.substr(0, bytes_once.size() / 2);
@@ -160,6 +179,8 @@ int main()
                   && victim.next_order_id == keep_order && victim.tiles.empty()
                   && victim.bodies.empty(),
               "P3 every rejected load left the destination world untouched");
+        check(victim.nations.empty() && victim.nation_budgets.empty(),
+              "P9 the v2 refusal left nations and nation_budgets untouched");
     }
 
     // -----------------------------------------------------------------------
@@ -349,6 +370,7 @@ int main()
             { "population_centre_tile", w.population_centre_tile.size(), loaded.population_centre_tile.size() },
             { "population_centre_name", w.population_centre_name.size(), loaded.population_centre_name.size() },
             { "nations", w.nations.size(), loaded.nations.size() },
+            { "nation_budgets", w.nation_budgets.size(), loaded.nation_budgets.size() },
             { "tile_to_nation", w.tile_to_nation.size(), loaded.tile_to_nation.size() },
             { "corporations", w.corporations.size(), loaded.corporations.size() },
             { "corp_body_pools", w.corp_body_pools.size(), loaded.corp_body_pools.size() },
@@ -409,6 +431,14 @@ int main()
                   && loaded.belt.outer_radius_au == w.belt.outer_radius_au,
               "P7 the asteroid belt survives");
         note("next entity id: ", (unsigned long long)loaded.next_entity_id());
+
+        // Sprint N3 T2: the EMPTINESS of this map is the inertness proof for
+        // the national budget pass (world.hpp). A generated world has never
+        // scored a nation, so the map must be empty on both sides -- and P7's
+        // table would report it "(empty here)" without asserting it, which is
+        // why it is named here.
+        check(w.nation_budgets.empty() && loaded.nation_budgets.empty(),
+              "P9 an EMPTY nation_budgets map round-trips as empty (the inertness state)");
     }
 
     // -----------------------------------------------------------------------
@@ -436,6 +466,24 @@ int main()
         // catch.
         f.sentiment.pairs[{ c1, c2 }] = sentiment_value{ 2.25f, -0.75f };
         f.sentiment.pairs[{ c2, c1 }] = sentiment_value{ -6.5f, 3.5f };
+
+        // Sprint N3 T2: two nations' weight vectors. Every weight is DISTINCT
+        // and one (0.3f) is non-dyadic on purpose -- a reader that widened or
+        // re-rounded a float would move it, and a reader that swapped two
+        // lines would be caught by the distinct values. The two reserves differ
+        // from every weight so a reserve read into a weight slot shows.
+        const entity_id n1 = 66, n2 = 67;
+        nation_budget   nb1;
+        for (std::size_t i = 0; i < priority_count; ++i)
+            nb1.weights[i] = 0.05f * static_cast<float>(i + 1);
+        nb1.weights[static_cast<std::size_t>(budget_priority::public_exploration)] = 0.3f;
+        nb1.reserve_fraction = 0.125f;
+        nation_budget nb2;
+        nb2.weights[static_cast<std::size_t>(budget_priority::contracted_force)] = 0.7f;
+        nb2.weights[static_cast<std::size_t>(budget_priority::charters)]         = 0.3f;
+        nb2.reserve_fraction = 0.875f;
+        f.nation_budgets[n1] = nb1;
+        f.nation_budgets[n2] = nb2;
 
         convoy_component cv;
         cv.source_market = 101; cv.dest_market = 202; cv.mode = convoy_mode::sea;
@@ -537,6 +585,28 @@ int main()
                       && back.sentiment.pairs.at({ c1, c2 }).access == 2.25f,
                   "P8 the pair-keyed float tables keep key orientation, and "
                   "sentiment keeps Access and Trust distinct (BL-546)");
+
+            // Sprint N3 T2: the weight map, slot by slot. Exact float equality
+            // is the point -- the scorer's output must survive a save unchanged
+            // or a loaded campaign spends by a vector nobody computed.
+            bool budgets_exact = back.nation_budgets.size() == 2
+                              && back.nation_budgets.count(n1) == 1
+                              && back.nation_budgets.count(n2) == 1;
+            if (budgets_exact)
+            {
+                const nation_budget& r1 = back.nation_budgets.at(n1);
+                const nation_budget& r2 = back.nation_budgets.at(n2);
+                for (std::size_t i = 0; i < priority_count; ++i)
+                    budgets_exact = budgets_exact && r1.weights[i] == nb1.weights[i]
+                                                  && r2.weights[i] == nb2.weights[i];
+                budgets_exact = budgets_exact && r1.reserve_fraction == 0.125f
+                                              && r2.reserve_fraction == 0.875f
+                                              && r1.weights[4] == 0.3f
+                                              && r2.weights[8] == 0.3f;
+            }
+            check(budgets_exact,
+                  "P9 nation_budgets round-trips exactly: nine weights + reserve for two "
+                  "nations, the non-dyadic 0.3f included");
         }
     }
 
