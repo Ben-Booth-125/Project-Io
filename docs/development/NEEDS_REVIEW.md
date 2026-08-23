@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*260 entries — 225 open, 35 resolved.*
+*264 entries — 229 open, 35 resolved.*
 
 ---
 
@@ -2258,6 +2258,81 @@ To let a harness reproduce the Era -1 exactly, `make_hard_coded_world` gained an
 > **Recommendation:** The second, scoped to the harnesses that need it. The live-Lua pattern already exists in the repo and is understood; extending it is cheaper than re-authoring two content files, and it closes the gap for world_gen.lua at the same time. The third is the honest interim and is already in place.
 
 *Files: `tools/verify/history_conquest_gap.cpp`, `docs/development/DEVELOPMENT_PRACTICES.md`, `scripts/works.lua`*
+
+### NR-559 — Seven bug reports filed as eight items: two calls taken on Ben’s behalf
+*decision taken on your behalf · raised 2026-08-22 · from Ben, 2026-08-22, seven numbered bug reports (single plate / non-viable starts / lack of industrialisation / provinces cross borders / bundle selection / mountains as elevation / legends in the minimap).*
+
+Filed as BL-559 through BL-566. Two partition calls were taken rather than asked, plus one status call across three items.
+
+(1) BUG 3 WAS SPLIT INTO TWO ITEMS. Ben wrote it as one sentence — "Surprising lack of industrialisation (need more worked tiles, and these should not be filled on the default lens)" — and it is one thought, but the two halves land in different layers: the density is generate_background_firms in src/world/ (BL-561), the fill is built_plate_colour in src/ui/ (BL-562). They are cross-linked in both directions and BL-561 lists BL-562 in unblocks, so the connection is not lost; but they can be built independently and one item spanning both layers would have carried two collision maps and two verification classes.
+
+(2) HALF OF BUG 4 WAS NOT FILED, BECAUSE IT ALREADY IS. Ben wrote "Provinces cross country boundaries, and country boundaries should not diffuse together". The first half is genuinely new and is BL-563. The SECOND half is BL-535 (national hue replaces the Country lens), which carries his own ruling from earlier the same day that the corner blend stops at national borders — designed, not yet built. Filing it again would have created two items for one change. BL-563 says so explicitly rather than silently omitting it.
+
+(3) THREE ITEMS FILED design-owed, NOT designed. BL-559 (which of gate / design-around / retune), BL-560 (the sentence has two readings and no predicate), BL-561 (direction is clear, the lever is not, and the measurement seam should run first). The other five are designed — the mechanism is traced and the change is stated.
+
+**Why it matters.** The split and the omission both change what Ben sees when he next queries the backlog: seven reports come back as eight rows, and one of his sentences has no row of its own. If either call is wrong it is cheap to undo now and expensive once tasks are promoted against them.
+
+- Accept both calls — BL-561/BL-562 stay separate, bug 4’s second half stays with BL-535
+- Merge BL-561 and BL-562 back into one item if the fill and the density should land together
+- Re-file bug 4’s second half as its own item if BL-535 is going to be re-scoped or dropped
+
+> **Recommendation:** Accept. The strongest argument for the split is that BL-562 is worth doing on its own merits even if the density never moves, and the strongest argument against re-filing bug 4 is that BL-535 already carries Ben’s own wording on it.
+
+*Files: `docs/development/backlog.json`*
+
+### NR-560 — The conquest half of Ben’s BL-563 answer was split into BL-567 rather than carried in the generation item
+*decision taken on your behalf · raised 2026-08-22 · from Ben, 2026-08-22, elicitation form, answering past the three BL-563 options: "Generate provinces alongside national borders, and have it be impossible to conquer a tile without also controlling the province".*
+
+The answer carries two rulings and they were separated. The FIRST (co-generate provinces with national borders) stayed in BL-563 and rewrote it: the item had proposed rejecting cross-nation candidates inside the existing fill, and Ben’s answer is the stronger design — regions grown to FIT the border rather than grown across it and trimmed. That also dissolved the frontier-fragmentation question the form asked, which is why no merge pass is in the ruling: offcuts never exist to merge.
+
+The SECOND (a tile cannot be conquered without the province) became BL-567, category Military, requires BL-563. Reasons for splitting rather than carrying: it lands in components.hpp / world.hpp / MILITARY.md rather than province.cpp; it is a FORWARD constraint on a system that does not exist rather than a fix to one that does; and it is design-owed where BL-563 is now designed, so carrying it would have held a buildable generation fix behind an unsettled military question.
+
+**Why it matters.** BL-563 can be promoted and built now; BL-567 cannot, and should not block it. If the split is wrong the cost is two rows where Ben wanted one, which is cheap to merge back before either is promoted.
+
+- Accept the split — BL-563 builds now, BL-567 carries the conquest invariant
+- Merge BL-567 back into BL-563 if the conquest rule should land with the generation change
+
+> **Recommendation:** Accept. BL-563 has a headless requirement that fails on today’s build and a clear fix; BL-567 has four genuinely open questions and a documented architectural collision. Holding the first behind the second buys nothing.
+
+*Files: `docs/development/backlog.json`*
+
+### NR-561 — BL-561: raising max_firms_per_body may be INERT — the two stop bounds are in series, not in parallel
+*observation · raised 2026-08-22 · from Ben, 2026-08-22, elicitation form: chose "Raise max_firms_per_body now" over running the measurement seam first.*
+
+Recorded because it is a caveat against a decision Ben took explicitly, and it should be visible as a flagged risk rather than buried in a design field.
+
+generate_background_firms loops `for (iter < max_iterations_per_body && firms_this_body < max_firms_per_body)` and BREAKS EARLY when production_ratio(production, demand) >= target_ratio (0.90f, corporation_generation.cpp:1718). The bounds are therefore in SERIES: whichever is reached first ends the loop. If the ratio is what currently stops it, the loop never approaches the 200-firm cap, and raising that cap adds exactly zero firms.
+
+The ruling is not thereby wrong — the cap may well be binding, and its own comment records it was already raised once from 40, which is weak evidence that it has been binding before. But the change is a coin-flip between "works" and "no-op" until someone reports which bound fired.
+
+**Why it matters.** The failure mode is not a bug, it is a SILENT no-op: the constant changes, the build succeeds, the world regenerates, and nothing moves — which reads as "the lever was too small" and invites raising it again. The distinguishing measurement costs almost nothing (measure_production_ratio was added on 2026-08-20 for exactly this question), so the design now requires reporting which bound fired as PART OF landing the change rather than as a preliminary study Ben declined.
+
+- Land the raise with the which-bound-fired report attached, as the design now says
+- Run the seam first after all, if the no-op case seems likely
+- Raise both target_ratio and max_firms_per_body together, so the change cannot be inert
+
+> **Recommendation:** The first. It honours Ben’s choice of lever, costs one extra printed line in whatever harness or generation report carries it, and makes the no-op case self-diagnosing instead of silent.
+
+*Files: `src/world/corporation_generation.cpp`, `docs/development/backlog.json`*
+
+### NR-562 — Campaign-era conquest (BL-567) collides with the documented reason provinces sit outside state_hash — and BL-536 is designing the save format right now
+*observation · raised 2026-08-22 · from Tracing Ben’s 2026-08-22 conquest ruling against world.hpp:250 and BL-518.*
+
+world.hpp:250 excludes `provinces` from state_hash and gives the reason explicitly: "state_hash folds the fields a TICK may mutate ... the partition is generation output and never moves once built". BL-518 states the same arrangement as Ben’s own earlier ruling (borders move during generation only, fixed once the campaign starts) and then warns, in as many words: "If this item ever grew into campaign-era border changes, that whole arrangement would need revisiting."
+
+Ben’s conquest ruling is that growth. The reconciling reading — and BL-567 recommends it rather than assuming it — is that the two things must be separated: the PARTITION (which tiles compose province P) stays fixed generation output, and only OWNERSHIP (which nation holds P) moves. That satisfies the rule exactly, since tiles are then not what changes hands, and it leaves provinces immutable, outside state_hash, still checked by determinism_harness across two generations, and still safe as a BL-467 battle-seed input.
+
+What does become live tick-mutable under that reading is nation_component::tiles, documented as "populated by Pass 2 (territory expansion) and STABLE THEREAFTER". That stops being true, and the field then has to enter state_hash and the save format.
+
+**Why it matters.** BL-536 (world-snapshot save) was designed on 2026-08-22 — the same day — and is being built now. It decides field-wise what is serialised. If nation ownership is about to become mutable campaign state, BL-536 should know that while its format is still being written, not after IOSV has a version number in the wild. The cost of knowing now is a comment; the cost of knowing later is a format version bump.
+
+- Tell BL-536 now, so the envelope anticipates mutable nation ownership even if nothing writes it yet
+- Leave BL-536 alone — the save version field exists precisely so the format can move, and BL-567 is design-owed with no build date
+- Settle BL-567’s partition-vs-ownership question first, since it is what determines the answer
+
+> **Recommendation:** The third, then the first. The partition-vs-ownership call is small, it is the thing everything else depends on, and it is Ben’s. Once it is made, BL-536 either needs nothing or needs one section — and either way it finds out cheaply.
+
+*Files: `src/world/world.hpp`, `src/world/components.hpp`, `docs/development/backlog.json`*
 
 ---
 
