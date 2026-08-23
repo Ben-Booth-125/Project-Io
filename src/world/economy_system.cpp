@@ -1616,9 +1616,24 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg)
             disband.push_back(id);
             continue;
         }
+
+        // BL-571: a nation-owned garrison is a FOURTH owner kind this pass
+        // never saw before — `owner` names a nation, not a corp. It is not
+        // orphaned by the corp-existence check below (it would never pass
+        // it); it is disbanded only if its OWNING NATION no longer exists,
+        // and it takes NONE of the corp vector past this point — no goods
+        // draw, no out-of-reach trigger, no decay/recovery. Its upkeep is a
+        // `military_research` budget-line claim in the nation's own budget
+        // pass instead (`run_nation_garrison_upkeep`, nation_step.cpp), which
+        // is also what moves its `supply_factor_permille`. See MILITARY.md
+        // § Nation garrisons: "A garrison does not draw the credits+goods
+        // vector run_unit_upkeep charges corp units."
         if (w.corporations.find(u.owner) == w.corporations.end())
         {
-            disband.push_back(id);
+            if (w.nations.find(u.owner) == w.nations.end())
+                disband.push_back(id);
+            else
+                ++out.units; // alive, counted, untouched by the rest of this loop
             continue;
         }
         if (u.muster_base != null_entity && w.buildings.find(u.muster_base) == w.buildings.end())

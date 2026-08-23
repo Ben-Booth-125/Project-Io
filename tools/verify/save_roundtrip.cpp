@@ -153,19 +153,33 @@ int main()
             check(!from_bytes(bad, victim), "P3 a mismatched version is rejected");
         }
         {
-            // Sprint 16, BL-570: the PREVIOUS format, by number. A v4 stream's
-            // `condition` records are one field short (no `province`), so a
-            // reader that accepted it would misread whatever bytes follow the
-            // first law's/embargo's condition as that condition's province id,
-            // and every field after it in the same record would shift with it.
-            // The whole stream is refused instead -- a v4 save is not migrated,
-            // it is rejected, and the destination is not touched.
-            static_assert(world_save_version == 5,
-                          "P9 names v4 as the refused predecessor; re-read this row on a bump");
+            // Sprint 16, BL-570: A v4 stream's `condition` records are one
+            // field short (no `province`), so a reader that accepted it would
+            // misread whatever bytes follow the first law's/embargo's condition
+            // as that condition's province id, and every field after it in the
+            // same record would shift with it. The whole stream is refused
+            // instead -- a v4 save is not migrated, it is rejected, and the
+            // destination is not touched.
+            static_assert(world_save_version == 6,
+                          "P9/P10 name v4/v5 as refused predecessors; re-read these rows on a bump");
             std::string bad = bytes_once;
             const uint32_t v4 = 4;
             std::memcpy(&bad[4], &v4, sizeof v4);
-            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v5)");
+            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v6)");
+        }
+        {
+            // Sprint 16, BL-571: the IMMEDIATE previous format (BL-570's v5,
+            // the version this batch actually released before BL-571 bumped
+            // again). A v5 stream's nation record is one w_id short (no
+            // capital_tile) -- not a trailing gap but a MID-RECORD one, so a
+            // reader that accepted it would misread every field of every
+            // nation after the first and everything serialised after
+            // `nations` besides. Refused whole, same contract as every prior
+            // bump.
+            std::string bad = bytes_once;
+            const uint32_t v5 = 5;
+            std::memcpy(&bad[4], &v5, sizeof v5);
+            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused (format is v6)");
         }
         {
             // Truncated mid-way through the tile store -- far enough in that a

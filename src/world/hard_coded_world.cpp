@@ -1229,6 +1229,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // generation-time write.
     seed_province_holders(w);
 
+    // BL-571: nation garrisons — capital plus grudge-border provinces, sized
+    // off each nation's treasury. Runs LAST of the three, because it reads
+    // both `w.provinces` (just built) and `province_holder_for` (just
+    // seeded) for the border-province test. See nation_generation.hpp.
+    seed_nation_garrisons(w);
+
     bump(12);
     return w;
 }

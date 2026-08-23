@@ -87,7 +87,18 @@ inline constexpr uint32_t world_save_magic =
 /// of a v5 record. A v4 stream is refused whole, on the same strict-equality
 /// contract as every prior bump — reinterpreting it would misread whatever
 /// bytes follow the first law's condition as that condition's province id.
-inline constexpr uint32_t world_save_version = 5;
+///
+/// Bumped to 6 by BL-571 (nation garrisons), landing the same Batch Delivery
+/// wave as BL-570 above: `nation_component::capital_tile` (one entity_id) is
+/// a new field IN THE MIDDLE of the existing per-nation record
+/// (`w_nation`/`r_nation`), not a trailing section — every nation record
+/// written before this item is one `w_id` short, so a v5 stream reads
+/// misaligned from the first nation onward rather than merely truncated. The
+/// same strict-equality contract refuses it whole. (BL-570 and BL-571 each
+/// independently bumped to 5 in their own worktrees; integrating both landed
+/// two new fields, so the version needed two bumps, not one — v5 exists only
+/// as the intermediate BL-570-alone shape and was never itself released.)
+inline constexpr uint32_t world_save_version = 6;
 
 /// Write @p w as a complete world snapshot.
 ///

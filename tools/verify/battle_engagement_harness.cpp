@@ -32,6 +32,10 @@
 //       per round, so an assertion tied to which ending a natural fight
 //       happens to reach would be exactly the kind of test that stops
 //       testing quietly the day the RNG stream shifts.
+//   B17 BL-571: A CORP-VS-NATION BATTLE OPENS AND RESOLVES. Drives
+//       `open_battle` directly rather than through the second trigger, which
+//       is a stub until BL-573 (contract templates, Wave 4) lands — see
+//       battle_system.hpp's own comment on `active_mercenary_contract_for`.
 //
 // Run: battle_engagement_harness
 // ---------------------------------------------------------------------------
@@ -102,6 +106,18 @@ entity_id add_corp(world& w, const char* name)
     cc.balance = 10000.0f;
     w.corporations[c] = cc;
     return c;
+}
+
+/// BL-571: a nation, for the corp-vs-nation battle case (B17). No territory,
+/// no budget — the battle mechanics under test read a unit's OWNER, never
+/// `nation_component`'s own fields.
+entity_id add_nation(world& w, const char* name)
+{
+    const entity_id n = w.create_entity();
+    nation_component nc{};
+    nc.name    = name;
+    w.nations[n] = nc;
+    return n;
 }
 
 entity_id add_unit(world& w, entity_id corp, entity_id tile, int count = 500)
@@ -683,6 +699,64 @@ int main()
             check(province_holder_for(f.w, f.province) == third,
                   "B16c THE PROVINCE HOLDER STAYED PUT -- a stalemate mutates nothing here");
         }
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB17 — BL-571: a corp-vs-nation battle opens and resolves\n");
+    {
+        // No declare_hostile row, by design (MILITARY.md § Nation garrisons):
+        // the second trigger's whole point is that an ACTIVE MERCENARY
+        // CONTRACT is the hostility, not a stance row. That trigger is stubbed
+        // today (active_mercenary_contract_for always returns null_entity —
+        // BL-573, contract templates, is Wave 4 and has not landed), so this
+        // case drives `open_battle` DIRECTLY — exactly the call the trigger
+        // would make once the stub has a real answer — to prove the
+        // MECHANICS work for a nation defender: the battle is opened,
+        // stepped and resolved through the same code path as any corp pair.
+        world w;
+        const entity_id body = make_grid_body(w, 6, 6);
+        build_province_partition(w, PARTITION_SEED);
+        const entity_id corp    = add_corp(w, "Mercenary");
+        const entity_id nation  = add_nation(w, "GarrisonNation");
+        const entity_id t       = tile_at(w, body, 2, 2);
+        const entity_id ua      = add_unit(w, corp, t);
+        const entity_id ud      = add_unit(w, nation, t);
+        const uint32_t province = w.provinces.province_of(t);
+
+        check(active_mercenary_contract_for(w, corp, province) == null_entity,
+              "B17 setup: the contract stub returns none (BL-573 has not landed)");
+        check(w.battles.empty(), "B17 setup: no battle exists before opening one");
+
+        const bool opened = open_battle(w, 0, province, corp, nation);
+        check(opened, "B17a open_battle opens a corp-vs-nation battle");
+        check(w.battles.size() == 1, "B17b exactly one battle is live");
+        if (!w.battles.empty())
+        {
+            const active_battle& b = w.battles.front();
+            check(b.attacker == corp && b.defender == nation,
+                  "B17c the corp is the attacker, the nation-owned garrison the defender");
+            check(b.attacker_units == std::vector<entity_id>{ ua }
+                      && b.defender_units == std::vector<entity_id>{ ud },
+                  "B17d each side carries exactly the one unit that stands there");
+        }
+
+        // Step it to a conclusion, the same ten-tick idiom B11 uses — the
+        // swing is genuinely random per round, so this loops rather than
+        // asserting a specific ending.
+        const int before = total_men(w);
+        bool concluded = false;
+        for (int i = 0; i < 10 && !concluded; ++i)
+        {
+            const battle_tick bt = run_battles(w, reg, i);
+            for (const battle_dispatch& d : bt.dispatches)
+                if (d.end != campaign_battle_end::in_progress)
+                    concluded = true;
+        }
+        check(concluded, "B17e the corp-vs-nation battle RESOLVED within ten ticks");
+        check(w.battles.empty(), "B17f ...and is erased, exactly as a corp-vs-corp conclusion is");
+        const int after = total_men(w);
+        check(after < before,
+              "B17g men died through the real step -- conservation and combat both hold for a nation side");
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);

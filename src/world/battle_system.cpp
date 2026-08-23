@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <map>
+#include <set>
 #include <vector>
 
 namespace {
@@ -363,6 +364,99 @@ bool request_withdraw(world& w, entity_id corp, uint32_t province, entity_id aga
     return false;
 }
 
+entity_id active_mercenary_contract_for(const world& w, entity_id corp, uint32_t province)
+{
+    (void)w; (void)corp; (void)province;
+    // STUB (BL-571). See this function's own doc comment (battle_system.hpp):
+    // no contract store exists in `world` until BL-573 lands. Always "none".
+    return null_entity;
+}
+
+bool open_battle(world& w, int tick, uint32_t province, entity_id attacker, entity_id defender)
+{
+    // Already fighting? Same identity rule discovery uses: a pair fights at
+    // most one battle per province at a time, in EITHER role order.
+    for (const active_battle& b : w.battles)
+    {
+        if (b.province != province)
+            continue;
+        if ((b.attacker == attacker && b.defender == defender)
+         || (b.attacker == defender && b.defender == attacker))
+            return false;
+    }
+
+    // Gather each side's units standing in `province`, ascending unit id —
+    // self-contained (unlike run_battles' discovery, this does not require a
+    // pre-built by-owner-by-province map), so a caller — either trigger, or a
+    // harness with no such map to hand — can call it directly.
+    std::vector<entity_id> attacker_units, defender_units;
+    {
+        std::vector<entity_id> ids;
+        ids.reserve(w.units.size());
+        for (const auto& kv : w.units)
+            ids.push_back(kv.first);
+        std::sort(ids.begin(), ids.end());
+        for (const entity_id uid : ids)
+        {
+            const unit_component& u = w.units.at(uid);
+            if (u.count <= 0 || u.owner == null_entity || u.position == null_entity)
+                continue;
+            if (w.provinces.province_of(u.position) != province)
+                continue;
+            if (u.owner == attacker)
+                attacker_units.push_back(uid);
+            else if (u.owner == defender)
+                defender_units.push_back(uid);
+        }
+    }
+    if (attacker_units.empty() || defender_units.empty())
+        return false;
+
+    const std::vector<army_stack_entry> atk_stack = build_side(w, attacker_units);
+    const std::vector<army_stack_entry> def_stack = build_side(w, defender_units);
+    if (!stack_can_fight(atk_stack) || !stack_can_fight(def_stack))
+        return false; // see stack_can_fight's own doc comment: the 0-vs-0 trap
+
+    const terrain_pick g = defender_ground(w, defender_units);
+
+    campaign_battle_identity id;
+    id.attacker   = attacker;
+    id.defender   = defender;
+    id.province   = province;
+    id.tick       = static_cast<uint64_t>(tick);
+    id.world_seed = w.provinces.seed;
+
+    auto mean_supply = [&](const std::vector<entity_id>& us) {
+        long long sum = 0; int n = 0;
+        for (const entity_id uid : us)
+        {
+            const auto it = w.units.find(uid);
+            if (it == w.units.end()) continue;
+            sum += it->second.supply_factor_permille;
+            ++n;
+        }
+        return n ? static_cast<int>(sum / n) : 1000;
+    };
+
+    active_battle nb;
+    nb.province        = province;
+    nb.attacker        = attacker;
+    nb.defender        = defender;
+    nb.attacker_units   = attacker_units;
+    nb.defender_units   = defender_units;
+    nb.state = begin_campaign_battle(
+        id,
+        atk_stack, doctrine_row{},
+        def_stack, doctrine_row{},
+        g.sub, g.cov, g.density, g.lf,
+        season::summer, // forced, exactly as trigger 1 — the world carries no season
+        mean_supply(attacker_units), mean_supply(defender_units));
+
+    w.battles.push_back(std::move(nb));
+    std::sort(w.battles.begin(), w.battles.end(), battle_order_less);
+    return true;
+}
+
 battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
 {
     battle_tick out;
@@ -517,6 +611,82 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
             ++out.opened;
         }
         std::sort(w.battles.begin(), w.battles.end(), battle_order_less);
+    }
+
+    // -----------------------------------------------------------------------
+    // 1b. DISCOVERY — corp vs. nation, over an ACTIVE MERCENARY CONTRACT
+    // -----------------------------------------------------------------------
+    // BL-571 (nation garrisons): no `declare_hostile` row is authored for this
+    // pair — the contract itself is the hostility, live only for its term
+    // (`active_mercenary_contract_for`). STUB TODAY (BL-573, contract
+    // templates, is Wave 4 of this batch and has not landed): the stub always
+    // returns `null_entity`, so this block is fully wired but finds no
+    // candidate from any production state yet. See battle_system.hpp's own
+    // doc comment on `active_mercenary_contract_for` and `open_battle`.
+    if (!w.units.empty() && !w.nations.empty() && !w.corporations.empty())
+    {
+        // province -> the nation whose garrison stands there. At most ONE by
+        // construction — BL-571 seeds exactly one nation's garrison per
+        // province — so "first found in ascending unit id" is exact, not a
+        // tie-break standing in for something that could genuinely differ.
+        std::map<uint32_t, entity_id> garrison_nation;
+        {
+            std::vector<entity_id> uids;
+            uids.reserve(w.units.size());
+            for (const auto& kv : w.units)
+                uids.push_back(kv.first);
+            std::sort(uids.begin(), uids.end());
+            for (const entity_id uid : uids)
+            {
+                const unit_component& u = w.units.at(uid);
+                if (u.count <= 0 || u.position == null_entity)
+                    continue;
+                if (w.nations.find(u.owner) == w.nations.end())
+                    continue; // a corp-owned unit
+                const uint32_t prov = w.provinces.province_of(u.position);
+                if (prov != 0)
+                    garrison_nation.emplace(prov, u.owner);
+            }
+        }
+
+        if (!garrison_nation.empty())
+        {
+            std::vector<entity_id> corp_ids;
+            corp_ids.reserve(w.corporations.size());
+            for (const auto& kv : w.corporations)
+                corp_ids.push_back(kv.first);
+            std::sort(corp_ids.begin(), corp_ids.end());
+
+            for (const entity_id corp : corp_ids)
+            {
+                // This corp's own provinces. A std::set, so the CONTENTS are
+                // all that matters — membership does not depend on w.units'
+                // iteration order, only on which units exist — and the
+                // consuming walk below is over the set's own ascending order.
+                std::set<uint32_t> corp_provinces;
+                for (const auto& kv : w.units)
+                {
+                    const unit_component& u = kv.second;
+                    if (u.owner != corp || u.count <= 0 || u.position == null_entity)
+                        continue;
+                    const uint32_t prov = w.provinces.province_of(u.position);
+                    if (prov != 0)
+                        corp_provinces.insert(prov);
+                }
+
+                for (const uint32_t prov : corp_provinces)
+                {
+                    const entity_id contract = active_mercenary_contract_for(w, corp, prov);
+                    if (contract == null_entity)
+                        continue; // always true today — see the stub's own doc comment
+                    const auto git = garrison_nation.find(prov);
+                    if (git == garrison_nation.end())
+                        continue; // no garrison standing here to engage
+                    if (open_battle(w, tick, prov, corp, git->second))
+                        ++out.opened;
+                }
+            }
+        }
     }
 
     if (w.battles.empty())
