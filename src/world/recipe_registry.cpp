@@ -8,6 +8,7 @@
 #include <cmath>     // std::isfinite -- the nation_ai loader's own rejection (Sprint N3 T1)
 #include <limits>
 #include <stdexcept>
+#include <string>
 
 namespace {
 
@@ -42,6 +43,33 @@ era_band read_era(const sol::table& entry, const std::string& context)
     if (*e == "industrial") return era_band::industrial;
     throw std::runtime_error("Unknown era '" + *e + "' in " + context
                              + " (expected any, ancient or industrial)");
+}
+
+/// Sprint N3 (NR-568): read an optional DECAY RATE, validated AS THE VALUE THAT
+/// LANDS — a finite number in [0, 1] — and REJECTED at load otherwise, naming
+/// the key. Never clamped: `decayed()` in sentiment.cpp does clamp a rate above
+/// 1 as an in-process backstop, but an AUTHORED nonsense rate reaching that
+/// clamp would be a silent reinterpretation, which is the thing the
+/// untrusted-input rule (io-standing-rules § Determinism & data model) forbids.
+/// Checked as a double BEFORE the narrowing cast, so a value that is finite as a
+/// Lua number but would not be as a float (> FLT_MAX) is caught by the range
+/// test rather than becoming +inf on the way in. A non-number under the key is
+/// rejected too, not defaulted — a typo'd `"0.07"` is not an absence.
+/// Absent is fine and keeps @p fallback (the inert zero today).
+float read_unit_rate(const sol::table& tbl, const char* key, float fallback,
+                     const std::string& context)
+{
+    const sol::object o = tbl[key];
+    if (!o.valid() || o.get_type() == sol::type::none || o.get_type() == sol::type::lua_nil)
+        return fallback;
+    if (o.get_type() != sol::type::number)
+        throw std::runtime_error(context + "." + key + " is not a number "
+                                 "(expected a finite rate in [0, 1])");
+    const double v = o.as<double>();
+    if (!std::isfinite(v) || v < 0.0 || v > 1.0)
+        throw std::runtime_error(context + "." + key + " = " + std::to_string(v)
+                                 + " is not a finite rate in [0, 1]");
+    return static_cast<float>(v);
 }
 
 /// BL-429: "food_rations_milled" -> "Food Rations Milled" — the pre-existing
@@ -386,8 +414,13 @@ void recipe_registry::load_from_lua(lua_state& lua)
     if (sentiment_tbl)
     {
         sentiment_params sp = m_sentiment;
-        sp.access_decay_per_tick = sentiment_tbl->get_or("access_decay_per_tick", sp.access_decay_per_tick);
-        sp.trust_decay_per_tick  = sentiment_tbl->get_or("trust_decay_per_tick",  sp.trust_decay_per_tick);
+        // The two rates are validated as the value that lands (finite, in
+        // [0, 1]) and REJECTED at load otherwise — see read_unit_rate. NR-568
+        // authored them at 1 - 2^(-1/9) (a nine-quarter half-life).
+        sp.access_decay_per_tick = read_unit_rate(*sentiment_tbl, "access_decay_per_tick",
+                                                  sp.access_decay_per_tick, "economy.sentiment");
+        sp.trust_decay_per_tick  = read_unit_rate(*sentiment_tbl, "trust_decay_per_tick",
+                                                  sp.trust_decay_per_tick,  "economy.sentiment");
         sp.neutral_epsilon       = sentiment_tbl->get_or("neutral_epsilon",       sp.neutral_epsilon);
         sp.limit                 = sentiment_tbl->get_or("limit",                 sp.limit);
         sp.band_edge_near        = sentiment_tbl->get_or("band_edge_near",        sp.band_edge_near);

@@ -286,6 +286,36 @@ economy = {
         offbody_freight_fraction      = 0.05,
     },
 
+    -- BL-545/BL-546: the relational substrate's DECAY (sentiment.hpp). Each
+    -- rate is the fraction of the remaining distance to neutral a dimension
+    -- sheds per tick; the substrate was inert until this table existed.
+    --
+    -- Ben's ruling (NR-568, 2026-08-23): a cancellation is forgotten in NINE
+    -- QUARTERS. One tick is one quarter, so that is a HALF-LIFE of 9 ticks, and
+    -- the rate is authored from it rather than guessed:
+    --
+    --     rate = 1 - 2^(-1 / half_life_ticks) = 1 - 2^(-1/9) = 0.0741253...
+    --
+    -- Authored as the RATE, not the half-life, because deriving it in-engine
+    -- would put a std::pow on the tick (sentiment.hpp says why that is refused).
+    -- Re-derive it from the line above if the ruling ever changes. Six
+    -- significant figures: a -2 Trust event is -1.000003 after nine ticks in
+    -- float32, which the sentiment harness asserts.
+    --
+    -- Access decays at the SAME rate until something emits into it (BL-540 is
+    -- the first nation->corp emitter); there is no separate ruling for it yet.
+    -- The loader (recipe_registry.cpp) REJECTS either rate at load unless it is
+    -- a finite number in [0, 1] — an authored rate is never clamped silently.
+    --
+    -- The factor weights are NOT authored here: contract_completed /
+    -- contract_cancelled Trust weights are seeded from procurement's
+    -- reputation_on_complete / reputation_on_cancel above (BL-546), and every
+    -- other factor stays at zero until its emitter lands.
+    sentiment = {
+        trust_decay_per_tick  = 0.074125,
+        access_decay_per_tick = 0.074125,
+    },
+
     -- BL-430: switching a processing_facility's recipe through the player-grade
     -- seam (the management UI's method dropdown, or an AI's dial_recipe margin
     -- chase — both go through corp_command's set_recipe verb) is a COMMITMENT,

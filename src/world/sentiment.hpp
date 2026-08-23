@@ -264,13 +264,18 @@ struct sentiment_params
     ///
     /// Authored as a rate rather than a half-life on purpose. A half-life is the
     /// legible way to THINK about it — rate = 1 - 2^(-1 / half_life_ticks), so a
-    /// 180-day half-life is ~0.00384 — but converting it would put a `std::pow`
-    /// in the engine, and pow is not guaranteed identically rounded across
-    /// libms. The value that crosses the save seam and the tick is the RATE.
+    /// 180-tick half-life is ~0.00384 (a tick is a quarter) — but converting it
+    /// would put a `std::pow` in the engine, and pow is not guaranteed
+    /// identically rounded across libms. The value that crosses the save seam
+    /// and the tick is the RATE. The authored value (scripts/economy.lua,
+    /// NR-568) is a NINE-tick half-life: 1 - 2^(-1/9) = 0.074125.
     ///
     /// Zero = this dimension does not decay AND IS NOT TOUCHED AT ALL (not even
     /// by the epsilon snap). Values above 1 are clamped to 1 (full decay in one
-    /// tick) so a nonsense authored rate can never flip a sentiment's sign.
+    /// tick) so a nonsense authored rate can never flip a sentiment's sign —
+    /// an in-process backstop only: the Lua loader (recipe_registry.cpp,
+    /// `read_unit_rate`) REJECTS an authored rate outside [0, 1] or non-finite
+    /// at load, naming the key, so an authored value never reaches the clamp.
     float access_decay_per_tick = 0.0f;
     float trust_decay_per_tick  = 0.0f;
 

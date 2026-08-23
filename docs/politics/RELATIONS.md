@@ -180,10 +180,12 @@ same axis.
 
 1. **The floor and the current standing must be VISIBLE** — pair with BL-390 (the seam has no
    read-back). A player reasoning about a number they cannot see is the defect's other half.
-2. **The decay rate needs a reason.** `economy.sentiment.trust_decay_per_tick` is **unauthored**, so
-   decay is inert in the shipped build and the deadlock is dissolved *in mechanism but not yet in
-   play*. Authoring it is one line; choosing the number is Ben's call, and it deserves BL-543's
-   treatment — an anchor, not a guess.
+2. ~~**The decay rate needs a reason.**~~ **AUTHORED 2026-08-23 (Sprint N3, NR-568).** Ben's
+   anchor: *a cancellation is forgotten in nine quarters* — a nine-tick half-life, so
+   `economy.sentiment.trust_decay_per_tick = 1 − 2^(−1/9) = 0.074125` in `scripts/economy.lua`,
+   with the derivation in the comment beside it. Access decays at the same rate until BL-540 emits
+   into it. The deadlock is now dissolved *in play*: a −2 cancellation halves in nine ticks and its
+   row is erased inside ~130 (`sentiment_harness` R3h–R3m).
 
 ### 3. Embargo — *a read path with no writer*
 
@@ -232,10 +234,12 @@ honest visible-information source for it, so the axis is left out rather than fa
   snapshot (`world_save_version` 1 → 2, because one float per pair became two). The procurement
   stream stopped carrying reputation entirely (`procurement_version` 2 → 3) — keeping a copy there
   would have recreated the second store the migration exists to delete.
-- **Decay is authored nowhere, so the substrate is inert in the shipped build.** Every factor
-  weight but the two procurement ones is zero, and both decay rates are zero, which is what makes
-  the migration byte-identical on the day it lands. It also means BL-391's fix is *available* rather
-  than *in play*: `scripts/economy.lua` has no `sentiment` table yet. See § 2 above.
+- ~~**Decay is authored nowhere, so the substrate is inert in the shipped build.**~~ **CLOSED
+  2026-08-23 (Sprint N3).** `scripts/economy.lua` now carries `economy.sentiment` with both decay
+  rates at the nine-tick half-life (NR-568), so the two procurement factors decay and BL-391's fix
+  is *in play*. Every factor weight but those two is still zero — each waits on its emitter. The
+  migration was byte-identical on the day it landed because decay was zero then; it is not now.
+  See § 2 above.
 - **No rival ever declares anything.** BL-450 (rivals score stance) was **granted on 2026-08-18**
   and `corp_ai.cpp` contains no stance scoring at all. So every hostility in a played game is one
   the player declared. The grant is a permission nobody has used — the same state

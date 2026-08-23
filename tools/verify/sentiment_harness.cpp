@@ -15,7 +15,9 @@
 //   R3  DECAY HAS NO FLOOR. A value driven to either extreme returns to EXACT
 //       neutral within the authored window, and its row is erased — so there is
 //       no value it cannot leave. This dissolves BL-391's reputation deadlock by
-//       construction rather than by a special case.
+//       construction rather than by a special case. R3h-R3m (Sprint N3, NR-568)
+//       pin the AUTHORED rate: a -2 cancellation halves in nine ticks, is erased
+//       inside ~130, and a pair with no event never grows a row.
 //   R4  TWO DIMENSIONS stored and moving independently, at every grain
 //       (corp->corp, nation->corp, nation->nation).
 //   R5  INERTNESS. All factor weights and decay at zero => nothing is stored and
@@ -354,6 +356,107 @@ int main()
         check(sentiment_toward(v, a, b).access == 0.0f,
               "R3g a rate above 1 lands exactly on neutral - it never flips the "
               "sign of a relationship");
+    }
+
+    // --- R3h-R3m: THE AUTHORED RATE (Sprint N3 T10, NR-568) --------------------
+    std::printf("\n-- R3  the authored rate: a cancellation is forgotten in nine quarters --\n");
+    {
+        // Ben's ruling (NR-568, 2026-08-23): a cancellation is forgotten in NINE
+        // QUARTERS, i.e. a nine-tick half-life, so scripts/economy.lua authors
+        //     trust_decay_per_tick = 1 - 2^(-1/9) = 0.074125   (six sig. figs)
+        // This fixture does not load Lua, so the SAME LITERAL is hand-set here;
+        // if economy.lua's number moves, this one must move with it.
+        //
+        // REPRESENTATION. `sentiment_value::trust` is an IEEE-754 binary32 and
+        // decay is the multiplicative step `v -= v * r` (sentiment.cpp,
+        // `decayed`). Nine of those from -2 give -2 * (1 - r)^9, which is -1.0
+        // exactly only if r were the irrational 1 - 2^(-1/9). The authored
+        // decimal is six significant figures, so (1 - r)^9 is off by about
+        // 9 * |dr| / (1 - r) ~ 3e-6 relative, plus nine float roundings of
+        // ~6e-8 each. The tolerance below is 1e-5 — about 80 ulps at 1.0 —
+        // which is that decimal rounding and nothing looser; "+-1 fixed-point
+        // step" has no meaning for a float, so this is the honest equivalent.
+        const float authored_rate = 0.074125f;
+        sentiment_params p = authored_params();
+        p.trust_decay_per_tick  = authored_rate;
+        p.access_decay_per_tick = authored_rate;
+        // The fold uses this harness's small-integer weights, where
+        // contract_cancelled is pure ACCESS; the ruling is about Trust, so the
+        // -2 is driven through the seeded procurement weight instead, exactly
+        // as the live loader does (reputation_on_cancel = -2 -> Trust).
+        p.factors[static_cast<std::size_t>(sentiment_factor_kind::contract_cancelled)] = {0.0f, -2.0f};
+
+        const entity_id buyer = 31, supplier = 32, bystander = 33;
+
+        sentiment_table t;
+        apply_sentiment_events(t, p, {ev(buyer, supplier, sentiment_factor_kind::contract_cancelled)});
+        check(same(sentiment_toward(t, buyer, supplier).trust, -2.0f) && t.pairs.size() == 1,
+              "R3h one cancellation on a quiet pair reads Trust -2, and creates "
+              "exactly one row");
+
+        auto within = [](float v, float target, float tol) {
+            const float d = v - target;
+            return d <= tol && d >= -tol;
+        };
+
+        for (int i = 0; i < 9; ++i)
+            decay_sentiment(t, p);
+        const float after_nine = sentiment_toward(t, buyer, supplier).trust;
+        check(within(after_nine, -1.0f, 1e-5f),
+              "R3i ...nine ticks later it has HALVED (-1.0 within 1e-5: the "
+              "authored decimal's rounding, binary32 multiplicative decay)");
+
+        for (int i = 0; i < 9; ++i)
+            decay_sentiment(t, p);
+        check(within(sentiment_toward(t, buyer, supplier).trust, -0.5f, 1e-5f),
+              "R3j ...and QUARTERED at eighteen: the half-life is a half-life, "
+              "not a one-off");
+
+        // No floor: keep going until the row is gone. Magnitude must fall
+        // STRICTLY every tick until the epsilon snap erases it - a tick on
+        // which it did not move would be a floor by another name. From -2 at
+        // this rate the snap lands at tick 129; 200 is a generous ceiling.
+        bool strictly_shrinking = true;
+        int  erased_at = -1;
+        float prev = sentiment_toward(t, buyer, supplier).trust;
+        for (int tick = 19; tick <= 200 && erased_at < 0; ++tick)
+        {
+            decay_sentiment(t, p);
+            const auto row = t.pairs.find({buyer, supplier});
+            if (row == t.pairs.end())
+            {
+                erased_at = tick;
+                break;
+            }
+            const float cur = row->second.trust;
+            if (!(cur > prev) || cur >= 0.0f) // toward zero from below, never past it
+                strictly_shrinking = false;
+            prev = cur;
+        }
+        check(erased_at > 0 && strictly_shrinking,
+              "R3k ...then shrinks strictly every tick until the row is ERASED - "
+              "it reaches exact neutral and never sits on a floor");
+        check(sentiment_toward(t, buyer, supplier) == sentiment_value{} && t.pairs.empty(),
+              "R3l ...leaving the table empty: forgotten is indistinguishable "
+              "from never-met");
+
+        // A pair with NO event stays at zero throughout: decay visits stored
+        // rows only and never manufactures one, so the bystander's rows are
+        // absent before, during and after.
+        sentiment_table u;
+        apply_sentiment_events(u, p, {ev(buyer, supplier, sentiment_factor_kind::contract_cancelled)});
+        bool bystander_quiet = true;
+        for (int tick = 0; tick < 200; ++tick)
+        {
+            decay_sentiment(u, p);
+            if (sentiment_toward(u, buyer, bystander) != sentiment_value{} ||
+                sentiment_toward(u, bystander, supplier) != sentiment_value{} ||
+                u.pairs.count({buyer, bystander}) != 0 || u.pairs.count({bystander, supplier}) != 0)
+                bystander_quiet = false;
+        }
+        check(bystander_quiet,
+              "R3m a pair with no event stays at exact zero with no row, before, "
+              "during and after the driven pair's whole decay");
     }
 
     // --- R4: TWO DIMENSIONS, AT EVERY GRAIN ---------------------------------

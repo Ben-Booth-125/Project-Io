@@ -84,10 +84,10 @@ enum class resource_type : uint8_t
     //
     // SAVE-FORMAT NOTE (BL-308 / BL-107): resource_type is a serialised width
     // and every per-resource array is sized off `count`, so APPENDING a value
-    // renumbers nothing but DOES change every array's length. There is no
-    // serialisation layer today and BL-107 (save magic + version header) has
-    // not landed, so this append is free right now. It stops being free the
-    // moment saves exist: from then on, a new resource_type value is a
+    // renumbers nothing but DOES change every array's length. When BL-340
+    // appended here there was no serialisation layer and the append was free.
+    // IT IS NOT FREE ANY MORE: BL-107 landed 2026-08-22 (world_save.cpp, magic
+    // + `world_save_version`), so from then on a new resource_type value is a
     // save-format break and needs a version bump + migration.
     propellant            = 26, ///< Launch propellant; consumed per space-mode convoy dispatch.
     // --- Tier 2/3: processing chain roster (BL-340, 2026-08-11) ---
@@ -1181,9 +1181,11 @@ struct nation_component
     /// never a mint. Zero at generation; nothing spends it yet, and a treasury
     /// that started full would be a balance change smuggled in as a field. The
     /// spend side is future nation-grain work under the 2026-08-18 grant.
-    /// NOT yet serialised and NOT covered by state_hash (nations are hashed
-    /// nowhere) — BL-107 must pick this field up; until then a treasury
-    /// divergence is only detectable through the debit half on corp balances
-    /// (review 2026-08-19 #3).
+    /// SERIALISED since BL-107, 2026-08-22 (world_save.cpp's nation record,
+    /// `w_nation` / `r_nation`, carries it). Whether `state_hash`
+    /// folds it is world.cpp's call — Sprint N3 (T8) folds nation treasuries
+    /// only when non-trivial, on the battles precedent; until that lands a
+    /// treasury divergence is only detectable through the debit half on corp
+    /// balances (review 2026-08-19 #3).
     float treasury = 0.0f;
 };
