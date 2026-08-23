@@ -506,6 +506,17 @@ in `tools/verify/README.md`.
   two-arg form every existing caller uses still cuts and still credits. An interception is an
   EVENT, not state — nothing is stored on `world`, serialised, or folded into `state_hash`.
 
+- **`cadence_schedule`** — Does every rival get its turn on the schedule the LIVE APP runs?
+  (BL-568, 2026-08-23.) corp_ai's stagger was keyed on the DAY tick, which is 90n at every
+  quarter boundary in the app, and 90n mod 4 is only ever 0 or 2 — so half the rival roster
+  never evaluated in a played game while every harness (passing 1..N) rotated all four slots.
+  The key is now `world::current_econ_tick`, set by every driver beside the day tick. This
+  harness drives `run_economy_step` on the APP's pair (day 90n, econ n) and asserts on
+  `economy_report::corps_evaluated`: every rival within `cadence_k` ticks (C2), and the record
+  equals `corp_strategic_eval_due`'s set each tick (C3). **Mutation-checked** — on the old key
+  C2/C3 go red, 4 of 7 rivals never due. **Any harness that sets `current_day_tick` before
+  stepping must set `current_econ_tick` too**, or it measures a sim where only index 0 acts.
+
 - **`tile_axes_harness`** — The substrate/cover terrain split (BL-519, 2026-08-21). 13 checks over
   the two-axis replacement for `terrain_composition`: the density invariant (density is 0 **iff**
   cover is `none`), `cover_fraction` monotonicity, `is_biotic_cover` membership, and — the rows that

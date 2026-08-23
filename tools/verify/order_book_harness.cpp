@@ -448,7 +448,8 @@ int main()
                     rm.order = s.w.sell_orders.front().id;
                     apply_corp_command(s.w, reg, rm);
                 }
-                s.w.current_day_tick = t;
+                s.w.current_day_tick  = t;
+                s.w.current_econ_tick = t;
                 const economy_report rep = run_economy_step(s.w, reg);
                 const auto flows = clear_markets(s.w, reg, rep);
                 apply_budget(s.w, reg, flows, rep.workforce_contention, nullptr);

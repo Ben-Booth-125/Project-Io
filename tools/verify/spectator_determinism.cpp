@@ -375,7 +375,8 @@ int families_covered(const std::map<verb_family, int>& f)
 /// can never complete and the hire/muster path silently zeroes out.
 void run_tick(world& w, const recipe_registry& reg, int tick, bool spectating)
 {
-    w.current_day_tick = tick;
+    w.current_day_tick  = tick;
+    w.current_econ_tick = tick;
     const economy_report rep = run_economy_step(w, reg, spectating);
     const auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, nullptr);

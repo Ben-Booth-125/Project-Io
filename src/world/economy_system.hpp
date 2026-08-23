@@ -144,6 +144,13 @@ struct economy_report
     /// deterministic order they were applied. See agency_event.
     std::vector<agency_event> agency_events;
 
+    /// The corps the strategic tier EVALUATED this tick, in sorted-id order —
+    /// whether or not they then acted. Recorded so a driver's cadence can be
+    /// proven through the real tick rather than inferred (BL-568: the live app
+    /// ran half the roster for weeks and nothing could see it). Includes the
+    /// player corp only under `corp_ai_params::spectating`.
+    std::vector<entity_id> corps_evaluated;
+
     /// Battles that did something this tick (BL-467/BL-468), in the same sorted
     /// (province, attacker, defender) order the battle record is walked in.
     ///

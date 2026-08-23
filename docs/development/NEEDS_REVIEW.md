@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*268 entries — 232 open, 36 resolved.*
+*271 entries — 234 open, 37 resolved.*
 
 ---
 
@@ -2385,6 +2385,34 @@ The branch carried two things: the Sprint 28 T1/T2 diagnostic (a duplicate of ma
 
 *Files: `src/world/history_sim.cpp`, `src/world/history_sim.hpp`, `tools/verify/history_conquest_gap.cpp`, `build_gen/settle_feasibility_port.patch`*
 
+### NR-567 — 'Wire the spines live' is three pieces, not two — the budget pass pays nobody without a claim producer, so public exploration (BL-538 line 5) is pulled forward into the wiring sprint
+*decision taken on your behalf · raised 2026-08-23 · from Sprint N3 scoping, 2026-08-23, after Ben chose the wiring-first order for the invisible N1 features.*
+
+run_national_budget transfers only against budget_claim rows, and every claim producer belongs to BL-538 (the nine priority lines), which is designed and unbuilt. Wiring BL-542 (scorer) + BL-537 (budget pass) alone yields a nation that authors weights every cadence and pays nothing — a surface over it (BL-555/BL-558) would render a treasury and a weight vector and an empty payments list. Ben was asked and chose BOTH: public exploration now as the proving line (survey_system already has a paid dispatch with cost and duration and 'merely has no funder but the player'), then contracted force once BL-377's contract seam exists.
+
+**Why it matters.** It changes the sprint's shape: BL-538's first cut (lines 1-6) is NOT being built wholesale — one line is pulled forward to prove the loop, and the other four hosted lines stay in BL-538. Recording so the partial landing of BL-538 is a choice on the record, not drift. It also means BL-377 (mercenary contract seam, reopened 2026-08-22 as never-built) enters this sprint as the second line's host.
+
+- Confirm: public exploration + contracted force in this sprint; lines 1-4 stay in BL-538.
+- Widen to BL-538's whole first cut (lines 1-6) in one go.
+- Narrow back to public exploration only; contracted force waits for a BL-377 sprint of its own.
+
+> **Recommendation:** Confirm, as chosen.
+
+*Files: `src/world/nation_budget.hpp`, `src/world/nation_ai.hpp`, `src/world/survey_system.cpp`, `docs/economy/CONTRACTS.md`*
+
+### NR-569 — Four calls taken on Ben's behalf from the integration map: weight map on world (save v2→3), state_hash folds treasuries conditionally, player corp not funded this cut, national pass runs under spectating
+*decision taken on your behalf · raised 2026-08-23 · from Sprint N3 integration map, 2026-08-23.*
+
+a) world::nation_budgets (std::map<entity_id, nation_budget>) is the persistent weight map the scorer overwrites one slot at a time; serialised beside nations, world_save_version 2→3, which refuses today's quicksave.iosave (rejection is the migration story, world_save.hpp:60). b) state_hash folds nation treasuries and the weight map ONLY when any treasury is non-zero or the map is non-empty (the battles precedent, world.cpp:193-204), so every empty-nation fixture's hash is unchanged. c) The player corp is never scored by corp_ai (corp_ai.cpp:613-614) so it is never funded this cut; a petition_nation verb is the BL-538 follow-on and the player's first path through the seam. d) The national pass has no human subject, so it runs regardless of corp_ai_params::spectating — a subsidy landing on the player's corp is a transfer TO, not an action ON, the player, so this is not a standing-rule widening.
+
+**Why it matters.** (a) and (b) move goldens; (c) means the mercenary's own income loop is still absent until contracted force lands; (d) is an interpretation of the prohibition that should be on record.
+
+- Confirm all four.
+- Overturn (c): give the player a petition path in this sprint.
+- Overturn (d): gate the pass on spectating like corp_ai.
+
+> **Recommendation:** Confirm.
+
 ---
 
 ## Resolved
@@ -2931,4 +2959,13 @@ PHANTOMS.md § Class 1 listed the star map as a system running in code with no d
 > **RESOLVED.** Self-corrected 2026-08-22 at the moment it was found. PHANTOMS.md § Class 1 marks the row as a false positive with the reason.
 
 *Files: `docs/development/PHANTOMS.md`, `docs/ui/MINIMAP.md`*
+
+### NR-568 — Sprint N3 rulings (Ben, 2026-08-23): cadence fix first; exploration credit is EARMARKED; claim is the full survey cost; sentiment forgets a cancellation in 9 quarters; contracted force is the second slice of the same sprint
+*decision · raised 2026-08-23 · from Design form answered by Ben, 2026-08-23, on the nation-spines integration map.*
+
+1) BL-568 (half the rivals never act) is fixed FIRST as its own commit — the econ counter mirrored onto world; the nation step reads the same field. 2) A nation funding a corp's survey is an EARMARKED dispatch: the payment dispatches the survey of the named body, it is not a fungible top-up the corp may spend on a build. This needs budget_claim::subject (the body) and a nation-payer path into dispatch_survey. 3) The claim amount is the FULL survey cost, not the shortfall. 4) Sentiment decay anchor: a cancellation is forgotten in 9 quarters — trust_decay_per_tick = 1 − 2^(−1/9) ≈ 0.0741; access at the same rate until BL-540 emits into it. 5) Contracted force (BL-377 as client) is the SECOND SLICE of this sprint, after the exploration line lands.
+
+**Why it matters.** Earmarking changes the claim producer's shape: the claim names a body, and run_national_budget's consumer dispatches rather than credits-and-forgets. Conservation still holds — the nation's credit lands on the corp and leaves it the same tick as the survey cost.
+
+> **RESOLVED.** Rulings applied to the Sprint N3 task list in REFINED.md.
 

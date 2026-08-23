@@ -473,7 +473,8 @@ static purity_trace run_purity_world(bool perturb_angles)
             w.pool_for(corp_id, body).quantities[ri(resource_type::propellant)] = 5.0f;
         }
 
-        w.current_day_tick = tick;
+        w.current_day_tick  = tick;
+        w.current_econ_tick = tick;
 
         // Run B: the live angles carry arbitrary frame-drift garbage. Dispatch
         // must not notice.

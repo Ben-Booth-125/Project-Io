@@ -156,7 +156,8 @@ void run_seed(uint32_t seed)
 
     for (int t = 1; t <= k_ticks; ++t)
     {
-        w.current_day_tick = t;
+        w.current_day_tick  = t;
+        w.current_econ_tick = t;
         const economy_report rep = run_economy_step(w, reg);
         const auto flows = clear_markets(w, reg, rep);
 

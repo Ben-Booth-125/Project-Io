@@ -629,7 +629,8 @@ int main(int argc, char* argv[])
     const auto t_run0 = std::chrono::steady_clock::now();
     for (int t = 1; t <= total_ticks; ++t)
     {
-        w.current_day_tick = t;
+        w.current_day_tick  = t;
+        w.current_econ_tick = t;
         const long long routes_before  = static_cast<long long>(w.trade_routes.size());
         const long long seeded_before  = plan.seeded;
         const long long convoys_before = static_cast<long long>(w.convoys.size());

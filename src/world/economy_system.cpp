@@ -1511,15 +1511,17 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // reflex tier (tier 0, unchanged above): due non-player corps evaluate a
     // bounded candidate set, emit corp_commands, and apply them through the
     // player-grade seams (apply_corp_command). The tick source is
-    // w.current_day_tick, which drives the staggered cadence; callers (app's
-    // sim loop, the harnesses) maintain it per tick. The player corp is never
+    // w.current_econ_tick — the quarter counter, NOT the day tick — which
+    // drives the staggered cadence; every driver sets it before stepping
+    // (BL-568: the day tick is 90n in the app and only ever rotates half the
+    // cadence slots). The player corp is never
     // evaluated or commanded (io-standing-rules.md) — EXCEPT under `spectating`
     // (BL-409), where the session has no human seat at all, so the prohibition
     // has no subject and every corp evaluates on the same cadence.
     {
         corp_ai_params p;
         p.spectating = spectating;
-        run_corp_strategic_step(w, reg, report, w.current_day_tick, p);
+        run_corp_strategic_step(w, reg, report, w.current_econ_tick, p);
     }
 
     // BL-470: the march pass. Runs where BL-467's battle-discovery phase will

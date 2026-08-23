@@ -164,7 +164,8 @@ recipe_registry make_world_registry()
 /// unlock_structure, is still bit-identical.
 void run_world_tick(world& w, const recipe_registry& reg, int tick)
 {
-    w.current_day_tick = tick;
+    w.current_day_tick  = tick;
+    w.current_econ_tick = tick;
     const economy_report rep = run_economy_step(w, reg);
     const auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, nullptr);

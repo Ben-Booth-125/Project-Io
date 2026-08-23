@@ -560,7 +560,8 @@ int main()
 
             for (int t = 0; t < 6; ++t)
             {
-                s.w.current_day_tick = t;
+                s.w.current_day_tick  = t;
+                s.w.current_econ_tick = t;
                 // Player traffic on even ticks; a hold on tick 3.
                 if (t % 2 == 0)
                     apply_corp_command(s.w, reg, dispatch_cmd(s, 5.0f + static_cast<float>(t)));

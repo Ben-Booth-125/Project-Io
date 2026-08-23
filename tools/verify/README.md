@@ -546,6 +546,28 @@ Each exits non-zero on a failed assertion. The economy *panel* (the visual class
 is verified separately via `ProjectIo --verify scripts/verify/economy_panel.lua`
 (the `verifier-visual` skill).
 
+## cadence_schedule (BL-568)
+
+Does every rival get its turn on the schedule the LIVE APP runs? corp_ai's stagger
+(`tick % cadence_k == index % cadence_k`) was keyed on `world::current_day_tick`,
+which the app mirrors from the sim loop — 90n at every quarter boundary — and
+90n mod 4 is only ever 0 or 2. Rivals at sorted index 1 or 3 (mod 4) never
+evaluated in a played game; every harness, `--serve` and `--verify` passed 1..N
+and rotated all four slots, so the suite certified a schedule the game never ran.
+
+The key is now `world::current_econ_tick`, set by every driver. This harness drives
+`run_economy_step` on the APP's pair (day 90n, econ n) and asserts on
+`economy_report::corps_evaluated`: C1 the day tick reaches fewer than
+`cadence_k` slots while the econ counter reaches all; C2 every rival is evaluated
+within `cadence_k` ticks; C3 the record equals `corp_strategic_eval_due`'s set on
+every tick. Mutation-checked: with the old key C2/C3 go red (4 of 7 rivals never
+due on seed 0). No registry needed — the gate precedes scoring.
+
+```
+cmake --build build --target cadence_schedule
+ctest --test-dir build -R cadence_schedule
+```
+
 ## spectator_determinism (BL-409)
 
 Spectator mode's no-human-seat rule. Asserts that the strategic tier evaluates the

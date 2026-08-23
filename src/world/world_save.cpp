@@ -627,7 +627,8 @@ void clear_derived_state(world& w)
 
     // Mirrored from the sim loop each frame by app; the envelope carries the
     // authoritative tick.
-    w.current_day_tick = 0;
+    w.current_day_tick  = 0;
+    w.current_econ_tick = 0;
 }
 
 void write_world_snapshot(const world& w, std::ostream& out)

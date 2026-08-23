@@ -181,7 +181,8 @@ recipe_registry make_registry()
 void run_tick(world& w, const recipe_registry& reg, int tick, int* out_idled_events = nullptr,
               economy_report* out_report = nullptr)
 {
-    w.current_day_tick = tick;
+    w.current_day_tick  = tick;
+    w.current_econ_tick = tick;
     const economy_report rep = run_economy_step(w, reg);
     if (out_report)
         *out_report = rep;

@@ -616,6 +616,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // Staggered cadence (Victoria-3 tick-task idea): due this tick?
         if ((tick % k) != (static_cast<int>(index) % k))
             continue;
+        report.corps_evaluated.push_back(corp);
 
         // This corp is evaluating: tick down its buildings' dial cooldowns.
         for (const entity_id bid : cc.assets)

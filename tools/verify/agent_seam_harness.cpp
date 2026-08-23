@@ -236,7 +236,8 @@ scene make_scene()
 /// replay — the deterministic frame both hashes are measured in.
 void step_tick(world& w, const recipe_registry& reg, int t)
 {
-    w.current_day_tick = t;
+    w.current_day_tick  = t;
+    w.current_econ_tick = t;
     economy_report rep   = run_economy_step(w, reg);
     auto           flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings);

@@ -143,7 +143,8 @@ int run_serve(int ticks, long long as_corp, bool as_any)
     // carry byte-identical copies of this sequence, which is how the survey step
     // came to be missing from BOTH rather than from one.
     const auto step_one_tick = [&](int t) {
-        w.current_day_tick = t;
+        w.current_day_tick  = t;
+        w.current_econ_tick = t;
         dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
                          reg.logistics_cost(convoy_mode::space));
         advance_convoys(w);
@@ -223,7 +224,8 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
 
     for (int t = 1; t <= ticks; ++t)
     {
-        w.current_day_tick = t;
+        w.current_day_tick  = t;
+        w.current_econ_tick = t;
         dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
                          reg.logistics_cost(convoy_mode::space));
         advance_convoys(w);

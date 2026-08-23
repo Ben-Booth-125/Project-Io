@@ -488,6 +488,11 @@ private:
     std::vector<persona::pack> m_persona_bench; ///< Seated mountain bench (BL-207 slice 1); empty if load_bench() failed.
     std::unordered_map<entity_id, int> m_counsel_channel; ///< corp -> its lazily-created Counsel chat_channel index.
     uint64_t        m_last_econ_tick = 0; ///< econ_tick() at the previous step; drives the boundary detection in run().
+    /// Count of step_economy() calls this campaign — warm start included — and
+    /// the value mirrored onto world::current_econ_tick before each step. The
+    /// cadence key (BL-568). On load it resumes at pre_game_ticks + envelope
+    /// econ_tick, so a loaded campaign rotates exactly as an unsaved one.
+    uint64_t        m_econ_steps = 0;
     std::vector<float> m_balance_history;      ///< Recent player balances (one per econ tick, capped); feeds the header net + sparkline.
     std::vector<float> m_income_history;      ///< Recent player income per econ tick (market sales); feeds economy panel graph.
     std::vector<float> m_expenditure_history; ///< Recent player expenditure per econ tick (auto-buys + wages + maintenance); feeds economy panel graph.

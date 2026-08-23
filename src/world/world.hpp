@@ -144,6 +144,21 @@ struct world
     /// render signature. Not authoritative sim state and not serialised.
     int current_day_tick = 0;
 
+    /// Current ECON tick (the quarter counter), mirrored by every driver before
+    /// it steps the economy — app::step_economy, main.cpp's --serve and
+    /// --export-blackboard loops, and each harness beside its day-tick write.
+    /// Same contract as `current_day_tick`: a derived convenience, not
+    /// authoritative, not serialised (zeroed on load, re-seeded by the driver).
+    ///
+    /// THIS, NOT THE DAY TICK, IS THE CADENCE KEY (BL-568, 2026-08-23). The
+    /// corp_ai stagger is `tick % cadence_k == index % cadence_k`; it was keyed
+    /// on the day tick, which in the live app is 90n at every quarter boundary,
+    /// and 90n mod 4 is only ever 0 or 2 — so rivals at sorted index 1 or 3
+    /// (mod 4) NEVER evaluated in a played game, while every harness and
+    /// --serve loop (which pass 1..N) rotated all four slots. The econ counter
+    /// is what every driver actually advances by one per step.
+    int current_econ_tick = 0;
+
     /// The system's asteroid belt (a band, not a body). belt.present() is false
     /// when the system has no belt.
     asteroid_belt belt;

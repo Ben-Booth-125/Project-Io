@@ -909,6 +909,7 @@ void app::apply_corp_choice(entity_id chosen)
     start_new_game_prelude();
     m_warm_starting   = true;
     m_warm_ticks_done = 0;
+    m_econ_steps      = 0; // BL-568: a new campaign's cadence starts at slot 0.
     m_warm_begin      = std::chrono::steady_clock::now();
     m_worldgen_progress.sub_progress.store(0, std::memory_order_relaxed);
     m_worldgen_progress.sub_total.store(pre_game_ticks, std::memory_order_relaxed);
@@ -1232,6 +1233,12 @@ void app::step_economy()
             std::chrono::duration_cast<std::chrono::microseconds>(now - t).count() / 1000.0;
         t = now;
     };
+
+    // BL-568: the cadence key. The day tick (mirrored each frame) is 90n at a
+    // quarter boundary and rotates only half the corp_ai slots; this counter
+    // advances by exactly one per step across warm start, live play and
+    // --verify, which is the schedule every harness already certifies.
+    m_world.current_econ_tick = static_cast<int>(m_econ_steps++);
 
     dispatch_convoys(m_world, m_registry,
                      m_registry.logistics_cost(convoy_mode::land),
@@ -1710,6 +1717,10 @@ bool app::load_game_from(const std::string& path)
     // it here means the activity fog reads the right age on the FIRST frame
     // after a load rather than on the second.
     m_world.current_day_tick = static_cast<int>(env.day_tick);
+    // The cadence counter resumes where an unsaved campaign would be: the warm
+    // start's steps plus every live quarter since (BL-568).
+    m_econ_steps = static_cast<uint64_t>(pre_game_ticks) + env.econ_tick;
+    m_world.current_econ_tick = static_cast<int>(m_econ_steps);
 
     m_balance_history     = std::move(env.balance_history);
     m_income_history      = std::move(env.income_history);

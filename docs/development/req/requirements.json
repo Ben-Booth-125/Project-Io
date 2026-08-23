@@ -5600,6 +5600,46 @@
                     "notes": "MUTATIONS RUN, one per row: A1 - null creeds in the re-run, and struct-default params. R1 - the round identity off by one (cleared_rounds == chosen + lost + 1). R2 - zero the chosen counter on every seed that fought, after classification, so only R2's universal clause can catch it. R3 - the all-zero placeholder table. R4 - trace the \"untraced\" control run, so the gating half sees non-empty counters. Each mutation turned its row red."
                 }
             ]
+        },
+        {
+            "brief": "cadence-key",
+            "batch": "2026-08-23-bl-568-cadence-key",
+            "title": "Half the rival corporations never evaluate in the live app — the cadence is now keyed on the econ counter",
+            "status": "complete",
+            "promoted_from": "backlog.json BL-568 (HALF_THE_RIVALS_NEVER_ACT, raised 2026-08-23 from the Sprint N3 integration map)",
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "class": "headless",
+                    "requirement": "ITEM-SPANNING (headless): ON THE APP'S OWN SCHEDULE — day tick 90n, econ tick n — every rival corporation is evaluated by the strategic tier at least once within cadence_k ticks, and the set evaluated each tick equals corp_strategic_eval_due's set. Asserted through run_economy_step on economy_report::corps_evaluated, not through the gate function alone.",
+                    "result_metric": "7 of 7 rivals within 4 ticks on seed 0; record == gate on 8 consecutive ticks",
+                    "notes": "tools/verify/cadence_schedule.cpp C2/C3. MUTATION-CHECKED: with the key reverted to current_day_tick, 4 of 7 rivals are never due and both rows go red."
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "class": "headless",
+                    "requirement": "Every harness that already rotated all slots is BYTE-IDENTICAL after the change: each sets current_econ_tick beside current_day_tick with the same value, so its schedule is unchanged.",
+                    "result_metric": "corp_ai_harness, order_book_harness, spectator_determinism pass/fail patterns unchanged",
+                    "notes": "spectator_determinism R2 (stale golden, NR-452) was red before and is red after with the same observed hash class; it sets both ticks identically so this change cannot move it."
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "class": "headless",
+                    "requirement": "The day tick is demonstrably NOT a cadence key: at quarter boundaries it reaches fewer than cadence_k residues, while the econ counter reaches all of them.",
+                    "result_metric": "{0,2} of 4 vs 4 of 4",
+                    "notes": "C1/C1b — the arithmetic stated as a row so it cannot be unlearned."
+                },
+                {
+                    "id": "R4",
+                    "status": "pending",
+                    "class": "visual",
+                    "requirement": "A played campaign shows rivals at every cadence slot acting: after the warm start, rival buildings/surveys are not confined to the quarter of the roster at sorted index 0 (mod 4). Checked live in the app, and visual goldens that capture rival state are re-blessed with dated provenance as a CORRECTION, not a tuning.",
+                    "notes": "Owed to the Sprint N3 integrating build — the goldens will move there anyway (treasury fold, funded surveys), so one re-bless covers both."
+                }
+            ]
         }
     ]
 }
