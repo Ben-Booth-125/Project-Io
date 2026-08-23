@@ -954,6 +954,7 @@ int app::run_verify(const std::string& script_path, bool bless)
     v.set_function("panel_view", [this](const std::string& name, int view) {
         if (name == "history")            m_ui.history_view = view;
         else if (name == "history_round") m_ui.history_round = view;
+        else if (name == "history_stage") m_ui.history_stage = view;
         else if (name == "economy")       m_ui.economy_view = view;
         else if (name == "market")        m_ui.market_ledger_view = view;
     });

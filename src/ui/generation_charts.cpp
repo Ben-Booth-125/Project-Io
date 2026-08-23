@@ -373,14 +373,20 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
 
         case chain_stage::spark:
         {
-            // How far up the ladder each body got. Ordinal, so the ceiling is the
-            // top of the enum rather than a nice_ceil of the data.
+            // HOW FAR THE CHEMISTRY CLIMBED, not how far the biology got. These are
+            // different questions and the second one used to stand in for the
+            // first: `peak` life_stage tops out at "microbial" for every world that
+            // sparked at all, so it could not distinguish a world that stopped at
+            // phosphorylation from one that built a coded genome. `abiogenesis_depth`
+            // is the axis BL-209 added for exactly this, and its eight rungs are the
+            // seven distinguishable failures plus success.
             const std::size_t n = body_bars([](const planetology_state& st) {
-                return static_cast<float>(st.peak);
+                return static_cast<float>(st.depth);
             });
-            chart_row("##c_peak", "Peak biology reached (sterile 0 -> civilised 6)", 140.0f, 2,
+            chart_row("##c_depth", "Abiogenesis reached (no feedstock 0 -> coded genome 7)",
+                      140.0f, 2,
                       [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                charts::draw_bars(dl, mn, mx, bars, n, 6.0f, "%.0f");
+                charts::draw_bars(dl, mn, mx, bars, n, 7.0f, "%.0f");
             });
 
             std::string ladder;
@@ -390,9 +396,32 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
                     ladder += "   ";
                 ladder += name_of(i);
                 ladder += ": ";
-                ladder += life_stage_name(state_of(i).peak);
+                ladder += abiogenesis_depth_name(state_of(i).depth);
             }
             dim_para(ladder.c_str());
+
+            // The cofactor metals. Neither is a resource and neither ever will be
+            // (that would shift resource_count and every array width in the model),
+            // but each one gates a biochemical step outright — so a reader tuning
+            // seeds needs to see them, or the photosystem fork looks like a coin
+            // toss rather than a consequence.
+            const std::size_t nmn = body_bars([](const planetology_state& st) {
+                return st.crustal_mn;
+            });
+            chart_row("##c_mn", "Crustal manganese (Earth = 1.0) - gates the Z-scheme at S6b",
+                      120.0f, 2,
+                      [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                charts::draw_bars(dl, mn, mx, bars, nmn, 3.0f, "%.2f");
+            });
+
+            const std::size_t nmo = body_bars([](const planetology_state& st) {
+                return st.crustal_mo;
+            });
+            chart_row("##c_mo", "Crustal molybdenum (Earth = 1.0) - gates nitrogen fixation, and so soil",
+                      120.0f, 2,
+                      [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                charts::draw_bars(dl, mn, mx, bars, nmo, 3.0f, "%.2f");
+            });
             break;
         }
 
@@ -629,6 +658,196 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
     }
 
     chart_break();
+}
+
+// ---------------------------------------------------------------------------
+// At-a-glance heuristics
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// The gates the spine shows, in chain order, with the short labels a compact row
+/// can afford. S5a-S5g is the abiogenesis chain; S6a-S6c the photosystem fork.
+struct spine_gate
+{
+    chem::substage gate;
+    const char*    tag;   ///< Two characters — the row has to stay one line.
+    const char*    what;  ///< Tooltip: the question this gate asks.
+};
+
+const spine_gate k_spine[] = {
+    { chem::substage::s5a_feedstock,      "Fd", "Feedstock - anything to build with? (HCN, formaldehyde)" },
+    { chem::substage::s5b_reductant,      "Rd", "Reductant - free energy of the right shape? (serpentinisation)" },
+    { chem::substage::s5c_phosphorylation,"Ph", "Phosphorylation - could it make a nucleotide? (the hard one)" },
+    { chem::substage::s5d_concentration,  "Cn", "Concentration - dense enough to polymerise? (the 0.1 M threshold)" },
+    { chem::substage::s5e_replicator,     "Rp", "Replicator - did a polymer copy itself AND survive the heat?" },
+    { chem::substage::s5f_compartment,    "Cm", "Compartment - did it become an individual?" },
+    { chem::substage::s5g_code,           "Cd", "Code - did DNA lift the genome ceiling?" },
+    { chem::substage::s6a_anoxygenic,     "Ax", "Anoxygenic photosynthesis - banded iron with no free oxygen" },
+    { chem::substage::s6b_oxygenic,       "Ox", "Oxygenic photosynthesis - the Z-scheme. Gates on manganese" },
+    { chem::substage::s6c_nitrogen,       "N2", "Nitrogen fixation - nitrogenase. Gates on molybdenum, and so on soil" },
+};
+
+/// Recover a gate's verdict from the trace.
+///
+/// Reads ONLY the event flagged `event_gate_verdict`. An earlier version took the
+/// worst outcome across every event the gate emitted, which was wrong: a gate
+/// records its contributing and competing reactions too, and those carry their own
+/// outcomes. On a healthy homeworld that reported four of seven gates as marginal
+/// — because the impact reduction, the schreibersite route, the hydrolysis and the
+/// cation load were each individually marginal — which drains the word of meaning.
+chem::outcome gate_outcome(const planetology_state& st, chem::substage g)
+{
+    for (const chem::molecular_event& e : st.trace)
+    {
+        if ((e.flags & chem::event_gate_verdict) == 0)
+            continue;
+        if (chem::info(static_cast<chem::process>(e.process_id)).gate != g)
+            continue;
+        return static_cast<chem::outcome>(e.outcome_id);
+    }
+    return chem::outcome::bypassed; // never evaluated — an earlier gate ended it
+}
+
+} // namespace
+
+void draw_chain_spine(const planetology_state& st)
+{
+    std::string marginal_at;
+    bool        any = false;
+
+    // TWO ROWS, not one. The ledger panel is ~310 px and a single row of ten tags
+    // plus a label clipped its last gate — which is the worst possible thing to
+    // lose off the end of a causal chain. Splitting on the S5/S6 boundary also
+    // matches what the groups mean.
+    ImGui::TextDisabled("S5 chain");
+    ImGui::SameLine();
+
+    for (std::size_t i = 0; i < sizeof(k_spine) / sizeof(k_spine[0]); ++i)
+    {
+        const chem::outcome oc = gate_outcome(st, k_spine[i].gate);
+
+        if (k_spine[i].gate == chem::substage::s6a_anoxygenic)
+        {
+            ImGui::TextDisabled("S6 fork ");
+            ImGui::SameLine();
+        }
+
+        ImVec4 col;
+        switch (oc)
+        {
+            case chem::outcome::fired:    col = ImVec4(0.42f, 0.78f, 0.46f, 1.0f); break; // green
+            case chem::outcome::marginal: col = ImVec4(0.90f, 0.72f, 0.30f, 1.0f); break; // amber
+            case chem::outcome::failed:   col = ImVec4(0.85f, 0.36f, 0.34f, 1.0f); break; // red
+            default:                      col = ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]; break;
+        }
+
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Text, col);
+        ImGui::TextUnformatted(oc == chem::outcome::bypassed ? "--" : k_spine[i].tag);
+        ImGui::PopStyleColor();
+
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::SetTooltip("%s\n%s", k_spine[i].what, chem::outcome_name(oc));
+        }
+
+        if (oc == chem::outcome::marginal)
+        {
+            if (!marginal_at.empty())
+                marginal_at += ", ";
+            marginal_at += k_spine[i].tag;
+            any = true;
+        }
+    }
+
+    ImGui::SameLine();
+    ImGui::TextDisabled("-> %s", abiogenesis_depth_name(st.depth));
+
+    // The margin. A world that only just cleared a gate is a world that nearly
+    // became something else, and that is the most interesting thing about it.
+    //
+    // Wrapped, not TextDisabled: the unwrapped form ran off the edge of the panel
+    // and the sentence was unreadable.
+    if (any)
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+        ImGui::TextWrapped("marginal at %s - came close to stopping there", marginal_at.c_str());
+        ImGui::PopStyleColor();
+    }
+}
+
+void draw_denial_list(const planetology_state& st)
+{
+    // Ordered by how much each absence constrains PLAY, not by chain order: a
+    // reader scanning seeds cares first about what they cannot build.
+    std::string lacks;
+    const auto add = [&lacks](const char* s) {
+        if (!lacks.empty())
+            lacks += ", ";
+        lacks += s;
+    };
+
+    if (st.peak < life_stage::land)        add("no coal");
+    else if (st.land_burial_gyr < 0.05f)   add("negligible coal");
+
+    if (st.peak < life_stage::microbial)   add("no fossil carbon at all");
+    else if (st.marine_anoxia_gyr < 0.10f) add("no petroleum");
+
+    if (st.ferruginous_gyr < 0.10f)        add("no banded iron");
+    if (!st.mobile_lid)                    add("no porphyry copper (stagnant lid)");
+    if (st.o2_fraction < 0.01f)            add("no free oxygen");
+
+    if (st.arable_share < 0.08f)           add("not farmable");
+    else if (st.arable_share < 0.15f)      add("thin soils");
+
+    if (st.crustal_mo < 0.45f)             add("molybdenum-poor (caps nitrogen fixation)");
+    if (st.crustal_mn < 0.45f)             add("manganese-poor (blocks the Z-scheme)");
+
+    // Wrapped in both branches — the panel is narrow enough that a SameLine label
+    // plus a long list clipped the list mid-word.
+    if (lacks.empty())
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+        ImGui::TextWrapped("lacks nothing decisive - the full set is here");
+        ImGui::PopStyleColor();
+        return;
+    }
+
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.55f, 0.40f, 1.0f));
+    ImGui::TextWrapped("lacks %s", lacks.c_str());
+    ImGui::PopStyleColor();
+}
+
+std::string citation_summary(const hist::entry& e)
+{
+    // Citation domain 0x01 is chemistry; see history_log.hpp for the key space.
+    int outcome_id = -1, yield_q = -1, venue_id = -1;
+    for (const hist::citation& c : e.citations)
+    {
+        switch (c.key)
+        {
+            case 0x0102: outcome_id = c.value; break;
+            case 0x0103: yield_q    = c.value; break;
+            case 0x0104: venue_id   = c.value; break;
+            default: break;
+        }
+    }
+
+    if (outcome_id < 0)
+        return {};
+
+    char buf[128];
+    const char* oc = chem::outcome_name(static_cast<chem::outcome>(outcome_id));
+    const char* vn = venue_id > 0 ? chem::venue_name(static_cast<chem::venue>(venue_id)) : "";
+
+    if (yield_q >= 0 && vn[0] != '\0')
+        std::snprintf(buf, sizeof(buf), "%-8s %.2f  %s", oc, yield_q / 1000.0f, vn);
+    else if (yield_q >= 0)
+        std::snprintf(buf, sizeof(buf), "%-8s %.2f", oc, yield_q / 1000.0f);
+    else
+        std::snprintf(buf, sizeof(buf), "%-8s", oc);
+    return buf;
 }
 
 } // namespace ui

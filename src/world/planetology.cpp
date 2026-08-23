@@ -141,6 +141,24 @@ enum : uint32_t
     tag_accretion = 0x51A1u,
     tag_breath    = 0xB6EAu,
     tag_green     = 0x67EEu,
+
+    // --- Added by BL-209 -----------------------------------------------------
+    // PER-SUB-GATE hashed sub-streams, which are load-bearing here more than
+    // anywhere else in the model: they are what lets a gate be added or retuned
+    // later without silently re-rolling every earlier one. All fresh constants —
+    // PLANETOLOGY.md warns 0x4A71012u is already folded twice in
+    // hard_coded_world.cpp, so nothing here reuses an existing value.
+    tag_cofactor = 0xC0F1u, ///< Crustal Mn and Mo.
+    tag_s5a      = 0xFEE5u, ///< Feedstock.
+    tag_s5b      = 0x2ED0u, ///< Reductant.
+    tag_s5c      = 0x9405u, ///< Phosphorylation.
+    tag_s5d      = 0x0C0Eu, ///< Concentration.
+    tag_s5e      = 0x2EB1u, ///< Replicator.
+    tag_s5f      = 0xCE11u, ///< Compartment.
+    tag_s5g      = 0xC0D3u, ///< Code.
+    tag_s6a      = 0xA40Bu, ///< Anoxygenic photosynthesis (photoferrotrophy).
+    tag_s6b      = 0x02EBu, ///< Oxygenic photosynthesis (the Z-scheme).
+    tag_s6c      = 0x42F1u, ///< Nitrogen fixation.
 };
 
 } // namespace
@@ -423,6 +441,22 @@ const char* life_stage_name(life_stage s)
     return "?";
 }
 
+const char* abiogenesis_depth_name(abiogenesis_depth d)
+{
+    switch (d)
+    {
+        case abiogenesis_depth::none:        return "no feedstock";
+        case abiogenesis_depth::feedstock:   return "feedstock only";
+        case abiogenesis_depth::reductant:   return "no nucleotides";
+        case abiogenesis_depth::nucleotides: return "never concentrated";
+        case abiogenesis_depth::polymers:    return "no replicator";
+        case abiogenesis_depth::replicators: return "no cells";
+        case abiogenesis_depth::cellular:    return "RNA-locked";
+        case abiogenesis_depth::coded:       return "coded genome";
+    }
+    return "?";
+}
+
 const char* chain_stage_name(chain_stage s)
 {
     switch (s)
@@ -465,17 +499,100 @@ const char* chain_stage_title(chain_stage s)
 
 planetology_state run_planetology(const body_inputs& in,
                                   const planetology_params& p,
-                                  uint32_t seed)
+                                  uint32_t seed,
+                                  hist::log* log,
+                                  hist::subject_ref subject)
 {
     planetology_state st;
     st.endowment.fill(1.0f);
 
+    // The narrative choke point. Every biography line in the model goes through
+    // here, which is why routing the history log (BL-208) through it is a
+    // one-place change rather than an audit of every gate.
+    //
+    // `last_head` is the headline the current stage's DETAIL entries hang under
+    // (BL-208's parented two-level tree). It is the id of the most recent line,
+    // which is correct because the gates emit their headline before their detail.
+    hist::entry_id last_head = hist::no_entry;
+
     auto say = [&](float gya, chain_stage stage, std::string ev, std::string cons = {}) {
-        st.history.push_back(history_event{ gya, stage, std::move(ev), std::move(cons) });
+        st.history.push_back(history_event{ gya, stage, ev, cons });
+        if (log)
+        {
+            // Years before present, as an int64. NEVER the float: under BL-208
+            // this key becomes load-bearing for ordering, and a float in a
+            // load-bearing comparison is the hazard the standing rules name.
+            // Widened to double first so the scaling is an exact IEEE operation.
+            const int64_t years_bp = static_cast<int64_t>(static_cast<double>(gya) * 1.0e9);
+            last_head = log->headline(hist::era::deep_time, subject,
+                                      static_cast<uint8_t>(stage), years_bp,
+                                      std::move(ev), std::move(cons));
+        }
     };
     auto die = [&](chain_stage where, body_archetype a) {
         st.died_at   = where;
         st.archetype = a;
+    };
+
+    // One molecular event: appended to the compact trace ALWAYS, and mirrored
+    // into the log as a detail entry under the current headline only when a sink
+    // is attached.
+    //
+    // THE NULL-SINK INVARIANT: nothing in here draws randomness or moves a gate
+    // threshold, so a run with `log == nullptr` produces a bit-identical state.
+    // BL-219's reduced-fidelity sweep depends on exactly this.
+    // `emit` records into the compact trace ONLY. The narrative detail entries are
+    // attached afterwards by `flush_trace`.
+    //
+    // The split exists because of the eight-line cap. A detail entry needs its
+    // headline to already exist (the log is append-only and a parent must precede
+    // its child), but the headline's TEXT is the gate's OUTCOME, which is not known
+    // until the gates have run. Emitting a placeholder headline up front and the
+    // real one at the end would cost a second biography line per stage and blow
+    // the cap — which PLANETOLOGY.md § Presentation makes load-bearing. So the
+    // events buffer in `st.trace`, one headline is authored with the real outcome,
+    // and the details are hung under it in emit order.
+    // `verdict` marks the one event per gate that carries the GATE'S result, as
+    // opposed to a contributing or competing reaction. Any reader summarising a
+    // gate must use it — see chem::event_gate_verdict.
+    auto emit = [&](chem::process pr, chem::outcome oc, float yield_frac,
+                    chem::venue vn, float gya, bool verdict = false) {
+        chem::molecular_event e;
+        e.flags = verdict ? chem::event_gate_verdict : 0u;
+        // Deci-Myr before present: gya * 1000 is Myr, * 10 is dMyr. Caps at
+        // 6.5 Gyr, which is beyond any age the chain accepts.
+        e.epoch_dmyr = static_cast<uint16_t>(clampf(gya * 10000.0f, 0.0f, 65535.0f));
+        e.process_id = static_cast<uint8_t>(pr);
+        e.outcome_id = static_cast<uint8_t>(oc);
+        e.yield_q    = static_cast<uint16_t>(clampf(yield_frac * 1000.0f, 0.0f, 65535.0f));
+        e.venue_id   = static_cast<uint8_t>(vn);
+        st.trace.push_back(e);
+        (void)pr;
+    };
+
+    // Hang every trace event recorded since `from` beneath the most recent
+    // headline, as `detail` entries in emit order. A no-op without a sink, which
+    // is what keeps the null-sink invariant true.
+    auto flush_trace = [&](std::size_t from, chain_stage stage) {
+        if (!log || last_head == hist::no_entry)
+            return;
+        for (std::size_t i = from; i < st.trace.size(); ++i)
+        {
+            const chem::molecular_event& e = st.trace[i];
+            const chem::process_info& pi = chem::info(static_cast<chem::process>(e.process_id));
+            const double gya = static_cast<double>(e.epoch_dmyr) / 10000.0;
+            log->detail(last_head, static_cast<uint8_t>(stage),
+                        static_cast<int64_t>(gya * 1.0e9),
+                        pi.name, pi.consequence,
+                        // Citation domain 0x01 is chemistry (history_log.hpp). The
+                        // 8-byte record decomposes into four integer pairs, so the
+                        // narrative view and the compact trace can never disagree
+                        // about what actually happened.
+                        { { 0x0101, static_cast<int32_t>(e.process_id) },
+                          { 0x0102, static_cast<int32_t>(e.outcome_id) },
+                          { 0x0103, static_cast<int32_t>(e.yield_q) },
+                          { 0x0104, static_cast<int32_t>(e.venue_id) } });
+        }
     };
 
     const float age = clampf(p.system_age_gyr, 1.0f, 10.0f);
@@ -755,6 +872,34 @@ planetology_state run_planetology(const body_inputs& in,
     st.surface_pressure_bar = airless ? 0.0f : (st.profile.atmosphere == atmosphere_class::thick ? 1.4f : 0.7f);
 
     // =======================================================================
+    // COFACTOR METALS (BL-209 residual call 1). Manganese and molybdenum are not
+    // resources and never become resources — expanding the resource list would
+    // shift resource_count and every std::array width in the model. They are
+    // internal scalars, and each one gates a specific biochemical step:
+    //
+    //   Mn -> the Mn4CaO5 oxygen-evolving complex, so it gates the Z-scheme (S6b)
+    //   Mo -> nitrogenase, so it gates nitrogen fixation (S6c) and therefore soil
+    //
+    // Both scale with metallicity (one nebula, S0) and with CRUSTAL REWORKING —
+    // a body that recycles its crust concentrates ore-forming metals into
+    // accessible enrichments, and a stagnant lid leaves them dispersed. theta is
+    // the reworking proxy the model already computes.
+    //
+    // Mo is scarcer and more variable than Mn, which is why its floor is lower:
+    // that asymmetry is what makes a Mo-poor-but-Mn-rich world (oxygen, but
+    // permanently thin soils) a distinguishable outcome rather than a rounding
+    // difference.
+    // =======================================================================
+    {
+        rng rc(seed, tag_cofactor);
+        const float reworking = clampf(st.theta * 0.5f, 0.0f, 1.0f);
+        st.crustal_mn = clampf(p.metallicity * (0.55f + 0.65f * reworking) * rc.range(0.75f, 1.30f),
+                               0.05f, 3.0f);
+        st.crustal_mo = clampf(p.metallicity * (0.45f + 0.75f * reworking) * rc.range(0.70f, 1.35f),
+                               0.03f, 3.0f);
+    }
+
+    // =======================================================================
     // S5 — SPARK. Serpentinisation delivers the reductant for free (up to
     // 200 mM H2 at pH 9-11 into a CO2-rich ocean — a proton gradient of the same
     // polarity every living cell uses, across Fe(Ni)S walls whose unit cells
@@ -774,37 +919,368 @@ planetology_state run_planetology(const body_inputs& in,
     const bool cycling_venue  = liquid_surface && st.profile.water_fraction < 0.92f;
     const bool time_budget    = age >= 1.5f;
 
+    // The abiogenesis epoch — when the chemistry ran. Every event below is dated
+    // against it so the trace reads as a sequence rather than a list.
+    const float spark_gya = age - 1.0f;
+
+    // `abiogenesis_ease` now biases the WHOLE chain rather than a single draw, per
+    // BL-209. It shifts every gate's threshold together, so a permissive campaign
+    // gets further up the chain on more worlds without any gate being skipped.
+    const float ease      = clampf(p.abiogenesis_ease, 0.0f, 1.0f);
+    const float thr_shift = (ease - 0.5f) * 0.30f; // -0.15 .. +0.15 on each threshold
+
+    // Land available for wet-dry cycling. This is the geometry the concentration
+    // problem actually turns on, and it is why a waterworld is a WORSE candidate
+    // than a world with continents.
+    const float land_share = clampf(1.0f - st.profile.water_fraction, 0.0f, 1.0f);
+
+    // Vent temperature from the heat budget. Lost City runs 45-90 C and works; a
+    // black smoker runs ~350 C and is lethal to RNA. This is the number that
+    // creates S5e's antagonism with S5b.
+    const float vent_temp_c = 40.0f + clampf(st.theta, 0.0f, 3.0f) * 55.0f;
+    const chem::venue vent_kind = vent_temp_c > 150.0f ? chem::venue::black_smoker
+                                                       : chem::venue::alkaline_vent;
+
+    /// Resolve one gate. Returns the outcome and records the margin — PLANETOLOGY's
+    /// anti-rigging device is to SURFACE the margin, so a world that barely passed
+    /// reads as lucky rather than as scripted.
+    // The marginal band is deliberately NARROW (0.03, not 0.08). At the wider
+    // value four of seven gates came out marginal on a healthy homeworld, which
+    // makes the word meaningless — "this world nearly stopped here" has to be rare
+    // to be worth reading. It changes no pass/fail verdict, only the label.
+    auto resolve = [&](float quality, float threshold) {
+        const float t = threshold - thr_shift;
+        if (quality < t)                 return chem::outcome::failed;
+        if (quality < t + 0.03f)         return chem::outcome::marginal;
+        return chem::outcome::fired;
+    };
+
+    // Records the failure line, the depth reached, and the verdict. Shared by all
+    // seven gates so a new gate cannot forget one of the three.
+    // `what` is a std::string rather than a const char* because S5e formats the
+    // temperature that killed the polymer into its line — the margin IS the story
+    // there, so it cannot be a literal.
+    auto fail_chain = [&](chem::substage gate, abiogenesis_depth reached,
+                          body_archetype verdict, std::string what, std::string left) {
+        st.depth = reached;
+        st.stage = st.peak = life_stage::prebiotic;
+        say(spark_gya, chain_stage::spark, std::move(what), std::move(left));
+        die(chain_stage::spark, verdict);
+        (void)gate;
+    };
+
+    // The fallback verdict for a world that never got started at all. Silent Eden
+    // is reserved for worlds that were GENUINELY CAPABLE and stayed silent — a
+    // distinction the old model could not make, which is why a perfect wet world
+    // used to resolve to relict_wet (Mars: a world that LOST its air) and read
+    // wrong.
+    const body_archetype early_verdict =
+        st.profile.water_fraction >= 0.92f ? body_archetype::waterworld : body_archetype::relict_wet;
+    const bool otherwise_perfect =
+        cycling_venue && liquid_surface && land_share > 0.10f
+        && st.profile.temperature == temperature_class::temperate;
+
     if (st.died_at != chain_stage::count)
     {
         // Already terminated. A subsurface ocean is the one branch that can still
-        // carry life past an airless verdict.
+        // carry life past an airless verdict, and it bypasses the surface chain
+        // entirely — no UV, no wet-dry cycling, no land.
         if (subsurface_ocean && st.theta > 0.25f && time_budget)
         {
             st.stage = st.peak = life_stage::microbial;
+            st.depth = abiogenesis_depth::coded;
             say(age - 1.0f, chain_stage::spark,
                 "Life at the vents, under the ice",
                 "chemical energy in abundance, and no way to reach it");
+            const std::size_t sub_from = st.trace.size();
+            emit(chem::process::serpentinisation, chem::outcome::fired, 0.45f,
+                 chem::venue::subsurface_ocean, spark_gya);
+            emit(chem::process::wood_ljungdahl, chem::outcome::fired, 0.30f,
+                 chem::venue::subsurface_ocean, spark_gya);
+            flush_trace(sub_from, chain_stage::spark);
         }
     }
-    else if (!(cycling_venue && st.profile.geology >= geological_activity::low && time_budget
-               && rng(seed, 0x5A4Bu).unit() < clampf(p.abiogenesis_ease, 0.0f, 1.0f)))
+    else if (!(cycling_venue && st.profile.geology >= geological_activity::low && time_budget))
     {
-        st.stage = st.peak = life_stage::prebiotic;
-        say(age - 1.0f, chain_stage::spark,
-            st.profile.water_fraction >= 0.92f
-                ? "Water everywhere and nowhere to concentrate it"
-                : "Chemistry, but no cycling venue - life never started",
-            "no fossil carbon, ever");
-        die(chain_stage::spark,
-            st.profile.water_fraction >= 0.92f ? body_archetype::waterworld
-                                               : body_archetype::relict_wet);
+        // The preconditions the chain cannot run without at all. Kept as a single
+        // early test rather than folded into S5a: a world with no liquid water has
+        // no venue for ANY of the seven gates, and pretending to evaluate them
+        // would emit a trace that claims more than the model knows.
+        fail_chain(chem::substage::s5a_feedstock, abiogenesis_depth::none, early_verdict,
+                   st.profile.water_fraction >= 0.92f
+                       ? "Water everywhere and nowhere to concentrate it"
+                       : "No cycling venue - the chemistry never had a vessel",
+                   "no fossil carbon, ever");
     }
     else
     {
-        st.stage = st.peak = life_stage::microbial;
-        say(age - 1.0f, chain_stage::spark,
-            "Serpentinising vents; abiogenesis",
-            "an Fe-oxidising biosphere - banded iron begins");
+        // ===================================================================
+        // The seven gates. Each reads scalars an earlier stage already computed,
+        // tests ONE threshold, and has a distinct nameable failure. Several reach
+        // BACK into S0-S4 rolls — that backward reach is what makes generation
+        // read as one causal system rather than ten independent dice.
+        // ===================================================================
+        // Where this stage's trace starts, so the details can be hung under
+        // whichever single headline the gates end up authoring.
+        const std::size_t trace_from = st.trace.size();
+
+        bool alive = true;
+
+        // --- S5a FEEDSTOCK -------------------------------------------------
+        // Adenine is literally (HCN)5, so everything starts with cyanide. HCN and
+        // formaldehyde yields collapse by orders of magnitude in an oxidised
+        // CO2/N2 atmosphere. The modern resolution is IMPACT-GENERATED TRANSIENT
+        // REDUCING ATMOSPHERES: a large iron-rich impactor reduces H2O to H2 for
+        // ~10^5-10^6 yr. That is why S1's late veneer reaches forward to here — a
+        // roll that previously only touched platinum-group metals.
+        if (alive)
+        {
+            rng r(seed, tag_s5a);
+            const float reduced_air = st.profile.atmosphere == atmosphere_class::thick ? 0.42f : 0.18f;
+            const float impact_help = clampf((late_veneer - 0.4f) / 1.2f, 0.0f, 1.0f) * 0.46f;
+            const float q  = reduced_air + impact_help + r.range(-0.06f, 0.06f);
+            const chem::outcome oc = resolve(q, 0.34f);
+
+            emit(chem::process::impact_reduction, impact_help > 0.23f ? chem::outcome::fired
+                                                                     : chem::outcome::marginal,
+                 impact_help, chem::venue::atmosphere, spark_gya + 0.25f);
+            emit(chem::process::hcn_synthesis, oc, q, chem::venue::atmosphere, spark_gya + 0.20f, true);
+            emit(chem::process::formaldehyde_synthesis, oc, q * 0.8f, chem::venue::atmosphere,
+                 spark_gya + 0.20f);
+
+            if (oc == chem::outcome::failed)
+            {
+                alive = false;
+                fail_chain(chem::substage::s5a_feedstock, abiogenesis_depth::none, early_verdict,
+                           "An oxidised sky and no reducing impact - no organic feedstock formed",
+                           "sterile, and not for want of water");
+            }
+        }
+
+        // --- S5b REDUCTANT -------------------------------------------------
+        // Serpentinisation is exothermic and free: olivine + water gives serpentine,
+        // magnetite and up to 200 mM H2 at pH 9-11. Alkaline effluent into a
+        // CO2-acidified ocean is a 3-4 pH-unit gradient of the same polarity every
+        // living cell uses, across Fe(Ni)S walls whose unit cells match ferredoxin's
+        // active site. Needs ultramafic crust and a working interior.
+        if (alive)
+        {
+            rng r(seed, tag_s5b);
+            const float geo = static_cast<float>(static_cast<int>(st.profile.geology)) * 0.22f;
+            const float q   = 0.30f + geo + clampf(st.theta * 0.16f, 0.0f, 0.30f) + r.range(-0.05f, 0.05f);
+            const chem::outcome oc = resolve(q, 0.42f);
+
+            emit(chem::process::serpentinisation, oc, q, vent_kind, spark_gya + 0.15f, true);
+            if (oc != chem::outcome::failed)
+            {
+                emit(chem::process::fes_barrier_growth, oc, q * 0.7f, vent_kind, spark_gya + 0.14f);
+                emit(chem::process::wood_ljungdahl, oc, q * 0.6f, vent_kind, spark_gya + 0.13f);
+            }
+
+            if (oc == chem::outcome::failed)
+            {
+                alive = false;
+                fail_chain(chem::substage::s5b_reductant, abiogenesis_depth::feedstock, early_verdict,
+                           "Feedstock present, and nothing to cycle it - the interior was already cold",
+                           "organics without energy: no fossil carbon, ever");
+            }
+        }
+
+        // --- S5c PHOSPHORYLATION -------------------------------------------
+        // The genuinely hard one, and the one most likely to end an otherwise
+        // perfect world. Seawater phosphorus is ~1 uM and locked in apatite. Two
+        // routes out: SCHREIBERSITE (meteoritic Fe3P, corroding to reactive
+        // phosphite — so S1's late veneer reaches forward a SECOND time), or
+        // CARBONATE-RICH ALKALINE LAKES, where calcium drops out as carbonate and
+        // frees phosphate to concentrate by 10^5-10^6x. The lake route needs
+        // subaerial relief and evaporation, so it reaches back into S4.
+        if (alive)
+        {
+            rng r(seed, tag_s5c);
+            const float schreibersite = clampf((late_veneer - 0.4f) / 1.2f, 0.0f, 1.0f) * 0.40f;
+            const float lakes         = land_share * 0.52f
+                                        * (st.profile.temperature == temperature_class::temperate ? 1.0f : 0.55f);
+            const float q  = 0.10f + schreibersite + lakes + r.range(-0.07f, 0.07f);
+            const chem::outcome oc = resolve(q, 0.46f);
+            const chem::venue vn = lakes > schreibersite ? chem::venue::carbonate_lake : vent_kind;
+
+            emit(chem::process::schreibersite_corrosion,
+                 schreibersite > 0.20f ? chem::outcome::fired : chem::outcome::marginal,
+                 schreibersite, vent_kind, spark_gya + 0.12f);
+            emit(chem::process::carbonate_lake_release,
+                 lakes > 0.20f ? chem::outcome::fired : chem::outcome::marginal,
+                 lakes, chem::venue::carbonate_lake, spark_gya + 0.11f);
+            emit(chem::process::nucleoside_phosphorylation, oc, q, vn, spark_gya + 0.10f, true);
+
+            if (oc == chem::outcome::failed)
+            {
+                alive = false;
+                // SILENT EDEN. A capable world that stayed silent is a genuinely
+                // different thing from a world that lost its air, and this is the
+                // outcome the old thirteen archetypes could not name.
+                fail_chain(chem::substage::s5c_phosphorylation, abiogenesis_depth::reductant,
+                           otherwise_perfect ? body_archetype::silent_eden : early_verdict,
+                           "Sugars and bases, and no reactive phosphorus to link them",
+                           "monomers that never became nucleotides - pristine ore, and no soil");
+            }
+        }
+
+        // --- S5d CONCENTRATION ---------------------------------------------
+        // HCN oligomerises above ~0.1 M, competes with hydrolysis between 0.01 and
+        // 0.1 M, and loses below. The Hadean ocean was orders of magnitude under —
+        // "the ocean was a soup" is chemically false. Two venues work: wet-dry
+        // cycling in subaerial pools (dehydration drives condensation, which is
+        // uphill in bulk water), or hydrothermal pore thermophoresis at ~5000x,
+        // which needs no land at all.
+        if (alive)
+        {
+            rng r(seed, tag_s5d);
+            const float pools = land_share * 0.60f;
+            const float pores = clampf(st.theta * 0.30f, 0.0f, 0.44f);
+            const float q     = 0.06f + (pools > pores ? pools : pores) + r.range(-0.05f, 0.05f);
+            const chem::outcome oc = resolve(q, 0.40f);
+            const chem::venue vn   = pools > pores ? chem::venue::subaerial_pool
+                                                  : chem::venue::hydrothermal_pore;
+
+            emit(vn == chem::venue::subaerial_pool ? chem::process::wet_dry_condensation
+                                                   : chem::process::thermophoretic_accumulation,
+                 oc, q, vn, spark_gya + 0.09f);
+            emit(chem::process::hcn_oligomerisation, oc, q, vn, spark_gya + 0.08f, true);
+            emit(chem::process::formose_reaction, oc, q * 0.75f, vn, spark_gya + 0.08f);
+
+            if (oc == chem::outcome::failed)
+            {
+                alive = false;
+                fail_chain(chem::substage::s5d_concentration, abiogenesis_depth::nucleotides,
+                           early_verdict,
+                           "Nucleotides made, and never dense enough to polymerise",
+                           "an ocean too dilute to build in - no fossil carbon");
+            }
+        }
+
+        // --- S5e REPLICATOR ------------------------------------------------
+        // THE ANTAGONISM. The phosphodiester backbone hydrolyses, and the rate
+        // climbs steeply with temperature: years near 0 C, hours near 100 C. So the
+        // venue that supplies the reductant and the proton gradient (S5b) is the
+        // venue that destroys the polymer. Lost City at 45-90 C is survivable; a
+        // black smoker at 350 C never is.
+        //
+        // The half-life comes from a 16-entry TABLE, never exp() — Arrhenius
+        // kinetics in a gate path is exactly the portability hazard
+        // PLANETOLOGY.md § Determinism & cost bans.
+        if (alive)
+        {
+            rng r(seed, tag_s5e);
+            const float temp_c    = st.profile.water_fraction > 0.0f && land_share > 0.15f
+                                        ? clampf(t_surf - 273.15f, 0.0f, 150.0f)
+                                        : clampf(vent_temp_c, 0.0f, 150.0f);
+            const float half_life = chem::rna_half_life_hours(temp_c);
+            const float survival  = clampf(half_life / chem::rna_survival_floor_hours, 0.0f, 1.5f);
+            const float q  = clampf(survival, 0.0f, 1.0f) * 0.72f + 0.10f + r.range(-0.05f, 0.05f);
+            const chem::outcome oc = resolve(q, 0.44f);
+
+            emit(chem::process::phosphodiester_hydrolysis,
+                 survival >= 1.0f ? chem::outcome::marginal : chem::outcome::fired,
+                 clampf(half_life / 10000.0f, 0.0f, 1.0f), vent_kind, spark_gya + 0.07f);
+            emit(chem::process::template_extension, oc, q, vent_kind, spark_gya + 0.06f, true);
+            if (oc != chem::outcome::failed)
+                emit(chem::process::ribozyme_folding, oc, q * 0.8f, vent_kind, spark_gya + 0.05f);
+
+            if (oc == chem::outcome::failed)
+            {
+                alive = false;
+                fail_chain(chem::substage::s5e_replicator, abiogenesis_depth::polymers,
+                           otherwise_perfect ? body_archetype::silent_eden : early_verdict,
+                           fmt("Chains formed and hydrolysed - %.0f C erased them faster than they copied", temp_c),
+                           "chemistry got further here than anywhere else, and stopped");
+            }
+        }
+
+        // --- S5f COMPARTMENT -----------------------------------------------
+        // Fatty-acid vesicles self-assemble above a critical concentration; without
+        // one, a useful ribozyme's benefit diffuses to its competitors and there is
+        // no Darwinian individuality. The known unresolved tension: fatty-acid
+        // membranes are destabilised by divalent cations, and RNA catalysis REQUIRES
+        // Mg2+. Chelators are the proposed workaround.
+        //
+        // FLAGGED FOR REMOVAL. This is the weakest of the seven on the
+        // name-the-decision test — its downstream endowment is identical to S5e's,
+        // and it is the first gate to cut if tuning shows it never fires distinctly.
+        // Kept for now because Ben chose the full chain (BL-209).
+        if (alive)
+        {
+            rng r(seed, tag_s5f);
+            const float cation_load = clampf(0.35f + land_share * 0.40f, 0.0f, 1.0f); // weathering delivers Mg2+
+            const float q = 0.62f - cation_load * 0.34f + r.range(-0.06f, 0.06f);
+            const chem::outcome oc = resolve(q, 0.30f);
+
+            emit(chem::process::cation_flocculation,
+                 cation_load > 0.6f ? chem::outcome::fired : chem::outcome::marginal,
+                 cation_load, chem::venue::subaerial_pool, spark_gya + 0.04f);
+            emit(chem::process::vesicle_assembly, oc, q, chem::venue::subaerial_pool, spark_gya + 0.03f, true);
+
+            if (oc == chem::outcome::failed)
+            {
+                alive = false;
+                fail_chain(chem::substage::s5f_compartment, abiogenesis_depth::replicators,
+                           otherwise_perfect ? body_archetype::silent_eden : early_verdict,
+                           "Replicators, and no membrane to make them individuals",
+                           "copying without selfhood - evolution never got a unit to act on");
+            }
+        }
+
+        // --- S5g CODE ------------------------------------------------------
+        // The last gate, and the only one whose failure leaves a LIVING world.
+        // EIGEN'S ERROR THRESHOLD is the real constraint: without proofreading the
+        // maximum genome length is ~1/(per-base mutation rate), which caps an
+        // RNA-only replicator near a few thousand bases. DNA plus a proofreading
+        // polymerase lifts that by orders of magnitude, and nothing complex is
+        // reachable underneath it.
+        if (alive)
+        {
+            rng r(seed, tag_s5g);
+            const float fidelity = clampf((age - 1.5f) / 3.0f, 0.0f, 1.0f); // time to find the trick
+            const float q = 0.22f + fidelity * 0.50f + r.range(-0.07f, 0.07f);
+            const chem::outcome oc = resolve(q, 0.46f);
+
+            emit(chem::process::ribosomal_translation, oc, q, vent_kind, spark_gya + 0.02f, true);
+
+            if (oc == chem::outcome::failed)
+            {
+                // RNA LOCK. Real, metabolising, evolving life — permanently simple.
+                // This world has a biosphere, so it keeps `microbial` and its
+                // fossil endowment; what it can never have is complexity.
+                st.depth = abiogenesis_depth::cellular;
+                st.stage = st.peak = life_stage::microbial;
+                st.ferruginous_gyr   = clampf(spark_gya * 0.55f, 0.0f, 4.0f);
+                st.marine_anoxia_gyr = st.ferruginous_gyr * 0.6f;
+                say(spark_gya, chain_stage::spark,
+                    "Cells, held under the RNA-world genome ceiling",
+                    fmt("life that works and cannot elaborate - %.0f Myr of ferruginous ocean",
+                        st.ferruginous_gyr * 1000.0f));
+                die(chain_stage::spark, body_archetype::rna_lock);
+                alive = false;
+            }
+            else
+            {
+                emit(chem::process::ribonucleotide_reduction, oc, q * 0.9f, vent_kind, spark_gya + 0.01f);
+                emit(chem::process::proofreading_replication, oc, q * 0.85f, vent_kind, spark_gya);
+            }
+        }
+
+        if (alive)
+        {
+            st.depth = abiogenesis_depth::coded;
+            st.stage = st.peak = life_stage::microbial;
+            say(spark_gya, chain_stage::spark,
+                "Serpentinising vents; DNA, proofreading, and a genome that can grow",
+                "an Fe-oxidising biosphere - banded iron begins");
+        }
+
+        // Exactly one Spark headline exists by now — either a fail_chain line, the
+        // RNA-lock line, or the success line above. Everything the seven gates did
+        // hangs beneath it.
+        flush_trace(trace_from, chain_stage::spark);
     }
 
     // =======================================================================
@@ -819,8 +1295,113 @@ planetology_state run_planetology(const body_inputs& in,
     // the error that makes the ladder unsatisfiable — Earth itself would fail a
     // 10%-O2 complex-life gate immediately after the GOE.
     // =======================================================================
-    float ferruginous_start = 0.0f;
+    // The banded-iron epoch. Hoisted above the photosystem fork because the fork
+    // dates its events against it and decides how long the window stays open.
+    float ferruginous_start = (st.peak >= life_stage::microbial) ? age - 1.0f : 0.0f;
     float noe_epoch         = 0.0f;
+
+    /// Nitrogenase output, Earth-relative. Set by S6c and consumed by S8's arable
+    /// calculation — this is the whole path by which molybdenum scarcity becomes
+    /// thin soil, so it must not stay local to the fork.
+    float n_fixation = 1.0f;
+
+    /// Where S6's trace starts. Flushed under the Breath headline once the stage
+    /// has authored one — same deferral as S5, and for the same cap reason.
+    const std::size_t breath_trace_from = st.trace.size();
+
+    if (st.peak >= life_stage::microbial && st.died_at == chain_stage::count)
+    {
+        // ===================================================================
+        // S6a-c — THE PHOTOSYSTEM FORK (BL-209). This is the item's highest-value
+        // piece, because it converts a named uncertainty in PLANETOLOGY.md's own
+        // "Known weaknesses" — whether banded iron gates on LIFE or on OXYGEN —
+        // from an authored constant into a generated branch.
+        //
+        // These gates sit IN FRONT of the flux-balance test below, which runs
+        // underneath them unchanged.
+        // ===================================================================
+
+        // --- S6a ANOXYGENIC PHOTOSYNTHESIS (photoferrotrophy) ---------------
+        // One photosystem, Fe(II) as the electron donor, no O2 produced at all.
+        // Cheap: it fires on nearly any microbial world with dissolved iron. The
+        // consequence that matters is that it PRECIPITATES BANDED IRON WITH NO
+        // FREE OXYGEN — which is precisely the ambiguity the doc flagged.
+        {
+            rng r(seed, tag_s6a);
+            const float dissolved_fe = clampf(st.profile.water_fraction * 1.30f, 0.0f, 1.0f);
+            const float q = dissolved_fe * 0.75f + 0.20f + r.range(-0.05f, 0.05f);
+            const chem::outcome oc = q >= 0.42f ? chem::outcome::fired : chem::outcome::failed;
+            st.photoferrotrophic = (oc == chem::outcome::fired);
+
+            emit(chem::process::photoferrotrophy, oc, q, chem::venue::open_ocean, ferruginous_start, true);
+            if (st.photoferrotrophic)
+                emit(chem::process::bif_precipitation, oc, q * 0.9f, chem::venue::open_ocean,
+                     ferruginous_start);
+        }
+
+        // --- S6b OXYGENIC PHOTOSYNTHESIS (the Z-scheme) --------------------
+        // Splitting water needs +1.23 V, more than any single photosystem
+        // delivers — which is why it needs TWO chained in series, and why it
+        // evolved exactly once in four billion years on Earth. Its cofactor is the
+        // Mn4CaO5 oxygen-evolving complex, so it GATES ON MANGANESE. It also needs
+        // the genome headroom from S5g: two photosystems plus dozens of supporting
+        // genes is not reachable under an RNA-world error threshold.
+        {
+            rng r(seed, tag_s6b);
+            const bool  headroom = st.depth >= abiogenesis_depth::coded;
+            const float mn_term  = clampf(st.crustal_mn * 0.55f, 0.0f, 0.80f);
+            const float q = mn_term + (headroom ? 0.26f : 0.0f) + r.range(-0.06f, 0.06f);
+            const chem::outcome oc = (headroom && q >= 0.52f) ? chem::outcome::fired
+                                                              : chem::outcome::failed;
+            st.oxygenic = (oc == chem::outcome::fired);
+
+            emit(chem::process::oxygenic_photosynthesis, oc, q, chem::venue::open_ocean,
+                 ferruginous_start - 0.10f, true);
+
+            if (!st.oxygenic)
+            {
+                // FERROTROPH WORLD. It never built the water-splitting complex, so
+                // there is no path to oxygen — not a flux balance it lost, a
+                // biochemistry it never invented. The mechanical difference from
+                // Mat World is that this window NEVER CLOSES: nothing will ever
+                // oxidise the ocean, so the iron keeps precipitating for the rest
+                // of the world's life.
+                //
+                // Honest risk recorded in BL-209: this may read the same as Mat
+                // World to a player. The strictly-higher unbounded iron window is
+                // the mechanical separation; if tuning cannot distinguish them,
+                // fold this into mat_world rather than ship two names for one
+                // feeling.
+                st.o2_fraction       = 0.0f;
+                st.ferruginous_gyr   = clampf(ferruginous_start, 0.0f, 4.5f);
+                st.marine_anoxia_gyr = st.ferruginous_gyr * 0.9f;
+                say(ferruginous_start - 0.10f, chain_stage::breath,
+                    st.crustal_mn < 0.45f
+                        ? "Too little manganese to split water - the Z-scheme was never built"
+                        : "Iron-breathing life, and no second photosystem",
+                    fmt("%.0f Myr of banded iron, and the window never closes",
+                        st.ferruginous_gyr * 1000.0f));
+                die(chain_stage::breath, st.photoferrotrophic ? body_archetype::ferrotroph_world
+                                                             : body_archetype::mat_world);
+            }
+        }
+
+        // --- S6c NITROGEN FIXATION ----------------------------------------
+        // N2's triple bond is 941 kJ/mol and yields only to nitrogenase, whose
+        // cofactor is molybdenum — soluble in oxic water, NOT in anoxic sulfidic
+        // water. Low Mo means weak fixation, which caps productivity, which caps
+        // burial, which caps oxygen. And because S8 already requires biological
+        // nitrogen fixation for soil, MO GATES ARABLE SHARE THROUGH PURE
+        // CHEMISTRY. Recorded here; applied where arable_share is computed.
+        if (st.died_at == chain_stage::count)
+        {
+            rng r(seed, tag_s6c);
+            n_fixation = clampf(0.25f + st.crustal_mo * 0.60f + r.range(-0.06f, 0.06f), 0.10f, 1.35f);
+            emit(chem::process::nitrogen_fixation,
+                 n_fixation >= 0.70f ? chem::outcome::fired : chem::outcome::marginal,
+                 n_fixation, chem::venue::open_ocean, ferruginous_start - 0.15f, true);
+        }
+    }
 
     if (st.peak >= life_stage::microbial && st.died_at == chain_stage::count)
     {
@@ -900,6 +1481,10 @@ planetology_state run_planetology(const body_inputs& in,
         }
     }
 
+    // The photosystem fork's events hang under whichever Breath headline this
+    // stage authored — the GOE line, the NOE line, or the ferrotroph/mat verdict.
+    flush_trace(breath_trace_from, chain_stage::breath);
+
     // =======================================================================
     // S7 — GREEN. Land is UV-sterile until an ozone column forms. Then lignin is
     // the payload: not hydrolysable, and with a terrestrial C:P far above marine,
@@ -977,8 +1562,15 @@ planetology_state run_planetology(const body_inputs& in,
 
             // Above ~21% fire suppresses forest cover — a high-oxygen world is
             // grassland-biased and timber-poor.
+            //
+            // `n_fixation` (S6c) enters here, and this is the whole payoff of the
+            // molybdenum gate: S8 already states that soil requires biological
+            // nitrogen fixation, so a Mo-poor world has permanently thin soils no
+            // matter how good its climate is. A chemical scarcity four stages
+            // upstream decides whether the world can farm.
             st.arable_share = clampf(land_frac * (0.28f - (st.o2_fraction - 0.21f) * 0.45f)
-                                     * (st.mobile_lid ? 1.0f : 0.72f), 0.02f, 0.40f);
+                                     * (st.mobile_lid ? 1.0f : 0.72f)
+                                     * clampf(n_fixation, 0.10f, 1.35f), 0.02f, 0.40f);
         }
     }
 

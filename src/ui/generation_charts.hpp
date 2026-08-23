@@ -1,8 +1,10 @@
 #pragma once
 
+#include "world/history_log.hpp"
 #include "world/planetology.hpp"
 
 #include <cstddef>
+#include <string>
 
 // ---------------------------------------------------------------------------
 // Generation stage charts — the chain's visual half, drawn from one place
@@ -83,5 +85,47 @@ const char* stage_explainer(chain_stage s);
 ///                question it answers — the wizard wants it, the ledger does not
 ///                (its collapsing header already carries the name).
 void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool heading);
+
+// ---------------------------------------------------------------------------
+// At-a-glance heuristics (BL-209 / BL-211)
+//
+// A dated biography is the right surface for reading ONE world carefully. It is
+// the wrong surface for judging a seed in two seconds, or for telling two seeds
+// apart — which is what tuning the generator actually asks of a reader who is not
+// a chemist. These three are that summary.
+//
+// All are pure functions of a planetology_state, same as the charts.
+// ---------------------------------------------------------------------------
+
+/// The chain spine — one compact row of gate outcomes, S5a..S5g then S6a..S6c,
+/// as pass / marginal / fail / not-reached glyphs.
+///
+/// This row IS the causal chain: it says where the world stopped without needing
+/// any of the chemistry to be understood. Outcomes are recovered from the
+/// molecular trace (each event names its own gate), so the spine cannot disagree
+/// with what was generated.
+///
+/// It also names any gate that came out MARGINAL. That is PLANETOLOGY.md's own
+/// anti-rigging device — surfacing the margin is what makes a world that barely
+/// passed read as lucky rather than as scripted, and "one roll from a Silent
+/// Eden" is exactly the kind of thing that makes a seed interesting.
+void draw_chain_spine(const planetology_state& st);
+
+/// What this world does NOT have, as one line.
+///
+/// PLANETOLOGY.md § Presentation argues this harder than anything else: "print
+/// the denial list, not just the grant... 'no subduction, therefore no porphyry
+/// copper' is more useful than any positive number — it tells the player where to
+/// go instead." For a reader judging a seed, absence is decisive, because absence
+/// is what constrains play.
+void draw_denial_list(const planetology_state& st);
+
+/// One trace detail entry's citation payload, rendered for a human: outcome,
+/// yield and venue.
+///
+/// Decodes the integer citation pairs (domain 0x01, chemistry) through the
+/// compiled-in tables, so displayed names can never drift from the ids that were
+/// actually generated — the invariant BL-209's id/table split exists to protect.
+std::string citation_summary(const hist::entry& e);
 
 } // namespace ui

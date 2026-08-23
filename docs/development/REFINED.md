@@ -36,6 +36,94 @@ focused agents, not a hard disjointness gate. Agents build and commit on their o
 worktree branch; the integrating session merges, builds, and verifies. See
 [`DELIVERY.md`](DELIVERY.md) § Sub-agents & worktrees for the authoritative model.
 
+## Generation chain batch (promoted from backlog.json § BL-208 slice S1, BL-209) — **IN PROGRESS**
+
+Promoted 2026-07-29. Ben's steer: *"Focus on improving generation so that we actually have a
+detailed path from cellular life to civilisation."* This batch builds the **substrate** (BL-208
+slice S1 — the only slice with no unlanded dependency, and the one BL-217/BL-218/BL-211 all
+require) and the **path to cellular life** (BL-209's seven S5 gates, whose vocabulary slice
+already landed 2026-07-28 as deliberately-inert `chemistry_tables.{hpp,cpp}`).
+
+Requirements: `req/requirements.json` groups `history-log-substrate`, `abiogenesis-seven-gates`.
+
+**Scope note.** The path *from* cellular life *to* civilisation is BL-217 (S7b–S7f) and it is
+blocked on BL-210's checkpoint/branch mechanism, which is still `design-owed`. This batch takes
+the arc as far as it can go without that design pass, and stops at a clean seam.
+
+- **A [3] — Build the log substrate.** New `src/world/history_log.{hpp,cpp}`: the `entry` type
+  (era / time_key int64 / subject / stage / tier / parent / citations / provenance), the two
+  segments by lifetime with `seal()`, monotonic id assignment, the per-subject headline index, and
+  `children()`. Standalone and inert — depends on `<cstdint>/<string>/<vector>` only, nothing in
+  `world/*` references it yet. Same discipline `chemistry_tables.hpp` already follows.
+  *Files:* `src/world/history_log.{hpp,cpp}`, `CMakeLists.txt` if globbing needs it.
+  *Deps:* foundation / independent root.
+- **B [2] — Route `say()` through the log.** `run_planetology` gains an optional
+  `hist::log*` out-param; the existing `say` lambda (planetology.cpp:473, the single choke point)
+  also appends a `headline` entry. `planetology_state::history` stays populated so nothing
+  downstream changes. Behaviour-preserving by construction; the null sink must consume no
+  randomness (requirement R2).
+  *Files:* `src/world/planetology.{hpp,cpp}`.
+  *Deps:* A.
+- **C [1] — Derive crustal manganese.** BL-209 residual call 1: Mn is needed by S6b and is not
+  derived anywhere today. A crustal-Mn scalar from metallicity × crustal reworking, reusing S0's
+  one-nebula correlation.
+  *Files:* `src/world/planetology.{hpp,cpp}`.
+  *Deps:* independent root (can precede A/B).
+- **D [4] — The seven S5 gates.** Replace the single boolean at planetology.cpp:789 with S5a–S5g,
+  each reading upstream scalars, testing one threshold, emitting `molecular_event`s as `detail`
+  entries under the Spark headline, and setting `abiogenesis_depth`. Wires the cross-stage
+  coupling (S1's late veneer into S5a's impact-reducing atmosphere and S5c's schreibersite) and
+  reaches `silent_eden` / `rna_lock`. Fresh stage tags per sub-gate.
+  *Files:* `src/world/planetology.{hpp,cpp}`.
+  *Deps:* A, B, C.
+- **E [3] — The S6 photosystem fork.** S6a anoxygenic / S6b oxygenic (gated on Mn + S5g genome
+  headroom) / S6c nitrogen fixation, sitting IN FRONT of the existing flux-balance test, which
+  runs underneath unchanged. Reaches `ferrotroph_world`.
+  *Files:* `src/world/planetology.{hpp,cpp}`.
+  *Deps:* C, D.
+- **F [3] — Verification.** New `tools/verify/history_log_harness.cpp` (group A R1–R3, including
+  the no-randomness null-sink assert). Extend `tools/verify/planetology_harness.cpp` group R12
+  for the in-situ orphan-id and gate-independence checks, and re-baseline R2/R4/R5.
+  *Files:* `tools/verify/history_log_harness.cpp`, `tools/verify/planetology_harness.cpp`.
+  *Deps:* A–E.
+
+**Parallelisation note.** A and C are independent roots; everything else is a chain
+(A → B → D → E → F, with C feeding D and E). **Fan-out is not worth it here**: B, C, D and E all
+write `src/world/planetology.cpp`, which makes them one hotspot file, and DELIVERY.md keeps
+hotspot and integration work in the main session. A is the only genuinely separable slice and it
+is small. Built sequentially in-session.
+
+### State at end of block, 2026-07-29
+
+| Task | State | Notes |
+|---|---|---|
+| A — log substrate | **COMPLETE** | `history_log.{hpp,cpp}`. Standalone, stdlib-only. |
+| B — route `say()` | **COMPLETE** | Optional `hist::log*` out-param; null sink proven inert. |
+| C — crustal Mn/Mo | **COMPLETE** | From metallicity × crustal reworking (theta). |
+| D — seven S5 gates | **PARTIAL** | Wired, deterministic, reaching `silent_eden` + `rna_lock`. **Five of seven gates are inert at current constants** — see below. |
+| E — S6 photosystem fork | **PARTIAL** | Branches both ways; `ferrotroph_world` reachable but at 0.02%, effectively never. |
+| F — verification | **PARTIAL** | `history_log_harness.cpp` written, ALL PASS (12/12). `planetology_harness` R12 extension and the R2/R4/R5 re-baseline are **owed**. |
+
+**The one substantive gap, and why it is not being guessed at.** S5a Feedstock, S5b Reductant,
+S5d Concentration, S5e Replicator and S5f Compartment never produce a terminal outcome across
+28,800 runs varying mass, orbit and system age — their thresholds are too loose, so five of the
+seven gates currently narrate rather than decide. Tuning them by hand now would be fitting
+constants against a probe rather than an instrument. **BL-219 is that instrument** (whole-pipeline
+sweep with rarity bands), and it is the right place for this; BL-209's own design predicted that a
+seed-only sweep over the four prototype bodies cannot exercise these gates at all, which the
+measurement confirms.
+
+**Two findings recorded in `req/requirements.json` rather than silently absorbed:**
+
+1. **The eight-line cap is already violated at HEAD.** Kepler emits ten biography lines, and did
+   so before this item touched the chain (verified with a probe against the committed sources).
+   PLANETOLOGY.md § Presentation documents a maximum of eight. Open question for Ben: is the cap a
+   *generation* rule or a *presentation* rule? BL-208's design assumes the former; the code says
+   otherwise.
+2. **Behaviour is preserved on the prototype set.** All four bodies resolve to the same archetypes
+   (11/0/11/12) and the same line counts as HEAD, so the S5 rewrite did not disturb the shipped
+   world.
+
 ## AI constituents batch (promoted from backlog.json § BL-202, BL-206, BL-207) — **COMPLETE**
 
 Batch: 2026-07-27-ai-constituents. Requirements: requirements.json §

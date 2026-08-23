@@ -6415,6 +6415,97 @@
           "result_metric": "scripts/verify/chat_panel.lua — golden blessed 2026-07-28; a per-corp Counsel channel tab renders (Counsel: <corp name>)."
         }
       ]
+    },
+    {
+      "brief": "history-log-substrate",
+      "batch": "2026-07-29-generation-chain",
+      "title": "BL-208 slice S1 — World history log substrate: one entry type, two sealed segments, parented tree",
+      "status": "active",
+      "promoted_from": "backlog.json BL-208 WORLD_HISTORY_LOG (slice S1)",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "HEADLESS: two same-seed generations produce byte-identical logs — entry count, append order, assigned ids, (era, time_key) ordering, parent links and citation payloads all match. Entry ids are monotonic from 1; every non-zero parent resolves to an existing headline; no float appears in the ordering key.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/history_log_harness.cpp — PASS (8/8), 2026-07-29. Entry-for-entry identity across two same-seed runs over the whole prototype body set; ids monotonic and dense; parents resolve to headlines; time_key asserted int64 BY TYPE (a value check would pass for a float too); years-before-present decreasing; seal() breach detected."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "HEADLESS (the BL-219 invariant): log authoring consumes no randomness. Across a seed sample, run_planetology with a null log sink produces a bit-identical planetology_state (archetype, died_at, life_stage, abiogenesis_depth, full endowment array) to a run with a log attached. This is what makes BL-219 reduced fidelity safe; without it the tuning instrument and the shipped generator drift apart.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/history_log_harness.cpp — PASS, 2026-07-29. 1600 body-seed pairs compared field-by-field (archetype, died_at, stage/peak, depth, Mn/Mo, both photosystem flags, all four window scalars, arable, o2, theta, surface temp, the full endowment array, and the whole molecular trace). Null sink is bit-identical. This is the invariant BL-219 reduced fidelity rests on."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "HEADLESS: the two reads both work off one structure — headlines(body) returns at most eight entries in (era, time_key) order, matching the existing eight-line biography for that body; children(headline) returns that headline's detail entries in emit order. A body whose chain died early returns proportionally fewer headlines (asymmetry-is-characterisation is preserved, not padded).",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/history_log_harness.cpp — PASS with a recorded FINDING, 2026-07-29. headlines() equals the chain's biography exactly (no padding, no truncation); asymmetry preserved (2 lines for a dead rock, 10 for Kepler); the trace hangs as detail under its own headline with integer citations. FINDING: the EIGHT-LINE CAP IS NOT ASSERTED, deliberately — Kepler emits TEN lines, and did so at HEAD (commit f9f5c4a) BEFORE this item, verified with a standalone probe against the committed sources. So PLANETOLOGY.md § Presentation's \"eight lines maximum\" is an aspiration the generator has never met. Asserting <=8 would fail on pre-existing behaviour and invite trimming a good biography to satisfy a harness; asserting nothing would hide it. OPEN DESIGN QUESTION FOR BEN: is the cap a GENERATION rule (the chain must emit at most eight) or a PRESENTATION rule (BL-211's Story view shows the best eight of more)? BL-208's design currently assumes the former, which the code contradicts."
+        }
+      ],
+      "note": "All three rows are MET as of 2026-07-29 (history_log_harness ALL PASS 12/12). The group stays `active` rather than `complete` because it covers BL-208 SLICE S1 only; the item remains open for slices S2-S5 (see backlog.json BL-208 § Slice order). Flip to complete when the item is terminal."
+    },
+    {
+      "brief": "abiogenesis-seven-gates",
+      "batch": "2026-07-29-generation-chain",
+      "title": "BL-209 — The seven-gate abiogenesis chain and the S6 photosystem fork",
+      "status": "active",
+      "promoted_from": "backlog.json BL-209 PLANETOLOGY_MOLECULAR_EVENT_TRACE",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "failed",
+          "requirement": "HEADLESS: the seven S5 gates fail INDEPENDENTLY — across a seed sample every abiogenesis_depth value from none..coded is observed, and each terminal depth maps to its stated archetype (S5c/S5e on an otherwise good world -> silent_eden; S5g -> rna_lock). Proves the chain is generative rather than narrating a pre-existing verdict.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "PARTIAL — 2026-07-29. The chain is wired, deterministic, and REACHES ALL THREE NEW ARCHETYPES, but only 2 of the 7 S5 gates bite at current constants. Measured over 28,800 runs varying mass (0.45-1.95 Me), orbit (0.70-1.50 AU) and system age (2.0-4.85 Gyr): cradle 47.27%, oven 33.33%, rna_lock 8.74% (S5g), boring_billion 5.41%, mat_world 3.86%, silent_eden 1.36% (S5c), ferrotroph_world 0.02% (S6b). Depths reached: coded 56.56%, none 33.33%, cellular 8.74%, reductant 1.36%. STILL FAILING THIS ROW: S5a feedstock, S5b reductant, S5d concentration, S5e replicator and S5f compartment NEVER produce a terminal depth — their thresholds are too loose, so five of the seven gates are currently inert. The requirement asks that every abiogenesis_depth value be observed; four of eight never are. ALSO NOTE: a seed-only sweep over the four prototype bodies cannot exercise these gates at all (three die at S1-S3 and never reach S5; the fourth is the homeworld the strict floor forces through) — it yields silent_eden 1.25% and nothing else. BL-209's own design predicted exactly this. Varying body inputs is required, which is BL-219's whole-pipeline sweep. Tuning these five thresholds should wait for that instrument rather than be guessed at now."
+        },
+        {
+          "id": "R2",
+          "status": "pending",
+          "requirement": "HEADLESS: no orphan ids IN SITU — every molecular_event emitted by a real generation run resolves in species_table/reaction_table, and its declared gate matches the substage that emitted it. Extends chemistry_tables_harness R12b from the static tables to the live generator, which is where drift will actually appear.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "PENDING — the in-situ orphan-id check is not yet written. chemistry_tables_harness already covers the STATIC tables (R12b, ALL PASS); extending it to events emitted by a live run is the owed half, and it is where drift will actually appear now that the generator emits ids."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "HEADLESS: determinism — the emitted event sequence is identical in (seed, body) across two runs; the S5e replicator gate reaches rna_half_life_hours (the 16-entry table) and no exp/log/pow appears on any gate path added by this item.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "PARTIAL — 2026-07-29. Trace determinism IS proven, via history_log_harness R1/R2: the full molecular_event sequence is compared field-by-field across 1600 body-seed pairs and is identical. The S5e gate reaches chem::rna_half_life_hours (the 16-entry table) and no exp/log/pow was added on any gate path. Not yet asserted from within planetology_harness itself."
+        },
+        {
+          "id": "R4",
+          "status": "failed",
+          "requirement": "HEADLESS: the photosystem fork branches both ways across a seed sample. A ferrotroph_world (S6a fired, S6b failed on Mn or genome headroom) carries a strictly higher and never-closing banded-iron window than any mat_world; a Mo-poor world shows a capped arable_share through the nitrogen-fixation path. Re-asserts BOTH ends of the R4 iron/coal antagonism, which this fork puts at risk by adding a second independent iron pathway.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "PARTIAL — 2026-07-29. The fork branches both ways and ferrotroph_world is reachable, but at 0.02% (7 of 28,800) it is far below anything meaningful — Ben's target was \"rare\", not absent. The strictly-higher-unbounded-iron-window assertion versus mat_world, and the Mo-poor arable cap, are NOT yet asserted. The R4 iron/coal antagonism has NOT been re-baselined."
+        },
+        {
+          "id": "R5",
+          "status": "pending",
+          "requirement": "HEADLESS regression re-baseline: the four prototype bodies still land in their stated archetypes (R2) and the homeworld corridor still resolves 100/100 (R5) with seven new gates in the path. Acceptance rate will fall and reject-and-reroll absorbs it — per-lean cost must be re-measured so no preference becomes a dead end.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "PENDING — planetology_harness has not been re-run against the new gates, and the homeworld corridor has not been re-measured. Behaviour-preserving evidence so far is narrower but real: the four prototype bodies still resolve to archetypes 11/0/11/12 and Kepler still emits 10 history lines, identical to HEAD (standalone probe against committed sources, 2026-07-29)."
+        }
+      ]
     }
   ]
 }

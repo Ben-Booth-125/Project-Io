@@ -2,6 +2,7 @@
 
 #include "components.hpp"
 #include "corp_command.hpp" // corp_decision_ring (BL-202 strategic decision log)
+#include "history_log.hpp"  // hist::log (BL-208 world history log)
 
 #include <cstdint>
 #include <map>
@@ -67,6 +68,16 @@ struct world
     /// at the Solar canvas centre; its name titles the minimap when the Solar
     /// canvas is shown there.
     entity_id star_body = null_entity;
+
+    /// The world history log (BL-208). Every dated line the generation passes
+    /// emit, plus the causal detail beneath each one, in one append-only store.
+    ///
+    /// The genesis segment is written during `make_hard_coded_world` and sealed;
+    /// the campaign segment grows during play. Subjects are addressed by
+    /// PROTOTYPE BODY INDEX, not entity id — the generation passes run before the
+    /// body entities exist, and `generation_report::body_entry::subject_id`
+    /// carries the mapping for readers.
+    hist::log history;
 
     /// The corporation's home planet. The game opens on this body's surface.
     entity_id home_body = null_entity;

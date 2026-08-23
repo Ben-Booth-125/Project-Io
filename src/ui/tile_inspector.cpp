@@ -125,23 +125,118 @@ void draw_tile_inspector(const world& w, ui_state& s,
         }
         else
         {
+            const planetology_state& st = entry->state;
+
             ImGui::TextDisabled("%s - %.2f Gya to present",
-                archetype_name(entry->state.archetype),
-                entry->state.history.front().gya);
+                archetype_name(st.archetype), st.history.front().gya);
+
+            // --- The at-a-glance heuristics (BL-209/BL-211) ------------------
+            // A non-expert cannot judge a seed from twenty dated lines. These
+            // three rows are the summary that makes one readable at a glance:
+            // where the chain got to, how close it came, and what the world
+            // therefore lacks. PLANETOLOGY.md § Presentation argues the last one
+            // hardest — absence is what constrains play.
+            ui::draw_chain_spine(st);
+            ui::draw_denial_list(st);
+            ImGui::Separator();
             ImGui::Spacing();
-            for (const history_event& ev : entry->state.history)
+
+            // --- The biography, with drill-down ------------------------------
+            // Read from the world history log rather than state.history, because
+            // the log is what carries the causal DETAIL beneath each line. The
+            // flat list this replaced had no way to reach the seven abiogenesis
+            // gates at all — they were generated and unreachable.
+            const hist::subject_ref subj{ hist::subject_kind::body, entry->subject_id };
+            const std::vector<hist::entry_id> heads = w.history.headlines_chronological(subj);
+
+            if (heads.empty())
             {
-                ImGui::TextWrapped("%.2f Gya  %s", ev.gya, ev.event.c_str());
-                if (!ev.consequence.empty())
+                // A world loaded from a save written before the log existed.
+                ImGui::TextDisabled("No causal detail recorded for this body.");
+            }
+
+            for (std::size_t i = 0; i < heads.size(); ++i)
+            {
+                const hist::entry& h = w.history.at(heads[i]);
+
+                // COLLAPSE RUNS OF IDENTICAL EVENTS. The continents pass emits one
+                // line per tectonic event, and "Two plates collided along a
+                // long-lived boundary" recurs verbatim many times — which drowns
+                // the lines that actually distinguish this world. Identical
+                // consecutive events fold into one row with a count.
+                std::size_t run = 1;
+                while (i + run < heads.size()
+                       && w.history.at(heads[i + run]).event == h.event
+                       && w.history.at(heads[i + run]).consequence == h.consequence)
+                    ++run;
+
+                const std::vector<hist::entry_id> kids = w.history.children(heads[i]);
+
+                // Only a line with detail beneath it gets an expander; the rest
+                // stay flush, so the affordance means something where it appears.
+                bool open = false;
+                if (!kids.empty())
                 {
-                    // Wrapped, not TextDisabled: the consequence is the longer half
-                    // of the pair and the column clipped it mid-word.
+                    ImGui::PushID(static_cast<int>(heads[i]));
+
+                    // A tree node's label CANNOT wrap, and this panel is ~310 px —
+                    // putting the event text in the label clipped it mid-word. So
+                    // the label carries only the date and the step count, and the
+                    // event text is wrapped underneath it.
+                    open = ImGui::TreeNodeEx("##drill",
+                        ImGuiTreeNodeFlags_SpanAvailWidth,
+                        "%.2f Gya  -  %zu steps", h.time_key / 1.0e9, kids.size());
+                    ImGui::TextWrapped("%s", h.event.c_str());
+                }
+                else if (run > 1)
+                {
+                    ImGui::TextWrapped("%.2f-%.2f Gya  %s  (x%zu)",
+                        h.time_key / 1.0e9,
+                        w.history.at(heads[i + run - 1]).time_key / 1.0e9,
+                        h.event.c_str(), run);
+                }
+                else
+                {
+                    ImGui::TextWrapped("%.2f Gya  %s", h.time_key / 1.0e9, h.event.c_str());
+                }
+
+                if (!h.consequence.empty())
+                {
                     ImGui::Indent();
                     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
-                    ImGui::TextWrapped("%s", ev.consequence.c_str());
+                    ImGui::TextWrapped("%s", h.consequence.c_str());
                     ImGui::PopStyleColor();
                     ImGui::Unindent();
                 }
+
+                if (!kids.empty())
+                {
+                    if (open)
+                    {
+                        // The chain, step by step. Names resolve through the
+                        // chemistry tables — an event stores ids, so this text
+                        // cannot drift from what was generated.
+                        for (const hist::entry_id k : kids)
+                        {
+                            const hist::entry& d = w.history.at(k);
+                            ImGui::PushStyleColor(ImGuiCol_Text,
+                                ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+                            ImGui::TextWrapped("%s  -  %s",
+                                ui::citation_summary(d).c_str(), d.event.c_str());
+                            if (!d.consequence.empty())
+                            {
+                                ImGui::Indent();
+                                ImGui::TextWrapped("%s", d.consequence.c_str());
+                                ImGui::Unindent();
+                            }
+                            ImGui::PopStyleColor();
+                        }
+                        ImGui::TreePop();
+                    }
+                    ImGui::PopID();
+                }
+
+                i += run - 1;
             }
         }
         ui::foldout_end();
@@ -205,6 +300,20 @@ void draw_tile_inspector(const world& w, ui_state& s,
             const ImGuiTreeNodeFlags flags =
                 (si == static_cast<int>(cr.first)) ? ImGuiTreeNodeFlags_DefaultOpen : 0;
             ImGui::PushID(si);
+
+            // A verify script can pin one stage open (ui_state::history_stage, set
+            // via verify.panel_view "history_stage"). Without this the only
+            // reachable state in a capture is the round's first stage, so every
+            // other stage's charts are unverifiable — which is how the Spark
+            // charts could have shipped broken and unnoticed.
+            //
+            // Pinning forces the others CLOSED as well as this one open: the column
+            // is narrow, and leaving the round's default-open stage expanded above
+            // pushes the pinned stage off the bottom of the panel, which defeats
+            // the point.
+            if (s.history_stage >= 0)
+                ImGui::SetNextItemOpen(s.history_stage == si, ImGuiCond_Always);
+
             if (ImGui::CollapsingHeader(head, flags))
             {
                 ImGui::TextWrapped("%s", chain_stage_title(stage));

@@ -94,9 +94,29 @@ world make_hard_coded_world(world_params params, generation_report* report)
         if (in.is_homeworld)
             in.orbit_au = rw.home_orbit_au;
         const uint32_t body_seed = params.seed ^ prototype_body_seed(proto_index);
-        planetology_state st = run_planetology(in, rw.params, body_seed);
+
+        // BL-208: the chain writes its biography into the world history log as it
+        // runs, so the dated lines and the causal detail beneath them share one
+        // store. The subject is the PROTOTYPE INDEX — body entities do not exist
+        // yet at this point in generation.
+        const hist::subject_ref subj{ hist::subject_kind::body,
+                                      static_cast<uint32_t>(proto_index) };
+        planetology_state st = run_planetology(in, rw.params, body_seed, &w.history, subj);
 
         const continent_state cs = run_continents(st, gw, gh, body_seed ^ 0xC0117E57u);
+
+        // Continents is a SECOND producer for the same subject. Its lines are
+        // headlines like any other stage's, so they go into the log too — and this
+        // is why `headlines()` orders by (era, time_key) rather than by append
+        // order: two producers cannot append in chronological order between them.
+        for (const history_event& ev : cs.history)
+        {
+            w.history.headline(hist::era::deep_time, subj,
+                               static_cast<uint8_t>(ev.stage),
+                               static_cast<int64_t>(static_cast<double>(ev.gya) * 1.0e9),
+                               ev.event, ev.consequence);
+        }
+
         st.history.insert(st.history.end(), cs.history.begin(), cs.history.end());
         std::stable_sort(st.history.begin(), st.history.end(),
             [](const history_event& a, const history_event& b) { return a.gya > b.gya; });
@@ -112,7 +132,8 @@ world make_hard_coded_world(world_params params, generation_report* report)
             planetology_params undrawn = rw.params;
             undrawn.drawdown = 0.0f;
             report->bodies.push_back(generation_report::body_entry{
-                in.name, st, run_planetology(in, undrawn, body_seed) });
+                in.name, st, run_planetology(in, undrawn, body_seed),
+                static_cast<uint32_t>(proto_index) });
         }
         return st;
     };

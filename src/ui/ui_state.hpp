@@ -159,6 +159,13 @@ struct ui_state
     /// static so a verify script can park the ledger on a given round.
     int  history_round = 0;
 
+    /// Within the History ledger's Chain view, a `chain_stage` index to pin OPEN,
+    /// or -1 for the default (only the round's first stage opens).
+    ///
+    /// Exists for verification: a capture could otherwise only ever show the
+    /// round's first stage, leaving every other stage's charts unverifiable.
+    int  history_stage = -1;
+
     // --- application / system menu (BL-070) ---
     // The corner gear popup for session control (Pause/Resume, Exit Game). Opened
     // by the gear button and toggled by Esc; confirm_exit_pending arms the inline

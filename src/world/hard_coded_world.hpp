@@ -55,6 +55,13 @@ struct generation_report
         /// has no preview to consult). Drawdown consumes no randomness, so this is
         /// the same world minus its industrial history — not a second roll.
         planetology_state undrawn;
+
+        /// This body's subject id in `world::history` (BL-208) — the prototype
+        /// body index. Carried here so a reader need not re-derive the mapping
+        /// from a name, and so the log's addressing stays independent of
+        /// entity-creation order. Last field, so the aggregate initialisation at
+        /// the fill site keeps working.
+        uint32_t subject_id = 0;
     };
 
     world_preferences       preferences{}; ///< What the player asked for.

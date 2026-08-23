@@ -1,6 +1,8 @@
 #pragma once
 
+#include "chemistry_tables.hpp"
 #include "components.hpp"
+#include "history_log.hpp"
 #include "tile_generation.hpp"
 
 #include <array>
@@ -275,6 +277,45 @@ struct planetology_state
     bool  mobile_lid          = false;///< Plate tectonics — gates porphyry copper.
     bool  core_exposed        = false;
 
+    // --- Added by BL-209: the abiogenesis chain's own outputs -----------------
+
+    /// How far the chemistry actually climbed. A SEPARATE AXIS from `stage` —
+    /// every resource rule in the model is a `>=` test on `life_stage`, so the
+    /// seven new endings live here instead of renumbering that enum. Everything
+    /// below `cellular` maps to `life_stage::prebiotic`.
+    abiogenesis_depth depth = abiogenesis_depth::none;
+
+    /// Crustal manganese, Earth-relative. The Mn4CaO5 oxygen-evolving complex is
+    /// oxygenic photosynthesis' cofactor, so this GATES the Z-scheme at S6b —
+    /// which is what turns PLANETOLOGY.md's own unresolved "does banded iron gate
+    /// on life or on oxygen" into a generated branch. BL-209 residual call 1.
+    float crustal_mn = 1.0f;
+
+    /// Crustal molybdenum, Earth-relative. Nitrogenase' cofactor, and soluble
+    /// only in oxic water — so low Mo caps nitrogen fixation, which caps
+    /// productivity and burial, and (because S8 requires biological fixation for
+    /// soil) caps `arable_share` through pure chemistry.
+    float crustal_mo = 1.0f;
+
+    /// True when the world precipitated banded iron via anoxygenic
+    /// photoferrotrophy (S6a) — iron WITHOUT free oxygen. The window never
+    /// closes on such a world, which is what separates a ferrotroph_world from a
+    /// mat_world mechanically rather than only by blurb.
+    bool photoferrotrophic = false;
+
+    /// True when the Z-scheme was built (S6b). Required for any oxygen at all.
+    bool oxygenic = false;
+
+    /// The molecular event trace — the chemistry, gate by gate, as 8-byte
+    /// records referencing the compiled-in tables in chemistry_tables.hpp. An
+    /// event NEVER holds a string; both the dev inspector and any player surface
+    /// resolve names through the same table, so names cannot drift from ids.
+    ///
+    /// Kept here as well as in the history log because the log stores the trace
+    /// as citation pairs on `detail` entries (the narrative view), while this is
+    /// the compact record the save format and the sweep read.
+    std::vector<chem::molecular_event> trace;
+
     /// The DERIVED solar parameters. This is the narrow waist: Planetology's
     /// minimum viable output is that these six stop being hand-authored literals
     /// in make_hard_coded_world().
@@ -303,10 +344,25 @@ struct planetology_state
 /// @param in   The body's authored physical facts.
 /// @param p    The campaign's planetology knobs.
 /// @param seed Per-body seed, already folded with the campaign seed.
+/// @param log  Optional narrative sink (BL-208). When non-null, every biography
+///             line is also appended as a `hist::tier::headline` entry and the
+///             molecular trace hangs beneath the Spark headline as `detail`
+///             entries. When null, nothing is authored.
+/// @param subject Which subject the entries are about. Only read when @p log is
+///             non-null; the caller owns body ids, this pass does not.
 /// @return     The body's derived profile, endowment, archetype and history.
+///
+/// THE NULL-SINK INVARIANT (BL-219 depends on it): authoring log entries consumes
+/// NO randomness and changes no gate outcome. A run with @p log null must produce
+/// a bit-identical `planetology_state` to a run with a log attached, for the same
+/// seed. That is what lets the tuning sweep skip presentation work at scale
+/// without the instrument and the shipped generator drifting apart. Asserted by
+/// tools/verify/history_log_harness.cpp.
 planetology_state run_planetology(const body_inputs& in,
                                   const planetology_params& p,
-                                  uint32_t seed);
+                                  uint32_t seed,
+                                  hist::log* log = nullptr,
+                                  hist::subject_ref subject = {});
 
 // ---------------------------------------------------------------------------
 // Preferences — the New World wizard's actual input
@@ -402,5 +458,10 @@ void preview_system(const planetology_params& p, float home_orbit_au, uint32_t s
 const char* archetype_name(body_archetype a);
 const char* archetype_blurb(body_archetype a); ///< One line: what it has and lacks.
 const char* life_stage_name(life_stage s);
+
+/// How far the abiogenesis chain climbed, as a short display string. The eighth
+/// rung (`coded`) is the only one that leads anywhere; the seven below it are the
+/// distinguishable endings BL-209 added.
+const char* abiogenesis_depth_name(abiogenesis_depth d);
 const char* chain_stage_name(chain_stage s);
 const char* chain_stage_title(chain_stage s); ///< The question the stage answers.

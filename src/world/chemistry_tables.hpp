@@ -171,7 +171,23 @@ struct molecular_event
     uint8_t  outcome_id = 0;  ///< chem::outcome.
     uint16_t yield_q    = 0;  ///< Fixed-point quantity, 1/1000. Meaning is per-process.
     uint8_t  venue_id   = 0;  ///< chem::venue.
-    uint8_t  flags      = 0;  ///< Reserved. Keeps the record 8-byte aligned.
+    uint8_t  flags      = 0;  ///< See `event_flags`. Keeps the record 8-byte aligned.
+};
+
+/// Bit flags for `molecular_event::flags`.
+enum event_flags : uint8_t
+{
+    /// This event carries its GATE'S VERDICT, as opposed to being one of the
+    /// contributing or competing reactions the gate also records.
+    ///
+    /// This distinction is load-bearing for any reader that summarises a gate.
+    /// A gate emits several events — S5a records the impact-generated reducing
+    /// atmosphere alongside the cyanide synthesis it enables; S5e records the
+    /// hydrolysis that competes with the template extension. Those side reactions
+    /// carry their own outcomes, and treating the worst of them as the gate's
+    /// result reports a healthy gate as marginal. Exactly one event per evaluated
+    /// gate sets this bit.
+    event_gate_verdict = 1u << 0,
 };
 
 static_assert(sizeof(molecular_event) == 8, "molecular_event must stay 8 bytes — it is a save-format record");
