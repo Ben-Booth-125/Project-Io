@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*6 entries — 6 open, 0 resolved.*
+*7 entries — 7 open, 0 resolved.*
 
 ---
 
@@ -95,6 +95,15 @@ nation_component::treasury is 0.0 for every nation at generation, by existing se
 - C) Re-scale BL-571's garrison-size anchor off something already non-zero at generation (e.g. resource_abundance or tile count) instead of treasury, decoupling garrison size from the funding question entirely.
 
 > **Recommendation:** B for Sprint 16 -- the mercenary slice's playthrough (BL-578) plays over enough ticks that a levy has time to credit treasuries before the slice needs a contract offer to fire; re-verify that assumption when BL-572/BL-578 land rather than gold-plating generation now. Revisit A as its own item if the playthrough shows the wait is too long to feel alive.
+
+### NR-581 — BL-572's offer fee/deadline are hardcoded, not read from the BL-570 template table — deliberately deferred to BL-573; plus one tested same-tick expire-reopen interaction
+*observation · raised 2026-08-23 · from BL-572 (CONTRACT_OFFERS) landing; contract_offer_params (nation_step.hpp).*
+
+Two things worth a look, neither blocking: (1) `contract_offer_params` hardcodes fee=400/deadline_ticks=180/template_index=0 rather than reading scripts/contracts.lua's authored 'take' row through `contract_template_registry`, because that registry needs sol2/Lua and its loader is excluded from the Lua-free world/* superset derive_contract_offers lives in (the same reason recipe_registry is threaded in as a plain parameter rather than loaded by world/* itself). The values match the authored row today, and BL-573 (accept_offer) is the natural point to thread a real contract_template_registry through — the same way recipe_registry already reaches world/* — since accepting an offer needs the template's actual predicate anyway. (2) Tested and asserted (nation_scorer_harness R8e2): because escrow refund runs before the funding gate is re-read in the same tick, an offer that expires while its nation still has budget and an eligible target reopens the SAME province in the SAME tick, funded by its own just-refunded escrow. Deterministic, conserves money exactly, not a bug — but a dispatch feed (BL-577) that later announces 'offer expired' then 'offer issued' in the same message batch would read oddly for something that never actually stopped being available.
+
+**Why it matters.** (1) is pure sequencing information for whoever builds BL-573 — worth a one-line pointer in REFINED.md so it isn't rediscovered. (2) only matters once BL-577 (contract messages) exists to surface it; flagging now so it isn't a surprise mid-implementation.
+
+> **Recommendation:** No action needed now. When BL-573 lands, thread contract_template_registry through derive_contract_offers's call chain the way recipe_registry already is. When BL-577 lands, consider collapsing an expire+reopen on the same province in the same tick into one 'renewed' message rather than two.
 
 ---
 

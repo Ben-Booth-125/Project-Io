@@ -5824,19 +5824,21 @@
         {
             "brief": "contract-offers",
             "title": "A nation derives a contract offer from its budget, and the contracted_force line takes a subject",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-23",
+            "resolution": "Landed on main (worktree-agent-a1a24b0f421a2fbf6, merged). nation_scorer_harness R8 (34 checks, all pass); save_roundtrip clean (world_save_version 6->7).",
             "promoted_from": "backlog.json BL-572 (CONTRACT_OFFERS) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "headless"
                     ],
-                    "requirement": "ITEM-SPANNING: derive_contract_offers (run_nation_step, after the budget pass) targets the weakest border province against the nation's highest-grudge neighbour (deterministic argmin, ascending-id tiebreak), a mercenary_offer accumulates the contracted_force line's spendable share into its own offer_escrow until the template minimum clears, several offers can be open and filling concurrently with the tick's share applied oldest-issued-first, an unanswered offer expires after offer_ttl_ticks and returns its escrow, and nation_scorer_harness R5 shows a threatened nation issuing an offer, an unthreatened one not, two offers coexisting, and the sequence replayable.",
-                    "notes": "line_takes_subject(contracted_force) = true.",
-                    "result_metric": ""
+                    "requirement": "ITEM-SPANNING: derive_contract_offers (run_nation_step, after the budget pass) targets the weakest border province against the nation's highest-grudge neighbour (deterministic argmin, ascending-id tiebreak), a mercenary_offer accumulates the contracted_force line's spendable share into its own offer_escrow until the template minimum clears, several offers can be open and filling concurrently with the tick's share applied oldest-issued-first, an unanswered offer expires after offer_ttl_ticks and returns its escrow, and nation_scorer_harness R5 shows a threatened nation issuing an offer, an unthreatened one not, two offers coexisting, and the sequence replayable. (Landed as R8, not R5 — the file's own R5 was already grudges; renumbered to avoid collision, same requirement content.)",
+                    "notes": "line_takes_subject(contracted_force) = true. Fee/deadline are a placeholder contract_offer_params, not a live contract_template_registry lookup — deferred to BL-573 (NR-581).",
+                    "result_metric": "nation_scorer_harness R8: 34 checks, 0 failures"
                 }
             ]
         },

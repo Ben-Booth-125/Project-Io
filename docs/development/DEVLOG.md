@@ -90,6 +90,31 @@ wiring nation income into generation now.
 Both items flipped `complete`, design prose archived, `REFINED.md` Wave 2 drained. Wave 3
 (BL-572) is next.
 
+**UPDATE, same session: Wave 3 lands (BL-572, contract offers).** A single item this wave, no
+sibling agent — the worktree was a clean ancestor of `main` this time, no reconciliation needed.
+`derive_contract_offers` (`nation_step.cpp`, called from `run_nation_step` after garrison
+upkeep): targets the weakest border province of the highest-grudge neighbour, accumulates the
+`contracted_force` line's spendable share into a per-offer `offer_escrow` until the fee clears,
+funds several open offers oldest-issued-first, expires unanswered offers after `offer_ttl_ticks`
+and refunds their escrow. `nation_scorer_harness` gained R8 (34 checks, all pass — targeting,
+clamping, oldest-first funding, expiry+refund, tie-break, replay); `save_roundtrip` clean
+(`world_save_version` 6→7). `spectator_determinism`'s golden held — a default world's
+`mercenary_offers` stays empty while treasury is 0 (NR-580), so no new state entered the hash
+this time.
+
+**Deliberately deferred, not a shortcut:** offer fee/deadline are a hardcoded
+`contract_offer_params`, not a live `contract_template_registry` lookup — that registry needs
+sol2/Lua, unreachable from `world/*`'s Lua-free superset, the same reason `recipe_registry` is
+threaded in as a plain parameter rather than loaded by `world/*` itself. BL-573 (accept_offer)
+is the natural point to wire a real lookup, since accepting an offer needs the template's actual
+predicate anyway. Filed `NR-581` alongside one tested, deterministic quirk worth knowing about:
+an offer that expires while its nation still wants the same target reopens the SAME tick,
+funded by its own refund — correct and conserved, but worth collapsing into one dispatch message
+once BL-577 exists to announce it.
+
+Item flipped `complete`, design prose archived, `REFINED.md` Wave 3 drained — with a pointer
+left in Wave 4's brief for the `contract_template_registry` threading. Wave 4 (BL-573) is next.
+
 ---
 
 ## Session — The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575) (2026-08-23, latest)

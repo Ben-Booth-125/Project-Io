@@ -10,7 +10,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
-| 2026-08-23 | [Sprint 16 Batch Delivery opens: BL-571/BL-572 ratified, the batch planned, Wave 1 lands (BL-569, BL-575)](DEVLOG.md) | BL-436 BL-569 BL-570 BL-571 BL-572 BL-575 BL-578 BL-579 | DEVLOG.md |
+| 2026-08-23 | [Sprint 16 Batch Delivery opens: BL-571/BL-572 ratified, the batch planned, Wave 1 lands (BL-569, BL-575)](DEVLOG.md) | BL-436 BL-569 BL-570 BL-571 BL-572 BL-573 BL-575 BL-577 BL-578 BL-579 | DEVLOG.md |
 | 2026-08-23 | [The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575)](DEVLOG.md) | BL-569 BL-570 BL-571 BL-572 BL-573 BL-574 BL-575 BL-576 BL-577 BL-578 | DEVLOG.md |
 | 2026-08-23 | [Housekeeping, and the nation spines go live (BL-568, Sprint N3 slice 1; NR-566–NR-572)](DEVLOG.md) | BL-462 BL-537 BL-542 BL-555 BL-556 BL-558 BL-559 BL-568 | DEVLOG.md |
 | 2026-08-21 | [Ownership separates from identity: the syndicate tier (BL-524–BL-530, NR-491–NR-497)](DEVLOG.md) | BL-094 BL-218 BL-219 BL-350 BL-365 BL-409 BL-524 BL-525 BL-526 BL-527 BL-528 BL-529 BL-530 BL-531 | DEVLOG.md |

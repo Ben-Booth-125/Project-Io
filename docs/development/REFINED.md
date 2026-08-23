@@ -63,22 +63,22 @@ funding side).
 
 ---
 
-### Wave 3 (after BL-570, BL-571)
+### Wave 3 — DONE (2026-08-23)
 
-#### BL-572 — CONTRACT_OFFERS
+**BL-572 (contract offers)** landed and merged to `main` (worktree-agent-a1a24b0f421a2fbf6, a
+clean fast-forward — no sibling wave-3 agent, no doc-conflict archaeology this time). `complete`
+in backlog.json, design prose archived. `nation_scorer_harness` gained R8 (34 checks, all
+pass); `save_roundtrip` clean (`world_save_version` 6→7). `spectator_determinism`'s golden did
+NOT move this time (a default world's `mercenary_offers` stays empty while treasury is 0, so no
+new state entered the hash).
 
-Requirements: § contract-offers. Files: `nation_ai.{hpp,cpp}`, `nation_step.cpp`,
-`nation_budget.{hpp,cpp}`, `world.hpp`, `world_save.cpp`,
-`tools/verify/nation_scorer_harness.cpp`.
-
-1. `mercenary_offer{id, client, target_province, template, fee, deadline, issued_tick}`;
-   `world::mercenary_offers` (vector — concurrent offers). **Consumes:** garrison-strength
-   query (BL-571), `contracts.lua` template shape (BL-570). **Provides:** `mercenary_offer`,
-   `world::mercenary_offers`, `offer_escrow` per-offer accumulator.
-2. `derive_contract_offers`, called from `run_nation_step`; targeting rule; escrow
-   accumulation; oldest-issued-first tick-share split; TTL expiry.
-3. `line_takes_subject(contracted_force) = true`.
-4. Save section + version bump; `nation_scorer_harness` R5.
+One thing carried forward into Wave 4, not a blocker: `NR-581` — offer fee/deadline are a
+placeholder `contract_offer_params`, not a live `contract_template_registry` lookup (that
+registry needs sol2/Lua, unreachable from `world/*`'s Lua-free superset `derive_contract_offers`
+lives in). BL-573 below is where a real lookup belongs, since accepting an offer needs the
+template's actual predicate anyway — thread `contract_template_registry` through the same way
+`recipe_registry` already reaches `world/*` (a plain parameter, loaded once at the app-layer
+boundary, never loaded by `world/*` itself).
 
 ---
 
@@ -91,7 +91,10 @@ Requirements: § contract-record-and-verbs. Files: `components.hpp`, `corp_comma
 
 1. `mercenary_contract{id, client, contractor, template, province, fee, deposit_paid,
    deadline, accepted_tick, units[8], state}`; `world::mercenary_contracts`. **Consumes:**
-   `world::mercenary_offers` (BL-572), the condition-template shape (BL-570). **Provides:**
+   `world::mercenary_offers` (BL-572), the condition-template shape (BL-570) — this is also
+   where `contract_template_registry` needs to become reachable for real (NR-581): thread it
+   through the same way `recipe_registry` already is, a plain parameter from the app-layer
+   boundary, not a `world/*`-side Lua load. **Provides:**
    `mercenary_contract`, `corp_verb::accept_offer`, `corp_verb::abandon_contract`,
    `sentiment_factor_kind::contract_failed`. This is what BL-571's placeholder
    `active_mercenary_contract_for` should resolve against — wire it for real here.
