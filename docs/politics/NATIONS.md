@@ -188,9 +188,21 @@ pass is gated on `any_import_tariff_enacted`, so a world with no tariff law pays
 mechanism.
 
 **A tariff is directional** (§ Settled 4): `(author, target, resource) → rate`, with an
-`all_nations` sentinel for the blanket form. The initial map is derived at campaign setup from the
-Era −1 sim's pair outcomes, and that derivation is the authoring path — the thing that enacts a
-tariff. It is owned by BL-541 (directional tariffs).
+`all_nations` sentinel for the blanket form. The intended authoring path is a derivation at campaign
+setup from the Era −1 sim's pair outcomes.
+
+**The tariff has no author** (Ben, 2026-08-23, ruling on NR-400). This is a deliberate ordering, and
+it is stated here so the section above is not read as describing a live duty. `import_tariff` is a
+member of the law-effect vocabulary and of the save format, and `market_clearing` carries the whole
+duty pass — but **nothing enacts one**. No corp verb, no control, and no generation path authors a
+tariff law; the generator seeds the extraction levy alone. So `any_import_tariff_enacted` is false
+for the whole of a played campaign, and the duty pass is unreached.
+
+That makes the tariff **vocabulary ahead of its consumer** — the same shape META_LAYER.md's unwired
+modifier subjects have, and subject to the same discipline: a shape is proven by an instance, and
+an instance is owed. What it is *not* is an inert mechanic the reader should design against as
+though it were charging anyone. The nation grant (§ The 2026-08-18 grant) is what a rate-setting
+author would be built on: setting a tariff rate is named there as a nation power.
 
 ---
 
