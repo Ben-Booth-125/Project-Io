@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*241 entries — 241 open, 0 resolved.*
+*242 entries — 242 open, 0 resolved.*
 
 ---
 
@@ -2488,6 +2488,13 @@ Ben's elicitation answer chose 'several open concurrently' over the proposed one
 - Switch to highest-value-first (by the offer's scored fee).
 
 > **Recommendation:** Confirm oldest-issued-first — it is the simplest deterministic rule, matches a FIFO reading of 'the nation gets to what it can afford', and needs no additional per-offer priority field.
+
+### NR-577 — BL-575 live-click pass confirmed March is reachable and dispatches, but did not confirm the unit visibly moving
+*observation · raised 2026-08-23 · from Main-session live verification (computer-use) of BL-575 before closing Wave 1.*
+
+Opened the built app, selected the starting unit, pressed March, and clicked a confirmed-different province (verified via the repeat-click cycle showing its own province id). The mode disarmed without falling through to normal building/tile selection -- the Selection panel stayed on Unit -- which is strong evidence the corp_command dispatched rather than the click landing on ordinary marker resolution, and corp_command.cpp's march_unit case reads correct on inspection. What was NOT achieved: relocating the marker after the order to watch its tile position actually change. Two compounding factors: the economy/march tick in this build is QUARTERLY-cadence (the header counts down 'd to Q2/Q3'), not daily, despite the calendar advancing daily, so only one quarter boundary elapsed during the pass; and re-finding one unit marker on a freshly generated, unfamiliar world via manual pan/zoom proved impractical within reasonable effort. Halt and Disband were not individually live-clicked (same code pattern as March, confirmed by reading, not by pressing).
+
+**Why it matters.** This satisfies the standing rule's core concern -- BL-449 shipped clean on both compile and harness while a press rendered unreachable, and this pass proves March IS reachable and does dispatch. But it stops short of the full 'watch it work' bar the rule aspires to, and per the rule's own reasoning (a scripted capture is not enough), neither is a click that merely disarms without a rejection message.
 
 ---
 

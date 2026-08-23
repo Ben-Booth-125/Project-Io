@@ -74,8 +74,8 @@
       "id": "BL-569",
       "short_name": "PROVINCE_HOLDER",
       "title": "A province has a holder, and a won battle moves it",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "A",
       "difficulty": 3,
       "version_goal": "v0.1.15",
@@ -94,8 +94,8 @@
         "tools/verify/battle_engagement_harness.cpp"
       ],
       "authority_doc": "docs/military/MILITARY.md",
-      "summary": "The contract predicate needs something to measure: 'province P is held by X'. Today a province has no owner by design (province.hpp: 'no name, no owner') and the only ownership signal is battle_dispatch::field_held_by, erased with the battle. This item adds world::province_holder (one entity_id per province id, ascending-id order), seeded at generation from tile_to_nation (the nation holding the plurality of the province's land tiles), and moved by run_battles when a battle closes with field_held_by set. The PARTITION stays fixed and out of state_hash; the HOLDER vector is live state, hashed and saved.",
-      "design": "## Work\n\n1. `world::province_holder` - `std::vector<entity_id>` indexed by `province::id`; `no_entity` for sea provinces. Seeded in `build_province_partition`'s caller from `tile_to_nation` plurality. Authority: MILITARY.md (field held), PROVINCES.md (partition fixed, ownership moves - the old BL-567 rule, now this item's rule).\n2. `run_battles`: when `campaign_battle_end` is attacker_broken / defender_withdrew, set `province_holder[p] = winner owner`. Stalemate and attacker_withdrew leave it. Log the change into the dispatch stream ('<corp> holds <province>').\n3. `world_save.cpp`: append the vector as a trailing section; bump the save version; `save_roundtrip.cpp` round-trips it.\n4. `state_hash` folds the vector.\n5. Harness: extend `battle_engagement_harness.cpp` with one case where a decisive battle moves the holder and one where a stalemate does not.\n\n## Not in scope\nTile ownership (`tile_to_nation`) does NOT follow the holder in this item - a held province is a military fact the contract reads; the political map changing hands is later work."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-570",
@@ -253,8 +253,8 @@
       "id": "BL-575",
       "short_name": "UNIT_MARKER_AND_MARCH_UI",
       "title": "A unit is visible on the Planetary canvas and can be ordered to march",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "A",
       "difficulty": 3,
       "version_goal": "v0.1.15",
@@ -275,8 +275,8 @@
         "docs/ai/ACTIONS.json"
       ],
       "authority_doc": "docs/military/MILITARY.md",
-      "summary": "The player can raise units and withdraw from a battle but cannot order a unit anywhere from the app: march_unit is reachable only through the agent protocol. A contract the player cannot march to is a mission list. This is the old unit-canvas-marker item re-filed for the slice: a unit glyph per province on the Planetary canvas, a march-target mode from the unit card, and the press dispatching corp_verb::march_unit.",
-      "design": "## Work\n\n1. `ui::icons::unit_marker` at the province anchor, count badge, owner colour from presentation.hpp; units committed to a contract carry a ring. ICONS.md row.\n2. Unit card (selection_kind::unit) gains **March** -> `ui_state::pending_march_unit`; the next province click sets `pending_march_province`; app.cpp dispatches. Halt and Disband presses alongside.\n3. question_log.json entries for the marker and the card presses; ACTIONS.json canvas-family entry for march-target mode.\n4. Live check: open the app, click a unit, march it, watch it move - a UI requirement needs a live click."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-576",

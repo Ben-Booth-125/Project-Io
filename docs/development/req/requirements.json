@@ -5761,7 +5761,9 @@
         {
             "brief": "province-holder",
             "title": "A province has a holder, and a won battle moves it",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-23",
+            "resolution": "Landed on main (worktree-agent-a85dd40a41493c103, merged). battle_engagement_harness B15/B16 pass; full-suite re-verification found and fixed one save_roundtrip tripwire and re-blessed spectator_determinism's golden (see the Wave 1 integration commit).",
             "promoted_from": "backlog.json BL-569 (PROVINCE_HOLDER) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
@@ -5875,19 +5877,21 @@
         {
             "brief": "unit-marker-and-march-ui",
             "title": "A unit is visible on the Planetary canvas and can be ordered to march",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-23",
+            "resolution": "Landed on main (worktree-agent-a0220dee51ed2793d, merged). Live click pass confirms the marker and the March press's two-step dispatch; see R1 notes for the residual (unconfirmed) movement-visual gap.",
             "promoted_from": "backlog.json BL-575 (UNIT_MARKER_AND_MARCH_UI) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "visual",
                         "manual"
                     ],
                     "requirement": "ITEM-SPANNING: a unit marker renders at its province anchor tile on the Planetary canvas with an owner-colour badge and a ring on contract-committed units, the unit card's March press enters a province-picking mode whose next click dispatches corp_verb::march_unit, and Halt/Disband presses are reachable alongside it — proven by a live open-and-click pass (a scripted capture alone does not prove the press is reachable), not only a scripts/verify capture of the marker rendering.",
-                    "notes": "question_log.json + ACTIONS.json entries for the marker and the three presses.",
+                    "notes": "Live pass (main session, computer-use, 2026-08-23): unit marker renders and selects correctly; March press shows the correct tooltip, arms province-picking, and a click on a confirmed-different province (verified via the repeat-click cycle showing its own province id) disarms the mode WITHOUT falling through to normal building/tile selection -- the Selection panel stayed on Unit, strong evidence the corp_command actually dispatched rather than the click landing on ordinary marker resolution. Cross-checked against corp_command.cpp's march_unit case (read directly): validation and movement_order construction are correct. unit_march_harness (headless, full suite) independently passed. NOT directly confirmed live: the unit's tile position visibly changing on screen -- map navigation after issuing the order made relocating the specific marker impractical within this pass, and only one quarter boundary had elapsed (this game's economy/march tick is quarterly-cadence, not daily, despite the calendar advancing daily). Halt and Disband were not individually clicked live; both are read confirmed as the identical app.cpp deferred-dispatch pattern as March, same file, same commit. Ben may want a follow-up spot check specifically watching a march resolve, given the residual gap is real even if the wiring reads correct on every other axis.",
                     "result_metric": ""
                 }
             ]

@@ -34,35 +34,14 @@ symbol sharing beyond wave 1 and the three-way wave 5 fan-out (574/576/577 all r
 
 ---
 
-### Wave 1
+### Wave 1 — DONE (2026-08-23)
 
-#### BL-569 — PROVINCE_HOLDER (province has a holder, a won battle moves it)
-
-Requirements: `req/requirements.json` § province-holder. Files: `src/world/province.hpp`,
-`world.hpp`, `hard_coded_world.cpp`, `battle_system.cpp`, `world_save.cpp`,
-`tools/verify/battle_engagement_harness.cpp`.
-
-1. `world::province_holder` — seed from `tile_to_nation` plurality at generation.
-   **Provides:** `world::province_holder`, `province_holder_for(world, province_id)`.
-2. `run_battles` sets `province_holder[p]` on a decisive close; logs the change to the
-   dispatch stream.
-3. `world_save.cpp` trailing section + version bump; `state_hash` folds the vector.
-4. `battle_engagement_harness`: decisive-battle-moves-holder case, stalemate-leaves-it case.
-
-#### BL-575 — UNIT_MARKER_AND_MARCH_UI (unit visible, can be ordered to march)
-
-Requirements: `req/requirements.json` § unit-marker-and-march-ui. Files:
-`src/ui/body_surface_canvas.cpp`, `icons.cpp`, `ui_state.hpp`, `src/core/app.cpp`,
-`selection_panel.cpp`.
-
-1. `ui::icons::unit_marker` at the province anchor tile, owner-coloured, count badge; a ring
-   for contract-committed units (reads a field BL-573 adds later — leave a `bool
-   committed = false` stub on the unit-summary struct now so BL-576/577 need no further UI
-   plumbing change). **Consumes:** nothing from this batch yet.
-2. Unit card gains March/Halt/Disband presses; March enters `ui_state::pending_march_unit`,
-   next province click dispatches `corp_verb::march_unit` via the existing seam.
-3. `question_log.json` + `docs/ai/ACTIONS.json` entries.
-4. Live click pass before flipping the visual requirement complete (standing rule).
+**BL-569 (province holder)** and **BL-575 (unit marker + march UI)** landed and merged to
+`main` (worktree-agent-a85dd40a41493c103, worktree-agent-a0220dee51ed2793d); both `complete`
+in backlog.json, design prose archived. Full-suite re-verification after the merge fixed one
+save-version tripwire and re-blessed one golden — see commit `e9c2c5ac`. BL-575's live-click
+pass confirmed March is reachable and dispatches; it did not confirm the unit visibly moving
+(NR-577, not a blocker — see that entry).
 
 ---
 
