@@ -727,3 +727,37 @@ cmake --build build --target unit_march_harness   # from a vcvars shell
 build_gen_harness.bat unit_march_harness          # or the CMake-free route
 ctest --test-dir build -R unit_march_harness
 ```
+
+## condition_set_harness (BL-342, extended by BL-570)
+
+The shared predicate laws/techs/embargo/contracts all read (`src/world/condition_set.{hpp,cpp}`).
+Existed unwired (no CMake target) until BL-570 (condition province subject, Sprint 16 Wave 2)
+gave it a reason to link Lua: C1-C7 cover the original nine subjects, comparator boundaries, the
+AND-list, determinism and an unknown corp; **C8/C9 and T2 are BL-570's rows.**
+
+C8 exercises `condition_subject::province_held` against a hand-built partition — holder,
+non-holder, a REAL open-ocean province (`province_kind_of` confirmed, not just a stand-in null),
+the unset `no_province` default, and an in-range id absent from the partition. C9 is a **live-Lua**
+row: it loads the actual `scripts/contracts.lua` through `contract_template_registry` (not a
+hand-built fixture — the question is what the *authored* table does) and asserts both rows parse
+(subject/comparator/operand), the unbound `province` field, and that `index_of` round-trips each
+row's own id to its own position. T2 asserts `condition_text`'s province_held rendering ("holds
+province #<id>", no `>=` noise — see the enum/struct comments for why it diverges from the generic
+`<subject> <cmp> <operand>` shape every other subject uses).
+
+**Live-Lua for C9 only**, same shape as `pregame_balance_harness`/`interbody_pull_harness`: adds
+back `contract_template.cpp` (the sol2/Lua TU the world superset excludes, mirroring
+`recipe_registry.cpp`) + `scripting/lua_state.cpp`, the sol2 include dir, and links `lua54`.
+Hand-declared in `CMakeLists.txt` above the glob, and listed in `IO_TEST_SCRIPT_ROOTED_HARNESSES`
+— it resolves `scripts/contracts.lua` by relative path, so it must run with the repo root as its
+working directory or the load throws.
+
+**BL-570 also bumped `world_save_version` to 5** (`condition` gained a `province` field, changing
+every law's and embargo's condition record layout) — that half is guarded by `save_roundtrip.cpp`
+(P8's condition_set fixture round-trips a real `province` value; P9's version-refusal row now
+names v4 as the refused predecessor), not by this harness.
+
+```
+cmake --build build --target condition_set_harness   # from a vcvars shell
+ctest --test-dir build -R condition_set_harness
+```

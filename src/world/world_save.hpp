@@ -78,7 +78,16 @@ inline constexpr uint32_t world_save_magic =
 /// stream simply ends where this one continues, so it is refused whole on the
 /// same strict-equality contract as every prior bump — there is no partial
 /// read of a v3 stream as a v4 with an empty holder vector.
-inline constexpr uint32_t world_save_version = 4;
+///
+/// Bumped to 5 by BL-570 (condition_subject::province_held): NOT a new
+/// trailing section this time — `condition` (condition_set.hpp) is a
+/// FIXED-SIZE record embedded inside every law and every corp's embargo
+/// condition_set (w_condition/r_condition), and it gained a new field
+/// (`c.province`), so every condition record written by v4 is one field short
+/// of a v5 record. A v4 stream is refused whole, on the same strict-equality
+/// contract as every prior bump — reinterpreting it would misread whatever
+/// bytes follow the first law's condition as that condition's province id.
+inline constexpr uint32_t world_save_version = 5;
 
 /// Write @p w as a complete world snapshot.
 ///

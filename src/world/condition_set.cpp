@@ -1,5 +1,6 @@
 #include "condition_set.hpp"
 
+#include "province.hpp"    // BL-570: province_holder_for
 #include "unit_roster.hpp" // BL-459: unit_strength (strength is derived, not stored)
 #include "world.hpp"
 
@@ -34,6 +35,9 @@ bool condition_subject_is_integral(condition_subject s)
         case condition_subject::structure:
         case condition_subject::era:
         case condition_subject::military_units:
+        // BL-570: province_held is a 1/0 fact (held or not), exactly like
+        // research above — never a fractional "0.5 held".
+        case condition_subject::province_held:
             return true;
         case condition_subject::stockpile:
         case condition_subject::market:
@@ -149,6 +153,20 @@ float measure_condition(const condition& c, const world& w, entity_id subject_co
                     s += unit_strength(w, uc);
             return static_cast<float>(s);
         }
+
+        // BL-570: a military fact, not a political one (province.hpp's own
+        // framing) — `province_holder_for` is the single read accessor
+        // `world::province_holder` (BL-569) exposes, and it is already safe
+        // over every case this subject needs: an unset `c.province`
+        // (`no_province`) or an out-of-range id simply finds no province and
+        // reads `null_entity`; a real but currently-unheld province (a sea
+        // province the partition never seeds a holder for, or a land province
+        // no nation reached a plurality in) reads `null_entity` too; and a
+        // province held by a DIFFERENT corp reads that corp's id. Every one of
+        // those compares false against `subject_corp`, so no case needs its own
+        // branch here.
+        case condition_subject::province_held:
+            return (province_holder_for(w, c.province) == subject_corp) ? 1.0f : 0.0f;
     }
     return 0.0f;
 }
@@ -200,6 +218,17 @@ std::string condition_text(const condition& c,
                            const char* (*resource_label)(resource_type),
                            const char* (*structure_label)(building_type))
 {
+    // BL-570: province_held renders as its own phrase rather than falling
+    // through to the generic "<subject> <qualifier> <cmp> <operand>" shape
+    // below. Two reasons, both structural: the predicate is always ">= 1" (see
+    // the enum comment), so restating the comparator would be noise for a
+    // subject that is only ever "held or not"; and a province carries no name
+    // at all (province.hpp: "the province is deliberately NOT the region ...
+    // no name, no owner, no culture, no economy"), so the qualifier can never
+    // be more than its id — there is no name branch to fall back to.
+    if (c.subject == condition_subject::province_held)
+        return "holds province #" + std::to_string(c.province);
+
     const char* subject = "";
     switch (c.subject)
     {
@@ -212,6 +241,10 @@ std::string condition_text(const condition& c,
         case condition_subject::military_units:    subject = "Units";             break;
         case condition_subject::military_strength: subject = "Military strength"; break;
         case condition_subject::science:           subject = "Research";          break;
+        // Unreachable (the early return above handles it); kept so the switch
+        // stays exhaustive with no `default:` — the compiler catches the next
+        // subject that forgets a label here.
+        case condition_subject::province_held:     subject = "Province";          break;
     }
 
     const char* cmp = "";
