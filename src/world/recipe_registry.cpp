@@ -5,6 +5,8 @@
 
 #include <sol/sol.hpp>
 
+#include <cmath>     // std::isfinite -- the nation_ai loader's own rejection (Sprint N3 T1)
+#include <limits>
 #include <stdexcept>
 
 namespace {
@@ -63,6 +65,49 @@ std::string title_case(const std::string& raw)
         at_start = false;
     }
     return out;
+}
+
+/// Sprint N3 T1: a STRICT numeric read for `economy.nation_ai`. Unlike the
+/// `get_or` reads elsewhere in this loader -- which fall back to the default on
+/// a wrong type and accept any double at all -- this one rejects, naming the
+/// key: a non-number, a NaN, an infinity, or a value outside [lo, hi] throws.
+/// The scorer these tune is replayable only if its constants are; a NaN that
+/// slipped through `get_or` would make every weight it touches NaN, and
+/// `nation_budget` would then normalise a vector of NaNs into a spend nobody
+/// could reproduce from the authored file. Absent keeps the default.
+void read_checked(const sol::table& tbl, const char* key, float& dst, double lo, double hi,
+                  const std::string& context)
+{
+    const sol::object o = tbl[key];
+    if (!o.valid() || o.get_type() == sol::type::lua_nil)
+        return;
+    if (o.get_type() != sol::type::number)
+        throw std::runtime_error(context + "." + key + " must be a number");
+    const double v = o.as<double>();
+    if (!std::isfinite(v) || v < lo || v > hi)
+        throw std::runtime_error(context + "." + key + " = " + std::to_string(v)
+                                 + " is outside [" + std::to_string(lo) + ", "
+                                 + std::to_string(hi) + "] or not finite");
+    dst = static_cast<float>(v);
+}
+
+/// Integer twin of the above: rejects a fractional value as well as a
+/// non-number or an out-of-range one, so `cadence_k = 2.5` does not silently
+/// become 2.
+void read_checked(const sol::table& tbl, const char* key, int& dst, int lo, int hi,
+                  const std::string& context)
+{
+    const sol::object o = tbl[key];
+    if (!o.valid() || o.get_type() == sol::type::lua_nil)
+        return;
+    if (o.get_type() != sol::type::number)
+        throw std::runtime_error(context + "." + key + " must be an integer");
+    const double v = o.as<double>();
+    if (!std::isfinite(v) || v != std::floor(v) || v < lo || v > hi)
+        throw std::runtime_error(context + "." + key + " = " + std::to_string(v)
+                                 + " must be an integer in [" + std::to_string(lo) + ", "
+                                 + std::to_string(hi) + "]");
+    dst = static_cast<int>(v);
 }
 
 } // namespace
@@ -362,6 +407,62 @@ void recipe_registry::load_from_lua(lua_state& lua)
         }
 
         m_sentiment = sp;
+    }
+
+    // BL-542 nation-scorer tunables (economy.nation_ai), Sprint N3 T1.
+    //
+    // Field by field over the struct's own defaults, so authoring one number
+    // does not zero the rest. Every key is range-checked through `read_checked`
+    // and rejected by name on violation -- never clamped. The domain is the
+    // honest one: `cadence_k` is a modulus (>= 1); every float is a scale,
+    // weight, floor or bias the scorer only ever multiplies or divides by, and
+    // none has a negative meaning (the divisors already substitute 1.0 for a
+    // non-positive value in nation_ai.cpp, so the reject here is the loud
+    // version of a guard the scorer carries quietly). Upper bound is left open
+    // except for the four [0, 1] fractions.
+    sol::optional<sol::table> nation_ai_tbl = (*econ)["nation_ai"];
+    if (nation_ai_tbl)
+    {
+        const std::string ctx = "economy.nation_ai";
+        const double      inf = std::numeric_limits<double>::infinity();
+        nation_ai_params  np  = m_nation_ai;
+        const sol::table& t   = *nation_ai_tbl;
+
+        read_checked(t, "cadence_k", np.cadence_k, 1, 1048576, ctx);
+
+        read_checked(t, "lack_scale",  np.lack_scale,  0.0, inf, ctx);
+        read_checked(t, "price_floor", np.price_floor, 0.0, inf, ctx);
+        read_checked(t, "niche_scale", np.niche_scale, 0.0, inf, ctx);
+        read_checked(t, "gap_scale",   np.gap_scale,   0.0, inf, ctx);
+
+        read_checked(t, "force_scale",         np.force_scale,         0.0, inf, ctx);
+        read_checked(t, "hostility_amplifier", np.hostility_amplifier, 0.0, inf, ctx);
+        read_checked(t, "deterrence_scale",    np.deterrence_scale,    0.0, inf, ctx);
+        read_checked(t, "threat_scale",        np.threat_scale,        0.0, inf, ctx);
+
+        read_checked(t, "niche_grudge_bias",        np.niche_grudge_bias,        0.0, 1.0, ctx);
+        read_checked(t, "conflict_grudge_bias",     np.conflict_grudge_bias,     0.0, 1.0, ctx);
+        read_checked(t, "grudge_border_saturation", np.grudge_border_saturation, 0.0, inf, ctx);
+        read_checked(t, "grudge_border_weight",     np.grudge_border_weight,     0.0, inf, ctx);
+        read_checked(t, "grudge_posture_weight",    np.grudge_posture_weight,    0.0, inf, ctx);
+
+        read_checked(t, "base_weight",       np.base_weight,       0.0, inf, ctx);
+        read_checked(t, "niche_charters",    np.niche_charters,    0.0, inf, ctx);
+        read_checked(t, "niche_works",       np.niche_works,       0.0, inf, ctx);
+        read_checked(t, "niche_logistics",   np.niche_logistics,   0.0, inf, ctx);
+        read_checked(t, "gap_exploration",   np.gap_exploration,   0.0, inf, ctx);
+        read_checked(t, "gap_academic",      np.gap_academic,      0.0, inf, ctx);
+        read_checked(t, "calm_schooling",    np.calm_schooling,    0.0, inf, ctx);
+        read_checked(t, "calm_academic",     np.calm_academic,     0.0, inf, ctx);
+        read_checked(t, "calm_works",        np.calm_works,        0.0, inf, ctx);
+        read_checked(t, "threat_contracted", np.threat_contracted, 0.0, inf, ctx);
+        read_checked(t, "threat_reserve",    np.threat_reserve,    0.0, inf, ctx);
+        read_checked(t, "threat_milres",     np.threat_milres,     0.0, inf, ctx);
+
+        read_checked(t, "base_reserve",       np.base_reserve,       0.0, 1.0, ctx);
+        read_checked(t, "calm_reserve_bonus", np.calm_reserve_bonus, 0.0, 1.0, ctx);
+
+        m_nation_ai = np;
     }
 
     // BL-430 player-facing recipe-switch cost/cooldown (economy.recipe_switch).

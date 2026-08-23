@@ -5,6 +5,7 @@
 #include "corp_command.hpp" // corp_decision_ring (BL-202 strategic decision log)
 #include "law.hpp"          // law (BL-343 enacted-law list, below)
 #include "modifier_set.hpp" // scalar_modifier (BL-479 per-corp tech effects, below)
+#include "nation_budget.hpp" // nation_budget (Sprint N3 T2: the persistent weight map, below)
 #include "province.hpp"     // province_partition (BL-466 province partition, below)
 #include "sentiment.hpp"    // sentiment_table (BL-545 relational substrate, below)
 
@@ -189,6 +190,28 @@ struct world
     /// Nation entities keyed by their entity ID. Populated by generate_nations()
     /// after tile generation; empty until that call is made for a body.
     std::unordered_map<entity_id, nation_component>    nations;
+
+    /// What each nation CARES ABOUT -- the persistent weight vector the national
+    /// budget pass (BL-537, `run_national_budget`) spends by. Keyed by nation
+    /// entity id. Sprint N3 T2 (NR-569a: on `world`, NOT on `nation_component`).
+    ///
+    /// THE CONTRACT WITH THE SCORER. `score_national_budgets` (BL-542,
+    /// nation_ai.hpp) returns weights for ONLY the nations DUE on a tick under
+    /// its staggered cadence -- not for every nation. The caller that holds this
+    /// map merges that result in by OVERWRITING one slot at a time and leaving
+    /// the rest standing, so a nation scored on tick t keeps spending by that
+    /// vector on t+1..t+k-1 rather than spending one tick in `cadence_k`. This
+    /// is that map; nothing else may hold one.
+    ///
+    /// EMPTINESS IS THE INERTNESS PROOF. A nation absent here has no budget, and
+    /// `run_national_budget` early-outs on an empty map (nation_budget.cpp), so
+    /// a world in which no nation has ever been scored spends nothing -- which
+    /// is the state every generated world starts in, and why `world_determinism`
+    /// is unmoved by this field's existence.
+    ///
+    /// A `std::map` so the save leg and any hash fold walk it in ascending id
+    /// with no sort. SERIALISED (world_save.cpp, beside `nations`; format v3).
+    std::map<entity_id, nation_budget> nation_budgets;
 
     /// Maps a tile entity ID to the nation entity ID that owns it.
     /// Absent entries are unclaimed (ocean tiles and bodies without nation generation).
