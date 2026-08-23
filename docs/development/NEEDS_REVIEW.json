@@ -3446,7 +3446,8 @@
                 "src/world/nation_budget.hpp",
                 "src/world/nation_ai.cpp",
                 "tools/verify/nation_wiring.cpp"
-            ]
+            ],
+            "amendment_2026-08-23": "Reason (1), INDIVISIBILITY, is SETTLED via BL-572 (contract offers) taking option (A) for the contracted_force line specifically — a per-offer `offer_escrow` pot, ratified into CONTRACTS.md § Where offers come from. Reason (2), NO INCOME, is UNTOUCHED by that item and stays open: a played default world still starts every nation's treasury at 0, so BL-572's escrow will accumulate nothing until a levy or tariff is enacted somewhere. This entry stays open on (2) alone; BL-578 (slice playthrough) is where the gap will surface concretely if it is not addressed first."
         },
         {
             "id": "NR-573",
@@ -3480,6 +3481,22 @@
             "what": "Six session modes (Design / Delivery-Light / Delivery-Full / Corpus / Review-verify / Rival), each with its signal, deliverable and reading list; the rule 'say the mode in your first line'. The doc map now lists every doc under docs/ (24 were missing: SUPPLY, COLLAPSE, CREEDS, STRATEGIES, MANUAL, the research notes, the shell panels, the ledger Q&As, PHANTOMS, NEXT_SESSION, REVIEW_AUTOMATION, the retired files) as one line each. The 200-word state essays per doc are gone — the doc owns its own description. The player-identity and syndicate paragraphs left CLAUDE.md; CONCEPT.md and GLOSSARY.md must carry them (verified in the same sweep).",
             "why_it_matters": "CLAUDE.md is read by every session; a stale state essay there outranks a correct doc in practice.",
             "ask": "Are the six modes the right cut? 'Corpus' is new and 'Review/verify' was implicit before."
+        },
+        {
+            "id": "NR-576",
+            "title": "BL-572 concurrent-offer escrow split — a tick's contracted_force share fills open offers oldest-first, not a rule Ben stated",
+            "raised": "2026-08-23",
+            "kind": "decision-taken",
+            "status": "open",
+            "source": "BL-571/BL-572 design ratification, elicitation form (Ben, 2026-08-23).",
+            "what": "Ben's elicitation answer chose 'several open concurrently' over the proposed one-offer-at-a-time cadence for BL-572, but the form did not ask how one tick's `contracted_force` spendable share is allocated when more than one offer is open and filling at once. Taken on his behalf: oldest-issued offer fills first, exhausting the tick's share before a younger offer sees any of it, rather than splitting the share proportionally across open offers. Ratified into CONTRACTS.md § Where offers come from and BL-572's design field.",
+            "why_it_matters": "The split rule changes how fast a province under sustained multi-front threat gets its offers funded — oldest-first means a nation's oldest want is always serviced before a newer, possibly more urgent one; a proportional split would fund all fronts slower but evenly. Either is deterministic and legal; this is a pacing/feel call, not a correctness one.",
+            "options": [
+                "Confirm oldest-issued-first.",
+                "Switch to a proportional split across all open offers each tick.",
+                "Switch to highest-value-first (by the offer's scored fee)."
+            ],
+            "recommendation": "Confirm oldest-issued-first — it is the simplest deterministic rule, matches a FIFO reading of 'the nation gets to what it can afford', and needs no additional per-offer priority field."
         }
     ]
 }

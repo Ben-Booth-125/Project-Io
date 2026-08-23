@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*240 entries — 240 open, 0 resolved.*
+*241 entries — 241 open, 0 resolved.*
 
 ---
 
@@ -2475,6 +2475,19 @@ Ben, 2026-08-23: purge and regenerate backlog.json; many fewer items; address th
 Six session modes (Design / Delivery-Light / Delivery-Full / Corpus / Review-verify / Rival), each with its signal, deliverable and reading list; the rule 'say the mode in your first line'. The doc map now lists every doc under docs/ (24 were missing: SUPPLY, COLLAPSE, CREEDS, STRATEGIES, MANUAL, the research notes, the shell panels, the ledger Q&As, PHANTOMS, NEXT_SESSION, REVIEW_AUTOMATION, the retired files) as one line each. The 200-word state essays per doc are gone — the doc owns its own description. The player-identity and syndicate paragraphs left CLAUDE.md; CONCEPT.md and GLOSSARY.md must carry them (verified in the same sweep).
 
 **Why it matters.** CLAUDE.md is read by every session; a stale state essay there outranks a correct doc in practice.
+
+### NR-576 — BL-572 concurrent-offer escrow split — a tick's contracted_force share fills open offers oldest-first, not a rule Ben stated
+*decision taken on your behalf · raised 2026-08-23 · from BL-571/BL-572 design ratification, elicitation form (Ben, 2026-08-23).*
+
+Ben's elicitation answer chose 'several open concurrently' over the proposed one-offer-at-a-time cadence for BL-572, but the form did not ask how one tick's `contracted_force` spendable share is allocated when more than one offer is open and filling at once. Taken on his behalf: oldest-issued offer fills first, exhausting the tick's share before a younger offer sees any of it, rather than splitting the share proportionally across open offers. Ratified into CONTRACTS.md § Where offers come from and BL-572's design field.
+
+**Why it matters.** The split rule changes how fast a province under sustained multi-front threat gets its offers funded — oldest-first means a nation's oldest want is always serviced before a newer, possibly more urgent one; a proportional split would fund all fronts slower but evenly. Either is deterministic and legal; this is a pacing/feel call, not a correctness one.
+
+- Confirm oldest-issued-first.
+- Switch to a proportional split across all open offers each tick.
+- Switch to highest-value-first (by the offer's scored fee).
+
+> **Recommendation:** Confirm oldest-issued-first — it is the simplest deterministic rule, matches a FIFO reading of 'the nation gets to what it can afford', and needs no additional per-offer priority field.
 
 ---
 
