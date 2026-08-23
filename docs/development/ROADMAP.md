@@ -95,6 +95,22 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   lazy-sim cost (**BL-425**), the stale-exe gate guard (**BL-426**), the verify world-snapshot
   cache (**BL-427**), harnesses measuring a different sim than ships (**BL-462**), and
   settlement count being seed-invariant (**BL-463**).
+- **v0.1.25 — The channel becomes visible.** *(Named 2026-08-23.)* *Theme: v0.1.24 built a
+  two-way channel between corporations and nations and rendered none of it.* Three of that minor's
+  subsystems ship with **no surface at all**, and one of them cannot work without one: sentiment's
+  invariant is that it *informs a declaration and may never make one* (**BL-556**), so the player is
+  the only thing it can act through — an unrendered sentiment table has no output, not a missing
+  view. Beside it, **BL-555** explains credits that currently arrive from nowhere and carries the
+  one field that changes a decision (`fill_fraction`: a rationed line predicts a smaller payment
+  next tick, and is one of the few honest reads on rival activity BL-068 permits); **BL-558** makes
+  a nation a readable actor and draws the line this minor rests on — **its actions are public, its
+  weights are private** — which is BL-068's rule carried up a grain, and the precondition for
+  **BL-539**'s lobbying being a decision rather than a slot machine. **BL-557** closes BL-391's
+  owed half at v0.1.24: a supplier's refusal now has an expiry the engine can compute, so rendering
+  it turns a dead end into a priceable wait. **BL-553** tidies four hand-rolled stream writers onto
+  `binary_io.hpp`. (The Era −1 fixture defect found alongside these belongs to **BL-462** at
+  v0.1.22, not here — BL-554 was a duplicate and is retired into it.)
+
 - **v0.1.24 — Who answers to whom.** *(Named 2026-08-22 on Ben's ruling, resolving NR-516.)*
   *Theme: the two-way channel between corporations and nations.* The treasury stops being a
   scoreboard and becomes a **weighted budget** over priority lines (**BL-537**, **BL-538**), so

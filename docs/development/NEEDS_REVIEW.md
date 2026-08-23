@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*257 entries — 222 open, 35 resolved.*
+*258 entries — 223 open, 35 resolved.*
 
 ---
 
@@ -2189,7 +2189,7 @@ Two joints in the nation scorer that no authority doc owned. (1) THE GRUDGE HAS 
 ### NR-554 — CORRECTED: the zero-war worlds are the MODAL outcome, and the fix direction I first reported was refuted
 *question · raised 2026-08-23 · from Sprint N2 lane C (Sprint 28 lane A T1/T2), reproduced independently by the main session.*
 
-SUPERSEDES WHAT THIS ENTRY FIRST SAID, which was written from an n=8 sweep and was wrong in three of its four claims. WHAT HOLDS: wherever a world fights no battle, the campaign score CLEARS its threshold and LOSES the argmax on every round - never the case that it fails to clear. Confirmed on all 17 silent seeds at n=32. WHAT WAS REFUTED, by an adversarial pass and by the main session's own n=32 run, which agree seed for seed: (a) the ceiling-below-floor separation holds on only 3 of 17 silent seeds, worst counterexample seed 18 overlapping by 142, and is not monotone with the outcome; (b) 'no salt could have won those worlds a round' is true of seeds 0 and 4 (margins 37, 65 against a 0..15 salt) and false of silent seeds 18/20/27 (margins 6/7/8); (c) 'the defect is the LEVEL of the campaign score relative to Settle' is unsupported - seed 8 clears 27,452 and fights 676 battles while seed 30 clears 2,338,095 and fights zero; (d) the base rate is 17 of 32 (53%), not 2 of 8. AND the fixture is not the generated Era -1 at all - six divergences from the app's own invocation, one gating build_work out of the contest (BL-554), and seed 0's generated era fights 8 battles.
+SUPERSEDES WHAT THIS ENTRY FIRST SAID, which was written from an n=8 sweep and was wrong in three of its four claims. WHAT HOLDS: wherever a world fights no battle, the campaign score CLEARS its threshold and LOSES the argmax on every round - never the case that it fails to clear. Confirmed on all 17 silent seeds at n=32. WHAT WAS REFUTED, by an adversarial pass and by the main session's own n=32 run, which agree seed for seed: (a) the ceiling-below-floor separation holds on only 3 of 17 silent seeds, worst counterexample seed 18 overlapping by 142, and is not monotone with the outcome; (b) 'no salt could have won those worlds a round' is true of seeds 0 and 4 (margins 37, 65 against a 0..15 salt) and false of silent seeds 18/20/27 (margins 6/7/8); (c) 'the defect is the LEVEL of the campaign score relative to Settle' is unsupported - seed 8 clears 27,452 and fights 676 battles while seed 30 clears 2,338,095 and fights zero; (d) the base rate is 17 of 32 (53%), not 2 of 8. AND the fixture is not the generated Era -1 at all - six divergences from the app's own invocation, one gating build_work out of the contest (BL-462, which already owned this defect - BL-554 was filed as a duplicate the same day and retired into it), and seed 0's generated era fights 8 battles.
 
 **Why it matters.** Zero-war being the MODAL outcome rather than a rare pathology changes the shape of the problem, and it makes Ben's 2026-08-21 ruling bite harder: if a zero-war world means 'many ancient tech quests would not be unlockable', then over half the worlds this fixture generates are unfinishable. But the counter-pressure is unchanged - BL-224's non-hegemony invariant wants some worlds multipolar - so the target is still a rate inside a stated band across seeds, reported and never clamped. What has changed is that NOBODY YET KNOWS WHAT MOVES THAT RATE. The two candidate diagnoses both failed on the wider sweep, and the instrument that produced them is measuring the wrong sim.
 
@@ -2197,7 +2197,7 @@ SUPERSEDES WHAT THIS ENTRY FIRST SAID, which was written from an n=8 sweep and w
 - Tune the campaign score's level now on the n=8 reading - explicitly rejected: it was refuted at n=32 and would be tuning on a wrong fixture as well as a wrong sample.
 - Treat the fork's answer as sufficient and go straight to making Campaign commensurable with Settle (the BL-318 shape) without re-measuring - cheaper, but it commits to a mechanism the measurement no longer supports.
 
-> **Recommendation:** The first, and the ordering is the whole recommendation. BL-554 is priority A for exactly this reason: every Era -1 number acted on so far - BL-384's premise, the conquest rate that refuted it, and this sprint's finding - came off an instrument running a 4000-year six-band sim with no creeds and no works on an already-simulated settlement. Re-pointing it at the app's own call is a day's work and it is the precondition for every later decision here.
+> **Recommendation:** The first, and the ordering is the whole recommendation. BL-462 is priority A for exactly this reason: every Era -1 number acted on so far - BL-384's premise, the conquest rate that refuted it, and this sprint's finding - came off an instrument running a 4000-year six-band sim with no creeds and no works on an already-simulated settlement. Re-pointing it at the app's own call is a day's work and it is the precondition for every later decision here.
 
 *Files: `src/world/history_sim.cpp`, `tools/verify/history_conquest_gap.cpp`, `src/world/hard_coded_world.cpp`*
 
@@ -2211,6 +2211,17 @@ growth-extinguishes-war R3, R4 and R5 were flipped from pending to complete by t
 > **Recommendation:** No action beyond what is done - R4 re-opened, R3/R5 stand, entry filed. Worth noting the pattern for future briefs: a lane that closes rows in a group it does not own should be required to say so in its report AND to file the entry itself, rather than leaving the integrator to notice.
 
 *Files: `docs/development/req/requirements.json`*
+
+### NR-556 — A duplicate backlog item was authored for a defect an existing priority-A item already owned
+*observation · raised 2026-08-23 · from Authoring BL-554 (Era -1 harness fixture) during Sprint N2 closeout.*
+
+BL-554 was written up as a new item for the history_conquest_gap fixture divergence. BL-462 (HARNESSES_MEASURE_A_DIFFERENT_SIM_THAN_SHIPS, filed 2026-08-18, priority A, v0.1.22) already owned it, named the span and clock divergences with the same line numbers, and carries the better provenance - it records this as the THIRD instance of the repo failure mode where a check looks like coverage and is not. BL-554 was retired into BL-462 the same day, contributing the four divergences BL-462 did not have (seed, creeds, the works argument that gates build_work out of the contest, the post-sim settlement) and an exact acceptance test.
+
+**Why it matters.** The duplicate cost nothing because it was caught within the hour, but the reason it happened is worth naming: a search for an existing owner was never run. backlog_query.js --grep and --touches exist precisely for this and take seconds. The near-miss is that BL-462 sits at v0.1.22 with a version goal, a file scope and a design; had the duplicate survived, the project would have carried two priority-A items for one defect in two different minors, and whichever one got worked would have silently orphaned the other.
+
+> **Recommendation:** No action - already folded. Worth a line in DELIVERY.md before authoring a new item: grep the backlog for the subject first. The existing rule covers ID allocation (next_id.js) but not subject collision.
+
+*Files: `docs/development/backlog.json`, `docs/development/DELIVERY.md`*
 
 ---
 

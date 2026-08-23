@@ -75,6 +75,11 @@ commit timestamps rather than reviving an unstarted timer.)
 | C3 | The engagement trigger, and the fight you can watch | **Open 2026-08-21** — BL-467 **LANDED** (26/26; a fight now happens through the real tick). Rider MEASURED not taken (NR-467); open on the rate ruling |
 | D4 | The border costs something (the international half) | **Open 2026-08-20** — depends on D3's treasury and Lane B's routes |
 | P1 | The province becomes a thing you can see, and then a thing worth seeing | **Closed 2026-08-21** — done_when met by BL-515, then overshot by five: the NR-438/439 ceiling ruling, BL-519 axis split, BL-520 texturing, BL-516 water kinds, BL-521 click injection. **Owed: nothing was rendered** |
+| ST1 | A global style sheet — narrowing down the visual language | Open 2026-08-22 — Joe's design track; drafting GLOBAL_STYLE_SHEET.md against iterated composite renders |
+| N1 | The two spines, landed inert | Closed 2026-08-23 — all three landed inert; two of the three were UNSOUND and were fixed in the closing pass (NR-546, NR-547) |
+| N2 | The spines move | Closed — three lanes merged; one lane’s interpretation withdrawn after adversarial verification (NR-554) |
+| N3 | The spines get a caller | Planned |
+| N4 | The channel becomes visible | Planned |
 
 Every other sprint number that has ever appeared in this file (3–5's original theming, 17–18,
 20–24, 25b, and the full Lane A/B/C/D breakdown of the 26–33 arc — 28, 29, 30, 31, B2, B3, C2,

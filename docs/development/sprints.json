@@ -910,7 +910,7 @@
       "id": "N2",
       "theme": "The spines move",
       "author": "session 2026-08-23",
-      "state": "open",
+      "state": "closed",
       "opened_date": "2026-08-23",
       "goal": "N1 landed two spines and a check, all three inert. An inert subsystem with no caller is the `military_points` defect with a new name, so this sprint gives each one a consumer. THREE LANES, run in parallel worktrees: BL-542 authors the weight vector the budget pass consumes; BL-546 migrates `corp_reputation` onto the sentiment substrate, which gives sentiment its first emitter and lands BL-391's deadlock fix as a passing row rather than a special case; and Sprint 28 Lane A's T1/T2 measure WHY two of eight worlds fight no war in an entire era - a fork that has to be measured before any fix can be chosen.",
       "planned": [
@@ -920,7 +920,42 @@
       ],
       "done_when": "A nation's weights are derived and derived identically twice, with a local horizon and a cadence slot that no new nation shifts; procurement is bit-identical to the pre-migration build with decay off and recovers from the floor with decay on, over ONE store; and the zero-war seeds are explained by a counter that says whether the campaign score never cleared its threshold or cleared it and lost. Every row mutation-tested against the pre-fix code - the N1 lesson, applied.",
       "risk": "The N1 lesson is the risk: an author's own harness passes. Mitigated by briefing every lane to mutate what each row guards and report which mutation it ran, by requiring a sanitizer build, and by the main session re-verifying adversarially rather than trusting a self-reported green. Second risk: BL-546 is a save-format change behind a strict version gate, and BL-536's world serialiser landed 2026-08-22 - the migration has TWO streams to check, not one.",
-      "notes": "Collision map: the three lanes are genuinely disjoint - nation_ai.* / procurement.cpp+sentiment.cpp / history_sim.*. Every shared hotspot stays with the main session: scripts/economy.lua (5 items declare it), components.hpp (4), world.hpp, CMakeLists.txt. BL-546 may legitimately need world.hpp to remove corp_reputation; that edit is flagged for checking at merge rather than forbidden."
+      "notes": "Collision map: the three lanes are genuinely disjoint - nation_ai.* / procurement.cpp+sentiment.cpp / history_sim.*. Every shared hotspot stays with the main session: scripts/economy.lua (5 items declare it), components.hpp (4), world.hpp, CMakeLists.txt. BL-546 may legitimately need world.hpp to remove corp_reputation; that edit is flagged for checking at merge rather than forbidden.",
+      "closed_date": "2026-08-23",
+      "retro": "**All three lanes merged and green; one lane's CONCLUSION was withdrawn after the merge, and that is the sprint's finding.**\n\nWhat landed: BL-542's nation scorer (60/60, the first use of the 2026-08-18 grant), BL-546's migration of reputation onto the sentiment substrate with BL-391 dissolved through it (66 PASS, two save formats moved), and Sprint 28 lane A's verb-competition instrumentation (4/4). Re-verified on the integrated tree rather than on branches: nine harnesses green, zero ASan/UBSan diagnostics, warning-clean at -Wall -Wextra.\n\n**Two lane reports did not survive verification, and neither would have been caught by reading.** A claimed layout-sensitive determinism violation in spectate does not reproduce on four clean trees, and the lane's own probe re-run moves neither hash — the likely cause, a stale object left in a rebuilt archive, bit a sibling lane in the same run and it said so. Filing it as reported would have put a false violation into the one invariant the project cannot compromise on. And a ceiling-vs-floor statistic folded its subject's WINNING scores into the ceiling, conditioning it on the outcome it explained; harmless here by luck, and fixed to the honest form.\n\n**The bigger one came from the adversarial pass, and it invalidated the sprint's headline.** Sprint 28's finding — that Campaign's score ceiling sits below the winner's floor on exactly the silent worlds — was a two-case coincidence. At n=32 only 3 of 17 silent seeds are disjoint and 14 overlap, worst by 142 points; the diagnosis that the defect is the score LEVEL is unsupported (seed 8 clears 27,452 and fights 676 battles, seed 30 clears 2,338,095 and fights zero); and zero-war is the MODAL outcome at 53%, not a 25% pathology. What survives is the fork's answer, which is a statement about the decision rule rather than about a world: wherever a world fights nothing, Campaign clears its threshold and loses the argmax on every round.\n\n**And underneath all of it, the instrument was measuring a sim the game does not run** — six divergences from the app's own invocation, one of which gates a whole verb out of the contest. That belongs to BL-462, which has owned it since 2026-08-18 and which this session initially duplicated as BL-554 by not searching the backlog first (NR-556).\n\n**The method lesson, and it is N1's repeated with the stakes raised.** N1 taught that an author's own harness passes; N2 briefed every lane to mutation-test its own rows and every lane did, catching two of its own false greens before reporting. That worked. What it did not catch is the class above it: a green harness measuring the wrong fixture, and a true measurement generalised from n=2. Mutation testing proves a row has teeth against the code; it says nothing about whether the FIXTURE is the subject, or whether the SAMPLE supports the claim. Both need a different check, and the adversarial pass is what supplied it.\n\n**Owed out of N2:** every spine still has no caller. BL-538 is the join, and it opens N3."
+    },
+    {
+      "id": "N3",
+      "theme": "The spines get a caller",
+      "author": "session 2026-08-23",
+      "state": "planned",
+      "opened_date": "2026-08-23",
+      "goal": "N1 landed two spines inert and N2 gave each one a consumer, but nothing joins them: `run_national_budget` takes its budgets as a parameter, `score_national_budgets` returns them, and no tick calls either. This sprint closes the loop so money makes a full circuit - corp -> nation -> corp - and a nation's opinion becomes an action. BL-538 is the join and the item everything else waits on: it decides what a budget line BUYS, and its own rule is that a line must spend through machinery that already exists.",
+      "planned": [
+        "BL-538 (treasury priority lines) - the first cut is lines 1 and 5 only (logistics maintenance through place_road, public exploration through survey_system), because those two are the lines whose hosts are COMPLETE. Lines 2-4 and 6 name real hosts but each pulls in another subsystem.",
+        "Wire the tick: score_national_budgets -> run_national_budget in the economy step, on the staggered cadence, behind the inertness the two items already carry.",
+        "BL-540 (nation-to-corp stance) - the derived read that gates who may operate inside a nation's borders, and the natural owner of the corp-grain/nation-grain bridge BL-542 had to invent (NR-553)."
+      ],
+      "done_when": "A generated world runs a tick in which a nation scores its own weights, spends them on at least one line, and a corporation's balance moves as a direct transfer - with money conserved to the pass's own guarantee, and with a world whose nations author nothing still bit-identical to today. The economy benchmark's movement is reported and attributed, not blessed.",
+      "risk": "THE FIRST NON-INERT NATION BEHAVIOUR. Everything in v0.1.24 so far has landed switched off, so no golden has moved. This sprint moves them, and a moved golden with no attribution is indistinguishable from a regression. Mitigation: land the wiring behind a default-off flag first, measure the delta with it on and off, attribute every moved number, and only then flip the default. Second risk: BL-538's first cut is a scope magnet - five of its nine lines look one step from working and are not.",
+      "notes": "Depends on nothing outside itself: BL-537, BL-542, BL-545 and BL-546 are all merged. BL-462's fix is in flight and does not block this - it is Era -1, this is the campaign tick."
+    },
+    {
+      "id": "N4",
+      "theme": "The channel becomes visible",
+      "author": "session 2026-08-23",
+      "state": "planned",
+      "opened_date": "2026-08-23",
+      "goal": "v0.1.24 built a two-way channel between corporations and nations and rendered NONE of it. Three subsystems ship with no surface, and one of them cannot function without one: sentiment's invariant is that it informs a declaration and may never make one, so the player is the only thing it can act through - an unrendered sentiment table has no output at all, which is the `military_points` defect reached from the opposite direction. This sprint gives the channel its surfaces.",
+      "planned": [
+        "BL-556 (sentiment has no surface) - both dimensions separately, the band not the float, and DIRECTION OF TRAVEL, which is the read a level cannot give once the value decays.",
+        "BL-555 (who is paying me) - the Balance Ledger row group and the comms message, carrying fill_fraction, which is the one field that changes a decision.",
+        "BL-557 (a refusal with no clock) - BL-391's owed half: standing, floor, cause, and WHEN IT CLEARS, which turns a dead end into a priceable wait.",
+        "BL-558 (a nation is not legible) - and the line the minor rests on: a nation's ACTIONS are public, its WEIGHTS are private."
+      ],
+      "done_when": "Every surface carries a question_log.json entry naming the question it answers and the item that demanded it; each is checked LIVE on Ben's machine, not only by a scripted capture, per the 2026-08-19 rule that a green harness does not prove a press is reachable.",
+      "risk": "Four surfaces is a lot of ImGui in one sprint, and the per-milestone panel rule wants each to earn its space rather than be a readout. Mitigation: BL-556 and BL-557 extend surfaces that already exist (the settled stance column, the procurement path) rather than adding panels; only BL-555's ledger group and BL-558's nation card are new real estate. Second risk: BL-557 reads 'never' until Ben authors a decay rate - that is correct behaviour and must not be papered over, but it will look like a bug in a screenshot.",
+      "notes": "BL-557 sits at v0.1.24 with BL-391; the other three are v0.1.25, named 'The channel becomes visible' in ROADMAP.md on 2026-08-23. None of the four depends on N3 - they render what already exists."
     }
   ],
   "status_table": [
@@ -1070,9 +1105,24 @@
       "state": "Open 2026-08-22 — Joe's design track; drafting GLOBAL_STYLE_SHEET.md against iterated composite renders"
     },
     {
+      "id": "N1",
+      "theme": "The two spines, landed inert",
+      "state": "Closed 2026-08-23 — all three landed inert; two of the three were UNSOUND and were fixed in the closing pass (NR-546, NR-547)"
+    },
+    {
       "id": "N2",
       "theme": "The spines move",
-      "state": "Open — three lanes in parallel worktrees"
+      "state": "Closed — three lanes merged; one lane’s interpretation withdrawn after adversarial verification (NR-554)"
+    },
+    {
+      "id": "N3",
+      "theme": "The spines get a caller",
+      "state": "Planned"
+    },
+    {
+      "id": "N4",
+      "theme": "The channel becomes visible",
+      "state": "Planned"
     }
   ]
 }
