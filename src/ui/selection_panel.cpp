@@ -1342,10 +1342,37 @@ void glyph_auto(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
 
 // A simple X — the building card's Dismantle glyph (2026-08-15; the
 // Lifecycle page's Dismantle moved onto the action grid under this name).
+// BL-575 reuses this UNCHANGED for the unit card's Disband: the two share
+// the same meaning ("erase this asset outright, no undo"), so the shape
+// stays shared rather than growing a near-identical twin.
 void glyph_dismantle(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
 {
     dl->AddLine({c.x - r * 0.55f, c.y - r * 0.55f}, {c.x + r * 0.55f, c.y + r * 0.55f}, col, 2.4f);
     dl->AddLine({c.x + r * 0.55f, c.y - r * 0.55f}, {c.x - r * 0.55f, c.y + r * 0.55f}, col, 2.4f);
+}
+
+// A shafted arrow pointing right — the unit card's March glyph (BL-575).
+// Distinct from glyph_goto's bare chevron (which moves the CAMERA to the
+// entity, not the entity itself) by carrying a full shaft behind the head —
+// the plain "move this" pictogram, reading apart from "look at this".
+void glyph_march(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    const float y = c.y;
+    dl->AddLine({c.x - r * 0.62f, y}, {c.x + r * 0.30f, y}, col, 2.4f);
+    dl->AddLine({c.x + r * 0.62f, y}, {c.x + r * 0.12f, y - r * 0.36f}, col, 2.4f);
+    dl->AddLine({c.x + r * 0.62f, y}, {c.x + r * 0.12f, y + r * 0.36f}, col, 2.4f);
+}
+
+// Two filled vertical bars — the unit card's Halt glyph (BL-575): the
+// universal "pause" pictogram, reading apart from the X (erase) and the
+// arrow (move) it sits beside on the same grid.
+void glyph_halt(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    const float bw  = r * 0.32f;
+    const float bh  = r * 0.62f;
+    const float gap = r * 0.20f;
+    dl->AddRectFilled({c.x - gap - bw, c.y - bh}, {c.x - gap, c.y + bh}, col);
+    dl->AddRectFilled({c.x + gap, c.y - bh}, {c.x + gap + bw, c.y + bh}, col);
 }
 
 // A square icon button: an ImGui::Button frame with a glyph drawn over it and a
@@ -1767,7 +1794,8 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
     }
     ImGui::SameLine();
 
-    // ── Right quarter: 2x3 action grid — only "Go to" is real today ──
+    // ── Right quarter: 2x3 action grid — Go to, plus March/Halt/Disband
+    // (BL-575, replacing three of the five reserved slots) ──
     {
         ImGui::BeginChild("##unit_actions", {right_w, total_h}, false,
                           ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
@@ -1775,14 +1803,77 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
         const float  bh  = (total_h - 2.0f * spacing) / 3.0f;
         const ImVec2 bsz = {bw, bh};
 
+        // Units carry no corp.assets entry (unlike buildings), so ownership is
+        // read straight off unit_component::owner rather than through
+        // is_player_owned (which walks corp.assets and would always miss a
+        // unit). A rival's unit is intel-only: every press below is disabled.
+        const bool owned = (uit->second.owner == w.player_entity);
+
         if (tile_icon_button("##unit_goto", bsz, /*enabled=*/true, "Go to", glyph_goto))
             focus_on_entity(w, ui, sel);
         ImGui::SameLine();
-        tile_icon_button("##unit_reserved1", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
 
-        tile_icon_button("##unit_reserved2", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+        // March (BL-575): arms province-picking mode on the Planetary canvas
+        // (body_surface_canvas.cpp reads pending_march_unit and, on the next
+        // province click, fills pending_march_dest_province for app::render
+        // to dispatch as corp_verb::march_unit). Visible armed state via the
+        // same accent-ring "primed" idiom the building card's Auto button
+        // uses — and per the project's toggle rule (any control whose active
+        // state is visible is a toggle), pressing March again while armed for
+        // THIS unit cancels the pick rather than re-arming it.
+        {
+            const bool  armed = owned && (ui.pending_march_unit == sel);
+            const char* tip   = !owned ? "Competitor unit - intel only"
+                               : armed ? "March - click a province to send this unit (click again to cancel)"
+                                       : "March - pick a destination province";
+            if (armed)
+            {
+                const ImVec2 pmin = ImGui::GetCursorScreenPos();
+                dl->AddRect({pmin.x - 2.0f, pmin.y - 2.0f}, {pmin.x + bsz.x + 2.0f, pmin.y + bsz.y + 2.0f},
+                           palette::selection, 4.0f, 0, 2.0f);
+            }
+            if (tile_icon_button("##unit_march", bsz, owned, tip, glyph_march) && owned)
+                ui.pending_march_unit = armed ? null_entity : sel;
+        }
+
+        // Halt (BL-575): clears the movement order immediately — no
+        // destination pick needed, unlike March — deferred through
+        // pending_halt_unit for app::render, the same shape as every other
+        // world-mutating press on this card (UI surfaces hold only
+        // `const world&`).
+        {
+            const char* tip = owned ? "Halt - clear this unit's movement order"
+                                    : "Competitor unit - intel only";
+            if (tile_icon_button("##unit_halt", bsz, owned, tip, glyph_halt) && owned)
+                ui.pending_halt_unit = sel;
+        }
         ImGui::SameLine();
-        tile_icon_button("##unit_reserved3", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+
+        // Disband (BL-575): permanent, confirm popup — same pattern as the
+        // building card's Dismantle (no refund either way, MILITARY.md §
+        // Marching; a confirm step is the UI's call, not the seam's).
+        {
+            const char* tip = owned ? "Disband - permanent. No refund; manpower walks away."
+                                    : "Competitor unit - intel only";
+            if (tile_icon_button("##unit_disband", bsz, owned, tip, glyph_dismantle) && owned)
+                ImGui::OpenPopup("confirm_disband");
+        }
+        if (ImGui::BeginPopup("confirm_disband"))
+        {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                               "Disband this unit?");
+            ImGui::TextDisabled("No refund. This cannot be undone.");
+            ImGui::Separator();
+            if (ImGui::Button("Disband"))
+            {
+                ui.pending_disband_unit = sel;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Keep"))
+                ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
 
         tile_icon_button("##unit_reserved4", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
         ImGui::SameLine();

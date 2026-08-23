@@ -1019,6 +1019,7 @@ struct body_frame_stamp
     int           day_tick  = -1;
     std::size_t   buildings = 0;
     std::size_t   convoys   = 0;
+    std::size_t   units     = 0; // BL-575: invalidates the unit-marker groups on hire/disband; a march ORDER doesn't move a unit until a tick advances, which day_tick already catches.
     std::uint32_t logi_gen  = ~0u; // default never matches a live stamp
     bool operator==(const body_frame_stamp&) const = default;
 };
@@ -1026,18 +1027,24 @@ struct body_frame_stamp
 body_frame_stamp make_body_frame_stamp(const world& w, entity_id body)
 {
     return { body, w.current_day_tick, w.buildings.size(), w.convoys.size(),
-             logistics_generation(w) };
+             w.units.size(), logistics_generation(w) };
 }
 
 /// Nearest-wins marker hit resolution shared by hover and click (BL-031/BL-059):
-/// building outranks market_centre within the glyph radii; the tile fallback
-/// stays with the callers. Extracted so the two paths cannot drift (BL-362).
+/// unit outranks building outranks market_centre within the glyph radii; the
+/// tile fallback stays with the callers. Unit was added above building by
+/// BL-575, matching the repeat-click cycle's own precedence (battle, unit,
+/// province, building, tile — SELECTION.md): a unit standing on a built tile
+/// must be reachable on the FIRST click, not only after cycling past the
+/// building. Extracted so the two paths cannot drift (BL-362).
 entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx, float my)
 {
-    float     best_bld_d2 = std::numeric_limits<float>::max();
-    float     best_mkt_d2 = std::numeric_limits<float>::max();
-    entity_id bld = null_entity;
-    entity_id mkt = null_entity;
+    float     best_unit_d2 = std::numeric_limits<float>::max();
+    float     best_bld_d2  = std::numeric_limits<float>::max();
+    float     best_mkt_d2  = std::numeric_limits<float>::max();
+    entity_id unit = null_entity;
+    entity_id bld  = null_entity;
+    entity_id mkt  = null_entity;
     for (const marker_hit_zone& hz : zones)
     {
         const float dx = mx - hz.centre.x;
@@ -1045,7 +1052,12 @@ entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx
         const float d2 = dx * dx + dy * dy;
         if (d2 > hz.radius * hz.radius)
             continue;
-        if (hz.kind == marker_hit_zone::kind::building && d2 < best_bld_d2)
+        if (hz.kind == marker_hit_zone::kind::unit && d2 < best_unit_d2)
+        {
+            best_unit_d2 = d2;
+            unit         = hz.id;
+        }
+        else if (hz.kind == marker_hit_zone::kind::building && d2 < best_bld_d2)
         {
             best_bld_d2 = d2;
             bld         = hz.id;
@@ -1056,7 +1068,7 @@ entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx
             mkt         = hz.id;
         }
     }
-    return bld != null_entity ? bld : mkt;
+    return unit != null_entity ? unit : (bld != null_entity ? bld : mkt);
 }
 
 } // namespace
@@ -1337,6 +1349,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // the signal that a marker click should land on the TILE (grouped stack
     // list) rather than assuming the whole hex is one installation.
     static std::unordered_map<entity_id, int>            tile_bld_count;
+    // Unit groups per province (BL-575) — see the pre-pass below. Keyed on the
+    // SAME stamp as the maps above, since a hire/disband changes w.units.size()
+    // and a march order's actual tile move only happens on a tick (already
+    // caught by day_tick).
+    static std::unordered_map<uint32_t, std::vector<unit_marker_summary>> province_units;
     const body_frame_stamp marker_stamp = make_body_frame_stamp(w, state.active_body);
     if (!(marker_stamp == s_marker_stamp))
     {
@@ -1372,6 +1389,45 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const auto tile_it = w.tiles.find(bld_it->second.tile);
                 if (tile_it != w.tiles.end() && tile_it->second.body == state.active_body)
                     tile_to_corp[bld_it->second.tile] = corp_id;
+            }
+        }
+
+        // Unit groups per province (BL-575). A unit's command grain is the
+        // province (BL-511's march_unit retarget), so units sharing a province
+        // AND an owner draw as one marker with a count badge, exactly as the
+        // "+N" building-stack badge above groups several buildings on one tile.
+        // Iterated in ascending unit-id order so `sample_unit` (the group's
+        // click/hover target) is deterministically the LOWEST id in the group,
+        // the same "lowest id wins" precedent tile_to_bld uses just above.
+        province_units.clear();
+        {
+            std::vector<entity_id> unit_ids;
+            unit_ids.reserve(w.units.size());
+            for (const auto& [uid, uc] : w.units)
+                unit_ids.push_back(uid);
+            std::sort(unit_ids.begin(), unit_ids.end());
+            for (const entity_id uid : unit_ids)
+            {
+                const auto& uc = w.units.at(uid);
+                const auto utile_it = w.tiles.find(uc.position);
+                if (utile_it == w.tiles.end() || utile_it->second.body != state.active_body)
+                    continue;
+                const uint32_t upid = w.provinces.province_of(uc.position);
+                if (upid == 0)
+                    continue;
+                std::vector<unit_marker_summary>& groups = province_units[upid];
+                auto grp_it = std::find_if(groups.begin(), groups.end(),
+                    [&](const unit_marker_summary& g) { return g.owner == uc.owner; });
+                if (grp_it == groups.end())
+                {
+                    // BL-575 stub: `committed` stays false — no writer sets it
+                    // true until BL-573 (wave 4) adds the real per-unit flag.
+                    groups.push_back({ uc.owner, uid, 1, /*committed=*/false });
+                }
+                else
+                {
+                    ++grp_it->count;
+                }
             }
         }
     }
@@ -2838,6 +2894,62 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
+            // UNIT MARKERS (BL-575). Same province-anchor convention as the
+            // battle marker just above: drawn once per (province, owner)
+            // GROUP, not once per unit or per tile — a unit's command grain is
+            // the province (BL-511's march_unit retarget), so a large
+            // province full of units reads as a handful of markers with count
+            // badges rather than a scatter. Offset BELOW the hex centre so it
+            // never sits directly under the battle glyph, which claims the
+            // centre when a fight is live here — the two can both be true at
+            // once, since a battle needs forces present.
+            if (draw_r >= 6.0f && prov_id != 0)
+            {
+                const province* pv = w.provinces.find(prov_id);
+                if (pv != nullptr && !pv->tiles.empty() && pv->tiles.front() == id)
+                {
+                    const auto pu_it = province_units.find(prov_id);
+                    if (pu_it != province_units.end() && !pu_it->second.empty())
+                    {
+                        const std::vector<unit_marker_summary>& groups = pu_it->second;
+                        const float ur      = std::max(2.5f, draw_r * 0.30f);
+                        const float spacing = ur * 2.4f;
+                        const float uy      = cy + draw_r * 0.62f;
+                        const float start_x = cx - spacing * (static_cast<float>(groups.size() - 1) * 0.5f);
+                        for (std::size_t gi = 0; gi < groups.size(); ++gi)
+                        {
+                            const unit_marker_summary& grp = groups[gi];
+                            const ImVec2 mpos{ start_x + spacing * static_cast<float>(gi), uy };
+                            const ImU32  fill = corp_identity(grp.owner);
+                            icons::unit_marker(dl, mpos, ur, fill, grp.committed);
+
+                            // "+N" stack badge — the same k/N text-overlay idiom the
+                            // building stack badge and the survey badge both use, for
+                            // a group of more than one unit entity.
+                            if (grp.count > 1)
+                            {
+                                char nbuf[8];
+                                std::snprintf(nbuf, sizeof nbuf, "+%d", grp.count - 1);
+                                const ImVec2 bpos{ mpos.x + ur * 0.85f, mpos.y + ur * 0.85f };
+                                dl->AddCircleFilled(bpos, 7.0f, IM_COL32(18, 20, 26, 225), 12);
+                                dl->AddText({bpos.x - 6.0f, bpos.y - 6.0f},
+                                            IM_COL32(230, 230, 235, 235), nbuf); // fit-exempt: on-canvas marker badge, no containing box
+                            }
+
+                            // Hit zone (BL-031/BL-059/BL-575): the group's LOWEST-id
+                            // unit is the click/hover target — same "lowest id wins"
+                            // idiom as the building stack above.
+                            marker_hit_zone hz;
+                            hz.id     = grp.sample_unit;
+                            hz.kind   = marker_hit_zone::kind::unit;
+                            hz.centre = mpos;
+                            hz.radius = ur * 2.0f;
+                            state.marker_hit_zones.push_back(hz);
+                        }
+                    }
+                }
+            }
+
             // Selection outline is drawn on every visible copy of the selected
             // tile; hover is deferred to a single nearest copy, resolved below.
             draw_hex_highlight(dl, verts,
@@ -2857,7 +2969,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                                        prov_hovered, /*pinned=*/false);
                 if (ph != highlight::none)
                 {
-                    const ImU32 pc = (ph == highlight::selected) ? palette::selection
+                    // March-picking mode (BL-575): the hovered province reads as a
+                    // destination candidate, not a selection candidate, while a
+                    // march is armed — a distinct green rather than the ordinary
+                    // hover tint, so the live click-through pass has a visible
+                    // "you are picking a destination" cue.
+                    const bool march_picking = state.pending_march_unit != null_entity
+                                             && prov_hovered && ph != highlight::selected;
+                    const ImU32 pc = march_picking ? IM_COL32(90, 230, 120, 235)
+                                   : (ph == highlight::selected) ? palette::selection
                                                                  : palette::hover;
                     for (int s = 0; s < 6; ++s)
                     {
@@ -3342,11 +3462,29 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // Construction mode suppresses selection: in placement mode a left-click is a
     // construction gesture, not a selection one, so it must not retarget the
     // Selection info element.
-    // BL-031: marker hit zones take priority over tile selection (building >
-    // market_centre; closest-wins tie-break within a kind).
+    // BL-031: marker hit zones take priority over tile selection (unit >
+    // building > market_centre; closest-wins tie-break within a kind).
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
     {
-        if (!state.construction.active)
+        // March-picking mode (BL-575) outranks everything below, exactly as
+        // construction placement mode does: the unit card's March press ARMED
+        // `pending_march_unit`, so this click's whole job is to name a
+        // destination province, not to select or build anything.
+        // app::render reads both fields once `pending_march_dest_province` is
+        // non-zero, dispatches `corp_verb::march_unit`, and clears both — the
+        // same deferred-mutation path every other canvas gesture takes (this
+        // canvas holds only `const world&`). A click that misses every
+        // province (open ocean, off-body) is simply ignored: the mode stays
+        // armed for the next try rather than silently cancelling on a stray
+        // miss.
+        if (state.pending_march_unit != null_entity)
+        {
+            const uint32_t march_prov = (hovered_tile != null_entity)
+                                        ? w.provinces.province_of(hovered_tile) : 0u;
+            if (march_prov != 0)
+                state.pending_march_dest_province = march_prov;
+        }
+        else if (!state.construction.active)
         {
             // Resolve marker hit zones in priority order (BL-031): building
             // outranks market-centre; both outrank tile. Shared with hover.

@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**32 surfaces** — 4 settled, 28 awaiting Ben's wording.
+**33 surfaces** — 4 settled, 29 awaiting Ben's wording.
 
 ---
 
@@ -200,9 +200,9 @@ alphabetical order.
 
 **Answers:** What is this unit/unit-stack, how strong is it, what type is it, who owns it, and can I do anything with it?
 
-**Because:** selection_kind::unit existed but fell through to the generic action/facts split with a bare Go to button - the only selection kind still on that path once the tile (BL-123) and building (BL-431 rework) cards moved to the 3-column band shape. BL-393 (UNITS_ARE_WRITE_ONLY_AND_INERT) already flags that units are largely inert in the live economy; Ben's direction was to build the CARD shape now anyway rather than wait on combat, so a unit selected today reads real unit_component fields (strength, count, roster type, owner) in the same picture/pager/actions shape as everything else, instead of standing out as the one kind that still looks unfinished. Paired with a repeat-click tile-cycle (Soldier -> Building -> Tile) in body_surface_canvas.cpp so a tile carrying a unit is actually reachable by clicking.
+**Because:** selection_kind::unit existed but fell through to the generic action/facts split with a bare Go to button - the only selection kind still on that path once the tile (BL-123) and building (BL-431 rework) cards moved to the 3-column band shape. BL-393 (UNITS_ARE_WRITE_ONLY_AND_INERT) already flags that units are largely inert in the live economy; Ben's direction was to build the CARD shape now anyway rather than wait on combat, so a unit selected today reads real unit_component fields (strength, count, roster type, owner) in the same picture/pager/actions shape as everything else, instead of standing out as the one kind that still looks unfinished. Paired with a repeat-click tile-cycle (Soldier -> Building -> Tile) in body_surface_canvas.cpp so a tile carrying a unit is actually reachable by clicking. BL-575 (unit marker + march UI, 2026-08-23) answers the "can I do anything with it" half for real: the action grid gained March (arms province-picking on the Planetary canvas, then dispatches corp_verb::march_unit on the qualifying province click), Halt (clears the standing order) and Disband (permanent, confirm popup, no refund — MILITARY.md § Marching) alongside the existing Go to, replacing three of the five reserved slots. All three route through the SAME corp-command seam corp_ai scores for rival units, so the player takes no shortcut around it.
 
-*Demanded by BL-393 · `src/ui/selection_panel.cpp`, `src/ui/selection_panel.hpp`, `src/ui/ui_state.hpp`, `src/ui/body_surface_canvas.cpp` · id `selection_unit_card`*
+*Demanded by BL-393, BL-575 · `src/ui/selection_panel.cpp`, `src/ui/selection_panel.hpp`, `src/ui/ui_state.hpp`, `src/ui/body_surface_canvas.cpp`, `src/core/app.cpp` · id `selection_unit_card`*
 
 ### Starting-corp selection stage (app_screen::choosing_corp, app::draw_corp_choice_screen)
 
@@ -243,6 +243,14 @@ alphabetical order.
 **Because:** Colour alone could not carry both halves once BL-519 split the terrain axes. The substrate and the cover blend into ONE fill, so a rocky slope with a thin wood and a sedimentary plain with a thin wood arrive at neighbouring greens and the player cannot tell which they are siting on. Texture separates the two readings onto separate channels: a faint substrate grain that says what the ground is, and a per-tile cover pattern whose mark count and weight scale with cover_density, so a sparse wood LOOKS thin exactly where the economy already CUTS it thin. It earns its space by being free of any: it adds no chrome, no legend and no control, and it is the only way a cover boundary reads as a boundary now that BL-511's province blend deliberately smooths the fills.
 
 *Demanded by BL-520, BL-519 · `src/ui/hex_render.cpp`, `src/ui/body_surface_canvas.cpp` · id `tile_texture`*
+
+### Unit marker (Planetary canvas, province anchor tile)
+
+**Answers:** Where are my (and my rivals') forces standing, and whose are they?
+
+**Because:** Units had no on-canvas glyph at all before this (ICONS.md previously documented Unit as "(no glyph)"), reachable only by clicking the exact tile a unit stood on or cycling into it — a large province full of units was otherwise invisible on the map. BL-511 made a unit's command grain the PROVINCE (march_unit targets a province, not a tile), so the marker follows the same province-anchor convention the battle marker already established: drawn once per (province, owner) GROUP at the province's lowest-member-tile anchor, with a "+N" count badge for more than one unit in the group, rather than once per unit or per tile. The humanoid silhouette echoes the unit card's own placeholder glyph (glyph_soldier) so the canvas and the card read as one vocabulary. Carries a stub ring for contract-committed units (always false today; BL-573, a later wave of the same Sprint 16 batch, adds the real per-unit flag) so that later item needs no further UI plumbing change.
+
+*Demanded by BL-575, BL-511 · `src/ui/body_surface_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/icons.hpp`, `src/ui/ui_state.hpp` · id `unit_marker`*
 
 ---
 
