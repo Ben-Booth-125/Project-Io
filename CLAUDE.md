@@ -128,6 +128,10 @@ an id) to pull one item's prose. That time-slice above is now **physical**: when
 design/resolution/completion prose moves to `docs/development/archive/backlog-design-<quarter>.json`
 via `tools/session/archive_designs.js`, and the item keeps a pointer. `--full` and `backlog_view.js`
 resolve it transparently; amend a landed item's prose **in the cold file**, not in `backlog.json`.
+Since 2026-08-23 the cold set also takes a landed item's `summary` and any ad-hoc prose key;
+`--grep` and `--fields summary` resolve it. The same move exists for the review queue:
+`node tools/session/archive_reviews.js` moves resolved `NEEDS_REVIEW.json` entries into
+`archive/needs-review-<quarter>.json`, so the hot file carries open entries only.
 
 **`docs/development/user_stories.json`** and **`docs/development/USER_STORIES.md`**
 The user-story catalogue — the game decomposed by **player intent** (what the player is *trying to

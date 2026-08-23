@@ -35,7 +35,31 @@ const ARCHIVE_DIR = 'docs/development/archive';
 
 // The narrative fields — prose a reader wants only when looking AT one item, never
 // when looking ACROSS them. Everything else in an item is index and stays hot.
-const NARRATIVE = ['design', 'resolution', 'completion_note', 'progress_note'];
+const NARRATIVE = ['design', 'resolution', 'completion_note', 'progress_note',
+    // Widened 2026-08-23 (archival pass): `summary` is prose too — it was 184 KB of the
+    // hot file across 324 landed items, none of it read when looking ACROSS the backlog.
+    'summary', 'completion', 'progress'];
+
+// Fields that are INDEX and must stay hot whatever their length.
+const INDEX_KEEP = new Set(['id', 'short_name', 'title', 'status', 'priority', 'difficulty',
+    'category', 'version_goal', 'files', 'touches', 'authority_doc', 'requires', 'blocked_on',
+    'waits_on', 'parked', 'glyph', 'written', 'created', 'resolved', 'completed', 'raised',
+    'superseded_by', 'archived', 'design']);
+
+// A landed item sometimes grows an ad-hoc prose key (`measurement_r5`, `dead_start_fix`,
+// ...) that no schema names. Anything non-index and longer than this is narrative.
+const ADHOC_PROSE_MIN = 300;
+
+// The narrative fields THIS item carries: the named set plus any ad-hoc long string.
+function narrativeFieldsOf(item) {
+    const out = new Set(NARRATIVE.filter((f) => item[f] != null));
+    for (const [k, v] of Object.entries(item)) {
+        if (INDEX_KEEP.has(k) || out.has(k)) continue;
+        if (typeof v === 'string' && v.length >= ADHOC_PROSE_MIN) out.add(k);
+        else if (Array.isArray(v) && JSON.stringify(v).length >= ADHOC_PROSE_MIN && v.every((x) => typeof x === 'string')) out.add(k);
+    }
+    return [...out];
+}
 
 // Terminal statuses. Kept in sync with the TERMINAL sets in gyre.py, backlog_view.js,
 // backlog_lint.js, story_check.js, status.ps1 — `shipped` is the tolerated legacy value.
@@ -101,8 +125,7 @@ function coldFraction(backlog) {
         const bytes = Buffer.byteLength(JSON.stringify(item));
         total += bytes;
         if (!TERMINAL.has(item.status)) continue;
-        for (const f of NARRATIVE) {
-            if (item[f] == null) continue;
+        for (const f of narrativeFieldsOf(item)) {
             if (f === 'design' && isPointer(item[f])) continue;
             cold += Buffer.byteLength(JSON.stringify(item[f]));
         }
@@ -111,6 +134,6 @@ function coldFraction(backlog) {
 }
 
 module.exports = {
-    ROOT, ARCHIVE_DIR, NARRATIVE, TERMINAL,
-    isPointer, bucketFor, archivePath, loadArchive, newArchive, resolve, coldFraction,
+    ROOT, ARCHIVE_DIR, NARRATIVE, INDEX_KEEP, TERMINAL,
+    narrativeFieldsOf, isPointer, bucketFor, archivePath, loadArchive, newArchive, resolve, coldFraction,
 };

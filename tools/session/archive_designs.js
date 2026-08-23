@@ -92,8 +92,7 @@ function doArchive() {
         // Collect whatever narrative this item actually carries. A legacy "@BACKLOG.md"
         // design is already a pointer — leave it alone, but still move its neighbours.
         const rec = {};
-        for (const f of A.NARRATIVE) {
-            if (item[f] == null) continue;
+        for (const f of A.narrativeFieldsOf(item)) {
             if (f === 'design' && A.isPointer(item[f])) continue;
             rec[f] = item[f];
         }

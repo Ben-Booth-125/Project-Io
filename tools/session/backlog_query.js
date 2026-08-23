@@ -70,7 +70,9 @@ let hits = backlog.items.filter((it) => {
     if (touches && !(it.files || []).some((f) => f.includes(touches))) return false;
     if (grep) {
         const needle = grep.toLowerCase();
-        const hay = [it.id, it.short_name, it.title, it.summary].filter(Boolean).join(' ').toLowerCase();
+        // A landed item's summary is cold (archival pass 2026-08-23); pull it back for the match.
+        const src = it.archived ? A.resolve(it, A.ROOT, cache) : it;
+        const hay = [src.id, src.short_name, src.title, src.summary].filter(Boolean).join(' ').toLowerCase();
         if (!hay.includes(needle)) return false;
     }
     return true;
@@ -85,7 +87,9 @@ if (has('--count')) {
     process.exit(hits.length ? 0 : 1);
 }
 
-if (full) hits = hits.map((it) => A.resolve(it, A.ROOT, cache));
+// --fields naming a cold field (summary, design ...) resolves too, not only --full.
+const needsCold = full || (wantFields || []).some((f) => A.NARRATIVE.includes(f));
+if (needsCold) hits = hits.map((it) => A.resolve(it, A.ROOT, cache));
 
 const fields = wantFields || (full ? null : INDEX_FIELDS);
 const project = (it) => (fields ? Object.fromEntries(fields.filter((f) => it[f] !== undefined).map((f) => [f, it[f]])) : it);
