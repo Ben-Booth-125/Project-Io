@@ -1,7 +1,6 @@
 #include "procurement.hpp"
 
 #include <istream>
-#include <map>
 #include <ostream>
 #include <utility>
 #include <vector>
@@ -100,13 +99,11 @@ void write_procurement(const world& w, std::ostream& out)
         write_f32(out, c.freight_cost);
     }
 
-    write_u32(out, static_cast<uint32_t>(w.corp_reputation.size()));
-    for (const auto& [pair, value] : w.corp_reputation)
-    {
-        write_u32(out, pair.first);
-        write_u32(out, pair.second);
-        write_f32(out, value);
-    }
+    // BL-546: the reputation table that used to trail the contracts is GONE
+    // from this stream. It was never procurement's store — it is the Trust
+    // dimension of `world::sentiment`, written by write_sentiment (and by
+    // world_save.cpp for a whole-world snapshot). The version bump to 3 is what
+    // stops a v2 stream's trailing block being read as anything at all.
 }
 
 bool read_procurement(world& w, std::istream& in)
@@ -168,25 +165,15 @@ bool read_procurement(world& w, std::istream& in)
         contracts.push_back(c);
     }
 
-    uint32_t rep_count = 0;
-    if (!read_u32(in, rep_count) || rep_count > procurement_max_records)
-        return false;
-
-    std::map<std::pair<entity_id, entity_id>, float> reputation;
-    for (uint32_t i = 0; i < rep_count; ++i)
-    {
-        entity_id buyer = null_entity, supplier = null_entity;
-        float     value = 0.0f;
-        if (!read_u32(in, buyer) || !read_u32(in, supplier) || !read_f32(in, value))
-            return false;
-        reputation[{buyer, supplier}] = value;
-    }
+    // BL-546: no reputation block follows. `world::sentiment` is deliberately
+    // NOT touched here — a v3 procurement stream carries no relational value,
+    // so a reader that cleared it would be destroying state this stream never
+    // claimed to own.
 
     // Replace only on full success — a truncated stream leaves the destination
     // world's procurement state exactly as it was (read_order_book's contract).
     w.procurement_quotes    = std::move(quotes);
     w.procurement_contracts = std::move(contracts);
     w.next_procurement_id   = next_id;
-    w.corp_reputation       = std::move(reputation);
     return true;
 }

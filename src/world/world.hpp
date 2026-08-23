@@ -6,6 +6,7 @@
 #include "law.hpp"          // law (BL-343 enacted-law list, below)
 #include "modifier_set.hpp" // scalar_modifier (BL-479 per-corp tech effects, below)
 #include "province.hpp"     // province_partition (BL-466 province partition, below)
+#include "sentiment.hpp"    // sentiment_table (BL-545 relational substrate, below)
 
 #include <cstdint>
 #include <map>
@@ -469,13 +470,61 @@ struct world
     /// (an enacted law that populates this) is a BL-343/BL-350 follow-on.
     std::unordered_map<entity_id, condition_set> corp_embargo_conditions;
 
-    /// Standing counterparty reputation (BL-350's Q3): one scalar per
-    /// (buyer, supplier) pair, moved only by a contract's completion (+) or
-    /// cancellation (-). std::map, not unordered — this is read in sorted
-    /// order wherever it feeds a deterministic pass (none yet; kept
-    /// consistent with the project's other pair-keyed maps, e.g.
-    /// economy_system.cpp's bldg_count_by_corp_body).
-    std::map<std::pair<entity_id, entity_id>, float> corp_reputation;
+    /// THE RELATIONAL SUBSTRATE (BL-545): one directed, continuous, DERIVED
+    /// value from an observer to a subject, on two dimensions (Access, Trust),
+    /// at every grain — corp->corp, nation->corp, nation->nation alike.
+    /// `sentiment.hpp` owns the meaning; this field is the ONLY join between
+    /// that translation unit and the world, and it is one-directional on
+    /// purpose: sentiment.cpp is never handed a `world&`, so it cannot reach a
+    /// stance table (THE INVARIANT — sentiment informs a declaration, it never
+    /// makes one).
+    ///
+    /// BL-546 (2026-08-23) folded `corp_reputation` into it. There is no
+    /// second store: procurement reputation is the TRUST dimension at
+    /// (buyer, supplier) grain, read through `procurement_reputation` below
+    /// and written through `note_conduct`. A `std::map` inside, so every walk
+    /// is a sorted walk over ids (BL-158).
+    sentiment_table sentiment;
+
+    /// BL-350's Q3 counterparty reputation, as a VIEW rather than a store
+    /// (BL-546). Reputation IS sentiment's Trust dimension from the BUYER
+    /// toward the SUPPLIER — directed, keyed exactly as `corp_reputation` was,
+    /// and neutral (0) for a pair that has never dealt.
+    ///
+    /// The single read point. `request_quote`'s floor test reads this, and
+    /// nothing else reads the axis today; because the row DECAYS toward
+    /// neutral, "below the floor" is a temporary state and no consumer may
+    /// treat it as terminal (BL-391, dissolved rather than special-cased).
+    ///
+    /// @param buyer    The corp forming the opinion (the observer).
+    /// @param supplier The corp it is about (the subject).
+    /// @return         Trust, or 0 for an absent row.
+    float procurement_reputation(entity_id buyer, entity_id supplier) const
+    {
+        return sentiment_toward(sentiment, buyer, supplier).trust;
+    }
+
+    /// Record ONE occurrence of observable conduct against the substrate, at
+    /// the moment it happens. The single write point, so the two procurement
+    /// writers cannot drift from one another or from the authored weights.
+    ///
+    /// Applied immediately rather than queued: the pre-BL-546 reputation
+    /// writers mutated in place, and a queue would have delayed a cancellation
+    /// by a tick — a behaviour change this migration is required not to make.
+    /// The tick's own decay half runs at the head of `run_economy_step`, so
+    /// "decay first, then this tick's conduct" still holds.
+    ///
+    /// @param p         Authored factor weights (recipe_registry::sentiment()).
+    /// @param observer  Who forms the opinion.
+    /// @param subject   Who it is about.
+    /// @param kind      Which authored row of conduct this is.
+    /// @param magnitude Occurrence count / natural size; 1.0 is "once".
+    void note_conduct(const sentiment_params& p, entity_id observer, entity_id subject,
+                      sentiment_factor_kind kind, float magnitude = 1.0f)
+    {
+        apply_sentiment_events(sentiment, p,
+                               { sentiment_event{ observer, subject, kind, magnitude } });
+    }
 
     /// Corp stance (BL-448): the directed hostility map, keyed (from, to) —
     /// presence means `from` has declared hostile toward `to`; absence means

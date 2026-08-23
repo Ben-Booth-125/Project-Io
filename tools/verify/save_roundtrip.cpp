@@ -353,7 +353,7 @@ int main()
             { "corporations", w.corporations.size(), loaded.corporations.size() },
             { "corp_body_pools", w.corp_body_pools.size(), loaded.corp_body_pools.size() },
             { "workforce_supply_overrides", w.workforce_supply_overrides.size(), loaded.workforce_supply_overrides.size() },
-            { "corp_reputation", w.corp_reputation.size(), loaded.corp_reputation.size() },
+            { "sentiment", w.sentiment.pairs.size(), loaded.sentiment.pairs.size() },
             { "convoys", w.convoys.size(), loaded.convoys.size() },
             { "trade_routes", w.trade_routes.size(), loaded.trade_routes.size() },
             { "body_last_glimpse_tick", w.body_last_glimpse_tick.size(), loaded.body_last_glimpse_tick.size() },
@@ -429,8 +429,13 @@ int main()
 
         f.workforce_supply_overrides[{ c1, b1 }] = 7.25f;
         f.workforce_supply_overrides[{ c2, b2 }] = 1.5f;
-        f.corp_reputation[{ c1, c2 }] = -0.75f;
-        f.corp_reputation[{ c2, c1 }] = 3.5f;
+        // BL-546: reputation is the TRUST dimension of the substrate now, and
+        // the record carries a second float. Access and Trust are given
+        // DIFFERENT values on purpose — equal ones round-trip even if the two
+        // are read into each other, which is the defect this fixture exists to
+        // catch.
+        f.sentiment.pairs[{ c1, c2 }] = sentiment_value{ 2.25f, -0.75f };
+        f.sentiment.pairs[{ c2, c1 }] = sentiment_value{ -6.5f, 3.5f };
 
         convoy_component cv;
         cv.source_market = 101; cv.dest_market = 202; cv.mode = convoy_mode::sea;
@@ -527,8 +532,11 @@ int main()
                       && lb.conditions.all.size() == 2,
                   "P8 a law survives with its conditions and effect");
             check(back.workforce_supply_overrides.at({ c1, b1 }) == 7.25f
-                      && back.corp_reputation.at({ c2, c1 }) == 3.5f,
-                  "P8 the pair-keyed float tables keep key orientation");
+                      && back.sentiment.pairs.at({ c2, c1 }).trust == 3.5f
+                      && back.sentiment.pairs.at({ c2, c1 }).access == -6.5f
+                      && back.sentiment.pairs.at({ c1, c2 }).access == 2.25f,
+                  "P8 the pair-keyed float tables keep key orientation, and "
+                  "sentiment keeps Access and Trust distinct (BL-546)");
         }
     }
 

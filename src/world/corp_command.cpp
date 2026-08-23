@@ -669,9 +669,13 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 !evaluate(embargo_it->second, w, cmd.corp))
                 return corp_command_result::rejected_embargo;
 
-            const float reputation =
-                [&]{ const auto rit = w.corp_reputation.find({cmd.corp, cmd.counterparty});
-                     return rit != w.corp_reputation.end() ? rit->second : 0.0f; }();
+            // BL-546: reputation is a VIEW of sentiment's Trust dimension, not
+            // a store of its own. THE FLOOR IS NO LONGER PERMANENT (BL-391) —
+            // the row decays toward neutral, so a pair below the floor climbs
+            // back out with time and this refusal is a temporary state. It is
+            // the ONLY consumer of the floor in the tree; any future one must
+            // read it the same way, as a condition of today and not a verdict.
+            const float reputation = w.procurement_reputation(cmd.corp, cmd.counterparty);
             if (reputation < reg.procurement().reputation_floor)
                 return corp_command_result::rejected_reputation;
 
@@ -818,7 +822,13 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // Forfeits the deposit (no refund) and moves reputation down —
             // BL-350 Q1/Q3. Erased, not flagged: a cancelled contract has
             // nothing left to pace.
-            w.corp_reputation[{it->buyer, it->supplier}] += reg.procurement().reputation_on_cancel;
+            //
+            // BL-546: the move is now one `contract_cancelled` occurrence
+            // folded into the substrate, at the weight `economy.lua` authors
+            // (seeded from `reputation_on_cancel`, so the magnitude is
+            // unchanged). Applied here and now, exactly as the old `+=` was.
+            w.note_conduct(reg.sentiment(), it->buyer, it->supplier,
+                           sentiment_factor_kind::contract_cancelled);
             w.procurement_contracts.erase(it);
             return corp_command_result::applied;
         }

@@ -324,6 +324,46 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_procurement = pp;
     }
 
+    // BL-545/BL-546 relational substrate (economy.sentiment).
+    //
+    // The two `contract_*` Trust weights are SEEDED FROM PROCUREMENT FIRST, so
+    // a build that authors `procurement` and nothing else keeps exactly the
+    // reputation behaviour it had before the migration. `economy.sentiment`,
+    // where it exists, then overrides — a factor row it does not name keeps the
+    // seeded (or zero) value, so authoring one weight cannot silently zero the
+    // rest.
+    //
+    // The factor table is read AS A LOOP OVER THE ROSTER, never ten branches:
+    // `sentiment_factor_names` is indexed by the kind, so naming a new factor
+    // costs an enumerator and a string and nothing here changes.
+    seed_procurement_sentiment(m_sentiment, m_procurement);
+    sol::optional<sol::table> sentiment_tbl = (*econ)["sentiment"];
+    if (sentiment_tbl)
+    {
+        sentiment_params sp = m_sentiment;
+        sp.access_decay_per_tick = sentiment_tbl->get_or("access_decay_per_tick", sp.access_decay_per_tick);
+        sp.trust_decay_per_tick  = sentiment_tbl->get_or("trust_decay_per_tick",  sp.trust_decay_per_tick);
+        sp.neutral_epsilon       = sentiment_tbl->get_or("neutral_epsilon",       sp.neutral_epsilon);
+        sp.limit                 = sentiment_tbl->get_or("limit",                 sp.limit);
+        sp.band_edge_near        = sentiment_tbl->get_or("band_edge_near",        sp.band_edge_near);
+        sp.band_edge_far         = sentiment_tbl->get_or("band_edge_far",         sp.band_edge_far);
+
+        sol::optional<sol::table> factors = (*sentiment_tbl)["factors"];
+        if (factors)
+        {
+            for (std::size_t i = 0; i < sentiment_factor_count; ++i)
+            {
+                sol::optional<sol::table> row = (*factors)[sentiment_factor_names[i]];
+                if (!row)
+                    continue;
+                sp.factors[i].access = row->get_or("access", sp.factors[i].access);
+                sp.factors[i].trust  = row->get_or("trust",  sp.factors[i].trust);
+            }
+        }
+
+        m_sentiment = sp;
+    }
+
     // BL-430 player-facing recipe-switch cost/cooldown (economy.recipe_switch).
     sol::optional<sol::table> recipe_switch = (*econ)["recipe_switch"];
     if (recipe_switch)

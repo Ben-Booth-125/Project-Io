@@ -5310,7 +5310,9 @@
      "verification": "headless - tools/verify/value_anchor.cpp",
      "notes": null
     }
-   ],
+   ]
+  },
+  {
    "brief": "world-save-snapshot",
    "batch": "2026-08-22-bl-536-save-state",
    "title": "A campaign can be saved and resumed - and a design pass can load one instead of generating",
@@ -5367,6 +5369,48 @@
     }
    ],
    "resolution": "LANDED 2026-08-22. The world snapshot (IOSV) plus the save-game envelope (IOSG) - one .iosave file, field-wise flat binary, atomic on failure at both levels. Reachable four ways: F5/F6 quick slots, --load <path>, and verify.save/verify.load for capture scripts. Two findings worth carrying out of the work: corp_modifiers is not recomputable and had to be serialised (NR-510), and verify.command had never routed through dispatch_action, so every app-level command it named silently did nothing."
+  },
+  {
+   "brief": "reputation-becomes-sentiment",
+   "batch": "2026-08-23-sprint-n2-the-spines-move",
+   "title": "Procurement reputation becomes a view of sentiment rather than a second store",
+   "status": "active",
+   "promoted_from": "backlog.json BL-546 (raised 2026-08-22), landing BL-391 (reputation floor is a deadlock) through it",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): THE MIGRATION CHANGES NO BEHAVIOUR. With decay unauthored (the default), every procurement outcome is BIT-IDENTICAL to the pre-migration build: the reputation value after each of three completions and a cancellation, the quoted unit price / quantity / freight / lead time, both corporations' balances, the buyer's pool, and the command result of each of the four refusal conditions. The comparison is against numbers CAPTURED FROM THE PRE-MIGRATION TREE and recorded as IEEE-754 bit patterns, not against a fixture written after the change. The fixture must ACCUMULATE - a single completion would pass over a substrate that silently dropped every event after the first.",
+     "result_metric": "17 rows green. Captured at 4262d66 pre-migration: rep 1/2/3 after three completions (0x3F800000 / 0x40000000 / 0x40400000), 1 after a cancellation, buyer balance 0x461BF3B2, supplier 0x461DF9A3, quote 2.4375 x 20 freight 0 lead 4, floor -5, cancels to -2 / -4 / -6. Corroborated by spectator_determinism: the unspectated 300-tick state_hash is B4D09255AF346008 before AND after.",
+     "verification": "headless - tools/verify/procurement_harness.cpp",
+     "notes": "MUTATION-TESTED. M1 (zero the contract_completed factor weight): 9 red including all four accumulation rows. M2 (make the fold ASSIGN instead of accumulate): 10 red - completion 1 still passes, completions 2 and 3 fail, which is exactly the non-accumulating-fixture trap. M5 (view reads Access instead of Trust): 20 red."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "THE FLOOR IS NO LONGER PERMANENT (BL-391). With decay authored, a buyer driven below the reputation floor by repeated cancellation - the path a player actually measured, -6 against a floor of -5 - climbs back above it within the authored window and is quoted again, with no new verb and no reparations mechanic. The same run against the pre-migration build sits at the same value for the same number of ticks and is still refused, so the row is a genuine before/after and not a restatement of the substrate's own unit test.",
+     "result_metric": "11 rows green. Pre-migration, 64 ticks moved -6 by ZERO bits (0xC0C00000 in, 0xC0C00000 out, still rejected_reputation). Post-migration at a 180-tick half-life (trust_decay_per_tick 0.00384) the same 64 ticks carry it back above the floor and the quote is applied. It heals gradually: still below the floor at tick 10, monotone toward neutral every tick, and the row is ERASED at neutral.",
+     "verification": "headless - tools/verify/procurement_harness.cpp",
+     "notes": "MUTATION-TESTED. M3 (remove decay_sentiment from run_economy_step): 7 red, ALL of them R2 - R1 stays green, which is itself the evidence that the migration and the fix are separable. CAVEAT: scripts/economy.lua authors no `sentiment` table, so decay is INERT in the shipped build - the deadlock is dissolved in mechanism, not yet in play. The rate is Ben's call (BL-391's second demand)."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "THE SERIALISATION SEAM TRAVELS WITH THE CHANGE. `procurement_version` is bumped (2 -> 3, the trailing reputation table removed) and a v3 stream round-trips its quotes, contracts and next id; a stream at any other version is REJECTED and mutates nothing. The relational value itself round-trips through the substrate's own leg of the seam and through the world snapshot, whose version is bumped in the same change (`world_save_version` 1 -> 2) because the per-pair record widened from one float to two.",
+     "result_metric": "9 rows green in procurement_harness; save_roundtrip P1/P7/P8 green (P8 now asserts Access and Trust stay distinct). The v3 stream is exactly 102 bytes for one quote + one contract - header + quotes + contracts and nothing after.",
+     "verification": "headless - tools/verify/procurement_harness.cpp; tools/verify/save_roundtrip.cpp",
+     "notes": "MUTATION-TESTED. M4a (procurement_version left at 2): 2 red. M4b (re-add the trailing reputation block to the wire): 1 red, the stream-size row - which is the one guarding 'no second store on the wire'. M6 (snapshot writes Trust twice, dropping Access): save_roundtrip P8 red. M7 (read_procurement clears w.sentiment): 1 red."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "THERE IS ONLY ONE STORE, so reputation and sentiment cannot disagree. `world::corp_reputation` no longer exists; the only read is `world::procurement_reputation`, which returns sentiment's Trust at (buyer, supplier) and nothing else, and the only writes are the two authored factors. Moving the substrate row moves what request_quote sees, in the same direction and by the same amount, with no third path anywhere in the tree. THE FLOOR-CONSUMER SWEEP IS PART OF THIS ROW: exactly one consumer reads the floor today (corp_command.cpp's quote path) and it must treat 'below the floor' as a condition of today rather than a verdict.",
+     "result_metric": "10 rows green. SWEEP COMPLETE: `grep -rn reputation_floor src/ tools/` finds exactly one comparison, corp_command.cpp's request_quote. The only other `reputation` hits outside the two writers are the enumerator name `rejected_reputation` (corp_command.hpp, agent_protocol.cpp, verify_api.cpp - strings, no floor logic) and the three authored rates in recipe_registry. Nothing latches: raising the row back above the floor is sufficient to be quoted again.",
+     "verification": "headless - tools/verify/procurement_harness.cpp",
+     "notes": "MUTATION-TESTED. M5 (procurement_reputation returns .access): 20 red. M1 (weight zeroed): the anti-vacuity row 'wrote exactly ONE substrate row' goes red, so it is not passing over an empty container."
+    }
+   ],
+   "resolution": "LANDED 2026-08-23 on a worktree branch. Reputation stopped being `world::corp_reputation` and became a read of `world::sentiment` on Trust. Three findings worth carrying: (1) the spectated state_hash in spectator_determinism is LAYOUT-SENSITIVE - adding one empty std::map to `world` with no logic change reproduces the exact hash this migration produces (042D88AB1C8701A2 -> BB2D94F63FC165E5), while the played hash is byte-identical throughout, so something in the spectate-only path reads uninitialised memory or orders by address; (2) requirements.json had a FUSED group boundary that made `value-anchor` (BL-543) invisible to every JSON consumer, fixed here; (3) scripts/economy.lua still needs an `economy.sentiment` table before BL-391's fix is in play rather than merely available."
   }
  ]
 }
