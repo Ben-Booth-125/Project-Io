@@ -1364,7 +1364,7 @@
             "difficulty": 4,
             "importance": "B",
             "evaluated_difficulty": 4,
-            "status": "pending",
+            "status": "cancelled",
             "rows": [
                 {
                     "id": "R1",
@@ -1396,7 +1396,8 @@
                     "result_metric": "Code-complete: draw_supply_routes_key renders log-scaled thickness bars per lane. Visual verification outstanding.",
                     "notes": ""
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "batch": "2026-07-08-backlog-refinement",
@@ -1406,7 +1407,7 @@
             "difficulty": 3,
             "importance": "B",
             "evaluated_difficulty": 3,
-            "status": "pending",
+            "status": "cancelled",
             "rows": [
                 {
                     "id": "R1",
@@ -1449,7 +1450,8 @@
                     "result_metric": "Audit done, palette::text_secondary (~10:1) added. Not yet wired into the ~90 existing TextDisabled call sites across selection_panel.cpp/header_panel.cpp/profile_panel.cpp/explorer_panel.cpp etc — separate follow-up sweep.",
                     "notes": ""
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "batch": "2026-07-08-backlog-refinement",
@@ -1470,7 +1472,7 @@
             "difficulty": 3,
             "importance": "B",
             "evaluated_difficulty": 3,
-            "status": "pending",
+            "status": "cancelled",
             "rows": [
                 {
                     "id": "R1",
@@ -1492,7 +1494,8 @@
                     "result_metric": "Fixes are correct by code inspection (content-derived sizing, fixed-edge anchoring) but not confirmed by an actual multi-resolution screenshot pass.",
                     "notes": ""
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "batch": "2026-07-09-fog",
@@ -1650,7 +1653,7 @@
             "brief": "corporate-reach-visual",
             "batch": "2026-07-18-corporate-borders",
             "title": "BL-183 — Corporate reach layer (visual slice of BL-182): rival HQ border rings on the Corporation lens",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-183 (visual slice of BL-182)",
             "rows": [
                 {
@@ -1663,7 +1666,8 @@
                     "result_metric": "",
                     "notes": "body_surface_canvas.cpp new block after the BL-085 home-presence block, gated on overlay_mode::corporation; scripts/verify/corporate_reach.lua captures a wide multi-corp view + a player-HQ frame. Static cold review PASSED (compiles-by-inspection, standing invariants, geometry). PENDING because the visual harness could not run in-session: the SDL3 FetchContent download is blocked by egress policy (403) so no local build, and CI (build.yml) does not run the visual-verify tier (deferred BL-057). CI build.yml will confirm the compile; the rendered frame needs an eyeball on a build-capable machine."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "sticky-detail-card",
@@ -1677,7 +1681,7 @@
             "brief": "sticky-card-selection-move",
             "batch": "2026-07-22-sticky-card",
             "title": "BL-195 — Move the Selection element wholesale into the sticky card; column becomes ledgers-only",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json STICKY-CARD-SELECTION-MOVE",
             "rows": [
                 {
@@ -1690,13 +1694,14 @@
                     "result_metric": "",
                     "notes": "Not started — promote-ready. Moves selection_panel.cpp draw calls to be hosted by selection_card.cpp; foldout_column.hpp loses the Selection slot. See REFINED.md task B."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "sticky-card-drilldown",
             "batch": "2026-07-22-sticky-card",
             "title": "BL-196 — Recursive drill-down: elements inside a card open child cards, bounded by acyclicity",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json STICKY-CARD-DRILLDOWN",
             "rows": [
                 {
@@ -1709,13 +1714,14 @@
                     "result_metric": "",
                     "notes": "Not started — promote-ready, depends on BL-194 (landed). See REFINED.md task C."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "chart-container",
             "batch": "2026-07-22-sticky-card",
             "title": "BL-197 — Chart container: titled, legended, dual-axis time-series element for cards and ledgers",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json CHART-CONTAINER",
             "rows": [
                 {
@@ -1728,13 +1734,14 @@
                     "result_metric": "",
                     "notes": "Not started — promote-ready, independent root. New src/ui/chart.{hpp,cpp} (distinct from the existing bar-only src/ui/charts.hpp). See REFINED.md task D."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "resource-timeseries-store",
             "batch": "2026-07-22-sticky-card",
             "title": "BL-198 — Resource time-series store: body aggregates always, per-tile series lazily on first drill-down",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json RESOURCE-TIMESERIES-STORE",
             "rows": [
                 {
@@ -1747,13 +1754,14 @@
                     "result_metric": "",
                     "notes": "Not started — promote-ready, independent root. src/core/app.{hpp,cpp} (new buffers alongside m_balance_history). See REFINED.md task E."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "card-dwell-open",
             "batch": "2026-07-23-card-dwell-open",
             "title": "BL-200 — Dwell-to-open: holding the pointer still over a Planetary entity opens the sticky detail card",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-200 CARD_DWELL_OPEN",
             "rows": [
                 {
@@ -1766,7 +1774,8 @@
                     "result_metric": "",
                     "notes": "Built 2026-07-23. Static-reviewed. NOTE: the headless verify harness drives selection directly (select_tile/dismiss_selection) and has no per-frame mouse/hover injection, so the dwell path cannot be exercised by sticky_card.lua; live verification of the dwell feel is owed on a build-capable machine (SDL FetchContent 403 blocks in-session build). Click path unchanged. Same verification posture as BL-183."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "corporate-border-foundation",
@@ -3364,7 +3373,7 @@
             "brief": "chain-depth-spine",
             "batch": "2026-08-15-sprint-17",
             "title": "BL-428 — Chain depth is the growth track",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-428 CHAIN_DEPTH_IS_THE_GROWTH_SPINE",
             "rows": [
                 {
@@ -3417,7 +3426,8 @@
                     "result_metric": "",
                     "notes": "NOT BUILT — slice 2. Adds per-corp world state, so it lands with the save-format note BL-107 will need: appending is free only until saves exist."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "ancient-chain-roster",
@@ -3492,7 +3502,7 @@
             "brief": "production-method-chain-ui",
             "batch": "2026-08-15-sprint-17",
             "title": "BL-431 — Production method selector, chain trace, depth readout",
-            "status": "active",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-431 PRODUCTION_METHOD_AND_CHAIN_UI",
             "rows": [
                 {
@@ -3525,7 +3535,8 @@
                     "result_metric": "",
                     "notes": "corp_reached_depth (selection_panel.cpp) is a pure function over w.buildings + reg; a headless assertion is straightforward once a harness world with completed buildings exists. Not yet authored — deferral logged in NEEDS_REVIEW.json alongside R1/R2."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "chain-depth-growth-gate",
@@ -3700,7 +3711,7 @@
             "brief": "quadratic-build-score-honest",
             "batch": "2026-08-17-bl417",
             "title": "BL-417 step 1 — The build score says what it does: net^2/capex, written out, bias retained",
-            "status": "active",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-417 AI_BUILD_SCORE_IS_QUADRATIC",
             "rows": [
                 {
@@ -3753,13 +3764,14 @@
                     "result_metric": "PENDING — open. This is a design decision, not an implementation task, and the item states the two steps must not be one commit.",
                     "notes": "Re-scoped by NR-265 before it is taken: there is no processing_facility build candidate in the scorer (BL-439), so this curve only ranks extraction sites against each other and against the flat-scored military base. Retuning it cannot produce the processor preference BL-436 attributed to it. Landing BL-439 first would change what step 2 is choosing between."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "ai-builds-processors",
             "batch": "2026-08-17-bl439",
             "title": "BL-439 — A rival corporation can build a processing facility, and does",
-            "status": "active",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-439 AI_NEVER_BUILDS_PROCESSORS",
             "rows": [
                 {
@@ -3832,7 +3844,8 @@
                     "result_metric": "MET. AI_OPPONENT.md s build-verb note is rewritten from \"ranges over two\" to \"ranges over three\", with the siting / recipe-choice / reachability / pricing rules stated, plus a block recording what the change immediately found and why the goldens are red.",
                     "notes": null
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "interbody-pull-counterpart",
@@ -4122,7 +4135,7 @@
             "brief": "convoy-dispatch-seam-and-ledger",
             "batch": "2026-08-17-sprint25a",
             "title": "BL-452 / BL-453 - the logistics layer joins the command seam, and gains a ledger",
-            "status": "partial",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-452 LOGISTICS_HAS_NO_VERB + BL-453 CONVOYS_HAVE_NO_LEDGER",
             "rows": [
                 {
@@ -4188,13 +4201,14 @@
                     ],
                     "result_metric": "FAILED, PRE-EXISTING, and isolated rather than assumed - see NR-319. spectator_determinism R2 byte-identity is red. Measured at three commits under g++: it was ALREADY red before this batch (4f3c4d8, observed 9744431472DE5755), the ordnance append moved it (44166a4, CCF93A83903B6B45), and the military_points deletion moved it not at all. The golden is MSVC-derived and cannot pass under g++ at any commit. Owed: a Windows re-bless citing resource_count 37->38."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "unit-upkeep-and-derived-strength",
             "batch": "2026-08-17-sprint25a",
             "title": "BL-454 / BL-459 - an army costs something to keep, and its strength stops duplicating its headcount",
-            "status": "partial",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-454 UNITS_COST_NOTHING_TO_KEEP + BL-459 UNIT_STRENGTH_IS_A_DUPLICATE_OF_COUNT",
             "rows": [
                 {
@@ -4269,13 +4283,14 @@
                     ],
                     "result_metric": "FAILED, EXPECTED, STRUCTURAL. spectator_determinism R2 moves again: unit_component gained two hashed fields, so every world hash holding a unit changes. Measured under g++ pre-change CCF93A83903B6B45, post-change C9A4EFB137D74095, MSVC golden 855E07DE529684EC. Combined with NR-319, the Windows re-bless now has TWO named structural causes: resource_count 37->38, and the unit_component field change. Also pre-existing and unrelated: ai_skill_harness 25 failures before and after, its own banner declaring its bands stale since BL-386; non-movement confirmed at processors_gained = 43 either side."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "stance-surface",
             "batch": "2026-08-19-c1-sprint",
             "title": "BL-449 - the Corporation panel gets a stance column and the three transition presses",
-            "status": "partial",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-449 STANCE_NEEDS_A_SURFACE",
             "rows": [
                 {
@@ -4307,7 +4322,8 @@
                     "result_metric": "ACTIONS.json +4 entries (declare_hostile/offer_friendship/accept_friendship/return_to_neutral), render_actions.js re-run clean. question_log.json +1 entry (corporation_panel), render_question_log.js re-run clean. Not yet checked against a compiled build in this batch."
                 }
             ],
-            "notes": "No automated visual capture (scripts/verify/*.lua) was authored in this batch - the main session confirms the panel by opening the live app instead. R1/R2 marked complete on code inspection + the inherited stance_determinism coverage; visual confirmation is the remaining open item before this group can close."
+            "notes": "No automated visual capture (scripts/verify/*.lua) was authored in this batch - the main session confirms the panel by opening the live app instead. R1/R2 marked complete on code inspection + the inherited stance_determinism coverage; visual confirmation is the remaining open item before this group can close.",
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "unit-march-seam",
@@ -4368,7 +4384,7 @@
             "brief": "diplomatic-lens",
             "batch": "2026-08-19-bl474-475",
             "title": "BL-474 - a Diplomatic lens shows stance geographically, on the bar, tile-fill",
-            "status": "open",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-474 DIPLOMATIC_LENS",
             "rows": [
                 {
@@ -4387,13 +4403,14 @@
                     "requirement": "A legend/key for the four states renders while the lens is active, matching the convention every other lens follows."
                 }
             ],
-            "notes": "Design settled 2026-08-19 by Ben in elicitation form (backlog.json BL-474 design field) - tile fill and on-bar placement both deliberately overrule the filed recommendation (marker/ring, off-bar). Live UI check required before any row here flips complete (io-standing-rules.md, 2026-08-19) - this is an interactive, click-driven surface."
+            "notes": "Design settled 2026-08-19 by Ben in elicitation form (backlog.json BL-474 design field) - tile fill and on-bar placement both deliberately overrule the filed recommendation (marker/ring, off-bar). Live UI check required before any row here flips complete (io-standing-rules.md, 2026-08-19) - this is an interactive, click-driven surface.",
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "corp-ledger-stance-detail",
             "batch": "2026-08-19-bl474-475",
             "title": "BL-475 - the per-corporation Selection ledger carries stance detail and the three transition presses",
-            "status": "open",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-475 CORP_LEDGER_STANCE_DETAIL",
             "rows": [
                 {
@@ -4412,7 +4429,8 @@
                     "requirement": "BL-449's Stance column and press blocks are removed from corporation_panel.cpp once this surface is live - no dead second copy of the same interaction."
                 }
             ],
-            "notes": "Companion to diplomatic-lens. Live UI check required before R1 flips complete (io-standing-rules.md, 2026-08-19)."
+            "notes": "Companion to diplomatic-lens. Live UI check required before R1 flips complete (io-standing-rules.md, 2026-08-19).",
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "rivals-start-armed",
@@ -4446,7 +4464,7 @@
             "brief": "live-agent-control-seam",
             "batch": "2026-08-19-watch-and-meta",
             "title": "BL-412 - live agent control seam",
-            "status": "partial",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-412 LIVE_AGENT_CONTROL_SEAM",
             "rows": [
                 {
@@ -4473,13 +4491,14 @@
                     "requirement": "The engine only LISTENS: no outbound connection code, no HTTP client, no API key (AI_OPPONENT.md section 10 invariant) - asserted by grep-level review in verifier-review, not by a harness.",
                     "result_metric": "verifier-review (the named authority): only listen-side socket code in src/ (::socket/bind/listen/accept); the sole connect/http hits are comments asserting the invariant; the one dialling process is tools/mcp/server.js, outside src/."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "spectator-god-view",
             "batch": "2026-08-19-watch-and-meta",
             "title": "BL-408 - spectator god view",
-            "status": "partial",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-408 SPECTATOR_GOD_VIEW",
             "rows": [
                 {
@@ -4494,13 +4513,14 @@
                     "requirement": "Ordinary (non-spectate) play is unaffected: god view unreachable, default off, no new always-on cost in the frame path.",
                     "result_metric": "By construction (flag default false, control rendered only under spectate, every read-site tests the pair) + verifier-review confirmation + world_determinism 11/11 and determinism_harness 26/26 green on the integrated tree."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "emergent-strategy-readout",
             "batch": "2026-08-19-watch-and-meta",
             "title": "BL-411 - emergent strategy readout",
-            "status": "partial",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-411 EMERGENT_STRATEGY_READOUT",
             "rows": [
                 {
@@ -4515,7 +4535,8 @@
                     "requirement": "question_log.json pair authored for the new surface (question answered + earning item BL-411), drafted status acceptable pending Ben's wording.",
                     "result_metric": "question_log.json entry strategy_readout added, status drafted (wording is Ben's per convention); mirror regenerated."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "tech-effect-union",
@@ -4548,7 +4569,7 @@
             "brief": "law-author-and-treasury",
             "batch": "2026-08-19-watch-and-meta",
             "title": "BL-480 - law author + nation treasury (Sprint D3)",
-            "status": "partial",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-480 LAW_HAS_AN_AUTHOR",
             "rows": [
                 {
@@ -4569,13 +4590,14 @@
                     "requirement": "No player-reachable enact/repeal control remains (balance_ledger.cpp checkbox removed); enactment is generation-seeded by the author nation this sprint, seam shaped for the granted nation-grain scorer. LIVE check: the balance ledger renders its levy line read-only.",
                     "result_metric": "PARTIAL: checkbox + pending_law_toggle + executor + dictionary entry all removed (verifier-review: no orphan); ledger Laws section browse-only by code. The live look at the read-only levy line is Ben's. NOTE: the seeded 1.0/unit rate is a placeholder now biting — NR-382 holds the rate ruling; ai_skill bands left red-and-attributed, deliberately unblessed."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "era-minus1-conquest-assertion",
             "batch": "2026-08-20-four-lane",
             "title": "BL-384 - conquest assertion half (Sprint 27)",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-384 ERA_MINUS1_SIM_CONQUERS_NOTHING",
             "rows": [
                 {
@@ -4590,13 +4612,14 @@
                     "requirement": "The measured conquest, elimination and dominance numbers are recorded verbatim as the Sprint 28 baseline. No constant, seed or scorer term is changed to move them.",
                     "result_metric": null
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "road-network-cuts",
             "batch": "2026-08-20-four-lane",
             "title": "Sprint B2 - the three road_generation cuts",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "sprints.json B2 (road_generation.cpp:65,:90,:195)",
             "rows": [
                 {
@@ -4611,13 +4634,14 @@
                     "requirement": "A road may cross water and cross-water adjacency is honoured, so a coastal or island nation is reachable. Generation stays deterministic: same seed, same road set, verified by state_hash over two runs.",
                     "result_metric": null
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "settlement-density-clamp",
             "batch": "2026-08-20-four-lane",
             "title": "Sprint B3 + BL-463 - density clamp against the current map",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "sprints.json B3; backlog.json BL-463 SETTLEMENT_COUNT_IS_SEED_INVARIANT",
             "rows": [
                 {
@@ -4632,13 +4656,14 @@
                     "requirement": "BL-463: settlement count VARIES with seed across the census seed set - the count is no longer seed-invariant - while remaining deterministic per seed (same seed, same count, two runs).",
                     "result_metric": null
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "province-partition",
             "batch": "2026-08-20-four-lane",
             "title": "BL-466 - province partition (Lane C foundation)",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-466 PROVINCE_PARTITION",
             "rows": [
                 {
@@ -4653,7 +4678,8 @@
                     "requirement": "Serialisation seam: the province record is appended, no existing record reordered; a save written before this item still loads, and a round-trip is bit-identical.",
                     "result_metric": null
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "battle-state-in-world-first-cut",
@@ -4686,7 +4712,7 @@
             "brief": "tariff-and-money-conservation",
             "batch": "2026-08-20-four-lane",
             "title": "BL-392 then Sprint D4 - procurement conservation + the tariff",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-392 PROCUREMENT_CONTRACTS_DESTROY_VALUE; sprints.json D4",
             "rows": [
                 {
@@ -4707,13 +4733,14 @@
                     "requirement": "The tariff rate comes from the nation own law (BL-480 author field), not a constant. With no tariff law enacted, the world is bit-identical to a pre-item baseline (state_hash).",
                     "result_metric": null
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "province-render-and-selection",
             "batch": "2026-08-21-province-grain",
             "title": "BL-511 - province as rendered and selected unit (Lane R)",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-511 PROVINCE_AS_RENDER_UNIT",
             "rows": [
                 {
@@ -4734,13 +4761,14 @@
                     "requirement": "Every lens still renders. Each of the eleven overlay modes has a stated per-province reduction (mean, dominant, or a deliberate refusal) rather than silently showing one tile value for the whole province.",
                     "result_metric": null
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "unit-position-province-grain",
             "batch": "2026-08-21-province-grain",
             "title": "BL-511 seam half - march_unit retargets to province (Lane U)",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-511; NR-405",
             "rows": [
                 {
@@ -4761,13 +4789,14 @@
                     "requirement": "ACTIONS.json march_unit entry matches the seam exactly - the dictionary is transcribed from corp_command.hpp, so a disagreement means the dictionary is wrong.",
                     "result_metric": null
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "province-building-limit",
             "batch": "2026-08-21-province-grain",
             "title": "BL-513 - province building limit (Lane B)",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-513 PROVINCE_BUILDING_LIMIT",
             "rows": [
                 {
@@ -4788,13 +4817,14 @@
                     "requirement": "Any coefficient is PINNED BY MEASUREMENT against province_capacity_probe across the seed set, and the measured spread is recorded in the item. No number is picked. Generation output is unchanged where the ceiling does not bind (state_hash).",
                     "result_metric": null
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "supply-interdiction",
             "batch": "2026-08-21-province-grain",
             "title": "BL-458 - supply lines can be cut (Lane M)",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-458 SUPPLY_LINES_CANNOT_BE_CUT",
             "rows": [
                 {
@@ -4815,13 +4845,14 @@
                     "requirement": "BL-315 third reading is earned: there is now an act that makes pirate the honest description of a company.",
                     "result_metric": null
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "retain-heightmap",
             "batch": "2026-08-21-province-redesign",
             "title": "BL-517 - retain the generation heightmap (Sprint P1, H1)",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-517 RETAIN_HEIGHTMAP",
             "rows": [
                 {
@@ -4842,13 +4873,14 @@
                     "requirement": "Determinism unchanged: same seed, same heights, two runs. Capturing the value perturbs NO RNG stream - world_determinism and determinism_harness stay green, and if spectator_determinism's pinned golden moves that is reported and explained rather than re-blessed by the implementer.",
                     "result_metric": null
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "organic-province-borders",
             "batch": "2026-08-21-province-redesign",
             "title": "BL-515 - provinces grown from settlement, stopped by terrain (Sprint P1, O1)",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-515 ORGANIC_PROVINCE_BORDERS",
             "rows": [
                 {
@@ -4875,7 +4907,8 @@
                     "requirement": "The land-only invariant is NARROWED to land provinces rather than deleted (NR-428); ocean stays out of scope and belongs to BL-516. Serialisation properties the partition already proved stay green: one appender, no record reordered, an older stream still loads, round-trip bit-identical.",
                     "result_metric": null
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "tile-axis-split",
@@ -5023,7 +5056,7 @@
             "brief": "battle-surfaces",
             "batch": "2026-08-21-engagement-trigger",
             "title": "BL-468 + BL-469 - the battle dispatches and the battle card (Sprint C3)",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-468 BATTLE_DISPATCHES, BL-469 BATTLE_CARD",
             "rows": [
                 {
@@ -5098,13 +5131,14 @@
                     "verification": "review - src/ui/body_surface_canvas.cpp, src/core/verify_api.cpp",
                     "notes": "The battle arm was added to the same province_sync_entity reconciliation that already keeps entity and province exclusive, and clear_selection / select_battle both write the whole tuple. Verified by inspection rather than by harness: the reconciliation is a frame-loop property with no headless entry point."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "growth-extinguishes-war",
             "batch": "2026-08-21-lane-a-sprint-28",
             "title": "Sprint 28 (re-scoped) - a quarter of worlds fight no war, and the scorer is why",
-            "status": "partial",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-384 (restated 2026-08-21), sprints.json Sprint 28",
             "rows": [
                 {
@@ -5163,13 +5197,14 @@
                     "verification": "review - the sprint's own diff",
                     "notes": "Held. Nothing in this sprint touched a combat constant. The one change made is a FEASIBILITY GATE - an action that cannot be performed stops being offered - not a weight."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "national-budget",
             "batch": "2026-08-22-lane-n-sprint-n1",
             "title": "BL-537 - a nation spends its treasury down weighted priority lines",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-537 (designed 2026-08-22), sprints.json Sprint N1",
             "rows": [
                 {
@@ -5212,13 +5247,14 @@
                     "verification": "headless - tools/verify/nation_budget_harness.cpp",
                     "notes": null
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "sentiment-substrate",
             "batch": "2026-08-22-lane-n-sprint-n1",
             "title": "BL-545 - one directed continuous derived value under every relational read",
-            "status": "pending",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-545 (designed 2026-08-22, Ben ruling on NR-520), sprints.json Sprint N1",
             "rows": [
                 {
@@ -5269,7 +5305,8 @@
                     "verification": "headless - tools/verify/sentiment_harness.cpp",
                     "notes": null
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "value-anchor",
@@ -5548,7 +5585,7 @@
             "brief": "era-minus-one-fixture",
             "batch": "2026-08-23-bl-462-era-minus-one-fixture",
             "title": "Every Era -1 harness measured a sim the game does not run; the invocation now has one construction",
-            "status": "active",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-462 (HARNESSES_MEASURE_A_DIFFERENT_SIM_THAN_SHIPS, raised 2026-08-18, amended 2026-08-23 with the four further divergences BL-554 held before it was closed as a duplicate and superseded by BL-462)",
             "rows": [
                 {
@@ -5599,7 +5636,8 @@
                     "verification": "headless - tools/verify/history_conquest_gap.cpp (rows A1/R1/R2/R3/R4)",
                     "notes": "MUTATIONS RUN, one per row: A1 - null creeds in the re-run, and struct-default params. R1 - the round identity off by one (cleared_rounds == chosen + lost + 1). R2 - zero the chosen counter on every seed that fought, after classification, so only R2's universal clause can catch it. R3 - the all-zero placeholder table. R4 - trace the \"untraced\" control run, so the gating half sees non-empty counters. Each mutation turned its row red."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         },
         {
             "brief": "cadence-key",
@@ -5645,7 +5683,7 @@
             "brief": "nation-spines-live",
             "batch": "2026-08-23-sprint-n3-slice-1",
             "title": "Sprint N3 slice 1 — the nation spines go live: a nation authors its weights, spends its treasury, and a survey gets funded",
-            "status": "active",
+            "status": "cancelled",
             "promoted_from": "backlog.json BL-537 (NATIONAL_BUDGET), BL-542 (NATION_SCORER), BL-538 line 5 (public exploration, pulled forward per NR-567), BL-545 (SENTIMENT_SUBSTRATE decay) — Sprint N3, opened 2026-08-23",
             "rows": [
                 {
@@ -5717,7 +5755,8 @@
                     "result_metric": "OPEN: does not close at ~1.3% weight (needs ~89k cr treasury/survey); no levy enacted by default. See NR-572.",
                     "notes": "The boundary between wired (R1-R5, done) and playing. NR-572 options A-E; recommendation D then A. This row stays pending until Ben rules."
                 }
-            ]
+            ],
+            "resolution": "CANCELLED 2026-08-23 by the backlog purge: its item(s) are not in the rebuilt Sprint-16 backlog (see archive/backlog-purged-2026-08-23.json). Rows kept as history; reopen with the item if it is resurrected."
         }
     ]
 }

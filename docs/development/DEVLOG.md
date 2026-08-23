@@ -10,7 +10,52 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Housekeeping, and the nation spines go live (BL-568, Sprint N3 slice 1; NR-566–NR-572) (2026-08-23, latest)
+## Session — The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575) (2026-08-23, latest)
+
+**Runtime:** ~2.5 h wall-clock, mode Corpus then Design. Fan-out: 11 doc-sweep agents in place
+(disjoint files), one gap-map agent; main session took the rules, CLAUDE.md, the backlog.
+
+**Ruling 1 (Ben):** *authority docs drive development and we should strive to make sure they are
+correct when authored* — the time-slice rule (backlog owns a design while open, the doc once
+landed) is wrong. Replaced in `DELIVERY.md` § Design state and the standing rules: a settled
+design goes into its authority doc the moment it is settled; whether it is built is a backlog
+fact (`backlog_query.js --touches`). A BL id survives in a doc only as the owner of a design;
+dated rulings survive as provenance.
+
+**The sweep.** 62 docs under `docs/` (minus `development/` and the two generated mirrors)
+rewritten to present-tense design: 2,500 → 1,238 BL refs, zero "Build status" / "What is
+absent" sections, 71 files, −1,563 lines. Stripping history exposed false claims in most docs;
+those were rewritten from the code (terrain tables, `building_type` has eight values not six,
+29 recipes not three, ledger surfaces, pipeline order, the rivals' real verb set — no road, no
+demolish). Every deleted hole was audited against the backlog: 411 lines, 161 NO ITEM, 94 STALE,
+archived at `archive/doc-sweep-holes-2026-08-23.md`. Commit `fd386180`.
+
+**CLAUDE.md** is a router now (7.6K → 2.1K words): session-mode table first (Design / Light /
+Full / Corpus / Review / Rival), a complete one-line-per-doc map (24 docs had been unlisted),
+condensed method. Player identity and the syndicate tier moved to CONCEPT.md / GLOSSARY.md.
+
+**Incident.** A concurrent session committed three times in this checkout (17:18–17:34) and its
+path reset the working tree; every uncommitted edit was lost once and redone. CLAUDE.md now
+warns that the checkout is shared.
+
+**Ruling 2 (Ben):** *purge and regenerate backlog.json — many fewer items; address the earliest
+sprint which isn't complete, file completely new items which are relevant.* All 530 items are
+snapshotted verbatim in `archive/backlog-purged-2026-08-23.json`; the hot file holds ten new
+items for **Sprint 16, the mercenary vertical slice** (open since 2026-08-12, never finished):
+BL-569 (province holder), BL-570 (condition province subject + Lua contract templates), BL-571
+(nation garrisons, design-owed), BL-572 (contract offers, design-owed — absorbs Sprint N3 slice
+2 and NR-572), BL-573 (contract record and verbs), BL-574 (contract harness), BL-575 (unit
+marker and march UI), BL-576 (contracts ledger), BL-577 (messages, card, income line), BL-578
+(the playthrough and the v0.1.15 cut). Authored from a gap map that found every step of the
+loop absent or built for a different party. 39 requirement groups for purged items cancelled
+with a pointer; lint clean. Orphan holes from the sweep are **not** filed.
+
+**Open for Ben:** NR-573 (flat-statement call; MANUAL.md lost its built/designed marks), NR-574
+(Sprint 16 as target; Sprint N3's ids retired mid-flight), NR-575 (the six session modes).
+
+---
+
+## Session — Housekeeping, and the nation spines go live (BL-568, Sprint N3 slice 1; NR-566–NR-572) (2026-08-23)
 
 Full mode. Opened as branch housekeeping, became a phantom-feature triage and a
 Sprint N3 delivery. Runtime ~4h (estimate); one understand-workflow (13 agents),

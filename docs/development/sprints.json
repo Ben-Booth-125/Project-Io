@@ -319,13 +319,19 @@
       "closed_date": null,
       "goal": "The loop that makes the ancient product a game: a polity hires the company, the company fights, the company is paid — playable end-to-end, however rough. Cuts v0.1.15.",
       "planned": [
-        "BL-377 — mercenary contract seam (designed): offers, acceptance, the contracted fact, payment. The buy side exists (procurement.cpp); this is the sell side's first surface.",
-        "BL-315 — conflict spine (design-owed, A): promoted from v0.3.0 groundwork onto the critical path — a mercenary company's core loop is built entirely on Conflict, and nothing in the campaign layer commands resolve_battle today.",
-        "BL-378 — minimap base render (designed): the company's home, always on screen.",
-        "Riders as room allows: BL-398 (persona counsel tick cost)."
+        "BL-569 — province holder",
+        "BL-570 — condition province subject + contract templates",
+        "BL-571 — nation garrisons (design-owed)",
+        "BL-572 — contract offers (design-owed)",
+        "BL-573 — contract record and verbs",
+        "BL-574 — contract harness",
+        "BL-575 — unit marker and march UI",
+        "BL-576 — contracts ledger",
+        "BL-577 — contract messages, card, income line",
+        "BL-578 — mercenary slice playthrough, v0.1.15 cut"
       ],
       "risk": "BL-315 is the unknown: design-owed, priority A, the item the whole sprint leans on. If it sprawls, fallback is BL-377 against the existing battle resolution with the thinnest possible command surface.",
-      "notes": "Amendment 2026-08-15: three of four planned items are complete — BL-377 (mercenary contract seam), BL-378 (minimap base render) and BL-398 (persona counsel tick cost). The sprint then drifted: sessions that followed went to v0.1.16 work (spectator mode, decision feed, gate hygiene) rather than the two items that make the slice PLAY. BL-315 (conflict spine) is now designed rather than design-owed, so the sprint's stated risk did not materialise — it simply was not built. The remainder was re-planned as Sprint 18, and v0.1.15 stays uncut until it lands."
+      "notes": "Amendment 2026-08-15: three of four planned items are complete — BL-377 (mercenary contract seam), BL-378 (minimap base render) and BL-398 (persona counsel tick cost). The sprint then drifted: sessions that followed went to v0.1.16 work (spectator mode, decision feed, gate hygiene) rather than the two items that make the slice PLAY. BL-315 (conflict spine) is now designed rather than design-owed, so the sprint's stated risk did not materialise — it simply was not built. The remainder was re-planned as Sprint 18, and v0.1.15 stays uncut until it lands.\n\nRe-planned 2026-08-23 with the backlog purge (Ben: address the earliest incomplete sprint, file only what it needs). The gap map against the code found every step of the loop absent or built for a different party (corp-to-corp procurement, corp-to-corp battles, a contracted_force budget line with no producer). Planned set, in dependency order: BL-569 province holder; BL-570 condition province subject + Lua contract templates; BL-571 nation garrisons (design-owed); BL-572 contract offers (design-owed; absorbs Sprint N3 slice 2 and NR-572); BL-573 contract record and verbs; BL-574 contract harness; BL-575 unit marker and march UI; BL-576 contracts ledger; BL-577 messages, card and income line; BL-578 the playthrough and the v0.1.15 cut. Sprints 18 and 19's military-surface remainder is subsumed here."
     },
     {
       "id": "17",
@@ -1022,7 +1028,7 @@
     {
       "id": "16",
       "theme": "The mercenary vertical slice",
-      "state": "Open 2026-08-12 — BL-377 playable end-to-end + BL-315 on the critical path; cuts v0.1.15"
+      "state": "Open — re-planned 2026-08-23 on the purged backlog: BL-569..BL-578"
     },
     {
       "id": "18b",
@@ -1117,7 +1123,7 @@
     {
       "id": "N3",
       "theme": "The spines get a caller",
-      "state": "Planned"
+      "state": "Slice 1 landed 2026-08-23 (f5d68ff1); slice 2 is BL-572 in Sprint 16"
     },
     {
       "id": "N4",

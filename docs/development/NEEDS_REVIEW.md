@@ -2462,12 +2462,12 @@ Every authority doc under docs/ (minus development/, the generated mirrors ACTIO
 
 **Why it matters.** Every doc was a status snapshot that rotted between sessions; MILITARY.md alone carried two holes the code had already closed. The cost is that a doc no longer tells a reader what is missing — backlog_query.js --touches <doc> has to.
 
-### NR-574 — Orphan holes from the sweep were filed as backlog items AND gathered into one proposed sprint — reading 'authoring sprints comes first' as 'plan them, do not just pile them'
+### NR-574 — Backlog purged and rebuilt around Sprint 16 — orphan holes NOT filed; Sprint N3's items retired mid-flight
 *decision taken on your behalf · raised 2026-08-23 · from Ben, 2026-08-23: 'We should be filing items in the backlog, but I think authoring sprints comes first. We already have the problem of massive backlogs with items left behind for too long.'*
 
-Each 'What is absent' hole the sweep deleted was audited against the backlog. Holes with an owning open item were dropped from the doc (the item carries them). Holes with NO item were filed as backlog items so they have an id, and the whole set was written into sprints.json as one proposed sprint so they are planned rather than shelved. See the sweep's DEVLOG entry for the list.
+Ben, 2026-08-23: purge and regenerate backlog.json; many fewer items; address the earliest incomplete sprint and file only what it needs. Done: all 530 items snapshotted verbatim to archive/backlog-purged-2026-08-23.json; the hot file holds ten new items (BL-569..BL-578) for Sprint 16, the mercenary vertical slice, authored from a code gap map. The 161 NO-ITEM holes from the doc sweep are NOT filed — they live in archive/doc-sweep-holes-2026-08-23.md. 39 requirement groups for purged items were cancelled with a pointer. Two calls taken: (1) 'earliest incomplete sprint' read as Sprint 16 (open since 2026-08-12), not Sprint 4's C-route remainder; (2) Sprint N3 — being worked in another session today — loses its item ids (BL-537/538/542/545); its slice 2 (contracted force) continues as BL-572.
 
-**Why it matters.** The alternative reading — author a sprint INSTEAD of filing items — would leave the holes with no id and no home once the sprint closes.
+**Why it matters.** If another session is mid-way through N3 slice 2 under the old ids, its commit will reference items that no longer exist; resurrecting them is a copy from the snapshot.
 
 ### NR-575 — CLAUDE.md rewritten as a router: session-mode table first, complete doc map, condensed method — 7,578 → ~2,100 words
 *decision taken on your behalf · raised 2026-08-23 · from Ben, 2026-08-23: 'tonnes of information missing, trimming it to direct to authority docs, and determine which mode the session runs in is vital.'*
