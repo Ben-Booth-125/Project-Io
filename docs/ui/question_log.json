@@ -317,15 +317,17 @@
   "selection_unit_card": {
    "surface": "Selection band - Unit (Soldier) card (3-column band)",
    "answers": "What is this unit/unit-stack, how strong is it, what type is it, who owns it, and can I do anything with it?",
-   "because": "selection_kind::unit existed but fell through to the generic action/facts split with a bare Go to button - the only selection kind still on that path once the tile (BL-123) and building (BL-431 rework) cards moved to the 3-column band shape. BL-393 (UNITS_ARE_WRITE_ONLY_AND_INERT) already flags that units are largely inert in the live economy; Ben's direction was to build the CARD shape now anyway rather than wait on combat, so a unit selected today reads real unit_component fields (strength, count, roster type, owner) in the same picture/pager/actions shape as everything else, instead of standing out as the one kind that still looks unfinished. Paired with a repeat-click tile-cycle (Soldier -> Building -> Tile) in body_surface_canvas.cpp so a tile carrying a unit is actually reachable by clicking.",
+   "because": "selection_kind::unit existed but fell through to the generic action/facts split with a bare Go to button - the only selection kind still on that path once the tile (BL-123) and building (BL-431 rework) cards moved to the 3-column band shape. BL-393 (UNITS_ARE_WRITE_ONLY_AND_INERT) already flags that units are largely inert in the live economy; Ben's direction was to build the CARD shape now anyway rather than wait on combat, so a unit selected today reads real unit_component fields (strength, count, roster type, owner) in the same picture/pager/actions shape as everything else, instead of standing out as the one kind that still looks unfinished. Paired with a repeat-click tile-cycle (Soldier -> Building -> Tile) in body_surface_canvas.cpp so a tile carrying a unit is actually reachable by clicking. BL-575 (unit marker + march UI, 2026-08-23) answers the \"can I do anything with it\" half for real: the action grid gained March (arms province-picking on the Planetary canvas, then dispatches corp_verb::march_unit on the qualifying province click), Halt (clears the standing order) and Disband (permanent, confirm popup, no refund — MILITARY.md § Marching) alongside the existing Go to, replacing three of the five reserved slots. All three route through the SAME corp-command seam corp_ai scores for rival units, so the player takes no shortcut around it.",
    "backlog_item": [
-    "BL-393"
+    "BL-393",
+    "BL-575"
    ],
    "files": [
     "src/ui/selection_panel.cpp",
     "src/ui/selection_panel.hpp",
     "src/ui/ui_state.hpp",
-    "src/ui/body_surface_canvas.cpp"
+    "src/ui/body_surface_canvas.cpp",
+    "src/core/app.cpp"
    ],
    "status": "drafted"
   },
@@ -460,6 +462,22 @@
     "src/ui/body_surface_canvas.cpp",
     "src/ui/icons.cpp",
     "src/ui/icons.hpp"
+   ],
+   "status": "drafted"
+  },
+  "unit_marker": {
+   "surface": "Unit marker (Planetary canvas, province anchor tile)",
+   "answers": "Where are my (and my rivals') forces standing, and whose are they?",
+   "because": "Units had no on-canvas glyph at all before this (ICONS.md previously documented Unit as \"(no glyph)\"), reachable only by clicking the exact tile a unit stood on or cycling into it — a large province full of units was otherwise invisible on the map. BL-511 made a unit's command grain the PROVINCE (march_unit targets a province, not a tile), so the marker follows the same province-anchor convention the battle marker already established: drawn once per (province, owner) GROUP at the province's lowest-member-tile anchor, with a \"+N\" count badge for more than one unit in the group, rather than once per unit or per tile. The humanoid silhouette echoes the unit card's own placeholder glyph (glyph_soldier) so the canvas and the card read as one vocabulary. Carries a stub ring for contract-committed units (always false today; BL-573, a later wave of the same Sprint 16 batch, adds the real per-unit flag) so that later item needs no further UI plumbing change.",
+   "backlog_item": [
+    "BL-575",
+    "BL-511"
+   ],
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/icons.cpp",
+    "src/ui/icons.hpp",
+    "src/ui/ui_state.hpp"
    ],
    "status": "drafted"
   },

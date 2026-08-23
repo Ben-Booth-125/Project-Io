@@ -2288,6 +2288,77 @@ void app::render()
         m_ui.pending_survey_dispatch = null_entity; // consume the request
     }
 
+    // March / Halt / Disband (BL-575) — the unit card's three presses, all
+    // routed through the SAME corp_verb seam corp_ai scores for rival units
+    // (MILITARY.md § Marching); the player takes no shortcut around it. March
+    // is two-step: the card press only ARMS `pending_march_unit`, and the
+    // Planetary canvas fills `pending_march_dest_province` on the qualifying
+    // province click (body_surface_canvas.cpp), so this only fires once both
+    // halves are in.
+    if (m_ui.pending_march_unit != null_entity && m_ui.pending_march_dest_province != 0)
+    {
+        corp_command cmd;
+        cmd.tick     = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp     = m_world.player_entity;
+        cmd.verb     = corp_verb::march_unit;
+        cmd.subject  = m_ui.pending_march_unit;
+        cmd.province = m_ui.pending_march_dest_province;
+        const auto r = apply_corp_command(m_world, m_registry, cmd);
+        switch (r)
+        {
+            case corp_command_result::applied:
+                m_ui.construction.last_message = "Marching."; break;
+            case corp_command_result::rejected_state:
+                // Already there, or in a battle — MILITARY.md § Marching's
+                // "walking away from contact is a priced withdrawal, never a
+                // march" (withdraw_from_battle is the card's separate press).
+                m_ui.construction.last_message = "Can't march — already there, or in a fight.";
+                break;
+            default:
+                m_ui.construction.last_message = "Can't march there."; break;
+        }
+        m_ui.pending_march_unit          = null_entity; // consume the request
+        m_ui.pending_march_dest_province = 0;
+    }
+
+    if (m_ui.pending_halt_unit != null_entity)
+    {
+        corp_command cmd;
+        cmd.tick    = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp    = m_world.player_entity;
+        cmd.verb    = corp_verb::halt_unit;
+        cmd.subject = m_ui.pending_halt_unit;
+        const auto r = apply_corp_command(m_world, m_registry, cmd);
+        m_ui.construction.last_message =
+            (r == corp_command_result::applied) ? "Halted." : "Already halted.";
+        m_ui.pending_halt_unit = null_entity; // consume the request
+    }
+
+    if (m_ui.pending_disband_unit != null_entity)
+    {
+        const entity_id doomed = m_ui.pending_disband_unit;
+        corp_command    cmd;
+        cmd.tick    = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp    = m_world.player_entity;
+        cmd.verb    = corp_verb::disband_unit;
+        cmd.subject = doomed;
+        const auto r = apply_corp_command(m_world, m_registry, cmd);
+        if (r == corp_command_result::applied)
+        {
+            m_ui.construction.last_message = "Disbanded.";
+            // Same dangling-selection guard as the demolish path just above:
+            // the entity no longer exists, and manpower gets no refund
+            // (MILITARY.md § Marching), so there is nothing left to inspect.
+            if (m_ui.selected_entity == doomed)
+                m_ui.selected_entity = null_entity;
+        }
+        else
+        {
+            m_ui.construction.last_message = "Couldn't disband that.";
+        }
+        m_ui.pending_disband_unit = null_entity; // consume the request
+    }
+
     // Order-book presses (BL-293) — same seam-consuming shape as the survey
     // dispatch above, applied through apply_corp_command so the player's press
     // and a rival corp's command share one implementation. A rejection is not
