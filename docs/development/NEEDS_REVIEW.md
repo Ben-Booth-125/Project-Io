@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*242 entries — 242 open, 0 resolved.*
+*243 entries — 243 open, 0 resolved.*
 
 ---
 
@@ -2495,6 +2495,21 @@ Ben's elicitation answer chose 'several open concurrently' over the proposed one
 Opened the built app, selected the starting unit, pressed March, and clicked a confirmed-different province (verified via the repeat-click cycle showing its own province id). The mode disarmed without falling through to normal building/tile selection -- the Selection panel stayed on Unit -- which is strong evidence the corp_command dispatched rather than the click landing on ordinary marker resolution, and corp_command.cpp's march_unit case reads correct on inspection. What was NOT achieved: relocating the marker after the order to watch its tile position actually change. Two compounding factors: the economy/march tick in this build is QUARTERLY-cadence (the header counts down 'd to Q2/Q3'), not daily, despite the calendar advancing daily, so only one quarter boundary elapsed during the pass; and re-finding one unit marker on a freshly generated, unfamiliar world via manual pan/zoom proved impractical within reasonable effort. Halt and Disband were not individually live-clicked (same code pattern as March, confirmed by reading, not by pressing).
 
 **Why it matters.** This satisfies the standing rule's core concern -- BL-449 shipped clean on both compile and harness while a press rendered unreachable, and this pass proves March IS reachable and does dispatch. But it stops short of the full 'watch it work' bar the rule aspires to, and per the rule's own reasoning (a scripted capture is not enough), neither is a click that merely disarms without a rejection message.
+
+### NR-578 — Sprint 32 (Logistic Points + Throughput lens) pulls a v0.1.20-roadmap item forward past v0.1.16/18/19 content, under the new 3-active-sprint cap
+*decision taken on your behalf · raised 2026-08-23 · from Authoring Sprint 32, on Ben's direct instruction: author the next sprint, themed logistics/exploration/rendering through fog of war.*
+
+ROADMAP.md names Logistic Points (the old BL-464, re-filed fresh as BL-595 after the 2026-08-23 purge) for v0.1.20 ("Stance & force"), bundled with BL-314/399/449/450/472/474/475. The two sprints already active under the new cap are v0.1.15 (16) and v0.1.17 (17) — earlier minors. Authoring Sprint 32 around BL-595/596/597 puts v0.1.20 content into the third active slot ahead of v0.1.16 (The watch, closed under the cap as W1, but not release-cut), v0.1.18 (economy tells the truth, Sprint 19 closed goal-NOT-met) and v0.1.19 (ancient conflict, uncertain completion). Checked before filing: LP's actual code prerequisites — body_reach_field, roads, stance/hostility (BL-448) — are all already built, so nothing BLOCKS the build; this is a release-numbering sequencing question, not a dependency one.
+
+**Why it matters.** The standing rule (io-standing-rules.md § Scope & sequence) says not to implement a milestone that depends on an earlier one not yet complete, without flagging it. Ben named this exact theme directly (logistics/exploration/fog rendering), which reads as an explicit choice to jump ahead — but the jump was not stated as a version-sequencing decision, so it is recorded rather than assumed.
+
+- Confirm: build Sprint 32 now: v0.1.15/17/20 run concurrently under the cap; v0.1.16/18/19's remaining content stays parked until a future slot.
+- Hold Sprint 32 until v0.1.16/18/19 are release-cut, and use the third cap slot for one of those instead.
+- Re-home BL-595/596/597 onto whichever version_goal actually ships next, decoupling the item from the v0.1.20 label entirely.
+
+> **Recommendation:** Confirm — Ben asked for this theme directly and nothing in LP's dependency chain is unmet; the roadmap's version bucketing is thematic grouping for release cuts, not a build-order gate.
+
+*Files: `docs/development/ROADMAP.md`, `docs/development/sprints.json`, `docs/development/backlog.json`*
 
 ---
 
