@@ -366,9 +366,32 @@ bool request_withdraw(world& w, entity_id corp, uint32_t province, entity_id aga
 
 entity_id active_mercenary_contract_for(const world& w, entity_id corp, uint32_t province)
 {
-    (void)w; (void)corp; (void)province;
-    // STUB (BL-571). See this function's own doc comment (battle_system.hpp):
-    // no contract store exists in `world` until BL-573 lands. Always "none".
+    // BL-573 (contract templates) landed: `world::mercenary_contracts` is now
+    // the real store this function was always going to read. "Active" reads
+    // `mercenary_contract_state::active` — a terminal contract (completed,
+    // failed, abandoned) is no longer the hostility for this pair, which is
+    // exactly "cleared at the contract's terminal state, never by a corp
+    // verb" (MILITARY.md § Nation garrisons): there is no separate stance row
+    // to clear, because this lookup IS the hostility signal.
+    //
+    // RETURN VALUE NOTE. This function's signature predates BL-573 and reads
+    // "returns the contract's entity id" — but `mercenary_contract::id`
+    // (like `mercenary_offer::id` before it, BL-572) is a uint32_t HANDLE
+    // from its own allocator, not an `entity_id` from `world::create_entity`;
+    // casting one into the other would be exactly the kind of silent id-space
+    // conflation the untrusted-seam rule exists to catch elsewhere. Every
+    // caller (run_battles, below) only compares the result against
+    // `null_entity`, so the value returned when one IS found is a sentinel
+    // that is honestly non-null rather than a borrowed number dressed as an
+    // identity — `corp` itself, which is already known non-null by the time
+    // one is found.
+    for (const mercenary_contract& c : w.mercenary_contracts)
+    {
+        if (c.state != mercenary_contract_state::active)
+            continue;
+        if (c.contractor == corp && c.province == province)
+            return corp;
+    }
     return null_entity;
 }
 

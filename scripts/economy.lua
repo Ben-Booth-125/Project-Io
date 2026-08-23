@@ -311,9 +311,19 @@ economy = {
     -- contract_cancelled Trust weights are seeded from procurement's
     -- reputation_on_complete / reputation_on_cancel above (BL-546), and every
     -- other factor stays at zero until its emitter lands.
+    --
+    -- BL-573: contract_failed is the mercenary contract's own third terminal
+    -- state (CONTRACTS.md § Q2 has no procurement analog to seed from, unlike
+    -- the two above). Authored directly here at DOUBLE reputation_on_cancel's
+    -- magnitude (-2.0) — a round, legible number that satisfies CONTRACTS.md's
+    -- "failed... down hardest" ordering against contract_cancelled's "down,
+    -- but less". Iterate by playtest; nothing else derives this figure.
     sentiment = {
         trust_decay_per_tick  = 0.074125,
         access_decay_per_tick = 0.074125,
+        factors = {
+            contract_failed = { trust = -4.0 },
+        },
     },
 
     -- BL-430: switching a processing_facility's recipe through the player-grade

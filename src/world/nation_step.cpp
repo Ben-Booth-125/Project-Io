@@ -1,6 +1,7 @@
 #include "nation_step.hpp"
 
 #include "components.hpp"
+#include "condition_set.hpp" // BL-573: evaluate_condition, the contract predicate
 #include "economy_system.hpp"
 #include "hex_neighbors.hpp" // BL-572: border-tile adjacency, mirroring nation_generation.cpp's own
 #include "logistics.hpp"     // BL-572: body_tile_grid, for the same
@@ -21,7 +22,7 @@
 #include <vector>
 
 void run_nation_step(world& w, const recipe_registry& reg, economy_report& report,
-                     int econ_tick)
+                     int econ_tick, const contract_template_registry& templates)
 {
     // ---- 1. Score: the nations due this tick overwrite their slot -----------
     const nation_ai_params& p = reg.nation_ai();
@@ -96,6 +97,106 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // it landed second — the two lines draw the same treasury independently
     // and neither reads the other's spend this tick.
     derive_contract_offers(w, reg, econ_tick);
+
+    // ---- 7. Mercenary contract evaluation (BL-573) — pay or fail -----------
+    // See nation_step.hpp's own comment on run_mercenary_contract_tick for
+    // the four moves and why "after run_battles" is already satisfied by
+    // this pass's position in the tick.
+    run_mercenary_contract_tick(w, reg, templates, econ_tick);
+}
+
+void run_mercenary_contract_tick(world& w, const recipe_registry& reg,
+                                 const contract_template_registry& templates,
+                                 int econ_tick)
+{
+    if (w.mercenary_contracts.empty())
+        return; // EMPTY IN EVERY GENERATED WORLD until accept_offer is issued.
+
+    // Ascending id — a plain sort of what is, in practice, a short vector;
+    // determinism is the requirement, not throughput (see the file comment).
+    std::vector<std::size_t> order(w.mercenary_contracts.size());
+    for (std::size_t i = 0; i < order.size(); ++i)
+        order[i] = i;
+    std::sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+        return w.mercenary_contracts[a].id < w.mercenary_contracts[b].id;
+    });
+
+    for (const std::size_t idx : order)
+    {
+        mercenary_contract& c = w.mercenary_contracts[idx];
+        if (c.state != mercenary_contract_state::active)
+            continue;
+
+        // A stale/out-of-range template index cannot have been written by
+        // accept_offer (it copies `mercenary_offer::template_index`
+        // verbatim, and derive_contract_offers only ever issues offers
+        // against a real registry row) — but a corrupt or hand-built world
+        // is not this pass's job to diagnose, so it is read defensively
+        // rather than asserted: an unresolvable contract simply never
+        // settles, which is the least surprising failure mode short of a
+        // crash.
+        if (c.template_index < 0 ||
+            static_cast<std::size_t>(c.template_index) >= templates.size())
+            continue;
+        const contract_template& tmpl = templates.at(static_cast<std::size_t>(c.template_index));
+
+        condition pred = tmpl.predicate;
+        pred.province  = c.province; // bound per accepted offer — never authored
+
+        const bool holds_now = evaluate_condition(pred, w, c.contractor);
+
+        bool settle_completed = false;
+        bool settle_failed    = false;
+
+        if (tmpl.continuous)
+        {
+            // "hold": the predicate must hold on EVERY tick up to the
+            // deadline, or the contract fails EARLY — it does not wait.
+            if (!holds_now)
+                settle_failed = true;
+            else if (econ_tick >= c.deadline)
+                settle_completed = true; // held throughout, to and including this tick
+        }
+        else
+        {
+            // "take": the predicate need only hold AT the deadline — losing
+            // and retaking the province before then still completes it.
+            if (econ_tick >= c.deadline)
+                settle_completed = holds_now;
+            settle_failed = (econ_tick >= c.deadline) && !holds_now;
+        }
+
+        if (settle_completed)
+        {
+            const float remainder = c.fee - c.deposit_paid;
+            // See accept_offer's own comment (corp_command.cpp) for why this
+            // is a direct transfer: the full fee already left the client
+            // nation's treasury when the originating offer's escrow filled,
+            // so this is disbursing money already reserved, not a fresh
+            // budget claim.
+            if (remainder > 0.0f)
+            {
+                const auto cit = w.corporations.find(c.contractor);
+                if (cit != w.corporations.end())
+                    cit->second.balance += remainder;
+            }
+            c.state = mercenary_contract_state::completed;
+            w.note_conduct(reg.sentiment(), c.client, c.contractor,
+                           sentiment_factor_kind::contract_completed);
+        }
+        else if (settle_failed)
+        {
+            // Nothing paid beyond the deposit already credited at
+            // accept_offer — CONTRACTS.md § Q2: "you are not paid for
+            // trying". The reserved remainder is not disbursed to anyone; it
+            // was already spent, from the client's perspective, the moment
+            // the escrow that funded it left the treasury.
+            c.state = mercenary_contract_state::failed;
+            w.note_conduct(reg.sentiment(), c.client, c.contractor,
+                           sentiment_factor_kind::contract_failed);
+        }
+        // else: still active, judged again next tick.
+    }
 }
 
 void run_nation_garrison_upkeep(world& w, const recipe_registry& reg)

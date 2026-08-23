@@ -558,6 +558,14 @@
    "The BATTLE CARD in the Selection element (BL-469, landed 2026-08-21): select a live battle and its 'Break off' press sits under the withdrawal price, with a confirm popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card."
   ],
   [
+   "gameplay.accept_offer",
+   "A corp_verb on the corp-command seam (ProjectIo --serve, COMMAND opcode). No in-app press yet — the Contracts ledger (BL-576, a later wave) is the intended surface; this item is the data model and the two verbs only."
+  ],
+  [
+   "gameplay.abandon_contract",
+   "A corp_verb on the corp-command seam (ProjectIo --serve, COMMAND opcode). No in-app press yet — see accept_offer's own surface note."
+  ],
+  [
    "chrome.quick_save_key",
    "Keyboard."
   ],

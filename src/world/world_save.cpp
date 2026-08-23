@@ -48,6 +48,7 @@ constexpr auto max_season     = season::winter;
 constexpr auto max_battle_res = battle_result::defender_victory;
 constexpr auto max_battle_end = campaign_battle_end::stalemate;
 constexpr auto max_withdraw   = withdrawing_side::defender;
+constexpr auto max_contract_state = mercenary_contract_state::abandoned; // BL-573
 
 // ---------------------------------------------------------------------------
 // Component writers / readers
@@ -418,6 +419,33 @@ bool r_offer(std::istream& i, mercenary_offer& m)
           && r_int(i, m.issued_tick) && r_f32(i, m.offer_escrow)))
         return false;
     return std::isfinite(m.fee) && std::isfinite(m.offer_escrow);
+}
+
+/// BL-573: an accepted mercenary contract. Rejects a non-finite `fee`/
+/// `deposit_paid` on the same grounds `r_offer` does above.
+void w_mercenary_contract(std::ostream& o, const mercenary_contract& c)
+{
+    w_u32(o, c.id);
+    w_id(o, c.client);
+    w_id(o, c.contractor);
+    w_int(o, c.template_index);
+    w_u32(o, c.province);
+    w_f32(o, c.fee);
+    w_f32(o, c.deposit_paid);
+    w_int(o, c.deadline);
+    w_int(o, c.accepted_tick);
+    w_id_array(o, c.units);
+    w_enum(o, c.state);
+}
+
+bool r_mercenary_contract(std::istream& i, mercenary_contract& c)
+{
+    if (!(r_u32(i, c.id) && r_id(i, c.client) && r_id(i, c.contractor)
+          && r_int(i, c.template_index) && r_u32(i, c.province) && r_f32(i, c.fee)
+          && r_f32(i, c.deposit_paid) && r_int(i, c.deadline) && r_int(i, c.accepted_tick)
+          && r_id_array(i, c.units) && r_enum(i, c.state, max_contract_state)))
+        return false;
+    return std::isfinite(c.fee) && std::isfinite(c.deposit_paid);
 }
 
 void w_condition(std::ostream& o, const condition& c)
@@ -801,6 +829,12 @@ void write_world_snapshot(const world& w, std::ostream& out)
     // id a live offer already holds.
     w_u32(out, w.next_offer_id);
     w_vec(out, w.mercenary_offers, w_offer);
+
+    // --- accepted mercenary contracts (BL-573), the v8 trailing section -----
+    // Same shape as mercenary_offers above: live tick state, its own section,
+    // allocator cursor travels with it.
+    w_u32(out, w.next_contract_id);
+    w_vec(out, w.mercenary_contracts, w_mercenary_contract);
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -964,6 +998,12 @@ bool read_world_snapshot(world& w, std::istream& in)
     if (!(r_u32(in, next_offer) && r_vec(in, s.mercenary_offers, r_offer)))
         return false;
     s.next_offer_id = next_offer;
+
+    // BL-573: accepted mercenary contracts, format v8's trailing section.
+    uint32_t next_contract = 1;
+    if (!(r_u32(in, next_contract) && r_vec(in, s.mercenary_contracts, r_mercenary_contract)))
+        return false;
+    s.next_contract_id = next_contract;
 
     clear_derived_state(s);
     w = std::move(s); // replace only on full success

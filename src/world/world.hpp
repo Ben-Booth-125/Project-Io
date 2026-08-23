@@ -173,6 +173,107 @@ struct mercenary_offer
     float offer_escrow = 0.0f;
 };
 
+// ---------------------------------------------------------------------------
+// mercenary_contract (BL-573) — an accepted offer, evaluated every tick
+// ---------------------------------------------------------------------------
+// docs/economy/CONTRACTS.md § The mercenary contract. `accept_offer`
+// (corp_command.cpp) consumes a `mercenary_offer` and creates one of these;
+// the tick-evaluation pass (`run_mercenary_contract_tick`, nation_step.cpp,
+// called from `run_nation_step` after `run_battles` has run this tick inside
+// `run_economy_step`) walks `world::mercenary_contracts` and resolves each
+// ACTIVE row toward a terminal state. UNLIKE an offer or a procurement quote,
+// a terminal contract is NOT erased — `state` is the field that says a record
+// is done, so a ledger surface (BL-576, a later wave) has something to show
+// for a contract that finished, and `active_mercenary_contract_for`
+// (battle_system.cpp) has a state to filter on rather than a second store to
+// consult.
+enum class mercenary_contract_state : uint8_t
+{
+    active = 0,   ///< Live: the tick pass still evaluates it.
+    completed,    ///< The predicate held (continuous: every tick; take: at the deadline).
+    failed,       ///< The predicate came up false — continuous: any tick; take: at the deadline.
+    abandoned,    ///< The CONTRACTOR walked away (`abandon_contract`), same money outcome as failed.
+};
+
+/// An accepted mercenary-contract offer (BL-573). "A contract is a
+/// condition_set the client will pay to have become true, by a deadline" —
+/// CONTRACTS.md's spine. The predicate itself is not stored here: `template_index`
+/// is the SAME "index into the authored table" convention `mercenary_offer`
+/// uses (CONTRACTS.md § Serialisation), and `province` binds the template's
+/// unbound predicate to the one this offer was for (contract_template.hpp's
+/// own comment: the province is bound per accepted offer, never authored).
+struct mercenary_contract
+{
+    /// Stable handle, allocated by `world::allocate_contract_id()`.
+    uint32_t id = 0;
+
+    /// The nation whose budget funded the originating offer — CONTRACTS.md's
+    /// "client". The sentiment OBSERVER on every terminal-state note_conduct
+    /// call: the nation forms an opinion of the contractor from how the job went.
+    entity_id client = null_entity;
+
+    /// The corporation that accepted the offer — CONTRACTS.md's "the company".
+    /// The sentiment SUBJECT.
+    entity_id contractor = null_entity;
+
+    /// Index into `contract_template_registry` — copied from the originating
+    /// `mercenary_offer::template_index` at `accept_offer` time. Names the
+    /// predicate and the continuous/point-in-time reading the tick-evaluation
+    /// pass binds `province` (below) onto.
+    int template_index = 0;
+
+    /// The province this contract's predicate is bound to — copied from the
+    /// originating offer's `target_province`.
+    uint32_t province = 0;
+
+    /// The full fee — copied from the originating offer's `fee` at accept
+    /// time. `completed` pays the BALANCE (`fee - deposit_paid`); `failed`/
+    /// `abandoned` pay nothing further (CONTRACTS.md § Q2: "you are not paid
+    /// for trying").
+    float fee = 0.0f;
+
+    /// Credits already paid to the contractor at `accept_offer` time — the
+    /// split-payment deposit (CONTRACTS.md § Serialisation: "reuses BL-095's
+    /// construction pacing model"). Paid directly from the offer's own
+    /// already-fully-funded escrow (see accept_offer's own comment in
+    /// corp_command.cpp for why this is a direct transfer, not a fresh
+    /// nation-budget claim).
+    float deposit_paid = 0.0f;
+
+    /// The econ tick this contract's predicate is judged against. Copied from
+    /// the originating offer's `deadline` (itself fixed at offer-issuance from
+    /// the template's `deadline_ticks` — "the deadline runs from the template,
+    /// independent of how long the escrow took to fill", CONTRACTS.md § Fee).
+    int deadline = 0;
+
+    /// The econ tick `accept_offer` was applied — observability only; nothing
+    /// currently reads it besides a save round-trip and a future ledger.
+    int accepted_tick = 0;
+
+    /// The committed force, a fixed-capacity array of unit ids (unused slots
+    /// are `null_entity`). Set once, at `accept_offer`, from the corp's OWN
+    /// units named on the command — "the player chooses the force, the
+    /// contract never does" (CONTRACTS.md Q1). Committing a unit sets no flag
+    /// on its position or order: `march_unit` stays free (MILITARY.md §
+    /// Marching), only `disband_unit` and a second `accept_offer` are gated —
+    /// see corp_command.cpp's disband_unit case and accept_offer's
+    /// double-commit check.
+    std::array<entity_id, mercenary_contract_max_units> units{};
+
+    mercenary_contract_state state = mercenary_contract_state::active;
+};
+
+/// True iff @p unit appears in @p c's committed force. The single predicate
+/// `disband_unit` (corp_command.cpp) and accept_offer's double-commit check
+/// both read, so the two cannot disagree about what "committed" means.
+inline bool mercenary_contract_has_unit(const mercenary_contract& c, entity_id unit)
+{
+    for (const entity_id u : c.units)
+        if (u == unit)
+            return true;
+    return false;
+}
+
 /// ECS registry. Entities are plain integer IDs; components are stored in
 /// per-type maps. The registry owns all component data for the lifetime of
 /// the simulation.
@@ -599,6 +700,23 @@ struct world
     /// the middle of `mercenary_offers`, so an id must not come back.
     uint32_t next_offer_id = 1;
     uint32_t allocate_offer_id() { return next_offer_id++; }
+
+    /// Accepted mercenary contracts (BL-573) — see `mercenary_contract`'s own
+    /// comment. A VECTOR, kept in ISSUANCE (accept) order; a terminal record
+    /// is never erased (unlike `mercenary_offers`/`procurement_quotes`), so a
+    /// walk over it for the tick-evaluation pass filters on `state == active`
+    /// rather than the vector's emptiness. EMPTY IN EVERY GENERATED WORLD —
+    /// the same inertness proof `mercenary_offers` carries: nothing creates
+    /// one until `accept_offer` is issued.
+    std::vector<mercenary_contract> mercenary_contracts;
+
+    /// Next stable contract handle. Same "stable across a sibling's
+    /// terminal-but-not-erased entry, unlike a vector index" contract as
+    /// `next_offer_id` — kept even though nothing currently erases from this
+    /// vector, so a future change that does start erasing cannot silently
+    /// start reusing ids.
+    uint32_t next_contract_id = 1;
+    uint32_t allocate_contract_id() { return next_contract_id++; }
 
     /// A supplier's standing embargo predicate (BL-350's Q2, the law/embargo
     /// decline condition) — keyed by the SUPPLIER corp; `request_quote`

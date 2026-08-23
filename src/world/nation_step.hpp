@@ -1,4 +1,5 @@
 #pragma once
+#include "contract_template.hpp" // BL-573: contract_template_registry, threaded in below
 #include "entity.hpp"
 #include "nation_ai.hpp"
 
@@ -76,8 +77,18 @@ struct earmark_result
 /// balances, the survey store (via `dispatch_survey`) and `w.nation_budgets`;
 /// nothing else. Appends to `report.national_budget`, `report.nation_scores`,
 /// `report.earmarks` and `report.budgets[corp].subsidies`.
+///
+/// @param templates BL-573: the authored contract-template roster
+///                  (contract_template_registry, loaded from
+///                  scripts/contracts.lua at the app-layer boundary exactly
+///                  where `reg` itself is — see main.cpp/app.cpp's
+///                  `load_economy`). Threaded through so
+///                  `run_mercenary_contract_tick` (below) can read a
+///                  contract's predicate and continuous/point-in-time
+///                  reading; `run_nation_step` itself does not otherwise
+///                  touch it.
 void run_nation_step(world& w, const recipe_registry& reg, economy_report& report,
-                     int econ_tick);
+                     int econ_tick, const contract_template_registry& templates);
 
 // ---------------------------------------------------------------------------
 // BL-571 — garrison upkeep, the `military_research` line's first consumer
@@ -227,3 +238,51 @@ struct contract_offer_params
 /// @param params    Tunables. Defaults are the values named above.
 void derive_contract_offers(world& w, const recipe_registry& reg, int econ_tick,
                             const contract_offer_params& params = {});
+
+// ---------------------------------------------------------------------------
+// BL-573 — the mercenary contract tick: evaluate, then pay or fail
+// ---------------------------------------------------------------------------
+// docs/economy/CONTRACTS.md § Q2. Called from `run_nation_step`, AFTER
+// `derive_contract_offers` — "Tick evaluation after run_battles" (the item's
+// own brief) is already satisfied by THAT position: `run_battles` runs inside
+// `run_economy_step`, which every driver calls strictly before
+// `run_nation_step` (dispatch/advance convoys -> run_economy_step ->
+// clear_markets -> apply_budget -> run_nation_step -> advance_tech_gates),
+// so `w.province_holder` already reflects this tick's battles by the time
+// this pass reads it.
+//
+// ONE PASS, over `w.mercenary_contracts` in ASCENDING id (a plain sort of a
+// small vector — a campaign holds a handful of live contracts, never
+// thousands), for every row still `active`:
+//
+//  1. BIND. Clone the template's predicate (`templates.at(c.template_index)`)
+//     and set its `province` qualifier to `c.province` — the same "the
+//     province is bound per accepted offer, never authored" rule
+//     contract_template.hpp's own comment states.
+//  2. CONTINUOUS EARLY-FAIL. If the template is `continuous` ("hold") and the
+//     bound predicate reads false RIGHT NOW, the contract fails immediately —
+//     it does not wait for the deadline. A "take" (continuous == false) is
+//     never failed early: losing and retaking the province before the
+//     deadline still completes it (CONTRACTS.md's own framing).
+//  3. DEADLINE. Once `econ_tick >= c.deadline`: a continuous contract that
+//     reached here without failing step 2 on any prior tick completes
+//     unconditionally (it has held throughout); a point-in-time contract
+//     is judged by the predicate's value AT this tick — true completes,
+//     false fails. A contract whose deadline has not yet arrived and which
+//     has not failed step 2 simply stays `active` and is read again next
+//     tick.
+//  4. SETTLE. `completed` pays the balance of the fee (`fee - deposit_paid`)
+//     directly to the contractor's balance — see accept_offer's own comment
+//     (corp_command.cpp) for why this is a direct transfer rather than a
+//     fresh nation-budget claim, and folds `sentiment_factor_kind::
+//     contract_completed`. `failed` pays nothing further and folds
+//     `contract_failed` — CONTRACTS.md's "you are not paid for trying",
+//     measurably the harder move (see sentiment.hpp's own comment on the
+//     factor and scripts/economy.lua's authored magnitude).
+//
+// DETERMINISTIC: `w.mercenary_contracts` walked by a stable sort on
+// ascending id (ties impossible — ids are unique); `evaluate_condition` is
+// pure; `note_conduct` is a single deterministic fold per settled contract.
+void run_mercenary_contract_tick(world& w, const recipe_registry& reg,
+                                 const contract_template_registry& templates,
+                                 int econ_tick);
