@@ -114,6 +114,11 @@ open, doc once landed — which made every doc a status snapshot that rotted bet
 The backlog accretes across sessions, so two items — or an item and older prose — can describe the
 same subject differently:
 
+- **Grep the backlog for the SUBJECT before authoring an item** (Ben, 2026-08-23, ruling on NR-556)
+  — `node tools/session/backlog_query.js --grep <subject>`, and `--touches <file>` where the item
+  names files. `next_id.js` guards the *id*; nothing guarded the *subject*, and a new item was
+  written for a defect a priority-A item already owned, naming the same divergence at the same line
+  numbers. It costs a second, and the duplicate costs a session.
 - **Timestamp a new item** (the `written` field / a `*(Written YYYY-MM-DD, trigger)*` note).
 - **Newest wins on conflict, and a present timestamp is never ignored** — a dated item outranks
   undated prose; between two dated statements the later wins. Do not discount a timestamp because

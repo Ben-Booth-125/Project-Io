@@ -672,6 +672,31 @@ only when building outside the CMake tree.
 
 ## Procedure
 
+0. **No configured build tree? Use the one-line builder** (Ben, 2026-08-23, ruling on NR-392):
+
+   ```
+   node tools/verify/build_harness.js <name> [--run] [--debug]
+   ```
+
+   This is the path for a **worktree agent**, a **fresh clone**, or any session whose network
+   policy refuses FetchContent — `cmake -B build` pulls SDL3, Lua, sol2 and ImGui from
+   codeload.github.com, which some sessions get a 403 for, and none of it is needed for a headless
+   check. It replaces two ad-hoc recipes that said the same thing in two dialects: the
+   agent-authored `build_gen_harness.bat`, and the Linux lib-then-link recipe.
+
+   It globs **every `src/world/*.cpp` minus the four sol2/Lua TUs** — the same set CMake's
+   `io_world_obj` uses — so the source list cannot rot the way a hand-picked one does. It picks
+   `cl` behind `vcvars64` on Windows and `g++` elsewhere, writes to `build_gen/verify/<name>`, and
+   deletes any stale binary first so a failed compile can never be mistaken for a fresh pass.
+   `--debug` adds ASan/UBSan, which is what to reach for when proving a row can fail.
+
+   It **refuses by name** the two harnesses needing a live Lua state (`pregame_balance_harness`,
+   `persona_counsel_harness`) — build those through CMake. That a headless build cannot reach the
+   shipped Lua configuration at all is a standing gap, recorded as NR-558.
+
+   Prefer `cmake --build build --target <name>` when a configured tree exists; this is the fallback,
+   not the default.
+
 1. **Compile** from the repo root, after sourcing the VS `vcvars64`. From Git Bash the quoting
    fails, so write a one-off `.bat` that `call`s vcvars then builds, and invoke it by **absolute
    path** (`cmd //c "C:\Users\benbo\Project-Io\build_x.bat"` — a bare name is not found).
