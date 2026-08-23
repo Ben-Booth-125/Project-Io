@@ -1166,6 +1166,14 @@ void app::load_economy()
     m_lua.load("scripts/economy.lua");
     m_registry.load_from_lua(m_lua);
 
+    // BL-573: the mercenary-contract template roster, loaded the same way and
+    // at the same app-layer boundary as m_registry above — never a Lua load
+    // performed inside world/* itself. A separate lua_state (not m_lua) so a
+    // hot-reload of the economy tables cannot also silently reset the
+    // contract kinds a live campaign's contracts still reference by index.
+    m_contract_lua.load("scripts/contracts.lua");
+    m_contract_templates.load_from_lua(m_contract_lua);
+
     // BL-433: gate the roster on the campaign's era band, derived from the epoch
     // year the live world was actually built from. Must happen HERE, after the
     // load (which resets the band to `any`) and before anything browses recipes —
@@ -1262,7 +1270,8 @@ void app::step_economy()
     // apply_budget so the treasury holds this quarter's levy and tariff; before
     // the tech gates so a `surplus` gate reads the moved balance. Keyed on the
     // econ counter (BL-568), which step_economy set at its top.
-    run_nation_step(m_world, m_registry, m_last_econ_report, m_world.current_econ_tick);
+    run_nation_step(m_world, m_registry, m_last_econ_report, m_world.current_econ_tick,
+                    m_contract_templates);
     lap(3); // nation step (folded into the budget phase)
     // BL-344: evaluate the tech gates once per economy tick, after the money loop
     // has moved balances (a `surplus` gate should read this quarter's balance, not

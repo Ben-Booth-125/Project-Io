@@ -135,6 +135,15 @@ inline void w_bool_array(std::ostream& out, const std::array<bool, N>& a)
         w_bool(out, v);
 }
 
+/// Write a fixed-size entity-id array, same no-count rule as `w_f32_array` —
+/// BL-573's `mercenary_contract::units` is the first user.
+template <std::size_t N>
+inline void w_id_array(std::ostream& out, const std::array<entity_id, N>& a)
+{
+    for (const entity_id id : a)
+        w_id(out, id);
+}
+
 /// Write a count-prefixed vector of entity ids.
 inline void w_ids(std::ostream& out, const std::vector<entity_id>& v)
 {
@@ -327,6 +336,16 @@ inline bool r_bool_array(std::istream& in, std::array<bool, N>& a)
             return false;
         a[i] = b;
     }
+    return true;
+}
+
+/// Read a fixed-size entity-id array -- no count, matching `w_id_array`.
+template <std::size_t N>
+inline bool r_id_array(std::istream& in, std::array<entity_id, N>& a)
+{
+    for (std::size_t i = 0; i < N; ++i)
+        if (!r_id(in, a[i]))
+            return false;
     return true;
 }
 

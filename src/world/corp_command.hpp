@@ -82,6 +82,15 @@ enum class corp_verb : uint8_t
     // decision a commander actually has once contact is made, so it is the only
     // thing the seam exposes.
     withdraw_from_battle, ///< `corp` breaks off the battle it is fighting in `province` against `counterparty` (null = the first in sorted order). Honoured at the tick boundary, before the next round batch; priced by the resolver's three-term withdrawal cost.
+    // --- BL-573: the mercenary-contract seam (2026-08-23) ---
+    // Appended AFTER withdraw_from_battle, same append-only rule.
+    // CONTRACTS.md § The mercenary contract: "a contract is a condition_set
+    // the client will pay to have become true, by a deadline". These two
+    // verbs are the whole player/agent surface onto it — accepting an OFFER
+    // (BL-572, already landed) with a named force, and walking away from a
+    // live one early.
+    accept_offer,      ///< Convert live offer `order` (a mercenary_offer id) into a mercenary_contract, committing `units` (the corp's own). `counterparty` names the offer's client NATION for this verb, not a corp — the seam's counterparty check forks on verb; see corp_command.cpp.
+    abandon_contract,  ///< `corp` (the contractor) walks away from live contract `order` early. Same money outcome as a failure (deposit only); a distinct, lesser sentiment magnitude (CONTRACTS.md § Q2).
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -91,7 +100,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::withdraw_from_battle) + 1;
+    static_cast<uint8_t>(corp_verb::abandon_contract) + 1;
 
 /// Ceiling on one corporation's outstanding sell orders. The book is now
 /// reachable by command, so it is reachable by a scorer with a bug in it — this
@@ -100,6 +109,17 @@ inline constexpr uint8_t corp_verb_count =
 /// AI places at most one per evaluation. `place_sell_order` returns
 /// `rejected_state` at the cap rather than silently dropping the order.
 inline constexpr std::size_t max_sell_orders_per_corp = 64;
+
+/// Fixed capacity of a mercenary contract's committed force
+/// (`mercenary_contract::units`, world.hpp — BL-573) and of this command's own
+/// `units` field below, which mirrors it exactly: a wire-safe fixed-size array
+/// is what the untrusted-input rule can range-check field by field, the same
+/// reason `corp_command` itself carries no `std::vector`. Eight is far above
+/// any single contract's real force at the prototype's roster scale. Defined
+/// here (not in world.hpp, where `mercenary_contract` lives) because
+/// `world.hpp` includes THIS header, not the reverse — a single definition
+/// both sides reach without a cycle.
+inline constexpr std::size_t mercenary_contract_max_units = 8;
 
 /// BL-511: "no province named" for `corp_command::province`. Deliberately
 /// UINT32_MAX and deliberately NOT 0 — 0 is a REAL province id under
@@ -138,6 +158,10 @@ struct corp_command
     float    floor_price = 0.0f; ///< place_sell_order: minimum unit price (>= 0; 0 = market price).
     uint32_t order       = 0;    ///< remove_sell_order: the sell_order::id to erase. Also accept_quote /
                                   ///< cancel_contract: the procurement_quote / procurement_contract id.
+                                  ///< BL-573 reuses it again: accept_offer's mercenary_offer id,
+                                  ///< abandon_contract's mercenary_contract id — the same "an id
+                                  ///< names the thing this verb acts on" reading every prior reuse
+                                  ///< carries, never two ids in flight on one command.
 
     // --- BL-350 procurement args ---
     /// request_quote: the supplier corp being asked. `subject` names the body
@@ -180,6 +204,15 @@ struct corp_command
     /// authoritative domain check — a wire caller's range gate only proves
     /// the value fits, and fitting is not existing.
     uint32_t province = no_province;
+
+    // --- BL-573: the mercenary-contract seam (2026-08-23) -------------------
+    /// accept_offer's committed force — the corp's OWN units, named by the
+    /// caller. Unused slots are `null_entity`; the seam counts a slot as
+    /// "named" iff it is not `null_entity`, so a caller need not also send a
+    /// count. "The player chooses the force, the contract never does"
+    /// (CONTRACTS.md Q1) — this field is the whole mechanism that ruling
+    /// rests on. Ignored by every other verb.
+    std::array<entity_id, mercenary_contract_max_units> units{};
 };
 
 /// Outcome of applying a command. Only `applied` mutates the world; every

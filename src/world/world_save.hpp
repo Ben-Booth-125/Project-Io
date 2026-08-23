@@ -106,7 +106,16 @@ inline constexpr uint32_t world_save_magic =
 /// section) — the same shape BL-569 used to add `province_holder` onto v3. A
 /// v6 stream simply ends where this one continues, so it is refused whole on
 /// the same strict-equality contract as every prior bump.
-inline constexpr uint32_t world_save_version = 7;
+///
+/// Bumped to 8 by BL-573 (contract record and verbs): `world::mercenary_contracts`
+/// (accepted mercenary contracts, one `mercenary_contract` record each, fixed
+/// at `mercenary_contract_max_units` committed-unit slots) and
+/// `world::next_contract_id` (its allocator cursor) are written as a new
+/// TRAILING section, directly after `mercenary_offers` (itself the previous
+/// last section) — the same shape v7 used to add `mercenary_offers` onto v6.
+/// A v7 stream simply ends where this one continues, so it is refused whole
+/// on the same strict-equality contract as every prior bump.
+inline constexpr uint32_t world_save_version = 8;
 
 /// Write @p w as a complete world snapshot.
 ///

@@ -517,6 +517,29 @@ target_link_libraries(condition_set_harness PRIVATE io_world_obj lua54)
 target_compile_features(condition_set_harness PRIVATE cxx_std_20)
 target_compile_options(condition_set_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# mercenary_contract_harness (BL-573) needs a live sol2/Lua state for BOTH
+# registries the item threads: recipe_registry (scripts/recipes.lua +
+# economy.lua, for the authored procurement.deposit_fraction split and the
+# sentiment factor weights the item's own terminal-state rows measure) and
+# contract_template_registry (scripts/contracts.lua, for the real take/hold
+# predicates run_mercenary_contract_tick evaluates against). Same shape as
+# condition_set_harness above: add back recipe_registry.cpp AND
+# contract_template.cpp + scripting/lua_state.cpp, the sol2 include dir, and
+# link lua54.
+add_executable(mercenary_contract_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/mercenary_contract_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/contract_template.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(mercenary_contract_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(mercenary_contract_harness PRIVATE io_world_obj lua54)
+target_compile_features(mercenary_contract_harness PRIVATE cxx_std_20)
+target_compile_options(mercenary_contract_harness PRIVATE ${IO_WARNING_FLAGS})
+
 # pregame_balance_harness is another harness that genuinely needs a live Lua
 # state: it constructs a `lua_state`, loads scripts/economy.lua + recipes.lua,
 # and calls recipe_registry::load_from_lua (defined in recipe_registry.cpp, the
@@ -1047,6 +1070,10 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     # copy exists), which is a loud failure here rather than the silent vacuity
     # trap the comment above warns about — but still wrong for the same reason.
     condition_set_harness
+    # ADDED 2026-08-23 (BL-573). Loads scripts/recipes.lua, economy.lua AND
+    # contracts.lua by relative path through two registries; same reasoning
+    # as condition_set_harness above.
+    mercenary_contract_harness
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})
