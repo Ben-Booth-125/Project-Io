@@ -405,6 +405,73 @@ function checkVersionInversion() {
 }
 checkVersionInversion();
 
+// ---------------------------------------------------------------------------
+// STRUCTURAL INTEGRITY OF THE JSON STORES — the defect no view can show
+// ---------------------------------------------------------------------------
+// Found 2026-08-23, and it had been live since 2026-08-22: `requirements.json`
+// held TWO group objects fused into one, because an append left out the `},{`
+// between them. That is still VALID JSON — the second object's keys simply land
+// inside the first, and JSON's last-key-wins rule silently discards whichever
+// they collide with. The `value-anchor` group (BL-543, four rows) vanished
+// entirely: `requirements_query.js value-anchor` answered "nothing matched" and
+// every consumer agreed with it, because by the time anything looked, the parse
+// had already thrown the group away.
+//
+// WHAT MAKES IT WORTH A PERMANENT CHECK is what happened next. The store is read
+// by parse-and-rewrite scripts, so the first tool to load and re-save the file
+// after the fusion made the loss PERMANENT IN THE TEXT — the group had still
+// been recoverable from the raw bytes right up to that moment, and then was not.
+// A corruption that erases itself on the next write is exactly the class that
+// has to be caught by machinery rather than by reading.
+//
+// Two cheap invariants catch it, and both are checked over the RAW TEXT rather
+// than the parsed object, because the parse is the thing under suspicion:
+//   1. every `"brief":` / `"id":` key at record depth must survive the parse —
+//      a count mismatch IS a fusion;
+//   2. a brief and an id must be unique — a duplicate makes every query
+//      ambiguous, and `requirements_query.js <brief>` silently answers for one
+//      of two different pieces of work.
+function checkStoreIntegrity() {
+  const stores = [
+    { rel: REQUIREMENTS, parsed: reqs, coll: 'groups', key: 'brief', label: 'requirement group' },
+    { rel: BACKLOG_JSON, parsed: backlog, coll: 'items', key: 'id', label: 'backlog item' },
+  ];
+
+  for (const st of stores) {
+    let raw = '';
+    try { raw = fs.readFileSync(P(st.rel), 'utf8'); } catch { continue; }
+    const records = st.parsed && Array.isArray(st.parsed[st.coll]) ? st.parsed[st.coll] : null;
+    if (!records) continue;
+
+    // Count the key at RECORD DEPTH only, with the depth CALIBRATED FROM THE
+    // FILE rather than hardcoded: take the indentation of the first occurrence
+    // and count every occurrence at exactly that indentation. A nested `"id":`
+    // (a requirement row carries one) is deeper and does not match; one inside a
+    // prose string is not at line start and does not match either. Calibrating
+    // matters because the two stores have been written by different tools at
+    // different indent widths, and an anchored pattern goes silently INERT the
+    // first time one of them is reformatted — which is the failure mode this
+    // whole check exists to not have.
+    const first = raw.match(new RegExp(`^([ \t]*)"${st.key}":`, 'm'));
+    const seen = first
+      ? (raw.match(new RegExp(`^${first[1]}"${st.key}":`, 'gm')) || []).length
+      : 0;
+
+    if (seen === 0) {
+      warn(`${st.rel}: found no "${st.key}" key at line start — the file's shape has changed, so the fusion check is INERT. Re-check checkStoreIntegrity against the new layout.`);
+    } else if (seen !== records.length) {
+      fail(`${st.rel}: the raw text carries ${seen} "${st.key}" keys but only ${records.length} ${st.label}(s) survive the parse — ${seen - records.length} record(s) are FUSED into a neighbour by a missing "},{" and are being silently discarded by last-key-wins. Do NOT let a tool re-save this file before repairing it: a parse-and-rewrite makes the loss permanent. Find the join with: grep -n '"${st.key}":' ${st.rel} and compare against the parsed order.`);
+    }
+
+    const keys = records.map((r) => r && r[st.key]).filter(Boolean);
+    const dupes = [...new Set(keys.filter((k, i) => keys.indexOf(k) !== i))];
+    for (const dup of dupes) {
+      fail(`${st.rel}: ${st.label} "${dup}" appears ${keys.filter((k) => k === dup).length}× — a duplicate ${st.key} makes every query for it ambiguous. Rename the older one or merge them.`);
+    }
+  }
+}
+checkStoreIntegrity();
+
 report();
 
 function report() {

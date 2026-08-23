@@ -4656,7 +4656,7 @@
       ]
     },
     {
-      "brief": "battle-state-in-world",
+      "brief": "battle-state-in-world-first-cut",
       "batch": "2026-08-20-four-lane",
       "title": "BL-467 + BL-315 remainder - battle state, trigger, losses",
       "status": "complete",
@@ -5270,6 +5270,48 @@
           "notes": null
         }
       ]
+    },
+    {
+      "brief": "value-anchor",
+      "batch": "2026-08-22-lane-n-sprint-n1",
+      "title": "BL-543 - the check that guards the ratio, not the numbers",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-543 (designed 2026-08-22, Ben ruling + clarification), sprints.json Sprint N1",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING (headless): THE BAND HOLDS. For every roster class, the authored unit_upkeep goods draw valued at world_gen.lua's BASE PRICES sits within a stated tolerance of 2x the authored credits_per_head. Ben's clarification is explicit that it is base prices and an authoring-time calibration, not a runtime coupling - so the harness reads the authored tables and resolves no market.",
+          "result_metric": null,
+          "verification": "headless - tools/verify/value_anchor.cpp",
+          "notes": "VERIFIED 2026-08-23. value_anchor R1a-R1c: all 19 roster rows swept, all five unit classes covered, none out of band. At the SHIPPED rates the sweep reports INERT for the whole roster - R3 branches on that rather than asserting it."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "IT FAILS WHEN PERTURBED. Move a rate or a base price and the check goes red. A check that cannot fail is not a check - and this is the row that earns the harness, because it is what catches a base-price edit silently invalidating the calibration.",
+          "result_metric": null,
+          "verification": "headless - tools/verify/value_anchor.cpp",
+          "notes": "VERIFIED 2026-08-23, and REWORKED after the Sprint N1 adversarial pass. Perturbation sizes are now DERIVED from k_tolerance (ordnance is 41.7% of the equipment basket, so the band breaks at 1.75x and holds at 1.30x) rather than the magic 4x/8x the first cut used, and every RED row is paired with a GREEN one just inside the band."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "INERT AT ZERO: with every unit_upkeep rate at 0.0 - the shipped state - the check reports the calibration as INERT and passes, moving no golden. Turning the rates on is a later data change this check already guards.",
+          "result_metric": null,
+          "verification": "headless - tools/verify/value_anchor.cpp",
+          "notes": "VERIFIED 2026-08-23 - as a BRANCH, not an assertion. The first cut hard-asserted the shipped rates were zero and would have gone red on the day the anchor was satisfied; the reviewer authored the harness own solved fixture into economy.lua and got exit 1 with all 19 rows in band. Verified in both directions: 16/16 green with rates authored at the solved fixture, R1a red when authored out of band."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "IT REPORTS THE IMPLIED FIGURE: the derived 'units funded per year' for the seeded extraction levy, so NR-382's rate question can be answered against a number rather than a feeling.",
+          "result_metric": null,
+          "verification": "headless - tools/verify/value_anchor.cpp",
+          "notes": "VERIFIED 2026-08-23. R4a reads the seeded levy rate back through law.cpp own path (1.0 cr/unit); R4b branches on the authored state; R4c asserts the funding identity closes. Throughput stays parametric because measuring it needs the Lua recipe registry, which is the excluded TU set for a headless harness."
+        }
+      ],
+      "resolution": "COMPLETE 2026-08-23 at 22/22 assertions, plain and under ASan+UBSan. THE GROUP ITSELF WAS LOST AND RECOVERED: it had been fused into world-save-snapshot object by a missing },{ in BL-536 append on 2026-08-22, so every JSON.parse of this file silently dropped it (last-key-wins) and requirements_query.js value-anchor returned nothing matched. Recovered from the raw text at 4262d66 and re-inserted 2026-08-23. See NR-550."
     },
     {
       "brief": "world-save-snapshot",
