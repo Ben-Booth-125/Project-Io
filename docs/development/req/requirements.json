@@ -5543,6 +5543,63 @@
         }
       ],
       "resolution": "COMPLETE 2026-08-23 as an INSTRUMENT; its INTERPRETATION was refuted the same day and is corrected here. WHAT SURVIVES, and it is worth having: wherever a world in this fixture fights no battle, the campaign score CLEARS its threshold and LOSES the argmax on every single round - it is never the case that the score never clears. Confirmed at n=32: all 17 fixture-silent seeds have cleared > 0, won == 0, lost == rounds. WHAT WAS WITHDRAWN, each refuted by an independent n=32 sweep the main session also ran itself. (1) \"Campaign ceiling below the winning verb floor on exactly the silent worlds\" is FALSE - only 3 of 17 silent seeds are disjoint (0, 4, 28) and 14 overlap, worst seed 18 at ceiling 317 vs floor 175, and the statistic is not even monotone with the outcome. The perfect separation at n=8 was a two-case coincidence, and the harness could not be widened to notice because its sweep width was coupled to its pinned regression table (fixed 2026-08-23). (2) \"No tie-break, salt or luckier target could have won those worlds a round\" holds for seeds 0 and 4 (min losing margins 37 and 65 against a 0..15 salt) and is FALSE of the silent population - silent seeds 18/20/27 have min margins of 6/7/8, inside the salt range. (3) \"The defect is the LEVEL of the campaign score relative to Settle\" is UNSUPPORTED - clearing volume and score level do not separate the classes: seed 8 clears 27,452 and fights 676 battles, seed 30 clears 2,338,095 and fights zero. (4) The base rate is 17 of 32 (53%) in this fixture, not 2 of 8 - zero-war is the MODAL outcome, which makes the underlying defect more urgent and not less. AND THE FIXTURE IS NOT THE GENERATED ERA -1 at all: six divergences from hard_coded_world.cpp own invocation, one of which gates build_work out of the contest entirely, so the harness scores four verbs where the app scores five. Seed 0 generated era fights 8 battles. See BL-554."
+    },
+    {
+      "brief": "era-minus-one-fixture",
+      "batch": "2026-08-23-bl-462-era-minus-one-fixture",
+      "title": "Every Era -1 harness measured a sim the game does not run; the invocation now has one construction",
+      "status": "active",
+      "promoted_from": "backlog.json BL-462 (HARNESSES_MEASURE_A_DIFFERENT_SIM_THAN_SHIPS, raised 2026-08-18, amended 2026-08-23 with the four further divergences BL-554 held before it was closed as a duplicate and superseded by BL-462)",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING (headless): THE HARNESS RE-RUN IS GENERATION'S OWN ERA. For every swept seed, a re-run of the Era -1 sim from the arguments generation was invoked with must produce battles / conquests / foundings BIT-EQUAL to generation_report::prehistory_battles / _conquests / _foundings from an ordinary generation of the same seed. This is the whole of BL-462 stated as a check: if it holds the harness is measuring the sim that ships, and if it does not, no other number the harness prints is evidence of anything. The pair is printed per seed, not only aggregated, so a single divergent seed is visible rather than averaged away.",
+          "result_metric": "32 / 32 seeds reproduce exactly (n=32 sweep, 2026-08-23); 8 / 8 at the default width",
+          "verification": "headless - tools/verify/history_conquest_gap.cpp (row A1)",
+          "notes": "VERIFIED at n=8 and n=32. MUTATION-TESTED TWICE, both restoring a real historical divergence: passing nullptr for creeds in the re-run (divergence 4) turns A1 red; taking history_sim_params' struct default instead of the captured params (divergences 1 and 2, the state before this item) turns A1 red. A1 is written over SEEDS, so a silent world with an empty battle set still exercises it."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "THE INVOCATION HAS ONE CONSTRUCTION, NOT TWO. The span, clock and seed derivations live in one place (world/era_minus_one.hpp: era_minus_one_enabled / era_minus_one_sim_params / era_minus_one_sim_seed) and make_hard_coded_world CALLS them; everything a caller cannot re-derive - the PRE-sim settlement, the creeds, the terrain arrays and the works pointer - is CAPTURED at generation's own call site into era_minus_one_fixture. A harness re-runs the era by handing those values back and constructs nothing of its own. Copying generation's settings into each harness was rejected: two places constructing one invocation is exactly how the six divergences arrived.",
+          "result_metric": "harness constructs 0 of the 8 sim arguments itself; all 8 come from the fixture",
+          "verification": "headless - tools/verify/history_conquest_gap.cpp (row A1 is the consequence); code review",
+          "notes": "The fixture is deliberately NOT a generation_report field. The report is serialised in full by src/core/save_game.cpp, so a field there is a save-format change - and it could not carry the value needed anyway, since its settlement copy is POST-sim (run_history_sim mutates in place). REJECTED ALTERNATIVES, both named in BL-462's amendment: (a) re-deriving the creeds in each harness by calling a shared derivation - rejected because it is a second construction of the same value, the defect this item exists to remove, and because the derivation needs the ladder state and the tile vector, neither of which the report carries; (b) adding creed_state to generation_report::body_entry - rejected because it is a save-format change (w_body_entry / r_body_entry, save_game.cpp) for a generation-time diagnostic, because creed_state carries pantheons and tongues to deliver one integer per culture, and because it would not solve the harder half at all: the PRE-sim settlement would still need a second new field. THE GROUP STAYS ACTIVE because BL-462's file scope also names tools/verify/history_sim_harness.cpp and tools/verify/history_sweep.cpp, and neither is fixed by this change: both build their own history_sim_params and most of their rows run on hand-built SYNTHETIC worlds where \"generation's params\" has no meaning. Three sites in them DO generate a real world and then re-run on struct defaults (history_sim_harness:247, history_sweep:295 and :512) and can now call the fixture; they were left alone because their pinned bands would move and only this harness's re-pin was authorised."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "THE SIM'S BEHAVIOUR DOES NOT MOVE. The factoring is a refactor of the call site and a capture beside it; not one generated world may change. Verified as a genuine BEFORE/AFTER against a pre-change build of the same source tree, not merely as self-consistency within one binary.",
+          "result_metric": "world_determinism R3 deep digests identical before and after: seedA/on 3457B414BE7C8727, seedB/on 2DB81610668C897B, seedA/off E8E8B4212DFA73B0; report seedA/on 400y 81 battles 57 conquests 1022 foundings on both. spectator_determinism unspectated state_hash B4D09255AF346008, matching the recorded Sprint N1 baseline.",
+          "verification": "headless - tools/verify/world_determinism.cpp, tools/verify/spectator_determinism.cpp",
+          "notes": "world_determinism ALL PASS on both builds. spectator_determinism carries ONE pre-existing red that is not this item's: its R2 golden 344A9FE48306E93A is the pre-BL-409 value and the world has legitimately moved since. The observed B4D09255AF346008 is unchanged by this item and equals the baseline recorded when the sprint opened."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "THE PINNED TABLE IS RE-PINNED FROM THE CORRECTED RUN, AND THE MOVE IS LEGIBLE. All 48 pinned numbers move, because the old ones described the struct-default sim; the old table and the reason are kept in a comment so the change reads as the item landing rather than as a re-blessing. pinned_seeds stays decoupled from the sweep width, so widening the sweep adds coverage without weakening the regression.",
+          "result_metric": "R3 green at n=8 and n=32, pinning 8 of 32 swept seeds; the harness also prints the current values in pinned[] literal form so a legitimate re-pin is a copy, not a re-typing",
+          "verification": "headless - tools/verify/history_conquest_gap.cpp (row R3)",
+          "notes": "MUTATION-TESTED: the placeholder all-zero table turns R3 red, and the re-pinned one turns it green - the re-pin itself was the mutation test. R3 is also killed by the creeds mutation and by the struct-default params mutation."
+        },
+        {
+          "id": "R5",
+          "status": "complete",
+          "requirement": "THE HARNESS NAMES THE CONFIGURATION IT MEASURED, AND ITS ONE REMAINING GAP, ON EVERY RUN. BL-462 work item 3: an Era -1 row must say which configuration it is a row about. The harness prints the span, band count, band step, creeds state and works state; and because scripts/works.lua is Lua-authored and a headless harness cannot load it, it prints a banner saying build_work is GATED OUT and that the run scores four verbs where the shipped game scores five.",
+          "result_metric": "header line reads \"-400 -> 0 (400 years), 1 band(s), first step 4 years, creeds ON, works OFF\"; the T2 verb table marks BuildWork \"GATED OUT\" and Q3 marks works_defence \"necessarily zero\"",
+          "verification": "headless - tools/verify/history_conquest_gap.cpp (printed, on every run)",
+          "notes": "The gap was NOT closed by transcribing works.lua into C++: that would put the roster in two places and stale the harness the next time the table moves, which is BL-462's own failure mode one layer down. Both sides of A1 pass the same null registry, so A1 stays exact. THE CALL IS OWED: either works_registry gains a Lua-free authoring path production also uses, or the works-enabled contest is measured by a Lua-capable --verify check instead of a headless one. Until then no headless harness can measure the shipped Era -1 exactly, and the same is true of world_gen.lua."
+        },
+        {
+          "id": "R6",
+          "status": "complete",
+          "requirement": "EVERY ROW IS WRITTEN OVER SEEDS AND CAN FAIL. The harness's standing vacuity trap is that a silent world produces an empty battle set, so any loop over battle_trace asserts nothing on exactly the worlds under study. Every row binds to per-seed counters; and the classification row carries a clause that fires on EVERY seed (a seed that fought must also have chosen - ++out.battles sits inside the Campaign case after ++out.campaign_chosen), so it stays alive in a sweep containing no silent worlds.",
+          "result_metric": "all 5 rows mutation-killed; 11 of 32 seeds silent at n=32, 1 of 8 at n=8",
+          "verification": "headless - tools/verify/history_conquest_gap.cpp (rows A1/R1/R2/R3/R4)",
+          "notes": "MUTATIONS RUN, one per row: A1 - null creeds in the re-run, and struct-default params. R1 - the round identity off by one (cleared_rounds == chosen + lost + 1). R2 - zero the chosen counter on every seed that fought, after classification, so only R2's universal clause can catch it. R3 - the all-zero placeholder table. R4 - trace the \"untraced\" control run, so the gating half sees non-empty counters. Each mutation turned its row red."
+        }
+      ]
     }
   ]
 }

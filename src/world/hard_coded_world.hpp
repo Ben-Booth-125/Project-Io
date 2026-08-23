@@ -13,6 +13,13 @@
 // widely, and the works table is only ever passed through it by pointer.
 class works_registry;
 
+// Same reason, same shape (BL-462): the Era -1 capture is only ever passed
+// through here by pointer, and its own header pulls in history_sim.hpp,
+// creeds.hpp and the terrain arrays — none of which this header's several
+// hundred includers should have to pay for. Include world/era_minus_one.hpp to
+// use one.
+struct era_minus_one_fixture;
+
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -409,10 +416,19 @@ struct generation_report
 ///               care — runs the pre-history with works disabled. Defaulted for
 ///               the same reason `gen_cfg` is: a caller that never touches Lua
 ///               still builds a world, it just builds one without works.
+/// @param fixture Optional out-param (BL-462): when non-null, receives EXACTLY
+///               what the Era -1 year-tick sim was invoked with, plus the three
+///               counts it produced. It exists so a harness can re-run the era
+///               generation actually ships instead of `history_sim_params`'s
+///               struct default — see world/era_minus_one.hpp for the six
+///               divergences that made every Era -1 check measure a different
+///               sim. Costs one copy of the settlement, creeds and terrain, and
+///               only when asked for; nullptr pays nothing.
 world make_hard_coded_world(world_params params = {}, generation_report* report = nullptr,
                             const world_gen_config& gen_cfg = {},
                             generation_progress* progress = nullptr,
-                            const works_registry* works = nullptr);
+                            const works_registry* works = nullptr,
+                            era_minus_one_fixture* fixture = nullptr);
 
 /// The homeworld's tile grid dimensions — one authority the build and the
 /// wizard preview both read.

@@ -7,6 +7,7 @@
 #include "continents.hpp"
 #include "corporation_generation.hpp"
 #include "creeds.hpp"
+#include "era_minus_one.hpp"    // BL-462: the shared Era -1 invocation
 #include "history_ladder.hpp"
 #include "history_sim.hpp"      // BL-271 wired into generation, 2026-08-12
 #include "sim_terrain_build.hpp" // build_sim_terrain for the sim's terrain view
@@ -192,7 +193,8 @@ std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
 world make_hard_coded_world(world_params params, generation_report* report,
                             const world_gen_config& gen_cfg,
                             generation_progress* progress,
-                            const works_registry* works)
+                            const works_registry* works,
+                            era_minus_one_fixture* fixture)
 {
     world w;
 
@@ -527,28 +529,46 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // measured, against a generation budget of one minute that the whole
         // chain currently spends 2.4 s of.
         bump(8);
-        if (params.epoch_year < 1700 && params.prehistory_years > 0
-            && !kepler_settlement.regions.empty())
+        // THE GATE AND THE PARAMS ARE DERIVED, NOT AUTHORED HERE (BL-462).
+        //
+        // Every line of this invocation used to be written out at this one site,
+        // where no other caller could read it — so every Era -1 harness took
+        // `history_sim_params`'s struct default instead (4000 BCE -> 0 CE on six
+        // bands, 136 rounds, against generation's 400 years on one 4-year band,
+        // 100 rounds) and no check in the project measured the run that actually
+        // generates a world. The derivations now live in era_minus_one.hpp and
+        // the harnesses call the same ones. This block's BEHAVIOUR is unchanged:
+        // the helpers reproduce it line for line.
+        //
+        // The settlement clause stays here because it is not a question about
+        // params — `era_minus_one_fixture::ran` is the answer that includes it.
+        if (era_minus_one_enabled(params) && !kepler_settlement.regions.empty())
         {
             const sim_terrain_arrays terr =
                 build_sim_terrain(w, kepler, home_grid_width, home_grid_height);
 
-            history_sim_params hp;
-            hp.start_year      = params.epoch_year - params.prehistory_years;
-            hp.stop_year       = params.epoch_year;
-            hp.tick_bands[0]   = {params.epoch_year, 4};
-            hp.tick_band_count = 1;
+            const history_sim_params hp    = era_minus_one_sim_params(params);
+            const uint32_t           hseed = era_minus_one_sim_seed(params);
 
-            // NO supply-decay override here, deliberately.
-            //
-            // An earlier cut of this block derived supply_decay_per_tile_q from
-            // the map width (2000/gw), because the authored 28 gave a maximum
-            // reach of 36 tiles and produced ZERO battles on a 312-wide map. That
-            // was a workaround for measuring supply from the CAPITAL. The sim now
-            // supplies a campaign from the staging holding next to the target
-            // (history_sim.cpp, `hub_dist`), so reach is bounded by
-            // neighbour_radius rather than by empire shape and does not need
-            // rescaling when the map does. The authored constant stands.
+            // THE CAPTURE (BL-462). Everything a re-run needs that cannot be
+            // re-derived from the report: the settlement BEFORE the sim mutates
+            // it in place, the creeds the polity aggressions are read off, the
+            // terrain, and the works pointer. Taken here, at the one call site,
+            // so a harness constructs nothing of its own and has nothing left to
+            // drift on. Costs nothing when no fixture was asked for.
+            if (fixture != nullptr)
+            {
+                fixture->ran        = true;
+                fixture->body       = kepler;
+                fixture->gw         = home_grid_width;
+                fixture->gh         = home_grid_height;
+                fixture->settlement = kepler_settlement;
+                fixture->creeds     = kepler_creeds;
+                fixture->terrain    = terr;
+                fixture->params     = hp;
+                fixture->seed       = hseed;
+                fixture->works      = works;
+            }
 
             // The one pass long enough to earn the loading screen's inner bar
             // (~23 s of the ~25 s total): announce the year span, hand the sim
@@ -564,7 +584,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
             const history_sim_state hs =
                 run_history_sim(kepler_settlement, &kepler_creeds, terr.view(),
                                 home_grid_width, home_grid_height, hp,
-                                /*seed=*/params.seed ^ 0x415C1E17u,
+                                hseed,
                                 progress != nullptr ? &progress->sub_progress
                                                     : nullptr,
                                 works); // BL-321: the Era -1 works table, or null.
@@ -590,6 +610,16 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 report->prehistory_conquests = hs.conquests;
                 report->prehistory_foundings = hs.foundings;
                 report->prehistory_years     = hs.years;
+            }
+
+            // The same four counts into the fixture, so a harness holding one
+            // can bind its re-run against them without also needing a report.
+            if (fixture != nullptr)
+            {
+                fixture->battles   = hs.battles;
+                fixture->conquests = hs.conquests;
+                fixture->foundings = hs.foundings;
+                fixture->years     = hs.years;
             }
         }
 
