@@ -1745,7 +1745,7 @@ So today no content anywhere is gated on a war HAPPENING. The dependency is real
 
 *Files: `scripts/tech_tree.lua`, `src/world/tech_gate.cpp`, `docs/development/req/requirements.json`*
 
-### NR-491 — Do BL-321's defence works ever reach a battle? Still unmeasured, and needs a works fixture
+### NR-563 — Do BL-321's defence works ever reach a battle? Still unmeasured, and needs a works fixture
 *question · raised 2026-08-21 · from Replaces the withdrawn NR-475. Sprint 28 T4.*
 
 The original question stands and its apparent answer did not: does a region carrying a defence work ever get attacked? `work_defence_mod` feeds both the scorer (history_sim.cpp:634, raising the defender's scored strength) and the resolver (:965, as readiness on the defender's stack), so if works are raised on safe interior regions while fighting happens on frontiers, the sim invests in defence exactly where defence is not needed — and neither number would ever show it.
@@ -1758,7 +1758,7 @@ It cannot be measured with the Lua-free convention every history harness follows
 
 *Files: `tools/verify/history_conquest_gap.cpp`, `src/world/history_sim.cpp`, `src/world/works_roster.cpp`*
 
-### NR-492 — EVERY history harness measures a 4000-year sim the game never runs — production is 400 years
+### NR-564 — EVERY history harness measures a 4000-year sim the game never runs — production is 400 years
 *observation · raised 2026-08-21 · from Sprint 28 T3, found when a verified fix changed nothing in production.*
 
 `history_sim_params`'s DEFAULTS are a 4000-year run (-4000 -> 0) on the six-band ladder, 136 decision rounds. `make_hard_coded_world` runs something else entirely: `prehistory_years = 400`, so -400 -> 0, on ONE band with step 4 — 100 rounds over a tenth of the span. It also passes creeds and a works registry, and seeds the sim with `params.seed ^ 0x415C1E17u` rather than the raw seed.
@@ -1777,7 +1777,7 @@ It was caught only because a fix that was verified to work — 2 of 8 zero-war w
 
 *Files: `src/world/hard_coded_world.cpp`, `tools/verify/history_sim_harness.cpp`, `tools/verify/history_conquest_gap.cpp`*
 
-### NR-493 — Sprint 28 T3: at PRODUCTION parameters campaign loses by as little as 8 points and never wins
+### NR-565 — Sprint 28 T3: at PRODUCTION parameters campaign loses by as little as 8 points and never wins
 *question · raised 2026-08-21 · from Sprint 28 T3, re-measured at production parameters.*
 
 With the harness pointed at the real 400-year configuration, a silent world's funnel reads: campaign CLEARED its threshold 1080 times and LOST all 1080 — beaten by settle x682 and invest x398 — with a margin of mean 205 and MINIMUM 8. Settle failures are zero at this span, so the settle-feasibility defect that dominates the 4000-year run is not what is happening here.

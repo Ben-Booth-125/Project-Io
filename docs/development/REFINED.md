@@ -63,7 +63,7 @@ Result at the configuration the harnesses use: **zero-war worlds 2/8 → 0/8**, 
 green (B318c, BL384a, R5, B384a) with none broken.
 
 **And then it changed nothing in the game.** Base and post-fix `seed_sweep_probe` are byte-identical,
-seed for seed. The cause is **NR-492, which is the sprint's most important finding**: every history
+seed for seed. The cause is **NR-564, which is the sprint's most important finding**: every history
 harness in the repo takes `history_sim_params`' defaults — a 4000-year run on the six-band ladder —
 while `make_hard_coded_world` runs **400 years on one band at step 4**. BL-384's original numbers,
 my restated numbers and the existing B384 assertions were all about a sim the player never sees.
@@ -76,14 +76,14 @@ winning and never does.
 ### What remains
 
 - **T3's production half** — a weighting question, and per R2 the band is Ben's to sanction rather
-  than mine to pick (NR-493). **Look at Invest first**: it takes 398 of seed 4's 1080 losses and
+  than mine to pick (NR-565). **Look at Invest first**: it takes 398 of seed 4's 1080 losses and
   nobody has checked whether it has the same scorer/executor gap Settle had. A second structural
   finding is worth more than a weight.
-- **NR-492's harness/production divergence** — worth fixing before any further tuning, or the next
+- **NR-564's harness/production divergence** — worth fixing before any further tuning, or the next
   measurement is wrong in the same way.
 - **T4 was withdrawn, not completed.** "Defence works appear in zero battles" was an artifact: the
   harness passes no works registry, so no work could be raised. The question is reopened honestly as
-  NR-491.
+  NR-563.
 
 ### Tasks
 
