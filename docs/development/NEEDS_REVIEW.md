@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*250 entries — 215 open, 35 resolved.*
+*251 entries — 216 open, 35 resolved.*
 
 ---
 
@@ -2126,6 +2126,17 @@ spectator_determinism reports 'R2 byte-identity: the unspectated hash equals the
 > **Recommendation:** The first. It is a few lines, it keeps the row's teeth on both toolchains, and it turns a footnote into a check.
 
 *Files: `tools/verify/spectator_determinism.cpp`*
+
+### NR-549 — binary_io.hpp landed a day after sentiment.cpp copied the older idiom — four files now hand-roll the same byte primitives
+*observation · raised 2026-08-23 · from Integrating Sprint N1's sentiment slice and auditing it against the merged origin/main.*
+
+src/world/sentiment.cpp opens with private write_u32/read_f32 helpers over reinterpret_cast, and says in its own comment that it follows 'history_log / procurement exactly'. It did, and that was correct: binary_io.hpp (BL-536) merged on 2026-08-22, a day after the slice was briefed. So there are now four copies of one idiom, three of them without the shared version's bounds constants and its checked r_enum. Nothing is broken — all three bound their counts and all three round-trip — but the next person to add a stream will copy the nearest one, and three of the four nearest ones are the wrong one. Filed as BL-553 (priority C, v0.1.25).
+
+**Why it matters.** The specific loss is r_enum. It reads a uint8_t and REJECTS an out-of-range byte rather than casting it, which is the property that matters most now that thirty enums cross a versioned byte stream (NR-545). The older streams do not get it. Worth knowing too that this is the second thing BL-536's merge invalidated about work briefed before it (the first was the components.hpp audit conclusion, NR-545) — a merge landing mid-sprint quietly ages every brief written before it, and neither instance was noticed by the agent that hit it.
+
+> **Recommendation:** Land BL-553 when something next touches one of those streams — which BL-546 is doing right now to procurement.cpp. Not worth a pass of its own.
+
+*Files: `src/world/binary_io.hpp`, `src/world/sentiment.cpp`, `src/world/procurement.cpp`, `src/world/history_log.cpp`*
 
 ---
 

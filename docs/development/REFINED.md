@@ -1,11 +1,41 @@
 # Project Io — REFINED (active worklist)
 
-**Empty between work blocks.** Sprints P1, C3, B2 and B3 closed 2026-08-21.
-**Sprint 28 (Lane A) is now active, re-scoped on measurement.**
+**Empty between work blocks.** Sprints P1, C3, B2 and B3 closed 2026-08-21; **N1 closed 2026-08-23**.
+**Sprint N2 is active** — three lanes in parallel worktrees, one of them Sprint 28 (Lane A)'s
+measurement half. See § Sprint N2 below.
+
+---
+
+## Sprint N2 — "the spines move" (opened 2026-08-23, three lanes in parallel worktrees)
+
+N1 landed two spines and a check, **all three inert**. An inert subsystem with no caller is the
+`military_points` defect with a new name, so N2 gives each one a consumer — and measures the one
+thing Lane A cannot fix until it is measured.
+
+| Lane | Item | Files (slice-owned) | Done when |
+|---|---|---|---|
+| **N2-a** | BL-542 (nation scorer) | `src/world/nation_ai.{hpp,cpp}` (new), `tools/verify/nation_scorer_harness.cpp` (new) | req group `nation-scorer` R1–R6 |
+| **N2-b** | BL-546 (reputation → sentiment) + BL-391 (the floor deadlock, landed through it) | `src/world/procurement.cpp`, `src/world/corp_command.cpp`, `src/world/sentiment.cpp`, `tools/verify/procurement_harness.cpp` | req group `reputation-becomes-sentiment` R1–R4 |
+| **N2-c** | Sprint 28 Lane A, T1+T2 — verb-competition **measurement** | `src/world/history_sim.{hpp,cpp}`, `tools/verify/history_conquest_gap.cpp` | req group `verb-competition-measurement` R1–R4 |
+
+**Hotspots stay with the main session**, as always: `scripts/economy.lua` (5 open items declare it),
+`src/world/components.hpp` (4), `src/world/world.hpp`, `CMakeLists.txt`. N2-b may legitimately need
+`world.hpp` to remove `corp_reputation`; that edit is flagged for checking at merge rather than
+forbidden.
+
+**Every lane is briefed to MUTATION-TEST its own rows** and report which mutation it ran per row.
+That is the N1 lesson applied (NR-547): three agents wrote the code *and* its harness, all three
+harnesses passed, two of three subjects were unsound, and not one defect was found by reading.
+
+---
 
 ---
 
 ## Sprint 28 — "growth stops extinguishing war" (Lane A)
+
+> **T1 and T2 are running now as Sprint N2's lane c.** The section below is the full argument and
+> stays here as the reason; T3 (the fix) is deliberately unwritten until T1/T2 report, and T4 is
+> untouched.
 
 ### Why it is re-scoped before a line is written
 
@@ -248,7 +278,15 @@ Re-verified this session: `law_author_harness` green at 14/14. **This is the ans
 a worktree agent now has a sanctioned way to build a harness, and every agent brief carries it.
 New harnesses need **no CMakeLists edit**: `file(GLOB IO_VERIFY_HARNESSES tools/verify/*.cpp)`.
 
-## Tasks
+## Sprint N1 — CLOSED 2026-08-23. All three landed; two were unsound and were fixed.
+
+Harnesses green at **36 / 41 / 22**, plain and under ASan+UBSan. Retro in `sprints.json` § N1.
+Defects fixed in the closing pass, each now guarded by a row that fails against the pre-fix code:
+an ASan-confirmed heap-buffer-overflow (`uint8_t`-backed enum indexing a 9-element array), an
+overdrawable spend bound (156 overdraws and 26 negative treasuries over 512 generated shapes), a
+check that went red on the day its subject was satisfied, a content claim that survived a ×10
+reprice, and an order-independence row that survived deleting the sort it guarded. Conservation's
+claim was narrowed rather than the code changed — NR-546.
 
 ### N1-A — BL-543, the value anchor's CHECK *(no C++ struct change; cleanest slice)*
 - **A1** `tools/verify/value_anchor.cpp` — read `scripts/economy.lua` § `unit_upkeep` and
