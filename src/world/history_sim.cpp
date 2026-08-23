@@ -206,6 +206,50 @@ int region_distance(const region& a, const region& b, int gw)
     return dc > dr ? dc : dr; // Chebyshev — movement is eight-connected.
 }
 
+/// The cell a Settle from @p src would land in, or false if the neighbourhood is
+/// full. Widening rings, occupancy-tested (BL-310).
+///
+/// EXTRACTED SO THE SCORER CAN ASK THE SAME QUESTION THE EXECUTION ANSWERS
+/// (Sprint 28 T3). Before this it existed only inside the execution branch, so
+/// Settle was scored WITHOUT knowing whether it was possible — while Campaign
+/// discounts itself by `p_win_q`, pricing its own odds of succeeding. Two verbs
+/// compared on different bases is the error this file has twice been bitten by
+/// (`w_cult` as a flat 150 that vetoed every war; `w_dist` flat against a
+/// tripled map), and measurement put the cost at roughly HALF of all Settle
+/// decisions being no-ops: 762 of 1548 on seed 0, 786 of 1548 on seed 4.
+///
+/// Pure and deterministic: the probe order folds `salt(qs, year*131 + probe)`,
+/// so asking twice in one round gives the same answer, which is what lets the
+/// scorer gate on it and the execution place into it without a second search
+/// disagreeing with the first.
+bool settle_target_cell(const settlement_state& ss, const region& src,
+                        uint32_t qs, int64_t y, int gw, int gh,
+                        int& out_col, int& out_row)
+{
+    for (int ring = 1; ring <= 6; ++ring)
+    {
+        const int span = 2 * ring + 1;
+        for (int probe = 0; probe < span * span; ++probe)
+        {
+            const uint32_t h = salt(qs, static_cast<uint32_t>(y) * 131u
+                                        + static_cast<uint32_t>(probe));
+            const int dc = static_cast<int>(h % static_cast<uint32_t>(span)) - ring;
+            const int dr = static_cast<int>((h >> 8) % static_cast<uint32_t>(span)) - ring;
+            if (dc == 0 && dr == 0) continue;
+
+            int cc = src.col + dc;
+            if (gw > 0) cc = ((cc % gw) + gw) % gw;
+            const int rr = clampi(src.row + dr, 0, gh > 0 ? gh - 1 : 0);
+
+            bool taken = false;
+            for (const region& e : ss.regions)
+                if (e.col == cc && e.row == rr) { taken = true; break; }
+            if (!taken) { out_col = cc; out_row = rr; return true; }
+        }
+    }
+    return false;
+}
+
 int step_for_year(const history_sim_params& p, int64_t y)
 {
     const int n = clampi(p.tick_band_count, 0, sim_tick_band_max);
@@ -814,7 +858,34 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // Letting it was the main reason losers regrew faster than they
                 // were conquered, and why elimination never happened.
                 const bool may_settle = q.cohesion_q >= params.settle_cohesion_gate_q;
-                if (may_settle && pressure_src >= 0 && pressure_best >= params.settle_pressure_q)
+
+                // SPRINT 28 T3 — SETTLE MUST BE POSSIBLE BEFORE IT CAN BE PREFERRED.
+                //
+                // Campaign prices its own odds of succeeding: its value is
+                // multiplied by `p_win_q`. Settle did not, and asked nothing
+                // about whether an empty cell existed to settle INTO — only the
+                // execution found out, and a full neighbourhood spent the round
+                // doing nothing. Measured before the fix: roughly HALF of all
+                // Settle decisions were no-ops (762 of 1548 on seed 0, 786 of
+                // 1548 on seed 4, 45-58% on every seed, 4000-year config).
+                //
+                // That is not a weighting problem, which is what it looked like
+                // from the outside — Campaign lost to Settle 931 times on seed 0
+                // and never once fought. It is the SCORER AND THE EXECUTOR
+                // DISAGREEING ABOUT WHAT IS POSSIBLE, the same class of error the
+                // works comment above names.
+                //
+                // So this is a feasibility GATE, not a weight. Nothing is tuned;
+                // an action that cannot be performed simply stops being offered.
+                // One call per polity-round, not per candidate, because the
+                // scorer has already reduced to a single `pressure_src`.
+                int settle_col = -1, settle_row = -1;
+                const bool settle_possible =
+                    may_settle && pressure_src >= 0
+                    && settle_target_cell(ss, ss.regions[static_cast<std::size_t>(pressure_src)],
+                                          qs, y, gw, gh, settle_col, settle_row);
+
+                if (settle_possible && pressure_best >= params.settle_pressure_q)
                 {
                     const region& sp = ss.regions[static_cast<std::size_t>(pressure_src)];
                     const int daughter_value = (region_value_q(sp) * 800) / 1000;
@@ -1143,6 +1214,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             }
             case sim_verb::settle:
             {
+                if (params.trace_battles) ++out.settle_chosen;
                 const region& src = ss.regions[static_cast<std::size_t>(best_target)];
 
                 // BL-310: find an UNOCCUPIED cell, widening the ring as the
@@ -1153,28 +1225,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // Co-located regions then had region_distance 0 and the
                 // Ages map drew a whole stack as one dot.
                 int nc = -1, nr = -1;
-                for (int ring = 1; ring <= 6 && nc < 0; ++ring)
+                if (!settle_target_cell(ss, src, qs, y, gw, gh, nc, nr))
                 {
-                    const int span = 2 * ring + 1;
-                    for (int probe = 0; probe < span * span; ++probe)
-                    {
-                        const uint32_t h = salt(qs, static_cast<uint32_t>(y) * 131u
-                                                    + static_cast<uint32_t>(probe));
-                        const int dc = static_cast<int>(h % static_cast<uint32_t>(span)) - ring;
-                        const int dr = static_cast<int>((h >> 8) % static_cast<uint32_t>(span)) - ring;
-                        if (dc == 0 && dr == 0) continue;
-
-                        int cc = src.col + dc;
-                        if (gw > 0) cc = ((cc % gw) + gw) % gw;
-                        const int rr = clampi(src.row + dr, 0, gh > 0 ? gh - 1 : 0);
-
-                        bool taken = false;
-                        for (const region& e : ss.regions)
-                            if (e.col == cc && e.row == rr) { taken = true; break; }
-                        if (!taken) { nc = cc; nr = rr; break; }
-                    }
+                    // Sprint 28 T3: with the scorer now gating on the same
+                    // probe, this branch should be unreachable. It stays as a
+                    // counted guard rather than an assertion so a regression
+                    // reads as a number in the harness, not a crash.
+                    if (params.trace_battles) ++out.settle_failed;
+                    break; // Neighbourhood full — no room to expand here.
                 }
-                if (nc < 0) break; // Neighbourhood full — no room to expand here.
 
                 region np;
                 np.col = nc;

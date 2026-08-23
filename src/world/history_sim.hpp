@@ -637,6 +637,18 @@ struct history_sim_state
     /// the won rounds included, so the margin distribution has a control.
     std::vector<verb_contest_trace> verb_contests;
 
+    /// SETTLE'S FEASIBILITY, which its SCORE did not consider (Sprint 28 T3).
+    /// Campaign discounts itself by `p_win_q`; Settle scored on pressure and
+    /// daughter value and asked nothing about whether an empty cell existed to
+    /// settle INTO — only the execution found out. Measured before the fix,
+    /// roughly HALF of all Settle decisions were no-ops (762/1548 on seed 0,
+    /// 786/1548 on seed 4 at the 4000-year harness configuration). The scorer
+    /// now gates on `settle_target_cell`, so `settle_failed` should read 0;
+    /// it is kept so a regression is a number rather than a silence. Counted
+    /// only under `params.trace_battles`.
+    int64_t settle_chosen = 0;
+    int64_t settle_failed = 0; ///< ...and found no free cell at execution.
+
     /// Per-battle observation, empty unless `params.trace_battles`. See
     /// `battle_trace` for why it exists and why it cannot move the run.
     std::vector<battle_trace> battle_traces;
