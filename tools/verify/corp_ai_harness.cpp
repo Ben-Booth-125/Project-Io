@@ -14,6 +14,10 @@
 //        pools: goods in pools unlock a gated row and are drained by exactly
 //        the hire cost (ascending body id); a corp without them is refused;
 //        an ungated row hires with no resource debit.
+//   R6 — the budget-claim producer (BL-537 / Sprint N3 T5): a survey foregone
+//        at the solvency gate becomes ONE earmarked `public_exploration` claim
+//        on the corp's home nation for the FULL survey cost of the top-scoring
+//        gated body; no home nation or no gating means no claim.
 // Hand-builds a minimal world (no Lua / SDL / ImGui); kept outside src/ so the
 // CMake glob ignores it. Follows the corp_agency_harness.cpp pattern.
 
@@ -23,7 +27,9 @@
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
 #include "world/market_clearing.hpp"
+#include "world/nation_budget.hpp" // budget_claim (R6, Sprint N3 T5)
 #include "world/recipe_registry.hpp"
+#include "world/survey_system.hpp"  // survey_cost (R6)
 #include "world/unit_roster.hpp"
 #include "world/world.hpp"
 
@@ -655,6 +661,99 @@ int main()
                 check(r == corp_command_result::applied && s.w.units.size() == 1 && left == 0.0f,
                       label.c_str());
             }
+        }
+    }
+
+    // =====================================================================
+    // R6 — the budget-claim producer (BL-537 / Sprint N3 T5)
+    // =====================================================================
+    // A survey the rival WANTED and could not afford becomes a claim on its
+    // home nation's `public_exploration` line: the FULL survey cost, earmarked
+    // to the body (NR-568). One per corp per evaluation — the top-scoring gated
+    // survey — none from a corp with no home nation, none when the survey was
+    // not gated. The scene's hidden body sits 2 AU out (cost 4508); a second
+    // hidden body at 1 AU (cost 2508) scores higher (same area, lower cost), so
+    // the claim must name THAT one and carry 2508, not 4508.
+    {
+        const recipe_registry reg = make_registry();
+
+        auto add_nation = [](scene& s) {
+            const entity_id n = s.w.create_entity();
+            nation_component nc{};
+            nc.name     = "Homeland";
+            nc.treasury = 0.0f; // the pass is not run here; the claim is the subject
+            s.w.nations[n] = nc;
+            return n;
+        };
+        auto add_near_hidden = [](scene& s) {
+            const entity_id b = s.w.create_entity();
+            body_component bc{};
+            bc.name         = "Near Veil";
+            bc.type         = body_type::planet;
+            bc.grid_width   = 4;
+            bc.grid_height  = 4;
+            bc.orbital_radius_au = 1.0f;
+            bc.survey.phase = survey_phase::hidden;
+            s.w.bodies[b] = bc;
+            return b;
+        };
+
+        // Cash-poor, with a home nation: exactly one claim, the right fields.
+        {
+            scene s = make_scene(1000.0f);
+            const entity_id nation = add_nation(s);
+            const entity_id near   = add_near_hidden(s);
+            s.w.corporations.at(s.ai_corp).home_nation = nation;
+            economy_report rep;
+            run_corp_strategic_step(s.w, reg, rep, /*tick=*/4);
+
+            const float near_cost = survey_cost(s.w, near);
+            const float far_cost  = survey_cost(s.w, s.hidden);
+            check(near_cost < far_cost && near_cost > 1000.0f,
+                  "BL-537 R6: the probe is not vacuous - both surveys cost more than "
+                  "the corp holds, and the near body is the cheaper (higher-scoring) one");
+            check(rep.budget_claims.size() == 1,
+                  "BL-537 R6: a cash-gated rival with a home nation files exactly ONE "
+                  "claim per evaluation, though two hidden bodies were gated");
+            if (rep.budget_claims.size() == 1)
+            {
+                const budget_claim& c = rep.budget_claims[0];
+                check(c.nation == nation && c.corp == s.ai_corp &&
+                      c.line == budget_priority::public_exploration,
+                      "BL-537 R6: the claim names the home nation, the corp, and the "
+                      "public_exploration line");
+                check(c.subject == near && c.amount == near_cost,
+                      "BL-537 R6: the claim is earmarked to the TOP-SCORING gated survey "
+                      "and carries that body's FULL survey cost (NR-568)");
+            }
+            check(s.w.bodies.at(near).survey.phase == survey_phase::hidden &&
+                  s.w.bodies.at(s.hidden).survey.phase == survey_phase::hidden,
+                  "BL-537 R6: filing a claim dispatches nothing - both bodies stay hidden");
+        }
+
+        // No home nation: nobody to ask; no claim.
+        {
+            scene s = make_scene(1000.0f);
+            add_near_hidden(s);
+            economy_report rep;
+            run_corp_strategic_step(s.w, reg, rep, /*tick=*/4);
+            check(rep.budget_claims.empty() &&
+                  s.w.corporations.at(s.ai_corp).home_nation == null_entity,
+                  "BL-537 R6: a cash-gated rival with NO home nation files no claim");
+        }
+
+        // Rich: the survey passes the gate and is dispatched; no claim.
+        {
+            scene s = make_scene(20000.0f);
+            const entity_id nation = add_nation(s);
+            const entity_id near   = add_near_hidden(s);
+            s.w.corporations.at(s.ai_corp).home_nation = nation;
+            economy_report rep;
+            run_corp_strategic_step(s.w, reg, rep, /*tick=*/4);
+            check(rep.budget_claims.empty() &&
+                  s.w.bodies.at(near).survey.phase == survey_phase::in_transit,
+                  "BL-537 R6: a rival that could afford its survey dispatches it and "
+                  "files no claim - the gate, not the wish, is the trigger");
         }
     }
 

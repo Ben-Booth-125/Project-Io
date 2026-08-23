@@ -5,6 +5,7 @@
 #include "economy_system.hpp"  // economy_report, agency_event, solve_workforce_target
 #include "logistics.hpp"       // body_reach_field (BL-379: warm before the reach-checked muster scan)
 #include "market_clearing.hpp" // market_for_tile
+#include "nation_budget.hpp"   // budget_claim (Sprint N3 T5: the cash-gated survey asks its nation)
 #include "placement_rules.hpp"
 #include "recipe_registry.hpp"
 #include "survey_system.hpp"
@@ -1428,6 +1429,21 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         float committed = 0.0f;
         std::vector<entity_id> touched_this_eval;
 
+        // The budget-claim producer (BL-537 / Sprint N3 T5). A survey this corp
+        // WANTED and could not afford is the one thing the national budget has a
+        // consumer for today: the corp asks its home nation to fund THAT survey
+        // in full — an earmarked claim on `public_exploration`, subject = the
+        // body (NR-568: the credit dispatches the named survey, it is not a
+        // top-up). At most ONE per corp per evaluation: the candidates are
+        // walked in score order, so the first cash-gated survey is the
+        // top-scoring one, and `run_national_budget` does not dedupe — without
+        // this latch a corp would file one claim per hidden body it could not
+        // afford, and the line would ration all of them against each other.
+        // The player corp never reaches this loop (the guard at the top), so it
+        // is never a claimant; accepted, NR-569c.
+        const entity_id home_nation = cc.home_nation;
+        bool            claimed     = false;
+
         // The decision log's runner-up (NR-232, 2026-08-14). It used to be
         // `cands[i + 1].score` — the next candidate in SORT order — which was
         // wrong in a way that mattered: this loop applies up to seven commands
@@ -1513,6 +1529,24 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 w.corporations.at(corp).balance - committed - c.spend <= required_floor)
             {
                 forgo(c); // could not afford it — foregone in the strongest sense
+
+                // ...and, for a survey, asked of the home nation instead. The
+                // claim carries the FULL survey cost (`c.spend` IS
+                // `survey_cost(w, body)`, set where the candidate was scored)
+                // and the body as its earmark. A corp with no home nation has
+                // nobody to ask. Recorded on the report, not applied: the
+                // budget pass is the nation step's, after `apply_budget`.
+                if (is_survey && !claimed && home_nation != null_entity)
+                {
+                    budget_claim claim;
+                    claim.nation  = home_nation;
+                    claim.corp    = corp;
+                    claim.line    = budget_priority::public_exploration;
+                    claim.amount  = c.spend;
+                    claim.subject = c.cmd.subject;
+                    report.budget_claims.push_back(claim);
+                    claimed = true;
+                }
                 continue;
             }
 

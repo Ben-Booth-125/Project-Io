@@ -220,6 +220,16 @@ bool corp_strategic_eval_due(const world& w, entity_id corp, int tick,
 /// Admitting the player corp does not perturb the others. The cadence keys on
 /// a corp's index in the SORTED FULL corp set, which already contains the
 /// player — so a spectated run changes who acts, never when the rest do.
+///
+/// BUDGET CLAIMS (BL-537 / Sprint N3 T5). Besides commands, the step emits
+/// `economy_report::budget_claims`: when a due corp's top-scoring survey is
+/// foregone at the SOLVENCY GATE and the corp has a `home_nation`, it files one
+/// `budget_claim` on `public_exploration` for that survey's FULL cost, subject =
+/// the body (NR-568: earmarked, not a top-up). At most one per corp per
+/// evaluation; none from a corp that could afford its survey, none from a corp
+/// with no home nation, and never from the player corp (never evaluated).
+/// Recorded only — the national budget pass that pays it runs later in the
+/// tick, and is not this function's.
 void run_corp_strategic_step(world& w, const recipe_registry& reg,
                              economy_report& report, int tick,
                              const corp_ai_params& p = {});

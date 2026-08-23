@@ -69,6 +69,21 @@ struct world; // forward-declared; nation_budget.cpp reads it.
 //     because the `treasury > 0` gate then locks the nation out of spending on
 //     every following tick. See `run_national_budget`'s § The bound.
 //
+//  3a. EARMARKED CLAIMS ARE WHOLE OR NOTHING (Ben, 2026-08-23, NR-568). A claim
+//     that names a `subject` is not a request for credits; it is a request that
+//     ONE NAMED THING be paid for — today, the survey of a body, which
+//     `dispatch_survey` debits at its full cost in the same tick the credit
+//     lands (Sprint N3 T6). Rule 3's pro-rata partial fill would leave such a
+//     corp holding a fraction of a survey: a credit that dispatches nothing,
+//     which is exactly the fungible top-up Ben ruled out. So an earmarked claim
+//     is paid in FULL when the line's remaining share and the nation's
+//     remaining headroom both cover it, and otherwise SKIPPED — pay 0, the
+//     share it would have taken left in the treasury (rule 2 already says where
+//     that goes), the skip counted on the line (`budget_line_result::skipped`)
+//     and the line flagged `rationed`. Unearmarked claims keep rule 3's partial
+//     fill unchanged. The walk order is unchanged too: a skipped earmarked claim
+//     changes which later claims are reached only through the share it leaves.
+//
 // DETERMINISM. Once per economy tick, over nations in ASCENDING ID, over lines
 // in the fixed authored enum order, over each line's claims in ascending
 // (corp id, arrival index). `w.nations` and `w.corporations` are unordered_maps
@@ -101,6 +116,18 @@ enum class budget_priority : uint8_t
 
 /// Number of enumerators in `budget_priority`. Every weight vector is this long.
 inline constexpr std::size_t priority_count = 9;
+
+/// Whether a line's claims name a SUBJECT — the one thing the credit is
+/// earmarked to pay for (rule 3a). Today only `public_exploration` does: its
+/// subject is the BODY to survey (NR-568). A claim on such a line with a null
+/// subject is rejected whole at gather; a claim on any other line has its
+/// subject IGNORED (nulled at gather, so "earmarked" and "has a subject" stay
+/// one predicate downstream). Sprint N3 slice 2 extends this to
+/// `contracted_force`; extend here, not at the call sites.
+inline constexpr bool line_takes_subject(budget_priority line)
+{
+    return line == budget_priority::public_exploration;
+}
 
 /// What a nation cares about, and how much of its treasury it refuses to touch.
 ///
@@ -142,6 +169,15 @@ struct budget_claim
     entity_id       corp   = null_entity; ///< Who is paid — always a named corporation.
     budget_priority line   = budget_priority::logistics_maintenance;
     float           amount = 0.0f;        ///< Credits the claim would take if paid in full.
+
+    /// What the credit is EARMARKED for, on a line that takes one
+    /// (`line_takes_subject`). For `public_exploration` this is the BODY to
+    /// survey, and `amount` is that body's FULL survey cost (NR-568): the
+    /// payment is the dispatch of that survey, not a top-up. Validated at
+    /// gather like every other field — null on a subject-taking line rejects
+    /// the claim whole, and a body `w.bodies` does not hold does the same. On
+    /// any other line it is ignored and reported as null.
+    entity_id       subject = null_entity;
 };
 
 /// What one line did this tick. Reported, not stored — a surface reads it to say
@@ -157,8 +193,40 @@ struct budget_line_result
     /// line was partially filled — the line SAYS SO rather than dropping a claim.
     float fill_fraction = 1.0f;
 
-    /// True when demand exceeded share, i.e. the fill was rationed pro rata.
+    /// True when the line could not meet its demand: either demand exceeded
+    /// share and the unearmarked claims were rationed pro rata (rule 3), or an
+    /// earmarked claim was skipped whole (rule 3a) — `skipped` says which.
     bool  rationed = false;
+
+    /// Earmarked claims skipped whole under rule 3a this tick — asked for more
+    /// than the line's remaining share (or the nation's remaining headroom)
+    /// could cover in full, so they were paid nothing rather than a fraction.
+    int   skipped  = 0;
+};
+
+/// One credit actually moved this tick: the record of WHO paid WHOM, on which
+/// line, for what. This is the datum the pass used to drop at the end of its
+/// walk — the transfer list existed only to apply the balances — and it is what
+/// "who is paying me" (BL-555) renders, and what the earmarked dispatch
+/// (Sprint N3 T6) walks to turn a `public_exploration` credit into the survey
+/// it was for. One entry per claim paid; a claim paid nothing has no entry.
+struct budget_transfer
+{
+    entity_id       corp    = null_entity; ///< Payee.
+    entity_id       nation  = null_entity; ///< Payer.
+    budget_priority line    = budget_priority::logistics_maintenance;
+    entity_id       subject = null_entity; ///< The claim's earmark (null on a line that takes none).
+    float           credits = 0.0f;        ///< What moved — the same float the balance received.
+
+    /// `credits / the claim's amount`: THIS claim's fill, not the line's. An
+    /// earmarked transfer is always 1.0 (rule 3a: whole or nothing); an
+    /// unearmarked one on a rationed line carries its pro-rata fraction.
+    float           fill_fraction = 1.0f;
+
+    /// The LINE's `rationed` flag, copied for context: true means the line this
+    /// transfer sits on could not meet its demand, whether or not this claim
+    /// itself was cut. Read `fill_fraction` for this claim's own fill.
+    bool            rationed = false;
 };
 
 /// What one nation did this tick.
@@ -183,6 +251,20 @@ struct national_budget_tick
     /// accumulation, so the identity holds for any weights. See rule 1 for what
     /// this does and does not say about the world's total credit.
     float total_transferred = 0.0f;
+
+    /// Every credit moved this tick, SORTED (corp, nation, line), arrival order
+    /// within equal keys — a payee's view, grouped for "who is paying me". A
+    /// RECORD of the credits, not the order they were applied in: the balances
+    /// are still credited on the pass's own (corp, nation, amount) sort, which
+    /// adding this list did not move.
+    ///
+    /// The SAME credits `total_transferred` sums, but NOT in the same order:
+    /// that total is nested — each nation's pays summed in (line, corp, arrival)
+    /// order, then the per-nation totals summed in ascending nation — and float
+    /// addition is not associative. A reader wanting the bit-exact identity
+    /// re-walks this list in the pass's order (the harness does exactly that);
+    /// a flat sum over it agrees only to rounding.
+    std::vector<budget_transfer> transfers;
 };
 
 /// Run one economy tick of national spending.
@@ -191,9 +273,11 @@ struct national_budget_tick
 ///   spendable = treasury x (1 - reserve_fraction)
 ///   share(L)  = spendable x weight(L) / sum(weights)
 ///   paid(L)   = min(share(L), demand(L)), rationed pro rata across the line's
-///               claims when demand exceeds share
+///               UNEARMARKED claims when demand exceeds share; an EARMARKED
+///               claim (one with a subject) is paid whole or skipped (rule 3a)
 /// and every paid credit is debited from the treasury and credited to the named
-/// corporation's balance — a direct transfer, never a market order.
+/// corporation's balance — a direct transfer, never a market order — and
+/// recorded on `report->transfers`.
 ///
 /// INERT BY DEFAULT. A nation absent from `budgets`, one whose weights are all
 /// zero, one whose reserve is 1.0, one with a non-positive treasury, and one
@@ -208,11 +292,13 @@ struct national_budget_tick
 ///                 nation scorer that will (BL-542) is unbuilt, and a persistent
 ///                 field ahead of its author would be state with no writer and a
 ///                 serialisation seam owed for nothing. See the item report.
-/// @param claims   This tick's line claims, from BL-538's per-line consumers.
-///                 Order-insensitive: the pass sorts them into its own walk order.
-/// @param report   Optional sink for the per-nation / per-line detail. Null for
-///                 callers that only need the transfers, exactly as
-///                 `apply_budget`'s `breakdown` is.
+/// @param claims   This tick's line claims, from BL-538's per-line consumers —
+///                 today `run_corp_strategic_step`'s cash-gated surveys
+///                 (`economy_report::budget_claims`). Order-insensitive: the
+///                 pass sorts them into its own walk order.
+/// @param report   Optional sink for the per-nation / per-line detail and the
+///                 transfer list. Null for callers that only need the balances
+///                 moved, exactly as `apply_budget`'s `breakdown` is.
 void run_national_budget(world& w,
                          const std::map<entity_id, nation_budget>& budgets,
                          const std::vector<budget_claim>& claims,

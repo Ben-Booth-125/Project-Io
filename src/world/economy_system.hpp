@@ -3,6 +3,8 @@
 #include "components.hpp"
 #include "recipe_registry.hpp"
 #include "battle_system.hpp" // battle_dispatch (BL-467/BL-468)
+#include "nation_ai.hpp"     // nation_scorer_report (BL-542; Sprint N3 T4)
+#include "nation_budget.hpp" // budget_claim, national_budget_tick (BL-537; Sprint N3 T4)
 #include "world.hpp"
 
 #include <array>
@@ -88,10 +90,20 @@ struct corp_budget
     int   force_units      = 0;
     int   force_unsupplied = 0;
 
+    /// BL-537 (Sprint N3): credits received from a nation this tick — the
+    /// national budget's direct transfers to this corp, summed from
+    /// `economy_report::national_budget.transfers` — BEFORE the earmarked
+    /// spend that leaves the same tick. A `public_exploration` credit is paid
+    /// in full and then spent in full by the survey dispatch it was for (NR-568:
+    /// earmarked, not a top-up), so on that line the inflow here and the
+    /// outflow of the dispatch net to zero across the tick; the ledger shows
+    /// both rather than neither. The one INFLOW that is not market income.
+    float subsidies   = 0.0f;
+
     /// The per-tick balance delta: income less every outflow.
     float net() const
     {
-        return income - expenditure - maintenance - wages - interest - levies - upkeep;
+        return income + subsidies - expenditure - maintenance - wages - interest - levies - upkeep;
     }
 };
 
@@ -206,6 +218,34 @@ struct economy_report
     /// breakdown sink (app's live loop); empty under the headless harnesses, which
     /// do not request it. Read by the Balance Ledger / Economy panel.
     std::map<entity_id, corp_budget> budgets;
+
+    // ---- The nation spines (BL-537 / BL-542; Sprint N3 slice 1) -----------
+    // Three records the national pass leaves on the tick's report, so a surface
+    // can see a nation act the way it already sees a corp act. Produced in tick
+    // order: the strategic tier emits `budget_claims` while it scores; the
+    // nation step (`run_nation_step`, after `apply_budget`) scores the nations
+    // into `nation_scores`, runs the budget over the claims, and leaves the
+    // pass's own report in `national_budget`. Each is empty on a tick that
+    // produced nothing; none is persisted.
+
+    /// Claims on a nation's budget raised THIS tick, in emission order. Today
+    /// the only producer is `run_corp_strategic_step`'s cash gate: a rival whose
+    /// top-scoring survey it could not afford asks its home nation to fund that
+    /// survey in full (`public_exploration`, subject = the body) — at most one
+    /// per corp per evaluation. Emission order is the sorted-corp walk, and the
+    /// budget pass re-sorts into its own order anyway.
+    std::vector<budget_claim> budget_claims;
+
+    /// What the national budget pass did this tick: per-nation / per-line
+    /// detail, the total moved, and every transfer (who paid whom, for what).
+    /// "Who is paying me" (BL-555) reads `transfers`; the earmarked dispatch
+    /// walks the `public_exploration` entries.
+    national_budget_tick national_budget;
+
+    /// What the nation scorer did this tick: the term breakdown for every
+    /// nation DUE on the cadence, plus the coverage counts that keep a sweep
+    /// from passing vacuously. BL-558 renders it.
+    nation_scorer_report nation_scores;
 };
 
 /// Run one economy step over every corporation's buildings: extraction credits
