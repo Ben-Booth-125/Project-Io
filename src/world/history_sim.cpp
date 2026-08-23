@@ -602,6 +602,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // run is byte-identical with tracing on or off.
             int      best_p_win_q = 0;
             int      best_hub     = -1;
+            // Sprint 28 lane A instrumentation, ALSO READ ONLY BY THE TRACE.
+            // The best Campaign score that cleared `campaign_threshold_q` this
+            // round, kept separately from `best_score` because `best_score` is
+            // overwritten by whichever verb wins — by the time the round ends
+            // there is no way to recover what Campaign offered, which is the
+            // one number the fork needs. Both are written only under
+            // `trace_battles` and neither is ever compared against, so the run
+            // is byte-identical with tracing on or off.
+            int      best_campaign_score  = 0;
+            bool     campaign_cleared_now = false;
 
             // -- Campaign --------------------------------------------------
             for (int hi : held)
@@ -753,6 +763,21 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         if (winter) s -= params.winter_score_premium_q;
                         if (params.trace_battles) ++out.campaign_scored;
                         s += static_cast<int>(salt(qs, static_cast<uint32_t>(ti)) % 16u); // Stable tie-break.
+
+                        // THE THRESHOLD TEST, OBSERVED SEPARATELY FROM THE
+                        // ARGMAX. The line below fuses two questions with `&&`
+                        // — "is this worth doing" and "is it the best thing to
+                        // do" — and a candidate that fails the first is
+                        // indistinguishable from one that fails the second in
+                        // any counter taken after it. Read here, on the same
+                        // `s` and the same constant the decision uses, so the
+                        // measurement cannot drift from the thing measured.
+                        if (params.trace_battles && s >= params.campaign_threshold_q)
+                        {
+                            ++out.campaign_cleared;
+                            campaign_cleared_now = true;
+                            if (s > best_campaign_score) best_campaign_score = s;
+                        }
 
                         if (s > best_score && s >= params.campaign_threshold_q)
                         {
@@ -922,6 +947,29 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         }
                     }
                 }
+            }
+
+            // THE ROUND-GRAIN HALF OF THE FORK (Sprint 28 lane A). Taken here,
+            // after every verb has been offered and BEFORE the `none` default
+            // below, because the question is which verb WON THE COMPARISON —
+            // a round that fell through to Consolidate by default chose
+            // nothing, and folding it in with rounds Consolidate actually beat
+            // Campaign on would invent a competitor that never competed.
+            //
+            // (A cleared Campaign always beats the initial `best_score` of 0,
+            // so `best_verb` cannot be `none` on any round recorded here. The
+            // ordering is still deliberate: it makes that a property of the
+            // placement rather than of an argument about the initial value.)
+            if (params.trace_battles && campaign_cleared_now)
+            {
+                ++out.campaign_cleared_rounds;
+                if (best_verb != sim_verb::campaign) ++out.campaign_cleared_lost;
+                out.verb_contests.push_back(verb_contest_trace{
+                    static_cast<int32_t>(y),
+                    static_cast<uint16_t>(q.id),
+                    best_campaign_score,
+                    best_score,
+                    best_verb});
             }
 
             if (best_verb == sim_verb::none) best_verb = sim_verb::consolidate;

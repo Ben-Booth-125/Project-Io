@@ -5125,27 +5125,27 @@
         },
         {
           "id": "R3",
-          "status": "pending",
+          "status": "complete",
           "requirement": "THE FORK IS SEPARATED BEFORE ANY FIX. The instrument distinguishes 'campaign never cleared campaign_threshold_q' from 'campaign cleared it and lost the > comparison to another verb' - and where it loses, names the winning verb and the margin. Until this row passes, no fix may be written: the two cases need different fixes and the code cannot currently tell them apart.",
           "result_metric": null,
           "verification": "headless - tools/verify/history_conquest_gap.cpp",
-          "notes": "This is the sprint's gate, T1+T2. Already known from the coarser funnel: seed 0 scores 9,945,420 campaign candidates and chooses NONE, so the stop is at the choice and not at discovery or adjacency."
+          "notes": "This is the sprint's gate, T1+T2. Already known from the coarser funnel: seed 0 scores 9,945,420 campaign candidates and chooses NONE, so the stop is at the choice and not at discovery or adjacency.\n\nSETTLED by requirement group verb-competition-measurement (2026-08-23, lane A). The stop is at the CHOICE, confirmed: 1,396,170 candidates clear the threshold on seed 0 across 1,032 decision rounds and Campaign wins none. The subject is verb competition, not combat."
         },
         {
           "id": "R4",
-          "status": "pending",
+          "status": "complete",
           "requirement": "A MARGIN OF 3 AND A MARGIN OF 3000 ARE DIFFERENT BUGS, and the report says which. If a cleared campaign loses to Settle by a small margin, the answer is a weighting nudge; if by orders of magnitude, it is BL-318 incommensurability - two scores authored on different scales. This file has been bitten by that twice already (w_cult as a flat 150 that vetoed every war; w_dist flat against a tripled map).",
           "result_metric": null,
           "verification": "headless - tools/verify/history_conquest_gap.cpp",
-          "notes": "Stated as its own row because the temptation on seeing 'campaign always loses' is to raise a weight, and that is the right fix for only one of the two cases."
+          "notes": "Stated as its own row because the temptation on seeing 'campaign always loses' is to raise a weight, and that is the right fix for only one of the two cases.\n\nANSWERED 2026-08-23: NEITHER extreme. It is not a 3 and it is not a 3000, so neither ready-made reading applies - and the margin alone was not the diagnostic quantity. The score LEVELS beside it are: Campaign's best cleared score over the whole run is 347 (seed 0) and 298 (seed 4), while the winning verb's WORST win is 349 and 308. The distributions are DISJOINT on exactly the two silent worlds and overlap on all six fighting ones. So it is a level problem rather than a weighting one: Campaign's ceiling sits below Settle's floor, and no tie-break could have won those worlds a round."
         },
         {
           "id": "R5",
-          "status": "pending",
+          "status": "complete",
           "requirement": "THE INSTRUMENT STAYS INERT. Every counter and trace added this sprint is populated only under history_sim_params::trace_battles, and a traced run matches an untraced one in every other output. An instrument that perturbs what it measures is worse than no instrument.",
           "result_metric": null,
           "verification": "headless - tools/verify/history_conquest_gap.cpp",
-          "notes": "Already asserted as T1 in the existing harness and passing; restated here because this sprint ADDS counters and the property must survive them."
+          "notes": "Already asserted as T1 in the existing harness and passing; restated here because this sprint ADDS counters and the property must survive them.\n\nSURVIVED the counters added 2026-08-23 - see verb-competition-measurement R4, which splits the claim into inert (traced == untraced) and gated (untraced leaves the counters empty) and mutation-tests each. The gating half is checked on a seed whose traced run actually moves a counter."
         },
         {
           "id": "R6",
@@ -5473,43 +5473,44 @@
     {
       "brief": "verb-competition-measurement",
       "batch": "2026-08-23-n2-the-spines-move",
-      "status": "in-flight",
+      "status": "complete",
       "title": "Why two of eight worlds fight no war in an entire era - the measurement that chooses the fix",
       "promoted_from": "docs/development/REFINED.md Sprint 28 (Lane A), re-scoped 2026-08-21 on history_conquest_gap's measurement; BL-384 is refuted as written",
       "rows": [
         {
           "id": "R1",
-          "status": "pending",
+          "status": "complete",
           "requirement": "ITEM-SPANNING (headless): THE FORK IS SEPARATED. Two counters distinguish 'the campaign score never cleared campaign_threshold_q' from 'it cleared and lost the > comparison to another verb'. Reported per seed across the benchmark sweep. Everything the sprint does next is conditional on which of the two it is, so this row is the sprint and not a step in it.",
           "result_metric": null,
           "verification": "headless - tools/verify/history_conquest_gap.cpp",
-          "notes": null
+          "notes": "VERIFIED 2026-08-23, and independently reproduced by the main session on its own rebuild. THE FORK IS ANSWERED: the campaign score CLEARS and LOSES. The never-cleared branch is empty on all eight seeds. Seed 0 - 1,396,170 candidates clear campaign_threshold_q across 1,032 rounds, Campaign wins none. Seed 4 - 74,432 across 1,062 rounds, none. The identity cleared_rounds == chosen + cleared_lost closes on every seed."
         },
         {
           "id": "R2",
-          "status": "pending",
+          "status": "complete",
           "requirement": "WHERE CAMPAIGN CLEARS AND LOSES, THE WINNING VERB AND THE MARGIN ARE NAMED. A margin of 3 and a margin of 3000 are different bugs - the first a weighting nudge, the second BL-318 incommensurability, which this file has been bitten by twice. The report distinguishes them by printing the distribution, not a mean.",
           "result_metric": null,
           "verification": "headless - tools/verify/history_conquest_gap.cpp",
-          "notes": null
+          "notes": "VERIFIED 2026-08-23. Winner is Settle in ~93% of lost rounds (957/1032 on seed 0, 987/1062 on seed 4), Invest in the remainder, Consolidate never. The distribution is printed, not a mean. THE ANSWER IS NEITHER OF THE TWO BUGS THE ROW ANTICIPATED: across all eight seeds the 1-3 margin bucket holds 13 rounds and the 1001+ bucket holds zero, so it is not a tie-break nudge and not a raw scale mismatch. The lane added score LEVELS beside the margin, unasked, and that is where the answer is."
         },
         {
           "id": "R3",
-          "status": "pending",
+          "status": "complete",
           "requirement": "THE ZERO-WAR SEEDS ARE THE SUBJECT, AND THEY ARE STILL ZERO. Seeds 0 and 4 fight no battle in an entire era while scoring ~10 million war candidates. The instrument reproduces that exactly before it explains it - a measurement that no longer reproduces the defect is measuring a different world.",
           "result_metric": null,
           "verification": "headless - tools/verify/history_conquest_gap.cpp",
-          "notes": null
+          "notes": "VERIFIED 2026-08-23 and re-verified by the main session from a clean rebuild: all 8 seeds x 6 counts reproduce exactly, seeds 0 and 4 still at zero battles. Stronger than the row asks - the harness whole pre-existing output is byte-identical to the pre-instrumentation build, the only textual difference in the run being 2 checks -> 4 checks."
         },
         {
           "id": "R4",
-          "status": "pending",
+          "status": "complete",
           "requirement": "MEASUREMENT ONLY: NO SCORER WEIGHT, THRESHOLD OR TERM IS CHANGED. The instrument adds counters and a report. Changing a weight in the same pass would make the before/after unreadable, and the fix is deliberately unspecified until R1/R2 choose it.",
           "result_metric": null,
           "verification": "review - the diff",
-          "notes": null
+          "notes": "VERIFIED 2026-08-23. Diff reviewed line by line: every added line in history_sim.{hpp,cpp} is a comment, a declaration, or a write gated on trace_battles. No weight, threshold or scoring term changed. The row is split into inert (traced == untraced on every other output) and gated (an untraced run leaves the counters empty), and each half is mutation-tested separately - dropping the trace_battles guard breaks the gated half alone."
         }
-      ]
+      ],
+      "resolution": "COMPLETE 2026-08-23. THE ANSWER: the campaign score clears its threshold and loses the argmax, on every round, on both silent worlds - so the subject is VERB COMPETITION, not discovery, not adjacency, not the threshold. Winner is Settle in ~93% of lost rounds. The diagnostic quantity turned out to be the score LEVELS rather than the margin: Campaign ceiling sits BELOW the winning verb floor on exactly the two silent worlds and overlaps on all six fighting ones, so no tie-break, salt or luckier target could have won those worlds a single round. The main session re-derived that column over LOST ROUNDS ONLY (the shipped code folds Campaign winning scores into the ceiling at history_conquest_gap.cpp:505, which conditions the statistic on the outcome it explains) and the separation is unchanged - only seed 2 moves, 411 -> 390, still overlapping. A FIX IS DELIBERATELY NOT WRITTEN: it must address the level of the campaign score relative to Settle on worlds where Settle stays high."
     }
   ]
 }

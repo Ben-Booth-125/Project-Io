@@ -457,10 +457,37 @@ in `tools/verify/README.md`.
   99.8% of victories convert — all three mechanisms refuted. What it found instead is that **2 of 8
   worlds fight no war at all** while the rest conquer heavily.
 
-  Its own two assertions are about the INSTRUMENT, not the finding: T1 that tracing is inert (a
-  traced run matches an untraced one in every other output — an instrument that perturbs what it
-  measures is worse than none), and T2 that it caught something. Runs ~8 real 0→1960 sims; budget
-  several minutes.
+  **Extended 2026-08-23 (Sprint 28 lane A) with the T1/T2 verb-competition measurement**, and this
+  is where the finding above actually resolves. "2 of 8 worlds fight no war" plus
+  `campaign_scored` in the millions with `campaign_chosen` at zero still had two readings that need
+  OPPOSITE fixes — Campaign never clearing `campaign_threshold_q`, versus Campaign clearing it and
+  losing the argmax to another verb — and no counter could tell them apart. Two new sim counters
+  (`campaign_cleared`, candidate-grain; `campaign_cleared_rounds`/`campaign_cleared_lost`,
+  round-grain) plus a per-round `verb_contest_trace` split it. **The answer: Campaign CLEARS AND
+  LOSES**, on both silent worlds and on every seed. The subject is verb competition, not combat.
+
+  T2 then names the winner and the margin as a DISTRIBUTION, never a mean (a margin of 3 and a
+  margin of 3000 are different bugs), and prints the two SCORE LEVELS beside it because a margin
+  cannot be read without them. The sharpest line it emits is *ceiling against floor*: on the two
+  silent worlds Campaign's best cleared score is strictly below the winning verb's worst win
+  (347 vs 349; 298 vs 308) — **DISJOINT**, so no tie-break could have changed those rounds — while
+  all six fighting worlds overlap. That one column separates the fighting worlds from the silent
+  ones exactly.
+
+  Its four rows are the requirement group **`verb-competition-measurement`**, and every one is
+  about the INSTRUMENT rather than the finding — the harness stays report-only about the gap.
+  **R1** the fork is answered for all 8 seeds and the round accounting closes on each
+  (`cleared_rounds == chosen + lost`, `cleared_rounds <= cleared <= scored`). **R2** every
+  ZERO-BATTLE seed is classified from counters, not from an empty battle set — the anti-vacuity
+  row, since a check written as a loop over `battle_trace`s asserts nothing on seeds 0 and 4, which
+  are the whole subject. **R3** the instrumented sweep reproduces the pre-change table exactly
+  (all 8 seeds × 6 counts): a measurement that no longer reproduces the defect is measuring a
+  different world. **R4** the instrument is inert AND gated — traced == untraced on every non-trace
+  output, and an untraced run leaves all four new counters empty, checked on a seed that actually
+  moves them rather than on one where the claim would hold vacuously.
+
+  Runs ~8 real sims plus 2 untraced companions; budget ~2 minutes. Q1–Q5's output is byte-identical
+  to the pre-instrumentation build, which is the strongest inertness evidence available.
 
 - **`interdiction_harness`** — Can a supply line be cut? (BL-458, Sprint C3, 2026-08-21.) The
   item-spanning check for the mechanic that makes a convoy a military object: a hostile unit
