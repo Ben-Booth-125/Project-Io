@@ -1,6 +1,7 @@
 #pragma once
 
-#include "components.hpp" // entity_id, resource_type, building_type
+#include "components.hpp"   // entity_id, resource_type, building_type
+#include "corp_command.hpp" // no_province (BL-570: the shared "absent province" sentinel)
 
 #include <cstdint>
 #include <string>
@@ -74,6 +75,21 @@ enum class condition_subject : uint8_t
     // not a currency it pays down. Making it spendable would need an entirely
     // different mechanism and would be a design change, not a wiring job.
     science,           ///< The subject corp's accumulated research points.
+
+    // --- province_held (BL-570, 2026-08-23) ---------------------------------
+    // CONTRACTS.md's spine — "a contract is a condition_set the client will pay
+    // to have become true" — could not be EXPRESSED until this landed: the nine
+    // subjects above are world-wide corp scalars with no location qualifier, and
+    // "hold this province" is inescapably local. Qualified by `condition::province`
+    // (below), and measured against `world::province_holder` (BL-569) via
+    // `province_holder_for` — a military fact ("who currently holds it"), never
+    // a political one (`tile_to_nation`, the territorial map, does not move).
+    //
+    // Appended LAST, exactly as `science` was: `condition_subject` is a uint8_t
+    // inside a SERIALISED `condition` record (a law's condition_set crosses the
+    // save seam — see world_save.cpp's `max_cond_subj`), so a value may be
+    // appended but never inserted or reordered.
+    province_held,     ///< 1 if `condition::province` is held by the subject corp, else 0.
 };
 
 /// How a measured value is compared against `condition::operand`.
@@ -107,6 +123,15 @@ struct condition
     resource_type resource  = resource_type::iron_ore; ///< `stockpile`, `market`.
     building_type structure = building_type::none;     ///< `structure`.
     std::string   key;                                 ///< `research` (a tech id).
+
+    /// `province_held` (BL-570). The province id `measure_condition` asks
+    /// `province_holder_for` about. Defaults to `no_province` — the SAME
+    /// sentinel `corp_command::province` uses (corp_command.hpp), reused rather
+    /// than reinvented so "no province named" has one meaning across the seams
+    /// that carry a province id. An authored contract template (scripts/
+    /// contracts.lua) leaves this unset: the real province is bound per
+    /// accepted offer (BL-572/BL-573), not authored in the template.
+    uint32_t province = no_province;
 };
 
 /// A flat AND-list. Every condition must hold; an EMPTY set holds (property 2).

@@ -38,7 +38,7 @@ constexpr auto max_ideology   = ideology::isolationist;
 constexpr auto max_posture    = expansionism::aggressive;
 constexpr auto max_econ_focus = economic_focus::trade;
 constexpr auto max_law_effect = law_effect_kind::import_tariff;
-constexpr auto max_cond_subj  = condition_subject::science;
+constexpr auto max_cond_subj  = condition_subject::province_held; // BL-570: appended after science
 constexpr auto max_cond_cmp   = condition_comparator::less_than;
 constexpr auto max_mod_subj   = modifier_subject::collapse_strain;
 constexpr auto max_mod_op     = modifier_op::multiply;
@@ -402,13 +402,20 @@ void w_condition(std::ostream& o, const condition& c)
     w_enum(o, c.resource);
     w_enum(o, c.structure);
     w_str(o, c.key);
+    w_u32(o, c.province); // BL-570 (format v5): province_held's qualifier
 }
 
 bool r_condition(std::istream& i, condition& c)
 {
     return r_enum(i, c.subject, max_cond_subj) && r_enum(i, c.comparator, max_cond_cmp)
         && r_f32(i, c.operand) && r_enum(i, c.resource, max_resource)
-        && r_enum(i, c.structure, max_building) && r_str(i, c.key);
+        && r_enum(i, c.structure, max_building) && r_str(i, c.key)
+        && r_u32(i, c.province); // BL-570 (format v5): not range-gated here, exactly
+                                 // like c.resource/c.structure are gated but a raw
+                                 // province id is not — province_holder_for (province.cpp)
+                                 // is already the authoritative existence check, and it is
+                                 // safe over every uint32 including no_province and a stale
+                                 // id from a partition that has since been regenerated.
 }
 
 void w_condition_set(std::ostream& o, const condition_set& cs) { w_vec(o, cs.all, w_condition); }

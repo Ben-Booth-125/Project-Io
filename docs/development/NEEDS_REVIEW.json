@@ -106,6 +106,21 @@
    "why_it_matters": "This satisfies the standing rule's core concern — BL-449 shipped clean on both compile and harness while a press rendered unreachable, and this pass proves March IS reachable and does dispatch. But it stops short of the full 'watch it work' bar the rule aspires to, and per the rule's own reasoning (a scripted capture is not enough), neither is a click that merely disarms without a rejection message.",
    "options": [],
    "recommendation": "Optional: a follow-up live session with more sim-time (past a quarter boundary, unit pre-located before issuing the march) to directly watch a unit's marker move. Not a blocker for Wave 1 close-out given the code-path and headless evidence."
+  },
+  {
+   "id": "NR-579",
+   "title": "scripts/contracts.lua's fee_mult and deadline_ticks (take 1.0/180, hold 1.25/90) are legible placeholders, not measured",
+   "raised": "2026-08-23",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-570 (CONDITION_PROVINCE_SUBJECT), authoring scripts/contracts.lua's first two template rows.",
+   "what": "BL-570's task is the vocabulary + template table shape, not a priced contract -- nothing reads fee_mult or deadline_ticks yet (BL-572 derives the offer/fee, BL-573 builds the live contract), so there was nothing to measure against. Authored round, legible defaults instead, matching economy.lua's own stated discipline for a first cut: take = 1.0x fee, 180-tick deadline; hold = 1.25x fee (a premium for standing watch), 90-tick deadline (a defensive window is naturally shorter than an offensive one). Both numbers are a guess at the right SHAPE (hold costs more, hold is shorter), not a derived magnitude.",
+   "why_it_matters": "BL-572 (contract offers) is the first item that actually prices a fee off these multipliers against a nation's contracted_force budget line, and BL-573 (contract record) is the first to run out a real deadline. If either lands without revisiting these two rows, the mercenary vertical slice's first offers will be priced/paced on an unexamined guess rather than a playtested number.",
+   "options": [],
+   "recommendation": "Re-derive or explicitly re-affirm fee_mult and deadline_ticks once BL-572 can measure them against a real nation treasury and BL-573 against a real contract's pacing -- same discipline CONTRACTS.md and economy.lua already apply elsewhere (iterate by playtest, not by authoring once and forgetting).",
+   "files": [
+    "scripts/contracts.lua"
+   ]
   }
  ]
 }

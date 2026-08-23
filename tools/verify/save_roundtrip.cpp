@@ -153,18 +153,19 @@ int main()
             check(!from_bytes(bad, victim), "P3 a mismatched version is rejected");
         }
         {
-            // Sprint 16, BL-569: the PREVIOUS format, by number. A v3 stream has
-            // no province_holder trailing section, so a reader that accepted it
-            // would read past the end of the embedded history-log stream and
-            // misparse whatever followed. The whole stream is refused instead --
-            // a v3 save is not migrated, it is rejected, and the destination is
-            // not touched.
-            static_assert(world_save_version == 4,
-                          "P9 names v3 as the refused predecessor; re-read this row on a bump");
+            // Sprint 16, BL-570: the PREVIOUS format, by number. A v4 stream's
+            // `condition` records are one field short (no `province`), so a
+            // reader that accepted it would misread whatever bytes follow the
+            // first law's/embargo's condition as that condition's province id,
+            // and every field after it in the same record would shift with it.
+            // The whole stream is refused instead -- a v4 save is not migrated,
+            // it is rejected, and the destination is not touched.
+            static_assert(world_save_version == 5,
+                          "P9 names v4 as the refused predecessor; re-read this row on a bump");
             std::string bad = bytes_once;
-            const uint32_t v3 = 3;
-            std::memcpy(&bad[4], &v3, sizeof v3);
-            check(!from_bytes(bad, victim), "P9 a v3-versioned stream is refused (format is v4)");
+            const uint32_t v4 = 4;
+            std::memcpy(&bad[4], &v4, sizeof v4);
+            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v5)");
         }
         {
             // Truncated mid-way through the tile store -- far enough in that a
@@ -182,7 +183,7 @@ int main()
               "P3 every rejected load left the destination world untouched");
         check(victim.nations.empty() && victim.nation_budgets.empty()
                   && victim.province_holder.empty(),
-              "P9 the v3 refusal left nations, nation_budgets and province_holder untouched");
+              "P9 the v4 refusal left nations, nation_budgets and province_holder untouched");
     }
 
     // -----------------------------------------------------------------------
@@ -512,9 +513,13 @@ int main()
         condition_set embargo;
         embargo.all.push_back({ condition_subject::science, condition_comparator::greater_than,
                                 42.5f, resource_type::coffee, building_type::launchpad,
-                                "embargo-key" });
-        embargo.all.push_back({ condition_subject::military_units, condition_comparator::at_most,
-                                3.0f, resource_type::furs, building_type::military_base, "" });
+                                "embargo-key" }); // province defaults to no_province — untouched
+        // BL-570: the 7th positional field (province) round-trips too — a
+        // real, non-default id, so byte-equality below is not just proving the
+        // pre-existing 6 fields survive while a defaulted 7th rides along free.
+        embargo.all.push_back({ condition_subject::province_held, condition_comparator::at_least,
+                                1.0f, resource_type::furs, building_type::military_base, "",
+                                4242u });
         f.corp_embargo_conditions[c3] = embargo;
 
         f.corp_hostile_pairs.insert({ c1, c2 });
@@ -569,6 +574,8 @@ int main()
                       && e.all[0].subject == condition_subject::science
                       && e.all[1].structure == building_type::military_base,
                   "P8 a condition_set nested in a map survives, strings included");
+            check(e.all[0].province == no_province && e.all[1].province == 4242u,
+                  "P8 BL-570: condition::province round-trips (default AND a real id)");
             check(back.earned_techs.at(c1) == std::set<std::string>{ "metallurgy", "rocketry" }
                       && back.earned_techs.at(c2).count("optics") == 1,
                   "P8 the per-corp earned-tech string sets survive");
