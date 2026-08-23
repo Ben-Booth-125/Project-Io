@@ -48,10 +48,12 @@ namespace
 {
 
 int g_failures = 0;
+int g_checks   = 0;
 
 void check(bool ok, const char* what)
 {
     std::printf("  %s  %s\n", ok ? "PASS" : "FAIL", what);
+    ++g_checks;
     if (!ok) ++g_failures;
 }
 
@@ -70,6 +72,122 @@ int median_of(std::vector<int> v)
     std::sort(v.begin(), v.end());
     return v[v.size() / 2];
 }
+
+const char* verb_name(sim_verb v)
+{
+    switch (v)
+    {
+    case sim_verb::none:        return "none";
+    case sim_verb::settle:      return "Settle";
+    case sim_verb::campaign:    return "Campaign";
+    case sim_verb::invest:      return "Invest";
+    case sim_verb::consolidate: return "Consolidate";
+    case sim_verb::build_work:  return "BuildWork";
+    }
+    return "?";
+}
+
+constexpr int verb_slots = 6; ///< sim_verb none..build_work.
+
+/// ORDER-OF-MAGNITUDE BUCKETS, NOT A MEAN — the T2 requirement in one function.
+/// A margin of 3 and a margin of 3000 are different bugs (a weighting nudge vs
+/// BL-318 incommensurability, two scores authored on different scales), and a
+/// mean of the two is 1501, which is neither. The bucket edges are decades
+/// because that is the axis the two bugs separate on.
+const char* margin_bucket_label(int i)
+{
+    static const char* labels[] = {"1-3", "4-10", "11-30", "31-100",
+                                   "101-300", "301-1000", "1001+"};
+    return labels[i];
+}
+constexpr int margin_buckets = 7;
+
+int margin_bucket_of(int m)
+{
+    if (m <=    3) return 0;
+    if (m <=   10) return 1;
+    if (m <=   30) return 2;
+    if (m <=  100) return 3;
+    if (m <=  300) return 4;
+    if (m <= 1000) return 5;
+    return 6;
+}
+
+/// Quantile of an ALREADY-SORTED vector, nearest-rank.
+int quantile_of(const std::vector<int>& sorted, double q)
+{
+    if (sorted.empty()) return 0;
+    const std::size_t i = static_cast<std::size_t>(q * (sorted.size() - 1) + 0.5);
+    return sorted[std::min(i, sorted.size() - 1)];
+}
+
+/// The three readings the fork admits. Total by construction — every seed lands
+/// in exactly one, which is what R1 asserts.
+enum class fork_reading
+{
+    unclassified = 0, ///< Only ever a bug in this harness; asserted against.
+    never_cleared,    ///< Campaign never clears its own threshold.
+    cleared_and_lost, ///< In the running every round, wins none of them.
+    cleared_and_won,  ///< Wins at least one round.
+};
+
+const char* reading_name(fork_reading r)
+{
+    switch (r)
+    {
+    case fork_reading::unclassified:     return "UNCLASSIFIED (harness bug)";
+    case fork_reading::never_cleared:    return "NEVER CLEARS the threshold";
+    case fork_reading::cleared_and_lost: return "CLEARS and LOSES every round";
+    case fork_reading::cleared_and_won:  return "clears and wins at least once";
+    }
+    return "?";
+}
+
+/// One seed's whole funnel, kept so the assertions run over the SEEDS rather
+/// than over the battles. That distinction is the point: seeds 0 and 4 produce
+/// no battles at all, so any check written as a loop over `battle_trace`s is
+/// silently vacuous on exactly the two worlds this sprint exists to explain.
+struct seed_row
+{
+    int     seed = 0;
+    int64_t battles = 0, conquests = 0, foundings = 0;
+    int64_t contacts = 0, scored = 0, chosen = 0;
+    int64_t cleared = 0, cleared_rounds = 0, cleared_lost = 0;
+    fork_reading reading = fork_reading::unclassified;
+    /// Losing margins (winner_score - campaign_score), split by winning verb.
+    std::vector<int> margins[verb_slots];
+    /// THE LEVELS THE MARGIN HAS TO BE READ AGAINST. A margin of 280 is a
+    /// weighting nudge if Campaign was scoring 3000 and an order-of-magnitude
+    /// mismatch if it was scoring 45 — the same number, two different bugs, and
+    /// the margin alone cannot tell them apart. So the two scores are carried
+    /// beside it, not just their difference.
+    std::vector<int> camp_scores[verb_slots];
+    std::vector<int> win_scores[verb_slots];
+    /// The control: what a Campaign score looks like on a round Campaign WON.
+    /// Empty on a silent world by definition, which is itself the finding.
+    std::vector<int> won_camp_scores;
+};
+
+/// The pinned table (R3). These are the counts the pre-instrumentation build
+/// produced on 2026-08-23, taken from a run of this harness against HEAD before
+/// the T1/T2 counters were added.
+///
+/// THE POINT OF PINNING THEM IS NOT REGRESSION IN GENERAL — it is that a
+/// MEASUREMENT which no longer reproduces the defect is measuring a different
+/// world. Seeds 0 and 4 at zero battles are the defect; if instrumentation
+/// moved them, every number this harness prints would describe a sim that no
+/// longer has the problem the sprint was scoped around.
+struct pinned_row { int64_t battles, conquests, foundings, contacts, scored, chosen; };
+constexpr pinned_row pinned[8] = {
+    {   0,    0, 786, 4972710,  9945420,   0},
+    { 236,  210, 643, 6189696, 12379392, 241},
+    { 435,  435, 543, 2620190,  5240380, 435},
+    { 163,  163, 383, 3062571,  6125142, 163},
+    {   0,    0, 762, 4089264,  8178528,   0},
+    { 164,  164, 628, 3796047,  7592094, 165},
+    {  44,   43, 872, 5441888, 10883776,  44},
+    { 184,  184, 662, 1578177,  3156354, 185},
+};
 
 // THE CONSTANTS, NEVER THE NUMBERS. The first cut of this harness hardcoded
 // 312x145 — the homeworld's size before BL-424 took it to 70% area — against a
@@ -98,8 +216,22 @@ int main()
     // measures is worse than no instrument, and this is the one thing here that
     // IS asserted.
     bool trace_is_inert = true;
+    /// R4's second half: the new T1/T2 counters must be GATED, not merely
+    /// harmless. An untraced run has to leave every one of them at zero and
+    /// `verb_contests` empty — otherwise the sim is paying for the measurement
+    /// on every generated world, and the inertness check above would still be
+    /// green because it only compares the OTHER outputs.
+    bool counters_are_gated = true;
+    /// THE ANTI-VACUITY GUARD ON R4. Checking "the untraced run left the
+    /// counters at zero" on a seed whose TRACED run also leaves them at zero
+    /// proves nothing — and seed 0, where the existing inertness pair runs, is
+    /// exactly a candidate for that. So the gating pair is run on the first
+    /// seed whose traced run actually moves a counter, and the seed it ran on
+    /// is asserted to exist.
+    int  gating_seed = -1;
     int  peaceful_worlds = 0;
     int  worlds = 0;
+    std::vector<seed_row> rows;
 
     for (int i = 0; i < seeds; ++i)
     {
@@ -134,6 +266,10 @@ int main()
                 || off.foundings != chk.foundings || off.winter_campaigns != chk.winter_campaigns
                 || off.owner_changes.size() != chk.owner_changes.size())
                 trace_is_inert = false;
+
+            if (off.campaign_cleared != 0 || off.campaign_cleared_rounds != 0
+                || off.campaign_cleared_lost != 0 || !off.verb_contests.empty())
+                counters_are_gated = false;
         }
 
         settlement_state ss_on = k->settlement;
@@ -144,6 +280,53 @@ int main()
 
         if (on.battles == 0) ++peaceful_worlds;
         ++worlds;
+
+        if (gating_seed < 0 && on.campaign_cleared > 0)
+        {
+            settlement_state ss_g = k->settlement;
+            history_sim_params p_g; // trace_battles stays false.
+            const history_sim_state g =
+                run_history_sim(ss_g, nullptr, terr.view(), kgw, kgh, p_g, wp.seed);
+            if (g.campaign_cleared != 0 || g.campaign_cleared_rounds != 0
+                || g.campaign_cleared_lost != 0 || !g.verb_contests.empty())
+                counters_are_gated = false;
+            if (g.battles != on.battles || g.conquests != on.conquests
+                || g.foundings != on.foundings || g.winter_campaigns != on.winter_campaigns
+                || g.owner_changes.size() != on.owner_changes.size())
+                trace_is_inert = false;
+            gating_seed = i;
+        }
+
+        seed_row row;
+        row.seed      = i;
+        row.battles   = on.battles;
+        row.conquests = on.conquests;
+        row.foundings = on.foundings;
+        row.contacts  = on.campaign_contacts;
+        row.scored    = on.campaign_scored;
+        row.chosen    = on.campaign_chosen;
+        row.cleared        = on.campaign_cleared;
+        row.cleared_rounds = on.campaign_cleared_rounds;
+        row.cleared_lost   = on.campaign_cleared_lost;
+
+        if (on.campaign_cleared == 0)      row.reading = fork_reading::never_cleared;
+        else if (on.campaign_chosen == 0)  row.reading = fork_reading::cleared_and_lost;
+        else                               row.reading = fork_reading::cleared_and_won;
+
+        for (const verb_contest_trace& vc : on.verb_contests)
+        {
+            if (vc.winner == sim_verb::campaign)
+            {
+                row.won_camp_scores.push_back(vc.campaign_score);
+                continue;
+            }
+            const int slot = static_cast<int>(vc.winner);
+            if (slot < 0 || slot >= verb_slots) continue;
+            row.margins[slot].push_back(vc.winner_score - vc.campaign_score);
+            row.camp_scores[slot].push_back(vc.campaign_score);
+            row.win_scores[slot].push_back(vc.winner_score);
+        }
+        rows.push_back(std::move(row));
 
         // The funnel, printed for EVERY seed including the silent ones — a world
         // with no battles has no traces, so the per-battle record is mute about
@@ -156,12 +339,244 @@ int main()
                     static_cast<long long>(on.campaign_contacts),
                     static_cast<long long>(on.campaign_scored),
                     static_cast<long long>(on.campaign_chosen));
+        std::fflush(stdout);
 
         all.insert(all.end(), on.battle_traces.begin(), on.battle_traces.end());
     }
 
-    check(trace_is_inert, "T1 tracing is INERT — a traced run matches an untraced one in every other output");
-    check(!all.empty(),   "T2 the instrument caught something (a run with zero battles would explain nothing)");
+    // ======================================================================
+    // T1/T2 — VERB COMPETITION. Sprint 28 lane A.
+    // ======================================================================
+    //
+    // WHY THIS IS THE WHOLE SPRINT'S FORK. Everything above (and BL-384 in its
+    // entirety) is about battles that happened. Two worlds in eight fight NO
+    // WAR IN AN ENTIRE ERA — not few, none — and for those worlds every
+    // per-battle number here is measuring an empty set. `campaign_chosen == 0`
+    // with `campaign_scored` in the millions narrows it to "the scorer looks at
+    // a war it could start ten million times and picks something else", and
+    // then stops: a candidate DISCARDED BELOW ITS THRESHOLD and one that
+    // CLEARED AND LOST THE ARGMAX are the same zero.
+    //
+    // They are different defects. Never-cleared is a defect in the campaign
+    // score itself; cleared-and-lost is a defect in the comparison between
+    // verbs — and the fix for one would be inert against the other. That is
+    // what T1 separates and what T2 then sizes.
+    std::printf("\n  === T1. THE FORK: does Campaign CLEAR its threshold and lose, or never clear? ===\n");
+    std::printf("    cleared        = CANDIDATES scoring >= campaign_threshold_q (a polity\n"
+                "                     examines many targets x 2 seasons in one round).\n");
+    std::printf("    rounds/won/lost= ROUND grain. Every round Campaign was in the running\n"
+                "                     either won the argmax or lost it; there is no third case.\n\n");
+    std::printf("    seed | battles | scored cand | cleared cand | rounds |  won |  lost | reading\n");
+    std::printf("    -----+---------+-------------+--------------+--------+------+-------+--------\n");
+    for (const seed_row& r : rows)
+        std::printf("    %4d | %7lld | %11lld | %12lld | %6lld | %4lld | %5lld | %s\n",
+                    r.seed, static_cast<long long>(r.battles),
+                    static_cast<long long>(r.scored),
+                    static_cast<long long>(r.cleared),
+                    static_cast<long long>(r.cleared_rounds),
+                    static_cast<long long>(r.chosen),
+                    static_cast<long long>(r.cleared_lost),
+                    reading_name(r.reading));
+
+    // The silent worlds, called out on their own, because they are the subject.
+    std::printf("\n    The worlds that fight nothing:\n");
+    int silent_seen = 0, silent_never_cleared = 0, silent_cleared_lost = 0;
+    for (const seed_row& r : rows)
+    {
+        if (r.battles != 0) continue;
+        ++silent_seen;
+        if (r.reading == fork_reading::never_cleared)    ++silent_never_cleared;
+        if (r.reading == fork_reading::cleared_and_lost) ++silent_cleared_lost;
+        std::printf("      seed %d: %lld candidates scored, %lld cleared the threshold,"
+                    " %lld rounds lost to another verb -> %s\n",
+                    r.seed, static_cast<long long>(r.scored),
+                    static_cast<long long>(r.cleared),
+                    static_cast<long long>(r.cleared_lost),
+                    reading_name(r.reading));
+    }
+    if (silent_seen == 0)
+        std::printf("      (none in this sweep — the defect this sprint was scoped around\n"
+                    "       is NOT REPRODUCING, and every number below describes a different world.)\n");
+    else if (silent_never_cleared == silent_seen)
+        std::printf("      READING: the campaign score NEVER clears its own threshold on a silent\n"
+                    "               world. Verb competition is not the subject — nothing was ever\n"
+                    "               in the running for another verb to beat.\n");
+    else if (silent_cleared_lost == silent_seen)
+        std::printf("      READING: Campaign is in the running on every silent world and loses\n"
+                    "               every argmax. The subject is VERB COMPETITION, and T2 names\n"
+                    "               what beats it and by how much.\n");
+    else
+        std::printf("      READING: the silent worlds are silent for DIFFERENT reasons — %d never\n"
+                    "               clear, %d clear and lose. One fix will not serve both.\n",
+                    silent_never_cleared, silent_cleared_lost);
+
+    // ---- T2. Who beats Campaign, and by how much -------------------------
+    std::printf("\n  === T2. WHEN CAMPAIGN CLEARS AND LOSES: the winning verb and the margin ===\n");
+    std::printf("    margin = winning verb's score - best cleared Campaign score, in the shared\n"
+                "    currency (BL-318). A margin of 3 is a weighting nudge; a margin of 3000 is\n"
+                "    incommensurability — two scores authored on different scales. This file has\n"
+                "    been bitten by that twice (w_cult flat 150; w_dist flat on a tripled map),\n"
+                "    so the DISTRIBUTION is printed and no mean is taken anywhere.\n");
+
+    int64_t total_lost_rounds = 0;
+    for (const seed_row& r : rows) total_lost_rounds += r.cleared_lost;
+
+    if (total_lost_rounds == 0)
+    {
+        std::printf("\n    No round anywhere in the sweep had Campaign clear and lose.\n"
+                    "    T2 does not apply: the fork's answer is on the other branch.\n");
+    }
+    else
+    {
+        for (const seed_row& r : rows)
+        {
+            if (r.cleared_lost == 0) continue;
+            std::printf("\n    seed %d — %lld rounds cleared and lost:\n",
+                        r.seed, static_cast<long long>(r.cleared_lost));
+            std::printf("      %-11s | %7s | %-28s | %-17s | %-17s\n",
+                        "winner", "rounds", "margin (min p25 med p75 p90 max)",
+                        "Campaign scored", "winner scored");
+            for (int v = 0; v < verb_slots; ++v)
+            {
+                if (r.margins[v].empty()) continue;
+                std::vector<int> m = r.margins[v];
+                std::vector<int> c = r.camp_scores[v];
+                std::vector<int> w = r.win_scores[v];
+                std::sort(m.begin(), m.end());
+                std::sort(c.begin(), c.end());
+                std::sort(w.begin(), w.end());
+                std::printf("      %-11s | %7zu | %4d %4d %4d %4d %4d %5d | %4d %4d %4d   | %4d %4d %4d\n",
+                            verb_name(static_cast<sim_verb>(v)), m.size(),
+                            m.front(), quantile_of(m, 0.25), quantile_of(m, 0.50),
+                            quantile_of(m, 0.75), quantile_of(m, 0.90), m.back(),
+                            c.front(), quantile_of(c, 0.50), c.back(),
+                            w.front(), quantile_of(w, 0.50), w.back());
+            }
+            // THE CONTROL, printed even when empty — "Campaign never scored high
+            // enough to win a round here" is a finding, and a table that simply
+            // omitted the line would read as an oversight instead.
+            if (r.won_camp_scores.empty())
+                std::printf("      control: Campaign won NO round on this seed, so there is no\n"
+                            "               winning Campaign score to compare the losing ones to.\n");
+            else
+            {
+                std::vector<int> wc = r.won_camp_scores;
+                std::sort(wc.begin(), wc.end());
+                std::printf("      control: on the %zu rounds Campaign DID win, its score ran"
+                            " %d / %d / %d (min/med/max).\n",
+                            wc.size(), wc.front(), quantile_of(wc, 0.50), wc.back());
+            }
+            // The histogram, because the quantiles above are still summary and
+            // the two bugs separate on the decade.
+            for (int v = 0; v < verb_slots; ++v)
+            {
+                if (r.margins[v].empty()) continue;
+                int hist[margin_buckets] = {0};
+                for (int m : r.margins[v]) ++hist[margin_bucket_of(m)];
+                std::printf("      %-11s margin histogram:", verb_name(static_cast<sim_verb>(v)));
+                for (int b = 0; b < margin_buckets; ++b)
+                    std::printf("  %s:%d", margin_bucket_label(b), hist[b]);
+                std::printf("\n");
+            }
+        }
+    }
+
+    // THE SHARPEST READ, AND THE ONE A TABLE OF QUANTILES HIDES: not how far
+    // apart the medians are, but whether the two distributions OVERLAP AT ALL.
+    // A Campaign score that could beat the winner on its best round and simply
+    // usually does not is a weighting problem. A Campaign CEILING that sits
+    // below the winner's FLOOR is a level problem — no round of that world was
+    // ever winnable for Campaign, and no tie-break, salt or lucky target could
+    // have changed it.
+    if (total_lost_rounds > 0)
+    {
+        std::printf("\n    Ceiling against floor — do the two score distributions ever overlap?\n");
+        std::printf("      seed | Campaign best cleared | winning verb's worst win | overlap?\n");
+        for (const seed_row& r : rows)
+        {
+            if (r.cleared_lost == 0) continue;
+            int camp_max = -1, win_min = -1;
+            for (int v = 0; v < verb_slots; ++v)
+                for (std::size_t j = 0; j < r.camp_scores[v].size(); ++j)
+                {
+                    if (r.camp_scores[v][j] > camp_max) camp_max = r.camp_scores[v][j];
+                    if (win_min < 0 || r.win_scores[v][j] < win_min) win_min = r.win_scores[v][j];
+                }
+            for (int wc : r.won_camp_scores) if (wc > camp_max) camp_max = wc;
+            std::printf("      %4d | %21d | %24d | %s%s\n",
+                        r.seed, camp_max, win_min,
+                        camp_max >= win_min ? "overlaps" : "DISJOINT — Campaign's best < the winner's worst",
+                        r.battles == 0 ? "   <- silent world" : "");
+        }
+    }
+
+    // ---- The rows --------------------------------------------------------
+    //
+    // Written over SEEDS, never over battles. A loop over `battle_trace`s
+    // asserts nothing on seeds 0 and 4, which is precisely where the defect is.
+    std::printf("\n  --- requirement group verb-competition-measurement ---\n");
+
+    // R1. Every seed classified, and the round accounting closes on each one.
+    bool r1_total = true, r1_identity = true, r1_grain = true;
+    for (const seed_row& r : rows)
+    {
+        if (r.reading == fork_reading::unclassified) r1_total = false;
+        if (r.cleared_rounds != r.chosen + r.cleared_lost) r1_identity = false;
+        // Candidate grain must dominate round grain, and clearing is a subset
+        // of scoring. Both would break if a counter were incremented in the
+        // wrong loop — the most likely way to get a plausible wrong answer.
+        if (r.cleared < r.cleared_rounds || r.cleared > r.scored) r1_grain = false;
+    }
+    check(static_cast<int>(rows.size()) == seeds && r1_total && r1_identity && r1_grain,
+          "R1 the fork is ANSWERED for every seed: all 8 classified, and on each one "
+          "cleared_rounds == chosen + lost with cleared_rounds <= cleared <= scored");
+
+    // R2. The silent seeds are measured, not skipped — and the assertion is
+    // written so an empty battle set cannot make it green.
+    bool r2_ok = silent_seen > 0;
+    for (const seed_row& r : rows)
+    {
+        if (r.battles != 0) continue;
+        // A silent seed must be classified from COUNTERS: candidates were
+        // examined, none was chosen, and exactly one branch of the fork fired.
+        const bool never  = (r.cleared == 0);
+        const bool lost   = (r.cleared > 0 && r.cleared_lost == r.cleared_rounds && r.cleared_rounds > 0);
+        if (r.scored == 0 || r.chosen != 0 || !(never != lost)) r2_ok = false;
+    }
+    check(r2_ok, "R2 every ZERO-BATTLE seed is classified from counters, not from an empty "
+                 "battle set: scored > 0, chosen == 0, and exactly one fork branch fired");
+
+    // R3. The measured world is still the defective world.
+    bool r3_ok = static_cast<int>(rows.size()) == seeds;
+    for (const seed_row& r : rows)
+    {
+        if (r.seed < 0 || r.seed >= seeds) { r3_ok = false; continue; }
+        const pinned_row& p = pinned[r.seed];
+        if (r.battles != p.battles || r.conquests != p.conquests || r.foundings != p.foundings
+            || r.contacts != p.contacts || r.scored != p.scored || r.chosen != p.chosen)
+        {
+            r3_ok = false;
+            std::printf("        seed %d MOVED: battles %lld (pinned %lld), conquests %lld (%lld), "
+                        "foundings %lld (%lld), contacts %lld (%lld), scored %lld (%lld), chosen %lld (%lld)\n",
+                        r.seed,
+                        static_cast<long long>(r.battles),   static_cast<long long>(p.battles),
+                        static_cast<long long>(r.conquests), static_cast<long long>(p.conquests),
+                        static_cast<long long>(r.foundings), static_cast<long long>(p.foundings),
+                        static_cast<long long>(r.contacts),  static_cast<long long>(p.contacts),
+                        static_cast<long long>(r.scored),    static_cast<long long>(p.scored),
+                        static_cast<long long>(r.chosen),    static_cast<long long>(p.chosen));
+        }
+    }
+    check(r3_ok, "R3 the instrumented sweep reproduces the pre-change table EXACTLY — seeds 0 "
+                 "and 4 still at zero battles, every seed's 6 counts unmoved");
+
+    // R4. The instrument is inert AND gated.
+    check(trace_is_inert && counters_are_gated && gating_seed >= 0,
+          "R4 the instrument is INERT and GATED: traced == untraced on every non-trace output, "
+          "and an untraced run leaves all four new counters empty (checked on a seed that "
+          "actually moves them)");
+    std::printf("        (gating pair ran on seed %d — the first whose traced run moves a counter)\n",
+                gating_seed);
 
     // THE HEADLINE, and it is not the one BL-384 expected: how many worlds
     // fight NO WAR AT ALL. A sim that conquers heavily on most seeds and is
@@ -179,7 +594,7 @@ int main()
     {
         std::printf("\n  No battles across %d worlds — the gap is UPSTREAM of the resolver:\n"
                     "  the scorer never selects Campaign at all. Nothing below applies.\n", seeds);
-        std::printf("\n%d checks, %d failures\n%s\n", 2, g_failures,
+        std::printf("\n%d checks, %d failures\n%s\n", g_checks, g_failures,
                     g_failures == 0 ? "ALL PASS (0 failures)" : "FAILURES");
         return g_failures == 0 ? 0 : 1;
     }
@@ -285,7 +700,7 @@ int main()
         }
     }
 
-    std::printf("\n2 checks, %d failures\n%s\n", g_failures,
+    std::printf("\n%d checks, %d failures\n%s\n", g_checks, g_failures,
                 g_failures == 0 ? "ALL PASS (0 failures)" : "FAILURES");
     return g_failures == 0 ? 0 : 1;
 }

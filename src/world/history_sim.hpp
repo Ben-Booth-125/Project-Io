@@ -545,6 +545,49 @@ struct battle_trace
     bool conquered      = false;
 };
 
+/// ONE DECISION ROUND IN WHICH CAMPAIGN CLEARED ITS THRESHOLD — Sprint 28's
+/// fork, recorded whether Campaign then won the round or lost it.
+///
+/// WHY THIS EXISTS, and why it is not a mean. `battle_trace` explains a battle
+/// that HAPPENED, so it is mute about the two worlds in eight that fight no war
+/// in an entire era. `campaign_contacts`/`campaign_scored`/`campaign_chosen`
+/// narrow those to "the scorer sees war and prefers something else every time"
+/// and then stop, because a candidate that was DISCARDED BELOW THE THRESHOLD
+/// and one that CLEARED IT AND LOST THE ARGMAX are indistinguishable in a
+/// `chosen == 0` count — and they are different defects with different fixes:
+///   - never cleared  -> the campaign score itself is too small (a term, a
+///     weight, or a prize that does not survive its own discounts);
+///   - cleared and lost -> Campaign is competing against verbs it cannot beat,
+///     which is a VERB-COMPETITION question and not a combat one.
+///
+/// And when it is the second, the MARGIN separates two further bugs that a mean
+/// cannot: a margin of 3 is a weighting nudge, a margin of 3000 is BL-318
+/// incommensurability — two scores authored on different scales. This file has
+/// been bitten by that twice (`w_cult` as a flat 150; `w_dist` flat against a
+/// tripled map), so the distribution is recorded per round and summarised by
+/// the harness rather than folded into an average here.
+///
+/// PURE OBSERVATION, exactly as `battle_trace` is. Populated only under
+/// `history_sim_params::trace_battles`; no field is read to make a decision and
+/// none feeds a draw, so a traced run and an untraced run are identical in
+/// every other output.
+struct verb_contest_trace
+{
+    int32_t  year   = 0;
+    uint16_t polity = 0;
+    /// Best Campaign candidate score this round, among those that cleared
+    /// `campaign_threshold_q`. Includes the tie-break salt, because that is the
+    /// value the argmax actually compared.
+    int      campaign_score = 0;
+    /// The score the round was decided on — `best_score` after every verb has
+    /// been offered. Equals `campaign_score` exactly when Campaign won.
+    int      winner_score = 0;
+    /// The verb that won. Never `none`: a cleared Campaign always beats the
+    /// initial `best_score` of 0, so this record cannot exist on a round that
+    /// fell through to the Consolidate default.
+    sim_verb winner = sim_verb::none;
+};
+
 struct history_sim_state
 {
     std::vector<polity> polities;
@@ -565,6 +608,34 @@ struct history_sim_state
     int64_t campaign_contacts = 0; ///< (own region, foreign-owned neighbour) pairs examined.
     int64_t campaign_scored   = 0; ///< Candidates that reached the score comparison.
     int64_t campaign_chosen   = 0; ///< Rounds where Campaign won the verb choice.
+
+    /// THE FORK THE THREE ABOVE STOP ONE STEP SHORT OF (Sprint 28 lane A).
+    /// `campaign_scored > 0, campaign_chosen == 0` still has two readings, and
+    /// they need opposite fixes — see `verb_contest_trace`. These split it:
+    ///   - `campaign_cleared` 0 -> the score NEVER clears its own threshold.
+    ///     Verb competition is irrelevant; nothing was ever in the running.
+    ///   - `campaign_cleared` > 0 with `campaign_cleared_lost` accounting for
+    ///     every cleared round -> Campaign is in the running every time and
+    ///     loses the argmax every time. That is a verb-competition question,
+    ///     and `verb_contests` names the winner and the margin.
+    ///
+    /// GRAINS DIFFER, deliberately, and the names say which: `campaign_cleared`
+    /// is CANDIDATE-grain (a polity examines many targets x 2 seasons in one
+    /// round), the other two are ROUND-grain. Mixing them would make the ratio
+    /// between them meaningless.
+    ///
+    /// The identity the harness binds to:
+    ///     campaign_cleared_rounds == campaign_chosen + campaign_cleared_lost
+    /// — every round in which Campaign was in the running either won it or lost
+    /// it, with no third outcome.
+    int64_t campaign_cleared        = 0; ///< CANDIDATES clearing `campaign_threshold_q`.
+    int64_t campaign_cleared_rounds = 0; ///< ROUNDS with at least one such candidate.
+    int64_t campaign_cleared_lost   = 0; ///< Of those rounds, the ones another verb won.
+
+    /// Per-round observation of the verb contest, empty unless
+    /// `params.trace_battles`. One entry per round in which Campaign cleared —
+    /// the won rounds included, so the margin distribution has a control.
+    std::vector<verb_contest_trace> verb_contests;
 
     /// Per-battle observation, empty unless `params.trace_battles`. See
     /// `battle_trace` for why it exists and why it cannot move the run.
