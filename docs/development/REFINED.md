@@ -1,8 +1,59 @@
 # Project Io — REFINED (active worklist)
 
 **Empty between work blocks.** Sprints P1, C3, B2 and B3 closed 2026-08-21; **N1 closed 2026-08-23**.
-**Sprint N2 is active** — three lanes in parallel worktrees, one of them Sprint 28 (Lane A)'s
-measurement half. See § Sprint N2 below.
+**Sprint N2 closed 2026-08-23** (all three lanes merged). **Sprint N3 is active** — the nation spines
+go live, in two slices. See § Sprint N3 below.
+
+---
+
+## Sprint N3 — "the spines go live" (opened 2026-08-23, BL-568 landed first as `3a1aa21f`)
+
+N1/N2 left the national budget (BL-537), the nation scorer (BL-542) and the sentiment substrate
+(BL-545) **inert and invisible**: nothing in the tick calls the first two and the third decays at an
+authored zero. Ben's order: wire first, then draw (BL-555/BL-558/BL-556 are the v0.1.25 surfaces).
+Scoping found the wiring is **three pieces, not two** — the budget pass pays nobody without a claim
+producer (NR-567) — and surfaced **BL-568 (half the rivals never act)**, fixed first on its own.
+
+**Rulings (NR-568, Ben 2026-08-23):** exploration credit is **EARMARKED** (the payment dispatches
+the survey of the named body — not a fungible top-up); the claim is the **full survey cost**; a
+cancellation is forgotten in **9 quarters** (`trust_decay_per_tick = 1 − 2^(−1/9) ≈ 0.0741`);
+contracted force is the **second slice of this sprint**. Delegated (NR-569): weight map on `world`
+with save v2→3; `state_hash` folds treasuries conditionally; player corp not funded this cut; the
+national pass runs regardless of spectating.
+
+### Slice 1 — public exploration proves the loop
+
+Tick order (after `apply_budget`, before `advance_tech_gates`, in all three drivers): score → merge
+weights into `w.nation_budgets` → gather claims → `run_national_budget` → **dispatch the earmarked
+surveys** → fold `subsidies` into the report. Keyed on `world::current_econ_tick` (BL-568).
+
+| # | Task | Files | Deps | Owner |
+|---|---|---|---|---|
+| T1 | `nation_ai_params` gets a registry home (`recipe_registry::nation_ai()`, optional `economy.nation_ai` Lua table); no behaviour change | recipe_registry.{hpp,cpp}, nation_ai.hpp | — | agent S1 |
+| T2 | `world::nation_budgets` (map<entity_id, nation_budget>) — persistent weight map the scorer overwrites one slot at a time; save leg beside `nations`; `world_save_version` 2→3; save_roundtrip row (map survives, v2 refused) | world.hpp, world_save.{hpp,cpp}, save_roundtrip.cpp | — | agent S1 |
+| T3 | `budget_claim::subject` (the body) + `budget_transfer` record {corp, nation, line, subject, credits, fill_fraction, rationed} on `national_budget_tick::transfers`, sorted (corp, nation, line); harness row Σ transfers.credits == total_transferred | nation_budget.{hpp,cpp}, nation_budget_harness.cpp | — | agent S2 |
+| T4 | Report plumbing: `economy_report::{budget_claims, national_budget, nation_scores}`; `corp_budget::subsidies` in `net()` | economy_system.hpp | T3 | agent S2 |
+| T5 | **Claim producer**: in corp_ai's cash-gate branch, a survey candidate gated on cash with `home_nation != null` emits `budget_claim{home_nation, corp, public_exploration, FULL cost, subject=body}` — one per corp per evaluation (the top-scoring gated survey); corp_ai harness row | corp_ai.{hpp,cpp}, corp_ai_harness.cpp | T4 | agent S2 |
+| T6 | **`run_nation_step`** (new nation_step.{hpp,cpp}): score → merge → claims → budget → **earmarked dispatch** (for each public_exploration transfer, `dispatch_survey(corp, subject)` paid from the credit just received; conservation: credit in == survey cost out, same tick) → `subsidies` | nation_step.{hpp,cpp} | T1–T5 | main |
+| T7 | Wire the three drivers (app.cpp after `lap(3)`, main.cpp after both `apply_budget`s) with `current_econ_tick` | app.cpp, main.cpp | T6 | main |
+| T8 | `state_hash` folds treasuries + `nation_budgets` **only when non-trivial** (battles precedent) | world.cpp | T2 | main |
+| T9 | **Wiring harness** `nation_wiring.cpp`: seed a levy, run ticks with the production sink, assert a cash-gated rival's survey is funded AND dispatched on a later slot, treasury + balances conserve; extend money_conservation to call `run_nation_step` | nation_wiring.cpp, money_conservation.cpp, SKILL.md | T7 | main |
+| T10 | **Sentiment decay authored**: `economy.sentiment = { trust_decay_per_tick = 0.0741, access_decay_per_tick = 0.0741 }` in economy.lua; finiteness guard at the loader; ACTIONS.json `cancel_contract` wording ("persistent and compounds"); sentiment.hpp "180-day" → "180-tick" | economy.lua, recipe_registry.cpp, sentiment.hpp, ACTIONS.json | — | agent S3 |
+| T11 | Stale comments: components.hpp:1152-1153, :1181-1187 (treasury IS serialised); NATIONS.md:239 | components.hpp, NATIONS.md | — | agent S3 |
+
+**Collision map:** S1 {recipe_registry, nation_ai.hpp, world.hpp, world_save, save_roundtrip} ·
+S2 {nation_budget, economy_system.hpp, corp_ai, two harnesses} · S3 {economy.lua,
+recipe_registry.cpp, sentiment.hpp, ACTIONS.json, components.hpp, NATIONS.md}. S1 and S3 both
+touch `recipe_registry.cpp` — different functions (nation_ai accessor vs sentiment loader);
+worktrees absorb it. Main: T6–T9 + goldens.
+
+### Slice 2 — contracted force (BL-377 as the nation's client)
+
+Opens after slice 1 merges. The nation issues a contract through a `budget_claim` on
+`contracted_force` — deposit on accept, balance on completion. Blockers the map verified in
+code: no territorial predicate subject (condition_set.hpp:47-77), battles require a declared hostile
+pair, battle end moves nobody. First template `clear_province`; two-point payment; no per-tick
+instalments. Tasks are written when slice 1 lands.
 
 ---
 
