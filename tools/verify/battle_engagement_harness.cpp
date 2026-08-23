@@ -24,6 +24,14 @@
 //   B7  THE TERRAIN PAIR IS THE DEFENDER'S BEST GROUND, ties by ascending tile.
 //   B8  WITHDRAWAL IS PRICED, AND A REJECTED REQUEST MUTATES NOTHING.
 //   B9  A UNIT IN CONTACT CANNOT MARCH — the gap BL-470 left named.
+//   B15 BL-569: A DECISIVE CLOSE MOVES world::province_holder to the winner.
+//   B16 BL-569: A STALEMATE LEAVES IT UNTOUCHED. B15/B16 hand-build the
+//       active_battle's state (rounds_fought and starting strengths already
+//       past the swing draw's reach of the outcome) rather than trust a live
+//       fight to land on a specific ending — the swing is genuinely random
+//       per round, so an assertion tied to which ending a natural fight
+//       happens to reach would be exactly the kind of test that stops
+//       testing quietly the day the RNG stream shifts.
 //
 // Run: battle_engagement_harness
 // ---------------------------------------------------------------------------
@@ -37,6 +45,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/stance.hpp"
 #include "world/terrain_combat.hpp"
+#include "world/unit_roster.hpp" // unit_to_stack_entry -- B15/B16's hand-built battle state
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -573,6 +582,107 @@ int main()
 
         const std::string sample = battle_dispatch_line(f.w, seen.front());
         std::printf("        e.g. \"%s\"\n", sample.c_str());
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB15 — BL-569: a decisive close moves the province holder\n");
+    {
+        fixture f;
+        build_fixture(f, /*declare=*/false); // discovery stays off -- the battle below is hand-pushed
+        seed_province_holders(f.w);
+        check(f.w.province_holder.size() == f.w.provinces.provinces.size(),
+              "B15 setup: province_holder is sized to the partition (no nations in this fixture -> all no_entity)");
+        check(province_holder_for(f.w, f.province) == null_entity,
+              "B15 setup: the fixture's province starts with no recorded holder");
+
+        // Hand-built battle, already at its final round, with the DEFENDER
+        // preset BELOW the rout threshold (300). A round can only ever
+        // REDUCE strength, so the defender's post-round permille stays
+        // <= 250 regardless of the swing draw -- def_broken is guaranteed.
+        // The attacker starts at 1000 and the worst possible single-round
+        // loss (a full-margin round) is 490 permille, leaving >= 510 -- so
+        // atk_broken is impossible. The ending is defender_broken, by
+        // construction, not by luck.
+        active_battle b;
+        b.province        = f.province;
+        b.attacker        = f.att;
+        b.defender        = f.def;
+        b.attacker_units  = { f.ua };
+        b.defender_units  = { f.ub };
+        b.state.attacker  = { unit_to_stack_entry(f.w, f.w.units.at(f.ua)) };
+        b.state.defender  = { unit_to_stack_entry(f.w, f.w.units.at(f.ub)) };
+        b.state.attacker_strength_permille = 1000;
+        b.state.defender_strength_permille = 250;
+        b.state.rounds_fought = 0;
+        b.state.end           = campaign_battle_end::in_progress;
+        b.state.stream_seed   = 0xB569D0u;
+        b.state.rng_state     = b.state.stream_seed;
+        f.w.battles.assign(1, b); // bypass discovery entirely
+
+        const battle_tick t = run_battles(f.w, reg, 0);
+        check(!t.dispatches.empty(), "B15a the hand-seeded battle stepped and reported");
+        if (!t.dispatches.empty())
+        {
+            const battle_dispatch& d = t.dispatches.front();
+            check(d.end == campaign_battle_end::defender_broken,
+                  "B15b the defender broke -- guaranteed by the preset strengths, not the swing draw");
+            check(d.field_held_by == f.att, "B15c the attacker held the field");
+            check(province_holder_for(f.w, f.province) == f.att,
+                  "B15d THE PROVINCE HOLDER MOVED to the winner");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB16 — BL-569: a stalemate leaves the province holder untouched\n");
+    {
+        fixture f;
+        build_fixture(f, /*declare=*/false);
+        seed_province_holders(f.w);
+
+        // Seed a KNOWN holder distinct from either combatant, so "unchanged"
+        // is a real assertion rather than "still no_entity, coincidentally".
+        const entity_id third = add_corp(f.w, "ThirdParty");
+        const province*  pr   = f.w.provinces.find(f.province);
+        check(pr != nullptr, "B16 setup: the fixture's province resolves in the partition");
+        if (pr != nullptr)
+        {
+            const auto idx = static_cast<std::size_t>(pr - f.w.provinces.provinces.data());
+            f.w.province_holder[idx] = third;
+        }
+
+        // Hand-built battle, ONE ROUND SHORT of max_rounds (6), both sides at
+        // 900 permille. The worst possible single-round loss between two
+        // EQUAL stacks is bounded by the swing range alone (400..1600 permille
+        // -> margin <= 750 -> loser_loss <= 90 + 750*400/1000 = 390), so
+        // apply_loss(900, 390) = 549 -- comfortably above the 300 rout
+        // threshold whichever side the swing happens to favour. Round 6
+        // therefore concludes as a stalemate by construction, not by luck.
+        active_battle b;
+        b.province        = f.province;
+        b.attacker        = f.att;
+        b.defender        = f.def;
+        b.attacker_units  = { f.ua };
+        b.defender_units  = { f.ub };
+        b.state.attacker  = { unit_to_stack_entry(f.w, f.w.units.at(f.ua)) };
+        b.state.defender  = { unit_to_stack_entry(f.w, f.w.units.at(f.ub)) };
+        b.state.attacker_strength_permille = 900;
+        b.state.defender_strength_permille = 900;
+        b.state.rounds_fought = 5;
+        b.state.end           = campaign_battle_end::in_progress;
+        b.state.stream_seed   = 0xB569E0u;
+        b.state.rng_state     = b.state.stream_seed;
+        f.w.battles.assign(1, b);
+
+        const battle_tick t = run_battles(f.w, reg, 0);
+        check(!t.dispatches.empty(), "B16a the hand-seeded battle stepped and reported");
+        if (!t.dispatches.empty())
+        {
+            const battle_dispatch& d = t.dispatches.front();
+            check(d.end == campaign_battle_end::stalemate,
+                  "B16b round 6 elapsed with both sides still standing -- guaranteed by the preset strengths");
+            check(province_holder_for(f.w, f.province) == third,
+                  "B16c THE PROVINCE HOLDER STAYED PUT -- a stalemate mutates nothing here");
+        }
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);

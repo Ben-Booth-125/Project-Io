@@ -744,9 +744,20 @@ void write_world_snapshot(const world& w, std::ostream& out)
     // `write_history_log` already writes both (BL-466 appended provinces as its
     // trailing section). Calling it nests a complete IOHL stream inside this one,
     // magic and all, rather than defining those bytes a second time (NR-512).
-    // It is the LAST section, so the nested reader's tolerance of a clean
-    // end-of-stream costs nothing here.
     write_history_log(w, out);
+
+    // --- the province holder (BL-569), APPENDED after the embedded stream ----
+    // NOT part of the province partition's own section (province.hpp's
+    // write_province_section / read_province_section): the partition is
+    // generation output and stays fixed, while the holder is live state, so
+    // it gets its own trailing section, gated by world_save_version alone,
+    // rather than riding inside the partition's own magic-guarded format.
+    // Placed AFTER write_history_log so read_province_section (called once,
+    // at a fixed point inside read_history_log) still reads exactly its own
+    // magic-prefixed section and returns before ever reaching these bytes —
+    // it only reads a "clean end of stream" as the pre-BL-466 case, and there
+    // is a well-formed section here, so that path is not the one taken.
+    w_ids(out, w.province_holder);
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -894,6 +905,15 @@ bool read_world_snapshot(world& w, std::istream& in)
 
     // The embedded IOHL stream -- fills s.history_log AND s.provinces.
     if (!read_history_log(s, in))
+        return false;
+
+    // BL-569: the province holder, the trailing section written after the
+    // embedded stream above. Sized independently of s.provinces here -- a
+    // stream that disagrees with the partition it was written against
+    // (a hand-corrupted file, never a real write path) is not this reader's
+    // job to reconcile; province_holder_for's own bounds check is what stays
+    // safe against that.
+    if (!r_ids(in, s.province_holder))
         return false;
 
     clear_derived_state(s);

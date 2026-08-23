@@ -771,6 +771,27 @@ endif()
 target_compile_features(agent_seam_harness PRIVATE cxx_std_20)
 target_compile_options(agent_seam_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# battle_engagement_harness (BL-467/BL-468/BL-469, pre-existing link gap fixed
+# incidentally by BL-569). Hand-declared for the same reason agent_seam_harness
+# is: its B10-B14 rows (landed bd2d4671, 2026-08-21) call battle_dispatch_line,
+# defined in src/core/battle_dispatch_text.cpp -- deliberately its own TU
+# because its natural home, session_history.cpp, reaches <SDL3/SDL.h> and
+# cannot be linked headless (see that file's own header comment). That TU was
+# never added here, so the generic glob loop below (io_world_obj alone) has
+# left this harness unable to LINK since the commit that added the rows —
+# found while building it to verify BL-569's own new rows (B15/B16), fixed
+# here rather than left blocking every future session's build of this target.
+add_executable(battle_engagement_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/battle_engagement_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/battle_dispatch_text.cpp"
+)
+target_include_directories(battle_engagement_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+target_link_libraries(battle_engagement_harness PRIVATE io_world_obj)
+target_compile_features(battle_engagement_harness PRIVATE cxx_std_20)
+target_compile_options(battle_engagement_harness PRIVATE ${IO_WARNING_FLAGS})
+
 file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/*.cpp")
 
 # ---------------------------------------------------------------------------
