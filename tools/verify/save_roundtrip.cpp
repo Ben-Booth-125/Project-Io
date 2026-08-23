@@ -153,17 +153,18 @@ int main()
             check(!from_bytes(bad, victim), "P3 a mismatched version is rejected");
         }
         {
-            // Sprint N3 T2: the PREVIOUS format, by number. A v2 stream has no
-            // nation_budgets section, so a reader that accepted it would parse
-            // tile_to_nation's count as the map's count and misalign everything
-            // after. The whole stream is refused instead -- a v2 save is not
-            // migrated, it is rejected, and the destination is not touched.
-            static_assert(world_save_version == 3,
-                          "P9 names v2 as the refused predecessor; re-read this row on a bump");
+            // Sprint 16, BL-569: the PREVIOUS format, by number. A v3 stream has
+            // no province_holder trailing section, so a reader that accepted it
+            // would read past the end of the embedded history-log stream and
+            // misparse whatever followed. The whole stream is refused instead --
+            // a v3 save is not migrated, it is rejected, and the destination is
+            // not touched.
+            static_assert(world_save_version == 4,
+                          "P9 names v3 as the refused predecessor; re-read this row on a bump");
             std::string bad = bytes_once;
-            const uint32_t v2 = 2;
-            std::memcpy(&bad[4], &v2, sizeof v2);
-            check(!from_bytes(bad, victim), "P9 a v2-versioned stream is refused (format is v3)");
+            const uint32_t v3 = 3;
+            std::memcpy(&bad[4], &v3, sizeof v3);
+            check(!from_bytes(bad, victim), "P9 a v3-versioned stream is refused (format is v4)");
         }
         {
             // Truncated mid-way through the tile store -- far enough in that a
@@ -179,8 +180,9 @@ int main()
                   && victim.next_order_id == keep_order && victim.tiles.empty()
                   && victim.bodies.empty(),
               "P3 every rejected load left the destination world untouched");
-        check(victim.nations.empty() && victim.nation_budgets.empty(),
-              "P9 the v2 refusal left nations and nation_budgets untouched");
+        check(victim.nations.empty() && victim.nation_budgets.empty()
+                  && victim.province_holder.empty(),
+              "P9 the v3 refusal left nations, nation_budgets and province_holder untouched");
     }
 
     // -----------------------------------------------------------------------

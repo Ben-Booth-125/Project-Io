@@ -466,8 +466,11 @@ carries an explicit `stage_live[]` alongside the entity table. On a tile with no
 the stage falls back to the tile, so the cycle never strands on an empty rung.
 
 A click on a **different** tile (or the first click anywhere) goes through the marker-hit precedence
-(`resolve_marker_hit`: building > market_centre, nearest wins) and only additionally seeds the cycle
-anchor so a follow-up repeat click knows where to advance from.
+(`resolve_marker_hit`: unit > building > market_centre, nearest-wins within a kind) and only
+additionally seeds the cycle anchor so a follow-up repeat click knows where to advance from. Unit
+was raised above building by BL-575 (unit marker and march UI) to match this section's own cycle
+order, where Soldier already precedes Building — a unit standing on a built tile is reachable on
+the first click, not only after cycling past the building.
 
 ### The body element's action is the survey front door (then go-to-surface)
 

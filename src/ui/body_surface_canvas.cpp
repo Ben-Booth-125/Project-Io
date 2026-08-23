@@ -1033,10 +1033,11 @@ body_frame_stamp make_body_frame_stamp(const world& w, entity_id body)
 /// Nearest-wins marker hit resolution shared by hover and click (BL-031/BL-059):
 /// unit outranks building outranks market_centre within the glyph radii; the
 /// tile fallback stays with the callers. Unit was added above building by
-/// BL-575, matching the repeat-click cycle's own precedence (battle, unit,
-/// province, building, tile — SELECTION.md): a unit standing on a built tile
-/// must be reachable on the FIRST click, not only after cycling past the
-/// building. Extracted so the two paths cannot drift (BL-362).
+/// BL-575, matching the repeat-click cycle's own order (Battle -> Soldier ->
+/// Building -> Province — SELECTION.md § Tile repeat-click selection cycle):
+/// a unit standing on a built tile must be reachable on the FIRST click, not
+/// only after cycling past the building. Extracted so the two paths cannot
+/// drift (BL-362).
 entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx, float my)
 {
     float     best_unit_d2 = std::numeric_limits<float>::max();
