@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*24 entries — 5 open, 19 resolved.*
+*25 entries — 6 open, 19 resolved.*
 
 ---
 
@@ -105,6 +105,21 @@ BL-171 added Tax and Wages tier selectors to the player Budget ledger as stubbed
 > **Recommendation:** Option 1, but option 4 is worth a moment because it is the one that keeps your original intent AND makes it coherent — a negotiated rate fits the chartered-corporation identity the history ladder (BL-223) is building toward, and it would make Tax the first place diplomacy touches the economy. It costs a negotiation mechanic that does not exist, so it is not a prototype answer; if it appeals, the honest move is option 1 now and option 4 filed for v0.2.0. Either way the Tax control as currently drawn should not ship promising a lever the player does not have.
 
 *Files: `docs/development/backlog.json`, `src/ui/balance_ledger.cpp`, `src/ui/ui_state.hpp`*
+
+### NR-025 — Two sub-calls I took inside the settled BL-217 checkpoint model — Round D carries one axis, and branch ordinals are append-only
+*decision taken on your behalf · raised 2026-08-02 · from Settling BL-217 (checkpoint/branch model) — you took the four headline calls in session, these two fell out below them*
+
+You settled BL-217's four questions directly. Writing the buildable spec surfaced two smaller calls I took rather than coming back to you. (1) Round D — you chose YES to a ninth historical lean axis; I specified it as ONE axis (history_turbulence: settled / mixed / turbulent) rather than a pair, on the grounds that PLANETOLOGY.md's own test is that every knob must change something a player can read, and one axis is enough to reach the only built checkpoint. A second Round D axis is filed in the design as a later call. (2) I made the new history_event branch ordinals APPEND-ONLY per stage, matching the rule body_archetype already carries, because the value is a determinism input and a future save-format value. That is a constraint on every future emitter, so it should be a rule you agreed to rather than one I introduced in passing.
+
+**Why it matters.** The first changes the New World wizard's shape — Round D is a new stage a player walks through, and the number of axes on it is a UX decision more than a data one. The second binds future work: once ordinals are append-only, a stage that reorders its branch outcomes is a breaking change rather than a tidy-up, which is exactly the discipline that makes a later serialiser cheap and exactly the friction that makes early iteration slower.
+
+- Accept both (what I did): one Round D axis to start, append-only branch ordinals.
+- Round D carries a second axis — say which, since the obvious candidate (how hard conquest is) is already an output of the ladder rather than an input a lean should move.
+- Drop the append-only rule while there is no serialiser, and impose it when one lands. Cheaper now, and the renumbering cost falls on whoever writes the serialiser.
+
+> **Recommendation:** Accept both. The append-only rule is the one worth a second look — it genuinely costs iteration speed today for a saving that only arrives with the serialiser, which does not exist yet. I kept it because chain_stage's own comment already flags the same hazard and says the enum needs a stable wire mapping before anything else is inserted; having two adjacent fields under two different rules is the kind of inconsistency that gets one of them wrong later.
+
+*Files: `docs/development/backlog.json`, `src/world/planetology.hpp`, `src/world/creeds.cpp`*
 
 ---
 

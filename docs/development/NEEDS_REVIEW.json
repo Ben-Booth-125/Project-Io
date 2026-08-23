@@ -529,6 +529,28 @@
         "src/ui/ui_state.hpp"
       ],
       "resolution": null
+    },
+    {
+      "id": "NR-025",
+      "title": "Two sub-calls I took inside the settled BL-217 checkpoint model — Round D carries one axis, and branch ordinals are append-only",
+      "raised": "2026-08-02",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Settling BL-217 (checkpoint/branch model) — you took the four headline calls in session, these two fell out below them",
+      "what": "You settled BL-217's four questions directly. Writing the buildable spec surfaced two smaller calls I took rather than coming back to you. (1) Round D — you chose YES to a ninth historical lean axis; I specified it as ONE axis (history_turbulence: settled / mixed / turbulent) rather than a pair, on the grounds that PLANETOLOGY.md's own test is that every knob must change something a player can read, and one axis is enough to reach the only built checkpoint. A second Round D axis is filed in the design as a later call. (2) I made the new history_event branch ordinals APPEND-ONLY per stage, matching the rule body_archetype already carries, because the value is a determinism input and a future save-format value. That is a constraint on every future emitter, so it should be a rule you agreed to rather than one I introduced in passing.",
+      "why_it_matters": "The first changes the New World wizard's shape — Round D is a new stage a player walks through, and the number of axes on it is a UX decision more than a data one. The second binds future work: once ordinals are append-only, a stage that reorders its branch outcomes is a breaking change rather than a tidy-up, which is exactly the discipline that makes a later serialiser cheap and exactly the friction that makes early iteration slower.",
+      "options": [
+        "Accept both (what I did): one Round D axis to start, append-only branch ordinals.",
+        "Round D carries a second axis — say which, since the obvious candidate (how hard conquest is) is already an output of the ladder rather than an input a lean should move.",
+        "Drop the append-only rule while there is no serialiser, and impose it when one lands. Cheaper now, and the renumbering cost falls on whoever writes the serialiser."
+      ],
+      "recommendation": "Accept both. The append-only rule is the one worth a second look — it genuinely costs iteration speed today for a saving that only arrives with the serialiser, which does not exist yet. I kept it because chain_stage's own comment already flags the same hazard and says the enum needs a stable wire mapping before anything else is inserted; having two adjacent fields under two different rules is the kind of inconsistency that gets one of them wrong later.",
+      "files": [
+        "docs/development/backlog.json",
+        "src/world/planetology.hpp",
+        "src/world/creeds.cpp"
+      ],
+      "resolution": null
     }
   ]
 }
