@@ -19,13 +19,20 @@ This table is the reason the document exists. Read it before touching any of the
 | Quantity | Question it answers | Shape | Origin | Gates |
 |---|---|---|---|---|
 | **Stance** | *How does A feel about B?* | hostile (directed) / friend (symmetric) | **declared** | interdiction, battle, march |
-| **Reputation** | *Will B do business with A again?* | one float per (buyer, supplier) | **earned** | procurement quotes |
+| **Sentiment** | *What has B's conduct earned with A?* | two floats (Access, Trust) per (observer, subject) | **derived** | procurement quotes, via the Reputation view |
+| **Reputation** | *Will B do business with A again?* | **a VIEW of sentiment's Trust**, not a store | **earned** | procurement quotes |
 | **Embargo** | *Is A forbidden to trade in B's terms?* | a `condition_set` per corp | **authored** | **nothing — no author exists** |
 | **Standing** | *How strong is A?* | five bands on three axes | **derived** | nothing — it is a readout |
 
-> **Settled 2026-08-22 (Ben, ruling on NR-520): sentiment is the substrate.** The table above is
-> what the code holds *today*; the target is **two layers, not four quantities**. See § The
-> settled model directly below — read it before extending anything in this document.
+> **Settled 2026-08-22 (Ben, ruling on NR-520): sentiment is the substrate.** The target is
+> **two layers, not four quantities**, and the first two rows are now the layers rather than
+> siblings. See § The settled model directly below — read it before extending anything here.
+>
+> **Landed 2026-08-23 (BL-545, BL-546).** `src/world/sentiment.{hpp,cpp}` is the substrate;
+> `world::corp_reputation` is **gone**, and the Reputation row above is a read of
+> `world::sentiment` on Trust (`world::procurement_reputation`). It is listed as its own row
+> because it is still the question procurement asks — but it is no longer a place anything is
+> stored, and there is no second table it can disagree with.
 
 **Standing is the odd one and the naming is a known hazard.** It is not a relation at all: it is a
 coarse public read of how powerful a corporation is, with no second party anywhere in it. NR-304
@@ -130,27 +137,53 @@ Note the care taken in the interdiction check: it tests `is_hostile(unit_owner, 
 that direction only. *"A corp that has been declared against but has not answered is a victim, not
 a raider."*
 
-### 2. Reputation — *shipped, and deadlocked*
+### 2. Reputation — *a view of sentiment, and no longer deadlocked*
 
-`world::corp_reputation` — one float per `(buyer, supplier)` pair, from BL-350 (procurement).
-Moved by exactly two writers: **completion** raises it, **cancellation** lowers it.
-`request_quote` refuses below a floor.
+**Landed 2026-08-23 (BL-546), and BL-391 landed through it.**
 
-**It is a live design fault, filed as BL-391 (reputation floor is a deadlock), priority A.** The
-recovery path from below the floor runs: raise reputation → complete a contract → accept a quote →
-obtain a quote → **be above the floor.** It is a cycle with no entry.
+Reputation is the **Trust dimension of `world::sentiment` at (buyer, supplier) grain.** There is
+one read point, `world::procurement_reputation(buyer, supplier)`, and two writes, both of them one
+occurrence of authored conduct folded into the substrate:
 
-A player measured it at reputation −6 against a floor of −5 and found no mechanic anywhere that
-could move it back up. That is not harsh balance; it is a permanent, unrecoverable, per-counterparty
-blacklist earned by an ordinary in-game action, invisible until you hit it and unsignalled when you
-do.
+| Conduct | Factor | Weight |
+|---|---|---|
+| A contract completes | `sentiment_factor_kind::contract_completed` | `procurement.reputation_on_complete` |
+| A contract is cancelled | `sentiment_factor_kind::contract_cancelled` | `procurement.reputation_on_cancel` |
 
-**It matters more under the ancient arc than when it was written.** BL-377's contract loop is built
-on this same reputation axis, and a loss spiral with no exit is a much bigger problem for a company
-whose whole livelihood is being hired.
+The two weights are **seeded from the procurement rates** (`seed_procurement_sentiment`, in
+`recipe_registry.hpp`) and overridden by `economy.sentiment.factors` in `scripts/economy.lua`. That
+seeding is what makes the migration a substrate swap rather than a balance change: on the day it
+landed, every procurement number was **bit-identical** to the pre-migration build, asserted against
+values captured from that build (`procurement_harness` § R1).
 
-*Proposed fix in BL-391: decay toward neutral, so a burned relationship heals with time. One line in
-the tick, no new verb, and it gives "wait" a legitimate strategic use.*
+**What it was, and why that mattered.** Until this landed it was its own serialised map, and it
+carried a live priority-A design fault — **BL-391 (reputation floor is a deadlock)**. The recovery
+path from below the floor ran: raise reputation → complete a contract → accept a quote → obtain a
+quote → **be above the floor.** A cycle with no entry. A player measured it at −6 against a floor of
+−5 and found no mechanic anywhere that could move it back: a permanent, unrecoverable,
+per-counterparty blacklist earned by an ordinary in-game action, invisible until you hit it and
+unsignalled when you did.
+
+**The deadlock does not have a fix; it has nowhere to live.** Sentiment decays toward neutral, and
+a row that reaches neutral is *erased*, so a fully-forgotten pair is indistinguishable from one that
+never dealt. **A quantity that decays has no permanent floor by construction.** The same 64-tick
+span that moved the pre-migration value by exactly zero bits (`0xC0C00000` in, `0xC0C00000` out,
+still refused) now carries it back above the floor and the corp is quoted again — no new verb, no
+reparations mechanic, no special case. `procurement_harness` § R2 asserts both halves.
+
+**The floor is now a temporary state, and every consumer must read it that way.** There is exactly
+one today — `corp_command.cpp`'s `request_quote` — and it treats "below the floor" as a condition of
+today rather than a verdict. That sweep will not stay small once BL-377's contract seam reads the
+same axis.
+
+**Two of BL-391's demands remain open**, and neither is supplied by the substrate:
+
+1. **The floor and the current standing must be VISIBLE** — pair with BL-390 (the seam has no
+   read-back). A player reasoning about a number they cannot see is the defect's other half.
+2. **The decay rate needs a reason.** `economy.sentiment.trust_decay_per_tick` is **unauthored**, so
+   decay is inert in the shipped build and the deadlock is dissolved *in mechanism but not yet in
+   play*. Authoring it is one line; choosing the number is Ben's call, and it deserves BL-543's
+   treatment — an anchor, not a guess.
 
 ### 3. Embargo — *a read path with no writer*
 
@@ -193,7 +226,16 @@ honest visible-information source for it, so the axis is left out rather than fa
   — `w_enum(o, d.stance)`, read back through `r_enum` against a named maximum so an out-of-range
   byte is rejected rather than cast. A declared war now outlives the session. NR-349's finding, that
   no `serialization.cpp` existed, was true when written and is superseded rather than wrong.
-  What is still owed is the *reputation* half once BL-546 migrates it onto sentiment.
+  ~~What is still owed is the *reputation* half once BL-546 migrates it onto sentiment.~~
+  **CLOSED 2026-08-23 (BL-546).** The relational half is on the seam in full: `write_sentiment` /
+  `read_sentiment` for the substrate's own stream, and the widened per-pair record in the world
+  snapshot (`world_save_version` 1 → 2, because one float per pair became two). The procurement
+  stream stopped carrying reputation entirely (`procurement_version` 2 → 3) — keeping a copy there
+  would have recreated the second store the migration exists to delete.
+- **Decay is authored nowhere, so the substrate is inert in the shipped build.** Every factor
+  weight but the two procurement ones is zero, and both decay rates are zero, which is what makes
+  the migration byte-identical on the day it lands. It also means BL-391's fix is *available* rather
+  than *in play*: `scripts/economy.lua` has no `sentiment` table yet. See § 2 above.
 - **No rival ever declares anything.** BL-450 (rivals score stance) was **granted on 2026-08-18**
   and `corp_ai.cpp` contains no stance scoring at all. So every hostility in a played game is one
   the player declared. The grant is a permission nobody has used — the same state
@@ -299,7 +341,9 @@ and the second time the vocabulary has collided.
 |---|---|
 | Stance tables, verbs, invariants | `src/world/stance.{hpp,cpp}` |
 | The three tables on the world | `src/world/world.hpp` § `corp_hostile_pairs`, `corp_friend_pairs`, `corp_friend_offers` |
-| Reputation | `src/world/world.hpp` § `corp_reputation`; written in `corp_command.cpp` |
+| The relational substrate | `src/world/sentiment.{hpp,cpp}`; the table on `world.hpp` § `sentiment` |
+| Reputation (a **view**, BL-546) | `src/world/world.hpp` § `procurement_reputation` / `note_conduct`; written from `economy_system.cpp` (completion) and `corp_command.cpp` (cancellation) |
+| The authored factor weights | `src/world/recipe_registry.hpp` § `seed_procurement_sentiment`, `sentiment()`; loaded from `economy.sentiment` |
 | Embargo | `src/world/world.hpp` § `corp_embargo_conditions` |
 | Standing bands | `src/world/standing.{hpp,cpp}` |
 | Interdiction gate | `src/world/supply_system.cpp` |

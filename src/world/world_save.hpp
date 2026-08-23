@@ -58,7 +58,12 @@ inline constexpr uint32_t world_save_magic =
 /// Broader versioning (migration, forward compatibility) stays deferred until
 /// the data model stabilises, per docs/tech/TECH_FOUNDATIONS.md. For the
 /// prototype, rejection IS the migration story.
-inline constexpr uint32_t world_save_version = 1;
+///
+/// Bumped to 2 by BL-546: `corp_reputation` (one float per pair) was replaced
+/// in place by `sentiment` (two floats per pair, Access and Trust). A v1
+/// snapshot's records are half the width, so every field after them would be
+/// misread — which is exactly the case strict version equality exists for.
+inline constexpr uint32_t world_save_version = 2;
 
 /// Write @p w as a complete world snapshot.
 ///

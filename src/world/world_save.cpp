@@ -4,6 +4,7 @@
 #include "history_log.hpp" // write_history_log / read_history_log -- the embedded section
 
 #include <algorithm>
+#include <cmath> // std::isfinite -- the sentiment record's own rejection (BL-546)
 #include <istream>
 #include <ostream>
 #include <set>
@@ -664,8 +665,13 @@ void write_world_snapshot(const world& w, std::ostream& out)
     w_map(out, w.corp_body_pools, w_id_pair, w_stockpile);
     w_map(out, w.workforce_supply_overrides, w_id_pair,
           [](std::ostream& s, const float& v) { w_f32(s, v); });
-    w_map(out, w.corp_reputation, w_id_pair,
-          [](std::ostream& s, const float& v) { w_f32(s, v); });
+    // BL-546: `corp_reputation` (one float per pair) became `sentiment` (two,
+    // Access and Trust). The map is written in the same place and the same
+    // shape — a pair key, then its value — so the only layout change is the
+    // second float, and world_save_version 2 is what refuses to read a v1
+    // snapshot's single-float records as this.
+    w_map(out, w.sentiment.pairs, w_id_pair,
+          [](std::ostream& s, const sentiment_value& v) { w_f32(s, v.access); w_f32(s, v.trust); });
 
     // --- logistics ----------------------------------------------------------
     w_vec(out, w.convoys, w_convoy);
@@ -779,8 +785,21 @@ bool read_world_snapshot(world& w, std::istream& in)
     if (!r_map(in, s.workforce_supply_overrides, r_id_pair,
                [](std::istream& st, float& v) { return r_f32(st, v); }))
         return false;
-    if (!r_map(in, s.corp_reputation, r_id_pair,
-               [](std::istream& st, float& v) { return r_f32(st, v); }))
+    // BL-546: the relational substrate, in `corp_reputation`'s old slot. A row
+    // is rejected on the same grounds `read_sentiment` rejects one — a null id,
+    // a self pair, a non-finite value or a stored NEUTRAL row cannot have been
+    // written by the writer above, so the stream is corrupt rather than odd.
+    // (`r_map` parses into a local and commits on success, so a rejection here
+    // leaves the destination world untouched.)
+    if (!r_map(in, s.sentiment.pairs,
+               [](std::istream& st, std::pair<entity_id, entity_id>& k) {
+                   return r_id_pair(st, k) && k.first != null_entity &&
+                          k.second != null_entity && k.first != k.second;
+               },
+               [](std::istream& st, sentiment_value& v) {
+                   return r_f32(st, v.access) && r_f32(st, v.trust) &&
+                          std::isfinite(v.access) && std::isfinite(v.trust) && !v.neutral();
+               }))
         return false;
 
     if (!r_vec(in, s.convoys, r_convoy))
