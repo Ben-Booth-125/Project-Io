@@ -885,6 +885,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // rail slot whose panel a script could not open was also the only one
         // with no capture — green-but-blind by omission rather than by design.
         else if (name == "corporations_table") m_ui.show_corporations_table = open;
+        // The in-session system menu (the header-corner popup, time_panel.cpp).
+        // `show_menu` sounds like this and is not: it re-enters the LAUNCH screen.
+        // The popup that holds save/load/options/quit had no hook at all, so the
+        // one surface a player must reach to leave a session was uncapturable.
+        else if (name == "system_menu")         m_ui.show_system_menu = open;
         // BL-536: the Generation Ledger had no name here, so no script could open
         // it. That mattered the moment a save had to prove it restores the
         // generation_report — this ledger is one of the two surfaces that read it.

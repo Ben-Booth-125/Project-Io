@@ -1,21 +1,24 @@
--- The shell pass: every UBIQUITOUS UI surface, captured from one loaded world.
+-- The shell pass: every UBIQUITOUS UI surface, captured from one staged world.
 --
 -- WHAT THIS IS FOR. Not a regression gate — a design review. It walks the chrome
 -- that is on screen in every session (profile tile, header strip, time panel, nav
--- rail, fold-out column, comms dock, selection band, minimap and its lens bar,
--- the hover card) plus each of the THIRTEEN nav-rail ledgers, so each one can be
--- looked at and its authority doc reconciled against what actually renders.
+-- rail, fold-out column, comms dock, selection band, minimap at each rung, the
+-- lens legend, the hover card, the system menu) plus each of the THIRTEEN
+-- nav-rail ledgers, so each one can be looked at and its authority doc reconciled
+-- against what actually renders.
 --
--- IT LOADS, IT DOES NOT GENERATE. `ui_shell_fixture.lua` stages the world and
--- writes the snapshot; this opens it. Two reasons, and the second is the one that
--- matters: a load is faster than a cold generate, and it is the SAME world every
--- run, so two captures taken a week apart differ because the UI changed rather
--- than because the world did. If the snapshot is missing or from another format
--- version, this script STOPS rather than quietly generating a different world —
--- captures of an unintended world are worse than no captures.
+-- IT STAGES ITS OWN WORLD, and that is a deliberate reversal. The first shape
+-- loaded the snapshot `ui_shell_fixture.lua` writes — Ben's own sequence, and the
+-- faster one. It does not hold: a loaded world does not RENDER as the world it
+-- was saved from. The canvas comes back dimmed because the activity fog reads a
+-- day tick the load re-seeded to the sim loop's (NR-590), and the comms dock comes
+-- back empty because the chat log is not in the envelope (NR-591). Reviewing a
+-- layout against a degraded picture of it is worse than paying the generate cost.
+-- `ui_shell_fixture.lua` still makes the save and captures both sides of the round
+-- trip, which is where that evidence lives; when the two are ruled on, this script
+-- goes back to a one-line load.
 --
---   ProjectIo --verify scripts/verify/ui_shell_fixture.lua   (once)
---   ProjectIo --verify scripts/verify/shell_pass.lua         (as often as you like)
+--   ProjectIo --verify scripts/verify/shell_pass.lua
 --
 -- ORDERING. `show_panel` writes ui_state directly rather than routing through
 -- `close_all_panels` the way a real rail press does, so two ledgers can be open
@@ -24,12 +27,7 @@
 
 verify.window(1280, 720)
 
-local FIXTURE = "build_gen/verify/ui_shell_fixture.iosave"
-
-verify.expect(verify.load(FIXTURE),
-              "loaded the UI fixture from " .. FIXTURE
-              .. " (run ui_shell_fixture.lua first if this failed)")
-verify.frames(3)
+local staged = stage_ui_fixture()
 print("SHELL state_hash=" .. verify.state_hash())
 
 -- Every panel this pass touches, so `ledger()` can guarantee a clean column.
@@ -66,18 +64,39 @@ shot("shell_01_at_rest")
 -- 2. The always-on chrome, one variation each
 -- ===========================================================================
 
--- 2a. The system menu, hung off the header's hamburger. It is the only way out
---     of a session, so it is chrome even though it is normally closed.
+-- 2a. The launch screen. `show_menu` re-enters it (its own binding says so) —
+--     it is NOT the in-session system menu, which is 2b. Captured because the
+--     wizard is the first thing a player ever sees.
 verify.show_menu(true)
-shot("shell_02_system_menu")
+shot("shell_02_main_menu")
 verify.show_menu(false)
+verify.frames(1)
+
+-- 2b. The in-session system menu: the header-corner popup holding save, load,
+--     options and quit. The only way out of a session, so it is chrome even
+--     though it is normally closed.
+verify.show_panel("system_menu", true)
+shot("shell_02b_system_menu")
+verify.show_panel("system_menu", false)
 verify.frames(1)
 
 -- 2b. The hover card over canvas content. The card is dwell-gated (BL-200), so
 --     the hover must be HELD for frames rather than sampled once — `hover`'s
 --     third argument is how many frames the pointer stays put.
 verify.hover(640, 300, 60)
-shot("shell_03_hover_card_tile", 2)
+shot("shell_03_hover_card_glance", 2)
+
+-- 2c. The CLICK-opened card, which is a different surface from the dwell card
+--     above and reached by a different gesture (sticky_card.lua § header: a
+--     single click opens the full per-kind layout; dwell only ever gives the
+--     terse two-line glance). Measured while writing this: a 160-frame dwell
+--     produces the SAME two lines as a 60-frame one, so the two states the
+--     tooltip doc describes are appear-vs-nothing, not glance-vs-detail.
+local tp = verify.tile_screen(staged.unit.col, staged.unit.row)
+if tp.ok then
+    verify.click(tp.x, tp.y)
+    shot("shell_03b_click_card", 3)
+end
 
 -- 2c. A nav-rail slot's own tooltip: the only place a slot explains itself.
 verify.hover(27, 121, 60)
@@ -101,18 +120,10 @@ close_all()
 verify.clear_selection()
 shot("shell_06_selection_none")
 
-local player_corp = nil
-for _, b in ipairs(verify.buildings()) do
-    if b.player then player_corp = b.corp; break end
-end
-verify.expect(player_corp ~= nil, "found the player's corporation from buildings()")
-
--- A tile the player can read: their own unit's ground.
-local mine = nil
-for _, u in ipairs(verify.units()) do
-    if u.owner == player_corp then mine = u; break end
-end
-verify.expect(mine ~= nil, "found a player unit (BL-331 seeds one)")
+-- The staging already resolved both, from the buildings()/units() readers rather
+-- than from a hard-coded id, so a generation change moves the subject instead of
+-- silently invalidating the capture.
+local mine = staged.unit
 
 verify.select_tile(mine.col, mine.row)
 shot("shell_07_selection_tile")
