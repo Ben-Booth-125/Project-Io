@@ -1959,9 +1959,9 @@
       "message": "Regenerate item-commits.json after BL-585/BL-586"
     },
     "BL-586": {
-      "commit": "52dd45c",
+      "commit": "075947b",
       "date": "2026-08-24",
-      "message": "Regenerate item-commits.json after BL-585/BL-586"
+      "message": "BL-586: bookkeeping for slice 2's landing, NR-596 resolved"
     },
     "BL-587": {
       "commit": "5a665b2",
@@ -1989,9 +1989,9 @@
       "message": "Regenerate item-commits.json after BL-591"
     },
     "BL-592": {
-      "commit": "5d5c75c",
+      "commit": "efaacb4",
       "date": "2026-08-24",
-      "message": "BL-592: roster-breadth guard rows land in chain_depth"
+      "message": "Regenerate item-commits.json after BL-592"
     },
     "BL-593": {
       "commit": "d02f022",
