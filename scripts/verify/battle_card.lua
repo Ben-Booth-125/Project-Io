@@ -10,6 +10,17 @@
 -- ways, march the player's unit into a rival's province, step until contact.
 -- Nothing here hard-codes a grid coordinate, so a generation change moves the
 -- fight rather than silently invalidating the check.
+--
+-- KNOWN FRAGILITY (NR-587, 2026-08-24): the step-until-contact loop below only
+-- ever observes a battle via `verify.select_battle`, which can only see world
+-- state BETWEEN whole ticks. If the specific matchup this run's generation
+-- produces settles within `campaign_battle_params::rounds_per_tick` (3) rounds
+-- -- as happened for every real fight tried in the session that filed this
+-- note -- the battle opens and concludes inside one `econ_step` call and is
+-- never observably "in progress", so this script fails with "no battle opened"
+-- even though a real fight did happen. Noted rather than fixed (Ben, 2026-08-24:
+-- low priority) -- if this script starts failing, check for that before
+-- assuming discovery itself broke.
 
 local VERB_DECLARE_HOSTILE = 17
 local VERB_MARCH_UNIT      = 21

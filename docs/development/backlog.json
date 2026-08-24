@@ -390,6 +390,31 @@
       "authority_doc": "docs/economy/CONTRACTS.md",
       "design": "@docs/development/archive/backlog-design-2026-Q3.json",
       "archived": "docs/development/archive/backlog-design-2026-Q3.json"
+    },
+    {
+      "id": "BL-595",
+      "short_name": "NATION_STARTING_TREASURY",
+      "title": "Generation credits every nation's starting treasury before garrison sizing and contract-offer funding read it",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "version_goal": "post-v0.1.15",
+      "sprint": null,
+      "category": "Generation",
+      "written": "2026-08-24",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "files": [
+        "src/world/hard_coded_world.cpp",
+        "src/world/nation_generation.cpp",
+        "docs/generation/NATION_GENERATION.md",
+        "docs/politics/NATIONS.md"
+      ],
+      "authority_doc": "docs/generation/NATION_GENERATION.md",
+      "design": "Ruled 2026-08-24 (NR-580): a generation-time levy/tariff pass credits every nation's `nation_component::treasury` before `seed_nation_garrisons` (BL-571) and before any contract-offer derivation (BL-572) can run — the same conservation-checked transfer `apply_budget`'s levy already uses, fired once at world creation off whatever each nation's own resource/territory profile earns that first quarter. No new authored number; a rich nation starts richer because its profile already says so. Design settled in `docs/generation/NATION_GENERATION.md` § Pass 7 and `docs/politics/NATIONS.md` § 2 — read those before implementing. Not yet built: every garrison and offer in a freshly generated world still lands on its funding floor today."
     }
   ]
 }

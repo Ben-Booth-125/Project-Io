@@ -328,6 +328,25 @@ settlement-density description with no consumer. The pass requires population ce
 exist — which is why `generate_population_centres` runs before `generate_nations` in
 `hard_coded_world.cpp` (see § Settlement generation below).
 
+### Pass 7 — Starting treasury (RULED, not yet built — Ben, 2026-08-24, NR-580)
+
+`nation_component::treasury` is zero at generation by NATIONS.md's existing design — deliberate,
+since a treasury that started full would be a balance change smuggled in as a field. That rule
+still holds for the ONGOING campaign; what it does not settle is generation itself, and Sprint 16
+hit the gap from two directions at once (BL-571's garrison sizing, BL-572's contract-offer
+funding both scale off treasury, so both flatten to their floor in a freshly generated world).
+
+**Ruled: generation runs a starting levy or tariff of its own**, crediting every nation's
+treasury via the SAME conservation-checked transfer `apply_budget`'s levy already uses
+(NATIONS.md § 2 — a transfer, not a mint; someone's balance debits exactly what the treasury
+credits), before `seed_nation_garrisons` (`hard_coded_world.cpp`) and before any contract-offer
+derivation can run. This
+is a generation-time pass, not a campaign-tick one — it fires once, at world creation, using
+whatever a nation's own resource/territory profile already earns it that first quarter, so a rich
+nation still starts richer without any new authored number. Owner: a future backlog item against
+this pass; not yet implemented (see `docs/development/backlog.json` for the open item this design
+promotes into).
+
 ---
 
 ## Settlement generation (companion pass)

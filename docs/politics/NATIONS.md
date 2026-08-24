@@ -68,8 +68,13 @@ sentiment model, not two.
 
 ### 2. The treasury — *a balance with both halves*
 
-`nation_component::treasury` is a float. It is **zero at generation** — deliberately, since a
-treasury that started full would be a balance change smuggled in as a field.
+`nation_component::treasury` is a float. It is zero the instant the field is constructed —
+deliberately, since a treasury that started full would be a balance change smuggled in as a
+field. **Generation itself is ruled to credit it before the campaign tick ever runs** (Ben,
+2026-08-24, NR-580) — see `docs/generation/NATION_GENERATION.md` § Pass 7 for the settled shape
+(a levy/tariff transfer, the same conservation-checked mechanism the campaign tick already uses,
+not yet implemented). The rule above is about the ONGOING campaign tick: nothing but the levy,
+the tariff and the budget outflow may ever move this field once play starts.
 
 Two flows credit it; one pass debits it.
 
