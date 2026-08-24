@@ -4,6 +4,8 @@
 #include "presentation.hpp"
 #include "text_fit.hpp"
 
+#include "world/economy_system.hpp" // BL-577: economy_report, for budgets[player].subsidies
+
 #include <imgui.h>
 
 #include <unordered_map>
@@ -48,6 +50,7 @@ float player_stockpile_value(const world& w)
 
 void draw_header_panel(const world& w,
                        const std::vector<float>& balance_history,
+                       const economy_report& report,
                        float left,
                        float right)
 {
@@ -109,6 +112,18 @@ void draw_header_panel(const world& w,
     // reading would be noise competing with NET for scarce header width. This is
     // also why it is not an "infinite quarters" reading: that number would be a
     // lie dressed as a figure.
+    // BL-577: this tick's contract income (budget_result::subsidies) — the
+    // SAME line the Balance ledger's new "Contract income" line reads
+    // (balance_ledger.cpp). The runway math itself needs no separate term:
+    // `net` is a plain balance delta, so a contract payment already moved it.
+    // What the math CANNOT say on its own is that one-off "steady burn"
+    // premise is wrong for a tick a contract paid out — a single lump sum
+    // reading as a rosy (or merely less bad) quarter would mislead the
+    // "assumes the burn holds steady" reader, so the tooltip names it.
+    float subsidies = 0.0f;
+    if (const auto bit = report.budgets.find(w.player_entity); bit != report.budgets.end())
+        subsidies = bit->second.subsidies;
+
     std::string runway_text;
     std::string runway_tip;
     bool        runway_urgent = false;
@@ -128,11 +143,19 @@ void draw_header_panel(const world& w,
         runway_text = buf;
         // Under two years of cushion is the point it needs acting on.
         runway_urgent = quarters < 8;
-        char tip[192];
-        std::snprintf(tip, sizeof(tip),
-                      "About %d quarters of cushion: balance divided by the current\n"
-                      "quarterly loss. Assumes the burn holds steady - it moves as\n"
-                      "prices, wages and upkeep change.", quarters);
+        char tip[256];
+        if (subsidies > 0.0f)
+            std::snprintf(tip, sizeof(tip),
+                          "About %d quarters of cushion: balance divided by the current\n"
+                          "quarterly loss. Assumes the burn holds steady - it moves as\n"
+                          "prices, wages and upkeep change. Includes Cr %.0f of contract\n"
+                          "income this quarter - a one-off payment, not a steady rate.",
+                          quarters, static_cast<double>(subsidies));
+        else
+            std::snprintf(tip, sizeof(tip),
+                          "About %d quarters of cushion: balance divided by the current\n"
+                          "quarterly loss. Assumes the burn holds steady - it moves as\n"
+                          "prices, wages and upkeep change.", quarters);
         runway_tip = tip;
     }
 

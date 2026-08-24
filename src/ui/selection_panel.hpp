@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ui_state.hpp"
+#include "world/contract_template.hpp" // contract_template_registry (BL-577: the contract card's predicate)
 #include "world/economy_system.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
@@ -148,10 +149,15 @@ void draw_unit_page(const world& w, const recipe_registry& reg,
 /// @param report   Most recent economy step report — the building layout reads its
 ///                 per-building row for output/rate; the Population facts read its
 ///                 body_habitability for a population centre's workforce cap.
+/// @param templates BL-577: the authored contract-template roster, read only
+///                 for the contract card's predicate text (see
+///                 selection_card.hpp's own comment on why this is a
+///                 separate object from @p reg).
 /// @param ui       UI state; read for the selection, written by 'go to' (focus),
 ///                 the close button (hide), and the tile "Construct Buildings" button.
 void draw_selection_content(world& w, const recipe_registry& reg,
-                            const economy_report& report, ui_state& ui);
+                            const economy_report& report,
+                            const contract_template_registry& templates, ui_state& ui);
 
 /// Draw the CURRENT page of the building Selection card's accordion (the page
 /// named by ui_state::selection_building_page against that building's own
