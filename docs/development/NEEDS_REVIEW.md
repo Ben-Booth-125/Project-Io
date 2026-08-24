@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*10 entries — 10 open, 0 resolved.*
+*9 entries — 9 open, 0 resolved.*
 
 ---
 
@@ -117,21 +117,6 @@ CONTRACTS.md's Q2 table settles the ORDERING — failed is 'down hardest', cance
 - Defer to playtest feel once BL-578's slice is playable.
 
 > **Recommendation:** Defer to playtest feel — this is exactly the kind of number CONTRACTS.md itself says should be iterated, not authored once and forgotten (the same discipline NR-579's fee_mult/deadline_ticks placeholders are held to).
-
-### NR-583 — Renumbered from NR-578 on merge (collision with an unrelated entry already on main) — Sprint 32 (Logistic Points + Throughput lens) pulls a v0.1.20-roadmap item forward past v0.1.16/18/19 content, under the new 3-active-sprint cap
-*decision taken on your behalf · raised 2026-08-23 · from Authoring Sprint 32, on Ben's direct instruction: author the next sprint, themed logistics/exploration/rendering through fog of war.*
-
-ROADMAP.md names Logistic Points (the old BL-464, re-filed fresh as BL-595 after the 2026-08-23 purge) for v0.1.20 ("Stance & force"), bundled with BL-314/399/449/450/472/474/475. The two sprints already active under the new cap are v0.1.15 (16) and v0.1.17 (17) — earlier minors. Authoring Sprint 32 around BL-595/596/597 puts v0.1.20 content into the third active slot ahead of v0.1.16 (The watch, closed under the cap as W1, but not release-cut), v0.1.18 (economy tells the truth, Sprint 19 closed goal-NOT-met) and v0.1.19 (ancient conflict, uncertain completion). Checked before filing: LP's actual code prerequisites — body_reach_field, roads, stance/hostility (BL-448) — are all already built, so nothing BLOCKS the build; this is a release-numbering sequencing question, not a dependency one. Renumbered NR-578 -> NR-583 on merging into main 2026-08-24: NR-578 was already claimed by an unrelated entry (BL-575 live-click observation) filed on main while this branch was in flight.
-
-**Why it matters.** The standing rule (io-standing-rules.md § Scope & sequence) says not to implement a milestone that depends on an earlier one not yet complete, without flagging it. Ben named this exact theme directly (logistics/exploration/fog rendering), which reads as an explicit choice to jump ahead — but the jump was not stated as a version-sequencing decision, so it is recorded rather than assumed.
-
-- Confirm: build Sprint 32 now: v0.1.15/17/20 run concurrently under the cap; v0.1.16/18/19's remaining content stays parked until a future slot.
-- Hold Sprint 32 until v0.1.16/18/19 are release-cut, and use the third cap slot for one of those instead.
-- Re-home BL-595/596/597 onto whichever version_goal actually ships next, decoupling the item from the v0.1.20 label entirely.
-
-> **Recommendation:** Confirm — Ben asked for this theme directly and nothing in LP's dependency chain is unmet; the roadmap's version bucketing is thematic grouping for release cuts, not a build-order gate.
-
-*Files: `docs/development/ROADMAP.md`, `docs/development/sprints.json`, `docs/development/backlog.json`*
 
 ### NR-584 — BL-574's own requirement text says a failed 'hold' contract has 'the escrow returned' -- the code does not return one (renumbered from NR-583 on merge, collision with an unrelated entry already on main)
 *observation · raised 2026-08-24 · from BL-574 (CONTRACT_HARNESS), req/requirements.json's R1 (M4): "a hold-template failed on the first lost tick with the escrow returned and reputation lower than a cancel".*
