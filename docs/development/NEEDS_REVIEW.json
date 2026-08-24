@@ -249,8 +249,9 @@
         "docs/development/sprints.json",
         "docs/development/SPRINTS.md"
       ],
-      "status": "open",
-      "resolution": null
+      "status": "resolved",
+      "resolved_on": "2026-08-24",
+      "resolution": "Ben, 2026-08-24: \"Let's move sprints into JSON. We also need to archive them once they're complete.\" Done same session: status_table retired in favour of a per-entry status_line (one entry, one line, nothing to drift); SPRINTS.md is now a generated mirror (tools/session/render_sprints.js) reading sprints.json plus archive/sprints-*.json, so every executed sprint — 27 included — is indexed; 29 completed sprints moved cold via tools/session/archive_sprints.js (hot file 128.7 KB → 12.6 KB). The empty retro fields on 27/P1/N1/N2 are frozen in the archive as found. The one remaining fork — gated 25b's sequence pointing at purged numbers 21/23 — is carried into the Sprint 18 logistics design, in flight this session."
     }
   ]
 }
