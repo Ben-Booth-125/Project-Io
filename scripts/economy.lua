@@ -286,29 +286,88 @@ economy = {
         -- two triggers (out of reach, or the draw went unmet), which is the
         -- same subtraction for the same reason.
         --
-        -- EVERY RATE IS ZERO ON LANDING, deliberately. The item ships INERT so
-        -- no shipped economy golden moves on landing and the pricing can be
-        -- tuned by playtest against a measured baseline rather than guessed
-        -- here. Turning it on is this table, not a code change.
+        -- BL-603 (UPKEEP_ZEROS, 2026-08-24): turned ON, first cut. NR-600 flags
+        -- these numbers for Ben's calibration by playtest — this is a reasoned
+        -- first cut against the BL-543 value anchor, not a final ruling.
+        --
+        -- THE ANCHOR (NATIONS.md § 3, Ben 2026-08-22): "the equipment needed to
+        -- sustain a unit costs about 2x their salary for that year", clarified
+        -- to price the GOODS draw against the WAGE's flat term using authored
+        -- base_price (world_gen.lua), never the resolved market price:
+        --
+        --     Σ ( goods_per_head[r] × base_price[r] )  ≈  2 × credits_per_head
+        --
+        -- An economy tick is one quarter, so the annual factor of 4 appears on
+        -- both sides and cancels — the identity holds per-tick as written.
+        --
+        -- CREDITS. credits_per_head = 6.0 matches the lowest authored
+        -- base_wage in this file (line 189, 6.0) — a token levy wage, the same
+        -- floor a civilian worker draws, deliberately conservative for a first
+        -- cut. credits_per_head_per_power adds a power-scaled top-up (the same
+        -- "floor plus power-scaled component" shape BL-394 gave
+        -- hire_cost_per_power) — BOUNDED, not picked freely: goods_per_head is
+        -- ONE flat table for the whole roster (see GOODS below) while the wage
+        -- is per-row, so tools/verify/value_anchor.cpp's R1/R5 rows require
+        --     wage(row) = credits_per_head + credits_per_head_per_power × power_mod
+        --     in  [ equip × 0.4, equip × 0.667 ]   (the ±25% band solved for wage)
+        -- for EVERY row, equip = 12.02 (below). The roster's heaviest row
+        -- (Mechanised Column, power_mod 420) is the binding case: solving
+        -- wage(420) <= 12.02 × 0.667 = 8.013 gives
+        --     credits_per_head_per_power <= (8.013 - 6.0) / 420 = 0.004793
+        -- 0.004 is chosen with headroom below that edge (R5's own "measured
+        -- off the edge, not on it") rather than at the limit — a Levy Spear
+        -- (power_mod 0) pays 6.0/head/tick flat; a Rifle Regiment (power_mod
+        -- 380) pays 6.0 + 380×0.004 = 7.52/head/tick; the heaviest row,
+        -- Mechanised Column, pays 6.0 + 420×0.004 = 7.68/head/tick. Annualised
+        -- (×4) that is 24 / 30.08 / 30.72 respectively — all well under their
+        -- one-off hire_base_cost/hire_cost_per_power prices (40 / 230 / n/a),
+        -- so keeping a standing unit for a year costs meaningfully less than
+        -- raising a fresh one, as it should. VERIFIED: value_anchor's R1a
+        -- passes at this rate (0/19 roster rows out of band; see harness
+        -- output — before this bound was derived, an unbounded first guess of
+        -- 0.02 put 10 of 19 rows outside the band, caught by that same row).
+        --
+        -- GOODS. The anchor target is 2 × credits_per_head's FLAT term = 12.0
+        -- credits of goods value per head per tick (the power-scaled wage
+        -- component has no goods counterpart — goods_per_head is one table,
+        -- not per-class, per NATIONS.md's "a band, not an identity"). Split:
+        --   food_rations_per_head = 1.0  -> 1.0 × 6.0  (base_price) =  6.00
+        --   ordnance_per_head     = 0.14 -> 0.14 × 43.0 (base_price) =  6.02
+        --                                                     total  = 12.02
+        -- "one ration per head per tick" is the legible anchor for the food
+        -- line; ordnance is sized to bring the pair to the 2x target (12.02 ≈
+        -- 2 × 6.0). Both draw from resource_type::ordnance / food_rations
+        -- (BL-457, BL-543).
+        --
+        -- SUPPLY CURVE. supply_decay_permille = 50 (5%/tick of the 0..1000
+        -- factor): a fully-supplied unit left unsupplied reaches 0 supply in
+        -- 20 ticks (5 years at one tick/quarter) — a long enough runway that
+        -- one missed convoy isn't catastrophic, short enough that sustained
+        -- neglect genuinely hollows a force out. supply_recovery_permille =
+        -- 100, 2x the decay rate, so correcting a supply failure repairs
+        -- faster than the failure itself did damage.
+        --
+        -- REACH. out_of_supply_reach = 24.0 reuses construction.max_logistics_
+        -- reach (line 578) EXACTLY — not a new scale. MILITARY.md's own
+        -- ruling is that economic reach IS military reach (one reach field,
+        -- BL-325 S3), so the "how far is still reachable" number a building
+        -- already answers is the same number a unit's supply line answers.
         unit_upkeep = {
-            credits_per_head           = 0.0,  -- flat wage per head per tick
-            credits_per_head_per_power  = 0.0, -- wage scaled by the roster row's power_mod
+            credits_per_head           = 6.0,   -- flat wage per head per tick
+            credits_per_head_per_power  = 0.004, -- wage scaled by the roster row's power_mod (bounded <= 0.004793, see derivation above)
 
             -- The goods half of the vector, per head per tick. ORDNANCE is the
             -- good (BL-457 added it as the roster's first terminal MILITARY
             -- good precisely so this draw could consume it); food_rations is
-            -- the sanctioned second line. Both are named here, at ZERO, so
-            -- turning upkeep on is editing a number rather than adding a line
-            -- — and so a reader can see what the draw WILL be. A zero entry is
-            -- skipped by the pass exactly as an absent one is.
+            -- the sanctioned second line.
             goods_per_head = {
-                ordnance     = 0.0,
-                food_rations = 0.0,
+                ordnance     = 0.14,
+                food_rations = 1.0,
             },
 
-            supply_decay_permille    = 0,   -- the ONE decay subtraction, per tick
-            supply_recovery_permille = 0,   -- regained per tick while supplied
-            out_of_supply_reach      = 0.0, -- reach cost past which a unit is out of supply; <= 0 disables
+            supply_decay_permille    = 50,   -- the ONE decay subtraction, per tick
+            supply_recovery_permille = 100,  -- regained per tick while supplied
+            out_of_supply_reach      = 24.0, -- reach cost past which a unit is out of supply; <= 0 disables
         },
 
         -- BL-470: march points spent per tick against per-tile traversal cost
