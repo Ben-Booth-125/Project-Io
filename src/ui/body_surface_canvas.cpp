@@ -211,29 +211,41 @@ ImU32 fog_dim(ImU32 c, float vision)
     return (dim & ~(0xFFu << IM_COL32_A_SHIFT)) | (alpha << IM_COL32_A_SHIFT);
 }
 
-/// Fill colour of a tile that carries a building — its **plate**. A built tile is
-/// swapped out of the terrain palette entirely (Ben, 2026-07-22): it fills with a
-/// desaturated wash of the owning corporation's identity colour, so ownership — the
-/// most load-bearing read on this canvas — carries at a glance and agrees with the
-/// marker/emblem convention (palette::corp_identity_colour). A building with no
-/// corporate owner gets the neutral industrial plate.
-///
-/// This is the ONE place the plate choice lives, so retuning it (flat neutral, or a
-/// building-type hue) is a single-function edit.
-ImU32 built_plate_colour(bool has_owner, ImU32 owner_colour)
-{
-    // Deep machine grey — deliberately outside the terrain hues so a built tile never
-    // reads as ground, even before the owner tint is mixed in.
-    constexpr ImU32 industrial = IM_COL32(50, 52, 60, 255);
-    return has_owner ? lerp_colour(industrial, owner_colour, 0.55f) : industrial;
-}
-
 /// Building silhouette radius as a fraction of the hex circumradius. The silhouette
-/// is now the tile's *content*, not a marker pinned on terrain, so it scales to the
-/// hex; the value leaves the lower-right corner free for the owner emblem tag and
-/// keeps the widest glyph (the square) inside the hexagon's inradius. Shared with the
-/// construction ghost so the armed preview matches what actually lands.
+/// scales to the hex rather than being a small pin on it; the value leaves the
+/// lower-right corner free for the owner emblem tag and keeps the widest glyph (the
+/// square) inside the hexagon's inradius. Shared with the construction ghost so the
+/// armed preview matches what actually lands.
+///
+/// BL-596 removed the *plate* this silhouette used to stand on — a built tile no
+/// longer swaps its hex out for an owner-tinted fill. The glyph now draws over live
+/// ground, so its legibility rests on its own dark outline against a live background,
+/// which is what the icon vocabulary is for (ICONS.md § Shared conventions).
 constexpr float kBuiltSilhouetteScale = 0.48f;
+
+/// Level-of-detail floor for the stacked-tile ring (BL-596), in drawn hex
+/// circumradius. Its OWN bound, and a stricter one than the coarse-fill threshold
+/// below, exactly as the terrain texture carries its own stricter bound — because
+/// the two passes fail differently. Coarse fill asks "is the corner cut still
+/// drawable"; the ring asks "is one SEGMENT still a segment", and a segment that has
+/// shrunk to the length of its own gap reads as a dotted circle, not as a count.
+///
+/// **Derived, not chosen.** A segment's drawn arc is
+/// `2 pi * 0.76 * draw_r / kinds * (1 - 0.20)`. At the practical worst case — the
+/// full building_type roster, six placeable kinds on one tile — that is `0.637 *
+/// draw_r`, and a stroke needs about 6 px of run before it reads as an arc rather
+/// than a blob: `0.637 * draw_r >= 6` gives `draw_r >= 9.4`. Rounded up to 10.
+///
+/// Because 10 > k_lod_radius_px (7), the ring is already gone by the time the fill
+/// goes coarse, which is the degrade BL-596's ruling requires: below the threshold
+/// there is no rim left to segment, so the tile falls back to the dominant kind's
+/// glyph alone — never to an empty hex, and never to a ring whose arcs have merged.
+constexpr float kStackRingLodRadiusPx = 10.0f;
+
+/// Upper bound on the kinds one tile's ring can name — the whole `building_type`
+/// roster minus `none`. Sized as a fixed array so the marker pass allocates nothing
+/// per tile per frame.
+constexpr int kStackRingMaxKinds = 7;
 
 /// Shared red→yellow→green ramp for every "red to green" lens (Opportunity,
 /// Population/workforce, Production). `t` in [0, 1]: 0 = red (low), 0.5 = yellow
@@ -1350,6 +1362,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // the signal that a marker click should land on the TILE (grouped stack
     // list) rather than assuming the whole hex is one installation.
     static std::unordered_map<entity_id, int>            tile_bld_count;
+    // BL-596: the DISTINCT building kinds standing on the tile, ascending by
+    // building_type — the segmented ring's contents. Kept separate from
+    // tile_bld_count on purpose, because the two answer different questions: the
+    // count says HOW MANY buildings ("+3"), the kind set says WHICH KINDS. Ben chose
+    // the ring over primary-plus-count precisely because a count "never says which".
+    static std::unordered_map<entity_id, std::vector<building_type>> tile_bld_kinds;
     // Unit groups per province (BL-575) — see the pre-pass below. Keyed on the
     // SAME stamp as the maps above, since a hire/disband changes w.units.size()
     // and a march order's actual tile move only happens on a tick (already
@@ -1363,12 +1381,23 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         tile_to_bld.clear();
         tile_to_corp.clear();
         tile_bld_count.clear();
+        tile_bld_kinds.clear();
         for (const auto& [bld_id, bld] : w.buildings)
         {
             auto tile_it = w.tiles.find(bld.tile);
             if (tile_it != w.tiles.end() && tile_it->second.body == state.active_body)
             {
                 ++tile_bld_count[bld.tile];
+                // Distinct kinds, inserted in sorted position. w.buildings is an
+                // unordered_map, so accumulate-then-sort would still be
+                // deterministic, but an ordered insert keeps the vector correct at
+                // every step and the sets are at most a handful long.
+                {
+                    std::vector<building_type>& kinds = tile_bld_kinds[bld.tile];
+                    const auto pos = std::lower_bound(kinds.begin(), kinds.end(), bld.type);
+                    if (pos == kinds.end() || *pos != bld.type)
+                        kinds.insert(pos, bld.type);
+                }
                 // Lowest building id wins the tile. w.buildings is an unordered_map, so a
                 // plain last-writer-wins assignment would let its iteration order pick the
                 // representative — fine while a tile holds one building, not once they
@@ -1984,14 +2013,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // unchanged, line for line — only where it runs moved.
     auto compute_tile_fill = [&](entity_id id, const tile_component& tile) -> ImU32
     {
-        const auto   built_it   = built_tiles.find(id);
-        const bool   built      = built_it != built_tiles.end();
         const auto   corp_it    = tile_to_corp.find(id);
         const bool   has_owner  = corp_it != tile_to_corp.end();
         const ImU32  owner_col  = has_owner ? corp_identity(corp_it->second)
                                             : IM_COL32(255, 255, 255, 255);
-        ImU32 fill = built ? built_plate_colour(has_owner, owner_col)
-                           : terrain_colour(tile.substrate, tile.cover, tile.cover_density);
+        // BL-596: EVERY tile starts from its terrain colour, built or not. A built
+        // tile used to be swapped wholesale for an owner-tinted plate; Ben, 2026-08-24:
+        // "Remove building background. Buildings should be drawn over the hex, not
+        // completely on top." The hex is what carries substrate, cover, ownership and
+        // every lens, so occluding it to label it trades away the map. Ownership has
+        // not lost a channel — it is still on the silhouette's fill, the corp emblem
+        // tag, and (for the player) the persistent footprint outline.
+        ImU32 fill = terrain_colour(tile.substrate, tile.cover, tile.cover_density);
         if (state.overlay == overlay_mode::country)
         {
             const auto nat_it = w.tile_to_nation.find(id);
@@ -2109,9 +2142,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const bool is_player_tile = has_owner && corp_it->second == w.player_entity;
         // Plain-default wash: tint the player's own tiles with the player identity
         // colour when no lens is active. Suppressed under any lens — the outline
-        // carries identity there, so the wash never fights a lens fill — and on a
-        // built tile, whose owner plate already IS the player's identity colour.
-        if (is_player_tile && !built && state.overlay == overlay_mode::none)
+        // carries identity there, so the wash never fights a lens fill.
+        //
+        // BL-596 removed the `!built` exemption that used to stand here. It existed
+        // because a built tile's owner PLATE already was the player's identity colour;
+        // with the plate gone, exempting built tiles would punch a hole in the middle
+        // of the player's own footprint — the one tile in a cluster that does not read
+        // as theirs would be the one they built on.
+        if (is_player_tile && state.overlay == overlay_mode::none)
             fill = lerp_colour(fill, corp_identity(w.player_entity), 0.30f);
 
         const bool   selected  = (id == state.selected_entity);
@@ -2141,11 +2179,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // habitability and mineral richness, and that cost applies whether or not a lens
         // is on, so this is always-on terrain chrome rather than an overlay_mode.
         //
-        // Skipped on a built tile: that hex is swapped wholesale for its owner plate as
-        // an identity signal, and shading it would muddy whose it is. No read is lost —
-        // the elevation matters when SITING, and a built tile has already been sited.
-        if (!built)
-            fill = landform_relief(fill, tile.landform);
+        // BL-596 removed the `!built` gate here too. It was the plate's argument —
+        // shading an identity fill would muddy whose it is — and with the plate gone
+        // a built tile's fill IS terrain, so relief applies to it exactly as it does
+        // to the ground next door. The landform under a building does not stop being
+        // a landform because something was sited on it.
+        fill = landform_relief(fill, tile.landform);
 
         // Survey mask (BL-067): tiles in regions not yet revealed render as a dark
         // locked overlay with no lens detail, borders, markers, or hit-testing — the
@@ -2200,13 +2239,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         sh.fill        = compute_tile_fill(cid, ct);
         sh.province    = w.provinces.province_of(cid);
         // A tile joins the blend only when it is ordinary ground under a lens
-        // whose field is continuous. A BUILT tile is excluded on purpose: it
-        // renders AS an installation (its hex is swapped wholesale for the owner
-        // plate), and smearing that plate across unbuilt ground would put a corp
-        // identity on land nobody owns. A survey-masked tile is excluded for the
-        // same reason in reverse — the lock fill is a statement about knowledge,
-        // not terrain.
-        const bool ct_built = built_tiles.find(cid) != built_tiles.end();
+        // whose field is continuous. A survey-masked tile is excluded: the lock
+        // fill is a statement about knowledge, not terrain, and smearing it would
+        // leak the shape of ground the player has not surveyed.
+        //
+        // A BUILT tile used to be excluded here as well, and BL-596 dropped that.
+        // The exclusion's whole argument was the plate — "smearing a corp identity
+        // across unbuilt ground would put ownership on land nobody owns" — and the
+        // plate is gone. A built tile's fill is now terrain, so blending it is
+        // blending terrain. Keeping the exclusion would have left the built hex as
+        // the one crisp, 1 px-bordered cell inside an otherwise seamless province:
+        // a plate-shaped hole where the plate used to be.
         const bool ct_seen  = survey_tile_visible(body.survey, gw, gh, ct.grid_x, ct.grid_y)
                               || god_view_lift;
         //
@@ -2219,7 +2262,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // it would change how the sea reads, and that is a look nobody has seen
         // yet. This change ships the pre-BL-516 rendering unchanged; softening
         // the sea is a separate, visually-reviewed call.
-        sh.blend = lens_blends && !ct_built && ct_seen && sh.province != 0
+        sh.blend = lens_blends && ct_seen && sh.province != 0
                    && !is_water(ct.substrate);
     }
 
@@ -2244,9 +2287,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (k_min > k_max)
             continue;
 
-        // Does this tile carry a building, and who owns it? Resolved before the fill
-        // so a built tile can start from its owner plate instead of terrain, and so
-        // the marker pass below reuses the one lookup.
+        // Does this tile carry a building, and who owns it? Resolved once here so the
+        // marker pass below reuses the one lookup. It no longer feeds the FILL — since
+        // BL-596 a built tile fills as terrain like any other.
         const auto   built_it   = built_tiles.find(id);
         const bool   built      = built_it != built_tiles.end();
         const building_type built_type = built ? built_it->second : building_type::none;
@@ -2275,12 +2318,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
         }
 
-        // Fill starts as the tile's terrain colour — EXCEPT on a built tile, which is
-        // swapped out wholesale for its owner plate (2026-07-22): a tile that carries a
-        // building renders AS an installation, with no terrain showing through around
-        // the glyph. Lens tints then composite over the plate exactly as they do over
-        // terrain — a lens is a mode the player chose, so suppressing it where the
-        // player's own assets sit would blind it where it matters most.
+        // Fill starts as the tile's terrain colour, on EVERY tile (BL-596 retired the
+        // built tile's owner plate). Lens tints then composite over it — a lens is a
+        // mode the player chose, so suppressing it where the player's own assets sit
+        // would blind it where it matters most.
         //
         // Under the Faction lens a tile owned by a nation is tinted that nation's
         // identity colour. The tint is a direct replacement (no blend); unclaimed
@@ -2401,12 +2442,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // Gated on `revealed`: a cover pattern IS terrain information, and
             // drawing it through the survey mask would leak the shape of ground
             // the player has not paid to survey (DISCOVERY.md's geographic fog).
-            // Gated on `!built`: a built hex is swapped wholesale for its owner
-            // plate as an identity signal — that plate is not ground, and texturing
-            // it would read as terrain showing through a building.
+            // BL-596 dropped the `!built` gate. It said a built hex is not ground —
+            // true while the plate stood, false now that the hex under a building is
+            // ordinary terrain. Ben's ruling is that terrain, texture and the live
+            // lens wash all keep showing under the glyph.
             // Never drawn under `coarse_fill`, which is implied: coarse_fill needs
             // draw_r <= 7 and texture_strength is 0 below draw_r 14.
-            if (revealed && !built && texture_strength > 0.0f)
+            if (revealed && texture_strength > 0.0f)
                 draw_tile_texture(dl, { cx, cy }, draw_r, tile.grid_x, tile.grid_y,
                                   tile.substrate, tile.cover, tile.cover_density,
                                   fill, texture_strength);
@@ -2654,11 +2696,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 // The silhouette is the tile's content now, so it scales to the hex.
                 const float sil_r = std::max(3.0f, draw_r * kBuiltSilhouetteScale);
 
-                // The structure reads PALE against its own (dark, owner-tinted) plate,
-                // and still reads when a saturated lens fill is composited over that
-                // plate. Lightening toward white keeps the owner hue, so identity
-                // survives; an unowned tile's owner_col is already white, so it stays
-                // white through the same blend.
+                // The structure reads PALE and carries the filled family's dark
+                // outline, so the pair is self-balancing over the live ground BL-596
+                // put back underneath it: over near-white ice the dark outline holds
+                // the shape, over dark forest the pale fill does. Lightening toward
+                // white keeps the owner hue, so identity survives; an unowned tile's
+                // owner_col is already white, so it stays white through the same blend.
                 const ImU32 marker_col =
                     lerp_colour(owner_col, IM_COL32(255, 255, 255, 255), 0.5f);
 
@@ -2687,6 +2730,43 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 if (state.overlay != overlay_mode::population &&
                     state.overlay != overlay_mode::opportunity)
                 {
+                    // Stacked-tile ring (BL-596). Drawn BEFORE the centre glyph so
+                    // the silhouette stays the loudest thing on the tile, and before
+                    // the emblem tag and the "+N" badge so those read as pinned onto
+                    // the ring rather than sliced by it.
+                    //
+                    // The ring names WHICH KINDS stand here; the centre glyph names
+                    // which of them leads (the lowest-id representative, the same one
+                    // tile_to_bld picks); the "+N" badge still names how many
+                    // buildings in total. Three different questions, three marks.
+                    //
+                    // Suppressed under the two value lenses for the same reason the
+                    // silhouette is: those lenses replace the tile's installation
+                    // read with a per-tile value mark, and a ring with no centre
+                    // glyph would be a ring with nothing to be dominant.
+                    if (draw_r > kStackRingLodRadiusPx)
+                    {
+                        const auto kinds_it = tile_bld_kinds.find(id);
+                        if (kinds_it != tile_bld_kinds.end() && kinds_it->second.size() >= 2)
+                        {
+                            ImU32 seg[kStackRingMaxKinds];
+                            int   n = 0;
+                            // DOMINANT FIRST — it takes the 12 o'clock segment, which
+                            // is the only thing tying an arc to the glyph in the
+                            // middle. The rest follow in the cache's ascending
+                            // building_type order, so the ring is stable frame to
+                            // frame and identical across runs.
+                            seg[n++] = palette::building_kind_colour(built_type);
+                            for (const building_type bt : kinds_it->second)
+                            {
+                                if (bt == built_type || n >= kStackRingMaxKinds)
+                                    continue;
+                                seg[n++] = palette::building_kind_colour(bt);
+                            }
+                            icons::stack_ring(dl, {cx, cy}, draw_r, seg, n);
+                        }
+                    }
+
                     if (under_construction)
                         icons::under_construction(dl, {cx, cy}, sil_r, marker_col);
                     else
@@ -2700,8 +2780,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 // of truth, so the tag matches the identity card and the Selection
                 // header. Parked past the enlarged silhouette (offsets are fractions of
                 // the hex circumradius, chosen to sit inside the lower-right edges) and
-                // backed by a dark disc so it never gets lost against plate, lens fill,
-                // or glyph. Does not affect hit-testing.
+                // backed by a dark disc so it never gets lost against terrain, lens fill,
+                // the stack ring, or the glyph. Does not affect hit-testing.
                 if (has_owner)
                 {
                     const entity_id owner = corp_it->second;
@@ -2721,9 +2801,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     const auto bld_it = tile_to_bld.find(id);
                     if (bld_it != tile_to_bld.end())
                     {
-                        // BL-367: one marker still stands for the whole tile (no
-                        // per-stack markers — the "+N" badge below is what tells
-                        // the two apart), so a tile with more than one building no
+                        // BL-367: one marker still stands for the whole tile (the
+                        // "+N" badge below counts them, and since BL-596 the stack
+                        // ring above names their kinds), so a tile with more than one building no
                         // longer assumes the whole hex is a single installation —
                         // the click lands on the TILE (grouped stack list) instead
                         // of jumping into whichever building sorts lowest-id.
@@ -2740,6 +2820,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                             // "+N" badge, lower-right — staggered past the corp-identity
                             // tag (also lower-right) per ICONS.md's multi-badge offset
                             // convention, same k/N text idiom the survey badge uses.
+                            // It survives BL-596's ring rather than being replaced by
+                            // it: the ring says which KINDS, the badge says how MANY,
+                            // and a tile holding three extraction sites is one kind
+                            // standing three times.
                             char nbuf[8];
                             std::snprintf(nbuf, sizeof nbuf, "+%d", count - 1);
                             const ImVec2 bpos{ cx + draw_r * 0.56f, cy + draw_r * 0.68f };
