@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*27 entries — 27 open, 0 resolved.*
+*29 entries — 29 open, 0 resolved.*
 
 ---
 
@@ -309,6 +309,24 @@ question_log.json holds 39 surfaces and the rule is that every information surfa
 **Why it matters.** Enforcement of this store is authorship, not machinery (Ben, 2026-08-01: no check may be built against it), which means a missing entry is only ever found by someone reading it against the screen. This pass is the first time anyone has read all of it against all of the shell.
 
 *Files: `docs/ui/question_log.json`, `docs/ui/TIME_CONTROLS.md`, `docs/ui/MINIMAP.md`, `docs/ui/LENSES.md`, `docs/ui/MENU.md`, `docs/ui/STARTUP.md`*
+
+### NR-603 — Retiring the Opportunity lens also retires BL-086's ambient growth read - there was never a second surface
+*decision taken on your behalf · raised 2026-08-24 · from Sprint 17b, Slice B (BL-604 / BL-602), reported 2026-08-24.*
+
+Ben's instruction was 'retire the opportunity lens and the production intensity lens', and the item was filed with a rider saying BL-086's ambient opportunity read is a SEPARATE always-on cue and should be confirmed untouched. That premise is wrong, and the slice checked rather than assumed: archive/DEVLOG-2026.md records BL-086 closed with NO NEW CODE - 'the shipped Opportunity lens already reads at rest with its key and isn't auto-activated; pinned with a golden'. scripts/verify/opportunity_ambient.lua pinned exactly that, and was deleted with the lens. So there is no second surface: the lens WAS BL-086's outcome, and retiring it retires the ambient read too.
+
+**Why it matters.** Ben asked for the lens to go, not for the glanceable growth read to go, and until now the two looked separable. They are not. If he still wants an at-rest read of where demand is unmet, it is NEW work with its own question to answer - not a surface that can be rediscovered. Raised so the loss is a decision rather than an accident found later.
+
+*Files: `docs/ui/LENSES.md`, `docs/development/archive/DEVLOG-2026.md`*
+
+### NR-604 — Scarcity's Circumplanetary badge is documented and unbuilt - the same hole that made Production's rung easy to retire
+*observation · raised 2026-08-24 · from Sprint 17b, Slice B (BL-604 / BL-602), reported 2026-08-24.*
+
+Retiring the Production lens raised the question of whether its Circumplanetary rung - a per-body output-throughput badge - should survive as body-level chrome. It was retired, and the decisive reason was that it WAS NEVER BUILT: circumplanetary_canvas.cpp carries no overlay_mode::production pass at all, only the Supply convoy badge. LENSES.md's rung table described an intent as a surface. The slice then noticed the same hole one row down: SCARCITY's documented Circumplanetary per-body shortfall badge is equally unbuilt. It was outside the item and left alone.
+
+**Why it matters.** The rung-applicability table is read as a statement of what exists, and at least two of its cells were statements of what was meant to exist. Either the table is corrected against the code, or the two badges are built. It also means the table cannot be trusted as the input to BL-603's per-lens structure walk without being checked cell by cell first.
+
+*Files: `docs/ui/LENSES.md`, `src/ui/circumplanetary_canvas.cpp`*
 
 ---
 
