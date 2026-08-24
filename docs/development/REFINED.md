@@ -362,3 +362,45 @@ Requirements: `req/requirements.json` § start-gate-audit. Files: `scripts/recip
    indirectly, scattered across `tech_effect_union_harness`, `chain_depth`'s G5, and the
    full-suite pass. Filed as `NR-594` — real coverage, just not consolidated, and not urgent
    enough to expand this item's scope over.
+
+---
+
+#### BL-593 — BUILD_DOOR_WIDE_ROSTER — COMPLETE 2026-08-24
+
+Requirements: `req/requirements.json` § build-door-wide-roster. Files: `src/ui/selection_panel.cpp`,
+`docs/ui/SELECTION.md`, `docs/ui/question_log.json`, `docs/ai/ACTIONS.json`,
+`scripts/verify/build_door_wide_roster.lua`.
+
+1. **A real, live bug found before any ruling**: the candidate filter (`selection_panel.cpp`)
+   never checked `recipe_unlocked` at all — only era and depth — so `refined_copper` (tech-locked
+   since `BL-589`) was appearing in Metal Foundry as a normal buildable option. Clicking it would
+   fail against `construct_building`'s `tech_locked` refusal with no explanation shown anywhere.
+2. Put the item's own named design call (filtered-out vs shown-and-locked) to Ben, with the
+   current code facts stated first (Rule 0b). Ruled: **filtered out**, matching the existing
+   `era_locked`/`depth_locked` precedent exactly — extending the filter's own stated argument
+   ("the door not showing what the gate would refuse") rather than starting a new one.
+3. Implemented as a third clause on the SAME removal predicate that already carried the other
+   two: `recipe_unlocked(w, reg, w.player_entity, c.recipe)`. `refined_copper` is the first recipe
+   this clause actually removes — every earlier tech gate targeted a `building_type`, never a
+   recipe, so the branch was dead code on every prior campaign.
+4. `SELECTION.md` gained a new paragraph distinguishing the two refusal classes: a
+   reason-coded row (the ledger shows *why*) versus a filtered-out row (the ledger never shows
+   it at all). `question_log.json`'s `selection_panel` entry updated in place.
+   `docs/ai/ACTIONS.json`'s `gameplay.construct` precondition **corrected, not just extended** —
+   it described only the original structure-level tech lock and was silent on the two
+   recipe-level gates BL-588/BL-589 already shipped, and on the fact that a locked structure
+   still shows a row while a locked recipe does not (an agent reading the stale text would not
+   know the ledger can hide a candidate entirely).
+5. **Visual verification is partial, and the gap is filed rather than glossed** (`NR-595`).
+   A new `scripts/verify/build_door_wide_roster.lua` captures the Build door, but the ledger's
+   dynamic window title (`"Construct [x, y]"`) matches none of `scroll_panel`'s five fixed
+   window names, so the column could not be scrolled to bring Metal Foundry into frame — a
+   pre-existing `verify_api.cpp` gap, not something this item's own scope covers. Separately,
+   `computer-use` reconnected mid-session but cannot resolve `ProjectIo.exe` as a grantable app
+   (the same gap `NR-593` recorded for BL-591), so no literal click was possible either. Accepted
+   as complete given the code change mirrors an already-verified pattern exactly — one more
+   clause on a predicate the era/depth precedent already proved correct — rather than novel logic.
+6. Full tree build and 6 relevant harnesses clean (`construction_gate_harness`,
+   `construction_harness`, `chain_depth`, `tech_gate_harness`, `corp_ai_harness`,
+   `recipe_switch_harness`) — none of them exercise `selection_panel.cpp` directly (a GUI-only
+   file), so this confirms the surrounding machinery is unaffected, not the UI change itself.

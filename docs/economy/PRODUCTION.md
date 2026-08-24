@@ -673,6 +673,18 @@ built (caught by `tech_gate_harness`'s T3 fixture, corrected before landing); `E
 widest anachronism before this gate, since `refined_copper` is `any`-band at required depth 0 and
 could be smelted for free on tick one of an ancient campaign with no ancient identity to it at all.
 
+**The Build door filters a tech-locked recipe out, the same way it already did for era- and
+depth-locked ones** (BL-593, 2026-08-24). The door's candidate filter (`selection_panel.cpp`)
+carried exactly two clauses before this item — `building_available` for era, `recipe_required_depth`
+for the ancient ladder — both resting on the same argument, stated in the code's own comment: *"the
+door not showing what the gate would refuse."* `recipe_unlocked` is now a third clause on that same
+predicate, extending the argument rather than starting a new one. Filtered was the ruled choice over
+shown-and-locked (Ben, 2026-08-24, same elicitation form as the opening ruling) — the alternative
+would have needed a new lock-reason string and a UI affordance the door doesn't have yet; the
+existing precedent already answers the question the same way. `refined_copper` is the first recipe
+this clause actually removes — every earlier tech gate targeted a `building_type`, never a recipe,
+so the branch was dead code on every campaign before `E0-EC-03`.
+
 **The readout lives on the corporation dashboard, not the building card** (BL-591, 2026-08-24).
 `corp_reached_depth` gates six places (construction, the recipe switch, the AI scorer, two Build
 door filters) and, until this item, displayed in none of them — the growth track this whole minor

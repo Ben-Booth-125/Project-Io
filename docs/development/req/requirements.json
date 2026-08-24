@@ -6271,6 +6271,53 @@
                     "result_metric": "1 observation filed (NR-594)"
                 }
             ]
+        },
+        {
+            "brief": "build-door-wide-roster",
+            "title": "The Build door filters a tech-locked recipe the same way it already filters era- and depth-locked ones",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-593 (BUILD_DOOR_WIDE_ROSTER) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "visual (partial — see notes)",
+                        "code"
+                    ],
+                    "requirement": "ITEM-SPANNING: put the item’s own named design call (filtered-out versus shown-and-locked for a tech-locked recipe) to Ben, with the current code-level facts stated first (Rule 0b) — the candidate filter never checked recipe_unlocked at all, so refined_copper (tech-locked since BL-589) was showing as a normal buildable option with no explanation for why placing it would fail.",
+                    "notes": "Ruling: filtered out, matching the existing era_locked/depth_locked precedent. Implemented as a third clause on the SAME removal predicate (selection_panel.cpp) that already carried the other two — recipe_unlocked(w, reg, w.player_entity, c.recipe). Not visually confirmed showing the group actually disappearing: two separate, pre-existing infra gaps blocked it (NR-595) — computer-use cannot reach the custom ProjectIo.exe (same gap as NR-593), and the tile build ledger’s dynamic window title does not match any of scroll_panel’s fixed names, so the column could not be scrolled to bring Metal Foundry into frame in a --verify capture. The code change itself mirrors an already-verified pattern exactly (one more clause on an existing, tested predicate), which is why it is accepted as complete rather than blocked.",
+                    "result_metric": "1 clause added to an existing 2-clause filter predicate"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: construction_gate_harness",
+                        "headless: construction_harness",
+                        "headless: chain_depth",
+                        "headless: tech_gate_harness",
+                        "headless: corp_ai_harness",
+                        "headless: recipe_switch_harness",
+                        "headless: full tree build"
+                    ],
+                    "requirement": "The filter change integrates cleanly — no regression to construction, the tech gates, the depth ladder, or the AI scorer, none of which this UI-only change should have touched.",
+                    "notes": "Full tree build (every target, zero errors) and 6 relevant headless harnesses clean — none of them exercise selection_panel.cpp (a GUI-only file), so this confirms the surrounding machinery (recipe_unlocked, the tech gates, construct_building) is unaffected, not the UI change itself.",
+                    "result_metric": "0 regressions"
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "code"
+                    ],
+                    "requirement": "Owed alongside the code, per the item’s own list: question_log.json and ACTIONS.json updated for the changed behavior.",
+                    "notes": "question_log.json’s selection_panel entry updated in place. ACTIONS.json’s gameplay.construct precondition corrected — it described only the ORIGINAL structure-level tech lock (military_base/E0-ML-01) and was silent on the two recipe-level gates BL-588/BL-589 shipped and on the fact that a locked structure still shows a row while a locked recipe does not (an AI agent reading the old text would not know the ledger can now hide a candidate entirely). Corrected rather than left stale.",
+                    "result_metric": "2 doc entries updated, 1 real staleness in ACTIONS.json fixed"
+                }
+            ]
         }
     ]
 }
