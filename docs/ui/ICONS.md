@@ -176,6 +176,11 @@ Smelter/Food Processor — it genuinely is the same steel, the same rations.
 | Smithy (+ the industrial Smelter) | `steel` | A flat trapezoid ingot bar |
 | Potter & Weaver, Glassworks | `trade_goods_misc` | A cinched sack — round body, tied neck |
 | Miller (+ the industrial Food Processor) | `food_rations` | A rounded, strapped ration pack — two binding lines across a loaf shape |
+| *(extraction target, no named building)* | `hides` | A raw hide stretched on a frame — a squat, irregular quadrilateral with four short peg lines at its corners |
+| *(extraction target, no named building)* | `fibre` | A bundle of reed/flax stalks gathered and tied at the base — converging lines with a cinch band, distinct from the Farm's fanning grain-headed stalks |
+| Tannery | `leather` | The cured counterpart of the raw hide glyph — a smoother, rounder silhouette with a single fold crease, no peg lines |
+| Weaver | `cloth` | Three stacked fabric folds — a zigzag ribbon read as draped cloth |
+| Shipwright | `rigging` | A coiled rope — two concentric rings sharing a gap, with a free end trailing out from the outer ring |
 
 The remaining `k_extractable` targets outside the ancient roster's names — coal,
 petroleum, silica, rare-earth ore, iron-nickel ore, platinum-group metals,

@@ -106,6 +106,17 @@ inline constexpr resource_type k_extractable[] = {
     // target it — a real, pre-existing gap, not new scope. Peat Cutting is now
     // placeable, and the Peat Kiln recipe (recipes.lua) gives it a consumer.
     resource_type::peat,
+    // BL-586 slice 2 (2026-08-24): `hides` (endemic, tile_generation.cpp's
+    // C -> D pass off planetology::endemics) and `fibre` (ambient, the same
+    // cover-based mechanic as agricultural_produce) both get real recipe
+    // consumers this change (Tannery, Weaver) — registered here so an
+    // extraction_site can actually target them, following BL-429 slice 2's
+    // own peat precedent rather than repeating its gap. NOTE: the four
+    // PRE-EXISTING endemic goods (tobacco, spices, coffee, furs) still carry
+    // that same gap — deposited by the same C -> D pass but never added here
+    // — left unfixed as out of this item's scope; see BL-586 slice 2's report.
+    resource_type::hides,
+    resource_type::fibre,
 };
 
 /// True if the given substrate is WATER OF ANY KIND — ocean, coast or lake.

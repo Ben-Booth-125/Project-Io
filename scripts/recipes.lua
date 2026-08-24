@@ -482,6 +482,183 @@ recipes = {
         inputs  = { iron_blooms = 2.0, charcoal = 1.0 },
         outputs = { ordnance = 1.0 },
     },
+
+    -- =====================================================================
+    -- BL-587 (2026-08-23) — the roster's first GENUINE interchangeable
+    -- methods. chain_depth's R2 buckets every prior same-output sibling pair
+    -- as a supply route (disjoint raws) or a named precondition; the
+    -- "methods" bucket that BL-430's alternate-production-methods ruling
+    -- describes was EMPTY. These two share an input with an existing sibling
+    -- (so R2 actually compares them) and trade BL-430's chain-depth axis: a
+    -- deeper method that needs a good not yet reached, in exchange for a
+    -- cheaper input basket once it is. Neither dominates its sibling — R2
+    -- checks this mechanically, not just by inspection.
+    -- =====================================================================
+
+    -- id 29 — Coking Kiln: a second route to charcoal, sharing `timber` with
+    -- id 17's Charcoal Burner (so R2 actually compares them, unlike the
+    -- Peat Kiln's disjoint raw). Reagent `iron_blooms` (a small, non-fuel
+    -- quantity — tongs and tools, not stock) needs the Bloomery already
+    -- built, so this route is DEEPER (required depth 2, against the
+    -- Charcoal Burner's 0) but its reference cost is lower per batch. Early
+    -- game runs the Charcoal Burner because nothing else exists yet; once a
+    -- corp has smelted its first blooms, the Kiln becomes the cheaper way to
+    -- keep making charcoal — the trade-off is about WHEN it opens, not
+    -- whether it is stronger.
+    {
+        name         = "charcoal_from_kiln",
+        display_name = "Coking Kiln",
+        era          = "ancient",
+        group        = "Fuel Production", -- BL-434, with the Charcoal Burner and Peat Kiln
+        inputs       = { timber = 1.5, iron_blooms = 0.1 },
+        outputs      = { charcoal = 1.0 },
+    },
+
+    -- id 30 — Bessemer Converter: a second route to industrial steel,
+    -- sharing both `iron_ore` and `coal` with id 0's Smelter. Reagent
+    -- `machinery` (required depth 2) puts this route below the Smelter's
+    -- shallow one (required depth 0) on the same growth-track logic as id
+    -- 29 above — a corp needs an existing machine-tool chain before it can
+    -- build the converter that then makes its own steel cheaper. The
+    -- industrial arc's counterpart to the ancient Kiln, on the same axis.
+    {
+        name         = "steel_bessemer",
+        display_name = "Bessemer Converter",
+        era          = "industrial",
+        group        = "Metal Foundry", -- BL-434, with the Smelter and its siblings
+        inputs       = { iron_ore = 1.5, coal = 0.5, machinery = 0.15 },
+        outputs      = { steel = 1.0 },
+    },
+
+    -- =====================================================================
+    -- BL-585/BL-586 (2026-08-24) — the wide ancient roster's first slice:
+    -- four named buildings on EXISTING raws (clay, stone, timber,
+    -- iron_blooms), no new deposit or extraction target. `hides` and its
+    -- leather/cloth consumers are a later slice — they need a new
+    -- extractable raw with real tile-generation deposits, deliberately not
+    -- attempted here (components.hpp's enum comment names the deferral).
+    --
+    -- PRICE IS DERIVED, NOT PICKED, same method id 27's comment states: the
+    -- processing roster prices an output at ~1.42x its input basket
+    -- (ordnance's own ratio, 1.433). Every base_price below in world_gen.lua
+    -- follows that ratio; re-derive rather than hand-tuning if an input
+    -- quantity changes.
+    -- =====================================================================
+
+    -- id 31 — Potter's Kiln: clay -> ceramics. Clay's SECOND consumer
+    -- (alongside id 20's Potter & Weaver, which uses clay for
+    -- trade_goods_misc) — a distinct terminal good, not an alternate method:
+    -- the two recipes share clay but produce different outputs, so
+    -- chain_depth's R2 never even pairs them (its grouping key is primary
+    -- output resource, not input).
+    {
+        name         = "ceramics_kiln",
+        display_name = "Potter's Kiln",
+        era          = "ancient",
+        group        = "Construction Materials", -- BL-434, new group — see PRODUCTION.md
+        inputs       = { clay = 2.0 },
+        outputs      = { ceramics = 1.0 },
+    },
+
+    -- id 32 — Stonemason: stone -> dressed_stone. Stone's second consumer
+    -- (alongside id 21's Miller, which uses stone as a millstone reagent) —
+    -- a terminal good sold to the market, same shape as ceramics above.
+    {
+        name         = "stonemason",
+        display_name = "Stonemason",
+        era          = "ancient",
+        group        = "Construction Materials", -- BL-434, with the Kiln above
+        inputs       = { stone = 2.0 },
+        outputs      = { dressed_stone = 1.0 },
+    },
+
+    -- id 33 — Sawmill: timber -> planks. Timber's third consumer (alongside
+    -- id 17's Charcoal Burner and id 20's Potter & Weaver). Unlike those
+    -- two, planks is NOT terminal — it feeds the Toolmaker below, so the
+    -- Sawmill is the roster's first ancient building whose whole purpose is
+    -- an intermediate rather than a sale.
+    {
+        name         = "sawmill",
+        display_name = "Sawmill",
+        era          = "ancient",
+        group        = "Construction Materials", -- BL-434, with the Kiln and Stonemason
+        inputs       = { timber = 2.0 },
+        outputs      = { planks = 1.0 },
+    },
+
+    -- id 34 — Toolmaker: iron_blooms + planks -> tools. Required depth is
+    -- max(depth(blooms)=2, depth(planks)=1) = 2, so depth(tools) = 1+2 = 3 —
+    -- TIED with the ancient ceiling (steel_from_blooms, ordnance_from_blooms),
+    -- not past it (chain_depth's D6 confirms: ancient max stays 3). Still the
+    -- roster's first chain that needs BOTH a smelted good and a milled one at
+    -- once — proof depth composes ACROSS chains, not just within one — which
+    -- is worth keeping even though it does not raise the ceiling. Terminal
+    -- for now (sold to the market); BL-590 gives it a construction-material
+    -- consumer later.
+    {
+        name         = "toolmaker",
+        display_name = "Toolmaker",
+        era          = "ancient",
+        group        = "Metal Foundry", -- BL-434, with the Bloomery/Smithy chain — its deepest member
+        inputs       = { iron_blooms = 1.5, planks = 1.0 },
+        outputs      = { tools = 1.0 },
+    },
+
+    -- =====================================================================
+    -- BL-586 slice 2 (2026-08-24) — the three chains slice 1 deliberately
+    -- deferred (components.hpp's enum comment names the deferral): all three
+    -- need a new extractable raw with real tile-generation deposits.
+    -- `hides` is ENDEMIC (Ben's ruling: lat/sector-restricted, richness-scored,
+    -- like furs — NOT the plain cover-based ambient mechanic timber/clay use);
+    -- `fibre` is the ordinary case, grown by the SAME cover-based ambient/
+    -- biotic mechanic agricultural_produce uses (tile_generation.cpp).
+    --
+    -- PRICE IS DERIVED, NOT PICKED, same method as the block above: ~1.433x
+    -- markup over the input basket (id 27 ordnance's own ratio). Re-derive
+    -- rather than hand-tuning if an input quantity changes.
+    -- =====================================================================
+
+    -- id 35 — Tannery: hides -> leather. Hides' only consumer; leather is
+    -- TERMINAL — sold to the market, reprocessed by nothing, same shape as
+    -- ceramics/dressed_stone above.
+    {
+        name         = "tannery",
+        display_name = "Tannery",
+        era          = "ancient",
+        group        = "Artisan Goods", -- BL-434, with the Potter & Weaver and Glassworks
+        inputs       = { hides = 2.0 },
+        outputs      = { leather = 1.0 },
+    },
+
+    -- id 36 — Weaver: fibre -> cloth. Fibre's only consumer. Unlike leather,
+    -- cloth is NOT terminal — it feeds the Shipwright below, the roster's
+    -- second intermediate-only ancient output (alongside planks).
+    {
+        name         = "weaver",
+        display_name = "Weaver",
+        era          = "ancient",
+        group        = "Artisan Goods", -- BL-434, with the Tannery above
+        inputs       = { fibre = 2.0 },
+        outputs      = { cloth = 1.0 },
+    },
+
+    -- id 37 — Shipwright: planks + cloth -> rigging. Required depth is
+    -- max(depth(planks)=1, depth(cloth)=1) = 1, so depth(rigging) = 1+1 = 2 —
+    -- past the flat depth-1 ceiling every other slice-2 chain sits at, and
+    -- the design's own "every chain should reach depth 2 or better" bar.
+    -- `rigging` is the chosen name for the design table's "terminal trade
+    -- good": ropework/cordage/tackle, a genuine ancient-craft good a
+    -- shipyard plausibly makes, in the same generic-material-noun register
+    -- as ceramics/dressed_stone/tools (never a proper noun). Terminal — sold
+    -- to the market, reprocessed by nothing.
+    {
+        name         = "shipwright",
+        display_name = "Shipwright",
+        era          = "ancient",
+        group        = "Advanced Fabrication", -- BL-434 — new to the ancient roster (already used by the industrial machinery/alloys/spacecraft_components chain)
+        inputs       = { planks = 1.5, cloth = 1.0 },
+        outputs      = { rigging = 1.0 },
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))

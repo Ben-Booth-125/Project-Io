@@ -76,7 +76,15 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   `spectator_determinism` carries the dated provenance log, so read the harness for the
   current constant and this line as the historical claim it is), and admitting one more
   corp **shifts no rival's cadence slot**, since the index is over the sorted corp set.
-  Outside spectate the prohibition is unchanged and absolute.
+  Outside spectate the prohibition is unchanged and absolute. **These two properties are
+  what the harness guarantees — not RNG-stream-identical behaviour across a content
+  change (Ben, 2026-08-24, ruling on NR-596).** `spectator_determinism.cpp` also carried
+  a third, stricter check (a seated+spectated corp reaches every verb family it reached
+  as a rival) that a resource-roster widening (BL-586 slice 2) broke through simple
+  RNG-stream drift, unrelated to the new content. Bit-identical RNG-stream determinism
+  across a content change was ruled out of scope for this harness — saves carry the
+  actual world state, not a replay-from-seed, and occasional randomness is a deliberate
+  strategy lever, not a defect — so that check is retired, not the two properties above.
   **Nation and polity behaviour is GRANTED (Ben, 2026-08-18, ruling 4 of NR-331), in the
   BL-202/BL-203 shape.** This is the exception that BL-054 (nation behaviour) had deferred
   indefinitely, and it is granted for **both** grains Ben named: Era −1 polities inside the

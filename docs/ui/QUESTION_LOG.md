@@ -240,9 +240,9 @@ alphabetical order.
 
 **Answers:** What have I selected, and what can I do with it?
 
-**Because:** The pinned, polymorphic detail surface for the current selection. It is the answer to the click model's promise: single-click selects, and something must visibly happen when it does.
+**Because:** The pinned, polymorphic detail surface for the current selection. It is the answer to the click model's promise: single-click selects, and something must visibly happen when it does. BL-593 (2026-08-24) extended the tile construction ledger's candidate filter with a third lock kind (tech_locked, BL-588), filtered out the same way era_locked and depth_locked already were -- "the door not showing what the gate would refuse", not a new UI affordance.
 
-*Demanded by BL-067, BL-068, BL-071, BL-367 · `src/ui/selection_panel.cpp` · id `selection_panel`*
+*Demanded by BL-067, BL-068, BL-071, BL-367, BL-593 · `src/ui/selection_panel.cpp` · id `selection_panel`*
 
 ### Selection band - Unit (Soldier) card (3-column band)
 
@@ -308,9 +308,9 @@ alphabetical order.
 
 **Answers:** How is my corporation doing overall?
 
-**Because:** Roll-up cards over holdings, balance and production, so the player has a whole-corp read without assembling it from four ledgers. Pairs existed on these cards before BL-247's log was removed. BL-343 added the sixth Finance bar, Levies: a law the player cannot see working is indistinguishable from an unimplemented one, so the levy is its own number rather than folded into maintenance.
+**Because:** Roll-up cards over holdings, balance and production, so the player has a whole-corp read without assembling it from four ledgers. Pairs existed on these cards before BL-247's log was removed. BL-343 added the sixth Finance bar, Levies: a law the player cannot see working is indistinguishable from an unimplemented one, so the levy is its own number rather than folded into maintenance. BL-591 (2026-08-24) added a fifth line to Production: the growth track (reached chain depth, the good that set it, what the next rung opens, what is missing to get there) — a corp-grain fact (corp_reached_depth) the 2026-08-15 playtest rework had cut from the building card without giving it a new home, so "how is my production going" had no answer to the growth-track half of the question until this item.
 
-*Demanded by BL-081, BL-214, BL-343 · `src/ui/corporation_dashboard.cpp` · id `corporation_dashboard`*
+*Demanded by BL-081, BL-214, BL-343, BL-591 · `src/ui/corporation_dashboard.cpp` · id `corporation_dashboard`*
 
 ### Corporation panel — stance column
 

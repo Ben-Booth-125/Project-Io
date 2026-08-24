@@ -10,7 +10,102 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Sprint 16 Batch Delivery opens: BL-571/BL-572 ratified, the batch planned, Wave 1 lands (BL-569, BL-575) (2026-08-23, latest)
+## Session — Sprint 17 designed, delivered end to end, and cut as v0.1.17 (BL-585–BL-594) (2026-08-24, latest)
+
+**Runtime:** ~9 h wall-clock across one continuous session, mode Design then Full (Batch
+Delivery). One worktree sub-agent (generation-dev, BL-586 slice 2). A full live playthrough
+against the built exe via computer-use closed the session.
+
+**Design.** Ben's steer (2026-08-15, restated in an elicitation form) named the growth spine as
+**chain depth**, the roster past 20 building types, alternate production methods with real
+trade-offs, and progression "not always clear that a more advanced method is better (depending
+on which market it builds to)." Six rulings collected via a second form (2026-08-23): a full
+content sprint, delete-dominated-siblings later corrected to "author the missing content instead"
+(NR-589, PRODUCTION.md's four "dominated pairs" were false positives of a retracted guard), the
+depth readout on the corporation dashboard, per-named-building construction materials, pay the
+save-format bump for new goods, and start only after Sprint 16 merges. Re-planned against the
+code rather than the stale archived designs: three of the six original carry items had already
+landed, the rest absorbed by later work. Ten fresh items authored, BL-585 through BL-594.
+
+**Sequencing.** BL-587 (interchangeable methods) was the one item with zero file overlap against
+Sprint 16's in-flight set, so it landed standalone ahead of the merge gate. Sprint 16 merged to
+`main` (v0.1.15 cut) partway through the session; this branch merged `origin/main` and the
+remaining nine items proceeded in three dependency waves.
+
+**Wave 1** (BL-588, BL-590, BL-591 — later joined by BL-585+BL-586 slice 1). `unlock_recipe`
+became the tech-effect union's third arm (`tech_gate.hpp`/`.cpp`), checked at both
+`construct_building` and `try_switch_recipe`, and in `corp_ai.cpp`'s scorer. Two gates authored
+fresh rather than transcribed from `tech_tree.lua`'s unreviewed node list (NR-591); a real
+predicate defect (`E1-EC-01`'s surplus-only first draft, satisfiable by any solvent corp
+regardless of what it had built) caught by `tech_gate_harness`'s own T3 fixture and corrected
+before landing. `resource_build_cost_for(type, target, recipe)` became the single lookup every
+material-cost site goes through (13 occurrences, 4 files); the whole ancient roster costs
+timber/stone instead of a shared steel default. The corporation dashboard's Production card
+gained a three-line growth track (reached depth + the good that set it, next rung, missing
+inputs); a real pre-existing UI defect found and fixed along the way — `ui::resource_name` had
+stale nulls for three BL-429-era goods. `resource_type` grew four values (ceramics,
+dressed_stone, planks, tools; `resource_count` 38→42), `world_save_version` 8→9;
+`spectator_determinism`'s golden re-blessed with dated provenance after confirming
+reproducibility across two independent builds.
+
+**Wave 2** (BL-589, BL-593). The start-gate audit measured a fresh ancient corp saw FIVE open
+Build-door groups, not the item's own four-group guess; five concrete calls put to Ben rather
+than defaulted, closing only Metal Foundry's `refined_copper` behind a new gate (`E0-EC-03`) and
+confirming several duplicate-looking siblings as genuine supply routes, not redundant methods.
+`chain_depth` gained a new G5 row asserting the ruled opening exactly. The Build-door item found
+a second, unrelated real bug before any ruling was needed: `selection_panel.cpp`'s candidate
+filter never checked `recipe_unlocked` at all, so a tech-locked recipe was showing as a normal
+buildable option with no explanation. Ruled filtered-out, matching the era/depth-lock precedent.
+
+**Wave 3** (BL-592, BL-586 slice 2, BL-594). `chain_depth`'s R2 grew a second reference-price
+vector (fuel-cheap, fuel-dear) so a method only better in one market isn't misread as dominated;
+a new R3 row checks every named building's material override is obtainable in its own era band,
+generic over the whole roster. BL-586's remaining three chains (Tannery, Weaver, Shipwright) were
+delegated to a generation-dev sub-agent in an isolated worktree — five new resources (hides,
+fibre, leather, cloth, rigging; `resource_count` 42→47), `world_save_version` 9→10, hides ruled
+**endemic** (like furs) and fibre ruled ordinary cover-based on ambiguous design calls put to Ben
+first. The sub-agent's own report surfaced a real regression rather than hiding it: the bare
+`resource_count` widening (not the new economic content — differentially proven by temporarily
+reverting the Lua) broke `spectator_determinism`'s R1 A/B family-coverage check. Put to Ben;
+ruled the check **retired** (commented with full provenance, not patched or weakened to pass) —
+bit-identical RNG-stream determinism across a content change is not a property that harness needs
+to hold. Filed as `NR-596`, with a clarifying note added to `io-standing-rules.md`'s BL-409
+section on what the harness still guarantees.
+
+**The live playthrough (BL-594).** Played via `computer-use` against the built exe — a Start Menu
+shortcut was created for `ProjectIo.exe` so `request_access` could resolve it, closing the
+`NR-593`/`NR-595` gap this sprint kept hitting. Confirmed live, across two separate generated
+worlds/corps: the Build door on a fresh corp shows only the ruled opening set, with a
+reason-coded Military Base lock and no filtered-out recipe standing in as a processing group's
+representative; the dashboard growth track reads legibly on both corps; BL-586 slice 2's new
+content (Fibre, Shipwright) is reachable in both surfaces; and an actual construction click
+succeeded ("Construction started", Clay Pit, 103cr against a 257cr balance). A method-switch for
+a stated market reason and a tech gate resolving were not reached live — both need more
+simulated economy time than one sitting covers, and the first corp tried was too deep in
+starting debt to build anything at all (a real, seed-dependent finding, not a defect). Ben's
+ruling: accept as substantially confirmed rather than push further. Two real findings surfaced
+and logged, not absorbed: `NR-597` (the corp-selection screen's per-row "Choose" buttons don't
+respond to clicks, reproduced twice — logged rather than filed as a backlog item since
+`KNOWN_BUGS.md` is retired, Ben's call), and one low-confidence, unreproduced anomaly (a
+full-canvas takeover control once returned the app to the main menu, not reproduced on two later
+clean attempts of the same control).
+
+**The cut.** `ROADMAP.md`'s v0.1.17 bullet gained its done-definition, written at the cut per
+NR-103; `MANUAL.md` §4.4 gained the three-lock model (era/depth/tech) and the growth-track
+readout. Merging into `main` found local `main` two commits ahead of this branch's own base — a
+concurrent session's "Conclude the Sprint 16 review queue" and "Purge Sprint 16 from the hot
+backlog" — reconciled by hand rather than trusting git's line-based merge: `NEEDS_REVIEW.json`
+and `backlog.json` both took `main`'s purged/resolved state as the base and spliced in only this
+session's genuinely new entries (`NR-589`–`597`; `BL-585`–`594`), not resurrecting anything the
+concurrent session had already archived; `REFINED.md` took `main`'s drained "empty between work
+blocks" form and named both sprints' closes in one line, matching the pattern the Sprint 16 close
+already set.
+
+All ten Sprint 17 items landed complete. `CHANGELOG.md` stamped, tagged `v0.1.17`.
+
+---
+
+## Session — Sprint 16 Batch Delivery opens: BL-571/BL-572 ratified, the batch planned, Wave 1 lands (BL-569, BL-575) (2026-08-23)
 
 **Runtime:** ~3 h wall-clock, mode Design then Full (Batch Delivery). Two worktree agents in
 Wave 1 (general-purpose for BL-569, ui-dev for BL-575), run concurrently.

@@ -469,6 +469,50 @@ spread across the build. The front door shows the analog rate/ETA/paused status 
 binary reject. Tunables live in `scripts/economy.lua` § `construction`. A build stalled for want
 of an input registers that want as demand, so the stall is visible to the price signal.
 
+### Construction materials are per-named-building, not per-type (BL-590, 2026-08-24)
+
+**Ruling (Ben, 2026-08-23): materials vary per named building.** `resource_build_cost`
+(`building_economics`) still names the DEFAULT for a `building_type` — before this item every
+building in the game, ancient or industrial, was made of `steel` and nothing else, the same
+anachronism the launchpad's era tag (BL-433) exists to fix for the launchpad specifically.
+
+**The override.** `recipe_registry::resource_build_cost_for(type, target, recipe)` is the single
+lookup every material-cost call site now goes through — the Build door's capex preview, the
+management view's rate, the real per-tick draw (`construction.cpp`, `economy_system.cpp`) — so a
+preview can never disagree with what the tick actually charges, the same argument BL-436 makes
+about richness. `extraction_site` is keyed by its `target_resource`; `processing_facility` by its
+recipe. No `building_type` is needed in either key: only extraction carries a target and only
+processing carries a recipe, so the dispatch is unambiguous. Authored in `economy.lua` as an
+optional `material_overrides` table nested beside the type's own `resource_costs` — absent means
+the type default, so nothing that does not opt in changes.
+
+**First-cut coverage: the whole ancient roster, nothing else.** Five extraction targets (`stone`,
+`timber`, `sand`, `clay`, `peat`) and all thirteen ancient processing recipes get a
+timber-and-stone basket instead of steel; every industrial and space-sourced entry is untouched —
+an industrial mine or smelter genuinely does need steel reinforcement, and the anachronism this
+item fixes is specifically the ancient arc's. The Smithy's two recipes (`steel_from_blooms`,
+`ordnance_from_blooms`) share the same basket, since `recipes.lua`'s own comment names them as the
+same physical building. See `scripts/economy.lua`'s `buildings.extraction_site.material_overrides`
+/ `buildings.processing_facility.material_overrides` for the authored table.
+
+**A second sink for the shallow goods**, beyond flavour: timber, stone, clay and the BL-585
+goods now cost something to a corp that is *building*, not only something a recipe consumes — the
+demand that makes an early quarry worth owning even before its output has a processor waiting.
+
+**A watch this item does NOT resolve**, recorded rather than silently assumed:
+`corp_ai.cpp`'s build-candidate scoring prices only the flat `build_cost` (`ex.build_cost` /
+`pe.build_cost`), never `resource_build_cost` — a pre-existing simplification, unchanged by this
+item, that predates the override. A rival can therefore still propose a candidate whose *materials*
+it cannot actually reach even though its *cash* is sufficient; `construct_building`'s own
+affordability gate refuses it cleanly (no mutation), so this is a missed opportunity for the
+scorer, not a correctness bug. Widening the scorer's estimate is real planner scope, not part of
+"materials vary per building" — a decision recorded here rather than a gap papered over.
+
+Guard: `tools/verify/construction_harness.cpp`'s R9 asserts the lookup directly — an overridden
+target/recipe reads its override, an unoverridden one falls back to the type default, and a
+non-extraction/non-processing type (which carries neither a target nor a recipe in the sense
+these overrides key on) ignores both maps regardless of what happens to be passed.
+
 ## The ancient chain
 
 The ancient arc's production chains, authored in `scripts/recipes.lua` with `era = "ancient"`
@@ -480,12 +524,43 @@ every one of them is priced and consumed, per the admission rule.
 |---|---|---|
 | Charcoal Burner | 3 timber → 1 charcoal | 1 |
 | Peat Kiln | 2 peat → 1 charcoal | 1 |
+| Coking Kiln | 1.5 timber + 0.1 iron blooms → 1 charcoal | 3\* |
 | Bloomery | 2 iron ore + 1 charcoal → 1 iron blooms | 2 |
 | Smithy | 2 iron blooms + 1 charcoal → 1 steel | 3 |
 | Smithy | 2 iron blooms + 1 charcoal → 1 **ordnance** | 3 |
 | Potter & Weaver | 2 clay + 1 timber → 1 trade goods | 1 |
 | Glassworks | 2 sand → 1 trade goods | 1 |
 | Miller | 2 agricultural produce + 1 stone → 1 food rations | 1 |
+| Potter's Kiln | 2 clay → 1 ceramics | 1 |
+| Stonemason | 2 stone → 1 dressed stone | 1 |
+| Sawmill | 2 timber → 1 planks | 1 |
+| Toolmaker | 1.5 iron blooms + 1 planks → 1 tools | 3 |
+| Tannery | 2 hides → 1 leather | 1 |
+| Weaver | 2 fibre → 1 cloth | 1 |
+| Shipwright | 1.5 planks + 1 cloth → 1 rigging | 2 |
+
+\* The Coking Kiln's own required depth, not `charcoal`'s overall depth — the Burner keeps that at
+1, since chain depth is a **min across recipes** (§ Chain depth below). The Kiln is BL-587's
+alternate method: unreachable until a corp has already smelted blooms, cheaper by the guard's
+reference prices once it is. See § Alternate production methods.
+
+**Rows five through eight are BL-585/BL-586's first slice of the wide ancient roster** (2026-08-24)
+— named buildings on existing raws, no new deposit or extraction target. The Toolmaker is that
+slice's deepest chain, needing both a smelted good and a milled one at once (required depth 2 from
+`max(depth(blooms)=2, depth(planks)=1)`, so `depth(tools) = 3`), tied with the existing ceiling
+rather than past it.
+
+**The last three rows are BL-586's second slice** (2026-08-24), authoring the chains slice 1
+deliberately deferred: `hides` (endemic — lat/sector-restricted, richness-scored, like the four
+endemic goods above, not the plain cover-based ambient mechanic `fibre` uses) and `fibre` (the
+ordinary case, grown by the same cover-based ambient/biotic mechanic `agricultural_produce`
+uses) are both new extractable raws (`placement_rules::k_extractable`), with real tile-generation
+deposits. The Shipwright is the roster's first chain to clear depth 2 (`max(depth(planks)=1,
+depth(cloth)=1) + 1 = 2`) — past the flat depth-1 ceiling every other named building outside the
+Toolmaker sits at, and the design's own "every chain should reach depth 2 or better" bar. `rigging`
+is the roster's chosen name for the design table's "terminal trade good": ropework, cordage and
+tackle — a genuine ancient-craft good a shipyard plausibly makes — in the same generic-material-
+noun register as `ceramics`/`dressed_stone`/`tools`.
 
 **The Smithy's second recipe is the ancient arc's route to `ordnance`** (BL-460, ancient
 ordnance) — the same building, same `iron_blooms + charcoal` basket as its steel recipe,
@@ -593,6 +668,88 @@ placement would leave a one-click bypass — place the shallowest method the cor
 onto the deepest sibling in the same group, and the ladder never has to be climbed. Both refusals map
 to the same `rejected_depth_locked` on the seam, so an agent cannot tell the two routes apart.
 
+**`tech_locked` reaches a recipe too, now** (BL-588, 2026-08-24). Until this item `tech_locked`
+only ever meant a *building type* was ungated — the effect union (`tech_gate.hpp`) had no arm that
+could name a recipe. `unlock_recipe` is the third arm: a tech gate names a `recipe::name`
+(`tech_gate::unlocks_recipe`), and `recipe_unlocked(w, reg, corp, recipe_id)` resolves the id to
+that name and checks it against `world::has_tech`, at both `construct_building` (returning the
+SAME `construction_result::tech_locked` the structure-level check already used) and
+`try_switch_recipe` (a new `recipe_switch_result::tech_locked`), for the identical retool-bypass
+reason the depth gate is checked at both doors. **The two locks are independent and both must
+pass** — a recipe can be depth-locked, tech-locked, both, or neither; they ask genuinely different
+questions (earned by building vs. earned by research) and neither substitutes for the other.
+First-cut authored gates (`tech_gate.cpp`): `E0-EC-01` unlocks the Toolmaker (BL-586) on owning a
+processing facility and a Cr 500 surplus; `E1-EC-01` unlocks the Bessemer Converter (BL-587) on
+already holding `machinery` in stockpile — the Converter's own reagent, not a cash figure, after a
+surplus-only first draft proved satisfiable by any solvent corp regardless of what it had actually
+built (caught by `tech_gate_harness`'s T3 fixture, corrected before landing); `E0-EC-03` unlocks
+`refined_copper` (BL-589) on owning a processing facility and a Cr 400 surplus — the roster's
+widest anachronism before this gate, since `refined_copper` is `any`-band at required depth 0 and
+could be smelted for free on tick one of an ancient campaign with no ancient identity to it at all.
+
+**The Build door filters a tech-locked recipe out, the same way it already did for era- and
+depth-locked ones** (BL-593, 2026-08-24). The door's candidate filter (`selection_panel.cpp`)
+carried exactly two clauses before this item — `building_available` for era, `recipe_required_depth`
+for the ancient ladder — both resting on the same argument, stated in the code's own comment: *"the
+door not showing what the gate would refuse."* `recipe_unlocked` is now a third clause on that same
+predicate, extending the argument rather than starting a new one. Filtered was the ruled choice over
+shown-and-locked (Ben, 2026-08-24, same elicitation form as the opening ruling) — the alternative
+would have needed a new lock-reason string and a UI affordance the door doesn't have yet; the
+existing precedent already answers the question the same way. `refined_copper` is the first recipe
+this clause actually removes — every earlier tech gate targeted a `building_type`, never a recipe,
+so the branch was dead code on every campaign before `E0-EC-03`.
+
+**The readout lives on the corporation dashboard, not the building card** (BL-591, 2026-08-24).
+`corp_reached_depth` gates six places (construction, the recipe switch, the AI scorer, two Build
+door filters) and, until this item, displayed in none of them — the growth track this whole minor
+is named for was only ever felt as a lock, never seen as a ladder. Ben's ruling: reached depth is
+a **corporation-grain** fact (it reads `corporation_component::produced_ever`, not any one
+building), which is why the 2026-08-15 playtest rework was right to cut the building card's old
+Depth page — the surface was wrong, not the idea. The dashboard's Production card now opens with
+three lines, computed once in `derive_corp_rollups` and shared by both hosts (the in-place
+accordion and the full-canvas takeover, BL-265's own shared-body pattern):
+1. **Reached depth**, and the good that set it — the first (ascending `resource_type` id)
+   produced-ever good found at that depth.
+2. **Next** — the display names of every era-allowed recipe whose `recipe_required_depth` is
+   exactly `reached + 1`, comma-joined.
+3. **Needs** — every input those recipes need that the corp has never produced, comma-joined —
+   the line that turns a lock into an instruction.
+
+A rival's reached depth is private by construction, not by an added check: the dashboard only
+ever renders `world::player_entity`, so the question of a rival's card never arises.
+
+---
+
+## The start gate — what a fresh corp actually sees (BL-589, 2026-08-24)
+
+Ben's steer authoring Sprint 17: *"most building types, and most recipes are not buildable on
+game start."* Measured against it: a fresh ancient corp (reached depth 0, no tech earned) saw
+**five** of the Build door's processing groups open, not the "extraction, one food route, one
+fuel route" first cut the item began with — Metal Foundry, Fuel Production, Food Processing,
+Artisan Goods and Construction Materials all offered something on tick one.
+
+**The ruled opening** (Ben, 2026-08-24, the start-gate elicitation form) is wider than that first
+cut, and is now the authoritative shape — not a compromise, a decision:
+
+| Group | Open at tick 0 | Why |
+|---|---|---|
+| Fuel Production | Charcoal Burner, Peat Kiln | A genuine supply-route pair (disjoint raws — R2's own classification), not a duplicate; both stay. |
+| Food Processing | Food Rations, Miller | Both stay — the any-band/ancient pair is not narrowed. |
+| Artisan Goods | Potter & Weaver, Glassworks, Tannery, Weaver | Left open — an early corp may sell trade goods without earning anything. The Tannery and Weaver (BL-586 slice 2) join under the same reasoning, not a re-opened ruling: both draw only on a raw (`hides`/`fibre`, required depth 0), same as the original pair. |
+| Construction Materials | Potter's Kiln, Stonemason, Sawmill | Left open — BL-586's slice-1 buildings are foundational, not earned content. |
+| Advanced Fabrication | *(nothing — the Shipwright is depth-locked)* | The Shipwright (BL-586 slice 2) draws `planks` and `cloth`, both required depth 1, so it is locked at tick 0 like every other depth>0 recipe — not a new closure, the ladder simply reaches it one rung up. |
+| Metal Foundry | *(nothing — the one closure)* | `refined_copper` gated by `E0-EC-03`; see § Chain depth's gate table. |
+
+**Only Metal Foundry closes**, and only because `refined_copper` (`any`-band, required depth 0)
+was the roster's widest anachronism — free industrial-grade copper smelting on turn one of a 0 CE
+campaign, with no ancient identity to it. The any-band depth exemption itself is **not** narrowed
+by this ruling; every other `any`-band recipe (Food Rations included) is deliberately untouched.
+
+Guard: `tools/verify/chain_depth.cpp`'s **G5** row asserts the ruled opening exactly — every
+recipe outside the one deliberate lock matches its ruled open/closed state, `refined_copper`
+reads `tech_locked` at tick 0, and `E0-EC-03` genuinely resolves (not a permanent orphan) once its
+own authored predicate is met.
+
 ---
 
 ## The era band — which roster a campaign sees
@@ -653,20 +810,47 @@ and instantly — that is sanctioned, narrow, local auto-agency reacting to a su
 strategic commitment, and it never calls `try_switch_recipe`. See
 `.claude/rules/io-standing-rules.md`'s BL-079 exception for the standing invariant this preserves.
 
-**The no-dominance guard.** `tools/verify/recipe_switch_harness.cpp`'s `R1` groups recipes by
-(primary output resource, era band) — the set genuinely interchangeable as methods on one building
-— and asserts no pair beats its sibling on *both* input-basket cost (a fixed reference-price
-snapshot, `world_gen.lua`'s `base_price`) *and* the chain depth of its deepest input at once. A
-pair identical or split across the two axes is a real trade-off; a pair dominated on both is dead
+**The no-dominance guard.** `tools/verify/chain_depth.cpp`'s `R2` is the live guard (moved from
+`recipe_switch_harness.cpp`'s retired `R1` on 2026-08-16 — see that file's own header for the
+retraction). It groups recipes by (primary output resource, era band) and buckets every
+same-output sibling pair as a **supply route** (disjoint raws — which one a corp runs is decided
+by deposit access, not price), a named **precondition pair** (differs by a placement fact the
+recipe data cannot carry, e.g. atmosphere vs airless body), or a genuine **interchangeable
+method** — and only the third bucket is compared, on input-basket cost (a fixed reference-price
+snapshot, `world_gen.lua`'s `base_price`) against the chain depth of its deepest input. A pair
+identical or split across the two axes is a real trade-off; a pair dominated on both is dead
 content the moment its sibling is reachable. Wage and build-duration were considered and rejected
 as guard axes: those live on `building_economics` (the *building type*), not the recipe, and every
 `processing_facility` offers the same era-allowed recipe set — so those axes are identical across
-every sibling by construction and carry no discriminating information. Four sibling pairs —
-`steel_from_iron_nickel` over `steel`, `propellant_atmospheric` over `propellant_electrolysis`,
-`peat_charcoal` over `charcoal`, and `glass` over `trade_goods` — are dominated on both axes;
-whether they are genuine alternates needing a retune, or intended tier upgrades the guard should
-not compare, is Ben's open call (NR-243), and the guard is left to report it rather than tuned
-silently.
+every sibling by construction and carry no discriminating information.
+
+**The four pairs once reported as "dominated" (NR-243) were a false positive of the old grouping,
+not a balance defect.** `steel_from_iron_nickel`/`steel`, `peat_charcoal`/`charcoal` and
+`glass`/`trade_goods` have disjoint raws — supply routes, not methods; the propellant pair is the
+named atmosphere-vs-airless precondition. None of the four is compared by R2 today, and NR-243 is
+closed on that basis rather than by a retune (BL-587, correcting NR-589).
+
+**BL-587 (2026-08-23) authored the roster's first two genuine interchangeable methods**, since
+until then the "methods" bucket was empty — BL-430's ruling had mechanism (the Method page
+compares whatever R2 would call a method) with no content to exercise it. Both trade the chain-
+depth axis: a deeper route that needs a good not yet reached, for a cheaper basket once it is.
+
+| Sibling pair | Shallow route | Deep route (needs) |
+|---|---|---|
+| `charcoal` (ancient) | Charcoal Burner — `timber` only, required depth 0 | Coking Kiln — `timber` + a reagent quantity of `iron_blooms`, required depth 2 |
+| `steel` (industrial) | Smelter — `iron_ore` + `coal`, required depth 0 | Bessemer Converter — `iron_ore` + `coal` + a reagent quantity of `machinery`, required depth 2 |
+
+Neither deep route is a tier upgrade: it is unreachable until the shallow route (or some other
+path to the same reagent) has already been run once, and its reference cost is lower only because
+the guard's fixed snapshot does not price the reagent's own chain. A market where the reagent is
+scarce can still make the shallow route the better-run choice — the point Ben raised authoring
+this sprint (*"it's not always clear that a more advanced method is better, depending on which
+market it builds to"*), and which `R2` now checks under **two** price snapshots (`BL-592`,
+2026-08-24) rather than trusting one as the final word: `fuel_cheap` and `fuel_dear` bracket the
+axis these two methods trade on, and a pair is flagged dominated only if it loses under **both** —
+a genuine alternate needs to win under at least one. Neither Coking Kiln nor the Bessemer
+Converter needed the second vector to pass (both already win on chain depth alone), so this is a
+guard-rail for `BL-586`'s still-widening roster, not a fix to a currently-failing case.
 
 **AI scoring.** `corp_ai.cpp`'s `dial_recipe` candidate does not price `switch_cost` into its
 projected gain and does not pre-filter on `recipe_switch_cooldown`; the seam enforces both at
@@ -690,15 +874,16 @@ sits in the `"General"` catch-all:
 
 | Group | Recipes (era) | Notes |
 |---|---|---|
-| Metal Foundry | `steel` (industrial), `steel_from_iron_nickel` (industrial), `steel_from_regolith` "In-Situ Smelter" (industrial), `refined_copper` (any), `iron_blooms` "Bloomery" (ancient), `steel_from_blooms` "Smithy" (ancient), `ordnance_from_blooms` "Smithy" (ancient) | Every route that smelts or shapes a structural metal — the industrial Smelter and the ancient Bloomery/Smithy chain both land here, since they reach the same terminal goods by different roads. |
+| Metal Foundry | `steel` (industrial), `steel_from_iron_nickel` (industrial), `steel_from_regolith` "In-Situ Smelter" (industrial), `steel_bessemer` "Bessemer Converter" (industrial), `refined_copper` (any), `iron_blooms` "Bloomery" (ancient), `steel_from_blooms` "Smithy" (ancient), `ordnance_from_blooms` "Smithy" (ancient), `toolmaker` "Toolmaker" (ancient) | Every route that smelts or shapes a structural metal — the industrial Smelter and the ancient Bloomery/Smithy chain both land here, since they reach the same terminal goods by different roads. The Bessemer Converter (BL-587) is the roster's first genuine interchangeable method rather than a disjoint-raw supply route — see § Alternate production methods. The Toolmaker (BL-586) is its deepest ancient member, needing a milled good (`planks`) alongside the smelted one. |
 | Refinery | `refined_fuel` (industrial) | A singleton — a real, specific kind (distinct from Metal Foundry's smelting), not a forced catch-all; more refined-fuel-family recipes would join it rather than needing a rename. |
+| Construction Materials | `ceramics_kiln` "Potter's Kiln" (ancient), `stonemason` "Stonemason" (ancient), `sawmill` "Sawmill" (ancient) | BL-586's new group: named buildings on existing raws (clay, stone, timber) that make construction-grade goods rather than trade goods or fuel — distinct from Artisan Goods below even though the Kiln and Potter & Weaver share `clay`, since the two produce different terminal goods and are never compared as siblings (chain_depth's R2 groups by output, not input). |
 | Food Processing | `food_rations` (any), `hydroponics_bay` (industrial), `food_rations_milled` "Miller" (ancient) | Feeding the population, whether growing the produce (Hydroponics Bay) or milling it into rations (Food Processor, Miller). |
 | Chemical Works | `propellant_atmospheric` (industrial), `propellant_electrolysis` (industrial) | The Chemical Plant's two propellant routes. |
 | Electronics | `silicon` (industrial), `ree_alloy` (industrial), `electronics` (industrial), `electronics_contact_grade` "Contact-Grade Electronics Lab" (industrial) | The silicon/REE/electronics chain. |
-| Advanced Fabrication | `machinery` (industrial), `alloys` (industrial), `ordnance` (industrial), `spacecraft_components` (industrial), `spacecraft_components_heavy` "Heavy Assembly Plant" (industrial) | Fabricator + Assembly Plant: goods assembled from refined inputs rather than smelted from ore. |
+| Advanced Fabrication | `machinery` (industrial), `alloys` (industrial), `ordnance` (industrial), `spacecraft_components` (industrial), `spacecraft_components_heavy` "Heavy Assembly Plant" (industrial), `shipwright` "Shipwright" (ancient) | Fabricator + Assembly Plant: goods assembled from refined inputs rather than smelted from ore. The Shipwright (BL-586 slice 2) is the group's first ancient member — new to the ANCIENT roster, not a new group overall, since it shares the name with the industrial machinery/alloys/spacecraft_components chain by the same "goods assembled from refined inputs" argument (planks + cloth, both already-processed goods, not raw hides or fibre). |
 | Welfare Goods | `clean_water` (industrial), `consumer_goods` (industrial), `medical_supplies` (industrial) | The habitability tranche — Water Treatment Plant, Consumer Goods Factory, Pharmaceutical Lab. |
-| Fuel Production | `charcoal` "Charcoal Burner" (ancient), `peat_charcoal` "Peat Kiln" (ancient) | Two independent producers of the same fuel good (`charcoal`). |
-| Artisan Goods | `trade_goods` "Potter & Weaver" (ancient), `glass` "Glassworks" (ancient) | Two independent producers of `trade_goods_misc`, same shape as Fuel Production. |
+| Fuel Production | `charcoal` "Charcoal Burner" (ancient), `peat_charcoal` "Peat Kiln" (ancient), `charcoal_from_kiln` "Coking Kiln" (ancient) | Three producers of `charcoal`: the Burner and the Peat Kiln are disjoint-raw supply routes, but the Coking Kiln shares `timber` with the Burner and is the roster's first genuine interchangeable method (BL-587) — see § Alternate production methods. |
+| Artisan Goods | `trade_goods` "Potter & Weaver" (ancient), `glass` "Glassworks" (ancient), `tannery` "Tannery" (ancient), `weaver` "Weaver" (ancient) | Four independent producers, each of a different terminal or intermediate good (`trade_goods_misc`, `leather`, `cloth`) — the Tannery and Weaver (BL-586 slice 2) join on the same "sells finished goods from a raw craft input" argument as the Potter & Weaver and Glassworks. |
 
 Judgment calls recorded in `NEEDS_REVIEW.json`: whether Hydroponics Bay (an agriculture
 *producer*, not a food *processor*) belongs in Food Processing or a standalone Agriculture group,

@@ -288,6 +288,21 @@ Buildings occupy tiles, consume inputs, and emit outputs on a recipe. Placement 
 terrain, deposits, slot rules and **logistical reach** — you cannot build at unbounded distance from
 a supply anchor, and build time depends on where you build, not only what.
 
+A campaign does not open onto the whole roster. Most building types and most recipes are not
+buildable on day one — a fresh corporation sees a narrow opening set, and the rest is **earned**.
+Three separate locks govern this, and the Build door tells them apart: an **era lock** (a recipe
+belongs to a later technological era and never appears here); a **depth lock** (you have not yet
+reached the chain depth a recipe requires — shown greyed with the reason, so you can see what you
+are missing); and a **tech lock** (a specific research condition, e.g. holding a stockpile or
+running a processing facility, that unlocks one recipe by name once met). Some buildings offer
+**alternate production methods** for the same output — a real trade-off, not a straight upgrade,
+so the better choice depends on which market the output is going to.
+
+The corporation dashboard's Production card carries a **growth track**: the chain depth you have
+reached and the good that set it, the buildings within reach at the next rung, and the specific
+inputs still missing to place one of them. This is the intended way to read "what do I build
+next" — not a wiki, the readout on your own dashboard.
+
 *Authority: `docs/economy/PRODUCTION.md`.*
 
 ### 4.5 Markets and prices

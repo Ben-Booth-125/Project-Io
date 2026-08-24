@@ -160,13 +160,13 @@ int main()
             // same record would shift with it. The whole stream is refused
             // instead -- a v4 save is not migrated, it is rejected, and the
             // destination is not touched.
-            static_assert(world_save_version == 8,
-                          "P9/P10/P11/P12 name v4/v5/v6/v7 as refused predecessors; re-read these "
-                          "rows on a bump");
+            static_assert(world_save_version == 10,
+                          "P9/P10/P11/P12/P13/P14 name v4/v5/v6/v7/v8/v9 as refused predecessors; "
+                          "re-read these rows on a bump");
             std::string bad = bytes_once;
             const uint32_t v4 = 4;
             std::memcpy(&bad[4], &v4, sizeof v4);
-            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v8)");
+            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v10)");
         }
         {
             // Sprint 16, BL-571: the IMMEDIATE previous format (BL-570's v5,
@@ -180,7 +180,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v5 = 5;
             std::memcpy(&bad[4], &v5, sizeof v5);
-            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused (format is v8)");
+            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused (format is v10)");
         }
         {
             // Sprint 16, BL-572: the IMMEDIATE previous format (BL-571's v6,
@@ -193,7 +193,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v6 = 6;
             std::memcpy(&bad[4], &v6, sizeof v6);
-            check(!from_bytes(bad, victim), "P11 a v6-versioned stream is refused (format is v8)");
+            check(!from_bytes(bad, victim), "P11 a v6-versioned stream is refused (format is v10)");
         }
         {
             // Sprint 16, BL-573: the IMMEDIATE previous format (BL-572's v7,
@@ -205,7 +205,32 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v7 = 7;
             std::memcpy(&bad[4], &v7, sizeof v7);
-            check(!from_bytes(bad, victim), "P12 a v7-versioned stream is refused (format is v8)");
+            check(!from_bytes(bad, victim), "P12 a v7-versioned stream is refused (format is v10)");
+        }
+        {
+            // BL-585: the IMMEDIATE previous format (Sprint 16's v8, the
+            // version this batch released before BL-585 bumped again). A v8
+            // stream's per-resource arrays are `resource_count`=38 long; a v9
+            // reader expects 42 -- not a trailing gap or a mid-record shift
+            // like the rows above, but every per-resource array in the WHOLE
+            // stream reading four fields short of what follows. Refused
+            // whole, same contract as every prior bump.
+            std::string bad = bytes_once;
+            const uint32_t v8 = 8;
+            std::memcpy(&bad[4], &v8, sizeof v8);
+            check(!from_bytes(bad, victim), "P13 a v8-versioned stream is refused (format is v10)");
+        }
+        {
+            // BL-586 slice 2: the IMMEDIATE previous format (BL-585's v9, the
+            // version this batch released before this slice bumped again). A
+            // v9 stream's per-resource arrays are `resource_count`=42 long; a
+            // v10 reader expects 47 -- the same structural class of move as
+            // P13's v8/v9 gap, not a trailing gap or a mid-record shift.
+            // Refused whole, same contract as every prior bump.
+            std::string bad = bytes_once;
+            const uint32_t v9 = 9;
+            std::memcpy(&bad[4], &v9, sizeof v9);
+            check(!from_bytes(bad, victim), "P14 a v9-versioned stream is refused (format is v10)");
         }
         {
             // Truncated mid-way through the tile store -- far enough in that a

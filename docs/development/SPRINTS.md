@@ -74,8 +74,8 @@ ones were deleted.
 | 9 | The militia takes the field | **Closed 2026-08-10** — v0.1.5 cut; BL-325/BL-331 landed, BL-332 designed and re-versioned |
 | 10–14 | Re-sequenced 2026-08-10 (the living world inserted) | **Overtaken** — Sprints 10/11 closed 2026-08-11; Sprints 12–14 superseded 2026-08-12 by the 0 CE refocus (NR-177), never opened |
 | 15 | The 0 CE refocus (retro-recorded) | **Closed 2026-08-12** — epoch 0, 3× map, Era −1 sim wired in, mercenary seam designed |
-| 16 | The mercenary vertical slice | **Open 2026-08-12** — re-planned 2026-08-23 in dependency order (BL-569→BL-578); cuts v0.1.15 |
-| 17 | Economy breadth: the chain is the growth track | **Open 2026-08-15** — chain-depth spine (BL-428) → roster/methods (BL-429/430) → UI (BL-431) → guard harness (BL-432); cuts v0.1.17 |
+| 16 | The mercenary vertical slice | **Closed 2026-08-24** — re-planned 2026-08-23 in dependency order (BL-569→BL-578); all ten landed; v0.1.15 cut |
+| 17 | The ancient roster becomes a ladder | **Open 2026-08-15, re-planned 2026-08-23** — ten items (BL-585..BL-594); the original set landed or was absorbed. BL-587 landed standalone 2026-08-23; the rest start now that Sprint 16 has merged; cuts v0.1.17 |
 | 18b | Roster invariants (retro-recorded) | **Closed 2026-08-16** — BL-432 landed; BL-435 paused 4/6; BL-436 filed |
 | 19 | The economy tells the truth | **Closed 2026-08-17 — goal NOT met.** The blame moved three times and landed on supply; goldens left red and unblessed |
 | 25a | The draw (upkeep, ordnance, convoy seam) | **Closed 2026-08-18** — 6/6; goldens left red and attributed |

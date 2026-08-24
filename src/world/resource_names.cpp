@@ -46,6 +46,24 @@ resource_type resource_from_name(const std::string& name, bool& ok)
         { "consumer_goods",        resource_type::consumer_goods },
         { "medical_supplies",      resource_type::medical_supplies },
         { "ordnance",              resource_type::ordnance }, // BL-457
+        // BL-585/BL-586 (2026-08-24) — ancient roster slice 1. NR-237's lesson
+        // applied on purpose: this table is the ONE mapping recipes.lua AND
+        // world_gen.lua's base_price both load through (recipe_registry.cpp,
+        // world_gen_config.cpp), so a name missing here throws at load in
+        // both files, not silently — add every new resource_type HERE the
+        // same change it is appended to the enum, never after.
+        { "ceramics",              resource_type::ceramics },
+        { "dressed_stone",         resource_type::dressed_stone },
+        { "planks",                resource_type::planks },
+        { "tools",                 resource_type::tools },
+        // BL-586 slice 2 (2026-08-24) — Tannery/Weaver/Shipwright. Same rule
+        // as the block above: every new resource_type lands HERE the same
+        // change it is appended to the enum.
+        { "hides",                 resource_type::hides },
+        { "fibre",                 resource_type::fibre },
+        { "leather",               resource_type::leather },
+        { "cloth",                 resource_type::cloth },
+        { "rigging",               resource_type::rigging },
     };
 
     const auto it = table.find(name);

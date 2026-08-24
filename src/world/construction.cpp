@@ -4,6 +4,7 @@
 
 #include "market_clearing.hpp" // market_for_tile
 #include "placement_rules.hpp"
+#include "tech_gate.hpp"       // BL-588: recipe_unlocked
 
 #include <algorithm> // std::find (asset-list removal in demolish_building), std::max, std::clamp
 #include <cmath>     // std::lround (BL-323 S3 site-time multiplier)
@@ -51,6 +52,16 @@ construction_result construct_building(world& w, const recipe_registry& reg,
             return construction_result::depth_locked;
     }
 
+    // BL-588 tech-recipe gate — a SECOND, independent lock on top of the depth
+    // one above (both must pass). Reuses `construction_result::tech_locked`,
+    // the same value the structure-level gate already returns, so an agent
+    // reading the seam cannot tell a structure lock from a recipe lock apart —
+    // which is the point (corp_command_result::rejected_tech_locked mirrors
+    // this one level up). `corp` is guaranteed non-null here (the no_corp
+    // check above already returned), so this is never the ungated no-corp case.
+    if (!recipe_unlocked(w, reg, corp, recipe))
+        return construction_result::tech_locked;
+
     // Tile-level validity check (ocean / deposit / terrain).
     if (!placement_rules::can_place(tile_it->second, type, target))
         return construction_result::invalid_tile;
@@ -77,6 +88,9 @@ construction_result construct_building(world& w, const recipe_registry& reg,
 
     corporation_component& cc = corp_it->second;
     const building_economics& econ = reg.economics(type);
+    // BL-590: the material cost specific to THIS named building (target/recipe),
+    // not just its type — see resource_build_cost_for's comment.
+    const auto& material_cost_row = reg.resource_build_cost_for(type, target, recipe);
 
     // Material cost (BL-044 → BL-095): a building's resource_build_cost is bought
     // from the local market — but under BL-095 it is no longer a single up-front
@@ -102,10 +116,10 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     float material_cost = 0.0f;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        if (econ.resource_build_cost[r] <= 0.0f)
+        if (material_cost_row[r] <= 0.0f)
             continue;
         const float p = mkt ? (mkt->price[r] > 0.0f ? mkt->price[r] : mkt->base_price[r]) : 0.0f;
-        material_cost += econ.resource_build_cost[r] * p;
+        material_cost += material_cost_row[r] * p;
     }
 
     // Affordability is a commitment gate only (BL-095): the corp must be able to

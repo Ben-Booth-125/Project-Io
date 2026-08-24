@@ -142,7 +142,62 @@ enum class resource_type : uint8_t
     // or medical draw later is an APPEND with its behaviour filed in the same
     // change — never a re-insertion here, which would repoint every id after it.
     ordnance               = 37, ///< Fabricator, from steel + machinery. Terminal military good; drawn per-tick by unit upkeep (BL-454).
-    count                  = 38
+    // --- Ancient roster, slice 1 (BL-585/BL-586, 2026-08-24) ---
+    //
+    // The wide ancient roster's first slice: four processing outputs from
+    // EXISTING raws (clay, stone, timber, iron_blooms) — no new tile deposit,
+    // no new extraction target, no new placement rule. `hides` and its two
+    // consumers (`leather`, `cloth`) are deliberately NOT in this slice: they
+    // need a new extractable raw with real tile-generation deposits, which is
+    // a separate change (BL-586's own design names the deferral).
+    //
+    // Admission rule (PRODUCTION.md / BL-340): PRODUCED by an authored recipe
+    // (recipes.lua, this same change). CONSUMED: `planks` by the Toolmaker
+    // recipe below (a real recipe input); `ceramics`, `dressed_stone` and
+    // `tools` are TERMINAL — sold on the market, reprocessed by nothing —
+    // same shape as `trade_goods_misc`, and named in chain_depth's R1
+    // exemption table for exactly that reason rather than left to read as an
+    // orphan. `tools` gains a second, real consumer (a construction-material
+    // draw) when BL-590 lands; the exemption is not a promise, it is today's
+    // honest state.
+    //
+    // world_save_version bumped 8 -> 9 for this append (world_save.hpp).
+    ceramics               = 38, ///< Potter, from clay. Terminal — sold, not reprocessed.
+    dressed_stone          = 39, ///< Stonemason, from stone. Terminal — sold, not reprocessed.
+    planks                 = 40, ///< Sawmill, from timber. Consumed by the Toolmaker.
+    tools                  = 41, ///< Toolmaker, from iron_blooms + planks. Ancient depth 3, tied with the existing ceiling. Terminal for now.
+    // --- Ancient roster, slice 2 (BL-586, 2026-08-24) ---
+    //
+    // The three chains slice 1 deliberately deferred: `hides` is the roster's
+    // first ENDEMIC raw (planetology.cpp's C -> D candidate list, alongside
+    // tobacco/spices/coffee/furs — lat/sector-restricted, richness-scored,
+    // NOT the plain cover-based ambient mechanic timber/clay use), on the
+    // pasture/hunting-ground reading of `terrain_cover::grass` (Ben,
+    // 2026-08-24). `fibre` is the ordinary case: a grass/marsh crop, grown by
+    // the SAME cover-based ambient/biotic mechanic `agricultural_produce`
+    // uses, additively — a tile can carry both.
+    //
+    // Admission rule (PRODUCTION.md / BL-340): PRODUCED — `hides` by the
+    // endemic pass, `fibre` by tile_generation.cpp's ambient pass, `leather`/
+    // `cloth`/`rigging` by the Tannery/Weaver/Shipwright recipes below
+    // (recipes.lua, this same change). CONSUMED — `hides` by the Tannery,
+    // `fibre` by the Weaver, `planks` (already consumed by the Toolmaker) and
+    // `cloth` both by the Shipwright; `leather` and `rigging` are TERMINAL —
+    // sold on the market, reprocessed by nothing — same shape as `ceramics`/
+    // `dressed_stone` above, and named in chain_depth's R1 exemption table for
+    // exactly that reason. `rigging` is the roster's chosen name for the
+    // "terminal trade good" the design table calls Shipwright's output —
+    // ropework/cordage/tackle, a genuine ancient-craft good a shipyard
+    // plausibly makes, in the same generic-material-noun register as
+    // `ceramics`/`dressed_stone`/`tools` (never a proper noun).
+    //
+    // world_save_version bumped 9 -> 10 for this append (world_save.hpp).
+    hides                  = 42, ///< Endemic (BL-191-shaped), pasture/hunting ground. Consumed by the Tannery.
+    fibre                  = 43, ///< Ambient grass/marsh crop, alongside agricultural_produce. Consumed by the Weaver.
+    leather                = 44, ///< Tannery, from hides. Terminal — sold, not reprocessed.
+    cloth                  = 45, ///< Weaver, from fibre. Consumed by the Shipwright.
+    rigging                = 46, ///< Shipwright, from planks + cloth. Ancient depth 2. Terminal — sold, not reprocessed.
+    count                  = 47
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);

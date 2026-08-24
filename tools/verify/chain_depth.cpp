@@ -71,6 +71,8 @@
 #include "world/components.hpp"
 #include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/tech_gate.hpp" // BL-589: the start-gate audit reads recipe_unlocked/advance_tech_gates
+#include "world/world.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -365,6 +367,103 @@ int main()
               "insertion order does not change a recipe's required depth");
     }
 
+    // --- G5: the start gate — a STATED opening, ruled by Ben (BL-589) ---------
+    //
+    // Measured before this row existed: five processing groups were open to a
+    // fresh ancient corp (Metal Foundry, Fuel Production, Food Processing,
+    // Artisan Goods, Construction Materials), one of them — Metal Foundry —
+    // open ONLY through `refined_copper`, an `any`-band recipe with no ancient
+    // identity at all (required depth 0, so the ladder never touched it).
+    //
+    // Ben's ruling (2026-08-24, the start-gate elicitation form): gate
+    // refined_copper by tech specifically (E0-EC-03); leave every other open
+    // recipe as-is — Food Processing keeps BOTH Food Rations and Miller, Fuel
+    // Production keeps BOTH Charcoal Burner and Peat Kiln (a genuine supply-
+    // route pair, R2's own classification), Artisan Goods and Construction
+    // Materials stay fully open, and the any-band depth exemption itself is
+    // NOT narrowed. So this row asserts the RULED opening exactly — not a
+    // narrower one this session might have preferred — and that the one newly
+    // locked recipe is not a permanent orphan (its gate actually resolves).
+    std::printf("\nG5 - the start gate: the ruled opening, exactly, and nothing stranded\n");
+    {
+        lua_state lua;
+        lua.load("scripts/recipes.lua");
+        lua.load("scripts/economy.lua");
+        recipe_registry reg;
+        reg.load_from_lua(lua);
+        reg.set_era(era_band::ancient);
+
+        world w;
+        const entity_id corp = w.create_entity();
+        w.corporations[corp] = corporation_component{}; // fresh: depth 0, no tech, no balance
+
+        // The ruled opening, by recipe NAME (not display_name — the Smithy's two
+        // recipes share a display_name and must not collide here).
+        static const char* const k_open[] = {
+            "charcoal", "peat_charcoal",                 // Fuel Production
+            "food_rations", "food_rations_milled",        // Food Processing
+            "trade_goods", "glass", "tannery", "weaver",   // Artisan Goods
+            "ceramics_kiln", "stonemason", "sawmill",      // Construction Materials
+            // "shipwright" (Advanced Fabrication) is DELIBERATELY NOT here:
+            // its inputs (planks, cloth) are both depth 1, so its required
+            // depth is 1 — locked at tick 0 for a fresh corp exactly like
+            // every other depth>0 recipe, not a new closure this row asserts.
+        };
+        auto expected_open = [&](const std::string& name) {
+            for (const char* n : k_open)
+                if (name == n)
+                    return true;
+            return false;
+        };
+
+        std::vector<std::string> mismatches;
+        bool saw_refined_copper_locked = false;
+        const int n = reg.recipe_count(building_type::processing_facility);
+        for (int i = 0; i < n; ++i)
+        {
+            const recipe&  rc  = reg.recipe_at(building_type::processing_facility, i);
+            const uint16_t rid = reg.recipe_id(rc.name);
+            const int      required = reg.recipe_required_depth(rid);
+            const bool     depth_ok = !(rc.era == era_band::ancient
+                                        && (required < 0 || required > 0));
+            const bool     placeable = depth_ok && recipe_unlocked(w, reg, corp, rid);
+
+            if (rc.name == "refined_copper")
+            {
+                saw_refined_copper_locked = !placeable;
+                continue; // asserted separately below — it is the one deliberate lock
+            }
+            const bool should_be_open = expected_open(rc.name);
+            if (placeable != should_be_open)
+                mismatches.push_back(rc.name + (placeable ? " is open, ruled locked"
+                                                          : " is locked, ruled open"));
+        }
+        for (const std::string& m : mismatches)
+            std::printf("      MISMATCH: %s\n", m.c_str());
+        check(mismatches.empty(),
+              "every recipe outside the one ruled lock matches the ruled opening exactly");
+        check(saw_refined_copper_locked,
+              "refined_copper is tech_locked at tick 0 (E0-EC-03), the one deliberate closure");
+
+        // Not a permanent orphan: build a corp whose state satisfies E0-EC-03's
+        // own authored predicate (one processing facility, Cr 400+ surplus) and
+        // confirm advance_tech_gates actually earns it and recipe_unlocked
+        // flips — proving the closure is a gate, not a silent dead end.
+        const entity_id tile = w.create_entity();
+        const entity_id bld  = w.create_entity();
+        building_component bc{};
+        bc.tile = tile;
+        bc.type = building_type::processing_facility;
+        w.buildings[bld] = bc;
+        w.corporations[corp].assets.push_back(bld);
+        w.corporations[corp].balance = 500.0f;
+        const int earned = advance_tech_gates(w);
+        check(earned >= 1 && w.has_tech(corp, "E0-EC-03"),
+              "E0-EC-03 resolves once its own authored predicate is met");
+        check(recipe_unlocked(w, reg, corp, reg.recipe_id("refined_copper")),
+              "...and refined_copper is placeable immediately after");
+    }
+
     // --- R1: no orphan resources, either direction ----------------------------
     //
     // BL-432 assertion 2. Every resource_type must be OBTAINABLE (produced by a
@@ -410,6 +509,21 @@ int main()
             // a lie and the row is supposed to catch it — delete the exemption
             // with the consumer, not after someone notices the good is dead.
             { resource_type::ordnance,              "BL-454 unit upkeep draw (per-tick, per unit)" },
+            // BL-585/BL-586 (2026-08-24). Three of the ancient roster's slice-1
+            // outputs are TERMINAL — sold to the market, reprocessed by nothing —
+            // same shape as trade_goods_misc above. `tools` gains a real second
+            // consumer (a construction-material draw) when BL-590 lands; this
+            // exemption names that as the plan rather than assuming it now.
+            { resource_type::ceramics,              "mercantile demand, terminal artisan good (BL-586)" },
+            { resource_type::dressed_stone,         "mercantile demand, terminal construction good (BL-586)" },
+            { resource_type::tools,                 "mercantile demand for now; BL-590 construction-material draw when it lands" },
+            // BL-586 slice 2 (2026-08-24). `leather` (Tannery) and `rigging`
+            // (Shipwright) are TERMINAL, same shape as the row above; `cloth`
+            // (Weaver) is NOT exempted here — it has a real recipe consumer,
+            // the Shipwright, so it is expected to show `consumed[r] == true`
+            // on its own.
+            { resource_type::leather,               "mercantile demand, terminal artisan good (BL-586 slice 2)" },
+            { resource_type::rigging,               "mercantile demand, terminal trade good (BL-586 slice 2, the Shipwright's output)" },
         };
         auto exempt_consumer = [&](std::size_t r) -> const char* {
             for (const exemption& e : k_actor_consumed)
@@ -530,6 +644,11 @@ int main()
             resource_type::spacecraft_components, resource_type::propellant,
             resource_type::clean_water,           resource_type::consumer_goods,
             resource_type::medical_supplies,      resource_type::ordnance,
+            // BL-585/BL-586's ceramics/dressed_stone/tools are DELIBERATELY NOT
+            // here, same reasoning as the excluded tobacco/spices/coffee/furs/
+            // trade_goods_misc above: "mercantile demand" in R1's table means
+            // sellable-on-the-market, not a real programmatic draw, so it must
+            // not force a band-independent want here.
         };
         auto actor_consumed = [&](std::size_t r) {
             for (const resource_type e : k_actor_consumed)
@@ -631,14 +750,32 @@ int main()
         reg.load_from_lua(lua);
         reg.set_era(era_band::any); // the whole authored roster — see R1's note
 
-        // Reference prices: world_gen.lua's base_price for the goods the sibling
-        // pairs actually use. A fixed snapshot — this asks about recipe SHAPE, not
-        // a moment's market state. Mirrors recipe_switch_harness's table.
-        auto reference_price = [](resource_type r) -> float {
+        // TWO reference-price snapshots (BL-592), not one. A single fixed vector
+        // cannot see a method that is only better "depending on which market it
+        // builds to" (Ben, 2026-08-23) — it reads as dominated under the one
+        // price regime tested, when a corp sitting on a different deposit mix
+        // would genuinely prefer it. `fuel_cheap` and `fuel_dear` bracket the
+        // axis BL-587's own methods trade on (timber/peat/coal locally abundant
+        // vs scarce); a genuine interchangeable method must win — not be
+        // dominated — under AT LEAST ONE of the two. Depth does not vary by
+        // price, so only cost is computed twice.
+        auto reference_price_cheap = [](resource_type r) -> float {
             switch (r)
             {
-                case resource_type::timber: return 1.5f;
-                case resource_type::peat:   return 1.2f;
+                case resource_type::timber: return 0.8f;
+                case resource_type::peat:   return 0.6f;
+                case resource_type::coal:   return 0.5f;
+                case resource_type::clay:   return 1.2f;
+                case resource_type::sand:   return 1.0f;
+                default:                    return 1.0f; // untabled input: neutral
+            }
+        };
+        auto reference_price_dear = [](resource_type r) -> float {
+            switch (r)
+            {
+                case resource_type::timber: return 3.0f;
+                case resource_type::peat:   return 2.5f;
+                case resource_type::coal:   return 2.5f;
                 case resource_type::clay:   return 1.2f;
                 case resource_type::sand:   return 1.0f;
                 default:                    return 1.0f; // untabled input: neutral
@@ -708,32 +845,42 @@ int main()
                     }
 
                     ++methods;
-                    float cost_a = 0.0f, cost_b = 0.0f;
+                    float cost_a_cheap = 0.0f, cost_b_cheap = 0.0f;
+                    float cost_a_dear  = 0.0f, cost_b_dear  = 0.0f;
                     int   depth_a = 0,   depth_b = 0;
                     for (std::size_t r = 0; r < resource_count; ++r)
                     {
                         const resource_type rt = static_cast<resource_type>(r);
                         if (ra.inputs[r] > 0.0f)
                         {
-                            cost_a += ra.inputs[r] * reference_price(rt);
+                            cost_a_cheap += ra.inputs[r] * reference_price_cheap(rt);
+                            cost_a_dear  += ra.inputs[r] * reference_price_dear(rt);
                             depth_a = std::max(depth_a, reg.depth_of(rt));
                         }
                         if (rb.inputs[r] > 0.0f)
                         {
-                            cost_b += rb.inputs[r] * reference_price(rt);
+                            cost_b_cheap += rb.inputs[r] * reference_price_cheap(rt);
+                            cost_b_dear  += rb.inputs[r] * reference_price_dear(rt);
                             depth_b = std::max(depth_b, reg.depth_of(rt));
                         }
                     }
-                    const bool a_dom = cost_a <= cost_b && depth_a <= depth_b &&
-                                       (cost_a < cost_b || depth_a < depth_b);
-                    const bool b_dom = cost_b <= cost_a && depth_b <= depth_a &&
-                                       (cost_b < cost_a || depth_b < depth_a);
-                    if (a_dom || b_dom)
+                    auto dominated_under = [&](float cost_a, float cost_b) {
+                        const bool a_dom = cost_a <= cost_b && depth_a <= depth_b &&
+                                           (cost_a < cost_b || depth_a < depth_b);
+                        const bool b_dom = cost_b <= cost_a && depth_b <= depth_a &&
+                                           (cost_b < cost_a || depth_b < depth_a);
+                        return a_dom || b_dom;
+                    };
+                    // Dominated only if BOTH price regimes agree — "must win
+                    // under at least one" restated as its negation.
+                    if (dominated_under(cost_a_cheap, cost_b_cheap) &&
+                        dominated_under(cost_a_dear, cost_b_dear))
                     {
                         ++dominated;
-                        std::printf("      DOMINATED METHOD: '%s' (cost %.1f, depth %d) vs '%s' (cost %.1f, depth %d)\n",
-                                    ra.name.c_str(), cost_a, depth_a,
-                                    rb.name.c_str(), cost_b, depth_b);
+                        std::printf("      DOMINATED METHOD under BOTH price regimes: '%s' "
+                                    "(cheap %.1f, dear %.1f, depth %d) vs '%s' (cheap %.1f, dear %.1f, depth %d)\n",
+                                    ra.name.c_str(), cost_a_cheap, cost_a_dear, depth_a,
+                                    rb.name.c_str(), cost_b_cheap, cost_b_dear, depth_b);
                     }
                 }
         }
@@ -745,7 +892,101 @@ int main()
         check(routes + exempted + methods > 0,
               "ANTI-VACUITY: the roster actually contains sibling pairs to classify");
         check(dominated == 0,
-              "no interchangeable method dominates a sibling on both input cost and chain depth");
+              "no interchangeable method dominates a sibling under BOTH price regimes "
+              "(fuel-cheap and fuel-dear) and chain depth");
+    }
+
+    // --- R3: every named building's material basket is obtainable in its own
+    // band (BL-590/BL-592) --------------------------------------------------
+    //
+    // A per-building override (BL-590) could name a good only the industrial
+    // arc makes for an ancient building — unbuildable at 0 CE, and nothing
+    // else in this suite would catch it: R1/R1b ask whether a good is
+    // obtainable SOMEWHERE, not whether it is obtainable in the SAME band as
+    // the specific building that costs it. Generic over the whole roster
+    // (every processing recipe, every extraction target `resource_build_cost_for`
+    // is ever called on), not a hand-picked list, so a future override earns
+    // this check for free rather than needing to be added to it.
+    std::printf("\nR3 - every named building's material basket is obtainable in its own band\n");
+    {
+        lua_state lua;
+        lua.load("scripts/recipes.lua");
+        lua.load("scripts/economy.lua");
+        recipe_registry reg;
+        reg.load_from_lua(lua);
+        reg.set_era(era_band::any);
+
+        std::vector<bool> extractable(resource_count, false);
+        for (const resource_type e : placement_rules::k_extractable)
+            extractable[static_cast<std::size_t>(e)] = true;
+        for (const resource_type e : { resource_type::tobacco, resource_type::spices,
+                                       resource_type::coffee,  resource_type::furs })
+            extractable[static_cast<std::size_t>(e)] = true;
+
+        // Obtainable in @p band: extractable (deposits are band-independent —
+        // world generation does not gate extraction by era, R1b's own note),
+        // OR produced by a recipe era_permits(band, ...) allows.
+        auto obtainable_in_band = [&](std::size_t r, era_band band) {
+            if (extractable[r])
+                return true;
+            const int n = reg.recipe_count(building_type::processing_facility);
+            for (int i = 0; i < n; ++i)
+            {
+                const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+                if (era_permits(band, rc.era) && rc.outputs[r] > 0.0f)
+                    return true;
+            }
+            return false;
+        };
+
+        std::vector<std::string> offenders;
+        int checked = 0;
+
+        // Extraction overrides: every extractable target, checked against the
+        // ancient band (the band this item's own overrides target).
+        for (const resource_type target : placement_rules::k_extractable)
+        {
+            const auto& def = reg.economics(building_type::extraction_site).resource_build_cost;
+            const auto& cost = reg.resource_build_cost_for(building_type::extraction_site,
+                                                            target, no_recipe);
+            if (cost == def)
+                continue; // no override authored for this target
+            ++checked;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (cost[r] > 0.0f && !obtainable_in_band(r, era_band::ancient))
+                    offenders.push_back("extraction target '" +
+                                        std::to_string(static_cast<int>(target)) +
+                                        "' costs resource " + std::to_string(r) +
+                                        ", unobtainable in the ancient band");
+        }
+
+        // Processing overrides: every ancient recipe, checked against ITS OWN
+        // band — the band a per-building override is authored for.
+        const int n = reg.recipe_count(building_type::processing_facility);
+        for (int i = 0; i < n; ++i)
+        {
+            const recipe&  rc  = reg.recipe_at(building_type::processing_facility, i);
+            const uint16_t rid = reg.recipe_id(rc.name);
+            const auto& def  = reg.economics(building_type::processing_facility).resource_build_cost;
+            const auto& cost = reg.resource_build_cost_for(building_type::processing_facility,
+                                                            resource_type::iron_ore, rid);
+            if (cost == def)
+                continue; // no override authored for this recipe
+            ++checked;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (cost[r] > 0.0f && !obtainable_in_band(r, rc.era))
+                    offenders.push_back("recipe '" + rc.name + "' costs resource " +
+                                        std::to_string(r) + ", unobtainable in its own band");
+        }
+
+        for (const std::string& o : offenders)
+            std::printf("      OFFENDER: %s\n", o.c_str());
+        std::printf("      %d named building%s carry a material override; %zu offender%s\n",
+                    checked, checked == 1 ? "" : "s", offenders.size(), offenders.size() == 1 ? "" : "s");
+
+        check(checked > 0, "ANTI-VACUITY: the roster actually authors per-building overrides");
+        check(offenders.empty(),
+              "every named building's material basket is obtainable in its own band");
     }
 
     std::printf("\n=== %s (%d failure%s) ===\n",

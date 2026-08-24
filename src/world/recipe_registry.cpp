@@ -322,6 +322,50 @@ void recipe_registry::load_from_lua(lua_state& lua)
                                   std::string("buildings.") + nt.key + ".resource_costs");
             e.era = read_era(*b, std::string("buildings.") + nt.key); // BL-433
             m_building_econ[static_cast<std::size_t>(nt.type)] = e;
+
+            // BL-590: per-named-building material overrides, authored beside the
+            // type's own resource_costs. extraction_site is keyed by target
+            // resource NAME; processing_facility by recipe NAME (resolved to an
+            // id here, while m_recipes is already loaded — recipes load before
+            // economy constants, see this function's own top). An unrecognised
+            // name throws the same as resource_costs' own read_resource_map does
+            // — this seam must not silently drop a typo'd override.
+            sol::optional<sol::table> overrides = (*b)["material_overrides"];
+            if (overrides && nt.type == building_type::extraction_site)
+            {
+                for (const auto& kv : *overrides)
+                {
+                    const std::string key = kv.first.as<std::string>();
+                    bool ok = false;
+                    const resource_type target = resource_names::resource_from_name(key, ok);
+                    if (!ok)
+                        throw std::runtime_error("recipe_registry: buildings.extraction_site."
+                                                 "material_overrides has an unknown target '"
+                                                 + key + "'");
+                    sol::table entry = kv.second.as<sol::table>();
+                    std::array<float, resource_count> cost{};
+                    read_resource_map(entry, cost,
+                                      "buildings.extraction_site.material_overrides." + key);
+                    m_extraction_material_overrides[target] = cost;
+                }
+            }
+            else if (overrides && nt.type == building_type::processing_facility)
+            {
+                for (const auto& kv : *overrides)
+                {
+                    const std::string key = kv.first.as<std::string>();
+                    const std::uint16_t rid = recipe_id(key);
+                    if (rid == no_recipe)
+                        throw std::runtime_error("recipe_registry: buildings.processing_facility."
+                                                 "material_overrides names an unknown recipe '"
+                                                 + key + "'");
+                    sol::table entry = kv.second.as<sol::table>();
+                    std::array<float, resource_count> cost{};
+                    read_resource_map(entry, cost,
+                                      "buildings.processing_facility.material_overrides." + key);
+                    m_processing_material_overrides[rid] = cost;
+                }
+            }
         }
     }
 

@@ -12,6 +12,37 @@ release.
 
 ## [Unreleased]
 
+## [0.1.17] — 2026-08-24
+
+### Added
+- **The ancient roster becomes a ladder (Sprint 17)**: a real production chain, not a flat menu.
+  The ancient roster grows to 23 named buildings across 47 resources (from 7 named buildings, 42
+  resources): Tannery, Weaver, Potter's Kiln, Sawmill, Stonemason, Toolmaker and Shipwright join
+  the existing arc, five new goods (ceramics, dressed_stone, planks, tools, then hides, fibre,
+  leather, cloth, rigging) each with their own construction-material basket, not a shared steel
+  default (BL-585, BL-586, BL-590). `world_save_version` 8 → 10 across the two enum appends.
+- **Progression through methods, not just tiers**: `chain_depth`'s dominance check now runs under
+  two price regimes (fuel-cheap, fuel-dear) so a method that's only better depending on which
+  market it builds to isn't misread as dead content (BL-587, BL-592). The tech-effect union gains
+  a third arm, `unlock_recipe` — a tech can now open a specific recipe rather than only a whole
+  building type — and a fresh ancient corp opens onto a deliberately narrow, ruled start gate
+  rather than the whole roster at once (BL-588, BL-589).
+- **The growth track is visible**: the corporation dashboard's Production card reads the reached
+  chain depth, the good that set it, the next buildable rung, and what's still missing to place
+  it (BL-591). The Build door now filters out a tech-locked recipe rather than showing it as a
+  normal option with no explanation (BL-593).
+
+### Known gaps, carried forward rather than silently closed
+- A method-switch made for a stated market reason, and a tech gate resolving mid-playthrough,
+  were not reached in this cut's live verification pass — both need more simulated economy time
+  than one sitting covers. Not a defect; the mechanisms are headless-verified.
+- The corp-selection screen's per-row "Choose" buttons do not respond to clicks (only the
+  seed-default "Surprise me" path works) — a real, reproduced defect, logged rather than fixed
+  this cut (not urgent).
+- `spectator_determinism`'s bit-identical-RNG-stream guarantee across a content change is
+  formally out of scope as of this cut — the harness's two load-bearing properties (the
+  spectator flag defaults false; admitting a corp shifts no rival's cadence slot) are unaffected.
+
 ## [0.1.15] — 2026-08-24
 
 ### Added
@@ -673,7 +704,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.15...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.17...HEAD
+[0.1.17]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.15...v0.1.17
 [0.1.15]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.10...v0.1.14
 [0.1.10]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.9...v0.1.10

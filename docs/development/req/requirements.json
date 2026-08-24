@@ -6001,6 +6001,505 @@
                     "result_metric": ""
                 }
             ]
+        },
+        {
+            "brief": "interchangeable-methods-exist",
+            "title": "Two genuine interchangeable production methods, and the no-dominance guard proving it",
+            "status": "complete",
+            "resolved": "2026-08-23",
+            "promoted_from": "backlog.json BL-587 (INTERCHANGEABLE_METHODS_EXIST) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (R2)"
+                    ],
+                    "requirement": "ITEM-SPANNING: scripts/recipes.lua carries at least two recipe pairs that chain_depth's R2 row classifies as genuine interchangeable methods (sharing an input with an existing sibling, not a disjoint-raw supply route or a named precondition pair), and R2 reports zero pairs dominated on both cost and chain depth across the whole roster.",
+                    "notes": "Landed as recipe ids 29 (charcoal_from_kiln, \"Coking Kiln\") and 30 (steel_bessemer, \"Bessemer Converter\"). chain_depth.exe: \"13 sibling pairs: 10 supply routes, 1 precondition, 2 interchangeable methods\" / \"[PASS] no interchangeable method dominates a sibling on both input cost and chain depth\".",
+                    "result_metric": "2 interchangeable methods, 0 dominated (was 0 methods, 0 dominated before this item)"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: recipe_switch_harness",
+                        "headless: price_band_harness"
+                    ],
+                    "requirement": "The two harnesses that also load scripts/recipes.lua and scripts/economy.lua live (recipe_switch_harness, price_band_harness) build and pass unchanged, confirming the new recipes did not break the shared Lua file for other in-flight work (both harnesses are outside Sprint 16's file set).",
+                    "notes": "recipe_switch_harness: ALL PASS (0 failures). price_band_harness: ALL PASS (0 failures).",
+                    "result_metric": ""
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "doc"
+                    ],
+                    "requirement": "docs/economy/PRODUCTION.md § Alternate production methods no longer reports the four NR-243 pairs as an open call — corrected to state they are supply routes/a precondition, per the 2026-08-16 R2 retraction — and records the two new methods in its group tables and the ancient-chain table.",
+                    "notes": "Corrects NR-589 (a ruling taken on the stale paragraph this row fixes).",
+                    "result_metric": ""
+                }
+            ]
+        },
+        {
+            "brief": "ancient-goods-append-and-slice-1",
+            "title": "The save-format bump for four new goods, and the wide roster’s first slice",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-585 (ANCIENT_GOODS_APPEND, complete) + BL-586 (ANCIENT_ROSTER_WIDE, slice 1) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (R1, R1b)"
+                    ],
+                    "requirement": "ITEM-SPANNING (BL-585): four resource_type values appended at the end of the enum (ceramics, dressed_stone, planks, tools), each produced by an authored recipe and either consumed by another recipe or named in chain_depth’s R1/R1b actor-consumed tables as a terminal market-sold good. world_save_version bumped with the read path’s strict-equality rejection extended (no migration).",
+                    "notes": "chain_depth: \"42 resources: 0 unobtainable, 0 unwanted, 14 actor-consumed exemptions\" / R1b \"0 stranded, 5 known-and-tracked gaps\". save_roundtrip gained P13 (v8-versioned stream refused). world_save_version 8 -> 9.",
+                    "result_metric": "4 new resource_type values, resource_count 38 -> 42, 0 orphans"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (D6, R2)"
+                    ],
+                    "requirement": "BL-586 slice 1: four named ancient buildings on existing raws (Potter’s Kiln, Stonemason, Sawmill, Toolmaker), each following the generic-building-plus-recipe pattern (no new building_type enum value), each declaring a BL-434 sub-facility group. No dominated method introduced; ancient depth ceiling unchanged.",
+                    "notes": "Construction Materials is a new group (Kiln/Stonemason/Sawmill); Toolmaker joined Metal Foundry as its deepest member (required depth 2, depth(tools)=3, tied with the existing ceiling). D6: \"max depth: industrial 4, ancient 3\" — unchanged from before this item.",
+                    "result_metric": "4 named buildings, 1 new sub-facility group, ancient max depth unchanged at 3"
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "headless: recipe_switch_harness",
+                        "headless: price_band_harness",
+                        "headless: save_roundtrip",
+                        "headless: determinism_harness",
+                        "headless: spectator_determinism",
+                        "build: full tree (cmake --build build, every target)"
+                    ],
+                    "requirement": "The widened enum and the save-format bump do not regress any other harness or the GUI build. Two guarded exhaustiveness checks (src/core/verify_api.cpp k_resource_slugs, src/world/resource_names.cpp) found and fixed beyond the item’s own declared file list. spectator_determinism’s golden re-blessed on the structural move, confirmed reproducible across two independently built worlds before blessing, per this file’s own standing policy.",
+                    "notes": "save_roundtrip: ALL PASS including new P13. determinism_harness: ALL PASS. spectator_determinism: re-blessed 2FB3C201D7C4B1FA, ALL PASS after. recipe_switch_harness / price_band_harness: unchanged, ALL PASS. Full tree build (cmake --build build): zero errors, zero warnings introduced.",
+                    "result_metric": "6 harnesses + full GUI build, 0 failures after the re-bless"
+                }
+            ]
+        },
+        {
+            "brief": "unlock-recipe-tech-arm",
+            "title": "A tech can unlock a recipe, not just a building type",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-588 (UNLOCK_RECIPE_TECH_ARM) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "headless: tech_effect_union_harness",
+                        "headless: tech_gate_harness"
+                    ],
+                    "requirement": "ITEM-SPANNING: tech_effect_kind gains unlock_recipe, storing the recipe NAME (never an id); tech_gate gains an unlocks_recipe mirror maintained only through add_effect; recipe_unlocked(w, reg, corp, recipe_id) and gating_tech_for_recipe resolve id -> name and check world::has_tech, with the same null_entity/ungated contract as structure_unlocked.",
+                    "notes": "tech_effect_union_harness: 35 passed, 0 failed. tech_gate_harness: 33 passed, 0 failed (after correcting E1-EC-01's predicate — see R3).",
+                    "result_metric": "3rd effect-union arm; 2 authored gates (E0-EC-01, E1-EC-01)"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: construction_gate_harness",
+                        "headless: construction_harness",
+                        "headless: recipe_switch_harness",
+                        "headless: corp_ai_harness"
+                    ],
+                    "requirement": "The tech-recipe gate is read at BOTH doors — construct_building (placement) and try_switch_recipe (retooling) — closing the same one-click bypass the depth gate's own comment names. Both return the shared tech_locked code (construction_result::tech_locked reused; a new recipe_switch_result::tech_locked mapped to the same corp_command_result::rejected_tech_locked the structure-level lock already uses). corp_ai.cpp's build-candidate loop filters on it, mirroring the existing depth filter, so the scorer never proposes a candidate the seam would refuse.",
+                    "notes": "construction_gate_harness / construction_harness / recipe_switch_harness / corp_ai_harness: all rerun clean after the change. Two locks are independent — a recipe can be depth_locked, tech_locked, both, or neither.",
+                    "result_metric": "2 doors gated, 1 scorer filter added, 0 regressions"
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "headless: tech_gate_harness"
+                    ],
+                    "requirement": "First-cut authored gates are satisfiable through ordinary play quantities, not a debug poke or a trivially-true predicate — the same bar BL-344's own T3 fixture holds the original garrison gate to.",
+                    "notes": "A first draft of E1-EC-01 (surplus >= 1500 only) was caught by tech_gate_harness's own T3 fixture (2 extraction sites, Cr 5,000, zero stockpile): the fixture accidentally satisfied it, proving the predicate was satisfiable by ANY solvent corp regardless of what it had built — a real design flaw, not just a test collision. Corrected to require holding machinery (the Bessemer Converter's own reagent) in stockpile instead, which the fixture genuinely lacks. tech_gate_harness: 33/33 after the fix.",
+                    "result_metric": "1 predicate corrected before landing, caught by the existing regression harness"
+                }
+            ]
+        },
+        {
+            "brief": "per-building-materials",
+            "title": "Construction materials vary per named building, not just per building type",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-590 (PER_BUILDING_MATERIALS) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "headless: construction_harness (R9)"
+                    ],
+                    "requirement": "ITEM-SPANNING: recipe_registry::resource_build_cost_for(type, target, recipe) resolves a per-named-building override — extraction_site keyed by target_resource, processing_facility by recipe id — falling back to the type default when none is authored, and ignoring both override maps for every other building type.",
+                    "notes": "construction_harness R9: 5/5 pass — overridden target reads override; unoverridden target falls back to steel default; overridden recipe reads override; unoverridden recipe falls back to default; a non-extraction/processing type (port) ignores both maps regardless of the target/recipe passed to it.",
+                    "result_metric": "5/5 R9 assertions"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: construction_gate_harness",
+                        "headless: construction_harness",
+                        "headless: chain_depth",
+                        "headless: recipe_switch_harness",
+                        "headless: price_band_harness",
+                        "headless: save_roundtrip",
+                        "headless: determinism_harness",
+                        "headless: corp_ai_harness",
+                        "headless: pregame_balance_harness",
+                        "headless: spectator_determinism"
+                    ],
+                    "requirement": "Every one of the (originally eight, actually thirteen occurrences across four files) call sites that read resource_build_cost directly now goes through resource_build_cost_for instead: construct_building, the three run_construction sites (economy_system.cpp), construction_rate (both the live selection_panel.cpp copy and the unused construction_panel.cpp mirror), and the Build door's capex loop. The two road-specific sites (place_road, the road capex preview) are unchanged — roads have no building_type/recipe identity to key an override on.",
+                    "notes": "Full tree build (cmake --build build, every target, zero errors) and 10 harnesses all clean. spectator_determinism's golden held — no re-bless needed (material overrides do not change what state_hash folds).",
+                    "result_metric": "13 call sites migrated across 4 files; 0 regressions"
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "live-Lua manual probe (not committed — throwaway CMake target, built, run, and removed in-session)"
+                    ],
+                    "requirement": "The authored economy.lua material_overrides tables actually load and resolve through the live Lua path — not just the hand-built registry the R1/R9 harness exercises.",
+                    "notes": "A temporary CMake target loaded the real recipes.lua/economy.lua and called resource_build_cost_for directly: stone extraction returned timber=12/steel=0 (overridden), iron_ore extraction returned steel=20 (unchanged default), the Toolmaker recipe returned stone=12/timber=10/steel=0 (overridden), the industrial steel recipe returned steel=25 (unchanged default). Probe deleted after confirming; CMakeLists.txt reverted to its pre-probe state.",
+                    "result_metric": "4/4 live-Lua spot checks matched the authored table exactly"
+                }
+            ]
+        },
+        {
+            "brief": "depth-readout-on-dashboard",
+            "title": "A corp’s reached chain depth is displayed, not just gated",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-591 (DEPTH_READOUT_ON_DASHBOARD) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "visual",
+                        "code"
+                    ],
+                    "requirement": "ITEM-SPANNING: the Corporation dashboard’s Production card shows, above the per-building list, the corp’s reached chain depth and the good that set it, the era-allowed recipes exactly one rung deeper, and the not-yet-produced inputs those recipes need — proven by a live open-and-click pass (a scripted capture alone does not prove the press is reachable), not only a scripts/verify capture of the content rendering.",
+                    "notes": "PARTIAL, recorded honestly (NR-593, Ben’s call 2026-08-24): no computer-use access this session, so the literal click could not be performed. scripts/verify/corp_dashboard.lua’s corp_rollup_production capture (driven by verify.fold(\"corp_rollup\", 0), the same rollup_body() code path a real click reaches) confirms the three lines render with real content — a fresh corp: \"Reached depth 0, via Iron Ore / Next: Bloomery / Needs: Charcoal\". The fold/expand CONTROL itself is not new to this item (BL-248, already live-verified); BL-591 only added content inside an already-reachable surface. Accepted as sufficient per Ben’s ruling, following BL-575’s own precedent for a named residual verification gap.",
+                    "result_metric": "render-confirmed via script capture; literal click owed (NR-593)"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: full tree build"
+                    ],
+                    "requirement": "derive_corp_rollups gains a recipe_registry parameter and computes the growth-track fields (reached_depth, reached_good, next_rung, missing_inputs) as pure data — shared by both dashboard hosts (the in-place accordion and the full-canvas takeover) through the one rollup_body() renderer, per BL-265’s established shared-body pattern.",
+                    "notes": "Full tree build (cmake --build build, every target, zero errors).",
+                    "result_metric": "4 new fields on corp_rollups, 1 new parameter on derive_corp_rollups"
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "code"
+                    ],
+                    "requirement": "A real, pre-existing UI defect found and fixed while authoring this item: ui::resource_name (src/ui/presentation.cpp) had NO entry for charcoal, iron_blooms or trade_goods_misc — explicit nulls left over from a \"still unauthored\" comment that predates BL-429 (2026-08-15) giving all three real producers and consumers, over a week stale. Every one of those three is exactly the kind of good this readout needs to name. Entries authored for all three, plus the four BL-585 goods (ceramics, dressed_stone, planks, tools) which would otherwise have rendered as \"(unnamed resource)\" the moment anything named them.",
+                    "notes": "Confirmed via the corp_rollup_production capture itself: \"via Iron Ore\" and \"Needs: Charcoal\" render as real names, not the fallback.",
+                    "result_metric": "7 resource_type entries authored (3 backfilled, 4 new)"
+                }
+            ]
+        },
+        {
+            "brief": "start-gate-audit",
+            "title": "A fresh ancient corp sees a stated, ruled opening — not an accidental one",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-589 (START_GATE_AUDIT) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (G5)"
+                    ],
+                    "requirement": "ITEM-SPANNING: measure what a fresh ancient corp (reached depth 0, no tech earned) can actually place, get Ben’s ruling on which of it should stay open versus be earned (the item’s own “state the call, do not let it stand as a default” instruction), then assert the ruled opening exactly in chain_depth — not a narrower default this session might have preferred.",
+                    "notes": "Measured via a live-Lua probe (temporary CMake target, built/run/deleted): five processing groups open at tick 0 (Metal Foundry via the any-band escape, Fuel Production, Food Processing, Artisan Goods, Construction Materials), wider than the item’s own “extraction, one food, one fuel” first cut. Elicitation form put five concrete calls to Ben; the ruling closed only Metal Foundry’s refined_copper (via a new tech gate, E0-EC-03) and left every other group as measured. chain_depth’s new G5 row: 4/4 pass — the ruled open/closed state matches exactly, refined_copper reads tech_locked at tick 0, and E0-EC-03 genuinely resolves (not a permanent orphan) once its own predicate is met.",
+                    "result_metric": "1 recipe newly gated (refined_copper); 4 groups left open as ruled; 4/4 G5 assertions"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: full tree build",
+                        "headless: tech_gate_harness",
+                        "headless: tech_effect_union_harness",
+                        "headless: construction_gate_harness",
+                        "headless: construction_harness",
+                        "headless: corp_ai_harness",
+                        "headless: recipe_switch_harness",
+                        "headless: price_band_harness",
+                        "headless: save_roundtrip",
+                        "headless: determinism_harness",
+                        "headless: spectator_determinism"
+                    ],
+                    "requirement": "The new gate (E0-EC-03) integrates cleanly with the whole tech-gate/depth-gate machinery BL-588 built — no regression to any existing gate, the recipe-unlock filter, or determinism.",
+                    "notes": "Full tree build (every target, zero errors) and 11 harnesses all clean. spectator_determinism’s golden held — no re-bless needed (the new gate’s predicate is not satisfied in that harness’s scenario).",
+                    "result_metric": "0 regressions across 11 harnesses"
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "observation, filed"
+                    ],
+                    "requirement": "A real coverage gap found while authoring this item’s gate, recorded rather than silently left or over-scoped into a fix: tech_gate_harness.cpp only exercises E0-ML-01 directly; the three economy gates (E0-EC-01/E1-EC-01 from BL-588, E0-EC-03 from this item) are proven correct only indirectly, scattered across three other harnesses.",
+                    "notes": "Filed as NR-594 rather than expanded into this item’s scope — no gap has actually bitten (E1-EC-01’s own defect WAS caught, just incidentally by T3 rather than a dedicated row), but the collision surface grows with each gate.",
+                    "result_metric": "1 observation filed (NR-594)"
+                }
+            ]
+        },
+        {
+            "brief": "build-door-wide-roster",
+            "title": "The Build door filters a tech-locked recipe the same way it already filters era- and depth-locked ones",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-593 (BUILD_DOOR_WIDE_ROSTER) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "visual (partial — see notes)",
+                        "code"
+                    ],
+                    "requirement": "ITEM-SPANNING: put the item’s own named design call (filtered-out versus shown-and-locked for a tech-locked recipe) to Ben, with the current code-level facts stated first (Rule 0b) — the candidate filter never checked recipe_unlocked at all, so refined_copper (tech-locked since BL-589) was showing as a normal buildable option with no explanation for why placing it would fail.",
+                    "notes": "Ruling: filtered out, matching the existing era_locked/depth_locked precedent. Implemented as a third clause on the SAME removal predicate (selection_panel.cpp) that already carried the other two — recipe_unlocked(w, reg, w.player_entity, c.recipe). Not visually confirmed showing the group actually disappearing: two separate, pre-existing infra gaps blocked it (NR-595) — computer-use cannot reach the custom ProjectIo.exe (same gap as NR-593), and the tile build ledger’s dynamic window title does not match any of scroll_panel’s fixed names, so the column could not be scrolled to bring Metal Foundry into frame in a --verify capture. The code change itself mirrors an already-verified pattern exactly (one more clause on an existing, tested predicate), which is why it is accepted as complete rather than blocked.",
+                    "result_metric": "1 clause added to an existing 2-clause filter predicate"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: construction_gate_harness",
+                        "headless: construction_harness",
+                        "headless: chain_depth",
+                        "headless: tech_gate_harness",
+                        "headless: corp_ai_harness",
+                        "headless: recipe_switch_harness",
+                        "headless: full tree build"
+                    ],
+                    "requirement": "The filter change integrates cleanly — no regression to construction, the tech gates, the depth ladder, or the AI scorer, none of which this UI-only change should have touched.",
+                    "notes": "Full tree build (every target, zero errors) and 6 relevant headless harnesses clean — none of them exercise selection_panel.cpp (a GUI-only file), so this confirms the surrounding machinery (recipe_unlocked, the tech gates, construct_building) is unaffected, not the UI change itself.",
+                    "result_metric": "0 regressions"
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "code"
+                    ],
+                    "requirement": "Owed alongside the code, per the item’s own list: question_log.json and ACTIONS.json updated for the changed behavior.",
+                    "notes": "question_log.json’s selection_panel entry updated in place. ACTIONS.json’s gameplay.construct precondition corrected — it described only the ORIGINAL structure-level tech lock (military_base/E0-ML-01) and was silent on the two recipe-level gates BL-588/BL-589 shipped and on the fact that a locked structure still shows a row while a locked recipe does not (an AI agent reading the old text would not know the ledger can now hide a candidate entirely). Corrected rather than left stale.",
+                    "result_metric": "2 doc entries updated, 1 real staleness in ACTIONS.json fixed"
+                }
+            ]
+        },
+        {
+            "brief": "roster-breadth-guard",
+            "title": "The sprint’s breadth invariants, gathered into the harness that already owns them",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-592 (ROSTER_BREADTH_GUARD) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (R2)"
+                    ],
+                    "requirement": "R2 gains a second price vector (fuel-cheap, fuel-dear) so a method that is only better “depending on which market it builds to” is not misread as dominated under one fixed snapshot; a pair is flagged only if dominated under BOTH regimes.",
+                    "notes": "13 sibling pairs, 10 supply routes, 1 precondition, 2 interchangeable methods, 0 dominated — unchanged from the single-vector reading, since both existing methods (Coking Kiln, Bessemer Converter) already win on chain depth alone. Confirmed non-vacuous (anti-vacuity check passes) and the dual-vector logic is exercised on every method pair, not a no-op.",
+                    "result_metric": "2 price vectors, 0 dominated under both"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (R3)"
+                    ],
+                    "requirement": "A materials row: every named building’s BL-590 material override is obtainable in its own band — generic over the whole roster (every extraction target, every processing recipe), not a hand-picked list, so a future override earns the check for free.",
+                    "notes": "18 named buildings carry an override (5 extraction targets, 13 processing recipes — matches BL-590’s authored count exactly), 0 offenders. Anti-vacuity confirms the row actually found overrides to check, not an empty set.",
+                    "result_metric": "18 buildings checked, 0 offenders"
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (G5, R1, R1b)"
+                    ],
+                    "requirement": "The start-gate row (BL-589’s G5) and the orphan rows (R1/R1b) are named as this item’s own requirement rather than assumed to still pass — both already exist and already pass, built by earlier items in this sprint.",
+                    "notes": "No new code: G5 was BL-589’s own row, R1/R1b predate this sprint. Named here per the item’s own instruction (“the rows already exist, but they ARE the sprint’s admission rule and should be named in its requirement rather than assumed”) and reconfirmed green in this item’s own full-suite run.",
+                    "result_metric": "3 pre-existing rows reconfirmed, 0 new code"
+                },
+                {
+                    "id": "R4",
+                    "status": "complete",
+                    "verification": [
+                        "code"
+                    ],
+                    "requirement": "The new rows are named in .claude/skills/verifier-headless/SKILL.md, part of this item per CLAUDE.md § Tool creation is skill creation — not a follow-up.",
+                    "notes": "G5 and R3 entries added. Also corrected two claims that had gone stale since the entry was last touched (R1 reported “ships RED on eight resources”, now green since NR-257; R2 reported “0 interchangeable methods”, now 2 since BL-587) — found while updating the adjacent text, fixed rather than left beside the new content.",
+                    "result_metric": "2 new row entries, 2 stale claims corrected"
+                }
+            ]
+        },
+        {
+            "brief": "ancient-roster-slice-2",
+            "title": "BL-586 slice 2 — the hides/fibre chain completes the ancient roster table",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-586 (ANCIENT_ROSTER_WIDE) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (R1, R1b)"
+                    ],
+                    "requirement": "Tannery (hides -> leather), Weaver (fibre -> cloth) and Shipwright (planks + cloth -> rigging) complete the design table’s remaining three chains; no orphan resource in either direction, band-reachable.",
+                    "notes": "47 resources total (up from 42), 0 unobtainable, 0 unwanted; R1b shows 0 stranded beyond the pre-existing 5 tracked space-era gaps. 23 named buildings now carry a material override (up from 18).",
+                    "result_metric": "47 resources, 0 orphans, 23 named buildings"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (D6/G1 depth report)"
+                    ],
+                    "requirement": "Depth is the point, not a side effect (the item’s own instruction): the deepest new chain should clear depth 2, confirmed by the harness’s own report, not hand-computed.",
+                    "notes": "leather and cloth land at depth 1 (one step above their depth-0 raw); Shipwright/rigging lands at depth 2 (max(depth(planks)=1, depth(cloth)=1) + 1), the roster’s first chain past the earlier Toolmaker-only depth-2+ example within this item’s own new content.",
+                    "result_metric": "rigging at depth 2"
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "code",
+                        "design ruling (elicitation form, 2026-08-24)"
+                    ],
+                    "requirement": "hides’ deposit-generation mechanism and fibre’s were unsettled design calls (cover-based vs endemic; new resource vs reuse) — put to Ben rather than assumed, before any code.",
+                    "notes": "Ruled: hides ENDEMIC (like furs — lat/sector-restricted, richness-scored, terrain_cover::grass); fibre ORDINARY cover-based/biotic (grass/marsh, alongside agricultural_produce, no rarity gate); Shipwright’s output a new named good (“rigging”) rather than reusing trade_goods_misc; whole slice built in one pass rather than split further.",
+                    "result_metric": "4 design calls ruled before implementation"
+                },
+                {
+                    "id": "R4",
+                    "status": "complete",
+                    "verification": [
+                        "headless: save_roundtrip, spectator_determinism"
+                    ],
+                    "requirement": "world_save_version bumps for the structural resource_count widening (9 -> 10), a refused-predecessor row proves the old format is rejected, and the spectator-mode golden is re-blessed only after confirmed reproducibility across independent builds.",
+                    "notes": "save_roundtrip P14 confirms a v9 stream is refused. spectator_determinism’s k_unspectated_golden re-blessed to 71273F6FEDE03965, confirmed across two independent builds.",
+                    "result_metric": "1 new P-row, 1 re-blessed golden"
+                },
+                {
+                    "id": "R5",
+                    "status": "complete",
+                    "verification": [
+                        "headless: spectator_determinism",
+                        "design ruling"
+                    ],
+                    "requirement": "A real regression found by the resource_count widening (spectator_determinism’s R1 A/B family-coverage check breaking, unrelated to this item’s new content) is differentially proven, not silently patched, and put to Ben before any fix.",
+                    "notes": "Differential test (recipes.lua/economy.lua reverted to pre-slice-2, enum width unchanged) reproduced the identical failure and hash, isolating the cause to the bare width change. Ben ruled the check retired (commented, with full provenance, not deleted or weakened) rather than patched around — filed as NR-596, with a follow-up note owed to io-standing-rules.md’s BL-409 section on what the harness still guarantees.",
+                    "result_metric": "1 regression differentially isolated, 1 check retired on ruling"
+                }
+            ]
+        },
+        {
+            "brief": "roster-playthrough-and-cut",
+            "title": "BL-594 — the sprint’s own done-definition, played rather than asserted",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-594 (ROSTER_PLAYTHROUGH_AND_CUT) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "visual: live click, computer-use against the built exe"
+                    ],
+                    "requirement": "A fresh ancient corp is offered the authored opening set and no more (BL-589) — a live click, not a scripted capture.",
+                    "notes": "Confirmed across TWO separate generated worlds/corps. The Build door on a fresh corp shows only extraction targets, Infrastructure, and a reason-coded-locked Military Base (“Locked - the technology that permits...”); never a filtered-out recipe standing in as a processing group’s representative.",
+                    "result_metric": "2 corps/worlds checked, 0 unruled rows shown"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "visual: live click"
+                    ],
+                    "requirement": "Building a fuel route makes the next rung placeable, legible from the dashboard readout (BL-591), not from a wiki.",
+                    "notes": "The corporation dashboard’s growth track read live, plain text, on both corps tried: “Reached depth 0, via Agricultural Produce. Next: Bloomery, Shipwright. Needs: Iron Ore, Charcoal, Planks, Cloth.” BL-586 slice 2’s Shipwright named as a live next-rung candidate.",
+                    "result_metric": "2/2 corps show a legible growth track"
+                },
+                {
+                    "id": "R3",
+                    "status": "partial",
+                    "verification": [
+                        "visual: live click attempted"
+                    ],
+                    "requirement": "A method choice is made for a stated reason about which market the output is going to (BL-587), and a tech gate resolves and opens a different recipe (BL-588) — both as live clicks.",
+                    "notes": "NOT reached live this session — both need more simulated economy time (earning a tech’s stockpile/surplus predicate) than one sitting’s clock-advance covered. The first corp tried (Cr -5.9k starting debt) could not afford to build anything at all, a real but non-defect finding about starting-solvency variance across seeds. Ben’s ruling: accept as substantially confirmed, close now rather than push further.",
+                    "result_metric": "0/2 reached live; deferred by ruling, not silently dropped"
+                },
+                {
+                    "id": "R4",
+                    "status": "complete",
+                    "verification": [
+                        "visual: live click"
+                    ],
+                    "requirement": "A building is placed whose material basket is not steel (BL-590) — an actual successful construction click, not an assertion.",
+                    "notes": "Clay Pit built live (“Construction started”, 103cr against a 257cr balance) on the solvent second corp. Confirms the general build flow and BL-590’s per-building material-cost lookup work end to end in the running app, not only in a harness.",
+                    "result_metric": "1 live construction, general flow confirmed"
+                },
+                {
+                    "id": "R5",
+                    "status": "complete",
+                    "verification": [
+                        "code"
+                    ],
+                    "requirement": "The v0.1.17 cut: ROADMAP.md’s done-definition written at the cut (NR-103), MANUAL.md gains the ancient roster and the earned locks, sprints.json’s Sprint 17 entry closed with a retro.",
+                    "notes": "ROADMAP.md’s v0.1.17 bullet carries a done-definition naming what shipped and what was explicitly excluded. MANUAL.md §4.4 gained the three-lock model (era/depth/tech) and the growth-track readout. sprints.json closed below.",
+                    "result_metric": "3 docs updated at the cut"
+                },
+                {
+                    "id": "R6",
+                    "status": "complete",
+                    "verification": [
+                        "visual: live click, reported not fixed"
+                    ],
+                    "requirement": "Real findings surfaced by the live playthrough are reported, not silently absorbed or silently dropped.",
+                    "notes": "NR-597: the corp-selection screen’s per-row “Choose” buttons do not respond to clicks, reproduced 2-for-2 across two sessions; Ben’s ruling: not urgent, logged (KNOWN_BUGS.md is retired) rather than filed as a backlog item. One LOW-CONFIDENCE, unreproduced anomaly also reported: a full-canvas takeover control once returned the app to the main menu in the very first session, not reproduced on two later clean attempts of the same control.",
+                    "result_metric": "1 confirmed defect logged, 1 unreproduced anomaly reported honestly"
+                }
+            ]
         }
     ]
 }

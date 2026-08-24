@@ -186,13 +186,25 @@ that body (`corp_body_pools`) — `construct_building` returns `insufficient_mat
 resources are absent, so the requirement is surfaced up front rather than only on a failed
 click.
 
-**Rejection is reason-coded, not silent.** `placement_rules::can_place[_in_world]` return a
-`placement_result` — a `placement_reason` enum plus human string, implicitly convertible to
-`bool` — so an invalid type shows *why* (`Cannot build on water`, `No extractable deposit
-here`, `A port must sit on the coast`, …). The same reason string follows the cursor as a
-**"why not here"** label under the armed placement ghost on the Planetary canvas, and the
-placement-suitability surface (LENSES.md § Placement-suitability surface) reads the same
-`placement_rules` seam. One vocabulary, three surfaces.
+**Rejection is reason-coded, not silent** — for a row the ledger actually shows. A DIFFERENT
+class of refusal never becomes a row at all: `construction_result::era_locked`,
+`depth_locked` and (since BL-593) `tech_locked` are filtered out of the candidate list before
+it renders, on one repeated argument stated in the filter's own code comment — *"the door not
+showing what the gate would refuse."* All three lock kinds resolve differently (never
+available at all / earned by building / earned by research, PRODUCTION.md § Chain depth) but
+share the same door-side treatment: not a reason string, an absent row. `refined_copper`
+(`E0-EC-03`, BL-589) was the first recipe the tech clause actually removed — every earlier
+tech gate targeted a `building_type`, never a recipe, so the branch was dead code until then.
+Filtered was the ruled choice over shown-and-locked (Ben, 2026-08-24) — extending the existing
+era/depth precedent rather than adding a new lock-reason string and UI affordance.
+
+`placement_rules::can_place[_in_world]` return a `placement_result` — a `placement_reason`
+enum plus human string, implicitly convertible to `bool` — so an invalid type that DOES survive
+the filter shows *why* (`Cannot build on water`, `No extractable deposit here`, `A port must
+sit on the coast`, …). The same reason string follows the cursor as a **"why not here"** label
+under the armed placement ghost on the Planetary canvas, and the placement-suitability surface
+(LENSES.md § Placement-suitability surface) reads the same `placement_rules` seam. One
+vocabulary, three surfaces — for the buildings the door was willing to name at all.
 
 **Placement-time coexistence with the Construction panel.** These readouts are read *while a
 build is armed* — exactly when the Construction panel is open. The Selection element occupies

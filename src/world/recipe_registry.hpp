@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -570,6 +571,39 @@ public:
         return m_building_econ[static_cast<std::size_t>(type)];
     }
 
+    /// BL-590: the material cost for a SPECIFIC named building, falling back
+    /// to `economics(type).resource_build_cost` when no override is authored.
+    /// `extraction_site` is keyed by its `target_resource`, `processing_facility`
+    /// by its recipe id — the same two identities every other per-building
+    /// lookup in this codebase already uses (a building's TYPE says what kind
+    /// of thing it is; its target/recipe says which named building it is).
+    /// No building_type parameter is needed in the override keys themselves:
+    /// only `extraction_site` ever carries a target and only
+    /// `processing_facility` ever carries a recipe, so the type dispatch below
+    /// is unambiguous without one.
+    ///
+    /// The single lookup every material-cost call site goes through, so a
+    /// preview (the Build door's capex, the management view's rate) can never
+    /// disagree with the real per-tick draw — the same argument BL-436 makes
+    /// about richness, applied here to materials.
+    const std::array<float, resource_count>&
+    resource_build_cost_for(building_type type, resource_type target, std::uint16_t recipe) const
+    {
+        if (type == building_type::extraction_site)
+        {
+            const auto it = m_extraction_material_overrides.find(target);
+            if (it != m_extraction_material_overrides.end())
+                return it->second;
+        }
+        else if (type == building_type::processing_facility)
+        {
+            const auto it = m_processing_material_overrides.find(recipe);
+            if (it != m_processing_material_overrides.end())
+                return it->second;
+        }
+        return economics(type).resource_build_cost;
+    }
+
     float t_full() const { return m_t_full; }
     float t_idle() const { return m_t_idle; }
 
@@ -809,6 +843,19 @@ public:
     {
         m_building_econ[static_cast<std::size_t>(type)] = e;
     }
+    /// BL-590: test-construction setters for the per-named-building material
+    /// overrides, mirroring `set_economics` above — a harness builds these by
+    /// hand rather than going through `load_from_lua`.
+    void set_extraction_material_override(resource_type target,
+                                          const std::array<float, resource_count>& cost)
+    {
+        m_extraction_material_overrides[target] = cost;
+    }
+    void set_processing_material_override(std::uint16_t recipe,
+                                          const std::array<float, resource_count>& cost)
+    {
+        m_processing_material_overrides[recipe] = cost;
+    }
     void set_logistics_cost(convoy_mode m, float v)
     {
         m_logistics_costs[static_cast<std::size_t>(m)] = v;
@@ -957,6 +1004,14 @@ private:
     /// launchpad / inland_logistics_hub / military_base / research_institute — BL-332
     /// bumped the count 7 → 8).
     std::array<building_economics, 8> m_building_econ = {};
+
+    /// BL-590: per-named-building material overrides, populated by `load_from_lua`
+    /// from `buildings.extraction_site.material_overrides` /
+    /// `buildings.processing_facility.material_overrides`. See
+    /// `resource_build_cost_for`'s comment for why no building_type is needed
+    /// in either key.
+    std::map<resource_type, std::array<float, resource_count>> m_extraction_material_overrides;
+    std::map<std::uint16_t, std::array<float, resource_count>> m_processing_material_overrides;
 
     float m_t_full = 1.0f;
     float m_t_idle = 0.2f;

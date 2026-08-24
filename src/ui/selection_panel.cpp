@@ -27,6 +27,7 @@
 #include "world/province.hpp"        // BL-534: province membership + BL-513 building ceiling
 #include "world/recipe_registry.hpp" // recipe/economics lookups for the building element
 #include "world/survey_system.hpp"
+#include "world/tech_gate.hpp"       // BL-593: recipe_unlocked — the door filters what the gate would refuse
 #include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324); also the Soldier card's Roster page name lookup
 
 #include <map> // BL-434: group -> representative-candidate lookup in draw_construction_ledger
@@ -269,12 +270,15 @@ void draw_revenue_expense_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const build
 // card. A local mirror of the world-side formula, not a call into it, because the UI
 // is const and only needs the read.
 float construction_rate(const world& w, const recipe_registry& reg,
-                        building_type type, entity_id tile)
+                        building_type type, resource_type target, uint16_t recipe,
+                        entity_id tile)
 {
     const building_economics& econ = reg.economics(type);
     const float duration = econ.build_duration_ticks;
     if (duration <= 0.0f)
         return 1.0f; // instant build — never material-gated
+    // BL-590: the material cost specific to THIS named building.
+    const auto& material_cost_row = reg.resource_build_cost_for(type, target, recipe);
 
     const market_component* m = nullptr;
     const entity_id mid = market_for_tile(w, tile);
@@ -288,7 +292,7 @@ float construction_rate(const world& w, const recipe_registry& reg,
     float rate = 1.0f;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        const float need = econ.resource_build_cost[r] / duration;
+        const float need = material_cost_row[r] / duration;
         if (need <= 0.0f)
             continue;
         const float avail = m ? m->supply[r] : 0.0f;
@@ -1511,7 +1515,7 @@ void draw_building_status_page(const world& w, const recipe_registry& reg, entit
     ImGui::Text("%s", building_type_name(b.type));
     if (b.ticks_remaining > 0)
     {
-        const float rate = construction_rate(w, reg, b.type, b.tile);
+        const float rate = construction_rate(w, reg, b.type, b.target_resource, b.recipe, b.tile);
         ImGui::TextColored(construction_status_colour(rate), "%s",
                            construction_status(rate, b.ticks_remaining).c_str());
     }
@@ -3505,15 +3509,28 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     // (depth_locked), so the door should not offer it either. Ancient-band
     // recipes only, per the 2026-08-16 first-cut ruling — an `any`-band recipe is
     // never depth-filtered.
+    //
+    // BL-593 adds the third: a recipe locked by `recipe_unlocked` (BL-588's
+    // tech-recipe gate — the growth track and the era/depth ones are three
+    // independent locks) is dropped the same way, regardless of band. Ben's
+    // ruling (2026-08-24, the same shape as the era/depth precedent above, not
+    // a new one): filtered out, not shown-and-locked — "the door not showing
+    // what the gate would refuse" is the standing argument, unchanged by this
+    // item. `refined_copper` (E0-EC-03, BL-589) is the first recipe this
+    // clause actually removes; before it, every tech gate targeted a
+    // building_type, never a recipe, so this branch was dead code on every
+    // prior campaign.
     const int reached = [&]
     {
         const auto it = w.corporations.find(w.player_entity);
         return (it != w.corporations.end()) ? corp_reached_depth(it->second, reg) : 0;
     }();
     cands.erase(std::remove_if(cands.begin(), cands.end(),
-                               [&reg, reached](const candidate& c)
+                               [&w, &reg, reached](const candidate& c)
                                {
                                    if (!reg.building_available(c.type))
+                                       return true;
+                                   if (!recipe_unlocked(w, reg, w.player_entity, c.recipe))
                                        return true;
                                    const recipe* rc = reg.get_recipe(c.recipe);
                                    if (!rc || rc->era != era_band::ancient)
@@ -3543,16 +3560,18 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         c.pr = placement_rules::can_place_in_world(w, tile_id, c.type, c.target,
                                                   ui.max_logistics_reach,
                                                   w.player_entity);
-        c.material_rate = construction_rate(w, reg, c.type, tile_id); // BL-328 pre-commit warning
+        c.material_rate = construction_rate(w, reg, c.type, c.target, c.recipe, tile_id); // BL-328 pre-commit warning
 
         // Capex is the figure construction.cpp actually gates on: build cost PLUS the
         // materials priced at the local market. This ledger used to gate on build_cost
         // alone, so between the two figures it offered an enabled Build button that
         // then failed with nothing but a post-hoc toast.
         c.capex = econ.build_cost;
+        // BL-590: the material cost specific to THIS named building.
+        const auto& material_cost_row = reg.resource_build_cost_for(c.type, c.target, c.recipe);
         for (std::size_t ri = 0; ri < resource_count; ++ri)
-            if (econ.resource_build_cost[ri] > 0.0f)
-                c.capex += econ.resource_build_cost[ri] * price(ri);
+            if (material_cost_row[ri] > 0.0f)
+                c.capex += material_cost_row[ri] * price(ri);
 
         c.produces = (c.type == building_type::extraction_site ||
                       c.type == building_type::processing_facility);

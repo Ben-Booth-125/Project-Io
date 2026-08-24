@@ -128,6 +128,15 @@ constexpr const char* k_resource_slugs[] = {
     "consumer_goods",          // 35
     "medical_supplies",        // 36
     "ordnance",                // 37
+    "ceramics",                // 38
+    "dressed_stone",           // 39
+    "planks",                  // 40
+    "tools",                   // 41
+    "hides",                   // 42
+    "fibre",                   // 43
+    "leather",                 // 44
+    "cloth",                   // 45
+    "rigging",                 // 46
 };
 static_assert(std::size(k_resource_slugs) == static_cast<std::size_t>(resource_type::count),
               "resource_type grew - append its slug to k_resource_slugs (and keep the order)");

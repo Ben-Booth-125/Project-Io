@@ -277,10 +277,13 @@ in `tools/verify/README.md`.
   `planetology::endemics` in `tile_generation.cpp`, which is *not* in `k_extractable` and whose
   omission makes all four endemics read as orphans) and wanted (a recipe consumes it, or a named
   actor does via an **explicit** exemption table, so an orphan cannot hide as an assumed terminal).
-  **This row ships RED on eight resources and that is the check working** — five of them
-  (grain, fodder, salt, transport_capacity, bullion) are orphaned in both directions and are exactly
-  the BL-286 "behaviour unfiled" values BL-432 was filed over; three more (platinum_group_metals,
-  regolith, machinery) are obtainable but unconsumed. See NR-257 for the content decision.
+  **Shipped RED on eight resources when this row was authored, which was the check working** — five
+  of them (grain, fodder, salt, transport_capacity, bullion) were orphaned in both directions and were
+  exactly the BL-286 "behaviour unfiled" values BL-432 was filed over; three more
+  (platinum_group_metals, regolith, machinery) were obtainable but unconsumed. See NR-257 for the
+  content decision. **Green as of 2026-08-24** — the five were deleted (NR-257), the three given
+  consumers, and every good BL-585's ancient-goods append and BL-586's roster slice added since has
+  landed with both a producer and a consumer in the same change, per this row's own admission rule.
 
   **R2 — no dominant production method, between recipes a corp can actually choose between.** The
   grouping is the whole content of this row. `recipe_switch_harness`'s old R1 grouped by (primary
@@ -290,14 +293,43 @@ in `tools/verify/README.md`.
   precondition. All four were grouping artefacts, and no recipe magnitude was changed (NR-258). Every
   sibling pair is now bucketed as a supply route, an explicitly-exempted precondition pair, or a
   genuine interchangeable method, and **only the third is price-compared**; bucketing every pair is
-  what stops a pair escaping by being unclassifiable, and the counts print on every run. Current
-  reading: **4 sibling pairs — 3 supply routes, 1 precondition, 0 interchangeable methods**, so the
-  dominance half currently guards an empty set and will only bite once BL-430's own alternates are
-  authored. The duplicate in `recipe_switch_harness` was **deleted**, not left as a second answer.
+  what stops a pair escaping by being unclassifiable, and the counts print on every run. The duplicate
+  in `recipe_switch_harness` was **deleted**, not left as a second answer.
+
+  **Current reading (2026-08-24, BL-587/589): 13 sibling pairs — 10 supply routes, 1 precondition, 2
+  interchangeable methods, 0 dominated.** The two — `charcoal_from_kiln` "Coking Kiln" and
+  `steel_bessemer` "Bessemer Converter" — are BL-587's first genuine alternates, each trading BL-430's
+  chain-depth axis (cheaper by the reference snapshot, but gated behind a reagent that needs the
+  shallow route's own chain to have already run once).
+
+  **Two price vectors, not one, since BL-592.** A single fixed snapshot cannot see a method that is
+  only better "depending on which market it builds to" — it would read as dominated under the one
+  regime tested even though a corp on a different deposit mix would genuinely prefer it. `fuel_cheap`
+  and `fuel_dear` bracket the axis BL-587's own methods trade on; a pair is only flagged **dominated
+  if BOTH regimes agree** — "must win under at least one," restated as its negation. Neither of the
+  two existing methods needed the second vector to pass (both already win on chain depth alone,
+  independent of price), so this is forward guard-rail for BL-586's still-widening roster, not a
+  currently-failing case it fixed.
 
   **Run it with the unmasked band.** Both R rows call `set_era(era_band::any)`. `industrial` is a
   band like any other and hides the entire ancient roster — measured mid-build, that misreported
   charcoal, iron_blooms, timber, clay and peat as orphans and hid two of the four sibling pairs.
+
+  **G5 — the start gate: a RULED opening, exactly, and nothing stranded** (BL-589, 2026-08-24).
+  A fresh ancient corp (reached depth 0, no tech earned) is walked against a table of the opening
+  Ben actually ruled — not a narrower first-cut guess — and every recipe outside the one deliberate
+  lock (`refined_copper`, gated by `E0-EC-03`) must match its ruled open/closed state exactly. Then
+  proves the lock is not a permanent orphan: builds a corp meeting `E0-EC-03`'s own authored
+  predicate (one processing facility, Cr 400+ surplus), calls `advance_tech_gates`, and confirms the
+  gate resolves and `recipe_unlocked` flips. Four assertions, all currently green.
+
+  **R3 — every named building's material basket is obtainable in its own band** (BL-590/BL-592,
+  2026-08-24). A per-building material override (BL-590) could name a good only the industrial arc
+  makes for an ancient building — unbuildable at 0 CE, and nothing else in this suite would catch
+  it, since R1/R1b ask whether a good is obtainable SOMEWHERE, not in the SAME band as the specific
+  building that costs it. Generic over the whole roster — every extraction target and every recipe
+  `resource_build_cost_for` can be called on, not a hand-picked list — so a future override earns
+  this check for free. **18 named buildings carry an override, 0 offenders** as of 2026-08-24.
 - **`player_seed_sweep`** — Which seeds hand the PLAYER a corp worth playing? A live-Lua sweep (real
   `scripts/recipes.lua` + `economy.lua`, real economy ticks) that generates one world per seed and
   reports, per seed, the player corp's buildings by type, its opening and post-warm-start balance,

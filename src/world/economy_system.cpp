@@ -8,6 +8,7 @@
 #include "market_clearing.hpp" // market_for_tile (BL-095 construction gate)
 #include "placement_rules.hpp" // stack_output_scalar (BL-193 building stacks)
 #include "stance.hpp"          // is_hostile (BL-470's NR-344: war flips the march queue)
+#include "tech_gate.hpp"       // recipe_unlocked (BL-588)
 #include "unit_roster.hpp"     // resolve_unit_upkeep (BL-454 unit pass), unit_roster_table (BL-470)
 #include "workforce.hpp"
 
@@ -590,6 +591,8 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         const building_economics& econ = reg.economics(b.type);
         const float duration           = econ.build_duration_ticks;
         if (duration <= 0.0f) { b.ticks_remaining = 0; continue; } // instant safety
+        // BL-590: the material cost specific to THIS named building.
+        const auto& material_cost_row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
 
         // BL-130: read the market's REAL persistent inventory — what is actually
         // on hand from prior ticks' sales — rather than last tick's cleared
@@ -603,7 +606,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         float rate = 1.0f;
         for (std::size_t r = 0; r < resource_count; ++r)
         {
-            const float need = econ.resource_build_cost[r] / duration;
+            const float need = material_cost_row[r] / duration;
             if (need <= 0.0f)
                 continue;
             const float avail = m ? std::max(0.0f, m->inventory[r]) : 0.0f;
@@ -628,7 +631,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             auto& want = report.wants[std::make_pair(corp, body)];
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                const float need = econ.resource_build_cost[r] / duration;
+                const float need = material_cost_row[r] / duration;
                 if (need > 0.0f)
                     want[r] += need;
             }
@@ -647,7 +650,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             auto& bought = report.purchases[std::make_pair(corp, body)];
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                const float need = econ.resource_build_cost[r] / duration;
+                const float need = material_cost_row[r] / duration;
                 if (need <= 0.0f)
                     continue;
                 const float drawn = need * rate;
@@ -739,6 +742,13 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
         if (need < 0 || need > corp_reached_depth(cit->second, reg))
             return recipe_switch_result::depth_locked;
     }
+
+    // BL-588 tech-recipe gate, mirroring construct_building's — SAME reason
+    // the depth gate above sits at both doors: guarding only placement leaves
+    // the one-click bypass (place the ungated method, retool onto the
+    // tech-locked one in the same group).
+    if (!recipe_unlocked(w, reg, corp, new_recipe_id))
+        return recipe_switch_result::tech_locked;
 
     const float cost = sw.switch_cost;
     if (cit->second.balance < cost)

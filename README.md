@@ -112,7 +112,17 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest releases — v0.1.1, v0.1.2, v0.1.8, v0.1.9, v0.1.10, v0.1.14 and v0.1.15
+## Latest releases — v0.1.1, v0.1.2, v0.1.8, v0.1.9, v0.1.10, v0.1.14, v0.1.15 and v0.1.17
+
+**v0.1.17 — the ancient roster becomes a ladder.** Seven named buildings is no longer a roster:
+Tannery, Weaver, Potter's Kiln, Sawmill, Stonemason, Toolmaker and Shipwright grow it to 23,
+across five new goods with their own construction materials rather than a shared steel default.
+Progression runs through methods, not tiers — a genuine alternate production route wins by market
+fit under either a cheap-fuel or a dear-fuel price regime, never both, and a tech can now unlock a
+specific recipe rather than only a whole building type. A fresh campaign opens onto a
+deliberately narrow start gate, and the corporation dashboard now reads the chain depth reached,
+the good that set it, and what's missing to build the next rung — the growth track is visible,
+not just a gate.
 
 **v0.1.15 — the mercenary vertical slice.** A polity hires the company, the company fights, the
 company is paid — playable end-to-end. Nations field static garrisons sized off their own

@@ -208,6 +208,20 @@ same kind of thing. `modifier_subject` does **not** grow subjects a levy could b
 
 None of the three maps onto either of the others.
 
+### The tech-gate effect union grew a third arm (BL-588, 2026-08-24)
+
+A DIFFERENT axis from the two-vocabulary split above: `tech_gate.hpp`'s own `tech_effect_kind` —
+what earning a tech DOES — had exactly two arms (`unlock_structure`, `modify_scalar`) until this
+item, so a tech could gate a *building type* but never the *method* a building already standing
+runs. `unlock_recipe` closes that: it names a `recipe::name` (never an id — ids are positional and
+a gate must survive a roster reorder), mirrored on `tech_gate::unlocks_recipe` the same way
+`unlocks_structure` already is, checked through `recipe_unlocked` at both `construct_building` and
+`try_switch_recipe` (guarding only placement leaves the retool bypass the depth gate's own comment
+already names). A recipe lock and a structure lock report the same `tech_locked` code on every
+seam — an agent cannot tell them apart, which is deliberate; the two stay distinct in MEANING, not
+in the code an agent reads. See `docs/economy/PRODUCTION.md` § Chain depth — the growth track for
+how this composes with the (separate) depth gate on the same recipe.
+
 ---
 
 ## `science` is REACHED, not SPENT

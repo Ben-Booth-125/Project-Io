@@ -26,12 +26,15 @@ namespace {
 // analog rate / ETA / paused status the Selection front door does. (Kept a local copy
 // rather than shared — the UI has no common header seam to hang it on.)
 float construction_rate(const world& w, const recipe_registry& reg,
-                        building_type type, entity_id tile)
+                        building_type type, resource_type target, uint16_t recipe,
+                        entity_id tile)
 {
     const building_economics& econ = reg.economics(type);
     const float duration = econ.build_duration_ticks;
     if (duration <= 0.0f)
         return 1.0f; // instant build — never material-gated
+    // BL-590: the material cost specific to THIS named building.
+    const auto& material_cost_row = reg.resource_build_cost_for(type, target, recipe);
 
     const market_component* m = nullptr;
     const entity_id mid = market_for_tile(w, tile);
@@ -45,7 +48,7 @@ float construction_rate(const world& w, const recipe_registry& reg,
     float rate = 1.0f;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        const float need = econ.resource_build_cost[r] / duration;
+        const float need = material_cost_row[r] / duration;
         if (need <= 0.0f)
             continue;
         const float avail = m ? m->supply[r] : 0.0f;

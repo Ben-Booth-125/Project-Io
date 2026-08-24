@@ -115,7 +115,25 @@ inline constexpr uint32_t world_save_magic =
 /// last section) — the same shape v7 used to add `mercenary_offers` onto v6.
 /// A v7 stream simply ends where this one continues, so it is refused whole
 /// on the same strict-equality contract as every prior bump.
-inline constexpr uint32_t world_save_version = 8;
+///
+/// Bumped to 9 by BL-585 (ancient goods append): four new `resource_type`
+/// values (`ceramics`, `dressed_stone`, `planks`, `tools`) widen
+/// `resource_count` 38 -> 42, which widens the length of EVERY per-resource
+/// `std::array<T, resource_count>` in the stream (stockpiles, prices, tile
+/// deposits, ...) rather than adding a trailing section — a structural
+/// change, not an additive one. `max_resource` (this file's enum-ceiling
+/// block) derives from `resource_count` automatically, so `r_enum` widens
+/// with it; nothing else needs touching. A v8 stream's arrays are the wrong
+/// length for a v9 reader, so it is refused whole on the same strict-equality
+/// contract as every prior bump — there is no migration to write.
+///
+/// Bumped to 10 by BL-586 slice 2 (hides/fibre/leather/cloth/rigging): five
+/// more new `resource_type` values widen `resource_count` 42 -> 47, the same
+/// structural class of move as the v8 -> v9 bump above — every per-resource
+/// array in the stream widens, not a trailing section. A v9 stream's arrays
+/// are the wrong length for a v10 reader, so it is refused whole on the same
+/// strict-equality contract as every prior bump.
+inline constexpr uint32_t world_save_version = 10;
 
 /// Write @p w as a complete world snapshot.
 ///
