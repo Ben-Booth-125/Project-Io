@@ -404,3 +404,30 @@ Requirements: `req/requirements.json` § build-door-wide-roster. Files: `src/ui/
    `construction_harness`, `chain_depth`, `tech_gate_harness`, `corp_ai_harness`,
    `recipe_switch_harness`) — none of them exercise `selection_panel.cpp` directly (a GUI-only
    file), so this confirms the surrounding machinery is unaffected, not the UI change itself.
+
+#### BL-592 — ROSTER_BREADTH_GUARD — COMPLETE 2026-08-24
+
+Requirements: `req/requirements.json` § roster-breadth-guard. Files: `tools/verify/chain_depth.cpp`,
+`.claude/skills/verifier-headless/SKILL.md`, `docs/economy/PRODUCTION.md`.
+
+1. **R2 grows a second reference-price vector** (fuel-cheap, fuel-dear) instead of one fixed
+   snapshot — a sibling pair is now flagged dominated only if it loses under BOTH regimes, so a
+   method that is only better “depending on which market it builds to” (Ben, 2026-08-23) is not
+   misread as dead content. Still 13 sibling pairs, 2 interchangeable methods, 0 dominated —
+   unchanged from the single-vector reading, since neither Coking Kiln nor the Bessemer Converter
+   needed the second vector (both already win on chain depth alone). A forward-looking guard-rail
+   for BL-586’s still-widening roster, not a fix to a currently-failing case.
+2. **New R3 row**: every named building’s BL-590 material override is obtainable in its own era
+   band — generic over the whole roster (every extraction target, every processing recipe) rather
+   than a hand-picked list, so a future override earns the check for free. 18 named buildings carry
+   an override (5 extraction, 13 processing — matches BL-590’s authored count exactly), 0 offenders.
+3. **G5 (BL-589’s start-gate row) and R1/R1b named as this item’s own requirement**, not assumed to
+   still pass — no new code, both already existed, both reconfirmed green in this item’s own
+   full-suite run.
+4. `.claude/skills/verifier-headless/SKILL.md` updated: new G5/R3 row descriptions added. Also
+   corrected two claims that had gone stale (R1’s “ships RED on eight resources”, now green since
+   `NR-257`; R2’s “0 interchangeable methods”, now 2 since `BL-587`) — found while editing the
+   adjacent text, fixed rather than left standing beside the new content.
+5. Full tree build clean; 8 relevant harnesses clean (`chain_depth`, `recipe_switch_harness`,
+   `price_band_harness`, `construction_gate_harness`, `construction_harness`, `corp_ai_harness`,
+   `save_roundtrip`, `determinism_harness`).

@@ -739,14 +739,32 @@ int main()
         reg.load_from_lua(lua);
         reg.set_era(era_band::any); // the whole authored roster — see R1's note
 
-        // Reference prices: world_gen.lua's base_price for the goods the sibling
-        // pairs actually use. A fixed snapshot — this asks about recipe SHAPE, not
-        // a moment's market state. Mirrors recipe_switch_harness's table.
-        auto reference_price = [](resource_type r) -> float {
+        // TWO reference-price snapshots (BL-592), not one. A single fixed vector
+        // cannot see a method that is only better "depending on which market it
+        // builds to" (Ben, 2026-08-23) — it reads as dominated under the one
+        // price regime tested, when a corp sitting on a different deposit mix
+        // would genuinely prefer it. `fuel_cheap` and `fuel_dear` bracket the
+        // axis BL-587's own methods trade on (timber/peat/coal locally abundant
+        // vs scarce); a genuine interchangeable method must win — not be
+        // dominated — under AT LEAST ONE of the two. Depth does not vary by
+        // price, so only cost is computed twice.
+        auto reference_price_cheap = [](resource_type r) -> float {
             switch (r)
             {
-                case resource_type::timber: return 1.5f;
-                case resource_type::peat:   return 1.2f;
+                case resource_type::timber: return 0.8f;
+                case resource_type::peat:   return 0.6f;
+                case resource_type::coal:   return 0.5f;
+                case resource_type::clay:   return 1.2f;
+                case resource_type::sand:   return 1.0f;
+                default:                    return 1.0f; // untabled input: neutral
+            }
+        };
+        auto reference_price_dear = [](resource_type r) -> float {
+            switch (r)
+            {
+                case resource_type::timber: return 3.0f;
+                case resource_type::peat:   return 2.5f;
+                case resource_type::coal:   return 2.5f;
                 case resource_type::clay:   return 1.2f;
                 case resource_type::sand:   return 1.0f;
                 default:                    return 1.0f; // untabled input: neutral
@@ -816,32 +834,42 @@ int main()
                     }
 
                     ++methods;
-                    float cost_a = 0.0f, cost_b = 0.0f;
+                    float cost_a_cheap = 0.0f, cost_b_cheap = 0.0f;
+                    float cost_a_dear  = 0.0f, cost_b_dear  = 0.0f;
                     int   depth_a = 0,   depth_b = 0;
                     for (std::size_t r = 0; r < resource_count; ++r)
                     {
                         const resource_type rt = static_cast<resource_type>(r);
                         if (ra.inputs[r] > 0.0f)
                         {
-                            cost_a += ra.inputs[r] * reference_price(rt);
+                            cost_a_cheap += ra.inputs[r] * reference_price_cheap(rt);
+                            cost_a_dear  += ra.inputs[r] * reference_price_dear(rt);
                             depth_a = std::max(depth_a, reg.depth_of(rt));
                         }
                         if (rb.inputs[r] > 0.0f)
                         {
-                            cost_b += rb.inputs[r] * reference_price(rt);
+                            cost_b_cheap += rb.inputs[r] * reference_price_cheap(rt);
+                            cost_b_dear  += rb.inputs[r] * reference_price_dear(rt);
                             depth_b = std::max(depth_b, reg.depth_of(rt));
                         }
                     }
-                    const bool a_dom = cost_a <= cost_b && depth_a <= depth_b &&
-                                       (cost_a < cost_b || depth_a < depth_b);
-                    const bool b_dom = cost_b <= cost_a && depth_b <= depth_a &&
-                                       (cost_b < cost_a || depth_b < depth_a);
-                    if (a_dom || b_dom)
+                    auto dominated_under = [&](float cost_a, float cost_b) {
+                        const bool a_dom = cost_a <= cost_b && depth_a <= depth_b &&
+                                           (cost_a < cost_b || depth_a < depth_b);
+                        const bool b_dom = cost_b <= cost_a && depth_b <= depth_a &&
+                                           (cost_b < cost_a || depth_b < depth_a);
+                        return a_dom || b_dom;
+                    };
+                    // Dominated only if BOTH price regimes agree — "must win
+                    // under at least one" restated as its negation.
+                    if (dominated_under(cost_a_cheap, cost_b_cheap) &&
+                        dominated_under(cost_a_dear, cost_b_dear))
                     {
                         ++dominated;
-                        std::printf("      DOMINATED METHOD: '%s' (cost %.1f, depth %d) vs '%s' (cost %.1f, depth %d)\n",
-                                    ra.name.c_str(), cost_a, depth_a,
-                                    rb.name.c_str(), cost_b, depth_b);
+                        std::printf("      DOMINATED METHOD under BOTH price regimes: '%s' "
+                                    "(cheap %.1f, dear %.1f, depth %d) vs '%s' (cheap %.1f, dear %.1f, depth %d)\n",
+                                    ra.name.c_str(), cost_a_cheap, cost_a_dear, depth_a,
+                                    rb.name.c_str(), cost_b_cheap, cost_b_dear, depth_b);
                     }
                 }
         }
@@ -853,7 +881,101 @@ int main()
         check(routes + exempted + methods > 0,
               "ANTI-VACUITY: the roster actually contains sibling pairs to classify");
         check(dominated == 0,
-              "no interchangeable method dominates a sibling on both input cost and chain depth");
+              "no interchangeable method dominates a sibling under BOTH price regimes "
+              "(fuel-cheap and fuel-dear) and chain depth");
+    }
+
+    // --- R3: every named building's material basket is obtainable in its own
+    // band (BL-590/BL-592) --------------------------------------------------
+    //
+    // A per-building override (BL-590) could name a good only the industrial
+    // arc makes for an ancient building — unbuildable at 0 CE, and nothing
+    // else in this suite would catch it: R1/R1b ask whether a good is
+    // obtainable SOMEWHERE, not whether it is obtainable in the SAME band as
+    // the specific building that costs it. Generic over the whole roster
+    // (every processing recipe, every extraction target `resource_build_cost_for`
+    // is ever called on), not a hand-picked list, so a future override earns
+    // this check for free rather than needing to be added to it.
+    std::printf("\nR3 - every named building's material basket is obtainable in its own band\n");
+    {
+        lua_state lua;
+        lua.load("scripts/recipes.lua");
+        lua.load("scripts/economy.lua");
+        recipe_registry reg;
+        reg.load_from_lua(lua);
+        reg.set_era(era_band::any);
+
+        std::vector<bool> extractable(resource_count, false);
+        for (const resource_type e : placement_rules::k_extractable)
+            extractable[static_cast<std::size_t>(e)] = true;
+        for (const resource_type e : { resource_type::tobacco, resource_type::spices,
+                                       resource_type::coffee,  resource_type::furs })
+            extractable[static_cast<std::size_t>(e)] = true;
+
+        // Obtainable in @p band: extractable (deposits are band-independent —
+        // world generation does not gate extraction by era, R1b's own note),
+        // OR produced by a recipe era_permits(band, ...) allows.
+        auto obtainable_in_band = [&](std::size_t r, era_band band) {
+            if (extractable[r])
+                return true;
+            const int n = reg.recipe_count(building_type::processing_facility);
+            for (int i = 0; i < n; ++i)
+            {
+                const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+                if (era_permits(band, rc.era) && rc.outputs[r] > 0.0f)
+                    return true;
+            }
+            return false;
+        };
+
+        std::vector<std::string> offenders;
+        int checked = 0;
+
+        // Extraction overrides: every extractable target, checked against the
+        // ancient band (the band this item's own overrides target).
+        for (const resource_type target : placement_rules::k_extractable)
+        {
+            const auto& def = reg.economics(building_type::extraction_site).resource_build_cost;
+            const auto& cost = reg.resource_build_cost_for(building_type::extraction_site,
+                                                            target, no_recipe);
+            if (cost == def)
+                continue; // no override authored for this target
+            ++checked;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (cost[r] > 0.0f && !obtainable_in_band(r, era_band::ancient))
+                    offenders.push_back("extraction target '" +
+                                        std::to_string(static_cast<int>(target)) +
+                                        "' costs resource " + std::to_string(r) +
+                                        ", unobtainable in the ancient band");
+        }
+
+        // Processing overrides: every ancient recipe, checked against ITS OWN
+        // band — the band a per-building override is authored for.
+        const int n = reg.recipe_count(building_type::processing_facility);
+        for (int i = 0; i < n; ++i)
+        {
+            const recipe&  rc  = reg.recipe_at(building_type::processing_facility, i);
+            const uint16_t rid = reg.recipe_id(rc.name);
+            const auto& def  = reg.economics(building_type::processing_facility).resource_build_cost;
+            const auto& cost = reg.resource_build_cost_for(building_type::processing_facility,
+                                                            resource_type::iron_ore, rid);
+            if (cost == def)
+                continue; // no override authored for this recipe
+            ++checked;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (cost[r] > 0.0f && !obtainable_in_band(r, rc.era))
+                    offenders.push_back("recipe '" + rc.name + "' costs resource " +
+                                        std::to_string(r) + ", unobtainable in its own band");
+        }
+
+        for (const std::string& o : offenders)
+            std::printf("      OFFENDER: %s\n", o.c_str());
+        std::printf("      %d named building%s carry a material override; %zu offender%s\n",
+                    checked, checked == 1 ? "" : "s", offenders.size(), offenders.size() == 1 ? "" : "s");
+
+        check(checked > 0, "ANTI-VACUITY: the roster actually authors per-building overrides");
+        check(offenders.empty(),
+              "every named building's material basket is obtainable in its own band");
     }
 
     std::printf("\n=== %s (%d failure%s) ===\n",

@@ -830,8 +830,12 @@ path to the same reagent) has already been run once, and its reference cost is l
 the guard's fixed snapshot does not price the reagent's own chain. A market where the reagent is
 scarce can still make the shallow route the better-run choice — the point Ben raised authoring
 this sprint (*"it's not always clear that a more advanced method is better, depending on which
-market it builds to"*) — which is why R2 is planned to grow a second price vector (BL-592) rather
-than trusting one snapshot as the final word.
+market it builds to"*), and which `R2` now checks under **two** price snapshots (`BL-592`,
+2026-08-24) rather than trusting one as the final word: `fuel_cheap` and `fuel_dear` bracket the
+axis these two methods trade on, and a pair is flagged dominated only if it loses under **both** —
+a genuine alternate needs to win under at least one. Neither Coking Kiln nor the Bessemer
+Converter needed the second vector to pass (both already win on chain depth alone), so this is a
+guard-rail for `BL-586`'s still-widening roster, not a fix to a currently-failing case.
 
 **AI scoring.** `corp_ai.cpp`'s `dial_recipe` candidate does not price `switch_cost` into its
 projected gain and does not pre-filter on `recipe_switch_cooldown`; the seam enforces both at

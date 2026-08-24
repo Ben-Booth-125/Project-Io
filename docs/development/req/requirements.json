@@ -6318,6 +6318,56 @@
                     "result_metric": "2 doc entries updated, 1 real staleness in ACTIONS.json fixed"
                 }
             ]
+        },
+        {
+            "brief": "roster-breadth-guard",
+            "title": "The sprint’s breadth invariants, gathered into the harness that already owns them",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-592 (ROSTER_BREADTH_GUARD) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (R2)"
+                    ],
+                    "requirement": "R2 gains a second price vector (fuel-cheap, fuel-dear) so a method that is only better “depending on which market it builds to” is not misread as dominated under one fixed snapshot; a pair is flagged only if dominated under BOTH regimes.",
+                    "notes": "13 sibling pairs, 10 supply routes, 1 precondition, 2 interchangeable methods, 0 dominated — unchanged from the single-vector reading, since both existing methods (Coking Kiln, Bessemer Converter) already win on chain depth alone. Confirmed non-vacuous (anti-vacuity check passes) and the dual-vector logic is exercised on every method pair, not a no-op.",
+                    "result_metric": "2 price vectors, 0 dominated under both"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (R3)"
+                    ],
+                    "requirement": "A materials row: every named building’s BL-590 material override is obtainable in its own band — generic over the whole roster (every extraction target, every processing recipe), not a hand-picked list, so a future override earns the check for free.",
+                    "notes": "18 named buildings carry an override (5 extraction targets, 13 processing recipes — matches BL-590’s authored count exactly), 0 offenders. Anti-vacuity confirms the row actually found overrides to check, not an empty set.",
+                    "result_metric": "18 buildings checked, 0 offenders"
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (G5, R1, R1b)"
+                    ],
+                    "requirement": "The start-gate row (BL-589’s G5) and the orphan rows (R1/R1b) are named as this item’s own requirement rather than assumed to still pass — both already exist and already pass, built by earlier items in this sprint.",
+                    "notes": "No new code: G5 was BL-589’s own row, R1/R1b predate this sprint. Named here per the item’s own instruction (“the rows already exist, but they ARE the sprint’s admission rule and should be named in its requirement rather than assumed”) and reconfirmed green in this item’s own full-suite run.",
+                    "result_metric": "3 pre-existing rows reconfirmed, 0 new code"
+                },
+                {
+                    "id": "R4",
+                    "status": "complete",
+                    "verification": [
+                        "code"
+                    ],
+                    "requirement": "The new rows are named in .claude/skills/verifier-headless/SKILL.md, part of this item per CLAUDE.md § Tool creation is skill creation — not a follow-up.",
+                    "notes": "G5 and R3 entries added. Also corrected two claims that had gone stale since the entry was last touched (R1 reported “ships RED on eight resources”, now green since NR-257; R2 reported “0 interchangeable methods”, now 2 since BL-587) — found while updating the adjacent text, fixed rather than left beside the new content.",
+                    "result_metric": "2 new row entries, 2 stale claims corrected"
+                }
+            ]
         }
     ]
 }
