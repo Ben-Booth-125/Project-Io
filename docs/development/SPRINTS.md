@@ -41,11 +41,24 @@ commit timestamps rather than reviving an unstarted timer.)
 ---
 
 **Active-sprint cap (Ben, 2026-08-23).** No more than 3 sprints open/proposed at once — enough
-that a session doesn't have to weigh a long tail of undocumented parallel work. On adoption,
-every open/proposed sprint except 16 and 17 was closed as descoped (not landed); pick back up
-from `sprints.json`'s `notes` on the item you want to reopen, one at a time as 16/17 close out.
+that a session doesn't have to weigh a long tail of undocumented parallel work.
 
-## Where things stand (updated 2026-08-23)
+**Sprint-number ceiling (Ben, 2026-08-24): keep sprints 18 and below.** Nothing is planned or
+authored past sprint 18 — narrower than the count cap above, this bounds *how far ahead* the
+sprint horizon is allowed to reach at all.
+
+**Unstarted plans are DELETED, not archived (Ben, 2026-08-24).** A sprint that was only ever
+open/proposed and never really executed is a stale reference once dropped — closing it and
+keeping its prose around just to reopen the same number later isn't worth the upkeep. On adopting
+the cap, 27 open/proposed sprints (plus Sprint 32, authored and dropped same-day on the ceiling
+above) were removed outright from `sprints.json`, freeing their numbers rather than retiring them:
+20, 21, 22, 22-24 preamble, 23, 24, 25, 26-33, 26a, 26b, 27, 28, 29, 30, 31, 32, B1, B2, B3, C1,
+C2, C3, D2, D3, D4, N3, N4, ST1, W1. This is narrower than it looks: a sprint that actually
+**landed work** — even a partial or unsatisfying result (Sprint 19's goal NOT met, P1's rendering
+debt) — is a real historical fact and stays in the table below as closed. Only the never-executed
+ones were deleted.
+
+## Where things stand (updated 2026-08-24)
 
 | Sprint | Theme | State |
 |---|---|---|
@@ -65,54 +78,28 @@ from `sprints.json`'s `notes` on the item you want to reopen, one at a time as 1
 | 17 | Economy breadth: the chain is the growth track | **Open 2026-08-15** — chain-depth spine (BL-428) → roster/methods (BL-429/430) → UI (BL-431) → guard harness (BL-432); cuts v0.1.17 |
 | 18b | Roster invariants (retro-recorded) | **Closed 2026-08-16** — BL-432 landed; BL-435 paused 4/6; BL-436 filed |
 | 19 | The economy tells the truth | **Closed 2026-08-17 — goal NOT met.** The blame moved three times and landed on supply; goldens left red and unblessed |
-| 20 | Not yet chosen | **Closed 2026-08-23** — descoped under the 3-active-sprint cap; three candidates still recorded in `sprints.json` for later |
 | 25a | The draw (upkeep, ordnance, convoy seam) | **Closed 2026-08-18** — 6/6; goldens left red and attributed |
-| 26–33 | **The Fall** — the arc to the Era −1 collapse | **Closed 2026-08-23** — descoped under the 3-active-sprint cap; eight rulings stay recorded in `sprints.json` |
-| 26a | The three authority edits | **Closed 2026-08-23** — descoped under the cap; determinism case was mid-flight |
-| 26b | Close-out and the doc truth pass | **Closed 2026-08-23** — descoped under the cap; doc pass was mid-flight |
-| 27 | The run is retained, and its failure falsifiable | **Closed 2026-08-23** — descoped under the cap; Lane A, BL-384 assertion half only |
-| B1 | The substrate becomes a number | **Closed 2026-08-23** — descoped under the cap; Lane B census harness was mid-flight |
-| C1 | Stance, and the first cut of Logistic Points | **Closed 2026-08-23** — descoped under the cap; BL-464 design half never taken |
-| W1 | The watch — an agent plays, a human watches | **Closed 2026-08-23** — descoped under the cap; all three items had landed |
 | D1 | A tech can express a buff | **Closed 2026-08-19** — BL-479 complete same-day; 35/35; BL-443 rider deliberately not taken (NR-296 is Ben's) |
-| D3 | A law has an author, and a tax is a transfer | **Closed 2026-08-23** — descoped under the cap; BL-480 had landed, harnesses green |
-| B2 | Roads that reach, ports that mean something | **Closed 2026-08-23** — descoped under the cap; Lane B road_generation cuts unstarted |
-| B3 | Density, and corporations stop all being the same thing | **Closed 2026-08-23** — descoped under the cap; density clamp still sized for the 180×84 map |
-| C3 | The engagement trigger, and the fight you can watch | **Closed 2026-08-23** — descoped under the cap; BL-467 had landed (26/26) |
-| D4 | The border costs something (the international half) | **Closed 2026-08-23** — descoped under the cap; depended on D3 + Lane B, neither active |
 | P1 | The province becomes a thing you can see, and then a thing worth seeing | **Closed 2026-08-21** — done_when met by BL-515, then overshot by five: the NR-438/439 ceiling ruling, BL-519 axis split, BL-520 texturing, BL-516 water kinds, BL-521 click injection. **Owed: nothing was rendered** |
-| ST1 | A global style sheet — narrowing down the visual language | **Closed 2026-08-23** — descoped under the cap; Joe's design track paused |
 | N1 | The two spines, landed inert | Closed 2026-08-23 — all three landed inert; two of the three were UNSOUND and were fixed in the closing pass (NR-546, NR-547) |
 | N2 | The spines move | Closed — three lanes merged; one lane’s interpretation withdrawn after adversarial verification (NR-554) |
-| N3 | The spines get a caller | **Closed 2026-08-23** — descoped under the cap; absorbed into Sprint 16's BL-572 |
-| N4 | The channel becomes visible | **Closed 2026-08-23** — descoped under the cap; unopened |
-| 32 | Logistic Points, and the map that shows them through both fogs | **Gated 2026-08-23** — third sprint under the cap; BL-595/596/597 designed, **paused pending NR-583** — no promotion until Ben rules |
 
-Every other sprint number that has ever appeared in this file (3–5's original theming, 17–18,
-20–24, 25b, and the full Lane A/B/C/D breakdown of the 26–33 arc — 28, 29, 30, 31, B2, B3, C2,
-C3, D1–D4) is recorded in `sprints.json` with its full goal/planned/risk/notes prose, whether it
-closed, was superseded, or was descoped under the 2026-08-23 cap — each carries a `notes` line
-saying so, so reopening one is a lookup, not a re-derivation.
+Sprint numbers 20–32 (and the lettered Fall-arc lanes B1–B3, C1–C3, D2–D4, plus N3, N4, ST1) do
+**not** appear above — they were never-executed open/proposed sprints, deleted outright 2026-08-24
+rather than kept as closed placeholders (see the ceiling note above). If one of these is picked
+back up, it is authored fresh against the current docs, under a number that fits the ceiling —
+not resurrected under its old number.
 
-**Next up.** As of **2026-08-23**, three sprints are active under the cap: **16** (mercenary
-vertical slice), **17** (economy breadth), and the newly authored **32** — Logistic Points and
-the Throughput lens, closing the seam where exploration (survey) and logistics (the reach field)
-meet on the same canvas, correctly rendered through both fogs. Everything else that was open or
-proposed — the Fall gate (26a/26b/27), Lane B (B1/B2/B3), Lane D (D3/D4), C1, C3, W1, ST1, N3, N4,
-and Sprint 20's three candidates — was closed 2026-08-23 as descoped, not landed; each keeps its
-prose in `sprints.json` for whoever reopens it. **BL-518** (the Era −1 sim redrawing borders as
-its wars resolve) and **BL-514** (blend all tiles, HELD) are not part of any active sprint and
-stay parked.
+**Next up.** As of **2026-08-24**, only **16** (mercenary vertical slice) and **17** (economy
+breadth) are active — both fit the sprint-number ceiling on their own. A third slot is open under
+the count cap, but nothing fills it yet: any candidate has to be numbered 18 or below. **BL-518**
+(the Era −1 sim redrawing borders as its wars resolve) and **BL-514** (blend all tiles, HELD) are
+not part of either active sprint and stay parked in `backlog.json`.
 
-**Sprint 32's sequencing is flagged, not assumed (NR-583).** ROADMAP.md names Logistic Points for
-**v0.1.20**, several minors past 16 (v0.1.15) and 17 (v0.1.17) — pulling it forward is a
-deliberate jump under the new cap, made because Ben named this theme directly, not a default.
-Nothing in LP's own dependency chain is unmet (the reach field, roads, and stance/hostility are
-all already built) — the open question is release-numbering, not build-order.
-
-**PAUSED 2026-08-23, pending NR-583.** BL-595/596/597 are designed but not promoted — do not move
-any of them into REFINED.md or start build until Ben rules on NR-583's sequencing question. This
-is the sprint's own gate, ahead of any other work on it.
+**Also deleted 2026-08-24, same basis:** six orphaned backlog items (BL-579–BL-584) a concurrent
+review-queue-purge session had filed with no sprint attached, plus Sprint 32's own three items
+(BL-595–BL-597, Logistic Points / Throughput lens) — all unstarted, all removed from
+`backlog.json` outright rather than archived.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in
 that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI
