@@ -91,6 +91,34 @@ constexpr int k_corner_sides[6][2] = { {0,5}, {5,4}, {4,3}, {3,2}, {2,1}, {1,0} 
 /// toward a different province is stroked between these two vertices.
 constexpr int k_side_verts[6][2] = { {5,0}, {4,5}, {3,4}, {2,3}, {1,2}, {0,1} };
 
+/// How far a blended corner travels from the tile's OWN fill toward the mean of
+/// its blending neighbours. `1.0` is the flat mean — the full-strength blend;
+/// `0.0` is no blend at all, every hex flat.
+///
+/// NAMED FOR LAND, NOT FOR PROVINCES, and the name is the point. BL-511 blended
+/// a hex into its PROVINCE, stopping at the cell boundary. BL-514 removed that
+/// stop (Ben, 2026-08-22: *"blur should cross province borders"*), so what is
+/// dialled here is a **land-wide continuous field** — the corner mean below has
+/// no province-match term and must not get one back. `ns.blend` carries the only
+/// exclusions that remain, and they are not about provinces.
+///
+/// BL-597, Ben 2026-08-24: *"Just reduce the amount of smearing so it looks less
+/// blurred."* The blend STAYS — it is doing something wanted (land reads as one
+/// continuous field rather than a wireframe of seams) and was simply doing too
+/// much of it. So this is a MAGNITUDE, not a mechanism change: none of the three
+/// offered redesigns (drop it, confine it to the seam, invert it) was taken, and
+/// a constant is far cheaper to tune by eye than a pass is to replace.
+///
+/// Read the chain and it is not a reversal of the original design: BL-511 blended
+/// inside a province, BL-514 widened it across the whole landmass, and this is
+/// Ben seeing the result of THAT widening at working zoom and pulling it back.
+///
+/// The value is Ben's eye in the live app, not a derived bound — 0.35 is the
+/// starting point the ruling names. `1.0` must reproduce the pre-BL-597 render
+/// byte for byte, which is the guard this constant is checked against
+/// (`scripts/verify/zoom_ladder.lua`).
+constexpr float k_land_blend_strength = 0.35f;
+
 /// Per-tile shade, computed one pass ahead of the draw loop so a tile's
 /// neighbours' colours are in hand when its corners are blended.
 struct tile_shade
@@ -2339,7 +2367,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         continue;
                     acc[n++] = ns.fill;
                 }
-                corner_col[v] = mean_colour(acc, n);
+                // BL-597: the corner does not take the flat mean any more — it
+                // travels from the tile's OWN fill toward that mean by
+                // k_land_blend_strength. At 1.0 lerp_colour returns the mean
+                // unchanged (u = 0, and an 8-bit channel round-trips a float
+                // multiply by 1.0 exactly), so the constant's top of range is the
+                // pre-BL-597 render byte for byte — the guard the item names.
+                corner_col[v] = lerp_colour(fill, mean_colour(acc, n),
+                                            k_land_blend_strength);
             }
         }
 

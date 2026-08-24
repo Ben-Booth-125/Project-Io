@@ -11,10 +11,16 @@
 -- be named before anything is tuned (BL-597, Rule 0b).
 --
 -- WHAT IT FOUND, 2026-08-24: the softness is not the texture pass at all. Land
--- tiles lose their hex edges entirely from ~3.5x up and read as a continuous smear,
--- while OCEAN tiles stay crisp — which is the signature of BL-511's province blend
--- (ocean is province 0 and does not blend), not of a faint texture. Keep that in
--- mind before reaching for the texture constants.
+-- tiles lost their hex edges entirely from ~3.5x up and read as a continuous smear,
+-- while OCEAN tiles stayed crisp — the signature of the province blend (ocean is
+-- province 0 and does not blend), not of a faint texture. So the texture constants
+-- were never the dial.
+--
+-- WHAT IT NOW GUARDS (BL-597). The blend is dialled by
+-- `k_province_blend_strength` (body_surface_canvas.cpp), shipped at 0.35. The
+-- constant's contract is that **1.0 reproduces the pre-BL-597 render byte for
+-- byte** — set it to 1.0, re-run this ladder, and the captures must match the
+-- pre-change ones exactly. If they do not, the lerp is wrong, not the value.
 --
 -- Run: ProjectIo --verify scripts/verify/zoom_ladder.lua
 

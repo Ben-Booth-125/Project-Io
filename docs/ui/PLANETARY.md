@@ -89,21 +89,36 @@ still instrumental unit values."*
 ### The blend
 
 Geometry is per hex — the row-band cull, the wrap window and the fill LOD are the same whether a
-hex blends or not. What the province changes is a hex's **colour**, by one mechanism:
+hex blends or not. What the blend changes is a hex's **colour**, by one mechanism:
+
+**It is a land-wide field, not a per-province one.** The blend began province-scoped, stopping at
+the cell boundary; the stop was removed (Ben, 2026-08-22: *"blur should cross province borders"*),
+so a corner now averages with every blending neighbour regardless of which cell it belongs to. The
+constant below is named `k_land_blend_strength` for exactly that reason, and the corner mean has no
+province-match term to reinstate.
 
 - Each hex is drawn as a **6-triangle fan with per-corner colours** (`prim_blended_hex`), not as a
   flat `AddConvexPolyFilled`. The centre vertex takes the tile's own composited colour.
-- A corner takes the **mean of the tile and the same-province neighbours sharing that corner**. Each
-  corner falls between exactly two of the six sides, tabulated once in `k_corner_sides`.
+- A corner takes the **mean of the tile and the blending neighbours sharing that corner**, then
+  travels back toward the tile's own fill by `1 − k_land_blend_strength`. Each corner falls between
+  exactly two of the six sides, tabulated once in `k_corner_sides`.
+- **The strength is a dial, and it is deliberately not at full.** `1.0` is the flat mean — the
+  maximum blend; `0.0` is no blend, every hex flat. At full strength the land reads as a *blur*
+  rather than as ground (Ben, 2026-08-24: *"just reduce the amount of smearing so it looks less
+  blurred"*), so the blend is dialled back rather than replaced: it is doing something wanted, only
+  too much of it. The shipped value is **0.35**, and the value's authority is Ben's eye in the live
+  app, not a derived bound. Below full strength two adjacent hexes' shared corners no longer agree
+  exactly, so a faint colour step returns at every seam — that step *is* the crispness, and it is
+  a step in hue, never the dark 1 px gridline (which stays given up, below).
 - A blending hex is drawn at the **full circumradius**, not at `draw_r`. That `-1 px` is the whole
-  reason a hex grid reads as a grid — the background showing through as a border. Inside a province
-  the gap is given up: adjacent hexes share edges exactly, their corner colours already agree, and
-  the seam stops existing.
-- An **out-of-province** neighbour contributes nothing, so the province boundary keeps its colour
-  step. That step, plus a faint dark edge stroke on every side facing another province, is what
-  makes a cell read as a cell.
+  reason a hex grid reads as a grid — the background showing through as a border. Across blending
+  land the gap is given up: adjacent hexes share edges exactly, so the dark seam stops existing and
+  what separates two tiles is the colour step alone.
+- **Water and installations are what the blend stops at, not province lines.** Ocean carries no
+  blend (it needs a province id, which sea tiles resolve to 0), so a coastline stays hard; a built
+  tile is excluded for its own reason (below). Those two exclusions are the whole boundary set.
 
-The result is a gradient across the province's **real tile mixture** — explicitly not a dominant
+The result is a gradient across the land's **real tile mixture** — explicitly not a dominant
 composition (which would discard the axis mixture [TILES.md](../economy/TILES.md) exists to
 express) and not a texture pattern. The Selection element's mixture bar is the blend's legend: it
 un-blends the same colours so "what did that gradient just average?" is answerable at a glance
@@ -114,7 +129,7 @@ un-blends the same colours so "what did that gradient just average?" is answerab
 | Excluded | Why |
 |---|---|
 | A **built** tile | It renders *as an installation* — its hex is swapped wholesale for the owner plate. Smearing that plate across unbuilt ground would put a corp identity on land nobody owns. |
-| A **survey-masked** tile | The lock fill is a statement about *knowledge*, not terrain. (The province edge stroke is gated on `revealed` for the same reason — an outline through the mask would leak the shape of unsurveyed ground.) |
+| A **survey-masked** tile | The lock fill is a statement about *knowledge*, not terrain. The edge passes over the ground are gated on `revealed` for the same reason — an outline through the mask would leak the shape of unsurveyed ground. |
 | Any tile under a **non-blending lens** | See the reduction table below. |
 
 ### Per-lens province reduction
@@ -151,9 +166,12 @@ grain under every lens, but it is the *render* grain only where the field is con
 - The **selection outline traces the province's outer boundary** — every side facing a different
   province, never the interior seams. Hover uses the same shape at the hover colour and yields to
   selection, per the highlight convention (`highlight.hpp`).
-- The always-on province edge is deliberately **faint** (`IM_COL32(10, 10, 16, 70)`, 1 px, and
-  skipped under the coarse LOD): Ben ruled for *softened* borders, so it suggests a cell rather than
-  laying a wireframe over the map. The crisp affordance is the on-demand selection outline.
+- **There is no always-on province edge.** It was a faint 1 px stroke on every side facing another
+  province; Ben took its alpha to zero (2026-08-22, the same ruling that let the blend cross province
+  borders), so the pass is gone rather than dialled down — at any alpha it would have been the one
+  thing still asserting a cell, which defeats the change instead of softening it. **A province's only
+  visible boundary is the on-demand selection/hover outline**, which is the crisp affordance the
+  faint stroke was trying to be.
 - An ocean or unpartitioned tile has no province and still selects as a tile.
 
 Full selection semantics — the mutual exclusion with `selected_entity`, the reconciliation rule, and
@@ -251,12 +269,12 @@ called from the Planetary fill loop and from the Selection band's neighbourhood 
 so the two surfaces cannot drift.
 
 **The split is the whole design, and it follows the axis split.** The substrate is the
-axis the province blend averages across a province; the cover is per tile
+axis the blend averages across the land; the cover is per tile
 and must read as per tile. So:
 
 | Pass | Keyed on | Character | Why |
 |---|---|---|---|
-| **Substrate grain** | `terrain_substrate` | 2–5 tiny marks, alpha 0.14–0.30 | Material, not a boundary. A rock-to-rock seam is not information, so the grain must not draw one — it stays quiet enough that the province blend still reads as one shape. |
+| **Substrate grain** | `terrain_substrate` | 2–5 tiny marks, alpha 0.14–0.30 | Material, not a boundary. A rock-to-rock seam is not information, so the grain must not draw one — it stays quiet enough that the blend still reads as one continuous field. |
 | **Cover pattern** | `terrain_cover` × `cover_density` | 1–5 marks, alpha 0.35–0.80 | A forest edge **is** information. The pattern asserts where one tile ends. |
 
 Grain kinds by substrate: a **dot stipple** (barren, regolith), **bedding strokes**
@@ -337,8 +355,8 @@ Two further gates, both in the canvas call site: texture is skipped on **survey-
 tiles (a cover pattern is terrain information, and drawing it through the mask would leak
 the shape of unsurveyed ground — [DISCOVERY.md](DISCOVERY.md)) and on **built** tiles
 (whose hex is swapped wholesale for the owner plate as an identity signal). It is drawn
-after the fill and **before** the province edge stroke, so a province border is never
-broken up by a canopy tick.
+after the fill and **before** the edge passes over the ground, so a border is never broken up by
+a canopy tick.
 
 **Check:** `scripts/verify/tile_texture.lua` (`verifier-visual`).
 
