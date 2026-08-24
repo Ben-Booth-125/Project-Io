@@ -398,7 +398,7 @@
       "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "version_goal": "v0.1.18",
       "sprint": "18",
@@ -422,7 +422,7 @@
         "docs/economy/LOGISTICS.md"
       ],
       "authority_doc": "docs/economy/LOGISTICS.md",
-      "design": "Ruled 2026-08-24 (Sprint 18 design form: shape A, active first): the LP substrate and its FIRST consumer land together, per settled rule 3 — read docs/economy/LOGISTICS.md § Logistic Points whole before implementing; all seven cut constraints bind. Cities generate the bifold per-tick rate (a RATE, not a stock: computed, spent or wasted, never banked, never serialised, no state_hash entry). Active LP prices run_unit_march in credits — march points still spend against traversal cost; active LP is what makes that march cost money (the 2026-08-22 ruling). A refused march is announced, never silently queued. Allocation is a deterministic priority over sorted city ids. First-cut rates authored here, argued against BL-543 (value anchor) and flagged for tuning (NR-600). Fresh authoring: BL-464 and the purged Sprint 32 item prose are reference only. Harness: generation determinism across two runs of one seed, march debit exactness, a refusal mutates nothing."
+      "design": "Ruled 2026-08-24 (Sprint 18 design form: shape A, active first): the LP substrate and its FIRST consumer land together, per settled rule 3 — read docs/economy/LOGISTICS.md § Logistic Points whole before implementing; all seven cut constraints bind. Cities generate the bifold per-tick rate (a RATE, not a stock: computed, spent or wasted, never banked, never serialised, no state_hash entry). Active LP prices run_unit_march in credits — march points still spend against traversal cost; active LP is what makes that march cost money (the 2026-08-22 ruling). A refused march is announced, never silently queued. Allocation is a deterministic priority over sorted city ids. First-cut rates authored here, argued against BL-543 (value anchor) and flagged for tuning (NR-600). Fresh authoring: BL-464 and the purged Sprint 32 item prose are reference only. Harness: generation determinism across two runs of one seed, march debit exactness, a refusal mutates nothing. COMPLETE 2026-08-24 (Sprint 18 wave 2, built in place on main): active_lp_anchor_pools (logistics.cpp/hpp), run_unit_march gated on nearest-anchor active LP with credit debit, refused draws mutate nothing (unit_march_tick::refused_no_lp). First-cut rates in scripts/economy.lua (NR-600). Verified independently: logistic_points_harness 27/27 fresh rebuild; unit_march_harness 89/90, the one failure (corp_verb_count staleness) confirmed pre-existing since Sprint 16's BL-573, unrelated; full ProjectIo rebuild clean. NR-619 filed for the nearest-anchor interpretation and refusal-surfacing gap (owed to BL-598). Commit 3cd0204c."
     },
     {
       "status": "designed",
