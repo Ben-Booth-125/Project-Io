@@ -183,11 +183,15 @@
   ],
   [
    "lens.good_selector",
-   "The on-canvas lens legend — the key box that folds out flush-left of the minimap while the Resource, Market, or Scarcity lens is active. One shared combo (bound to a single shared lens_resource value), not three separate controls."
+   "The lens chrome region — the minimap's header, top right (BL-602). One region hosts the selector and whichever key the active lens draws; the selector sits directly above that key while the Resource, Market, or Scarcity lens is active. One shared combo bound to a single shared lens_resource value, not three separate controls. It is NOT on the minimap's lens bar, which carries glyphs only."
   ],
   [
    "lens.industry",
    "Off the lens bar (trimmed in BL-093 the day it shipped); the factory-silhouette glyph exists but is not on the strip"
+  ],
+  [
+   "lens.key_toggle",
+   "The lens chrome region's header bar — the minimap's header, top right (BL-602). The bar carries a caret, the key's title, and its row count, e.g. '^ Countries (44)'. Its foot rests on the minimap's top edge and stays there whether the list is open or shut."
   ],
   [
    "lens.market",

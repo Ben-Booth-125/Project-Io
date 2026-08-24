@@ -112,39 +112,69 @@ Solar/Circumplanetary representations, where specified, are additive render
 passes guarded behind the same `overlay_mode` — they do not change the Planetary
 behaviour.
 
-### Legend placement
+### Legend placement — one chrome home
 
-Every lens legend is keyed off the active `overlay_mode` and drawn in
+**Everything a lens puts on screen beside the canvas lives in one region: the
+minimap's header, top right.** Ben, 2026-08-24 (BL-602, one chrome home): *"This
+selection element for lenses should always fit in the header for the minimap, at
+the top right corner."* The selector and the key share that home, because a lens
+draws **at most one** key — so one region serves the whole roster and there is
+nothing for a new lens to choose between.
+
+This supersedes two earlier rulings on the same region. BL-533 (legend in minimap
+quadrant) moved legends off the canvas into the right chrome column; BL-566
+(legend inside minimap) revised that to put them inside the minimap box. The
+current placement is the minimap **header**.
+
+**The rect.** Same x and width as the minimap (`ui::minimap_rect`), so the two read
+as one stack of chrome flush to the right screen edge; **bottom edge on the
+minimap's top edge**, growing **upward** into the column's otherwise-unused space
+and ceilinged one margin below the time panel's foot. `ui::lens_chrome_rect`
+(`shell_metrics.hpp`) owns that algebra and every legend asks it — no key takes a
+position argument, so there is no second derivation to drift.
+
+**Bottom-anchored, and that is load-bearing.** A box that grows upward from a
+fixed top takes its own header, and therefore its toggle, with it: opening the
+list moved the control a third of the screen and the second press landed on the
+canvas instead of closing it, so the toggle worked exactly once. Anchoring the
+**bottom** keeps the header on the minimap's edge open or shut, and the list reads
+as a drawer sliding up out of the minimap.
+
+Every legend is keyed off the active `overlay_mode` and drawn in
 `body_surface_canvas.cpp`, before the input early-out so it shows in headless
-captures too. Two chromes:
+captures too. Two shapes share the one region:
 
 - **Count-driven keys** — Country, Market, Reach, Supply-routes, whose row list
   grows with the world (nations / markets / lanes present) — share
-  `draw_scroll_list_key`. The box lives in the **right chrome column**, aligned
-  with the minimap (right edge on the screen edge), filling the otherwise-unused
-  space above it, and it is a **dropdown, collapsed by default**
+  `draw_scroll_list_key`. They are a **dropdown, collapsed by default**
   (`ui_state::lens_key_open`; one flag serves every legend, since a lens draws at
-  most one) — so a lens switch never throws a forty-row list over the map (Ben,
-  2026-08-22, NR-503). The box is pinned at its **top** (the time panel's
-  published height, `ui_state::time_panel_h`, is its ceiling) and grows
-  **downward** toward the minimap, so the header — and its toggle — stays in one
-  place open or shut. Rows live in a bounded, wheel/drag-scrolling ImGui child;
-  long labels **wrap** rather than widening the box (Ben: "keep names shorter,
-  and use text wrapping"). The Market lens's good-selector combo sits above the
-  header.
+  most one), so a lens switch never throws a forty-row list across the column
+  (Ben, 2026-08-22, NR-503). The header bar sits at the box's **foot**, on the
+  minimap's edge, carrying a caret, the title and the row count — the count so a
+  collapsed legend still says how much it is hiding. Rows live in a bounded,
+  wheel/drag-scrolling ImGui child; long labels **wrap** rather than widening the
+  box (Ben: "keep names shorter, and use text wrapping").
 - **Fixed-height gradient-bar keys** — Resource, Scarcity, Population, Industry,
-  Continent — use the simpler `begin_lens_key`
-  chrome: a box anchored **flush-left of the minimap**, its right edge at the
-  minimap's left edge and vertically centred on it (a `lens_key_anchor` passed
-  from `app.cpp`), reading as a drawer folding out from the minimap's left side.
-  The Continent key alone draws on ImGui's **foreground** draw list with an
-  opaque fill, so it floats over the always-open Selection band rather than
-  being buried by it (BL-376, continent key z-order).
+  Continent — use `begin_lens_key` and draw **open**. The collapse affordance
+  belongs only to the lists, because a list that grows with the world is the only
+  thing it was ever for; a key with nothing to overflow gains nothing from a press
+  that hides it.
+
+**Z-order is a placement consequence, not a patch.** The gradient keys used to
+anchor flush-**left** of the minimap, vertically centred — inside the rect the
+always-open Selection band occupies — so they drew as ghosts through the band at
+roughly a tenth of their contrast, and only the Continent key escaped by taking
+ImGui's foreground draw list with an opaque fill (BL-376, continent key z-order).
+One of seven was fixed and the collision was never generalised. In the region the
+keys no longer overlap any window, so every key draws on the shared background
+list and the foreground special case is gone. An **input blocker** over the whole
+region is what remains necessary: a draw list paints pixels and registers no
+window, so without it a press on the legend would also select the tile underneath.
 
 The resource/good selector shared by the Resource, Market and Scarcity lenses is
-one combo bound to `ui_state.lens_resource` (`draw_lens_resource_combo`), hosted
-at the top of the lens legend — not on the minimap bar (BL-134, lens selector in
-legend).
+one combo bound to `ui_state.lens_resource` (`draw_lens_resource_combo`), sitting
+directly above the active key in the same region — never on the minimap bar, which
+carries glyphs only (BL-134, lens selector in legend).
 
 ---
 
@@ -251,8 +281,8 @@ strata.
 **Legend.** Named by the strip glyph highlight and its hover tooltip
 (`overlay_mode_name` → "Countries"), plus a **per-nation key** (`draw_country_key`,
 `body_surface_canvas.cpp`): one `palette::nation_colour` swatch + name per nation
-present on the active body, sorted by id, in the collapsed-by-default right-column
-chrome (§ Legend placement).
+present on the active body, sorted by id, as a collapsed-by-default dropdown in the
+shared lens chrome region (§ Legend placement).
 
 **Interaction notes.** Planetary-only, single-select. Borders are recomputed at
 draw time from the neighbour ownership comparison; no border data is persisted.
@@ -316,8 +346,8 @@ Distinct from the supply horizontal pair and the resource horizontal strata
 (market bars are vertical and outlined).
 
 **Legend.** Strip glyph highlight + tooltip ("Market catchment boundaries") plus a
-city-name swatch key (`draw_market_key`) in the right-column scroll-list chrome,
-the good-selector combo above its header.
+city-name swatch key (`draw_market_key`) in the shared lens chrome region, the
+good-selector combo directly above its header bar (§ Legend placement).
 
 **Interaction notes.** Single-select. The Circumplanetary strip and the Planetary
 surface share the resolved `market_component.price`. Verified by
@@ -389,8 +419,8 @@ full-width, equal), the market *vertical* bars, the country shield, and the
 corporation seal-square; and distinct from the resource *pip* diamond (the
 `resource_type` overload) it shares a name with.
 
-**Legend.** Strip glyph highlight + tooltip ("Resource deposits"), plus an
-on-canvas key: the selected resource's identity swatch + name and the note
+**Legend.** Strip glyph highlight + tooltip ("Resource deposits"), plus a key in
+the shared lens chrome region: the selected resource's identity swatch + name and the note
 "filled = deposit present". Flat, not a gradient — the lens shows deposit *shape*.
 
 **Interaction notes.** Planetary-only, single-select. The resource selector is the
@@ -463,7 +493,7 @@ exactly as much spatial variation as the body has markets.
 the inverse of the filled resource pip.
 
 **Legend.** An abundant→scarce gradient bar ("Market scarcity", met → scarce) plus the selected
-resource's name and identity swatch, same placement as the other gradient keys. Tooltip "Market
+resource's name and identity swatch, in the shared lens chrome region. Tooltip "Market
 scarcity". The resource selector appears in the lens legend (shared with Resource/Market).
 
 **Interaction notes.** Planetary-only, single-select. The verify script runs `verify.econ_step(12)`
@@ -512,7 +542,7 @@ per-faction colours.
 **Legend.** Strip glyph highlight + tooltip (`overlay_mode_name` → "Industry density"), plus an
 on-canvas **low→high amber gradient key** (`draw_industry_key` in
 [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp)) — a bar running the terrain-hue
-base to full industrial amber, in the gradient-key placement.
+base to full industrial amber, in the shared lens chrome region (§ Legend placement).
 
 **Interaction notes.** Planetary-only, single-select; the verify script's `verify.econ_step(4)` is
 load-bearing — the field is read from the economy report, so it needs a tick to exist at all.
@@ -564,18 +594,18 @@ Country glyph's bordered territory and from any solid landmass blob, because wha
 the boundary, not the area.
 
 **Legend.** Strip glyph highlight + tooltip (`overlay_mode_name` → "Continents (tectonic plates)"),
-plus an on-canvas key (`draw_continent_key`) at the flush-left-of-the-minimap anchor. Unlike the
+plus a key (`draw_continent_key`) in the shared lens chrome region (§ Legend placement). Unlike the
 gradient keys it has no scale to explain — the tint is categorical — so it explains the one thing
 that is not self-evident: that the **pale** tiles are boundaries. It also reports the plate count,
 and degrades honestly: a body with no plate record says so, and a **stagnant-lid** body
 (`plate_count == 1`) says "one immobile plate" rather than drawing a meaningless single tint.
 
-**Z-order** (BL-376, continent key z-order). The key keeps that anchor — it does **not** move to a
-corner and does **not** dock into the minimap lens bar — but is drawn on ImGui's **foreground** draw
-list rather than the background one shared by the other `ImDrawList` keys, so it floats over the
-always-open Selection band instead of being buried by it. It takes an **opaque** panel fill
-(`begin_lens_key`'s `bg` argument) rather than the 210-alpha default: what sits underneath it is a
-window background, not the canvas, and the plate swatches are the one thing this key exists to show.
+**Z-order.** This key was for a while the only one that read at all, because it alone drew on
+ImGui's **foreground** list with an opaque fill (BL-376, continent key z-order) while the other
+gradient keys were buried under the always-open Selection band at the old flush-left anchor. That
+was a z-order patch standing in for a placement fix. In the shared region no key overlaps a window,
+so this one draws on the same background list as the rest — the plate swatches, which are the one
+thing it exists to show, read on their own without a special case.
 
 **Interaction notes.** Planetary-only, single-select. Verified by
 `scripts/verify/continents_terrain.lua`, which captures the lens on **Kepler** and on **Selene** (the

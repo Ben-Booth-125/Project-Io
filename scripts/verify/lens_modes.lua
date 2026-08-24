@@ -30,3 +30,26 @@ verify.capture("lens_supply_routes")
 verify.set_overlay("resource")
 verify.set_lens_resource("iron_ore")
 verify.capture("lens_resource_iron_ore")
+
+-- The lens chrome region (BL-602): one home in the minimap header, top right, for
+-- the selector and whichever key the active lens draws. The count-driven keys are a
+-- DROPDOWN collapsed by default, and their header bar sits on the minimap's top edge
+-- so the toggle does not travel when the body opens upward. Press it and capture both
+-- states -- the press is the thing a capture alone cannot prove.
+verify.window(1280, 720)
+verify.set_overlay("country")
+verify.capture("lens_chrome_country_collapsed")
+
+-- The header bar is the full width of the right chrome column, its foot on the
+-- minimap's top edge. Aim at the middle of that bar rather than at the caret glyph.
+local mini = { w = 336, h = 260 }   -- minimap_rect at 1280x720; see shell_metrics.cpp
+verify.click(1280 - mini.w * 0.5, 720 - mini.h - 10)
+verify.frames(2)
+verify.capture("lens_chrome_country_expanded")
+
+-- Toggle rule: a second press on the same spot closes it again.
+verify.click(1280 - mini.w * 0.5, 720 - mini.h - 10)
+verify.frames(2)
+verify.capture("lens_chrome_country_reclosed")
+
+verify.set_overlay("none")

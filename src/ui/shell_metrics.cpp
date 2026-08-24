@@ -69,6 +69,19 @@ shell_rect selection_band_rect(ImVec2 disp)
     return { left, disp.y - h, std::max(0.0f, right - left), h };
 }
 
+shell_rect lens_chrome_rect(ImVec2 disp, float time_h, float want_h)
+{
+    const shell_rect mini = minimap_rect(disp);
+    // The FLOOR is the minimap's own top edge, with no gutter: the region is the
+    // minimap's header, not a separate panel hovering above it. The shell carries no
+    // internal gutter anywhere else in this column either (see selection_band_rect).
+    const float floor_y   = mini.y;
+    const float ceiling_y = (time_h > 0.0f) ? (time_h + shell_margin) : shell_margin;
+    const float avail     = std::max(0.0f, floor_y - ceiling_y);
+    const float h         = std::min(std::max(0.0f, want_h), avail);
+    return { mini.x, floor_y - h, mini.w, h };
+}
+
 shell_rect pinned_panel_rect(ImVec2 disp, float time_h)
 {
     // Below the time panel, above the minimap — one margin clear of each. The

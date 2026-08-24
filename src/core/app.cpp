@@ -1952,9 +1952,13 @@ void app::render()
                 // so this is a map lookup on every frame but the first after an
                 // invalidation (a road laid, a building placed or demolished).
                 body_reach_field(m_world, m_ui.active_body);
+                // No lens-key anchor argument (BL-602): every legend now asks
+                // ui::lens_chrome_rect for the one region — the minimap's header, top
+                // right — rather than being handed a point derived here. That derivation
+                // was the last hand-rolled shell rect in this block.
                 ui::draw_body_surface_canvas(m_world, m_ui, m_registry, m_last_econ_report,
-                                             m_generation_report, {0.0f, 0.0f}, disp, primary_input,
-                                             {mm_origin.x, mm_origin.y + mm_h * 0.5f});
+                                             m_generation_report, {0.0f, 0.0f}, disp,
+                                             primary_input);
                 ui::draw_circumplanetary_canvas(m_world, m_ui, inset_origin, inset_size, minimap_input, true);
                 {
                     const entity_id anchor = ui::circumplanetary_anchor(m_world, m_ui.active_body);

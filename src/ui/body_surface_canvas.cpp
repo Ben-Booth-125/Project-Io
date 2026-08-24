@@ -249,27 +249,70 @@ ImU32 ryg_colour(float t)
                     : lerp_colour(yellow, green,  (t - 0.5f) * 2.0f);
 }
 
-/// Shared chrome for an on-canvas lens key: a rounded dark panel of @p box_w ×
-/// @p body_h at the left edge (inset past the nav rail), vertically centred —
-/// clear of the Selection panel, the header/comms log, and the lens control strip.
-/// Returns the inner top-left and the inner content width via @p out_x/@p out_y/
-/// @p out_w. Pure ImDrawList — no ImGui widget state.
-/// @p bg is the panel fill; a key that floats over a *window* rather than the
-/// canvas passes an opaque one (BL-376 — see draw_continent_key's call site).
-void begin_lens_key(ImDrawList* dl, ImVec2 anchor, float box_w,
-                    float body_h, float pad, float& out_x, float& out_y, float& out_w,
-                    ImU32 bg = IM_COL32(18, 18, 24, 210))
+/// Paint the lens chrome region's panel — fill, border, and the input blocker — and
+/// hand back its rect. Shared by BOTH key families (BL-602), which is the whole point:
+/// there is one region, so there is one function that opens it.
+///
+/// The BLOCKER is a full-region empty ImGui window. The panel paints through a draw
+/// list, which draws pixels and nothing else — it registers no window, so
+/// `io.WantCaptureMouse` stays false over it, and `app.cpp` derives the canvas's
+/// `primary_input` from exactly that flag. Without it, a press on the legend ALSO
+/// lands on the canvas behind it: the measured symptom was clicking the legend header
+/// toggling the legend AND selecting whatever tile sat underneath.
+///
+/// @param want_h Height the caller's content needs; the region caps it (shell_metrics).
+/// @param id     Distinct blocker-window id, so two keys never collide on one name.
+ui::shell_rect open_lens_chrome(ImDrawList* dl, const ui_state& state, float want_h,
+                                const char* id)
 {
-    // Anchored so the box's RIGHT edge sits at anchor.x (the minimap's left edge) and
-    // the box is vertically centred on anchor.y — it reads as a drawer folding out from
-    // the left side of the minimap. anchor is passed in from app.cpp (lens_key_anchor).
-    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
-    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
-    dl->AddRectFilled(p0, p1, bg, 4.0f);
+    const ui::shell_rect r =
+        ui::lens_chrome_rect(ImGui::GetIO().DisplaySize, state.time_panel_h, want_h);
+    const ImVec2 p0 = { r.x, r.y };
+    const ImVec2 p1 = { r.x + r.w, r.y + r.h };
+    // OPAQUE. The region is chrome sitting on the minimap's edge, not an overlay on
+    // the map, and its neighbour (the minimap box) is opaque too — a translucent fill
+    // let terrain hexes read faintly through the panel, which is a milder version of
+    // exactly the complaint this region exists to answer (NR-601). Nothing underneath
+    // it is worth seeing; the key is.
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 255), 4.0f);
     dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
-    out_x = p0.x + pad;
-    out_y = p0.y + pad * 0.5f;
-    out_w = box_w - 2.0f * pad;
+
+    ImGui::SetNextWindowPos(p0, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({ r.w, r.h }, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.0f);
+    constexpr ImGuiWindowFlags bflags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav   | ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoBringToFrontOnFocus;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
+    ImGui::Begin(id, nullptr, bflags);
+    ImGui::End();
+    ImGui::PopStyleVar();
+    return r;
+}
+
+/// Shared chrome for a FIXED-HEIGHT lens key — the gradient bars (Resource, Scarcity,
+/// Population, Industry) and the Continent swatch list. Opens the one lens chrome
+/// region at exactly the height the caller measured and returns the inner top-left and
+/// content width via @p out_x / @p out_y / @p out_w.
+///
+/// These keys have nothing to overflow, so they draw OPEN. The collapse affordance
+/// belongs only to the count-driven keys, because a list that grows with the world is
+/// the only thing it was ever for (Ben, 2026-08-22, NR-503).
+///
+/// Drawn on the BACKGROUND list like every other key. The Continent key used to take
+/// the foreground list with an opaque fill (BL-376) because at the old flush-left
+/// anchor it sat inside the always-open Selection band; the region no longer overlaps
+/// any window, so the z-order patch has nothing left to work around and one draw path
+/// serves all of them.
+void begin_lens_key(ImDrawList* dl, const ui_state& state,
+                    float body_h, float pad, float& out_x, float& out_y, float& out_w)
+{
+    const ui::shell_rect r = open_lens_chrome(dl, state, body_h, "##lens_key_blocker");
+    out_x = r.x + pad;
+    out_y = r.y + pad * 0.5f;
+    out_w = r.w - 2.0f * pad;
 }
 
 /// The lens-local resource/good selector for the Resource, Market, and Scarcity
@@ -325,51 +368,45 @@ struct key_row
 };
 
 /// Shared chrome for a count-driven, potentially-overflowing lens key (BL-163/164):
-/// a dark panel with a fixed header (and an optional good-selector combo, for the
-/// Market lens) over a bounded, smoothly-scrolling body that hosts the rows. The
-/// box's right edge sits at @p anchor.x; its height is capped to the canvas vertical
-/// span [@p top_limit, @p bottom_limit] so a long list never overruns the canvas —
-/// the rows scroll (wheel/drag) inside a borderless ImGui child instead of the box
-/// growing off-screen. Must run inside the ImGui frame (it opens child windows, like
-/// draw_lens_resource_combo). @p combo_state != nullptr draws the resource selector.
-/// BL-533 (Ben, 2026-08-22) moved this off the canvas entirely.
+/// the Country, Market, Reach and Supply-routes legends, whose row list grows with the
+/// world. A header bar over a bounded, smoothly-scrolling body of rows, plus an
+/// optional good-selector combo (Market). Must run inside the ImGui frame -- it opens
+/// child windows, like draw_lens_resource_combo. @p combo_state != nullptr draws the
+/// resource selector.
 ///
-/// It used to anchor flush-left of the minimap and bound itself to the CANVAS
-/// vertical span, which is why the Country legend put forty nations over the
-/// tile ledger (NR-503): the canvas span runs behind the bottom panels, so
-/// "clamped to the canvas" was never a promise not to overlap anything. The box
-/// now lives in the right chrome column — right edge on the screen edge, aligned
-/// with the minimap, filling the otherwise-unused space above it — and it is a
-/// DROPDOWN that is collapsed by default.
+/// It lives in the ONE lens chrome region (BL-602, ui/shell_metrics.hpp), the same
+/// region the fixed-height gradient keys use: bottom edge on the minimap's top edge,
+/// right edge on the screen edge, growing upward and ceilinged below the time panel.
 ///
-/// @p anchor is unused now and kept only so the four call sites did not all need
-/// rewriting in the same change; @p box_w likewise — the width is the column, and
-/// long labels WRAP rather than widening the box (Ben: "keep names shorter, and
-/// use text wrapping"). @p top_limit still ceilings the box; @p bottom_limit is
-/// ignored in favour of the minimap top edge.
-void draw_scroll_list_key(ImVec2 anchor, float top_limit, float bottom_limit,
-                          const char* id, const char* header, float box_w,
+/// THE HEADER SITS AT THE FOOT OF THE BOX, and that is deliberate. The region is
+/// bottom-anchored, so a header drawn at the top would travel with the box: opening
+/// the list moved the control ~320 px up the screen and a second press at the same
+/// point landed on the canvas instead of closing it -- the toggle worked exactly once.
+/// Drawn at the foot, the header stays on the minimap's edge open or shut, so
+/// open/close is one repeatable press in one place, and the list reads as a drawer
+/// sliding up out of the minimap header. Above it sits the combo, and above that the
+/// rows.
+///
+/// Collapsed by default (Ben, 2026-08-22, NR-503), so a lens switch never throws a
+/// forty-row list over the column. Long labels WRAP rather than widening the box --
+/// the width is the chrome column's ("keep names shorter, and use text wrapping").
+void draw_scroll_list_key(const char* id, const char* header,
                           const std::vector<key_row>& rows, const char* empty_note,
                           ui_state* combo_state, ui_state& state)
 {
-    (void)anchor; (void)bottom_limit; (void)box_w;
+    const float pad      = 8.0f;
+    const float line_h   = ImGui::GetTextLineHeight();
+    const float swatch   = line_h;
+    const float row_h    = line_h + 2.0f;              // matches the legacy per-row advance
+    const float header_h = line_h + 4.0f;
+    const float combo_h  = combo_state ? (kLensComboH + 4.0f) : 0.0f;
+    const float bar_max  = 40.0f;                      // key_marker::bar full length
 
-    const ImVec2 disp    = ImGui::GetIO().DisplaySize;
-    const auto   mini    = ui::minimap_rect(disp);
-    const float  pad     = 8.0f;
-    const float  line_h  = ImGui::GetTextLineHeight();
-    const float  swatch  = line_h;
-    const float  row_h   = line_h + 2.0f;              // matches the legacy per-row advance
-    const float  header_h= line_h + 4.0f;
-    const float  combo_h = combo_state ? (kLensComboH + 4.0f) : 0.0f;
-    const float  bar_max = 40.0f;                      // key_marker::bar full length
+    const ImVec2 disp   = ImGui::GetIO().DisplaySize;
+    const float  box_w2 = ui::minimap_rect(disp).w;
+    const float  body_w = box_w2 - 2.0f * pad;
 
-    // The column: aligned to the minimap, so the two read as one stack of chrome.
-    const float box_x = mini.x;
-    const float box_w2 = mini.w;
-    const float body_w = box_w2 - 2.0f * pad;
-
-    // A row may now WRAP, so its height is measured rather than assumed.
+    // A row may WRAP, so its height is measured rather than assumed.
     const float label_w = std::max(16.0f, body_w - (swatch + 4.0f));
     float content_h = 0.0f;
     for (const key_row& r : rows)
@@ -377,93 +414,43 @@ void draw_scroll_list_key(ImVec2 anchor, float top_limit, float bottom_limit,
                               ImGui::CalcTextSize(r.label.c_str(), nullptr, false, label_w).y + 2.0f);
     if (rows.empty()) content_h = row_h;
 
-    // Collapsed is the default and the common case: just the header bar.
-    //
-    // The ceiling is the TIME PANEL, not the canvas top. top_limit is the canvas
-    // top, and the right chrome column starts higher than that — ceilinging on it
-    // let an expanded 40-nation list grow straight over the clock. time_panel_h is
-    // published by time_panel for exactly this. It is 0 on the first frame before
-    // that panel has drawn, so fall back to top_limit rather than to zero, which
-    // would let the box reach the screen top for one frame.
-    const float chrome    = pad + combo_h + header_h + pad;
-    const float floor_y   = mini.y - ui::shell_margin;   // never overlap the minimap
-    const float ceiling_y = (state.time_panel_h > 0.0f)
-                          ? (ui::shell_margin + state.time_panel_h + ui::shell_margin)
-                          : top_limit;
-    const float avail     = std::max(0.0f, (floor_y - ceiling_y) - chrome);
-    const float body_h  = state.lens_key_open ? std::min(content_h, avail) : 0.0f;
-    const float box_h   = chrome + body_h;
-
-    // The box is pinned at its TOP and grows DOWNWARD toward the minimap.
-    //
-    // It grew upward from the minimap at first, on the reasoning that the header
-    // would then sit in a constant place. That was wrong in a way the capture
-    // caught immediately: the header is drawn at the top of the box, so a box
-    // that grows upward takes its own toggle with it. Opening the list moved the
-    // control ~320px up the screen, and a second click at the same point landed
-    // on the canvas instead of closing it — the toggle worked exactly once.
-    //
-    // Pinned at the top, the header is at ceiling_y whether the list is open or
-    // shut, so open/close is one repeatable press in one place.
-    const float top = ceiling_y;
-    const ImVec2 p0 = { box_x, top };
-    const ImVec2 p1 = { box_x + box_w2, std::min(floor_y, top + box_h) };
+    // Ask for chrome + whatever the rows want; the region caps it against the time
+    // panel, so an expanded forty-nation list stops below the clock rather than over it.
+    const float chrome = pad + combo_h + header_h + pad;
+    const float want_h = chrome + (state.lens_key_open ? content_h : 0.0f);
 
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
-    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
-    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+    const ui::shell_rect r = open_lens_chrome(dl, state, want_h, "##lens_key_blocker");
 
-    // A full-box blocker, so a press on the legend does not ALSO land on the
-    // canvas behind it. The box paints through the background draw list, which
-    // draws pixels and nothing else — it registers no ImGui window, so
-    // io.WantCaptureMouse stayed false over it, and app.cpp derives the canvas's
-    // primary_input from exactly that flag. The measured symptom: clicking the
-    // legend header toggled the legend AND selected whatever tile sat underneath,
-    // moving the Selection panel to a tile the player never aimed at.
-    //
-    // An empty always-on window over the box footprint is enough: ImGui sets
-    // WantCaptureMouse from the window under the cursor, so the canvas stands
-    // down over the whole legend rather than only over the header hit-rect.
-    {
-        ImGui::SetNextWindowPos(p0, ImGuiCond_Always);
-        ImGui::SetNextWindowSize({ p1.x - p0.x, p1.y - p0.y }, ImGuiCond_Always);
-        ImGui::SetNextWindowBgAlpha(0.0f);
-        constexpr ImGuiWindowFlags bflags =
-            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav   | ImGuiWindowFlags_NoScrollbar |
-            ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings |
-            ImGuiWindowFlags_NoBringToFrontOnFocus;
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
-        ImGui::Begin("##lens_key_blocker", nullptr, bflags);
-        ImGui::End();
-        ImGui::PopStyleVar();
-    }
-
-    const float x = p0.x + pad;
-    float       y = p0.y + pad * 0.5f;
+    const float x = r.x + pad;
+    // Laid out from the FOOT upward: header on the minimap edge, combo above it, rows
+    // above that. The rows take whatever the region actually granted, which is how the
+    // cap reaches them without a second clamp.
+    const float header_y = (r.y + r.h) - pad * 0.5f - header_h;
+    const float combo_y  = header_y - combo_h;
+    const float rows_top = r.y + pad * 0.5f;
+    const float body_h   = std::max(0.0f, combo_y - rows_top);
 
     if (combo_state)
-    {
-        draw_lens_resource_combo(*combo_state, {x, y}, box_w2 - 2.0f * pad);
-        y += kLensComboH + 4.0f;
-    }
+        draw_lens_resource_combo(*combo_state, {x, combo_y}, body_w);
 
-    // Header row: a caret plus the title, and the whole bar is the toggle. The
-    // count rides in the header so a collapsed legend still says how much it is
-    // hiding — otherwise "Countries >" gives the player no reason to open it.
+    // Header row: a caret plus the title, and the whole bar is the toggle. The count
+    // rides in the header so a collapsed legend still says how much it is hiding --
+    // otherwise "Countries" gives the player no reason to open it. The caret points
+    // the way the press will move the body: "^" opens upward, "v" closes it back down.
     {
         char title[96];
         std::snprintf(title, sizeof title, "%s  %s  (%d)",
-                      state.lens_key_open ? "v" : ">", header,
+                      state.lens_key_open ? "v" : "^", header,
                       static_cast<int>(rows.size()));
-        dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), title); // fit-exempt: header bar spans the chrome column
+        dl->AddText({x, header_y}, IM_COL32(235, 235, 235, 255), title); // fit-exempt: header bar spans the chrome column
 
-        // The hit rect spans the full chrome band (both pads plus the text line),
-        // not just the glyph row: a press anywhere on the header bar should open
-        // the list, and a narrow blind target is one a script or a player misses.
-        const float hit_top = p0.y;
-        const float hit_h   = (y - p0.y) + header_h;
-        ImGui::SetNextWindowPos({ p0.x, hit_top }, ImGuiCond_Always);
+        // The hit rect spans the header band down to the box foot, not just the text
+        // line: a press anywhere on the bar should work, and a narrow blind target is
+        // one a script or a player misses.
+        const float hit_top = header_y - pad * 0.5f;
+        const float hit_h   = (r.y + r.h) - hit_top;
+        ImGui::SetNextWindowPos({ r.x, hit_top }, ImGuiCond_Always);
         ImGui::SetNextWindowSize({ box_w2, hit_h }, ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(0.0f);
         constexpr ImGuiWindowFlags hflags =
@@ -472,28 +459,26 @@ void draw_scroll_list_key(ImVec2 anchor, float top_limit, float bottom_limit,
             ImGuiWindowFlags_NoSavedSettings;
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
         ImGui::Begin("##lens_key_toggle", nullptr, hflags);
-        // Toggle rule (standing rules § Toggle rule): the control expresses an
-        // active state, so pressing it while open closes it.
+        // Toggle rule (standing rules § Toggle rule): the control expresses an active
+        // state, so pressing it while open closes it.
         if (ImGui::InvisibleButton("##lens_key_hit", { box_w2, hit_h }))
             state.lens_key_open = !state.lens_key_open;
         ImGui::End();
         ImGui::PopStyleVar();
     }
-    y += header_h;
 
-    if (!state.lens_key_open)
+    if (!state.lens_key_open || body_h <= 0.0f)
         return;
 
     if (rows.empty())
     {
-        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), empty_note); // fit-exempt: legend box sized to its measured entries (container 2)
+        dl->AddText({x, rows_top}, IM_COL32(170, 175, 185, 255), empty_note); // fit-exempt: legend box sized to its measured entries (container 2)
         return;
     }
 
     // Scrollable body: a borderless child overlaying the row area (the combo pattern),
-    // so overflow scrolls with a clean scrollbar rather than overrunning the canvas.
-    const ImVec2 body_pos = { x, y };
-    ImGui::SetNextWindowPos(body_pos, ImGuiCond_Always);
+    // so overflow scrolls with a clean scrollbar rather than overrunning the region.
+    ImGui::SetNextWindowPos({ x, rows_top }, ImGuiCond_Always);
     ImGui::SetNextWindowSize({ body_w, body_h }, ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(0.0f);
     constexpr ImGuiWindowFlags wflags =
@@ -503,35 +488,35 @@ void draw_scroll_list_key(ImVec2 anchor, float top_limit, float bottom_limit,
     ImGui::Begin(id, nullptr, wflags);
     ImGui::BeginChild("##rows", { body_w, body_h }, false, ImGuiWindowFlags_NoBackground);
     ImDrawList* wdl = ImGui::GetWindowDrawList();
-    for (const key_row& r : rows)
+    for (const key_row& kr : rows)
     {
         const ImVec2 c = ImGui::GetCursorScreenPos();
-        switch (r.marker)
+        switch (kr.marker)
         {
             case key_marker::swatch:
-                wdl->AddRectFilled(c, { c.x + swatch, c.y + swatch }, r.marker_colour);
+                wdl->AddRectFilled(c, { c.x + swatch, c.y + swatch }, kr.marker_colour);
                 break;
             case key_marker::dot:
-                wdl->AddCircleFilled({ c.x + 4.0f, c.y + line_h * 0.5f }, 3.5f, r.marker_colour);
+                wdl->AddCircleFilled({ c.x + 4.0f, c.y + line_h * 0.5f }, 3.5f, kr.marker_colour);
                 break;
             case key_marker::bar:
             {
-                const float th = 3.0f + (bar_max - 3.0f) * std::clamp(r.bar_frac, 0.0f, 1.0f);
+                const float th = 3.0f + (bar_max - 3.0f) * std::clamp(kr.bar_frac, 0.0f, 1.0f);
                 wdl->AddRectFilled({ c.x, c.y + line_h * 0.5f - 2.0f },
-                                   { c.x + th, c.y + line_h * 0.5f + 2.0f }, r.marker_colour);
+                                   { c.x + th, c.y + line_h * 0.5f + 2.0f }, kr.marker_colour);
                 break;
             }
         }
-        // BL-533: the box no longer widens to the longest name — it is the width
-        // of the chrome column — so a long name WRAPS. AddText with a wrap_width
-        // takes the same path ImGui uses for wrapped text, so the row grows by
-        // whatever it actually needed and the Dummy below reserves exactly that.
-        const float text_x = (r.marker == key_marker::bar) ? (bar_max + 6.0f) : (swatch + 4.0f);
+        // The box does not widen to the longest name -- it is the width of the chrome
+        // column -- so a long name WRAPS. AddText with a wrap_width takes the same path
+        // ImGui uses for wrapped text, so the row grows by whatever it actually needed
+        // and the Dummy below reserves exactly that.
+        const float text_x = (kr.marker == key_marker::bar) ? (bar_max + 6.0f) : (swatch + 4.0f);
         const float wrap_w = std::max(16.0f, body_w - text_x);
         wdl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), { c.x + text_x, c.y },
-                     r.label_colour, r.label.c_str(), nullptr, wrap_w); // fit-exempt: wrapped to the column
+                     kr.label_colour, kr.label.c_str(), nullptr, wrap_w); // fit-exempt: wrapped to the column
         const float this_h = std::max(row_h,
-                                      ImGui::CalcTextSize(r.label.c_str(), nullptr, false, wrap_w).y + 2.0f);
+                                      ImGui::CalcTextSize(kr.label.c_str(), nullptr, false, wrap_w).y + 2.0f);
         ImGui::Dummy({ body_w, this_h });
     }
     ImGui::EndChild();
@@ -539,17 +524,16 @@ void draw_scroll_list_key(ImVec2 anchor, float top_limit, float bottom_limit,
     ImGui::PopStyleVar();
 }
 
-/// On-canvas legend for the Resource lens (BL-019): the selected resource's name
+/// Legend for the Resource lens (BL-019): the selected resource's name
 /// and identity swatch, plus a note that the fill marks the contiguous deposit.
 /// Flat, not a gradient — the lens shows deposit *shape*, not magnitude.
-void draw_resource_key(ImDrawList* dl, ImVec2 anchor,
-                       ui_state& state)
+void draw_resource_key(ImDrawList* dl, ui_state& state)
 {
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
     const float body_h = pad + kLensComboH + 4.0f + line_h + 4.0f + line_h + 4.0f + line_h + pad;
     float x, y, bar_w;
-    begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
+    begin_lens_key(dl, state, body_h, pad, x, y, bar_w);
 
     draw_lens_resource_combo(state, {x, y}, bar_w);
     y += kLensComboH + 4.0f;
@@ -566,12 +550,11 @@ void draw_resource_key(ImDrawList* dl, ImVec2 anchor,
 
 /// On-canvas legend for the Market lens: a diverging cheap↔dear gradient bar plus
 /// the selected good's name and its current price ratio (or an "untraded" note when
-/// the body's market has no entry for it). Same left-edge placement as the Resource key.
+/// the body's market has no entry for it). The one lens chrome region, like every key.
 // BL-015: market lens is now a catchment-boundary tint (one colour per market).
 // The key shows a colour swatch per market labelled with its city name (matching the
 // ledger / selection / CSV — never a bare ordinal, which the player never sees elsewhere).
-void draw_market_key(ImVec2 anchor, float top_limit, float bottom_limit, const world& w,
-                     ui_state& state,
+void draw_market_key(const world& w, ui_state& state,
                      const std::unordered_map<entity_id, ImU32>& catchment_colours)
 {
     const float pad    = 8.0f;
@@ -597,10 +580,10 @@ void draw_market_key(ImVec2 anchor, float top_limit, float bottom_limit, const w
         rows.push_back({ col, IM_COL32(220, 220, 220, 255), std::move(name),
                          key_marker::swatch, 0.0f });
     }
-    const float box_w = std::max(140.0f, label_w + 2.0f * pad);
 
-    draw_scroll_list_key(anchor, top_limit, bottom_limit, "##lens_key_market",
-                         "Market catchments", box_w, rows, "No markets", &state, state);
+
+    draw_scroll_list_key("##lens_key_market",
+                         "Market catchments", rows, "No markets", &state, state);
 }
 
 /// On-canvas legend for the Country lens (BL-133): one colour swatch + nation name
@@ -609,8 +592,7 @@ void draw_market_key(ImVec2 anchor, float top_limit, float bottom_limit, const w
 /// label guaranteed-fits (CalcTextSize pattern draw_market_key already uses).
 /// Colour source is palette::nation_colour — the same source the tile tint itself
 /// uses (the country lens's tile-tint pass, above).
-void draw_country_key(ImVec2 anchor, float top_limit, float bottom_limit,
-                      const world& w, ui_state& state)
+void draw_country_key(const world& w, ui_state& state)
 {
     std::vector<entity_id> present;
     for (const auto& [tid, nid] : w.tile_to_nation)
@@ -635,7 +617,7 @@ void draw_country_key(ImVec2 anchor, float top_limit, float bottom_limit,
             continue;
         name_w = std::max(name_w, ui::fit_width(nat_it->second.name.c_str()));
     }
-    const float box_w = pad * 2.0f + swatch + 4.0f + name_w;
+
 
     std::vector<key_row> rows;
     rows.reserve(present.size());
@@ -648,13 +630,13 @@ void draw_country_key(ImVec2 anchor, float top_limit, float bottom_limit,
                          nat_it->second.name, key_marker::swatch, 0.0f });
     }
 
-    draw_scroll_list_key(anchor, top_limit, bottom_limit, "##lens_key_country",
-                         "Countries", box_w, rows, "No nations", nullptr, state);
+    draw_scroll_list_key("##lens_key_country",
+                         "Countries", rows, "No nations", nullptr, state);
 }
 
-/// On-canvas legend for the Population lens: a low→high habitability gradient bar
-/// (dark substrate → liveable green). Same left-edge placement as the other keys.
-void draw_population_key(ImDrawList* dl, ImVec2 anchor)
+/// Legend for the Population lens: a low→high habitability gradient bar (dark substrate
+/// → liveable green), in the one lens chrome region like every key.
+void draw_population_key(ImDrawList* dl, const ui_state& state)
 {
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
@@ -662,7 +644,7 @@ void draw_population_key(ImDrawList* dl, ImVec2 anchor)
 
     const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
     float x, y, bar_w;
-    begin_lens_key(dl, anchor, 156.0f, body_h, pad, x, y, bar_w);
+    begin_lens_key(dl, state, body_h, pad, x, y, bar_w);
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Workforce efficiency"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
@@ -720,7 +702,7 @@ ImU32 plate_colour(int index)
 /// canvas, is now what sits underneath, the panel takes an opaque fill: the 210-alpha
 /// default let the band's own background bleed through and muddy the plate swatches,
 /// which are the one thing this key exists to show.
-void draw_continent_key(ImDrawList* dl, ImVec2 anchor, const continent_state* plates)
+void draw_continent_key(ImDrawList* dl, const ui_state& state, const continent_state* plates)
 {
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
@@ -728,8 +710,7 @@ void draw_continent_key(ImDrawList* dl, ImVec2 anchor, const continent_state* pl
 
     const float body_h = pad + line_h + 6.0f + sw + 4.0f + sw + 4.0f + line_h + pad;
     float x, y, inner_w;
-    begin_lens_key(dl, anchor, 176.0f, body_h, pad, x, y, inner_w,
-                   IM_COL32(18, 18, 24, 255));
+    begin_lens_key(dl, state, body_h, pad, x, y, inner_w);
     (void)inner_w;
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Tectonic plates"); // fit-exempt: legend box sized to its measured entries (container 2)
@@ -778,7 +759,7 @@ void draw_continent_key(ImDrawList* dl, ImVec2 anchor, const continent_state* pl
 /// amber gradient bar mapping the tile tint, so the field reads as "where the
 /// industry I did not build is densest". Same placement as the others. (This
 /// comment previously drifted onto plate_colour, which it does not describe.)
-void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
+void draw_industry_key(ImDrawList* dl, const ui_state& state)
 {
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
@@ -786,7 +767,7 @@ void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
 
     const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
     float x, y, bar_w;
-    begin_lens_key(dl, anchor, 156.0f, body_h, pad, x, y, bar_w);
+    begin_lens_key(dl, state, body_h, pad, x, y, bar_w);
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Background industry"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
@@ -808,10 +789,9 @@ void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
     dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high"); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
-/// On-canvas legend for the Scarcity lens: an abundant→scarce gradient bar (no tint
+/// Legend for the Scarcity lens: an abundant→scarce gradient bar (no tint
 /// → hot) plus the selected resource's name and swatch. Same placement as the others.
-void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
-                       ui_state& state)
+void draw_scarcity_key(ImDrawList* dl, ui_state& state)
 {
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
@@ -820,7 +800,7 @@ void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
     const float body_h = pad + kLensComboH + 4.0f
                        + line_h + 4.0f + bar_h + 2.0f + line_h + 4.0f + line_h + pad;
     float x, y, bar_w;
-    begin_lens_key(dl, anchor, 156.0f, body_h, pad, x, y, bar_w);
+    begin_lens_key(dl, state, body_h, pad, x, y, bar_w);
 
     draw_lens_resource_combo(state, {x, y}, bar_w);
     y += kLensComboH + 4.0f;
@@ -873,10 +853,8 @@ struct supply_edge { entity_id other_body; int convoy_count; activity_vis tier; 
 /// bodies" the design calls for reads here as a list of the active body's own
 /// connections (name + recency tier) — the body-marker glow the design describes
 /// belongs on the Solar canvas, out of this lens work's file scope.
-void draw_reach_key(ImVec2 anchor, float top_limit, float bottom_limit, const world& w,
-                    const std::vector<reach_link>& links, ui_state& state)
+void draw_reach_key(const world& w, const std::vector<reach_link>& links, ui_state& state)
 {
-    const float box_w = 176.0f;
     std::vector<key_row> rows;
     rows.reserve(links.size());
     for (const reach_link& link : links)
@@ -886,8 +864,8 @@ void draw_reach_key(ImVec2 anchor, float top_limit, float bottom_limit, const wo
         const ImU32 c    = reach_tier_colour(link.tier);
         rows.push_back({ c, c, name, key_marker::dot, 0.0f });
     }
-    draw_scroll_list_key(anchor, top_limit, bottom_limit, "##lens_key_reach",
-                         "Reach (your trade network)", box_w, rows,
+    draw_scroll_list_key("##lens_key_reach",
+                         "Reach (your trade network)", rows,
                          "no routes from this body", nullptr, state);
 }
 
@@ -896,10 +874,9 @@ void draw_reach_key(ImVec2 anchor, float top_limit, float bottom_limit, const wo
 /// stands in for the edge-thickness encoding the design specifies for the
 /// (out-of-scope-here) Solar-canvas graph rendering, and colour is the shared
 /// recency tier.
-void draw_supply_routes_key(ImVec2 anchor, float top_limit, float bottom_limit, const world& w,
-                            const std::vector<supply_edge>& edges, ui_state& state)
+void draw_supply_routes_key(const world& w, const std::vector<supply_edge>& edges,
+                            ui_state& state)
 {
-    const float box_w = 176.0f;
     std::vector<key_row> rows;
     rows.reserve(edges.size());
     for (const supply_edge& edge : edges)
@@ -915,8 +892,8 @@ void draw_supply_routes_key(ImVec2 anchor, float top_limit, float bottom_limit, 
                                       0.0f, 1.0f);
         rows.push_back({ c, c, name, key_marker::bar, frac });
     }
-    draw_scroll_list_key(anchor, top_limit, bottom_limit, "##lens_key_supply",
-                         "Supply routes", box_w, rows, "no lanes from this body", nullptr, state);
+    draw_scroll_list_key("##lens_key_supply",
+                         "Supply routes", rows, "no lanes from this body", nullptr, state);
 }
 
 /// BL-362: bumps whenever the logistics caches were cleared since the last look.
@@ -1121,7 +1098,7 @@ void update_body_vision(world& w, ui_state& state, double now_days)
 void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_registry& reg,
                               const economy_report& report, const generation_report& gen,
                               ImVec2 origin, ImVec2 size,
-                              bool input_enabled, ImVec2 lens_key_anchor)
+                              bool input_enabled)
 {
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
 
@@ -3120,35 +3097,33 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
     dl->PopClipRect();
 
-    // On-canvas lens key (drawn unclipped, flush-left of the minimap so it reads as a
-    // drawer folding out from it — anchor passed in as lens_key_anchor; before the
-    // input early-out so it shows in headless captures too).
-    // Count-driven keys (Country/Market/Reach/Supply) are bounded to the canvas
-    // vertical span [key_top, key_bot] so a long entry list scrolls inside the box
-    // rather than overrunning the canvas edges (BL-163/164).
-    const float key_top = grid_area_origin.y + 8.0f;
-    const float key_bot = origin.y + size.y - 8.0f;
+    // The active lens's key, in the ONE lens chrome region (BL-602): the minimap's
+    // header, top right. Drawn unclipped and BEFORE the input early-out, so it shows in
+    // headless captures too.
+    //
+    // Neither family takes a position argument any more, and that is the change. Every
+    // key asks `ui::lens_chrome_rect` where it goes, so there is nothing here for a
+    // future edit to leave un-updated — the same rule shell_metrics.hpp exists to
+    // enforce on the rest of the shell. The Continent key drops its foreground-list
+    // special case with the move (see begin_lens_key).
     if (state.overlay == overlay_mode::country)
-        draw_country_key(lens_key_anchor, key_top, key_bot, w, state);
+        draw_country_key(w, state);
     else if (state.overlay == overlay_mode::resource)
-        draw_resource_key(dl, lens_key_anchor, state);
+        draw_resource_key(dl, state);
     else if (state.overlay == overlay_mode::market)
-        draw_market_key(lens_key_anchor, key_top, key_bot, w, state, market_catchment_colour);
+        draw_market_key(w, state, market_catchment_colour);
     else if (state.overlay == overlay_mode::population)
-        draw_population_key(dl, lens_key_anchor);
+        draw_population_key(dl, state);
     else if (state.overlay == overlay_mode::scarcity)
-        draw_scarcity_key(dl, lens_key_anchor, state);
+        draw_scarcity_key(dl, state);
     else if (state.overlay == overlay_mode::industry)
-        draw_industry_key(dl, lens_key_anchor);
-    // BL-376: foreground list, not `dl` (background) — the Selection band is an ImGui
-    // window and always open, so a background-list key at this anchor is drawn under
-    // it. Same position, higher z-order.
+        draw_industry_key(dl, state);
     else if (state.overlay == overlay_mode::continent)
-        draw_continent_key(ImGui::GetForegroundDrawList(), lens_key_anchor, plates);
+        draw_continent_key(dl, state, plates);
     else if (state.overlay == overlay_mode::reach)
-        draw_reach_key(lens_key_anchor, key_top, key_bot, w, reach_links, state);
+        draw_reach_key(w, reach_links, state);
     else if (state.overlay == overlay_mode::supply_routes)
-        draw_supply_routes_key(lens_key_anchor, key_top, key_bot, w, supply_edges, state);
+        draw_supply_routes_key(w, supply_edges, state);
 
     if (!input_enabled)
         return;

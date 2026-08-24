@@ -23,9 +23,9 @@ namespace ui {
 ///
 /// @param w             Read-only world state.
 /// @param state         Shared UI state; mutated on tile click and pan/zoom.
-/// @param reg           Recipe / economy registry — read by the Production and
-///                      Opportunity lenses to value outputs and recipes.
-/// @param report        Most recent economy-step report — the Production lens reads
+/// @param reg           Recipe / economy registry — read where a lens or marker needs
+///                      to value outputs and recipes.
+/// @param report        Most recent economy-step report — the Industry lens reads
 ///                      per-building output quantities from it.
 /// @param gen           The world's generation report (app::m_generation_report) — the
 ///                      Continent lens reads the active body's retained plate field from
@@ -35,14 +35,13 @@ namespace ui {
 /// @param size          Width and height of the region, in screen pixels.
 /// @param input_enabled When true, hover and click are processed. The caller
 ///                      disables input for whichever canvas the mouse is not over.
-/// @param lens_key_anchor Screen point the active lens's on-canvas key hangs from:
-///                      its RIGHT edge sits at anchor.x and it is vertically centred on
-///                      anchor.y. Pass the minimap's left edge + vertical centre so the
-///                      key reads as a drawer folding out from the minimap.
+///
+/// The active lens's key takes NO position argument (BL-602). It goes in the one lens
+/// chrome region — the minimap's header, top right — which `ui::lens_chrome_rect`
+/// owns, so the canvas neither knows nor passes where its legend lands.
 void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_registry& reg,
                               const economy_report& report, const generation_report& gen,
-                              ImVec2 origin, ImVec2 size,
-                              bool input_enabled, ImVec2 lens_key_anchor);
+                              ImVec2 origin, ImVec2 size, bool input_enabled);
 
 /// Refresh the intra-body vision model for state.active_body (BL-151/152/154). Rebuilds
 /// state.permanent_vision (radius-2 pockets around the player's building tiles + 3-wide
