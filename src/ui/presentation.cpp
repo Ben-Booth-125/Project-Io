@@ -106,6 +106,16 @@ constexpr resource_presentation resource_table[resource_count] = {
     { "Dressed Stone",      "DStn",IM_COL32(180, 178, 170, 255) }, // paler, worked grey against raw Stone
     { "Planks",             "Plk", IM_COL32(196, 158, 104, 255) }, // milled wood tan, against Timber's foliage green
     { "Tools",              "Tool",IM_COL32(158, 148, 128, 255) }, // worked bronze-grey, cooler than Iron Blooms
+    // --- Ancient roster, slice 2 (BL-586, 2026-08-24) — Tannery/Weaver/
+    // Shipwright, authored WITH the append, same discipline as slice 1. Hides
+    // and fibre sit with the endemic/ambient raws in hue register (pelt cream,
+    // crop green); leather/cloth/rigging warm and saturate with depth, the
+    // same value-gradient argument the Tier 2/3 processing roster above uses.
+    { "Hides",              "Hid", IM_COL32(168, 118,  90, 255) }, // raw pelt hide, between Furs' cream and Clay's earth
+    { "Fibre",              "Fib", IM_COL32(150, 196, 108, 255) }, // pale crop green, beside Agricultural Produce
+    { "Leather",            "Lthr",IM_COL32(120,  78,  52, 255) }, // tanned, darker and warmer than raw Hides
+    { "Cloth",              "Cth", IM_COL32(210, 200, 160, 255) }, // woven undyed fibre, paler than raw Fibre
+    { "Rigging",            "Rig", IM_COL32(176, 140,  72, 255) }, // tarred cordage gold-brown, the roster's deepest good
 };
 
 // Reserved corporation identity colours. Slot 0 is the player's corporation; the

@@ -56,6 +56,14 @@ resource_type resource_from_name(const std::string& name, bool& ok)
         { "dressed_stone",         resource_type::dressed_stone },
         { "planks",                resource_type::planks },
         { "tools",                 resource_type::tools },
+        // BL-586 slice 2 (2026-08-24) — Tannery/Weaver/Shipwright. Same rule
+        // as the block above: every new resource_type lands HERE the same
+        // change it is appended to the enum.
+        { "hides",                 resource_type::hides },
+        { "fibre",                 resource_type::fibre },
+        { "leather",               resource_type::leather },
+        { "cloth",                 resource_type::cloth },
+        { "rigging",               resource_type::rigging },
     };
 
     const auto it = table.find(name);

@@ -603,6 +603,62 @@ recipes = {
         inputs       = { iron_blooms = 1.5, planks = 1.0 },
         outputs      = { tools = 1.0 },
     },
+
+    -- =====================================================================
+    -- BL-586 slice 2 (2026-08-24) — the three chains slice 1 deliberately
+    -- deferred (components.hpp's enum comment names the deferral): all three
+    -- need a new extractable raw with real tile-generation deposits.
+    -- `hides` is ENDEMIC (Ben's ruling: lat/sector-restricted, richness-scored,
+    -- like furs — NOT the plain cover-based ambient mechanic timber/clay use);
+    -- `fibre` is the ordinary case, grown by the SAME cover-based ambient/
+    -- biotic mechanic agricultural_produce uses (tile_generation.cpp).
+    --
+    -- PRICE IS DERIVED, NOT PICKED, same method as the block above: ~1.433x
+    -- markup over the input basket (id 27 ordnance's own ratio). Re-derive
+    -- rather than hand-tuning if an input quantity changes.
+    -- =====================================================================
+
+    -- id 35 — Tannery: hides -> leather. Hides' only consumer; leather is
+    -- TERMINAL — sold to the market, reprocessed by nothing, same shape as
+    -- ceramics/dressed_stone above.
+    {
+        name         = "tannery",
+        display_name = "Tannery",
+        era          = "ancient",
+        group        = "Artisan Goods", -- BL-434, with the Potter & Weaver and Glassworks
+        inputs       = { hides = 2.0 },
+        outputs      = { leather = 1.0 },
+    },
+
+    -- id 36 — Weaver: fibre -> cloth. Fibre's only consumer. Unlike leather,
+    -- cloth is NOT terminal — it feeds the Shipwright below, the roster's
+    -- second intermediate-only ancient output (alongside planks).
+    {
+        name         = "weaver",
+        display_name = "Weaver",
+        era          = "ancient",
+        group        = "Artisan Goods", -- BL-434, with the Tannery above
+        inputs       = { fibre = 2.0 },
+        outputs      = { cloth = 1.0 },
+    },
+
+    -- id 37 — Shipwright: planks + cloth -> rigging. Required depth is
+    -- max(depth(planks)=1, depth(cloth)=1) = 1, so depth(rigging) = 1+1 = 2 —
+    -- past the flat depth-1 ceiling every other slice-2 chain sits at, and
+    -- the design's own "every chain should reach depth 2 or better" bar.
+    -- `rigging` is the chosen name for the design table's "terminal trade
+    -- good": ropework/cordage/tackle, a genuine ancient-craft good a
+    -- shipyard plausibly makes, in the same generic-material-noun register
+    -- as ceramics/dressed_stone/tools (never a proper noun). Terminal — sold
+    -- to the market, reprocessed by nothing.
+    {
+        name         = "shipwright",
+        display_name = "Shipwright",
+        era          = "ancient",
+        group        = "Advanced Fabrication", -- BL-434 — new to the ancient roster (already used by the industrial machinery/alloys/spacecraft_components chain)
+        inputs       = { planks = 1.5, cloth = 1.0 },
+        outputs      = { rigging = 1.0 },
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))

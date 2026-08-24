@@ -535,18 +535,32 @@ every one of them is priced and consumed, per the admission rule.
 | Stonemason | 2 stone → 1 dressed stone | 1 |
 | Sawmill | 2 timber → 1 planks | 1 |
 | Toolmaker | 1.5 iron blooms + 1 planks → 1 tools | 3 |
+| Tannery | 2 hides → 1 leather | 1 |
+| Weaver | 2 fibre → 1 cloth | 1 |
+| Shipwright | 1.5 planks + 1 cloth → 1 rigging | 2 |
 
 \* The Coking Kiln's own required depth, not `charcoal`'s overall depth — the Burner keeps that at
 1, since chain depth is a **min across recipes** (§ Chain depth below). The Kiln is BL-587's
 alternate method: unreachable until a corp has already smelted blooms, cheaper by the guard's
 reference prices once it is. See § Alternate production methods.
 
-**The last four rows are BL-585/BL-586's first slice of the wide ancient roster** (2026-08-24) —
-named buildings on existing raws, no new deposit or extraction target. The Toolmaker is the
-roster's first chain needing both a smelted good and a milled one at once (required depth 2 from
+**Rows five through eight are BL-585/BL-586's first slice of the wide ancient roster** (2026-08-24)
+— named buildings on existing raws, no new deposit or extraction target. The Toolmaker is that
+slice's deepest chain, needing both a smelted good and a milled one at once (required depth 2 from
 `max(depth(blooms)=2, depth(planks)=1)`, so `depth(tools) = 3`), tied with the existing ceiling
-rather than past it. `hides` and its leather/cloth consumers are deferred — they need a new
-extractable raw with real tile-generation deposits, a separate change from this slice.
+rather than past it.
+
+**The last three rows are BL-586's second slice** (2026-08-24), authoring the chains slice 1
+deliberately deferred: `hides` (endemic — lat/sector-restricted, richness-scored, like the four
+endemic goods above, not the plain cover-based ambient mechanic `fibre` uses) and `fibre` (the
+ordinary case, grown by the same cover-based ambient/biotic mechanic `agricultural_produce`
+uses) are both new extractable raws (`placement_rules::k_extractable`), with real tile-generation
+deposits. The Shipwright is the roster's first chain to clear depth 2 (`max(depth(planks)=1,
+depth(cloth)=1) + 1 = 2`) — past the flat depth-1 ceiling every other named building outside the
+Toolmaker sits at, and the design's own "every chain should reach depth 2 or better" bar. `rigging`
+is the roster's chosen name for the design table's "terminal trade good": ropework, cordage and
+tackle — a genuine ancient-craft good a shipyard plausibly makes — in the same generic-material-
+noun register as `ceramics`/`dressed_stone`/`tools`.
 
 **The Smithy's second recipe is the ancient arc's route to `ordnance`** (BL-460, ancient
 ordnance) — the same building, same `iron_blooms + charcoal` basket as its steel recipe,
@@ -721,8 +735,9 @@ cut, and is now the authoritative shape — not a compromise, a decision:
 |---|---|---|
 | Fuel Production | Charcoal Burner, Peat Kiln | A genuine supply-route pair (disjoint raws — R2's own classification), not a duplicate; both stay. |
 | Food Processing | Food Rations, Miller | Both stay — the any-band/ancient pair is not narrowed. |
-| Artisan Goods | Potter & Weaver, Glassworks | Left open — an early corp may sell trade goods without earning anything. |
+| Artisan Goods | Potter & Weaver, Glassworks, Tannery, Weaver | Left open — an early corp may sell trade goods without earning anything. The Tannery and Weaver (BL-586 slice 2) join under the same reasoning, not a re-opened ruling: both draw only on a raw (`hides`/`fibre`, required depth 0), same as the original pair. |
 | Construction Materials | Potter's Kiln, Stonemason, Sawmill | Left open — BL-586's slice-1 buildings are foundational, not earned content. |
+| Advanced Fabrication | *(nothing — the Shipwright is depth-locked)* | The Shipwright (BL-586 slice 2) draws `planks` and `cloth`, both required depth 1, so it is locked at tick 0 like every other depth>0 recipe — not a new closure, the ladder simply reaches it one rung up. |
 | Metal Foundry | *(nothing — the one closure)* | `refined_copper` gated by `E0-EC-03`; see § Chain depth's gate table. |
 
 **Only Metal Foundry closes**, and only because `refined_copper` (`any`-band, required depth 0)
@@ -865,10 +880,10 @@ sits in the `"General"` catch-all:
 | Food Processing | `food_rations` (any), `hydroponics_bay` (industrial), `food_rations_milled` "Miller" (ancient) | Feeding the population, whether growing the produce (Hydroponics Bay) or milling it into rations (Food Processor, Miller). |
 | Chemical Works | `propellant_atmospheric` (industrial), `propellant_electrolysis` (industrial) | The Chemical Plant's two propellant routes. |
 | Electronics | `silicon` (industrial), `ree_alloy` (industrial), `electronics` (industrial), `electronics_contact_grade` "Contact-Grade Electronics Lab" (industrial) | The silicon/REE/electronics chain. |
-| Advanced Fabrication | `machinery` (industrial), `alloys` (industrial), `ordnance` (industrial), `spacecraft_components` (industrial), `spacecraft_components_heavy` "Heavy Assembly Plant" (industrial) | Fabricator + Assembly Plant: goods assembled from refined inputs rather than smelted from ore. |
+| Advanced Fabrication | `machinery` (industrial), `alloys` (industrial), `ordnance` (industrial), `spacecraft_components` (industrial), `spacecraft_components_heavy` "Heavy Assembly Plant" (industrial), `shipwright` "Shipwright" (ancient) | Fabricator + Assembly Plant: goods assembled from refined inputs rather than smelted from ore. The Shipwright (BL-586 slice 2) is the group's first ancient member — new to the ANCIENT roster, not a new group overall, since it shares the name with the industrial machinery/alloys/spacecraft_components chain by the same "goods assembled from refined inputs" argument (planks + cloth, both already-processed goods, not raw hides or fibre). |
 | Welfare Goods | `clean_water` (industrial), `consumer_goods` (industrial), `medical_supplies` (industrial) | The habitability tranche — Water Treatment Plant, Consumer Goods Factory, Pharmaceutical Lab. |
 | Fuel Production | `charcoal` "Charcoal Burner" (ancient), `peat_charcoal` "Peat Kiln" (ancient), `charcoal_from_kiln` "Coking Kiln" (ancient) | Three producers of `charcoal`: the Burner and the Peat Kiln are disjoint-raw supply routes, but the Coking Kiln shares `timber` with the Burner and is the roster's first genuine interchangeable method (BL-587) — see § Alternate production methods. |
-| Artisan Goods | `trade_goods` "Potter & Weaver" (ancient), `glass` "Glassworks" (ancient) | Two independent producers of `trade_goods_misc`, same shape as Fuel Production. |
+| Artisan Goods | `trade_goods` "Potter & Weaver" (ancient), `glass` "Glassworks" (ancient), `tannery` "Tannery" (ancient), `weaver` "Weaver" (ancient) | Four independent producers, each of a different terminal or intermediate good (`trade_goods_misc`, `leather`, `cloth`) — the Tannery and Weaver (BL-586 slice 2) join on the same "sells finished goods from a raw craft input" argument as the Potter & Weaver and Glassworks. |
 
 Judgment calls recorded in `NEEDS_REVIEW.json`: whether Hydroponics Bay (an agriculture
 *producer*, not a food *processor*) belongs in Food Processing or a standalone Agriculture group,

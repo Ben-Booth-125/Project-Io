@@ -402,8 +402,12 @@ int main()
         static const char* const k_open[] = {
             "charcoal", "peat_charcoal",                 // Fuel Production
             "food_rations", "food_rations_milled",        // Food Processing
-            "trade_goods", "glass",                       // Artisan Goods
+            "trade_goods", "glass", "tannery", "weaver",   // Artisan Goods
             "ceramics_kiln", "stonemason", "sawmill",      // Construction Materials
+            // "shipwright" (Advanced Fabrication) is DELIBERATELY NOT here:
+            // its inputs (planks, cloth) are both depth 1, so its required
+            // depth is 1 — locked at tick 0 for a fresh corp exactly like
+            // every other depth>0 recipe, not a new closure this row asserts.
         };
         auto expected_open = [&](const std::string& name) {
             for (const char* n : k_open)
@@ -513,6 +517,13 @@ int main()
             { resource_type::ceramics,              "mercantile demand, terminal artisan good (BL-586)" },
             { resource_type::dressed_stone,         "mercantile demand, terminal construction good (BL-586)" },
             { resource_type::tools,                 "mercantile demand for now; BL-590 construction-material draw when it lands" },
+            // BL-586 slice 2 (2026-08-24). `leather` (Tannery) and `rigging`
+            // (Shipwright) are TERMINAL, same shape as the row above; `cloth`
+            // (Weaver) is NOT exempted here — it has a real recipe consumer,
+            // the Shipwright, so it is expected to show `consumed[r] == true`
+            // on its own.
+            { resource_type::leather,               "mercantile demand, terminal artisan good (BL-586 slice 2)" },
+            { resource_type::rigging,               "mercantile demand, terminal trade good (BL-586 slice 2, the Shipwright's output)" },
         };
         auto exempt_consumer = [&](std::size_t r) -> const char* {
             for (const exemption& e : k_actor_consumed)

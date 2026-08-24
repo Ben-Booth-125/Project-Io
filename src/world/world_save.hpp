@@ -126,7 +126,14 @@ inline constexpr uint32_t world_save_magic =
 /// with it; nothing else needs touching. A v8 stream's arrays are the wrong
 /// length for a v9 reader, so it is refused whole on the same strict-equality
 /// contract as every prior bump — there is no migration to write.
-inline constexpr uint32_t world_save_version = 9;
+///
+/// Bumped to 10 by BL-586 slice 2 (hides/fibre/leather/cloth/rigging): five
+/// more new `resource_type` values widen `resource_count` 42 -> 47, the same
+/// structural class of move as the v8 -> v9 bump above — every per-resource
+/// array in the stream widens, not a trailing section. A v9 stream's arrays
+/// are the wrong length for a v10 reader, so it is refused whole on the same
+/// strict-equality contract as every prior bump.
+inline constexpr uint32_t world_save_version = 10;
 
 /// Write @p w as a complete world snapshot.
 ///

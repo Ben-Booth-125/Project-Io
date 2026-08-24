@@ -322,6 +322,29 @@ area** — the knife-edge is real.
 **Limestone.** Skeletal carbonate from shelly life: the flux for iron smelting and the binder for all
 masonry. *(Io has no resource slot for it — see Open calls.)*
 
+### Endemism — the C → D joint
+
+A sibling stage to Legacy, answering a different question: not "what can this world **build**
+with" but "what is this world worth **carrying from**". A biosphere does not spread a species
+evenly — it evolves it in one climate band, in one region, and nowhere else, which is why a good
+here is valuable for being *somewhere else* rather than for being *useful* (`docs/economy/
+RESOURCES.md` § Mercantile — endemic trade goods, BL-191).
+
+Once `life_stage ≥ land`, each candidate good rolls independently for **whether** this biosphere
+evolved it at all, and if so a **latitude band** (fixed per good — the climate it wants) and a
+**longitude sector** (rolled — where it actually arose): tobacco (temperate/subtropical
+grassland), spices (tropical wetland/forest), coffee (subtropical highland forest), furs
+(subpolar/polar tundra), and — joining the set (BL-586, 2026-08-24, Ben's ruling) — **hides**
+(temperate/subtropical grassland, the pasture reading, sharing tobacco's band but its own rolled
+sector). A tile only carries the deposit inside the band **and** the sector **and** a suitable
+terrain cover for the good; `docs/generation/TILE_GENERATION.md` § Post-multiplies and endemic
+additions owns the per-tile placement mechanics.
+
+This is the ENDEMIC mechanism specifically — richness-scored, lat/sector-restricted, rarer and
+regional. It is a different mechanic from the plain cover-based **ambient/biotic** goods
+(timber, clay, and now **fibre**, BL-586) that grow wherever their cover appears, with no
+biosphere-wide scarcity roll at all.
+
 ### And then the civilisation gate itself
 
 Not a timer. Five concrete requirements, each traceable to something above:

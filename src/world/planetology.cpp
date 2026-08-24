@@ -1363,6 +1363,13 @@ planetology_state run_planetology(const body_inputs& in,
             { resource_type::spices,  0.00f, 0.25f, 0.60f }, // tropical wetland and forest
             { resource_type::coffee,  0.15f, 0.45f, 0.60f }, // subtropical highland forest
             { resource_type::furs,    0.60f, 0.95f, 0.65f }, // subpolar and polar tundra
+            // BL-586 slice 2 (2026-08-24, Ben's ruling): hides are ENDEMIC,
+            // like furs — lat/sector-restricted, richness-scored, rarer and
+            // regional — NOT the plain cover-based ambient mechanic fibre
+            // (below) uses. Temperate/subtropical grassland, the same band as
+            // tobacco (pasture, not the polar trapping ground furs reads as);
+            // the two are differentiated by sector, not by band alone.
+            { resource_type::hides,   0.15f, 0.55f, 0.65f }, // temperate/subtropical grassland (pasture)
         };
 
         for (const candidate& c : k_candidates)
@@ -1392,6 +1399,7 @@ planetology_state run_planetology(const body_inputs& in,
                     case resource_type::spices:  names += "spices";  break;
                     case resource_type::coffee:  names += "coffee";  break;
                     case resource_type::furs:    names += "furs";    break;
+                    case resource_type::hides:   names += "hides";   break;
                     default: break;
                 }
             }
