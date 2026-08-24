@@ -9,6 +9,7 @@
 #include "placement_rules.hpp"
 #include "recipe_registry.hpp"
 #include "survey_system.hpp"
+#include "tech_gate.hpp"       // recipe_unlocked (BL-588)
 #include "unit_roster.hpp"
 #include "world.hpp"
 
@@ -829,6 +830,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // refused costs a build slot to learn nothing.
                     const int required = reg.recipe_required_depth(rid);
                     if (required < 0 || required > depth)
+                        continue;
+
+                    // BL-588's tech gate, same reason as the depth one just
+                    // above: construct_building refuses a tech-locked recipe,
+                    // so a candidate that can only ever be refused costs a
+                    // build slot to learn nothing.
+                    if (!recipe_unlocked(w, reg, corp, rid))
                         continue;
 
                     // INPUT ACCESS. A processor with no reachable input is an

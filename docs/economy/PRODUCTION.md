@@ -610,6 +610,22 @@ placement would leave a one-click bypass — place the shallowest method the cor
 onto the deepest sibling in the same group, and the ladder never has to be climbed. Both refusals map
 to the same `rejected_depth_locked` on the seam, so an agent cannot tell the two routes apart.
 
+**`tech_locked` reaches a recipe too, now** (BL-588, 2026-08-24). Until this item `tech_locked`
+only ever meant a *building type* was ungated — the effect union (`tech_gate.hpp`) had no arm that
+could name a recipe. `unlock_recipe` is the third arm: a tech gate names a `recipe::name`
+(`tech_gate::unlocks_recipe`), and `recipe_unlocked(w, reg, corp, recipe_id)` resolves the id to
+that name and checks it against `world::has_tech`, at both `construct_building` (returning the
+SAME `construction_result::tech_locked` the structure-level check already used) and
+`try_switch_recipe` (a new `recipe_switch_result::tech_locked`), for the identical retool-bypass
+reason the depth gate is checked at both doors. **The two locks are independent and both must
+pass** — a recipe can be depth-locked, tech-locked, both, or neither; they ask genuinely different
+questions (earned by building vs. earned by research) and neither substitutes for the other.
+First-cut authored gates (`tech_gate.cpp`): `E0-EC-01` unlocks the Toolmaker (BL-586) on owning a
+processing facility and a Cr 500 surplus; `E1-EC-01` unlocks the Bessemer Converter (BL-587) on
+already holding `machinery` in stockpile — the Converter's own reagent, not a cash figure, after a
+surplus-only first draft proved satisfiable by any solvent corp regardless of what it had actually
+built (caught by `tech_gate_harness`'s T3 fixture, corrected before landing).
+
 ---
 
 ## The era band — which roster a campaign sees

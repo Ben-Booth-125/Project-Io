@@ -6087,6 +6087,50 @@
                     "result_metric": "6 harnesses + full GUI build, 0 failures after the re-bless"
                 }
             ]
+        },
+        {
+            "brief": "unlock-recipe-tech-arm",
+            "title": "A tech can unlock a recipe, not just a building type",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-588 (UNLOCK_RECIPE_TECH_ARM) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "headless: tech_effect_union_harness",
+                        "headless: tech_gate_harness"
+                    ],
+                    "requirement": "ITEM-SPANNING: tech_effect_kind gains unlock_recipe, storing the recipe NAME (never an id); tech_gate gains an unlocks_recipe mirror maintained only through add_effect; recipe_unlocked(w, reg, corp, recipe_id) and gating_tech_for_recipe resolve id -> name and check world::has_tech, with the same null_entity/ungated contract as structure_unlocked.",
+                    "notes": "tech_effect_union_harness: 35 passed, 0 failed. tech_gate_harness: 33 passed, 0 failed (after correcting E1-EC-01's predicate — see R3).",
+                    "result_metric": "3rd effect-union arm; 2 authored gates (E0-EC-01, E1-EC-01)"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: construction_gate_harness",
+                        "headless: construction_harness",
+                        "headless: recipe_switch_harness",
+                        "headless: corp_ai_harness"
+                    ],
+                    "requirement": "The tech-recipe gate is read at BOTH doors — construct_building (placement) and try_switch_recipe (retooling) — closing the same one-click bypass the depth gate's own comment names. Both return the shared tech_locked code (construction_result::tech_locked reused; a new recipe_switch_result::tech_locked mapped to the same corp_command_result::rejected_tech_locked the structure-level lock already uses). corp_ai.cpp's build-candidate loop filters on it, mirroring the existing depth filter, so the scorer never proposes a candidate the seam would refuse.",
+                    "notes": "construction_gate_harness / construction_harness / recipe_switch_harness / corp_ai_harness: all rerun clean after the change. Two locks are independent — a recipe can be depth_locked, tech_locked, both, or neither.",
+                    "result_metric": "2 doors gated, 1 scorer filter added, 0 regressions"
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "headless: tech_gate_harness"
+                    ],
+                    "requirement": "First-cut authored gates are satisfiable through ordinary play quantities, not a debug poke or a trivially-true predicate — the same bar BL-344's own T3 fixture holds the original garrison gate to.",
+                    "notes": "A first draft of E1-EC-01 (surplus >= 1500 only) was caught by tech_gate_harness's own T3 fixture (2 extraction sites, Cr 5,000, zero stockpile): the fixture accidentally satisfied it, proving the predicate was satisfiable by ANY solvent corp regardless of what it had built — a real design flaw, not just a test collision. Corrected to require holding machinery (the Bessemer Converter's own reagent) in stockpile instead, which the fixture genuinely lacks. tech_gate_harness: 33/33 after the fix.",
+                    "result_metric": "1 predicate corrected before landing, caught by the existing regression harness"
+                }
+            ]
         }
     ]
 }

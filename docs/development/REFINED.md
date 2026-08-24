@@ -221,3 +221,34 @@ Requirements: `req/requirements.json` § ancient-goods-append-and-slice-1 (R2). 
 3. **Deliberately not this slice**: Tannery/Weaver/Shipwright — all three need `hides`, a new
    extractable raw with real tile-generation deposits, a materially bigger change than a recipe.
    BL-586 stays `designed` rather than flipping to `complete` for exactly this reason.
+
+---
+
+#### BL-588 — UNLOCK_RECIPE_TECH_ARM — COMPLETE 2026-08-24
+
+Requirements: `req/requirements.json` § unlock-recipe-tech-arm. Files: `src/world/tech_gate.{hpp,cpp}`,
+`construction.cpp`, `economy_system.{hpp,cpp}`, `corp_ai.cpp`, `corp_command.cpp`,
+`docs/META_LAYER.md`, `docs/economy/PRODUCTION.md`.
+
+1. `tech_effect_kind` gained a third arm, `unlock_recipe`, storing a recipe **name** (never an id —
+   ids are positional). `tech_gate::unlocks_recipe` mirrors it, maintained only through `add_effect`,
+   exactly as `unlocks_structure` already is. `recipe_unlocked(w, reg, corp, recipe_id)` resolves id →
+   name and checks `world::has_tech`; `gating_tech_for_recipe` is the reverse lookup.
+2. Checked at **both** doors — `construct_building` (reuses `construction_result::tech_locked`) and
+   `try_switch_recipe` (new `recipe_switch_result::tech_locked`, mapped to the existing
+   `corp_command_result::rejected_tech_locked`) — closing the same retool bypass the depth gate's
+   own comment names. `corp_ai.cpp`'s build-candidate loop filters on it, mirroring the existing
+   depth filter.
+3. Two first-cut gates authored **fresh**, not transcribed from `tech_tree.lua`'s unreviewed
+   sketch/derived node list (the call NR-591 raised and this item took): `E0-EC-01` unlocks the
+   Toolmaker (BL-586) on a processing facility + Cr 500; `E1-EC-01` unlocks the Bessemer Converter
+   (BL-587) on holding `machinery` in stockpile.
+4. **A real predicate defect found and fixed before landing.** E1-EC-01's first draft (surplus ≥
+   1,500 only) was caught by `tech_gate_harness`'s own T3 fixture — satisfiable by any solvent corp
+   regardless of what it had actually built, the exact failure mode a gate exists to prevent, not
+   merely a test collision. Corrected to require the Converter's own reagent in stock instead.
+5. Full tree build and 13 relevant harnesses (`tech_effect_union_harness`, `tech_gate_harness`,
+   `construction_gate_harness`, `construction_harness`, `corp_ai_harness`, `chain_depth`,
+   `recipe_switch_harness`, `price_band_harness`, `save_roundtrip`, `determinism_harness`,
+   `spectator_determinism`, `corp_ai_predictive_harness`, `corp_agency_harness`) all clean.
+   `spectator_determinism`'s golden held — no re-bless needed.

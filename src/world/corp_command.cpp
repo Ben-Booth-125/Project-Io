@@ -414,6 +414,10 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 // routes apart — which is the point. Not `rejected_invalid`: the
                 // arguments are fine, the corp simply has not climbed far enough.
                 case recipe_switch_result::depth_locked:        return corp_command_result::rejected_depth_locked;
+                // BL-588: reuses the SAME typed code the build door's
+                // structure-level tech lock returns, so an agent cannot tell
+                // a structure lock from a recipe lock apart on the seam.
+                case recipe_switch_result::tech_locked:         return corp_command_result::rejected_tech_locked;
             }
             return corp_command_result::rejected_invalid;
         }

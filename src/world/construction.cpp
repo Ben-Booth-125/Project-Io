@@ -4,6 +4,7 @@
 
 #include "market_clearing.hpp" // market_for_tile
 #include "placement_rules.hpp"
+#include "tech_gate.hpp"       // BL-588: recipe_unlocked
 
 #include <algorithm> // std::find (asset-list removal in demolish_building), std::max, std::clamp
 #include <cmath>     // std::lround (BL-323 S3 site-time multiplier)
@@ -50,6 +51,16 @@ construction_result construct_building(world& w, const recipe_registry& reg,
         if (required < 0 || required > corp_reached_depth(corp_it->second, reg))
             return construction_result::depth_locked;
     }
+
+    // BL-588 tech-recipe gate — a SECOND, independent lock on top of the depth
+    // one above (both must pass). Reuses `construction_result::tech_locked`,
+    // the same value the structure-level gate already returns, so an agent
+    // reading the seam cannot tell a structure lock from a recipe lock apart —
+    // which is the point (corp_command_result::rejected_tech_locked mirrors
+    // this one level up). `corp` is guaranteed non-null here (the no_corp
+    // check above already returned), so this is never the ungated no-corp case.
+    if (!recipe_unlocked(w, reg, corp, recipe))
+        return construction_result::tech_locked;
 
     // Tile-level validity check (ocean / deposit / terrain).
     if (!placement_rules::can_place(tile_it->second, type, target))

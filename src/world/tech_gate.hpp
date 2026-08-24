@@ -4,10 +4,16 @@
 #include "condition_set.hpp"
 #include "modifier_set.hpp"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
-struct world; // forward-declared; tech_gate.cpp reads it.
+struct world;          // forward-declared; tech_gate.cpp reads it.
+class  recipe_registry; // forward-declared; recipe_unlocked/gating_tech_for_recipe read it
+                        // to resolve a recipe id to the name a gate's `unlocks_recipe`
+                        // stores — recipe_registry.hpp is Lua-free (the class itself
+                        // carries no sol2 dependency, only recipe_registry.cpp does), so
+                        // this stays linkable by the SDL/Lua/ImGui-free world superset.
 
 // ---------------------------------------------------------------------------
 // Tech gates (BL-344) — the one place a tech actually gates something
@@ -45,20 +51,25 @@ struct world; // forward-declared; tech_gate.cpp reads it.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// The effect union (BL-479) — what earning a tech DOES
+// The effect union (BL-479, widened BL-588) — what earning a tech DOES
 // ---------------------------------------------------------------------------
-// Until this item the whole effect vocabulary was one field, `unlocks_structure`
-// — a 9:1 condition-to-effect asymmetry against BL-342's predicate side. The
-// union widens it to exactly TWO arms: unlock a structure (BL-344's existing
-// behaviour, unchanged) or move a scalar (a `scalar_modifier`, modifier_set.hpp).
-// Closed on purpose: no callback, no Lua hook — an effect is data, so it stays
-// deterministic, serialisable, and legible in the F9 viewer's prose.
+// Until BL-479 the whole effect vocabulary was one field, `unlocks_structure`
+// — a 9:1 condition-to-effect asymmetry against BL-342's predicate side. BL-479
+// widened it to unlock-a-structure or move-a-scalar. BL-588 adds a THIRD arm:
+// unlock a recipe. Until this arm existed a tech could gate a building type but
+// never the METHOD a building runs, which is what Ben's progression steer
+// ("most recipes are not buildable on game start") actually needs — most of
+// the roster is buildings the player already has, running a recipe they have
+// not yet earned. Closed on purpose, still: no callback, no Lua hook — an
+// effect is data, so it stays deterministic, serialisable, and legible in the
+// F9 viewer's prose.
 
 /// Which arm of the union a `tech_effect` is.
 enum class tech_effect_kind : uint8_t
 {
     unlock_structure = 0, ///< Earning permits constructing `structure` (BL-344).
     modify_scalar,        ///< Earning applies `modifier` to the earning corp (BL-479).
+    unlock_recipe,        ///< Earning permits running/switching-to `recipe` (BL-588).
 };
 
 /// One effect of earning a tech. A tagged union over POD arms rather than a
@@ -76,13 +87,29 @@ struct tech_effect
     /// the tech (applied by `advance_tech_gates`, read by `world::modified_scalar`).
     scalar_modifier modifier{};
 
-    /// The two arms' authoring spellings — a misauthored effect (an unlock arm
-    /// carrying a modifier, or vice versa) cannot be written through these.
+    /// `unlock_recipe` arm: the recipe's `name` (`recipe::name`, recipe_registry.hpp)
+    /// — NOT its id. A recipe id is its POSITION in the authored list
+    /// (recipe_registry.hpp's own comment: "keep the order stable so authored
+    /// ids hold"), so a gate that stored an id would silently repoint onto a
+    /// different recipe the moment the roster is reordered. The name survives
+    /// that; `recipe_unlocked` resolves name -> id through the live registry at
+    /// the point of check.
+    std::string recipe;
+
+    /// The three arms' authoring spellings — a misauthored effect (an unlock
+    /// arm carrying a modifier, or vice versa) cannot be written through these.
     static tech_effect unlock(building_type t)
     {
         tech_effect e;
         e.kind      = tech_effect_kind::unlock_structure;
         e.structure = t;
+        return e;
+    }
+    static tech_effect unlock(const std::string& recipe_name)
+    {
+        tech_effect e;
+        e.kind   = tech_effect_kind::unlock_recipe;
+        e.recipe = recipe_name;
         return e;
     }
     static tech_effect modify(modifier_subject subject, modifier_op op, float magnitude)
@@ -110,19 +137,26 @@ struct tech_gate
     /// through `add_effect` so the two cannot disagree.
     building_type unlocks_structure = building_type::none;
 
+    /// BL-588: the SAME mirror pattern as `unlocks_structure`, one level over —
+    /// the (at most one) unlock_recipe entry's `recipe` name, or empty for a
+    /// tech that gates no recipe. Never author directly; through `add_effect`.
+    std::string unlocks_recipe;
+
     /// The effect list — the union is the vocabulary, this is the store. At
-    /// most ONE unlock_structure entry per tech (the pre-union model could not
-    /// express more, and the mirror field cannot hold more); any number of
-    /// modify_scalar entries, applied in this stored order at the earn moment.
+    /// most ONE unlock_structure and ONE unlock_recipe entry per tech (the
+    /// mirror fields cannot hold more); any number of modify_scalar entries,
+    /// applied in this stored order at the earn moment.
     std::vector<tech_effect> effects;
 
-    /// The single authoring point: appends to `effects` and keeps the
-    /// `unlocks_structure` mirror true.
+    /// The single authoring point: appends to `effects` and keeps both mirrors
+    /// true.
     void add_effect(const tech_effect& e)
     {
         effects.push_back(e);
         if (e.kind == tech_effect_kind::unlock_structure)
             unlocks_structure = e.structure;
+        else if (e.kind == tech_effect_kind::unlock_recipe)
+            unlocks_recipe = e.recipe;
     }
 };
 
@@ -180,3 +214,24 @@ bool structure_unlocked(const world& w, entity_id corp, building_type type);
 /// refusal say WHICH tech is missing rather than just "locked" (BL-071's
 /// teach-the-player-why rule, applied to the tech gate).
 std::string gating_tech_for(building_type type);
+
+/// BL-588: whether `corp` may run/switch-to `recipe_id` — the recipe-arm
+/// counterpart of `structure_unlocked`, same null_entity/ungated contract.
+/// Resolves `recipe_id` to its `recipe::name` through @p reg (gates store the
+/// name, never the id — see `tech_effect::recipe`'s comment) and looks that
+/// name up against every gate's `unlocks_recipe` mirror. An id with no
+/// resolvable name (a stale or out-of-range id) reads as ungated rather than
+/// throwing — the same "never crash on missing data" contract the recipe
+/// switch seam already keeps.
+///
+/// @param w        Read-only world state.
+/// @param reg      Loaded recipe registry, for id -> name resolution.
+/// @param corp     Corporation asking. `null_entity` disables the check.
+/// @param recipe_id The recipe's absolute id (recipe_registry storage id).
+bool recipe_unlocked(const world& w, const recipe_registry& reg,
+                     entity_id corp, uint16_t recipe_id);
+
+/// The tech id gating `recipe_id`, or an empty string if the recipe is
+/// ungated (or its id does not resolve). The recipe-arm counterpart of
+/// `gating_tech_for`.
+std::string gating_tech_for_recipe(const recipe_registry& reg, uint16_t recipe_id);

@@ -8,6 +8,7 @@
 #include "market_clearing.hpp" // market_for_tile (BL-095 construction gate)
 #include "placement_rules.hpp" // stack_output_scalar (BL-193 building stacks)
 #include "stance.hpp"          // is_hostile (BL-470's NR-344: war flips the march queue)
+#include "tech_gate.hpp"       // recipe_unlocked (BL-588)
 #include "unit_roster.hpp"     // resolve_unit_upkeep (BL-454 unit pass), unit_roster_table (BL-470)
 #include "workforce.hpp"
 
@@ -739,6 +740,13 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
         if (need < 0 || need > corp_reached_depth(cit->second, reg))
             return recipe_switch_result::depth_locked;
     }
+
+    // BL-588 tech-recipe gate, mirroring construct_building's — SAME reason
+    // the depth gate above sits at both doors: guarding only placement leaves
+    // the one-click bypass (place the ungated method, retool onto the
+    // tech-locked one in the same group).
+    if (!recipe_unlocked(w, reg, corp, new_recipe_id))
+        return recipe_switch_result::tech_locked;
 
     const float cost = sw.switch_cost;
     if (cit->second.balance < cost)

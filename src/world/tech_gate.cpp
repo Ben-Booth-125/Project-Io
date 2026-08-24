@@ -1,5 +1,6 @@
 #include "tech_gate.hpp"
 
+#include "recipe_registry.hpp" // BL-588: recipe_unlocked's id -> name resolution
 #include "world.hpp"
 
 #include <vector>
@@ -49,6 +50,75 @@ std::vector<tech_gate> build_gates()
         garrison.condition.all.push_back(c);
     }
     gates.push_back(garrison);
+
+    // BL-588 — the effect union's first two `unlock_recipe` gates. Not a
+    // reshaping of the tech tree (Ben's constraint on this item): both ids
+    // below are authored fresh rather than transcribed from tech_tree.lua's
+    // ~150 sketch/derived nodes, since none of them resolve to a real
+    // predicate yet (NR-579 records this as the open question the next
+    // authoring pass owns). "First cut" per the item's own design — proving
+    // the arm resolves end to end, not gating the whole roster in one item.
+    //
+    // Neither predicate uses `stockpile` as a proxy for "produced" — BL-428's
+    // OWN mechanism (`corp_reached_depth`, produced_ever) already answers
+    // "has this corp ever made X", and re-deriving that from a stockpile
+    // snapshot would drift the moment a corp sold or consumed the good. A
+    // tech gate is a DIFFERENT, ADDITIONAL lock layered on top of the depth
+    // one (both must pass), so its predicate asks a genuinely different
+    // question — held infrastructure and cash — rather than shadowing depth.
+
+    // E0-EC-01 "Tool-and-Die Practice" — unlocks the Toolmaker (BL-586), the
+    // ancient roster's chain that needs both a smelted good and a milled one
+    // at once. Predicate: a Bloomery already stands (the smelting half is
+    // real, not hypothetical) and a Cr 500 surplus (a smaller doctrine cost
+    // than the garrison's 2,000 — this is a production method, not a standing
+    // military commitment).
+    tech_gate tool_and_die;
+    tool_and_die.id = "E0-EC-01";
+    tool_and_die.add_effect(tech_effect::unlock(std::string("toolmaker")));
+    {
+        condition c;
+        c.subject    = condition_subject::structure;
+        c.structure  = building_type::processing_facility;
+        c.comparator = condition_comparator::at_least;
+        c.operand    = 1.0f;
+        tool_and_die.condition.all.push_back(c);
+    }
+    {
+        condition c;
+        c.subject    = condition_subject::surplus;
+        c.comparator = condition_comparator::at_least;
+        c.operand    = 500.0f;
+        tool_and_die.condition.all.push_back(c);
+    }
+    gates.push_back(tool_and_die);
+
+    // E1-EC-01 "Converter Practice" — unlocks the Bessemer Converter (BL-587),
+    // industrial steel's alternate method. Predicate: the corp already HOLDS
+    // machinery — the Converter's own reagent — rather than a cash figure. A
+    // surplus-only predicate was authored first and rejected on measurement:
+    // `tech_gate_harness`'s T3 fixture (2 extraction sites, Cr 5,000, zero
+    // stockpile) satisfied ANY plausible cash bar by accident, which is the
+    // same "satisfied by an unrelated corp" failure a gate exists to avoid —
+    // not just a test collision, a real design flaw the test caught. Holding
+    // machinery means the machine-tool chain (Fabricator: steel + refined
+    // copper) is ALREADY running, which is the genuinely industrial-arc fact
+    // "converter practice" should require. `structure` is deliberately NOT
+    // used: every processing_facility can run the Smelter already, so
+    // requiring one would be circular the same way a military subject on the
+    // garrison gate would have been.
+    tech_gate converter_practice;
+    converter_practice.id = "E1-EC-01";
+    converter_practice.add_effect(tech_effect::unlock(std::string("steel_bessemer")));
+    {
+        condition c;
+        c.subject    = condition_subject::stockpile;
+        c.resource   = resource_type::machinery;
+        c.comparator = condition_comparator::at_least;
+        c.operand    = 1.0f;
+        converter_practice.condition.all.push_back(c);
+    }
+    gates.push_back(converter_practice);
 
     return gates;
 }
@@ -124,6 +194,39 @@ std::string gating_tech_for(building_type type)
 {
     for (const tech_gate& g : prototype_tech_gates())
         if (g.unlocks_structure == type)
+            return g.id;
+    return {};
+}
+
+bool recipe_unlocked(const world& w, const recipe_registry& reg,
+                     entity_id corp, uint16_t recipe_id)
+{
+    // Same null_entity/ungated contract as structure_unlocked.
+    if (corp == null_entity)
+        return true;
+
+    // Gates store the recipe NAME (tech_effect::recipe's comment: an id is
+    // positional and would silently repoint). A stale/out-of-range id has no
+    // name to resolve, which reads as ungated rather than throwing — the same
+    // "never crash on missing data" contract try_switch_recipe already keeps.
+    const recipe* rc = reg.get_recipe(recipe_id);
+    if (rc == nullptr)
+        return true;
+
+    for (const tech_gate& g : prototype_tech_gates())
+        if (!g.unlocks_recipe.empty() && g.unlocks_recipe == rc->name)
+            return w.has_tech(corp, g.id);
+    return true; // ungated
+}
+
+std::string gating_tech_for_recipe(const recipe_registry& reg, uint16_t recipe_id)
+{
+    const recipe* rc = reg.get_recipe(recipe_id);
+    if (rc == nullptr)
+        return {};
+
+    for (const tech_gate& g : prototype_tech_gates())
+        if (!g.unlocks_recipe.empty() && g.unlocks_recipe == rc->name)
             return g.id;
     return {};
 }

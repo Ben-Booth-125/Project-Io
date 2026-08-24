@@ -377,6 +377,8 @@ enum class recipe_switch_result : uint8_t
                           ///< outright, not priced. See try_switch_recipe's comment.
     depth_locked,         ///< BL-428: the corp has not reached the chain depth the new recipe needs.
                           ///< Closes the retool bypass — see try_switch_recipe's comment.
+    tech_locked,          ///< BL-588: the corp has not earned the tech that unlocks the new recipe.
+                          ///< A SECOND, independent lock alongside depth_locked — see try_switch_recipe.
 };
 
 /// Attempt a PLAYER-grade recipe switch on `b`, gated by `economy.recipe_switch`
