@@ -113,6 +113,22 @@ economy = {
             richness_reference = 24.9,
             richness_min       = 0.25,
             richness_max       = 2.0,
+
+            -- BL-590 (2026-08-24): per-named-building material overrides, keyed
+            -- by TARGET resource — an ancient extraction site is a wooden dig
+            -- shed or a quarry frame, not a steel-reinforced structure, so the
+            -- five ancient-only targets override the type's steel=20 default.
+            -- Absent target = the default above; every space-sourced/industrial
+            -- target (iron_ore, coal, ...) is UNCHANGED, deliberately — the
+            -- anachronism BL-590 exists to fix is the ANCIENT arc's, and an
+            -- industrial mine genuinely does need steel reinforcement.
+            material_overrides = {
+                stone  = { timber = 12.0 },              -- a timber-framed quarry
+                timber = { stone  = 6.0  },               -- an axe-and-saw camp needs a whetstone, not a shed
+                sand   = { timber = 10.0 },
+                clay   = { timber = 10.0 },
+                peat   = { timber = 8.0  },
+            },
         },
         processing_facility = {
             base_rate   = 8.0,
@@ -121,6 +137,36 @@ economy = {
             build_cost  = 200.0,
             build_duration_ticks = 3.0,
             resource_costs = { steel = 25.0 },
+
+            -- BL-590 (2026-08-24): keyed by RECIPE — every industrial recipe is
+            -- unchanged (still steel=25.0, the default above); the ancient
+            -- roster's thirteen recipes each get a basket from goods the
+            -- ancient arc actually makes. Grouped by what the building IS:
+            material_overrides = {
+                -- Fuel Production — a simple kiln, mostly timber.
+                charcoal            = { timber = 10.0 },              -- Charcoal Burner
+                peat_charcoal       = { timber = 6.0, stone = 3.0 },   -- Peat Kiln
+                charcoal_from_kiln  = { timber = 8.0, stone = 4.0 },   -- Coking Kiln (BL-587)
+
+                -- Metal Foundry — a masonry hearth, so stone-heavy. The Smithy's
+                -- two recipes (steel/ordnance) share the SAME physical building
+                -- (recipes.lua's own comment), so they carry the same basket.
+                iron_blooms          = { stone = 15.0, timber = 5.0 }, -- Bloomery
+                steel_from_blooms    = { stone = 15.0, timber = 5.0 }, -- Smithy (steel)
+                ordnance_from_blooms = { stone = 15.0, timber = 5.0 }, -- Smithy (ordnance)
+                toolmaker            = { stone = 12.0, timber = 10.0 }, -- Toolmaker (BL-586, deepest chain)
+
+                -- Artisan Goods / Construction Materials — a clay-fired or
+                -- timber workshop, cheap and light.
+                trade_goods    = { clay = 8.0, timber = 4.0 },  -- Potter & Weaver
+                glass          = { sand = 8.0, timber = 4.0 },  -- Glassworks
+                ceramics_kiln  = { clay = 8.0, timber = 4.0 },  -- Potter's Kiln (BL-586)
+                stonemason     = { timber = 8.0 },              -- Stonemason (BL-586)
+                sawmill        = { stone = 6.0, timber = 4.0 }, -- Sawmill (BL-586) — cannot cost only its own output
+
+                -- Food Processing — a millstone needs stone.
+                food_rations_milled = { stone = 10.0, timber = 4.0 }, -- Miller
+            },
         },
         port = {
             base_rate   = 0.0,

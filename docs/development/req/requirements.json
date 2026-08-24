@@ -6131,6 +6131,55 @@
                     "result_metric": "1 predicate corrected before landing, caught by the existing regression harness"
                 }
             ]
+        },
+        {
+            "brief": "per-building-materials",
+            "title": "Construction materials vary per named building, not just per building type",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-590 (PER_BUILDING_MATERIALS) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "headless: construction_harness (R9)"
+                    ],
+                    "requirement": "ITEM-SPANNING: recipe_registry::resource_build_cost_for(type, target, recipe) resolves a per-named-building override — extraction_site keyed by target_resource, processing_facility by recipe id — falling back to the type default when none is authored, and ignoring both override maps for every other building type.",
+                    "notes": "construction_harness R9: 5/5 pass — overridden target reads override; unoverridden target falls back to steel default; overridden recipe reads override; unoverridden recipe falls back to default; a non-extraction/processing type (port) ignores both maps regardless of the target/recipe passed to it.",
+                    "result_metric": "5/5 R9 assertions"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: construction_gate_harness",
+                        "headless: construction_harness",
+                        "headless: chain_depth",
+                        "headless: recipe_switch_harness",
+                        "headless: price_band_harness",
+                        "headless: save_roundtrip",
+                        "headless: determinism_harness",
+                        "headless: corp_ai_harness",
+                        "headless: pregame_balance_harness",
+                        "headless: spectator_determinism"
+                    ],
+                    "requirement": "Every one of the (originally eight, actually thirteen occurrences across four files) call sites that read resource_build_cost directly now goes through resource_build_cost_for instead: construct_building, the three run_construction sites (economy_system.cpp), construction_rate (both the live selection_panel.cpp copy and the unused construction_panel.cpp mirror), and the Build door's capex loop. The two road-specific sites (place_road, the road capex preview) are unchanged — roads have no building_type/recipe identity to key an override on.",
+                    "notes": "Full tree build (cmake --build build, every target, zero errors) and 10 harnesses all clean. spectator_determinism's golden held — no re-bless needed (material overrides do not change what state_hash folds).",
+                    "result_metric": "13 call sites migrated across 4 files; 0 regressions"
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "live-Lua manual probe (not committed — throwaway CMake target, built, run, and removed in-session)"
+                    ],
+                    "requirement": "The authored economy.lua material_overrides tables actually load and resolve through the live Lua path — not just the hand-built registry the R1/R9 harness exercises.",
+                    "notes": "A temporary CMake target loaded the real recipes.lua/economy.lua and called resource_build_cost_for directly: stone extraction returned timber=12/steel=0 (overridden), iron_ore extraction returned steel=20 (unchanged default), the Toolmaker recipe returned stone=12/timber=10/steel=0 (overridden), the industrial steel recipe returned steel=25 (unchanged default). Probe deleted after confirming; CMakeLists.txt reverted to its pre-probe state.",
+                    "result_metric": "4/4 live-Lua spot checks matched the authored table exactly"
+                }
+            ]
         }
     ]
 }

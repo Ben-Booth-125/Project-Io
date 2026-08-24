@@ -469,6 +469,50 @@ spread across the build. The front door shows the analog rate/ETA/paused status 
 binary reject. Tunables live in `scripts/economy.lua` § `construction`. A build stalled for want
 of an input registers that want as demand, so the stall is visible to the price signal.
 
+### Construction materials are per-named-building, not per-type (BL-590, 2026-08-24)
+
+**Ruling (Ben, 2026-08-23): materials vary per named building.** `resource_build_cost`
+(`building_economics`) still names the DEFAULT for a `building_type` — before this item every
+building in the game, ancient or industrial, was made of `steel` and nothing else, the same
+anachronism the launchpad's era tag (BL-433) exists to fix for the launchpad specifically.
+
+**The override.** `recipe_registry::resource_build_cost_for(type, target, recipe)` is the single
+lookup every material-cost call site now goes through — the Build door's capex preview, the
+management view's rate, the real per-tick draw (`construction.cpp`, `economy_system.cpp`) — so a
+preview can never disagree with what the tick actually charges, the same argument BL-436 makes
+about richness. `extraction_site` is keyed by its `target_resource`; `processing_facility` by its
+recipe. No `building_type` is needed in either key: only extraction carries a target and only
+processing carries a recipe, so the dispatch is unambiguous. Authored in `economy.lua` as an
+optional `material_overrides` table nested beside the type's own `resource_costs` — absent means
+the type default, so nothing that does not opt in changes.
+
+**First-cut coverage: the whole ancient roster, nothing else.** Five extraction targets (`stone`,
+`timber`, `sand`, `clay`, `peat`) and all thirteen ancient processing recipes get a
+timber-and-stone basket instead of steel; every industrial and space-sourced entry is untouched —
+an industrial mine or smelter genuinely does need steel reinforcement, and the anachronism this
+item fixes is specifically the ancient arc's. The Smithy's two recipes (`steel_from_blooms`,
+`ordnance_from_blooms`) share the same basket, since `recipes.lua`'s own comment names them as the
+same physical building. See `scripts/economy.lua`'s `buildings.extraction_site.material_overrides`
+/ `buildings.processing_facility.material_overrides` for the authored table.
+
+**A second sink for the shallow goods**, beyond flavour: timber, stone, clay and the BL-585
+goods now cost something to a corp that is *building*, not only something a recipe consumes — the
+demand that makes an early quarry worth owning even before its output has a processor waiting.
+
+**A watch this item does NOT resolve**, recorded rather than silently assumed:
+`corp_ai.cpp`'s build-candidate scoring prices only the flat `build_cost` (`ex.build_cost` /
+`pe.build_cost`), never `resource_build_cost` — a pre-existing simplification, unchanged by this
+item, that predates the override. A rival can therefore still propose a candidate whose *materials*
+it cannot actually reach even though its *cash* is sufficient; `construct_building`'s own
+affordability gate refuses it cleanly (no mutation), so this is a missed opportunity for the
+scorer, not a correctness bug. Widening the scorer's estimate is real planner scope, not part of
+"materials vary per building" — a decision recorded here rather than a gap papered over.
+
+Guard: `tools/verify/construction_harness.cpp`'s R9 asserts the lookup directly — an overridden
+target/recipe reads its override, an unoverridden one falls back to the type default, and a
+non-extraction/non-processing type (which carries neither a target nor a recipe in the sense
+these overrides key on) ignores both maps regardless of what happens to be passed.
+
 ## The ancient chain
 
 The ancient arc's production chains, authored in `scripts/recipes.lua` with `era = "ancient"`

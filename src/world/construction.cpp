@@ -88,6 +88,9 @@ construction_result construct_building(world& w, const recipe_registry& reg,
 
     corporation_component& cc = corp_it->second;
     const building_economics& econ = reg.economics(type);
+    // BL-590: the material cost specific to THIS named building (target/recipe),
+    // not just its type — see resource_build_cost_for's comment.
+    const auto& material_cost_row = reg.resource_build_cost_for(type, target, recipe);
 
     // Material cost (BL-044 → BL-095): a building's resource_build_cost is bought
     // from the local market — but under BL-095 it is no longer a single up-front
@@ -113,10 +116,10 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     float material_cost = 0.0f;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        if (econ.resource_build_cost[r] <= 0.0f)
+        if (material_cost_row[r] <= 0.0f)
             continue;
         const float p = mkt ? (mkt->price[r] > 0.0f ? mkt->price[r] : mkt->base_price[r]) : 0.0f;
-        material_cost += econ.resource_build_cost[r] * p;
+        material_cost += material_cost_row[r] * p;
     }
 
     // Affordability is a commitment gate only (BL-095): the corp must be able to

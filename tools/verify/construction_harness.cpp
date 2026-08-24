@@ -191,6 +191,68 @@ int main()
               && w.buildings[wharf_built].target_resource == resource_type::agricultural_produce,
           "C.R8 Fishing Wharf resolves its extraction target to agricultural_produce");
 
+    // --- R9 (BL-590): per-named-building material overrides -------------------
+    // resource_build_cost_for is the single lookup every material-cost call
+    // site now goes through. Verified directly against the registry rather
+    // than through a live market: R4 above already proves construct_building
+    // reads whatever this lookup returns (its material_cost loop sums exactly
+    // that array), so this section only needs to prove the LOOKUP itself picks
+    // the override over the type default, and falls back correctly when none
+    // is authored.
+    {
+        recipe_registry reg2;
+        building_economics ex; ex.resource_build_cost[ri(resource_type::steel)] = 20.0f;
+        reg2.set_economics(building_type::extraction_site, ex);
+        building_economics pr; pr.resource_build_cost[ri(resource_type::steel)] = 25.0f;
+        reg2.set_economics(building_type::processing_facility, pr);
+
+        recipe quarry_recipe; quarry_recipe.name = "stone_recipe_unused";
+        const uint16_t overridden_recipe = reg2.add_recipe(quarry_recipe);
+        recipe other_recipe; other_recipe.name = "other";
+        const uint16_t plain_recipe = reg2.add_recipe(other_recipe);
+
+        std::array<float, resource_count> stone_override{};
+        stone_override[ri(resource_type::timber)] = 12.0f;
+        reg2.set_extraction_material_override(resource_type::stone, stone_override);
+
+        std::array<float, resource_count> recipe_override{};
+        recipe_override[ri(resource_type::clay)] = 8.0f;
+        reg2.set_processing_material_override(overridden_recipe, recipe_override);
+
+        const auto& stone_cost = reg2.resource_build_cost_for(
+            building_type::extraction_site, resource_type::stone, no_recipe);
+        check(near(stone_cost[ri(resource_type::timber)], 12.0f) &&
+              near(stone_cost[ri(resource_type::steel)], 0.0f),
+              "C.R9 an overridden extraction target reads the override, not the type default");
+
+        const auto& iron_cost = reg2.resource_build_cost_for(
+            building_type::extraction_site, resource_type::iron_ore, no_recipe);
+        check(near(iron_cost[ri(resource_type::steel)], 20.0f) &&
+              near(iron_cost[ri(resource_type::timber)], 0.0f),
+              "C.R9 a target with no override falls back to the type default (steel)");
+
+        const auto& overridden_recipe_cost = reg2.resource_build_cost_for(
+            building_type::processing_facility, resource_type::iron_ore, overridden_recipe);
+        check(near(overridden_recipe_cost[ri(resource_type::clay)], 8.0f) &&
+              near(overridden_recipe_cost[ri(resource_type::steel)], 0.0f),
+              "C.R9 an overridden recipe reads the override, not the type default");
+
+        const auto& plain_recipe_cost = reg2.resource_build_cost_for(
+            building_type::processing_facility, resource_type::iron_ore, plain_recipe);
+        check(near(plain_recipe_cost[ri(resource_type::steel)], 25.0f) &&
+              near(plain_recipe_cost[ri(resource_type::clay)], 0.0f),
+              "C.R9 a recipe with no override falls back to the type default (steel)");
+
+        // An infrastructure type (no target, no recipe) is never dispatched
+        // into either override map — it must always read its own type default,
+        // regardless of whatever target/recipe id happens to be passed.
+        const auto& port_cost = reg2.resource_build_cost_for(
+            building_type::port, resource_type::stone, overridden_recipe);
+        check(near(port_cost[ri(resource_type::timber)], 0.0f) &&
+              near(port_cost[ri(resource_type::clay)], 0.0f),
+              "C.R9 a non-extraction/processing type ignores both override maps");
+    }
+
     std::printf("\n%s  (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",
                 g_failures, g_failures == 1 ? "" : "s");
     return g_failures == 0 ? 0 : 1;

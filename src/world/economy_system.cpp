@@ -591,6 +591,8 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         const building_economics& econ = reg.economics(b.type);
         const float duration           = econ.build_duration_ticks;
         if (duration <= 0.0f) { b.ticks_remaining = 0; continue; } // instant safety
+        // BL-590: the material cost specific to THIS named building.
+        const auto& material_cost_row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
 
         // BL-130: read the market's REAL persistent inventory — what is actually
         // on hand from prior ticks' sales — rather than last tick's cleared
@@ -604,7 +606,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         float rate = 1.0f;
         for (std::size_t r = 0; r < resource_count; ++r)
         {
-            const float need = econ.resource_build_cost[r] / duration;
+            const float need = material_cost_row[r] / duration;
             if (need <= 0.0f)
                 continue;
             const float avail = m ? std::max(0.0f, m->inventory[r]) : 0.0f;
@@ -629,7 +631,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             auto& want = report.wants[std::make_pair(corp, body)];
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                const float need = econ.resource_build_cost[r] / duration;
+                const float need = material_cost_row[r] / duration;
                 if (need > 0.0f)
                     want[r] += need;
             }
@@ -648,7 +650,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             auto& bought = report.purchases[std::make_pair(corp, body)];
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                const float need = econ.resource_build_cost[r] / duration;
+                const float need = material_cost_row[r] / duration;
                 if (need <= 0.0f)
                     continue;
                 const float drawn = need * rate;

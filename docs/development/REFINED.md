@@ -252,3 +252,37 @@ Requirements: `req/requirements.json` § unlock-recipe-tech-arm. Files: `src/wor
    `recipe_switch_harness`, `price_band_harness`, `save_roundtrip`, `determinism_harness`,
    `spectator_determinism`, `corp_ai_predictive_harness`, `corp_agency_harness`) all clean.
    `spectator_determinism`'s golden held — no re-bless needed.
+
+---
+
+#### BL-590 — PER_BUILDING_MATERIALS — COMPLETE 2026-08-24
+
+Requirements: `req/requirements.json` § per-building-materials. Files: `scripts/economy.lua`,
+`src/world/recipe_registry.{hpp,cpp}`, `construction.cpp`, `economy_system.cpp`,
+`src/ui/selection_panel.cpp`, `construction_panel.cpp`, `tools/verify/construction_harness.cpp`,
+`docs/economy/PRODUCTION.md`.
+
+1. `recipe_registry::resource_build_cost_for(type, target, recipe)` — the single lookup every
+   material-cost call site now goes through: `extraction_site` keyed by `target_resource`,
+   `processing_facility` by recipe id, falling back to the type's own `resource_build_cost` when
+   unauthored. Two `std::map` overrides, populated by `load_from_lua` from an optional
+   `material_overrides` table nested beside each type's `resource_costs` in `economy.lua`.
+2. **13 raw occurrences across 4 files migrated** — `construct_building`, the three
+   `run_construction` material-draw sites (`economy_system.cpp`), both copies of
+   `construction_rate` (`selection_panel.cpp`'s live one and `construction_panel.cpp`'s unused
+   mirror — updated for consistency though nothing calls it), and the Build door's capex loop.
+   The two road-specific sites (`place_road`, the road capex preview) are unchanged — roads carry
+   no building_type/recipe identity to key an override on.
+3. First-cut coverage: 5 ancient extraction targets and all 13 ancient processing recipes get a
+   timber/stone basket; every industrial and space-sourced entry is untouched.
+4. **A real pre-existing gap found and recorded, not silently fixed** (NR-592):
+   `corp_ai.cpp`'s build-candidate scoring prices only `build_cost`, never `resource_build_cost` —
+   true before this item too, invisible while every type shared one steel basket. `construct_building`'s
+   affordability gate still refuses cleanly (no mutation) if a rival's cash covers a candidate its
+   materials cannot, so this is a missed-opportunity gap for the scorer, not a correctness bug.
+5. Verified three ways: `construction_harness`'s new R9 (a hand-built registry, 5/5 — override hit,
+   type-default fallback on both extraction and processing, and a non-extraction/processing type
+   ignoring both maps regardless of what's passed); a full tree build with 10 harnesses clean; and a
+   temporary live-Lua probe confirming the authored `economy.lua` tables actually resolve through
+   `load_from_lua` (built, run, deleted — not a committed harness). `spectator_determinism`'s golden
+   held — material overrides change nothing `state_hash` folds.

@@ -269,12 +269,15 @@ void draw_revenue_expense_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const build
 // card. A local mirror of the world-side formula, not a call into it, because the UI
 // is const and only needs the read.
 float construction_rate(const world& w, const recipe_registry& reg,
-                        building_type type, entity_id tile)
+                        building_type type, resource_type target, uint16_t recipe,
+                        entity_id tile)
 {
     const building_economics& econ = reg.economics(type);
     const float duration = econ.build_duration_ticks;
     if (duration <= 0.0f)
         return 1.0f; // instant build — never material-gated
+    // BL-590: the material cost specific to THIS named building.
+    const auto& material_cost_row = reg.resource_build_cost_for(type, target, recipe);
 
     const market_component* m = nullptr;
     const entity_id mid = market_for_tile(w, tile);
@@ -288,7 +291,7 @@ float construction_rate(const world& w, const recipe_registry& reg,
     float rate = 1.0f;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        const float need = econ.resource_build_cost[r] / duration;
+        const float need = material_cost_row[r] / duration;
         if (need <= 0.0f)
             continue;
         const float avail = m ? m->supply[r] : 0.0f;
@@ -1511,7 +1514,7 @@ void draw_building_status_page(const world& w, const recipe_registry& reg, entit
     ImGui::Text("%s", building_type_name(b.type));
     if (b.ticks_remaining > 0)
     {
-        const float rate = construction_rate(w, reg, b.type, b.tile);
+        const float rate = construction_rate(w, reg, b.type, b.target_resource, b.recipe, b.tile);
         ImGui::TextColored(construction_status_colour(rate), "%s",
                            construction_status(rate, b.ticks_remaining).c_str());
     }
@@ -3543,16 +3546,18 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         c.pr = placement_rules::can_place_in_world(w, tile_id, c.type, c.target,
                                                   ui.max_logistics_reach,
                                                   w.player_entity);
-        c.material_rate = construction_rate(w, reg, c.type, tile_id); // BL-328 pre-commit warning
+        c.material_rate = construction_rate(w, reg, c.type, c.target, c.recipe, tile_id); // BL-328 pre-commit warning
 
         // Capex is the figure construction.cpp actually gates on: build cost PLUS the
         // materials priced at the local market. This ledger used to gate on build_cost
         // alone, so between the two figures it offered an enabled Build button that
         // then failed with nothing but a post-hoc toast.
         c.capex = econ.build_cost;
+        // BL-590: the material cost specific to THIS named building.
+        const auto& material_cost_row = reg.resource_build_cost_for(c.type, c.target, c.recipe);
         for (std::size_t ri = 0; ri < resource_count; ++ri)
-            if (econ.resource_build_cost[ri] > 0.0f)
-                c.capex += econ.resource_build_cost[ri] * price(ri);
+            if (material_cost_row[ri] > 0.0f)
+                c.capex += material_cost_row[ri] * price(ri);
 
         c.produces = (c.type == building_type::extraction_site ||
                       c.type == building_type::processing_facility);
