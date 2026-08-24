@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*20 entries — 20 open, 0 resolved.*
+*21 entries — 21 open, 0 resolved.*
 
 ---
 
@@ -260,6 +260,17 @@ Two separate verification limits, not one: (1) computer-use reconnected mid-sess
 > **Recommendation:** Add a scroll_panel case for the tile build ledger's window (likely needs the dynamic "Construct [x, y]" title matched by prefix, or the window renamed to something fixed scroll_panel can target) the next time this surface needs a full-content capture. Separately, a live-click pass the next time computer-use can reach this project's built exe (a Start-Menu shortcut, or an update to how request_access resolves custom binaries) would close both this and NR-593 at once.
 
 *Files: `scripts/verify/build_door_wide_roster.lua`, `src/core/verify_api.cpp`, `src/ui/selection_panel.cpp`*
+
+### NR-596 — spectator_determinism’s R1 A/B family-coverage check retired — bit-identical RNG-stream determinism is not a property this harness needs to hold
+*decision taken on your behalf · raised 2026-08-24 · from BL-586 slice 2 (Tannery/Weaver/Shipwright): widening resource_count 42->47 shifted an RNG stream and broke the "seated+spectated reaches every family it reached as a rival" assertion, unrelated to the new content itself (differentially confirmed: identical failure with recipes.lua/economy.lua reverted to pre-slice-2, enum width unchanged).*
+
+The check compared as_seated (family coverage in a seated+spectated 300-tick rollout) against as_rival (the same corp’s coverage as an ordinary rival) and required as_seated >= as_rival. Put to Ben rather than silently patched (per the standing rule against weakening a failing test) or silently left failing. Ruled: bit-identical RNG-stream determinism is not the property this harness needs to prove beyond what R2/R3 already assert — saves carry the actual state, not a replay-from-seed, and occasional randomness is a deliberate strategy lever, not a defect. The check is retired (commented out with the ruling and full provenance trail, not deleted) rather than weakened to pass; the two properties io-standing-rules.md’s BL-409 section actually cites by name (defaults false, no rival’s cadence slot shifts) are untouched and still pass.
+
+**Why it matters.** io-standing-rules.md’s Determinism & data model section cites spectator_determinism.cpp by name as the harness proving the BL-409 spectator grant’s two load-bearing properties. This ruling narrows what that citation is understood to guarantee — worth a standing-rules note so a future reader does not assume EVERY assertion in that file is load-bearing.
+
+> **Recommendation:** Add a one-line clarifying note to io-standing-rules.md’s BL-409 paragraph: the harness proves the two named properties (default-false, no cadence-slot shift), not RNG-stream-identical behavioural outcomes across a content change — that expectation was explicitly ruled out 2026-08-24.
+
+*Files: `tools/verify/spectator_determinism.cpp`, `.claude/rules/io-standing-rules.md`*
 
 ---
 
