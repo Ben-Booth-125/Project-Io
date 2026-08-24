@@ -76,7 +76,7 @@ ones were deleted.
 | 15 | The 0 CE refocus (retro-recorded) | **Closed 2026-08-12** — epoch 0, 3× map, Era −1 sim wired in, mercenary seam designed |
 | 16 | The mercenary vertical slice | **Closed 2026-08-24** — re-planned 2026-08-23 in dependency order (BL-569→BL-578); all ten landed and v0.1.15 was cut |
 | 17 | Economy breadth: the chain is the growth track | **Open 2026-08-15** — chain-depth spine (BL-428) → roster/methods (BL-429/430) → UI (BL-431) → guard harness (BL-432); cuts v0.1.17 |
-| 17b | The shell stops fighting the map | **Open 2026-08-24** — batch delivery over BL-596–BL-604 in three parallel slices; BL-599/BL-600 landed same-day; four design calls gate three of the remaining items |
+| 17b | The shell stops fighting the map | **Closed 2026-08-24 — goal met.** All nine items; four parallel slices then one main-session wave. Final sweep 93 scripts / 4 failures, all four pre-existing. Found four doc fictions and, in three separate checks, the same rot: a hard-coded screen coordinate outliving the world it was measured in |
 | 18b | Roster invariants (retro-recorded) | **Closed 2026-08-16** — BL-432 landed; BL-435 paused 4/6; BL-436 filed |
 | 19 | The economy tells the truth | **Closed 2026-08-17 — goal NOT met.** The blame moved three times and landed on supply; goldens left red and unblessed |
 | 25a | The draw (upkeep, ordnance, convoy seam) | **Closed 2026-08-18** — 6/6; goldens left red and attributed |
