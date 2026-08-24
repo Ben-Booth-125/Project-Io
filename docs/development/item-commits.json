@@ -1959,9 +1959,9 @@
       "message": "Regenerate item-commits.json after BL-585/BL-586"
     },
     "BL-586": {
-      "commit": "075947b",
+      "commit": "a57f1fb",
       "date": "2026-08-24",
-      "message": "BL-586: bookkeeping for slice 2's landing, NR-596 resolved"
+      "message": "Regenerate item-commits.json after BL-586"
     },
     "BL-587": {
       "commit": "5a665b2",
@@ -1999,9 +1999,9 @@
       "message": "Regenerate item-commits.json after BL-593"
     },
     "BL-594": {
-      "commit": "401eae7",
-      "date": "2026-08-23",
-      "message": "Author Sprint 17: the ancient roster becomes a ladder (BL-585..BL-594)"
+      "commit": "4c92e39",
+      "date": "2026-08-24",
+      "message": "BL-594: the ancient-roster playthrough, played live, and the v0.1.17 cut"
     }
   }
 }
