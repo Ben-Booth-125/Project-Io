@@ -1707,6 +1707,18 @@ bool app::save_game_to(const std::string& path)
     env.planetary_pan_x   = m_ui.planetary_pan_x;
     env.planetary_pan_y   = m_ui.planetary_pan_y;
 
+    // Make the destination directory before writing. `write_save_game` opens an
+    // ofstream, which does NOT create intervening directories, so a save aimed at
+    // a path like "build_gen/verify/<name>.iosave" returned false for a reason
+    // that reads as "the save is broken" rather than "the folder is missing" —
+    // which is exactly how save_load.lua's own fixture path behaved on a tree
+    // where nothing had created build_gen/verify yet.
+    if (const auto parent = std::filesystem::path{path}.parent_path(); !parent.empty())
+    {
+        std::error_code ec;
+        std::filesystem::create_directories(parent, ec);
+    }
+
     const bool ok = write_save_game(path, m_world, env);
 
     ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), null_entity,

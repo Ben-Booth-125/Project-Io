@@ -881,6 +881,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "decisions")    m_ui.show_decision_feed = open; // AI decision feed (BL-407)
         else if (name == "strategy")     m_ui.show_strategy_readout = open; // Strategy readout (BL-411)
         else if (name == "contracts")    m_ui.show_contracts_ledger = open; // Contracts ledger (BL-576)
+        // Nav slot 8's all-corporations table. It had no name here, so the one
+        // rail slot whose panel a script could not open was also the only one
+        // with no capture — green-but-blind by omission rather than by design.
+        else if (name == "corporations_table") m_ui.show_corporations_table = open;
         // BL-536: the Generation Ledger had no name here, so no script could open
         // it. That mattered the moment a save had to prove it restores the
         // generation_report — this ledger is one of the two surfaces that read it.
