@@ -8,6 +8,7 @@
 #include "nation_budget.hpp"   // budget_claim (Sprint N3 T5: the cash-gated survey asks its nation)
 #include "placement_rules.hpp"
 #include "recipe_registry.hpp"
+#include "supply_system.hpp"   // price_convoy_leg / commit_convoy (BL-600, the shared dispatch seam)
 #include "survey_system.hpp"
 #include "tech_gate.hpp"       // recipe_unlocked (BL-588)
 #include "unit_roster.hpp"
@@ -62,6 +63,15 @@ entity_id resolve_command_body(const world& w, const corp_command& cmd)
         case corp_verb::survey:
         case corp_verb::place_sell_order:
             return cmd.subject; // subject IS the body for these verbs
+        case corp_verb::dispatch_convoy:
+        {
+            // subject is the SOURCE MARKET (corp_command.hpp), not a body or a
+            // building — the default branch below would wrongly probe
+            // w.buildings with it. Tagged by the source body, matching every
+            // other verb's "where did the corp act FROM" reading.
+            const auto mit = w.markets.find(cmd.subject);
+            return (mit != w.markets.end()) ? mit->second.body : null_entity;
+        }
         case corp_verb::remove_sell_order:
         {
             // The order names no body directly; resolve it from the book while
@@ -1561,12 +1571,150 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
         }
 
+        // ---- Directed-dispatch candidate: haul into a public shortfall -------
+        // (BL-600, LOGISTICS.md § Logistic Points / SUPPLY.md § Dispatch
+        // trigger; the same dated grant BL-599 lands under). `dispatch_convoy`
+        // reaches the corp-command seam exactly as `place_sell_order` does
+        // (§ 2C) — through `apply_corp_command`, which already prices and
+        // commits it via `price_convoy_leg` + `commit_convoy`
+        // (corp_command.cpp): the SAME two functions the auto-dispatcher's
+        // shortfall scan calls (SUPPLY.md's "no fourth code path" rule). This
+        // block supplies exactly that scan's opinion as one scored candidate
+        // rather than reimplementing pricing here — it prices with the shared
+        // function to RANK opportunities, and the seam re-prices and commits
+        // for real at apply time.
+        //
+        // Bounded to the corp's own surplus pools (own asset bodies) against
+        // markets carrying a PUBLIC shortfall (demand > supply — the same
+        // aggregates `export_corp_blackboard` shows a rival, visibility-honest
+        // per BL-068/DISCOVERY.md, and the same reading
+        // `forecast_glut_multiplier` gives the build candidates above), and
+        // keeps only the single best-scoring opportunity — the same
+        // one-candidate-per-eval shape `max_trades` already gives the
+        // order-book verb, so a directed haul competes for exactly one slot
+        // rather than flooding the candidate list with every (body, resource)
+        // pair.
+        {
+            // Lowest-id market on a body — the same stable pick
+            // `supply_system.cpp`'s own (internal-linkage) `market_for_body`
+            // makes, duplicated rather than shared for the same reason that
+            // one's own comment gives.
+            auto market_on_body = [&w](entity_id body) -> entity_id {
+                entity_id best = null_entity;
+                for (const auto& [mid, mc] : w.markets)
+                    if (mc.body == body && (best == null_entity || mid < best))
+                        best = mid;
+                return best;
+            };
+
+            const logistics_nodes nodes = collect_logistics_nodes(w);
+
+            entity_id   best_market   = null_entity;
+            entity_id   best_src_body = null_entity;
+            std::size_t best_ri       = 0;
+            float       best_qty      = 0.0f;
+            float       best_score    = 0.0f;
+            convoy_leg  best_leg;
+
+            for (const auto& [key, pool] : w.corp_body_pools)
+            {
+                if (key.first != corp)
+                    continue;
+                const entity_id src_body = key.second;
+
+                for (std::size_t r = 0; r < resource_count; ++r)
+                {
+                    // Same hold rule as the trade candidate above (BL-293):
+                    // never divert stock below the threshold the corp's own
+                    // chain might still want.
+                    const float surplus = pool.quantities[r] - p.trade_hold_threshold;
+                    if (surplus <= 0.0f)
+                        continue;
+
+                    for (const auto& [mid, mc] : w.markets)
+                    {
+                        // Same-body IS a real haul (BL-096 multi-market bodies):
+                        // `price_convoy_leg` routes it over `intra_body_path`
+                        // exactly like the auto-dispatcher's own scan does, so
+                        // this candidate does not special-case it away.
+                        if (mc.base_price[r] <= 0.0f)
+                            continue; // this market does not price the good
+
+                        const float shortfall = mc.demand[r] - mc.supply[r];
+                        if (shortfall <= 0.0f)
+                            continue; // no PUBLIC shortfall here
+
+                        const float qty = std::min(surplus, shortfall);
+                        if (qty <= 0.0f)
+                            continue;
+
+                        // Priced through the SHARED function, purely to RANK
+                        // candidates — nothing here mutates the world beyond
+                        // the A* path cache `price_convoy_leg` itself warms
+                        // (the same non-const-`w` shape `body_reach_field`
+                        // uses above). The seam re-prices and commits for
+                        // real at apply time.
+                        const convoy_leg leg = price_convoy_leg(
+                            w, reg, nodes, corp, src_body, mid, r, qty,
+                            reg.logistics_cost(convoy_mode::space));
+                        if (!leg.viable)
+                            continue; // unroutable / unpadded / unfuelled lane
+
+                        // Valued at the CLEARED price, not the floor: unlike
+                        // the trade candidate (a standing order the book
+                        // might not fill at all), a dispatched convoy WILL
+                        // credit the destination pool on arrival — the
+                        // conservative choice there does not apply here.
+                        const float price   = (mc.price[r] > 0.0f) ? mc.price[r] : mc.base_price[r];
+                        const float revenue = qty * price;
+                        const float score   = revenue - leg.cost;
+                        if (score <= 0.0f)
+                            continue; // never haul at a loss
+
+                        if (score > best_score)
+                        {
+                            best_score    = score;
+                            best_market   = mid;
+                            best_src_body = src_body;
+                            best_ri       = r;
+                            best_qty      = qty;
+                            best_leg      = leg;
+                        }
+                    }
+                }
+            }
+
+            if (best_market != null_entity)
+            {
+                const entity_id src_market = market_on_body(best_src_body);
+                if (src_market != null_entity)
+                {
+                    candidate c;
+                    c.cmd.tick        = tick;
+                    c.cmd.corp        = corp;
+                    c.cmd.verb        = corp_verb::dispatch_convoy;
+                    c.cmd.subject     = src_market;                              // source market
+                    c.cmd.counterparty = best_market;                            // destination market
+                    c.cmd.target      = static_cast<resource_type>(best_ri);     // cargo
+                    c.cmd.quantity    = best_qty;                                // units
+                    // Same currency every other candidate scores in — expected
+                    // cash, so a haul competes honestly against a dial or a
+                    // build with no hand-tuned weight of its own.
+                    c.score  = best_score * jitter;
+                    c.spend  = best_leg.cost;
+                    c.reason = corp_decision_reason::best_build;
+                    c.bucket = bucket_for_reason(c.reason);
+                    cands.push_back(c);
+                }
+            }
+        }
+
         if (cands.empty())
             continue;
         std::sort(cands.begin(), cands.end(), candidate_before);
 
         // ---- Greedy selection under the action budget + solvency gate -------
-        int   builds = 0, dials = 0, surveys = 0, hires = 0, trades = 0;
+        int   builds = 0, dials = 0, surveys = 0, hires = 0, trades = 0, dispatches = 0;
         float committed = 0.0f;
         std::vector<entity_id> touched_this_eval;
 
@@ -1632,7 +1780,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // subject is a tile), and capped at one per evaluation besides.
             const bool is_trade  = (c.cmd.verb == corp_verb::place_sell_order ||
                                     c.cmd.verb == corp_verb::remove_sell_order);
-            const bool is_dial   = !is_build && !is_survey && !is_hire && !is_trade;
+            // Directed dispatch (BL-600) is excluded from the dial budget for
+            // the identical reason trade is: its subject is a MARKET, not a
+            // building, so neither the dial cap nor the one-touch-per-building
+            // rule below means anything for it. Its own cap, same shape as
+            // hire's.
+            const bool is_dispatch = (c.cmd.verb == corp_verb::dispatch_convoy);
+            const bool is_dial   = !is_build && !is_survey && !is_hire && !is_trade && !is_dispatch;
             // Every `continue` below is a FOREGONE candidate, and each one calls
             // forgo() so it can compete to be the decision log's runner-up.
             // A budget-capped candidate is the purest case of the thing the
@@ -1644,6 +1798,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // hiring every tick would out-hire the player by pure frequency.
             if (is_hire   && hires   >= 1)            { forgo(c); continue; }
             if (is_trade  && trades  >= p.max_trades) { forgo(c); continue; }
+            // One directed dispatch per evaluation, same cadence as trade —
+            // a rival redirecting cargo every tick would out-haul the player
+            // by pure frequency, and the enumeration above already keeps only
+            // its single best-scoring opportunity.
+            if (is_dispatch && dispatches >= p.max_dispatches) { forgo(c); continue; }
             // One touch per building per evaluation: a second dial on a
             // building already commanded this eval is contradictory.
             if (is_dial && std::find(touched_this_eval.begin(), touched_this_eval.end(),
@@ -1727,11 +1886,15 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             if (is_survey) ++surveys;
             if (is_hire)   ++hires;
             if (is_trade)  ++trades;
+            if (is_dispatch) ++dispatches;
 
             // Cooldown on the touched building (anti-thrash). A trade command's
             // subject is a body, so it records no touch — the anti-duplicate rule
-            // in the trade block above is what stops it thrashing.
-            if (!is_trade)
+            // in the trade block above is what stops it thrashing. A dispatch's
+            // subject is a market, for the identical reason — nothing here to
+            // cool down, and the enumeration's own single-best-candidate cap is
+            // what stops it thrashing.
+            if (!is_trade && !is_dispatch)
             {
                 const entity_id touched = is_build ? built : c.cmd.subject;
                 if (const auto tb = w.buildings.find(touched); tb != w.buildings.end())
