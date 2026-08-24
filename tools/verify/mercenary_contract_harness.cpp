@@ -43,6 +43,73 @@
 //       balance and every sentiment pair bit-identical.
 //
 // The process exits non-zero if any assertion FAILs.
+//
+// ---------------------------------------------------------------------------
+// BL-574 extension — CONTRACT_HARNESS, "one observed instance of every
+// contract terminal state, conserved and replayable" (CONTRACTS.md §
+// Verification). Cases below are labelled M1-M7 after the item's own R1.
+// Several are already satisfied by BL-573's own rows above or by a sibling
+// harness; those are named rather than duplicated (Ben, project-wide: an
+// observed instance beats a re-authored one).
+//
+//   M1  AN OFFER ISSUED BY A THREATENED NATION (BL-572's own mechanism,
+//       `derive_contract_offers`). Already fully exercised, end to end
+//       (weakest-border-province targeting, fee/deadline, escrow accrual
+//       and clamp, TTL expiry-and-refund), by nation_scorer_harness.cpp's
+//       own R8a-R8e. NOT duplicated here: this file's fixtures hand-build
+//       `mercenary_offer` rows directly (`make_offer`) precisely so the
+//       accept/evaluate/pay-or-fail machinery under test here is isolated
+//       from the derivation machinery R8 already covers on its own terms.
+//   M2  ACCEPT WITH A VALID FORCE CONSERVES EXACTLY. R1e below already
+//       proves the deposit lands on the contractor at the exact authored
+//       fraction; the new case adds the other half of "conserves" — the
+//       client nation's treasury is untouched by accept_offer itself,
+//       because the fee already left it during the offer's own funding
+//       (R8c). A second debit here would be a real leak, not a style
+//       choice — accept_offer's own comment (corp_command.cpp) says so.
+//   M3  A "TAKE" CONTRACT COMPLETES OFF A REAL, DECISIVE BATTLE — not a
+//       hand-set `province_holder` (R3b's shortcut, which proves the
+//       EVALUATION side only). Hand-builds an `active_battle` past the
+//       swing draw's reach of the outcome, exactly battle_engagement_
+//       harness.cpp's own B15 idiom (BL-569), so the ending is
+//       defender_broken by construction, then lets `run_battles` move
+//       `province_holder` for real before the contract tick reads it.
+//   M4  A "HOLD" CONTRACT FAILS ON THE FIRST LOST TICK. R3d below already
+//       proves the EARLY-fail timing; the new assertions on that same
+//       case add the money outcome and the ORDERING CONTRACTS.md § Q2
+//       demands: a hold-contract's failure costs strictly MORE Trust than
+//       an otherwise-identical abandon, not merely a different number.
+//       NOTE ON "ESCROW RETURNED": the item's own requirement text (R1)
+//       says the failure case has "the escrow returned". Read literally
+//       against the code, that is not what happens — a `mercenary_contract`
+//       carries no escrow field at all (only `fee`/`deposit_paid`;
+//       world.hpp's own struct comment), and run_mercenary_contract_tick's
+//       failure branch says outright: "the reserved remainder is not
+//       disbursed to anyone; it was already spent, from the client's
+//       perspective, the moment the escrow that funded it left the
+//       treasury." An OFFER's escrow returns to the treasury on TTL
+//       expiry (R8e) — a different record, a different event, BEFORE
+//       acceptance. This case therefore asserts the ACTUAL observed
+//       failure behaviour (nothing beyond the deposit moves) rather than
+//       the requirement's literal wording; flagged to Ben in
+//       NEEDS_REVIEW.json (NR-583) rather than silently reworded in the
+//       requirement text, which is out of this item's scope to edit.
+//   M5  ABANDON. Already fully exercised by R4 below (R4a-R4d): the
+//       not-the-contractor rejection, the state and money outcome, and
+//       the reputation ordering against a fresh failure. Not duplicated.
+//   M6  DETERMINISM, HASH-IDENTICAL. R6 below already replays two
+//       identical accept-through-complete sequences and compares state
+//       field by field; extended in place with a `world::state_hash`
+//       comparison for the stronger "hash-identical" claim (folds
+//       corp balance, nation treasury and `province_holder` — see
+//       world.cpp's own state_hash comment for what it folds and why;
+//       sentiment is NOT folded, so the existing field-by-field sentiment
+//       check stays alongside the hash rather than being replaced by it).
+//   M7  SAVE/LOAD ROUND-TRIPS MID-CONTRACT. Already fully exercised by
+//       save_roundtrip.cpp's own P12 (BL-573's addition): an ACTIVE
+//       mercenary_contract, scalar fields and the committed-force array
+//       both, round-tripped field by field. Not duplicated here — this
+//       file has no save/load surface of its own to exercise.
 
 #include "scripting/lua_state.hpp"
 #include "world/battle_system.hpp"      // active_mercenary_contract_for
@@ -54,6 +121,7 @@
 #include "world/province.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/sentiment.hpp"
+#include "world/unit_roster.hpp"        // unit_to_stack_entry -- M3's hand-built battle state
 #include "world/world.hpp"
 
 #include <cstdio>
@@ -318,6 +386,33 @@ int main()
     }
 
     // -------------------------------------------------------------------
+    // M2 (BL-574, NEW): accept_offer's transfer conserves exactly. R1e
+    // above proves the deposit lands on the contractor at the exact
+    // authored fraction; this proves the OTHER half of "conserves" -- the
+    // client nation's treasury is untouched by accept_offer itself. The
+    // fixture hand-sets a treasury value standing in for whatever
+    // derive_contract_offers would already have spent it down to while
+    // funding this offer's escrow (R8c, nation_scorer_harness.cpp), so a
+    // double-debit here would show up as a real, not cosmetic, drift.
+    // -------------------------------------------------------------------
+    {
+        fixture f = make_fixture();
+        f.w.nations.at(f.nat_a).treasury = 1234.5f; // an arbitrary already-settled value
+        f.w.mercenary_offers.push_back(make_offer(1, f.nat_a, f.prov_target, take_idx, 400.0f, 100, 400.0f));
+
+        const float corp_balance_before = f.w.corporations.at(f.corp).balance;
+        const corp_command cmd = make_accept(f.corp, 1, f.nat_a, { f.unit1 });
+        check(apply_corp_command(f.w, reg, cmd) == corp_command_result::applied,
+              "M2 setup: the accept applies");
+        check(same(f.w.nations.at(f.nat_a).treasury, 1234.5f),
+              "M2a the client nation's treasury is UNTOUCHED by accept_offer -- the fee already "
+              "left it during offer funding, so paying the deposit here is not a second debit");
+        check(same(f.w.corporations.at(f.corp).balance, corp_balance_before + 400.0f * deposit_fraction),
+              "M2b the contractor's balance moves by EXACTLY the deposit -- fee times the "
+              "authored deposit_fraction, neither more nor less: the transfer conserves");
+    }
+
+    // -------------------------------------------------------------------
     // R2: double-commit and the unit lock.
     // -------------------------------------------------------------------
     {
@@ -418,8 +513,76 @@ int main()
     }
 
     // -------------------------------------------------------------------
+    // M3 (BL-574, NEW): a "take" contract completes off a REAL, decisive
+    // battle -- not R3b's hand-set province_holder (which proves only the
+    // EVALUATION side of completion). Hand-builds an active_battle already
+    // past the swing draw's reach of the outcome, exactly
+    // battle_engagement_harness.cpp's own B15 idiom (BL-569): the
+    // defender preset BELOW the rout threshold so a single round-batch
+    // settles defender_broken by construction, not by luck. run_battles
+    // then moves province_holder for real (battle_system.cpp) before the
+    // contract tick ever reads it.
+    // -------------------------------------------------------------------
+    {
+        fixture f = make_fixture();
+        const province* pv = f.w.provinces.find(f.prov_target);
+        check(pv != nullptr && !pv->tiles.empty(),
+              "M3 setup: the target province resolves a tile to garrison");
+        const entity_id target_tile = (pv != nullptr && !pv->tiles.empty()) ? pv->tiles.front() : null_entity;
+        const entity_id garrison = add_unit(f.w, f.nat_b, target_tile, 30);
+
+        f.w.mercenary_offers.push_back(make_offer(1, f.nat_a, f.prov_target, take_idx, 400.0f, 20, 400.0f));
+        check(apply_corp_command(f.w, reg, make_accept(f.corp, 1, f.nat_a, { f.unit1 }))
+                  == corp_command_result::applied,
+              "M3 setup: the offer accepts");
+        check(province_holder_for(f.w, f.prov_target) == f.nat_b,
+              "M3 setup: nat_b still holds the target before the battle");
+
+        active_battle b;
+        b.province       = f.prov_target;
+        b.attacker        = f.corp;
+        b.defender        = f.nat_b;
+        b.attacker_units  = { f.unit1 };
+        b.defender_units  = { garrison };
+        b.state.attacker  = { unit_to_stack_entry(f.w, f.w.units.at(f.unit1)) };
+        b.state.defender  = { unit_to_stack_entry(f.w, f.w.units.at(garrison)) };
+        b.state.attacker_strength_permille = 1000;
+        b.state.defender_strength_permille = 250; // guaranteed defender_broken -- B15's own idiom
+        b.state.rounds_fought = 0;
+        b.state.end           = campaign_battle_end::in_progress;
+        b.state.stream_seed   = 0xB574u;
+        b.state.rng_state     = b.state.stream_seed;
+        f.w.battles.assign(1, b); // bypass discovery entirely, same as B15/B16
+
+        const battle_tick t = run_battles(f.w, reg, 0);
+        check(!t.dispatches.empty() && t.dispatches.front().end == campaign_battle_end::defender_broken,
+              "M3a the hand-seeded battle resolves defender_broken, by construction not luck");
+        check(province_holder_for(f.w, f.prov_target) == f.corp,
+              "M3b THE PROVINCE HOLDER MOVED to the contractor through the REAL combat path");
+
+        const float balance_before_completion = f.w.corporations.at(f.corp).balance;
+        const mercenary_contract c_before = f.w.mercenary_contracts[0];
+        run_mercenary_contract_tick(f.w, reg, templates, /*econ_tick*/ 20); // == deadline
+        const mercenary_contract& c = f.w.mercenary_contracts[0];
+        check(c.state == mercenary_contract_state::completed,
+              "M3c the 'take' contract completes off a battle-driven province flip");
+        check(same(f.w.corporations.at(f.corp).balance,
+                   balance_before_completion + (c_before.fee - c_before.deposit_paid)),
+              "M3d the remainder is paid on this real-battle completion too");
+    }
+
+    // -------------------------------------------------------------------
     // R3d: a "hold" (continuous) contract fails EARLY, the moment its
     // predicate reads false -- it does not wait for the deadline.
+    //
+    // M4 (BL-574): extends this same case with the money outcome and the
+    // ordering assertion CONTRACTS.md § Q2 demands -- a hold-contract's
+    // failure must cost strictly MORE Trust than an otherwise-identical
+    // abandon, not merely a different number. See the file-header note on
+    // "escrow returned" (NR-583): a mercenary_contract has no escrow of
+    // its own, so the money assertion below is "nothing beyond the
+    // deposit moves", the actually-observed behaviour, not the
+    // requirement text's literal wording.
     // -------------------------------------------------------------------
     {
         fixture f = make_fixture();
@@ -427,6 +590,7 @@ int main()
         f.w.mercenary_offers.push_back(make_offer(1, f.nat_a, f.prov_home, hold_idx, 400.0f, 100, 400.0f));
         apply_corp_command(f.w, reg, make_accept(f.corp, 1, f.nat_a, { f.unit1 }));
         check(templates.at(hold_idx).continuous, "setup: 'hold' really is authored continuous");
+        const float balance_after_deposit = f.w.corporations.at(f.corp).balance;
 
         run_mercenary_contract_tick(f.w, reg, templates, /*econ_tick*/ 5); // well before deadline 100
         check(f.w.mercenary_contracts[0].state == mercenary_contract_state::active,
@@ -434,9 +598,35 @@ int main()
 
         f.w.province_holder[0] = f.nat_b; // the corp LOSES the province mid-contract
         run_mercenary_contract_tick(f.w, reg, templates, /*econ_tick*/ 6); // still far from deadline 100
-        check(f.w.mercenary_contracts[0].state == mercenary_contract_state::failed,
+        const mercenary_contract& c = f.w.mercenary_contracts[0];
+        check(c.state == mercenary_contract_state::failed,
               "R3d a 'hold' contract fails the FIRST tick its predicate reads false, "
               "not waiting for the deadline");
+        check(same(f.w.corporations.at(f.corp).balance, balance_after_deposit),
+              "M4a nothing beyond the already-paid deposit moves on this failure -- there is no "
+              "escrow on a mercenary_contract to return (see the file-header note, NR-583)");
+
+        const sentiment_value sv_fail = sentiment_toward(f.w.sentiment, f.nat_a, f.corp);
+        check(sv_fail.trust < 0.0f, "M4b contract_failed moved Trust downward on the 'hold' case too");
+
+        // The ordering assertion: an otherwise-identical pair that
+        // ABANDONS instead of failing loses LESS Trust -- the same
+        // comparison R4d draws for a 'take' contract's failure, drawn
+        // here for 'hold'.
+        fixture g = make_fixture();
+        g.w.mercenary_offers.push_back(make_offer(1, g.nat_a, g.prov_target, take_idx, 400.0f, 100, 400.0f));
+        apply_corp_command(g.w, reg, make_accept(g.corp, 1, g.nat_a, { g.unit1 }));
+        const uint32_t g_contract_id = g.w.mercenary_contracts[0].id;
+        corp_command ab;
+        ab.verb  = corp_verb::abandon_contract;
+        ab.corp  = g.corp;
+        ab.order = g_contract_id;
+        check(apply_corp_command(g.w, reg, ab) == corp_command_result::applied,
+              "M4 setup: the comparison pair abandons cleanly");
+        const sentiment_value sv_ab = sentiment_toward(g.w.sentiment, g.nat_a, g.corp);
+        check(sv_fail.trust < sv_ab.trust,
+              "M4c a HOLD contract's failure costs strictly MORE Trust than an otherwise-identical "
+              "abandon -- the ordering CONTRACTS.md Q2 demands, not just two separate numbers");
     }
 
     // -------------------------------------------------------------------
@@ -538,6 +728,20 @@ int main()
             const sentiment_value s2 = sentiment_toward(f2.w.sentiment, f2.nat_a, f2.corp);
             check(same(s1.trust, s2.trust) && same(s1.access, s2.access),
                   "R6 both replays fold the SAME sentiment event to the SAME value");
+
+            // M6 (BL-574): the stronger "hash-identical" claim, on top of
+            // R6's field-by-field comparison above. world::state_hash folds
+            // corporation balance, nation treasury and province_holder
+            // (world.cpp's own state_hash comment) -- all three of which
+            // this sequence's accept-then-complete moves -- so a divergence
+            // in any of them, not just the ones asserted by name above,
+            // would show here. Sentiment is NOT folded into state_hash
+            // (also per that comment), which is exactly why R6's own
+            // sentiment_toward comparison stays alongside this rather than
+            // being replaced by it.
+            check(f1.w.state_hash(25) == f2.w.state_hash(25),
+                  "M6 both replays are HASH-IDENTICAL at the final tick, not just "
+                  "identical on the fields checked by name");
         }
     }
 

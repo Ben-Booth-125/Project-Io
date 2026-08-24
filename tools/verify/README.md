@@ -761,3 +761,46 @@ names v4 as the refused predecessor), not by this harness.
 cmake --build build --target condition_set_harness   # from a vcvars shell
 ctest --test-dir build -R condition_set_harness
 ```
+
+## mercenary_contract_harness (BL-573, extended by BL-574)
+
+The accept/evaluate/pay-or-fail seam for a mercenary contract (`corp_command.cpp`'s
+`accept_offer`/`abandon_contract`, `nation_step.cpp`'s `run_mercenary_contract_tick`,
+`battle_system.cpp`'s `active_mercenary_contract_for`). BL-573's own rows (R1-R6) prove the
+mechanism works at all; **BL-574 extended the same file** with M1-M7, the item's own "one
+observed instance of every contract terminal state" requirement — 66 checks total.
+
+R1a-R1e: `accept_offer` as an untrusted seam — every rejection (wrong counterparty, an
+under-escrowed offer, a non-owned unit, an empty force) mutates nothing; a valid accept converts
+the offer, pays the deposit, consumes the offer. R2: the double-commit/unit-lock rule. R3a-R3d:
+tick evaluation — a "take" contract judges its predicate only at the deadline, a "hold" contract
+fails the moment its predicate goes false. R4: abandonment is a distinct, lesser penalty than
+failure. R5: `active_mercenary_contract_for` is wired for real. R6: determinism by replay.
+
+**M1** (an offer issued by a threatened nation) and **M5** (abandon) are already fully exercised
+elsewhere — `nation_scorer_harness.cpp`'s own R8a-R8e for M1, this file's own R4 for M5 — and are
+not duplicated. **M7** (save/load round-trips mid-contract) is `save_roundtrip.cpp`'s own P12.
+**M2** adds the other half of "accept conserves exactly": the client nation's treasury is
+untouched by `accept_offer` itself (the fee already left it during the offer's own funding).
+**M3** replays R3b's "take" completion off a REAL, hand-built decisive battle — the
+`battle_engagement_harness.cpp` B15 idiom — rather than a hand-set `province_holder`. **M4**
+extends R3d's early-fail row with the money outcome and the ordering CONTRACTS.md § Q2 demands: a
+"hold" contract's failure costs strictly more Trust than an otherwise-identical abandon. **M6**
+extends R6 with a `world::state_hash` comparison for the stronger hash-identical claim.
+
+**NOTE (NR-583):** the item's own requirement text describes M4's failure as having "the escrow
+returned" — the code does not return one; a `mercenary_contract` carries no escrow field at all.
+M4 asserts the actually-observed behaviour (nothing beyond the deposit moves) instead; see the
+harness's own file-header comment and NR-583 for the full account.
+
+**Live-Lua**, same shape as `condition_set_harness`'s C9: needs both `recipe_registry` (for
+`procurement.deposit_fraction` and the sentiment factor weights) and `contract_template_registry`
+(for the real take/hold predicates). Hand-declared in `CMakeLists.txt` above the glob — adds back
+`recipe_registry.cpp` + `contract_template.cpp` + `scripting/lua_state.cpp`, the sol2 include dir,
+and links `lua54`. Listed in `IO_TEST_SCRIPT_ROOTED_HARNESSES` — run with the repo root as the
+working directory or the script loads throw.
+
+```
+cmake --build build --target mercenary_contract_harness   # from a vcvars shell
+ctest --test-dir build -R mercenary_contract_harness
+```
