@@ -110,7 +110,8 @@ instead flips a `held` flag that `advance_convoys` skips: the convoy stops dead 
 nothing further (the haul was paid once), and resumes from the same progress when the verb is issued
 again. A toggle, not a one-way door.
 
-**The in-app dispatch form lives on the market Selection card** — a dispatch starts from a source
+**The in-app dispatch form lives on the market Selection card** (BL-601, dispatch form) — a
+dispatch starts from a source
 you are looking at, and it is a resource + quantity + destination-market form, not a press. The
 Market Ledger's Convoys tab (BL-453, convoys ledger) lists the result, shows `cost_paid`, and
 carries the Hold press.
@@ -131,7 +132,7 @@ Mode is selected by the source/destination pair: inter-body → **space**; intra
 | Mode | Gate |
 |---|---|
 | **Land** | Ungated |
-| **Sea** | **Port** building at both endpoints — BL-188 (coastal ports) owns the port model and the gate |
+| **Sea** | **Port** building at both endpoints — BL-602 (sea port gate) owns the Port and the gate; BL-188's archived coastal-trade prose is reference |
 | **Air** | **Airfield** building at both endpoints |
 | **Space** | **Launchpad** at origin (`corp_has_launchpad_on`) + **Orbital Port** at destination; Era 1 required (ERAS.md) |
 

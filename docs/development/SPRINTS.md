@@ -39,28 +39,30 @@ and/or a version goal (v0.1.1 etc.).
 
 **Also deleted 2026-08-24, same basis:** six orphaned backlog items (BL-579–BL-584) a concurrent review-queue-purge session had filed with no sprint attached, plus Sprint 32’s own three items (BL-595–BL-597, Logistic Points / Throughput lens) — all unstarted, all removed from `backlog.json` outright rather than archived.
 
+**Sprint 25b deleted 2026-08-24, same policy** (the Sprint 18 design form verdict): never opened, gated on a sequence (25a → 21 → 23 → 25b) whose middle numbers the purge had already freed. Its undelivered half — interception narration, the out_cuts sink — is unowned until re-filed (NR-599); the interdiction core itself landed 2026-08-21 and is unaffected.
+
 ## Open now
 
-### Sprint 25b — The cut (interdiction)
-*Gated*
-
-**Goal.** The interception trigger in the economy tick, convoy_tile_at lifted out of the renderer, stance as the sole predicate, and the comms/ledger/canvas surfaces that stop it being silent.
-
-**Planned.**
-- BL-458 — supply lines cannot be cut (designed, A, d4): requires BL-315, BL-448, BL-452.
-
-**Done when.** A player can lose a convoy to a hostile company and be told exactly what was taken and by whom.
-
-**Risk.** Real risk is scope creep into a combat system — the moment interception grows escorts, blockades, ambient banditry or neutral interception it stops being a logistics item and becomes BL-315's job done twice.
-
-Gated; cannot start before Sprints 21 and 23. This item is why BL-315's own ruling has been waiting: army/mercenary/pirate are three derived readings of one company, the reading is derived never authored; army and mercenary have paths to being read, pirate has NO mechanic at all — taking a convoy is exactly that act. SETTLED 2026-08-17 (Ben, on NR-310) — capture, with destruction as the fallback. Cargo leaves the source pool at dispatch, so both answers conserve. On interception the cargo credits the interceptor's (corp, body) pool at the interception body; where it cannot be credited it is destroyed instead, and the outcome says which — an interceptor with no market access holds goods it cannot sell, a legitimate outcome, NOT special-cased away. What decided it: destroy-only pays the interceptor zero, so BL-450's scored-utility stance layer would correctly never rank an interception — interdiction would ship as a capability only the player ever uses, the same unreachable-capability defect this sprint exists to fix. Capture gives the scorer a number, and earns BL-315's third derived reading: a company that takes cargo reads as a pirate, one that only burns it reads as a saboteur. Harness's load-bearing row: captured quantity == quantity credited exactly, with the destroyed-fallback path asserting zero credited and zero minted. Not a battle by default — a convoy is cargo, not a force, the first cut resolves interception as an OUTCOME; escort (a unit assigned to a convoy, turning interception into a real resolve_campaign_battle call) is the obvious follow-on, deliberately out because it needs BL-315's engagement machinery SHIPPED not merely built. SETTLED 2026-08-17 (Ben, on NR-312): 25a runs next, sequence is 25a → 21 → 23 → 25b — interdiction, the payoff this sprint was rescoped to carry, is now three sprints out; the alternative (opening Sprint 23 stance first as shortest path) was on the table, Ben chose the substrate instead, the reading that leaves 25b with fewer unknowns when it arrives. The check: interdiction — convoy_tile_at agrees with the renderer on every lane in a generated world IN BOTH KEY ORIENTATIONS (the bug this item is most likely to ship); a hostile unit on the head tile intercepts and a neutral one does not; goods conserved exactly under capture and destroyed exactly under destroy, no minting either way; two runs of one seed intercept the same convoys on the same ticks; an interception with no stance entry never fires. Plus a --verify capture of the Convoys tab, and a dispatch→hold→resume round-trip asserting a rejection mutates nothing. What this sprint deliberately does not carry: escort stays out (needs BL-315 shipped); ambient banditry, neutral interception, terrain blockade stay out (stance is the sole predicate); BL-325 S3 not cut but not separately scoped (converges with BL-454's shortfall rule); per-node throughput out of prototype scope; air mode/airfield deferred; a second reach field forbidden outright by BL-325 ruling 3; waypoint routing and standing lane orders stay out; a second and third military good stay out.
-
-### Sprint 18 — Logistics
+### Sprint 18 — Logistic Points land with their consumers
 *Open · opened 2026-08-24*
 
-**Goal.** Logistics-focused (Ben, 2026-08-24) — being designed in this session; goal text lands when the design settles.
+**Goal.** The network gets its ceiling: the bifold city-generated throughput rate LOGISTICS.md argues end-to-end, landing with both consumers — the priced march first (Ben, 2026-08-24), convoy admissibility second — plus the two rival network grants and the three riders the design form settled. Cuts v0.1.18 (amended: Logistic Points pulled forward from v0.1.20).
 
-Number reuse, deliberate (Ben, 2026-08-24): the superseded military-engagement Sprint 18 (opened 2026-08-15) is archived cold alongside the ‘18 retro’ and ‘18b’ entries; this sprint is a fresh authoring against the current docs, not a resurrection. Fits the sprint-number ceiling (18 and below).
+**Planned.**
+- BL-599 (rival roads and hubs) — wave 1: the scorer builds the generator, per Ben’s “before LP lands” (grant 2026-08-24)
+- BL-596 (LP active march) — the bifold city rate + the priced march, one landing (settled rule 3)
+- BL-597 (LP passive convoys) — convoy admissibility; war flips the queue observably
+- BL-598 (throughput lens) — Reach with a magnitude; live click
+- BL-600 (rival directed dispatch) — the scorer directs convoys through the shared seam (grant 2026-08-24)
+- BL-601 (dispatch form) — the Selection-card form SUPPLY.md designs; live click
+- BL-602 (sea port gate) — the Port gates the sea leg (park lifted 2026-08-24)
+- BL-603 (upkeep zeros) — the reach field starts to bite (data edit; Ben calibrates)
+
+**Done when.** A march costs credits through active LP in a live game; an over-cap dispatch leg is refused and the refusal announced; the queue flip is observable under mobilisation in the harness; a rival places a road deterministically across two runs of one seed; the Throughput lens and the dispatch form each pass a live click.
+
+**Risk.** LP’s seven constraints each killed an earlier cut — constraint 3 (cost formula before allocation sort key) is the live one. The substrate deliberately keeps its measured mispricings (route-wide crosses_ocean, unpriced intra-catchment distance): Ben chose depth over correction on the design form, so LP’s first-cut rates are argued against numbers known to be imperfect and must be re-argued if a later sprint fixes them. Golden churn from upkeep zeros and the sea gate is real and is attributed, never blessed away.
+
+Verdict provenance — the 2026-08-24 design form: shape A over B/C/D (B’s pricing-honesty roster stays purged-designed reference); purged records enter FRESH, archive as reference only; Sprint 25b deleted under the purge policy (its interception-narration work is unowned — NR-599); rival grants place_road/hub + directed dispatch (standing rules, dated); riders all three (dispatch form, sea-gate park lift, upkeep zeros); LP consumer order ACTIVE FIRST; rates first-cut-then-tune (NR-600). Number reuse, deliberate (Ben, 2026-08-24): the superseded military-engagement Sprint 18 (opened 2026-08-15) is archived cold alongside the ‘18 retro’ and ‘18b’ entries; this sprint is a fresh authoring against the current docs, not a resurrection.
 
 ## Where things stand
 
@@ -95,11 +97,10 @@ Number reuse, deliberate (Ben, 2026-08-24): the superseded military-engagement S
 | N1 | The two spines, landed inert | Closed 2026-08-23 — all three landed inert; two of the three were UNSOUND and were fixed in the closing pass (NR-546, NR-547) |
 | N2 | The spines move | Closed — three lanes merged; one lane’s interpretation withdrawn after adversarial verification (NR-554) |
 | 26 | Re-baseline (the gate; nothing else may open first) | Subsumed — split at execution into 26a/26b, themselves deleted in the 2026-08-24 purge |
-| 25b | The cut (interdiction) | Gated — needs BL-315’s engagement machinery shipped; its settled sequence (25a → 21 → 23 → 25b) points at numbers purged 2026-08-24 (NR-598) |
-| 18 | Logistics | Open 2026-08-24 — logistics-focused (Ben); design in flight this session |
+| 18 | Logistic Points land with their consumers | Open 2026-08-24 — Logistic Points land with their consumers; BL-596..BL-603 filed; cuts v0.1.18 |
 
-**Next up.** As of 2026-08-24, **Sprint 18 (logistics)** is open — the theme is Ben’s call, the design is in flight. **25b (interdiction)** stays gated; its sequence points at purged numbers (NR-598). Two cap slots free; any candidate numbers 18 or below. **BL-518** (the Era −1 sim redrawing borders as its wars resolve) and **BL-514** (blend all tiles, HELD) stay parked in `backlog.json`.
+**Next up.** As of 2026-08-24, **Sprint 18 (Logistic Points land with their consumers)** is the only open sprint — eight items, BL-596..BL-603, cutting v0.1.18 (Logistic Points pulled forward from v0.1.20 by the design-form verdict). Two cap slots free; any candidate numbers 18 or below. **BL-518** (the Era −1 sim redrawing borders as its wars resolve) and **BL-514** (blend all tiles, HELD) stay parked in `backlog.json`.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*29 sprints archived cold; 2 open/gated in the hot store.*
+*29 sprints archived cold; 1 open/gated in the hot store.*

@@ -252,6 +252,45 @@
       "status": "resolved",
       "resolved_on": "2026-08-24",
       "resolution": "Ben, 2026-08-24: \"Let's move sprints into JSON. We also need to archive them once they're complete.\" Done same session: status_table retired in favour of a per-entry status_line (one entry, one line, nothing to drift); SPRINTS.md is now a generated mirror (tools/session/render_sprints.js) reading sprints.json plus archive/sprints-*.json, so every executed sprint — 27 included — is indexed; 29 completed sprints moved cold via tools/session/archive_sprints.js (hot file 128.7 KB → 12.6 KB). The empty retro fields on 27/P1/N1/N2 are frozen in the archive as found. The one remaining fork — gated 25b's sequence pointing at purged numbers 21/23 — is carried into the Sprint 18 logistics design, in flight this session."
+    },
+    {
+      "id": "NR-599",
+      "title": "Interception narration is unowned after Sprint 25b's deletion",
+      "raised": "2026-08-24",
+      "kind": "question",
+      "source": "The Sprint 18 design form: Ben ruled 25b deleted under the purge policy; its interception-surfacing half died with the shell.",
+      "what": "Interdiction's core landed 2026-08-21, but every interception_record is computed and discarded — the out_cuts sink (supply_system.hpp) has no production caller, so LOGISTICS.md §7's own clause ('announced in the same change that resolves it… silence is the wrong default', NR-407) is design without an owner. The work is one wiring pass: comms message naming lane and interceptor, Convoys-ledger exit with stated cause, tile marked a few ticks — the battle_dispatches precedent applies.",
+      "why_it_matters": "An interception is the most consequential thing that can happen to a player's economy without them pressing anything; today it is silent — the exact defect the deleted sprint existed to fix.",
+      "options": [
+        "Add it to Sprint 18 as a ninth item — it is small, and BL-597 (LP passive convoys) touches the same dispatch surfaces",
+        "File it fresh for the next conflict-facing sprint",
+        "Accept silent interception until the military surface returns"
+      ],
+      "recommendation": "File it fresh now and let it ride whichever sprint next touches the convoy surfaces; it is an afternoon of wiring, and leaving it unfiled is how designed-but-silent work went missing the last time.",
+      "files": [
+        "src/world/supply_system.hpp",
+        "src/app/app.cpp",
+        "docs/economy/LOGISTICS.md"
+      ],
+      "status": "open",
+      "resolution": null
+    },
+    {
+      "id": "NR-600",
+      "title": "LP rates and upkeep constants: first-cut-then-tune, taken on your behalf",
+      "raised": "2026-08-24",
+      "kind": "decision-taken",
+      "source": "The Sprint 18 design form left the rates line blank; the LP consumer order was answered (active first) but not who sets the constants.",
+      "what": "Decision taken so the sprint can build: the first-cut constants — active-LP credit price per unit-distance, passive cap magnitudes per city scale, and BL-603's (upkeep zeros) decay/recovery/out_of_supply_reach rates — are authored in the landing items, each argued against BL-543's (value anchor) unit-cost anchor with a dated comment in scripts/economy.lua, and flagged here for your tuning pass rather than ruled ahead of code.",
+      "why_it_matters": "LOGISTICS.md's own constraint 3 makes the LP cost formula load-bearing (the allocation sort key is a function of it); a wrong first cut is cheap to retune but expensive to discover late.",
+      "options": [],
+      "recommendation": "Review the constants at the sprint's first calibration pause — overturn any of them freely; the items carry the argument for each number.",
+      "files": [
+        "scripts/economy.lua",
+        "docs/economy/LOGISTICS.md"
+      ],
+      "status": "open",
+      "resolution": null
     }
   ]
 }

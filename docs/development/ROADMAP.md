@@ -90,13 +90,14 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   deferred past this cut for want of session time to simulate the economy that far (not a defect);
   a pre-existing, unrelated corp-selection screen defect found along the way (NR-597) is logged,
   not fixed, by Ben's ruling.
-- **v0.1.18 — The economy tells the truth.** *(Defined 2026-08-19 — Ben chose define over
-  dissolve; the version had existed in the backlog since the Sprint 25a era while the Sprint-26
-  split that owed its ROADMAP entry was dropped, NR-377.)* *Theme: the measured economy
-  pathologies, fixed.* Sprint 19 closed goal-not-met; these four are its remainder as diagnoses:
-  processing underearns extraction (**BL-436**), the economy mines one resource (**BL-437**),
-  co-extraction is invisible (**BL-438**), and intra-catchment distance is free (**BL-465**).
-  The benchmark is `ai_skill_harness`'s final net worth, per the Fall arc's amendment 5.
+- **v0.1.18 — Logistic Points land with their consumers.** *(Amended 2026-08-24, the Sprint 18
+  design form: Logistic Points pulled forward from v0.1.20. The prior "economy tells the truth"
+  roster — BL-436, BL-437, BL-438, BL-465, all purged-designed records — re-enters fresh under a
+  later minor when re-filed; its 2026-08-19 define-over-dissolve provenance, NR-377, carries with
+  it.)* *Theme: the network gets its ceiling.* The bifold rate and both consumers (**BL-596**,
+  **BL-597**), the Throughput lens (**BL-598**), the rival network grants (**BL-599**,
+  **BL-600**), the dispatch form (**BL-601**), the sea Port gate (**BL-602**), and upkeep
+  economics turned on (**BL-603**). Cut by **Sprint 18**.
 - **v0.1.19 — Ancient conflict & seams.** *(The old v0.1.16 theme, re-homed whole in the
   2026-08-19 split.)* *Theme: the Era −1 machinery graduates from generator to gameplay.*
   Era-keyed rosters (**BL-274**), the Era −1 strategic layer (**BL-277**), the diplomacy seam
@@ -105,8 +106,9 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   Fall arc feeds it.
 - **v0.1.20 — Stance & force.** *Theme: who may fight whom, and the verbs to do it.* The unit
   verb family (**BL-314**), company answerability (**BL-399**), the stance surface (**BL-449**),
-  rivals reasoning about stance (**BL-450**), Logistic Points (**BL-464**), unit formations
-  (**BL-472**, moved from v0.1.18 for theme coherence), and the parked diplomacy pair
+  rivals reasoning about stance (**BL-450**), unit formations
+  (**BL-472**, moved from v0.1.18 for theme coherence; Logistic Points moved out to v0.1.18,
+  2026-08-24), and the parked diplomacy pair
   (**BL-474**, **BL-475**). Lane C's home; C2/C3 cut toward it.
 - **v0.1.21 — The credible rival.** *Theme: the scorer behaves like a competitor, and every verb
   is reachable.* The AI build-score quadratic (**BL-417**), decision-feed rebuild cost
