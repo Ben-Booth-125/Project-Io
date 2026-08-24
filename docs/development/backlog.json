@@ -424,20 +424,22 @@
       "category": "UI",
       "authority_doc": "docs/ui/PLANETARY.md",
       "files": [
-        "src/ui/hex_render.cpp",
         "src/ui/body_surface_canvas.cpp",
-        "src/ui/detail_level.cpp",
+        "src/ui/hex_render.cpp",
+        "scripts/verify/zoom_ladder.lua",
         "docs/ui/PLANETARY.md"
       ],
-      "title": "Tile texture reads crisp at working zoom instead of averaging into a blur",
-      "design": "## Ben's words\n> \"Texture / Land diffusion turns into a blur, it should definitely be crisper than this.\"\n\n## This is the first eyeball the texturing pass has had\nBasic tile texturing (BL-520) landed 2026-08-21 - a substrate grain plus a cover pattern, 13\ncomposable marks - and its own note in the verifier-visual skill records that it was authored\nin a container that could neither build nor display the app, so nothing about it had been\nseen. This is that review arriving, and it is a tuning finding rather than a design reversal:\nthe two-pass structure is not what Ben is objecting to.\n\n## What 'blur' most likely is\nThe pass already carries a hard LOD floor - no texture at all below 14px of drawn\ncircumradius, deliberately stricter than the 7px coarse-fill threshold, because a sampled\npattern at hex scale is moire rather than merely invisible. The complaint is about the band\nABOVE that floor, where marks are drawn but are small enough that neighbouring hexes average\ninto mush. Three candidate causes, to be measured before any is acted on:\n  * mark size scales with zoom, so marks shrink toward the sampling limit rather than holding\n    a screen-space size;\n  * the cover pattern's alpha is low enough that its contrast against the substrate drops\n    below what survives at small scale;\n  * every lens attenuates texture to 0.45, so a lens frame is a second, compounding softening.\n\nMeasure first, then change one. The 'crisp' target is Ben's eye, so this ends with him looking\nat the live app rather than at a capture (Rule 0b).",
+      "title": "The land stops smearing: what reads as blurred texture is the province blend",
+      "design": "## Ben's words\n> \"Texture / Land diffusion turns into a blur, it should definitely be crisper than this.\"\n\n## Measured before changing anything (Rule 0b), and it is not the texture pass\n`scripts/verify/zoom_ladder.lua` walks the canvas's four LOD bands at one spot:\ncoarse fill below 7px circumradius, hexes with no texture below 14px, texture ramping\n14-22px, full strength above 22px.\n\nWhat the ladder shows:\n  * **x1 and x2 are CRISP.** Coarse fill draws a distinct little block per tile and reads\n    cleanly. The complaint is not about the far view.\n  * **From ~x3.5 up, LAND loses its hex edges entirely** and becomes a continuous grey-brown\n    smear with building and settlement glyphs floating in it.\n  * **OCEAN stays crisp at every zoom**, hex outlines intact.\n\nThat split is the diagnosis. A faint texture pass would soften land and water alike; only\none thing in the canvas treats them differently, and it is **BL-511's province blend**\n(`body_surface_canvas.cpp`, 'a hex's fill is blended into its province's, so the seams\nINSIDE a province disappear'). Ocean tiles carry province id 0, are unpartitioned, and do\nnot blend - which is exactly why they are the only thing still showing a grid.\n\nProvinces run 7-12 tiles since the repartition, so the blend is averaging colour across a\nlarge cell rather than softening a seam. The texture constants are not implicated and\nshould not be touched first.\n\n## This is a reversal of Ben's own recent ruling, and is his to make\nThe blend is not an accident: the code records it as **Ben's ruling of 2026-08-21** - 'a\nblended gradient, explicitly not a dominant composition and not a texture pattern'. Three\ndays later the same treatment is being described as a blur. That is a legitimate change of\nmind on seeing it at working zoom for the first time, and it is named here rather than\nquietly tuned, because silently dialling back a dated ruling is how a design loses its\nrecord.\n\nThree shapes, and the third is where the rest of the 2026-08-24 list points:\n  1. **Drop the blend.** Every tile draws its own colour; the province reads from its edge\n     stroke alone. Maximum crispness, and the province stops being visible as a FIELD.\n  2. **Confine it to the seam.** Blend only within a band near province vertices, so the\n     interior of a cell stays flat and only the joins soften. Keeps the soft-cell read at a\n     fraction of the smear.\n  3. **Invert it - colour at the edge, clarity inside.** Which is precisely what BL-601 asks\n     for at the NATION grain: 'borders extending their colour inwards', no diffusion. Same\n     complaint, same mechanism, one grain apart - so answering the two together is cheaper\n     than answering them separately, and more likely to be coherent.\n\n## Not implicated, checked\nThe texture LOD floor (14px), the 22px full-strength ramp, and the 0.45 per-lens attenuation\nare all working as designed. The lens rungs of the ladder show the same land smear with or\nwithout a lens, so the attenuation is not compounding into the symptom either.",
       "status": "designed",
       "glyph": "✓",
       "priority": "A",
       "version_goal": null,
       "sprint": "U1",
       "written": "2026-08-24",
-      "requires": [],
+      "requires": [
+        "BL-601"
+      ],
       "blocked_on": null,
       "parked": false,
       "source": "Ben, 2026-08-24, the UI improvement list."
