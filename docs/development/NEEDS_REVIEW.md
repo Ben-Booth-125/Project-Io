@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*8 entries — 8 open, 0 resolved.*
+*9 entries — 9 open, 0 resolved.*
 
 ---
 
@@ -117,6 +117,18 @@ CONTRACTS.md's Q2 table settles the ORDERING — failed is 'down hardest', cance
 - Defer to playtest feel once BL-578's slice is playable.
 
 > **Recommendation:** Defer to playtest feel — this is exactly the kind of number CONTRACTS.md itself says should be iterated, not authored once and forgotten (the same discipline NR-579's fee_mult/deadline_ticks placeholders are held to).
+
+### NR-583 — BL-574's own requirement text says a failed 'hold' contract has 'the escrow returned' -- the code does not return one
+*observation · raised 2026-08-24 · from BL-574 (CONTRACT_HARNESS), req/requirements.json's R1 (M4): "a hold-template failed on the first lost tick with the escrow returned and reputation lower than a cancel".*
+
+Read literally against src/world/nation_step.cpp's run_mercenary_contract_tick, this is not what happens on a mercenary_contract's failure. A mercenary_contract carries no escrow field at all — only fee/deposit_paid (world.hpp) — and the failure branch's own comment says outright: 'the reserved remainder is not disbursed to anyone; it was already spent, from the client's perspective, the moment the escrow that funded it left the treasury' (corp_command.cpp's accept_offer draws the same conclusion for why the deposit is a direct transfer, not a fresh budget claim). The only 'escrow returned' mechanic anywhere in the mercenary-contract code is on a still-open mercenary_offer's TTL expiry, BEFORE acceptance (nation_scorer_harness.cpp's own R8e) — a different record, a different event, already covered there. tools/verify/mercenary_contract_harness.cpp's new M4 case (this item) asserts the ACTUAL observed behaviour instead — nothing beyond the already-paid deposit moves on a hold-contract's failure — rather than the requirement's literal wording, and says so in the harness's own file-header comment.
+
+**Why it matters.** Either the requirement text is loose paraphrase of a mechanic that was never built this way (most likely — carried over from offer-TTL-expiry's refund, or procurement's deposit-forfeit shape), or Ben intended a real refund-on-failure that BL-573 never implemented and BL-574 was supposed to catch missing. This item's own scope is headless verification only, so it observes and reports rather than silently reinterpreting the requirement or adding an unasked refund path.
+
+- Confirm the requirement text is loose paraphrase, not a literal spec — the observed behaviour (deposit only, no refund) is correct, and matches CONTRACTS.md's own Q2 table ('failed: deposit forfeit, nothing paid').
+- Decide a mercenary_contract's failure SHOULD refund something to the client nation's treasury (a real behaviour change to nation_step.cpp, not a harness fix), and file it as its own backlog item.
+
+> **Recommendation:** Likely the first option — CONTRACTS.md's own Q2 table for 'failed' already reads 'deposit forfeit, nothing paid', matching the code and not the requirement text's 'escrow returned'. Worth a one-line correction to the requirement text next time req/requirements.json is touched, so a future reader doesn't file a phantom bug against it.
 
 ---
 
