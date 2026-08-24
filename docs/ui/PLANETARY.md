@@ -64,7 +64,7 @@ an outcome of the plate pass and the body's hydrological state, not a flood-fill
 |---|---|
 | Background | Dark: `(18, 18, 24)` |
 | Tile | Filled hexagon. Colour from `ui::terrain_colour` (substrate + cover hue), composited with the landform relief tint (§ Terrain types above). A 1 px gap between hexes lets the background show through as a border — achieved by drawing each hex at `circumradius - 1 px` rather than adding explicit borders. |
-| Building marker | A small white vector glyph centred on the tile (~22% of hex circumradius), drawn by `ui::icons::building` with a thin dark outline. The silhouette encodes the type: extraction = ore-chunk, processing = square, port = triangle, inland logistics hub = hexagon, other = circle. |
+| Building marker | A vector glyph centred on the tile at 48 % of the hex circumradius, drawn by `ui::icons::building` over **live ground** — the hex keeps its terrain hue, its texture, its relief and whatever the active lens washes over it. The silhouette encodes the type and the fill encodes the owner; a stacked tile adds the segmented ring. Full spec: [§ Building markers](#building-markers) below. |
 | Road network | **Always-on** (like terrain, not a lens): the generated road lattice plus player-placed roads render as **continuous, symmetric spans**. Each roaded tile draws its **own half** of every shared road edge — from its centre to the midpoint of the centre-to-neighbour line — toward each roaded, survey-revealed cardinal neighbour; the two tiles' halves meet at the edge midpoint, so a road spans the pair identically whichever tile is "from" (no from/to asymmetry), and a small centre cap rounds junctions and keeps a lone / just-placed road visible. Cylinder-seam edges shift one period to stay short; drawn only toward survey-revealed neighbours, so roads don't leak past the survey fog. Styled by the drawing tile's **tier** — **Track** (`road_level` 1) thin/dim, **Road** (2) medium, **Highway** (3) thick/bright — so a tier change reads as a taper at the midpoint. Spans **dim with the commercial-reach fog**, through the same wash the lens fill takes; a road edge is fogged by the **max** of its two tiles' vision (see [DISCOVERY.md](DISCOVERY.md)). The tier ladder has **no on-canvas key** — it is named contextually in the Selection panel instead (below). |
 | Road-tier legend | **Contextual, not chrome** (Ben's call, 2026-08-09). The three tiers render by line weight and brightness alone, and roads are always-on terrain rather than a lens, so the per-lens legend drawer cannot carry them. Instead, selecting a roaded tile names its tier beside the coordinates in the Selection panel header — `Tile [x, y] · Highway` — with a hover tooltip giving the thin→thick ladder. A roadless tile shows nothing; no persistent chip is added anywhere. |
 | Selection / hover indicator | Hex outline drawn through the shared highlight convention (`src/ui/highlight.hpp`): white for the selected tile, light blue for the hovered tile (per wrap copy), amber for pinned. Precedence is selected > pinned > hovered. |
@@ -75,6 +75,112 @@ an outcome of the plate pass and the body's hydrological state, not a flood-fill
 | Home-cluster ring + HQ star | Always-on player-presence chrome on `home_body` only: a translucent ring (player-identity colour) encloses the player's holdings cluster on that body ("my region"), and an `ui::icons::hq` star marks the building nearest the cluster centroid ("my origin"). Composes with, does not duplicate, the per-tile ownership outline. |
 | National border band | **Always-on** political chrome (like roads, not a lens): a nation's identity colour sits at its frontier and falls off inwards over three tiles, and clicking the band selects the nation. See § The national border band below. |
 | Rivers | Directed river lines drawn along tile edges with downstream chevrons, so a basin reads as flowing rather than as a static blue band. Terrain drawing, not a lens; always on. |
+
+---
+
+## Building markers
+
+### The glyph draws over the hex, never on a plate of its own
+
+**A building marker paints no background.** The silhouette is drawn straight onto the
+tile's own fill, so terrain hue, substrate grain, cover pattern, landform relief and
+whatever the active lens washes over them all keep rendering underneath and around it.
+Ben, 2026-08-24: *"Remove building background. Buildings should be drawn over the hex,
+not completely on top."* (BL-596, buildings over the hex.)
+
+The argument is that the hex is the thing carrying substrate, cover, ownership and every
+lens; occluding it in order to label it trades away the map to annotate it. A built tile
+is therefore an ordinary tile in every render pass — it takes the province blend, the
+texture pass and the relief tint exactly as the unbuilt ground beside it does.
+
+**Legibility rests on the glyph, not on a backing.** The silhouette is drawn at 48 % of
+the hex circumradius in a pale, owner-tinted fill, carrying the filled family's dark
+outline ([ICONS.md](ICONS.md) § Shared conventions). The pair is self-balancing across the
+terrain palette's full range: over near-white ice the dark outline holds the shape, over
+dark forest the pale fill does. When a glyph is illegible over some terrain, the fix
+belongs in the **glyph** — its weight, or an outline/halo on the stroke itself — never in
+a reinstated plate.
+
+**Ownership keeps three channels and loses none.** The silhouette's *fill* is the owning
+corporation's identity colour lightened toward white; a small `corp_emblem` tag sits in
+the hex's lower-right; and the player's own tiles carry the persistent footprint outline
+on the rim under every lens. The player-identity wash on the plain default applies to a
+built tile like any other tile of theirs, so a cluster reads as one footprint rather than
+as a ring of owned ground around an unowned hole.
+
+### A stacked tile: the segmented ring
+
+A tile carries as many buildings as its richness allows, so "how does one hex say it holds
+more than one thing?" is a real question. Ben's answer, 2026-08-24: **the segmented ring**
+— one arc per building **kind** laid around the inside of the hex rim, with the dominant
+kind's glyph in the centre. Chosen over a glyph cluster (which becomes soup past three) and
+over primary-plus-count (which is always legible but never says *which*): the ring is the
+only one of the three that scales with the richness-derived stack cap and still names its
+contents.
+
+**A kind is a `building_type`, not a named building.** Two extraction sites working
+different deposits are one kind standing twice. Each kind's arc takes its colour from
+`palette::building_kind_colour` — a hand-picked, hue-separated set rather than a hash,
+because the roster is small and closed and the one place these colours are read is exactly
+where two adjacent hues would be indistinguishable.
+
+**Three marks, three questions.** They compose rather than duplicate:
+
+| Mark | Answers |
+|---|---|
+| The **ring** | *Which kinds stand here?* |
+| The **centre glyph** | *Which of them leads?* — the dominant (lowest-id) building's silhouette |
+| The **`+N` badge** | *How many buildings in total?* |
+
+**Read clockwise from the top.** The first segment sits at 12 o'clock and is the dominant
+kind — the one the centre glyph depicts. The remainder follow in ascending `building_type`
+order, so the ring is stable frame to frame and identical across runs. A single-kind tile
+draws **no ring at all**: its centre glyph already describes it fully, and a ring on every
+built tile in the world would be chrome rather than information.
+
+**The rim is the borders' territory, and a ring placed there must not read as one.** Three
+passes claim it: the player's own footprint outline (the loudest), the nation-border
+segments under the Country lens, and the province edge stroke. Every one of them is
+**hexagonal, continuous and thin**, and four properties separate the ring from all three:
+
+| Property | The ring | The border passes |
+|---|---|---|
+| **Shape** | A circle — curved everywhere | Hexagonal: straight sides, hard corners |
+| **Radius** | Inset to 0.76 r, inside both the edges (0.866 r at their midpoints) and the vertices (1.0 r) | On the rim itself |
+| **Continuity** | **Broken** — a gap between every segment | Continuous; a border is never dashed |
+| **Weight** | `max(2, 0.14 r)`, plus its own dark under-stroke | 1.5–2 px flat |
+
+Shape is the load-bearing one: a curve among hexagons cannot be read as a boundary of a
+hexagonal cell. The gap is the second — no border pass is ever dashed.
+
+### The ring's level of detail — it degrades, it does not vanish
+
+The ring draws only above **`draw_r > 10 px`**, its own bound and a stricter one than the
+`7 px` coarse-fill threshold (§ Fill level-of-detail at far zoom), for the same reason the
+texture pass carries its own stricter bound: the two ask different questions. Coarse fill
+asks whether the corner cut is still drawable; the ring asks whether one *segment* is still
+a segment, and a segment shrunk to the length of its own gap reads as a dotted circle rather
+than as a count.
+
+**The bound is derived.** A segment's drawn arc is `2π × 0.76 × draw_r / kinds × (1 − 0.20)`.
+At the practical worst case — the full placeable roster, six kinds on one tile — that is
+`0.637 × draw_r`, and a stroke needs about 6 px of run before it reads as an arc rather than
+a blob: `0.637 × draw_r ≥ 6` gives `draw_r ≥ 9.4`, rounded up to 10.
+
+**Below the bound the tile falls back to the dominant kind's glyph alone.** That is the
+whole point of stating a bound rather than letting the arcs shrink: never an empty hex,
+and never a ring drawn at a size where its arcs have merged. Because 10 > 7, the ring is
+already gone by the time the fill goes coarse, so there is no band in which a rim is being
+segmented that the fill is no longer drawing.
+
+The ring is suppressed under the **Population** and **Opportunity** lenses, alongside the
+silhouette it surrounds: those lenses replace a tile's installation read with a per-tile
+value mark, and a ring with no centre glyph would be a ring with nothing to be dominant.
+
+**Check:** `scripts/verify/stacked_tile_ring.lua` (`verifier-visual`), which *stages* a
+multi-kind stack rather than hunting for one — a generated world does not reliably produce
+a tile carrying several kinds, and a capture of a state the script could not produce proves
+nothing.
 
 ---
 
@@ -125,11 +231,10 @@ express) and not a texture pattern. The Selection element's mixture bar is the b
 un-blends the same colours so "what did that gradient just average?" is answerable at a glance
 (see [SELECTION.md](SELECTION.md) § The province element).
 
-**Three classes of tile are excluded from the blend and keep their crisp hex and 1 px border:**
+**Two classes of tile are excluded from the blend and keep their crisp hex and 1 px border:**
 
 | Excluded | Why |
 |---|---|
-| A **built** tile | It renders *as an installation* — its hex is swapped wholesale for the owner plate. Smearing that plate across unbuilt ground would put a corp identity on land nobody owns. |
 | A **survey-masked** tile | The lock fill is a statement about *knowledge*, not terrain. The national border band is gated on `revealed` for the same reason — a boundary drawn through the mask would leak the political shape of unsurveyed ground. |
 | Any tile under a **non-blending lens** | See the reduction table below. |
 
@@ -266,9 +371,10 @@ Beyond the base grid and the chrome in the table above, the draw pass
 - **Lens tints** — the lenses keyed on `ui_state::overlay`
   ([LENSES.md](LENSES.md)); relief composites *after* the lens tint so landform
   survives a saturated overlay.
-- **Built-tile installations** — building markers (enlarged silhouette + corp
-  emblem tag on built tiles), road spans, settlement conurbation
-  markers, the home-cluster ring + HQ star.
+- **Built-tile installations** — building markers (the silhouette, the stacked-tile
+  ring, the corp emblem tag and the `+N` count badge), road spans, settlement
+  conurbation markers, the home-cluster ring + HQ star. Drawn *over* the hex, which
+  keeps rendering underneath ([§ Building markers](#building-markers)).
 - **Corporate HQ markers** — per-corp seat markers (`draw_corp_hq`; see LENSES.md).
 - **Activity fog + convoy beams** — the intra-body vision layers
   (`permanent_vision`, `convoy_beams` in `ui_state`) and the
@@ -428,11 +534,12 @@ zoom notch and the next reads as a rendering fault. So `texture_lod_scale` is 0 
 `r ≤ 14`, 0.25 at 16, 0.5 at 18, and 1 at `r ≥ 22` — and the whole-grid view
 (`draw_r ≈ 5–7`) carries no texture at all.
 
-Two further gates, both in the canvas call site: texture is skipped on **survey-masked**
-tiles (a cover pattern is terrain information, and drawing it through the mask would leak
-the shape of unsurveyed ground — [DISCOVERY.md](DISCOVERY.md)) and on **built** tiles
-(whose hex is swapped wholesale for the owner plate as an identity signal). It is drawn
-after the fill and **before** the national border band, so a border is never broken up by a canopy
+One further gate, in the canvas call site: texture is skipped on **survey-masked** tiles
+(a cover pattern is terrain information, and drawing it through the mask would leak the
+shape of unsurveyed ground — [DISCOVERY.md](DISCOVERY.md)). A **built** tile is *not*
+excluded — its ground is ordinary ground and its texture keeps drawing under the
+silhouette ([§ Building markers](#building-markers)). Texture is drawn after the fill and
+**before** the national border band, so a boundary is never broken up by a canopy
 tick.
 
 **Check:** `scripts/verify/tile_texture.lua` (`verifier-visual`).

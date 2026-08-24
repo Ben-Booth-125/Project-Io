@@ -41,8 +41,10 @@ void glyph(ImDrawList* dl, ImVec2 centre, float r, /* trailing type/tier/colour 
   glyph pulls its colour from `presentation_of`). See the catalogue for which.
 - **trailing parameters** — most glyphs take a single colour; the multi-parameter
   cases are `building` (a `building_type` + a `resource_type` identity, § 1c, +
-  `fill`), `settlement` (a `tier` + `colour`) and `landform` (a
-  `terrain_landform` + `colour`).
+  `fill`), `settlement` (a `tier` + `colour`), `landform` (a
+  `terrain_landform` + `colour`) and `stack_ring` (an ARRAY of colours + a count —
+  the one glyph whose colour parameter is plural, because it draws one mark per
+  member of a set).
 
 Two settled visual sub-conventions (2026-06-15):
 
@@ -53,7 +55,8 @@ Two settled visual sub-conventions (2026-06-15):
 - **`colour` means fill or stroke per family, fixed:** the filled families
   (`building`, `country`, `corporation`, resource `pip`, `settlement`, `industry`) treat
   `colour` as the **fill**; the stroke families (`supply`, `convoy`, `market`, `ledger`,
-  `placeholder`, resource-**lens**) treat it as the **stroke** line colour and have no fill;
+  `placeholder`, `stack_ring`, resource-**lens**) treat it as the **stroke** line colour
+  and have no fill;
   `hq` and `activity` span both — the one `colour` fills the core *and* strokes the ring.
 
 ---
@@ -85,11 +88,20 @@ Glyphs fall into three families by role.
 | **Activity** | `activity(…, colour)` | Concentric pulse — a filled core ringed by a signal ring (commercial-beacon motif; deliberately distinct from the survey magnifier and the unknown "?") | Caller `colour` — per activity tier (`palette::activity_known` / `activity_stale` / `activity_visible`) | Commercial-activity fog badge, Solar canvas — lower-left of the body, offset from the survey badge's upper-right so the two fogs read apart (BL-089, commercial fog; see [DISCOVERY.md](DISCOVERY.md)) |
 | **Value mark** | `value_mark(…, colour)` | Single filled dot | Caller fill — the caller's red→green ramp sample (`ryg_colour`) | Per-tile magnitude mark for the Workforce (Population) and Opportunity lenses (BL-135, lens value marks): drawn on every buildable tile while either lens is active, in place of a full-tile tint and, on occupied tiles, of the building glyph. See LENSES.md § Population / § Opportunity |
 | **Battle** | `battle(…, colour)` | Two crossed blades, each a stroked shaft with a short cross-guard bar near its base, meeting at the centre. Deliberately **not** a bare X: the X is already the "close this" affordance throughout the chrome, and a mark meaning *a fight is here* must never read as a button meaning *dismiss this*. Stroke-only — a battle is an event on the ground, not a thing installed on it | Caller stroke | Drawn on the **province anchor tile only**, once per live battle, Planetary canvas (BL-469, battle marker). Province-grain by ruling (BL-467 ruling 1 — the province frames the fight), so scattering it across every participating tile would say the opposite |
-| **Stack-count badge** | inlined in `body_surface_canvas.cpp` (no shared `icons::` helper) | A dark-filled circle carrying `+N` text (N = additional buildings/units beyond the first) — the same k/N text-overlay idiom the Solar-canvas survey badge uses for region progress, not a new glyph shape | Fixed light text on a dark disc, no owner tint | On a built tile carrying more than one building (BL-367, stacked tiles), staggered lower-right past the corp-identity tag (which also sits lower-right) so the two never overlap. Only the dominant (lowest-id) building's silhouette draws — this badge is what tells a stacked tile apart from a single-building one, since no per-stack marker exists. BL-575 reuses the SAME inline idiom, independently, for the unit marker's own group count (N = additional units of that owner in the province beyond the first) |
+| **Stack ring** | `stack_ring(…, kind_colours, kinds)` | A **segmented circle** inset to 0.76 r — one arc per building KIND on the tile, separated by a gap of 20 % of each segment's slot, each arc drawn as a dark under-stroke then the kind's colour (the `convoy` / `under_construction` shadow-then-colour idiom applied to an arc). Read **clockwise from the top**: the 12 o'clock segment is the dominant kind, the one the centre glyph depicts. Draws nothing below two kinds | Caller-supplied array, dominant **first** — sourced from `palette::building_kind_colour` | A stacked tile's marker, Planetary canvas (BL-596, buildings over the hex). Drawn under the centre silhouette, the corp emblem tag and the `+N` badge, all of which sit on top of it. Its level-of-detail gate belongs to the caller (PLANETARY.md § The ring's level of detail) |
+| **Stack-count badge** | inlined in `body_surface_canvas.cpp` (no shared `icons::` helper) | A dark-filled circle carrying `+N` text (N = additional buildings/units beyond the first) — the same k/N text-overlay idiom the Solar-canvas survey badge uses for region progress, not a new glyph shape | Fixed light text on a dark disc, no owner tint | On a built tile carrying more than one building (BL-367, stacked tiles), staggered lower-right past the corp-identity tag (which also sits lower-right) so the two never overlap. Only the dominant (lowest-id) building's silhouette draws. The badge answers HOW MANY; the **stack ring** above it answers WHICH KINDS, and the two compose — a tile holding three extraction sites is one kind standing three times, so it draws `+2` and no ring at all. BL-575 reuses the SAME inline idiom, independently, for the unit marker's own group count (N = additional units of that owner in the province beyond the first) |
 
 On the Planetary canvas the **building** glyph's `fill` encodes the *owning
 corporation* (player corp = corp slot 0; rivals a hashed slot), so the
 silhouette reads the building **type** and the fill reads **who owns it**.
+
+**It draws over live ground, on no backing of its own** (BL-596, buildings over the hex).
+The tile keeps its terrain hue, texture, relief and lens wash under and around the glyph,
+so legibility is the glyph's own job: a pale owner-tinted fill inside the filled family's
+dark outline, a pair that is self-balancing across a palette running from near-white ice
+to near-black forest. **When a glyph proves illegible over some terrain, the fix is in the
+glyph** — its weight, or an outline/halo on the stroke itself — never a plate reinstated
+behind it. See [PLANETARY.md](PLANETARY.md) § Building markers.
 
 ### 1b. Landform glyphs — terrain shape, drawn on the canvases
 
@@ -276,7 +288,21 @@ must still obey:
 4. **Fill-vs-stroke is fixed per family (2026-06-15).** Documented in § Shared
    conventions.
 
-5. **Nation tint vs. corp emblem.** The political layer conveys nations by tile *tint*
+5. **A marker never paints its own background (2026-08-24).** Ben: *"Remove building
+   background. Buildings should be drawn over the hex, not completely on top."* No
+   canvas-placed glyph fills a plate behind itself; the ground it stands on keeps
+   rendering. Contrast is carried by the family's outline rule (3 above) and, for stroke
+   families, by the shadow-then-colour pass. A glyph that cannot hold its shape over some
+   terrain is a glyph to redraw, not a glyph to back.
+
+6. **The rim belongs to borders — a mark placed there must not read as one (2026-08-24).**
+   The hex rim already carries the province edge stroke, the player-footprint outline and
+   the Country lens's nation-border segments, all of which are **hexagonal, continuous and
+   thin**. The `stack_ring` earns its place there by being none of those: a **circle**,
+   **inset** clear of the edges and their midpoints, **broken** by a gap between every
+   segment, and **thicker**. Any future rim mark owes the same four-way separation.
+
+7. **Nation tint vs. corp emblem.** The political layer conveys nations by tile *tint*
    (`palette::nation_colour`), glyph-less. Corporations have a dedicated **`corp_emblem`**
    glyph (shape + identity colour, both a pure function of the corp id) rendered wherever a
    corp is *identified* — the identity card, the Selection header, a small tag beside each

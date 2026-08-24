@@ -361,6 +361,57 @@ void building(ImDrawList* dl, ImVec2 centre, float r, building_type type,
     }
 }
 
+void stack_ring(ImDrawList* dl, ImVec2 centre, float r, const ImU32* kind_colours, int kinds)
+{
+    // Under two kinds there is nothing a ring can say that the centre glyph does
+    // not already say. See the header contract.
+    if (dl == nullptr || kind_colours == nullptr || kinds < 2)
+        return;
+
+    // The annulus the ring lives in is bounded on BOTH sides. Inside it must clear
+    // the building silhouette, drawn at 0.48 of the hex circumradius; outside it
+    // must clear the rim, where the player-footprint outline (a hexagon at the full
+    // circumradius) and the Country lens's nation-border segments (at the EDGE
+    // MIDPOINTS, 0.866) already draw. 0.76 sits between the two with margin at each
+    // end, and a circle at 0.76 never touches a hex edge, whose nearest point is
+    // 0.866 away.
+    constexpr float k_inset    = 0.76f;
+    // Fraction of each segment's angular slot given up to the gap that separates it
+    // from its neighbour. The gap is the property no border pass has, so it has to
+    // survive at the smallest size the caller's LOD gate admits.
+    constexpr float k_gap_frac = 0.20f;
+    constexpr float k_pi       = 3.14159265358979f;
+
+    const float ring_r = r * k_inset;
+    const float thick  = std::max(2.0f, r * 0.14f);
+    const float slot   = 2.0f * k_pi / static_cast<float>(kinds);
+    const float gap    = slot * k_gap_frac;
+    // Start half a gap past 12 o'clock so the FIRST segment is centred on the top
+    // and the ring reads clockwise from there — the convention the header states,
+    // and the only thing tying the centre glyph to its own arc.
+    const float start  = -k_pi * 0.5f + gap * 0.5f;
+
+    for (int i = 0; i < kinds; ++i)
+    {
+        const float a0 = start + slot * static_cast<float>(i);
+        const float a1 = a0 + slot - gap;
+
+        // Shadow-then-colour, the same two-pass idiom convoy() and
+        // under_construction() use: the terrain palette runs from near-white ice to
+        // near-black forest and any lens may composite over it, so a single-pass
+        // stroke is legible over one half of that range and invisible over the
+        // other. The dark pass is the ring's own outline — the filled family's
+        // contrast rule (ICONS.md § Shared conventions) applied to a stroke.
+        dl->PathClear();
+        dl->PathArcTo(centre, ring_r, a0, a1, 0);
+        dl->PathStroke(outline, 0, thick + 2.0f);
+
+        dl->PathClear();
+        dl->PathArcTo(centre, ring_r, a0, a1, 0);
+        dl->PathStroke(kind_colours[i], 0, thick);
+    }
+}
+
 void resource(ImDrawList* dl, ImVec2 centre, float r, resource_type res)
 {
     diamond(dl, centre, r, presentation_of(res).colour);

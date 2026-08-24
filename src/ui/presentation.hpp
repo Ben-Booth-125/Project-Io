@@ -206,6 +206,24 @@ inline constexpr int nation_slot_count = 12;
 /// @return   The nation's identity colour.
 ImU32 nation_colour(entity_id id);
 
+/// Identity colour for a building **kind** — the colour a segment of the stacked-tile
+/// ring is drawn in (`ui::icons::stack_ring`, PLANETARY.md § Building markers).
+///
+/// A KIND is `building_type`, not a named building: the ring answers "which kinds
+/// stand here", and two extraction sites working different deposits are one kind
+/// standing twice (the "+N" count badge is what says how many). The palette is a
+/// hand-picked, hue-separated set rather than a hash, because the set is small,
+/// closed and enumerated — a hash would put two adjacent hues on the one tile that
+/// needs them told apart. Mid-to-light luminance throughout, so a segment reads over
+/// dark terrain; the ring's own dark under-stroke carries it over light terrain.
+///
+/// Lives here rather than in icons.cpp because identity colour is presentation's
+/// job and the glyph layer takes colour as a parameter (ICONS.md § Shared conventions).
+///
+/// @param type Building type.
+/// @return     That kind's ring-segment colour.
+ImU32 building_kind_colour(building_type type);
+
 } // namespace palette
 
 /// Semantic colour for a value's direction: positive/negative/neutral.

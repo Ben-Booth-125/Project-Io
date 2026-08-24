@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**39 surfaces** — 4 settled, 35 awaiting Ben's wording.
+**40 surfaces** — 4 settled, 36 awaiting Ben's wording.
 
 ---
 
@@ -51,6 +51,14 @@ alphabetical order.
 **Because:** A battle is a province-grain event drawn on a tile-grain canvas, so without a mark it has no position at all — the units are visible but nothing says they are in contact rather than merely adjacent. Drawn on the province anchor tile only, once per battle, because the fight IS the province envelope (BL-467 ruling 1) and scattering a glyph across every participating tile would say the opposite. The glyph is two crossed blades with cross-guards, deliberately not an X: X is already the 'close this' affordance everywhere else in the chrome, and a mark meaning 'a fight is here' must not read as a button meaning 'dismiss this'.
 
 *Demanded by BL-469, BL-467 · `src/ui/body_surface_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/icons.hpp` · id `battle_marker`*
+
+### Stacked-tile ring (Planetary canvas building marker)
+
+**Answers:** This hex holds more than one building - which KINDS are standing here?
+
+**Because:** A tile carries as many buildings as its richness allows (BL-193, building stack capacity), and the canvas drew exactly one silhouette however many stood there. The '+N' count badge told the player a stack existed but never what was in it, and Ben rejected primary-plus-count for exactly that reason: it is always legible and never says WHICH. The ring is the only one of the three shapes considered that scales with the richness-derived cap AND names its contents - a glyph cluster becomes soup past three. It earns space it does not take from anything else: it occupies the empty annulus between the silhouette (0.48 r) and the rim, adds no chrome, no legend and no control, and it composes with the two marks already there rather than replacing them - the ring says which kinds, the centre glyph says which of them leads, the badge says how many in total. It draws nothing on a single-kind tile, so the world's ordinary built tiles are unchanged. Its LOD bound (draw_r > 10 px) is derived from the arc length one segment needs to read as a segment, and below it the tile degrades to the dominant kind's glyph alone - never to an empty hex.
+
+*Demanded by BL-596, BL-193 · `src/ui/icons.cpp`, `src/ui/icons.hpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/presentation.cpp` · id `building_stack_ring`*
 
 ### Comms dock
 
