@@ -32,8 +32,14 @@ enum class overlay_mode
     none = 0,    ///< No overlay; the plain canvas.
     supply,      ///< Supply routes / convoy paths (Layer 5).
     market,      ///< Market / price lens (per-body price wash; see LENSES.md § Market lens).
-    country,     ///< Country (nation) territory tint + owner borders. See LENSES.md § Country lens.
-    corporation, ///< Corporate-owned tiles (per-corp tint; player-corp border). See LENSES.md.
+    // `country` RETIRED (BL-601, Ben 2026-08-24): "National borders should not
+    // diffuse together, instead they should borders extending their colour
+    // inwards. With this, we can drop the nation lens." The lens dissolved
+    // rather than being deleted — its content is always-on chrome now, the
+    // national border band in body_surface_canvas.cpp, drawn like roads. The
+    // selection route it owned (hovered tile → owning nation → Nation ledger)
+    // moved onto the band itself: click the border, get the nation.
+    corporation,///< Corporate-owned tiles (per-corp tint; player-corp border). See LENSES.md.
     resource,    ///< Single-resource deposit lens: flat fill over the contiguous deposit. See LENSES.md § Resource lens.
     population,  ///< Per-tile habitability tint (dark → liveable green). See LENSES.md § Population lens.
     opportunity, ///< Per-catchment unmet-demand surface (green = market bid above base = a gap to fill). BL-112. See LENSES.md § Opportunity lens.
@@ -59,6 +65,37 @@ struct marker_hit_zone
     enum class kind : uint8_t { building, market_centre, unit } kind = kind::building;
     ImVec2    centre{};         ///< Marker centre in screen pixels (this frame).
     float     radius = 0.0f;   ///< Hit-test radius in screen pixels.
+};
+
+/// The grain of a STRUCTURE selection: a region-scale entity the player selects
+/// by its BOUNDARY rather than by anything sitting on a tile.
+///
+/// Deliberately a family and not a nation flag (BL-601, Ben 2026-08-24). The
+/// national border band is its first member — the always-on band is what carries
+/// a nation on screen now that the Country lens has retired, so the band is what
+/// opens it — but nothing about the mechanism is nation-shaped: a plate boundary,
+/// a market catchment rim or a corp territory edge is one more value here and one
+/// more producer of zones, with the resolver and the click path untouched. BL-603
+/// generalises exactly this pattern, which is why it is not a special case.
+enum class structure_kind : uint8_t
+{
+    nation,  ///< A generated nation, selected by its national border band.
+};
+
+/// One segment of a structure's boundary, registered by the draw pass so the
+/// click and hover paths can hit-test it.
+///
+/// A segment, not a point, because a boundary is a line — and a line is not
+/// clickable at play zoom, so `half_width` gives it a real corridor, independent
+/// of how thick the border is drawn. Cleared and rebuilt every frame by
+/// body_surface_canvas, alongside `marker_hit_zones`.
+struct structure_hit_zone
+{
+    entity_id      id   = null_entity;          ///< The structure entity (a nation, today).
+    structure_kind kind = structure_kind::nation;
+    ImVec2    a{};                              ///< Segment start, screen px (this frame).
+    ImVec2    b{};                              ///< Segment end, screen px (this frame).
+    float     half_width = 0.0f;                ///< Hit corridor half-width, screen px.
 };
 
 /// One (province, owner) GROUP of units, built each frame for the Planetary
@@ -599,6 +636,12 @@ struct ui_state
     /// the top of body_surface_canvas each frame and rebuilt during the draw pass
     /// so click/hover handling can hit-test in priority order. See marker_hit_zone.
     std::vector<marker_hit_zone> marker_hit_zones;
+
+    /// Per-frame list of on-canvas STRUCTURE boundaries (national borders today).
+    /// Cleared and rebuilt with `marker_hit_zones`, and hit-tested after it: a
+    /// marker is a specific thing the player aimed at, a boundary is a region.
+    /// See structure_hit_zone.
+    std::vector<structure_hit_zone> structure_hit_zones;
 
     /// Building-placement interaction state (Layer 4 UI groundwork scaffold). See construction_state.
     construction_state construction;
