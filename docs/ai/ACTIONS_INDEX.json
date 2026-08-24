@@ -178,10 +178,6 @@
    "Minimap lens bar, slot 1 (the seal-square glyph: filled square with centred inner dot)"
   ],
   [
-   "lens.country",
-   "Minimap lens bar, slot 2 (the downward-pointing shield glyph)"
-  ],
-  [
    "lens.good_selector",
    "The lens chrome region — the minimap's header, top right (BL-602). One region hosts the selector and whichever key the active lens draws; the selector sits directly above that key while the Resource, Market, or Scarcity lens is active. One shared combo bound to a single shared lens_resource value, not three separate controls. It is NOT on the minimap's lens bar, which carries glyphs only."
   ],
@@ -378,8 +374,8 @@
    "Selection band, tile card's metric accordion, fold chevron at the right of the pager row"
   ],
   [
-   "ledger.selection_metric_pager",
-   "Selection band, tile card's centre metric accordion, '<' / '>' arrow buttons"
+   "ledger.selection_section_toggle",
+   "The Selection band's tile element — a five-section accordion in the centre column, ordered Buildings, Deposits, Resources, Population, Terrain. It replaced a three-view pager, and the province card that used to sit beside it (BL-598): the province is a SECTION here, not a selection of its own."
   ],
   [
    "chrome.esc",
@@ -580,6 +576,10 @@
   [
    "ledger.contracts_view_tab",
    "Contracts ledger, view tab strip at the top"
+  ],
+  [
+   "canvas.border_band_select",
+   "The national border band on the Planetary canvas — always-on chrome, not a lens. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths."
   ]
  ]
 }

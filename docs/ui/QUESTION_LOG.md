@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**42 surfaces** — 4 settled, 38 awaiting Ben's wording.
+**43 surfaces** — 4 settled, 39 awaiting Ben's wording.
 
 ---
 
@@ -219,6 +219,14 @@ alphabetical order.
 **Because:** Convoys are drawn on three canvases -- a moving beam on the Planetary canvas, lines on the Solar canvas, a lens glyph, an aggregated route graph -- and were LISTED nowhere, so the one number the player needs from them had no home. Travel time became load-bearing on 2026-08-12: a long haul now takes several quarters where it used to take one, and stock committed to a convoy is out of the pool for the whole of it. Without ticks-to-arrival on a surface, a player cannot tell a delivery that is late from one that was always going to be slow, and cannot plan a build against stock already in transit. The tab also gives BL-452's Hold press a per-convoy row to sit on.
 
 *Demanded by BL-452, BL-453 · `src/ui/market_ledger.cpp` · id `market_ledger_convoys`*
+
+### National border band (Planetary canvas, always-on chrome)
+
+**Answers:** Whose ground is this, and where does it stop?
+
+**Because:** A nation used to be a LENS - a territory-wide tint you had to switch to, which meant the political map was invisible unless you asked for it, and the tint occupied the same channel as terrain, texture and every other lens. The band answers the same question as always-on chrome instead, the way roads already do: colour at the boundary falling off inwards, so a nation reads as a bordered region and the middle of a territory stays free for whatever else is being shown. Two neighbours meeting therefore show two parallel rules and never average into a third nation's colour - which the old tint did, because it was composited INSIDE the blended fill. It also carries the route the lens used to own: clicking the band selects the nation, which is the only way to reach one (Ben, 2026-08-24: 'click the border itself'). The corridor is capped at 0.18 of the drawn hex radius so it narrows with the hex rather than swallowing a frontier tile, and hovering it names the nation immediately - well short of the hover card's dwell - so the target is readable before the click commits.
+
+*Demanded by BL-601 · `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp`, `docs/ui/PLANETARY.md` · id `national_border_band`*
 
 ### Nav rail
 

@@ -618,6 +618,20 @@
     "src/ui/selection_panel.cpp",
     "src/ui/ui_state.hpp"
    ]
+  },
+  "national_border_band": {
+   "surface": "National border band (Planetary canvas, always-on chrome)",
+   "answers": "Whose ground is this, and where does it stop?",
+   "because": "A nation used to be a LENS - a territory-wide tint you had to switch to, which meant the political map was invisible unless you asked for it, and the tint occupied the same channel as terrain, texture and every other lens. The band answers the same question as always-on chrome instead, the way roads already do: colour at the boundary falling off inwards, so a nation reads as a bordered region and the middle of a territory stays free for whatever else is being shown. Two neighbours meeting therefore show two parallel rules and never average into a third nation's colour - which the old tint did, because it was composited INSIDE the blended fill. It also carries the route the lens used to own: clicking the band selects the nation, which is the only way to reach one (Ben, 2026-08-24: 'click the border itself'). The corridor is capped at 0.18 of the drawn hex radius so it narrows with the hex rather than swallowing a frontier tile, and hovering it names the nation immediately - well short of the hover card's dwell - so the target is readable before the click commits.",
+   "backlog_item": [
+    "BL-601"
+   ],
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/ui_state.hpp",
+    "docs/ui/PLANETARY.md"
+   ],
+   "status": "drafted"
   }
  }
 }

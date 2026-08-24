@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*145 entries — 27 gameplay · 24 canvas · 14 lens · 47 ledger · 33 chrome.*
+*145 entries — 27 gameplay · 25 canvas · 13 lens · 47 ledger · 33 chrome.*
 
 ---
 
@@ -863,6 +863,20 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Move closer to or further from a specific spot — cursor anchoring means you aim the zoom at the thing you are interested in.
 
+### `canvas.border_band_select` — The national border band on the Planetary canvas — always-on chrome, not a lens. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths.
+
+**Press.** Single left-click inside the band, on the boundary between two territories (or between a territory and unclaimed ground).
+
+**Valid when:**
+- Planetary rung only; the band is a surface-canvas mark.
+- The tile must be revealed — the band is gated on survey exactly as terrain is, so a boundary is never drawn through the mask.
+- A marker under the pointer WINS: buildings, market centres and units outrank the band, because a marker is a specific thing the player aimed at. The band in turn outranks the ground it runs across.
+- The clickable corridor is capped at 0.18 of the drawn hex radius, so at coarse zoom it narrows with the hex rather than swallowing it. The centre of a hex always selects the hex.
+
+**Expected output.** The NATION is selected — `selection_kind` becomes `nation` and the Selection element shows its card, which is the route to a nation's ledger. The province mirror clears, as it does for every entity selection. Hovering the corridor names the nation at the cursor immediately, well short of the hover card's dwell delay, so the target is readable before the click commits.
+
+**Reason to select.** This is the ONLY route to a nation. It replaced the Country lens, which used to own it: under that lens a hovered tile resolved to its owning nation. Ben, 2026-08-24 — 'National borders should not diffuse together, instead they should borders extending their colour inwards. With this, we can drop the nation lens' and, on what replaces the route, 'click the border itself'. The border is what carries the nation on screen now, so it is the thing that opens it.
+
 ---
 
 ## Lenses — re-skinning the map to answer a question
@@ -905,18 +919,6 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** On the Planetary canvas, every tile holding a corporate building tints to its owning corporation's identity colour (the literal building tile only — no influence radius). The player's tiles additionally get a thin white border. Each rival corporation's HQ-projected reach ring and HQ star draw on that corp's home body in its identity colour. Tiles with no corporate building keep their plain terrain colour — there is no nation underlay. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. No on-canvas colour key yet (glyph highlight + tooltip only). Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.
 
 **Reason to select.** Who owns what: where do rival corporations operate, how does my footprint sit against theirs, and where do their HQ reach rings suggest they will grow? Use it to find uncontested ground to expand into or to size up a rival's holdings before competing.
-
-### `lens.country` — Minimap lens bar, slot 2 (the downward-pointing shield glyph)
-
-**Press.** Single left-click on the Country glyph in the lens bar.
-
-**Valid when:**
-- Always pressable from the lens bar; Planetary-only surface — no Solar or Circumplanetary representation.
-- Re-clicking while active clears the lens (see lens.clear).
-
-**Expected output.** Claimed tiles tint to their owning nation's identity colour; a dark border stroke draws on every hex edge between different owners (including claimed/unclaimed boundaries), so territories read as filled regions with hard outlines. Unclaimed tiles keep their plain terrain hue. An on-canvas per-nation key (one colour swatch + name per nation on the active body) sits in the lens chrome region — the minimap's header, top right — as a dropdown collapsed by default. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.
-
-**Reason to select.** Which nation holds which tile, and where the borders fall. Political context for siting: whose territory would I be building in, which nations border my operations, and how the body's political map is carved up.
 
 ### `lens.good_selector` — The lens chrome region — the minimap's header, top right (BL-602). One region hosts the selector and whichever key the active lens draws; the selector sits directly above that key while the Resource, Market, or Scarcity lens is active. One shared combo bound to a single shared lens_resource value, not three separate controls. It is NOT on the minimap's lens bar, which carries glyphs only.
 
@@ -1587,21 +1589,21 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The band's chart is 260 px tall; the overlay gives it the axis room and legend space to actually compare values.
 
-### `ledger.selection_metric_pager` — Selection band, tile card's centre metric accordion, '<' / '>' arrow buttons
+### `ledger.selection_section_toggle` — The Selection band's tile element — a five-section accordion in the centre column, ordered Buildings, Deposits, Resources, Population, Terrain. It replaced a three-view pager, and the province card that used to sit beside it (BL-598): the province is a SECTION here, not a selection of its own.
 
-**Press.** Click the left or right arrow beside the metric title ('Name (i/N)')
+**Press.** Click a section header to open it; click the open section's header again to close it.
 
 | Arg | Type | Meaning |
 |---|---|---|
 | `direction` | `enum` | 'previous' or 'next' page |
 
 **Valid when:**
-- A tile is selected
-- Not already at the first/last page (the arrow disables at the ends)
+- A tile is selected. Every other selection kind (building, unit, market, nation) still takes a pager, not an accordion — see NR-605, which asks whether that split should stand.
+- One section open at a time; none-open is reachable, because a header shows its own state and is therefore a toggle under the standing Toggle rule.
 
-**Expected output.** Pages the accordion to the adjacent metric: one page per resource deposited on the tile (this tile's yield vs a top-10% tile), then the tile's Habitability and Hazard scalars (vs the body average). One titled chart shows at a time.
+**Expected output.** The pressed section expands in place and any other closes. Deposits and Population read the PROVINCE of the selected tile, so the province's content is reachable without a province selection existing. The tile's available-buildings tab is unchanged; the province's own buildings roll-up and member-tile list are gone.
 
-**Reason to select.** Walks every measurable fact about the tile one chart at a time - the read that grades a prospective build site.
+**Reason to select.** The pager hid the LIST of questions the surface can answer behind a press, so a player had to already know a reading existed to go and find it. An accordion shows all five and opens the one you ask for. The order is the other half (Ben, 2026-08-24): it runs from what the player can act on to what the ground merely is, where the pager ran the other way and put the least actionable reading in the default slot.
 
 ### `ledger.decision_feed_open` — Navigation rail slot 11, "AI decisions"
 
