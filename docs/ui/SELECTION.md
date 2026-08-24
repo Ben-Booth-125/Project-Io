@@ -103,8 +103,8 @@ horizontal columns (Ben, 2026-07-28):
 1. **Left quarter — zoomed hex neighbourhood.** A bordered render of the selected tile and its
    immediate ring (`draw_tile_neighbourhood`, radius 2), the selected tile picked out — the
    actual terrain render, not a placeholder image.
-2. **Centre half — ONE accordion of five SECTIONS**, in this order
-   (`ui_state::card_tile_view` holds which is open):
+2. **Centre half — a SECTION TOP NAV over five sections**, in this order
+   (`ui_state::card_tile_view` holds which is showing):
 
    > **Buildings → Deposits → Resources → Population → Terrain**
 
@@ -113,10 +113,26 @@ horizontal columns (Ben, 2026-07-28):
    workforce that would take it) to what the ground merely *is*. The reading you can do
    nothing about is last.
 
-   **One section is open at a time**, and *none* is a reachable state: a section header shows
-   its own open state, which makes it a toggle under the standing Toggle rule, so pressing the
-   open header closes it. The band is a fixed height, so five open bodies would each get a
-   sliver; the open one takes what the closed headers leave.
+   **The nav is one row, and the section below it takes the whole body.** Ben, 2026-08-24:
+   *"a topnav left and right chevron, with a full canvas expansion button… straddle left and
+   right buttons across the entire span, excepting the expand chevron. And our open accordion
+   element title should be centred."*
+
+   - **The chevrons straddle the span** — hard left, hard right — rather than clustering
+     around the title, so the two presses sit the largest possible distance apart.
+   - **The title is centred on the run between them**, with an `i/N` count that says how many
+     readings exist. That count is what an accordion's stack of headers was buying, at one row
+     instead of five.
+   - **The full-canvas control keeps the rightmost slot** and is excepted from the straddle —
+     the same two-control disclosure idiom every other surface uses, and `disclosure_controls`
+     owns its glyph. `in_place` is false here: a section is already the whole body, so the only
+     larger state is the canvas.
+   - **The nav wraps** in both directions, so five presses of either chevron return to where
+     you started.
+
+   *A vertical accordion was built first, on Ben's earlier ruling the same day, and ruled out
+   on sight. The measurement is why: five stacked headers spent **169 of the band's 258 px** on
+   chrome to leave the open section **89**. The nav spends one frame height.*
 
    - **Buildings** — a table **per province throughout** (Ben, 2026-08-22), the selected tile
      serving only to name which province is meant: the province's total building count against

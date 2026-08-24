@@ -605,20 +605,6 @@
     "src/ui/body_surface_canvas.cpp"
    ]
   },
-  "selection_tile_accordion": {
-   "surface": "Selection band - the tile element's five-section accordion",
-   "answers": "Everything this ground has to say, in the order I can act on it: what can I still build here, what does the locality hold, what does this hex yield, who works here, what is the terrain?",
-   "because": "The centre column was a PAGER - one view at a time behind prev/next arrows - and the province was a second element with a pager of its own. Both cost the player the same thing: the list of questions the surface can answer was hidden behind a press, so you had to already know a reading existed to go and find it. An accordion shows the whole list of questions and opens the one you press, which is what makes five sections readable where five pager stops would not be. The ORDER is the second half of the argument (Ben, 2026-08-24): Buildings, Deposits, Resources, Population, Terrain runs from what the player can act on to what the ground merely is, where the pager's order ran the other way and put the least actionable reading in the default slot. One section open at a time because the band is a fixed height; none-open is reachable because a header shows its own state, which makes it a toggle under the standing Toggle rule.",
-   "status": "drafted",
-   "backlog_item": [
-    "BL-598",
-    "BL-534"
-   ],
-   "files": [
-    "src/ui/selection_panel.cpp",
-    "src/ui/ui_state.hpp"
-   ]
-  },
   "national_border_band": {
    "surface": "National border band (Planetary canvas, always-on chrome)",
    "answers": "Whose ground is this, and where does it stop?",
@@ -632,6 +618,19 @@
     "docs/ui/PLANETARY.md"
    ],
    "status": "drafted"
+  },
+  "selection_tile_section_nav": {
+   "surface": "Selection band - the tile element's section top nav",
+   "answers": "Everything this ground has to say, in the order I can act on it: what can I still build here, what does the locality hold, what does this hex yield, who works here, what is the terrain?",
+   "because": "The centre column was a PAGER, and the province was a second element with a pager of its own; both hid the list of questions the surface can answer behind a press. An accordion was built to show that list and was ruled out on sight, on a measurement rather than a taste: five stacked headers spent 169 of the band's 258 px on chrome to leave the open section 89. The nav keeps what the accordion was FOR - a visible sense of how many readings exist - by putting an i/N count beside the title, which costs one row instead of five, and returns the rest of the band to the reading you are actually doing. The chevrons straddle the span so the two presses are as far apart as the element allows; the title centres on the run between them; the full-canvas control is excepted and keeps the rightmost slot, which is where every other surface in the shell puts it. The ORDER is the other half of the argument (Ben, 2026-08-24): Buildings, Deposits, Resources, Population, Terrain runs from what the player can act on to what the ground merely is.",
+   "status": "drafted",
+   "backlog_item": [
+    "BL-598"
+   ],
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/ui_state.hpp"
+   ]
   }
  }
 }

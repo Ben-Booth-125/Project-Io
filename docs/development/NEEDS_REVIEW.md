@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*31 entries — 31 open, 0 resolved.*
+*31 entries — 30 open, 1 resolved.*
 
 ---
 
@@ -330,15 +330,6 @@ NOT REWRITTEN TO MATCH THE CODE, deliberately. The standing rule is that authori
 
 *Files: `docs/ui/LENSES.md`, `src/ui/circumplanetary_canvas.cpp`, `src/ui/solar_system_canvas.cpp`, `src/ui/body_surface_canvas.cpp`*
 
-### NR-605 — The Selection band now carries two centre-column idioms - an accordion for the tile, pagers for everything else
-*question · raised 2026-08-24 · from Sprint 17b, Slice C (BL-598), reported 2026-08-24.*
-
-BL-598 replaced the tile element's three-view PAGER with a five-section ACCORDION, on Ben's ruling. The building card and the unit card still use pagers. That is defensible on its face - the tile has five sections and they have two or three, and an accordion over two sections is ceremony - but it is a fork in the shell's vocabulary, and the slice filed it as an open question in ledgers/selection.md rather than unifying on its own judgement. Which is right: a reader now learns two disclosure idioms for the same region, and 'how many sections' is not a rule a player can see.
-
-**Why it matters.** The band is permanent chrome and the second-largest region on screen. Two idioms in one rect is the kind of thing that reads as an accident rather than a decision, and it gets more expensive to unify with every card added. Three answers: unify on the accordion, keep the split and write the rule down (pager under N sections), or let each card choose and stop treating it as one region.
-
-*Files: `docs/ui/SELECTION.md`, `docs/ui/ledgers/selection.md`, `src/ui/selection_panel.cpp`*
-
 ### NR-606 — Four verify scripts fail for reasons that predate this sprint, and one of them has never run at all
 *observation · raised 2026-08-24 · from Sprint 17b integration sweep, 2026-08-24 - all 92 verify scripts run against the merged tree.*
 
@@ -359,4 +350,15 @@ Worth noting about that pair: icon_silhouettes is the whole curated golden set, 
 
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
+
+### NR-605 — The Selection band now carries two centre-column idioms - an accordion for the tile, pagers for everything else
+*question · raised 2026-08-24 · from Sprint 17b, Slice C (BL-598), reported 2026-08-24.*
+
+BL-598 replaced the tile element's three-view PAGER with a five-section ACCORDION, on Ben's ruling. The building card and the unit card still use pagers. That is defensible on its face - the tile has five sections and they have two or three, and an accordion over two sections is ceremony - but it is a fork in the shell's vocabulary, and the slice filed it as an open question in ledgers/selection.md rather than unifying on its own judgement. Which is right: a reader now learns two disclosure idioms for the same region, and 'how many sections' is not a rule a player can see.
+
+**Why it matters.** The band is permanent chrome and the second-largest region on screen. Two idioms in one rect is the kind of thing that reads as an accident rather than a decision, and it gets more expensive to unify with every card added. Three answers: unify on the accordion, keep the split and write the rule down (pager under N sections), or let each card choose and stop treating it as one region.
+
+> **RESOLVED.** RESOLVED 2026-08-24, by the fork closing rather than by a ruling on it. Ben replaced the tile card's accordion with a section TOP NAV the same day he ruled the accordion in - so the tile card uses a pager-shaped control again, as the building and unit cards always did, and the shell carries one disclosure idiom in that region rather than two. The question this entry asked - unify, or write down the rule for the split - is answered by there being no split.
+
+*Files: `docs/ui/SELECTION.md`, `docs/ui/ledgers/selection.md`, `src/ui/selection_panel.cpp`*
 

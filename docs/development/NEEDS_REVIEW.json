@@ -508,7 +508,7 @@
       "id": "NR-605",
       "title": "The Selection band now carries two centre-column idioms - an accordion for the tile, pagers for everything else",
       "raised": "2026-08-24",
-      "status": "open",
+      "status": "resolved",
       "kind": "question",
       "source": "Sprint 17b, Slice C (BL-598), reported 2026-08-24.",
       "what": "BL-598 replaced the tile element's three-view PAGER with a five-section ACCORDION, on Ben's ruling. The building card and the unit card still use pagers. That is defensible on its face - the tile has five sections and they have two or three, and an accordion over two sections is ceremony - but it is a fork in the shell's vocabulary, and the slice filed it as an open question in ledgers/selection.md rather than unifying on its own judgement. Which is right: a reader now learns two disclosure idioms for the same region, and 'how many sections' is not a rule a player can see.",
@@ -517,7 +517,8 @@
         "docs/ui/SELECTION.md",
         "docs/ui/ledgers/selection.md",
         "src/ui/selection_panel.cpp"
-      ]
+      ],
+      "resolution": "RESOLVED 2026-08-24, by the fork closing rather than by a ruling on it. Ben replaced the tile card's accordion with a section TOP NAV the same day he ruled the accordion in - so the tile card uses a pager-shaped control again, as the building and unit cards always did, and the shell carries one disclosure idiom in that region rather than two. The question this entry asked - unify, or write down the rule for the split - is answered by there being no split."
     },
     {
       "id": "NR-606",

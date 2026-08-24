@@ -2756,50 +2756,93 @@ void draw_tile_selection(world& w, ui_state& ui)
         const int n    = static_cast<int>(pages.size());
         page = std::clamp(page, 0, std::max(0, n - 1));
 
-        // TIGHTER HEADER ROWS, and this is a height argument, not a taste one.
-        // Five headers at the default frame padding cost 130 px of the ~217 px
-        // this column has — 60% of the surface spent on the labels of the four
-        // sections you are NOT reading. Halving the vertical frame padding for
-        // the header rows alone buys the open section back about 30% more room,
-        // which is the difference between a chart and a stripe. The padding is
-        // popped before the body draws, so the controls inside a section keep the
-        // ordinary metrics.
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
-                            {style.FramePadding.x, std::max(1.0f, style.FramePadding.y * 0.5f)});
-        const float per_hdr = ImGui::GetFrameHeight() + style.ItemSpacing.y;
-        ImGui::PopStyleVar();
-
-        for (int s = 0; s < k_view_count; ++s)
+        // ── The section nav (Ben, 2026-08-24, revising his own accordion ruling
+        //    the same day, on seeing it) ────────────────────────────────────────
+        //
+        //   "I meant a topnav left and right chevron, with a full canvas expansion
+        //    button... straddle left and right buttons across the entire span,
+        //    excepting the expand chevron. And our open accordion element title
+        //    should be centred. This is opposed to a vertical accordion."
+        //
+        // WHY THE REVERSAL IS RIGHT, in the numbers that produced it: five stacked
+        // headers spent 169 of the band's 258 px on chrome to give the open section
+        // 89. This row spends ONE frame height and gives the section everything
+        // below it. The accordion's own argument — show the whole list of questions
+        // rather than hiding it behind a press — is answered instead by the count
+        // beside the title, which says how many readings exist without spending a
+        // row on each.
+        //
+        // It also un-forks the shell: the building and unit cards never stopped
+        // using a pager, so the tile card was briefly the only accordion in the
+        // band (NR-605). One idiom again.
+        //
+        // The chevrons STRADDLE the span — hard left and hard right — rather than
+        // clustering around the title, so the two presses are the largest possible
+        // distance apart and the title sits centred between them. The full-canvas
+        // control is excepted from the straddle and keeps the rightmost slot, which
+        // is where every other surface in the shell puts it (BL-265's two-control
+        // idiom; `disclosure_controls` owns the glyph, so it is not re-drawn here).
         {
-            const bool was_open = (open == s);
-            ImGui::SetNextItemOpen(was_open, ImGuiCond_Always);
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
-                                {style.FramePadding.x,
-                                 std::max(1.0f, style.FramePadding.y * 0.5f)});
-            const bool shown = ImGui::CollapsingHeader(
-                k_view_names[s],
-                ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
-            ImGui::PopStyleVar();
+            const float row_h  = ImGui::GetFrameHeight();
+            const float span   = ImGui::GetContentRegionAvail().x;
+            const float x0     = ImGui::GetCursorPosX();
+            const float y0     = ImGui::GetCursorPosY();
 
-            // The toggle rule, in one line: pressing the header that is already
-            // open closes it (-1); pressing any other opens it and closes the
-            // rest. Read from ImGui's own toggle status rather than from `shown`,
-            // which is also false for a header that was simply never open.
-            if (ImGui::IsItemToggledOpen())
-                open = was_open ? -1 : s;
+            if (open < 0 || open >= k_view_count)
+                open = k_sec_buildings;   // the nav always has a current section
 
-            if (!shown || open != s)
-                continue;
+            if (ImGui::ArrowButton("##sec_prev", ImGuiDir_Left))
+                open = (open + k_view_count - 1) % k_view_count;
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", k_view_names[(open + k_view_count - 1) % k_view_count]);
 
-            // The body gets whatever height the headers left. It is measured, not
-            // assumed: the closed headers below this one still have to fit, so the
-            // budget is what remains minus one header's worth per section still to
-            // be drawn.
-            const float body_h  = std::max(40.0f,
-                                           ImGui::GetContentRegionAvail().y
-                                               - per_hdr * static_cast<float>(k_view_count - 1 - s));
+            // The right chevron sits immediately left of the full-canvas control,
+            // NOT one full gutter in. `disclosure_gutter_width` reserves two slots
+            // so the `›` lands in the same column on rows that also offer `⌄` —
+            // this row does not, so reserving both would leave a slot of dead air
+            // between the two presses and break the straddle Ben asked for.
+            const float expand_w = row_h + style.ItemSpacing.x;
+            ImGui::SameLine(x0 + span - expand_w - row_h);
+            if (ImGui::ArrowButton("##sec_next", ImGuiDir_Right))
+                open = (open + 1) % k_view_count;
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", k_view_names[(open + 1) % k_view_count]);
 
-            ImGui::BeginChild(k_view_names[s], {0.0f, body_h}, false,
+            // Centred between the chevrons, measured rather than guessed so a long
+            // section name stays centred instead of drifting.
+            char title[64];
+            std::snprintf(title, sizeof title, "%s  %d/%d",
+                          k_view_names[open], open + 1, k_view_count);
+            // Centred on the run BETWEEN the two chevrons, which is what "centred"
+            // means once they straddle — not centred on the whole span, which would
+            // sit it visibly left of the gap it is meant to fill.
+            const float tw    = fit_width(title);
+            const float run_l = x0 + row_h;
+            const float run_r = x0 + span - expand_w - row_h;
+            ImGui::SameLine(run_l + (run_r - run_l - tw) * 0.5f);
+            ImGui::SetCursorPosY(y0 + (row_h - ImGui::GetTextLineHeight()) * 0.5f);
+            fit_text(text_box::selection, "selection.tile.section", title,
+                     std::max(24.0f, run_r - run_l));
+
+            // The full-canvas expansion, in the rightmost slot. `in_place = false`:
+            // a section is already the whole body, so there is nothing to expand
+            // in place — the only larger state is the canvas.
+            ImGui::SameLine();
+            ImGui::SetCursorPosY(y0);
+            disclosure_controls(ui, detail_surface::selection_metric,
+                                1000 + open, /*in_place=*/false);
+
+            ImGui::SetCursorPosX(x0);
+            ImGui::SetCursorPosY(y0 + row_h + style.ItemSpacing.y);
+            ImGui::Separator();
+        }
+
+        // ONE section draws, and it gets the whole body. No height arithmetic:
+        // the accordion had to reserve a header's worth of room for every section
+        // still below it, and there is nothing below this one.
+        {
+            const int s = open;
+            ImGui::BeginChild(k_view_names[s], {0.0f, 0.0f}, false,
                               ImGuiWindowFlags_NoSavedSettings);
 
             switch (s)

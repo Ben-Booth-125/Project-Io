@@ -268,13 +268,13 @@ alphabetical order.
 
 *Demanded by BL-067, BL-068, BL-071, BL-367 · `src/ui/selection_panel.cpp` · id `selection_panel`*
 
-### Selection band - the tile element's five-section accordion
+### Selection band - the tile element's section top nav
 
 **Answers:** Everything this ground has to say, in the order I can act on it: what can I still build here, what does the locality hold, what does this hex yield, who works here, what is the terrain?
 
-**Because:** The centre column was a PAGER - one view at a time behind prev/next arrows - and the province was a second element with a pager of its own. Both cost the player the same thing: the list of questions the surface can answer was hidden behind a press, so you had to already know a reading existed to go and find it. An accordion shows the whole list of questions and opens the one you press, which is what makes five sections readable where five pager stops would not be. The ORDER is the second half of the argument (Ben, 2026-08-24): Buildings, Deposits, Resources, Population, Terrain runs from what the player can act on to what the ground merely is, where the pager's order ran the other way and put the least actionable reading in the default slot. One section open at a time because the band is a fixed height; none-open is reachable because a header shows its own state, which makes it a toggle under the standing Toggle rule.
+**Because:** The centre column was a PAGER, and the province was a second element with a pager of its own; both hid the list of questions the surface can answer behind a press. An accordion was built to show that list and was ruled out on sight, on a measurement rather than a taste: five stacked headers spent 169 of the band's 258 px on chrome to leave the open section 89. The nav keeps what the accordion was FOR - a visible sense of how many readings exist - by putting an i/N count beside the title, which costs one row instead of five, and returns the rest of the band to the reading you are actually doing. The chevrons straddle the span so the two presses are as far apart as the element allows; the title centres on the run between them; the full-canvas control is excepted and keeps the rightmost slot, which is where every other surface in the shell puts it. The ORDER is the other half of the argument (Ben, 2026-08-24): Buildings, Deposits, Resources, Population, Terrain runs from what the player can act on to what the ground merely is.
 
-*Demanded by BL-598, BL-534 · `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp` · id `selection_tile_accordion`*
+*Demanded by BL-598 · `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp` · id `selection_tile_section_nav`*
 
 ### Selection band - Unit (Soldier) card (3-column band)
 

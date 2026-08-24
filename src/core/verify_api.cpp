@@ -782,6 +782,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             else if (m_ui.show_contracts_ledger)   panel = "contracts";
             out["open_panel"] = std::string(panel);
         }
+        // Which section of the tile Selection element's top nav is showing, so a
+        // check can assert the chevrons MOVED it rather than assuming they did.
+        out["selection_section"] = m_ui.card_tile_view;
         out["hover_card"]        = (m_ui.hover_card_entity != null_entity);
         out["hover_card_stuck"]  = m_ui.hover_card_stuck;
         out["x"]                 = m_pointer_x;
