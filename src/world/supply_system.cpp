@@ -362,6 +362,28 @@ entity_id corp_representative_tile(const world& w, const corporation_component& 
     return best_tile;
 }
 
+/// True when an active (built AND non-decommissioned) Port sits on `tile` —
+/// the sea-mode endpoint gate (BL-602, SUPPLY.md § Infrastructure gates:
+/// "Port building at both endpoints"). Ownership-agnostic like
+/// `is_supply_anchor` (logistics.cpp): a Port is body infrastructure, not a
+/// corp asset check — unlike `corp_has_launchpad_on` above, which is
+/// deliberately per-corp because a launchpad IS the corp's own pad. Same
+/// built+active test `is_supply_anchor` and `collect_logistics_nodes` already
+/// use for port/hub anchors, narrowed to Port only (a hub does not gate sea).
+bool tile_has_active_port(const world& w, entity_id tile)
+{
+    if (tile == null_entity)
+        return false;
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        (void)bid;
+        if (bc.tile == tile && bc.type == building_type::port
+            && bc.ticks_remaining <= 0 && !bc.decommissioned)
+            return true;
+    }
+    return false;
+}
+
 /// Find the market entity for a given body — the lowest-id one, so the pick is
 /// stable when a body hosts several markets (w.markets is an unordered_map; the
 /// first hit would inherit hash layout). Returns null_entity if none exists.
@@ -462,7 +484,25 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
         const logistics_path& path = intra_body_path(w, src_body, origin, dest_centre);
         if (!path.reachable)
             return leg;
-        mode      = path.crosses_ocean ? convoy_mode::sea : convoy_mode::land;
+        if (path.crosses_ocean)
+        {
+            // BL-602: sea mode is gated on an active Port at BOTH endpoints
+            // (SUPPLY.md § Infrastructure gates). The cheapest A* path already
+            // crosses water — there is no cheaper land-only route BL-522's
+            // per-leg pricing would recover — so an ungated pair is refused
+            // outright rather than silently re-priced at the land rate: a
+            // cart cannot be billed for a lane it cannot physically cross.
+            // `leg` is still default-constructed (viable == false) here, so
+            // this mutates nothing; the caller's existing `!leg.viable` path
+            // (corp_command.cpp: dispatch_convoy -> rejected_placement) surfaces it.
+            if (!tile_has_active_port(w, origin) || !tile_has_active_port(w, dest_centre))
+                return leg;
+            mode = convoy_mode::sea;
+        }
+        else
+        {
+            mode = convoy_mode::land;
+        }
         dist      = path.cost;
         unit_cost = reg.logistics_cost(mode);
         // Distance now costs TIME as well as money (Ben, 2026-08-12). Computed

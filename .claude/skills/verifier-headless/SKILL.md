@@ -145,6 +145,22 @@ in `tools/verify/README.md`.
   and arrival (R1), `recipe_registry` logistics-cost accessors (R4), `dispatch_convoys`
   gate check + balance debit + source-pool debit (R4–R6), and `credit_arrived_convoys`
   pool + market-supply injection (R7). Links `world.cpp`, `supply_system.cpp`.
+- **`sea_port_gate`** — The sea-mode infrastructure gate (BL-602, SUPPLY.md § Infrastructure
+  gates: "Port building at both endpoints"). Before this item `price_convoy_leg`
+  (`supply_system.cpp`) picked sea mode off `path.crosses_ocean` alone, with no check that
+  either endpoint held a Port — this harness is the gate's acceptance test. R0: both
+  endpoints Port-equipped dispatches normally, in sea mode, at the sea unit cost over a
+  forced water-crossing fixture (a full vertical ocean band, not a single row — a partial
+  band leaves every other row a free land detour and `crosses_ocean` never fires, which is
+  how the first draft of this fixture silently tested nothing). R1: missing a Port at
+  EITHER endpoint (dest only, source only, neither) is refused through the existing
+  `!leg.viable -> rejected_placement` path — the same one "no launchpad", "no reachable
+  route" already use — with a full-world-fingerprint check that the rejection mutates
+  nothing, matching `convoy_command.cpp`'s R1 discipline. R2: a decommissioned or
+  still-under-construction Port does not count as active (mirrors `is_supply_anchor`'s
+  built+active test). R3: two runs of the same scripted sequence agree byte-for-byte.
+  Links `world.cpp`, `supply_system.cpp`, `corp_command.cpp` (drives the gate through the
+  real `dispatch_convoy` corp_verb, not a direct call to `price_convoy_leg`).
 - **`construction_harness`** — Layer 4 player construction (`construct_building`):
   `placement_rules::can_place` validation, build-cost spend from the corp balance,
   building/stockpile authoring and asset attachment, default-recipe seeding, and the

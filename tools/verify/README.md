@@ -273,6 +273,12 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\supply_advance.cpp ^
    /Fo:build_gen\verify\supply_advance\ /Fe:build_gen\verify\supply_advance.exe
 .\build_gen\verify\supply_advance.exe
 
+:: Sea-mode Port gate (BL-602): price_convoy_leg refuses sea mode unless an
+:: active Port sits at BOTH the source anchor and destination market centre,
+:: driven through the real dispatch_convoy corp_verb (corp_command.cpp).
+:: Easiest via the one-line builder (needs the world-superset TU set):
+::   node tools/verify/build_harness.js sea_port_gate --run
+
 :: Population MVP + workforce-pool step 2 — population centres on Kepler (R3),
 :: agricultural demand from pop (R4), agglomeration workforce contention (R5 / BL-042 R1).
 :: Also covers population-dynamic R2 (hab scalar) and R3 (growth level-up).
