@@ -121,6 +121,19 @@ world_gen = {
             dressed_stone          = 2.9,  -- stone 2.0 * 1.0 = 2.0; 2.0 * 1.433
             planks                 = 4.3,  -- timber 2.0 * 1.5 = 3.0; 3.0 * 1.433
             tools                  = 25.5, -- iron_blooms 1.5*9.0 + planks 1.0*4.3 = 17.8; 17.8 * 1.433
+
+            -- BL-586 slice 2 (2026-08-24) — Tannery/Weaver/Shipwright. `hides`
+            -- and `fibre` are raws, priced like the ambient/endemic bulk
+            -- commons above (stone 1.0 / timber 1.5 / clay 1.2): `hides` a
+            -- little dearer for being endemic (rarer, regional, like the
+            -- unpriced tobacco/spices/coffee/furs would be); `fibre` at the
+            -- plain ambient-crop tier, alongside clay/peat. `leather`/`cloth`/
+            -- `rigging` all DERIVED at the same ~1.433x markup as above.
+            hides                  = 2.5,  -- endemic raw, dearer than the ambient bulk floor
+            fibre                  = 1.3,  -- ambient crop, same tier as clay/peat
+            leather                = 7.2,  -- hides 2.0*2.5 = 5.0; 5.0 * 1.433
+            cloth                  = 3.7,  -- fibre 2.0*1.3 = 2.6; 2.6 * 1.433
+            rigging                = 14.5, -- planks 1.5*4.3 + cloth 1.0*3.7 = 10.15; 10.15 * 1.433
         },
 
         -- Nation tradeable-resource concentration gates (BL-096): a nation

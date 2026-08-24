@@ -1290,6 +1290,15 @@ void generate_deposits(terrain_substrate sub, terrain_cover cov, std::uint8_t de
                 case cv::grass:
                     put(r::agricultural_produce,
                         roll_mod(rng, 40.0f, 180.0f, valley ? 1.3f : 1.0f) * thickness);
+                    // BL-586 slice 2 (2026-08-24): fibre is the ordinary case —
+                    // a grass/marsh crop grown by this SAME cover-based
+                    // ambient/biotic mechanic, ADDITIVE with agricultural
+                    // produce (a pasture crop tile can carry ordinary produce
+                    // too), not gated behind planetology endowment or
+                    // endemics like `hides` below. Similar magnitude to
+                    // agricultural produce, same tier as timber/clay.
+                    put(r::fibre,
+                        roll_mod(rng, 30.0f, 140.0f, valley ? 1.3f : 1.0f) * thickness);
                     break;
                 case cv::forest:
                     put(r::agricultural_produce,
@@ -1297,6 +1306,8 @@ void generate_deposits(terrain_substrate sub, terrain_cover cov, std::uint8_t de
                     break;
                 case cv::marsh:
                     put(r::agricultural_produce, roll(rng, 40.0f, 200.0f) * thickness);
+                    // Fibre also grows on marsh, same as grass above.
+                    put(r::fibre, roll(rng, 30.0f, 150.0f) * thickness);
                     break;
                 case cv::scrub:
                     // The old `tundra` row: thin ground with surface iron.
@@ -1903,6 +1914,13 @@ std::vector<entity_id> generate_body_tiles(
                         // terrain (Ben, 2026-08-21) and its ground is scrub, which
                         // is where the trapping actually happens.
                         case resource_type::furs:    suitable = (c == terrain_cover::scrub); break;
+                        // BL-586 slice 2 (2026-08-24). Hides are pastured /
+                        // hunted livestock and game, the literal reading of
+                        // grazing ground — `grass`, shared with tobacco's
+                        // cover exactly as `furs`/`scrub` already stands
+                        // alone: the two are differentiated by latitude band
+                        // and sector, not by cover.
+                        case resource_type::hides:    suitable = (c == terrain_cover::grass); break;
                         default: break;
                     }
                     if (!suitable)

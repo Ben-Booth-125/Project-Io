@@ -402,12 +402,20 @@ tuned on them; the full-set pass below leaves them bit-for-bit unchanged.
 | Volcanic | Iron ore | 0–150 | — | ×1.3 | — |
 | Icy | Water | 0–400 | — | — | — |
 | Grassland | Agricultural produce | 40–180 | — | — | ×1.3 |
+| Grassland | Fibre | 30–140 | — | — | ×1.3 |
 | Forest | Agricultural produce | 10–80 | — | — | ×1.15 |
 | Wetland | Agricultural produce | 40–200 | — | — | — |
+| Wetland | Fibre | 30–150 | — | — | — |
 | Tundra | Iron ore | 0–60 | ×1.3 | — | — |
 | Metallic | Iron ore | 50–250 | — | — | — |
 | Metallic | Regolith | 20–50 | — | — | — |
 | Regolith | Regolith | 20–50 | — | — | — |
+
+**Fibre (BL-586, 2026-08-24)** is the ordinary case, not the endemic one below: it grows by this
+same cover-based ambient/biotic mechanic agricultural produce uses, on the same grassland and
+wetland tiles, **additively** — a tile carries both deposits at once, not one instead of the
+other. It is a common crop, priced and gated the same as any other Tier 1 ambient good, with no
+planetology-endowment or endemic-scarcity gate on top.
 
 Modifiers apply multiplicatively to the upper bound of the base range. (The
 metallic row also authors regolith 20–50, same as the regolith composition — a
@@ -460,7 +468,10 @@ Then **endemic trade goods (BL-191, endemic goods)** *add* deposits rather than 
 them — an endemic good has no base distribution to scale; it exists only where it
 evolved. Each `endemic_good` from the Planetology state places its resource only
 where latitude band ∩ wrapped longitude sector ∩ suitable composition all hold
-(tobacco → grassland; spices → wetland/forest; coffee → forest; furs → tundra),
+(tobacco → grassland; spices → wetland/forest; coffee → forest; furs → tundra;
+**hides → grassland**, BL-586 2026-08-24 — Ben's ruling: hides are endemic like furs,
+lat/sector-restricted and richness-scored, sharing tobacco's grassland cover but
+differentiated from it by latitude band and sector, not by composition alone),
 densest at the sector centre and thinning toward its edge. The amount rides
 `deposit_scalar` like every other deposit. Distance-from-origin pricing of these
 goods happens in `hard_coded_world.cpp`'s market authoring, not here.

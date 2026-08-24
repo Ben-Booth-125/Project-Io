@@ -317,6 +317,91 @@ void ration_pack(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
     dl->AddLine({c.x + r * 0.30f, lo.y}, {c.x + r * 0.30f, hi.y}, outline, 1.5f);
 }
 
+// --- BL-586 slice 2: five more named-good glyphs -----------------------------
+// Hides and fibre are extraction targets (`k_extractable`, placement_rules.hpp);
+// leather, cloth and rigging are processing outputs. One shape per resource,
+// per the BL-429 rule this file's own comment above states.
+
+void hide_stretch(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A raw hide stretched on a frame — a squat, irregular quadrilateral (the
+    // pelt) with four short peg lines at its corners (the stretching frame).
+    // Distinct from the smooth clay-pit vessel and the angular boulder.
+    const ImVec2 v[4] = {
+        { c.x - r * 0.85f, c.y - r * 0.55f },
+        { c.x + r * 0.70f, c.y - r * 0.70f },
+        { c.x + r * 0.85f, c.y + r * 0.60f },
+        { c.x - r * 0.65f, c.y + r * 0.75f },
+    };
+    dl->AddConvexPolyFilled(v, 4, fill);
+    dl->AddPolyline(v, 4, outline, ImDrawFlags_Closed, 1.0f);
+    for (const ImVec2& p : v)
+        dl->AddLine(p, { p.x + (p.x > c.x ? 1.0f : -1.0f) * r * 0.20f,
+                          p.y + (p.y > c.y ? 1.0f : -1.0f) * r * 0.20f }, outline, 1.0f);
+}
+
+void fibre_sheaf(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A bundle of reed/flax stalks gathered and tied at the base — converging
+    // lines with a cinch band, distinct from the Farm's fanning grain-headed
+    // stalks (no tie band, round grain heads instead).
+    const ImVec2 base = {c.x, c.y + r * 0.80f};
+    for (int i = -2; i <= 2; ++i)
+    {
+        const ImVec2 tip = {c.x + static_cast<float>(i) * r * 0.28f, c.y - r};
+        dl->AddLine(base, tip, fill, 1.8f);
+    }
+    dl->AddLine({c.x - r * 0.45f, c.y + r * 0.30f}, {c.x + r * 0.45f, c.y + r * 0.30f}, outline, 2.0f);
+}
+
+void tanned_hide(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // The cured counterpart of hide_stretch — a smoother, rounder silhouette
+    // (no peg lines: the frame is gone) with a single fold crease, reading as
+    // "finished" against the raw hide's rough peg-marked outline.
+    const ImVec2 v[5] = {
+        { c.x - r * 0.75f, c.y - r * 0.40f },
+        { c.x + r * 0.55f, c.y - r * 0.60f },
+        { c.x + r * 0.80f, c.y + r * 0.35f },
+        { c.x + r * 0.05f, c.y + r * 0.80f },
+        { c.x - r * 0.70f, c.y + r * 0.45f },
+    };
+    dl->AddConvexPolyFilled(v, 5, fill);
+    dl->AddPolyline(v, 5, outline, ImDrawFlags_Closed, 1.0f);
+    dl->AddLine({c.x - r * 0.35f, c.y - r * 0.10f}, {c.x + r * 0.30f, c.y + r * 0.25f}, outline, 1.0f);
+}
+
+void folded_cloth(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // Three stacked fabric folds — a zigzag ribbon read as draped cloth,
+    // distinct from the peat cutting's flat rectangular bricks (no zigzag)
+    // and the goods sack's cinched-neck bundle.
+    const float w  = r * 0.85f;
+    const float h  = r * 0.42f;
+    const float y0 = c.y - h * 1.5f;
+    ImVec2 pts[4];
+    for (int i = 0; i < 4; ++i)
+    {
+        const float yy = y0 + static_cast<float>(i) * h;
+        const float xo = (i % 2 == 0) ? -w * 0.5f : w * 0.5f;
+        pts[i] = { c.x + xo, yy };
+        dl->AddCircleFilled(pts[i], r * 0.10f, fill);
+    }
+    for (int i = 0; i < 3; ++i)
+        dl->AddLine(pts[i], pts[i + 1], fill, 3.0f);
+}
+
+void coiled_rope(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A coiled rope — two concentric rings sharing a gap, a free end trailing
+    // out from the outer ring — the only spiral-read silhouette in the
+    // vocabulary, so rigging never collides with the smithy ingot bar or any
+    // other trapezoid/hexagon shape.
+    dl->AddCircle(c, r * 0.80f, fill, 0, 2.2f);
+    dl->AddCircle(c, r * 0.48f, fill, 0, 2.2f);
+    dl->AddLine({c.x + r * 0.80f, c.y}, {c.x + r * 1.05f, c.y - r * 0.30f}, fill, 2.2f);
+}
+
 } // namespace
 
 void building(ImDrawList* dl, ImVec2 centre, float r, building_type type,
@@ -336,6 +421,8 @@ void building(ImDrawList* dl, ImVec2 centre, float r, building_type type,
                 case resource_type::copper_ore:             copper_mine(dl, centre, r, fill);        break;
                 case resource_type::water:                  water_extractor(dl, centre, r, fill);    break;
                 case resource_type::agricultural_produce:   farm(dl, centre, r, fill);               break;
+                case resource_type::hides:                  hide_stretch(dl, centre, r, fill);       break;
+                case resource_type::fibre:                  fibre_sheaf(dl, centre, r, fill);        break;
                 default:                                     ore_chunk(dl, centre, r, fill);          break;
             }
             break;
@@ -347,6 +434,9 @@ void building(ImDrawList* dl, ImVec2 centre, float r, building_type type,
                 case resource_type::steel:            smithy_ingot(dl, centre, r, fill);  break;
                 case resource_type::trade_goods_misc: goods_bundle(dl, centre, r, fill);  break;
                 case resource_type::food_rations:     ration_pack(dl, centre, r, fill);   break;
+                case resource_type::leather:           tanned_hide(dl, centre, r, fill);   break;
+                case resource_type::cloth:              folded_cloth(dl, centre, r, fill);  break;
+                case resource_type::rigging:            coiled_rope(dl, centre, r, fill);   break;
                 default:                                square(dl, centre, r, fill);        break;
             }
             break;

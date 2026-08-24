@@ -128,6 +128,13 @@ economy = {
                 sand   = { timber = 10.0 },
                 clay   = { timber = 10.0 },
                 peat   = { timber = 8.0  },
+                -- BL-586 slice 2 (2026-08-24): hides and fibre join the same
+                -- ancient-arc override, a fenced pasture/hunting camp and a
+                -- marsh/grass field camp respectively, both timber-framed
+                -- like the rest of this table rather than the type's steel
+                -- default.
+                hides  = { timber = 10.0 },
+                fibre  = { timber = 8.0  },
             },
         },
         processing_facility = {
@@ -163,6 +170,14 @@ economy = {
                 ceramics_kiln  = { clay = 8.0, timber = 4.0 },  -- Potter's Kiln (BL-586)
                 stonemason     = { timber = 8.0 },              -- Stonemason (BL-586)
                 sawmill        = { stone = 6.0, timber = 4.0 }, -- Sawmill (BL-586) — cannot cost only its own output
+                tannery        = { timber = 8.0, stone = 4.0 }, -- Tannery (BL-586 slice 2) — a timber-framed shed with stone-lined vats
+                weaver         = { timber = 10.0 },             -- Weaver (BL-586 slice 2) — a simple loom shed
+
+                -- Advanced Fabrication — the Shipwright is the roster's
+                -- heaviest ancient facility (a slipway and yard), so it
+                -- carries the biggest basket in this table even before
+                -- BL-590's steel default would have.
+                shipwright     = { timber = 14.0, stone = 6.0 }, -- Shipwright (BL-586 slice 2)
 
                 -- Food Processing — a millstone needs stone.
                 food_rations_milled = { stone = 10.0, timber = 4.0 }, -- Miller
