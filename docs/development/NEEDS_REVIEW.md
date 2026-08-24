@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*9 entries — 9 open, 0 resolved.*
+*11 entries — 11 open, 0 resolved.*
 
 ---
 
@@ -129,6 +129,30 @@ Read literally against src/world/nation_step.cpp's run_mercenary_contract_tick, 
 - Decide a mercenary_contract's failure SHOULD refund something to the client nation's treasury (a real behaviour change to nation_step.cpp, not a harness fix), and file it as its own backlog item.
 
 > **Recommendation:** The first option -- CONTRACTS.md's own Q2 table for 'failed' already reads 'deposit forfeit, nothing paid', matching the code and not the requirement text's 'escrow returned'. Correcting requirements.json's imprecise wording in the same change that closes this entry.
+
+### NR-585 — mercenary_contract::abandoned_event_posted is deliberately unserialized -- a saved-then-reloaded abandoned contract re-announces itself once
+*decision taken on your behalf · raised 2026-08-24 · from BL-577 (CONTRACT_MESSAGES_AND_INCOME), the dispatch one-shot flag for the abandoned event.*
+
+accept_offer/abandon_contract run outside any report-producing tick pass, so 'accepted' reuses the existing accepted_tick field for free, but 'abandoned' needed a new marker to avoid re-announcing on every subsequent tick. Rather than a real persistent field (a world_save_version bump), abandoned_event_posted was added as a bool that is NOT written to the save stream -- 'derived convenience, not authoritative', the same framing world::current_day_tick already carries in world_save.hpp's bucket-2 list. The cost: a contract already abandoned before a save re-announces itself once on the first tick after that save reloads -- one duplicate chat line, never a duplicate payment or a determinism divergence (the flag gates only the dispatch-text call, not the state transition itself).
+
+**Why it matters.** This is a genuine, if minor, exception to 'the serialisation seam travels with the change' -- worth a second look given how load-bearing that rule is everywhere else in src/world/. The field lives inside an otherwise-fully-serialized struct (mercenary_contract, world_save.cpp's P12 round-trip), so it is not obviously in the same bucket as current_day_tick (which world.cpp fully rebuilds from other state -- this one cannot be rebuilt, it is just accepted as a one-time repeat).
+
+- Confirm the trade-off -- a save-version bump for one cosmetic bool is not worth it.
+- Serialize it properly (bump world_save_version to 9) if a duplicate chat line after a reload is judged worse than it sounds.
+
+> **Recommendation:** Confirm the trade-off. A duplicate 'contract abandoned' line after loading an old save is a one-time, low-stakes cosmetic repeat, and the bar for a save-version bump should stay high -- every prior bump this batch (v4 through v8) was for state that actually needs to round-trip correctly for the SIMULATION to be right, not for a UI notification flag.
+
+### NR-586 — The Contracts ledger took nav-rail slot 13 -- the curated nine plus the 10-12 developer tail were both full
+*decision taken on your behalf · raised 2026-08-24 · from BL-576 (CONTRACTS_LEDGER), placing the ledger's rail icon.*
+
+The nav rail's existing slots (a curated nine, plus a developer tail at 10-12) had no free slot for the Contracts ledger, so it was appended as a new 13th slot rather than displacing an existing one. Documented as a deliberate exception in docs/ui/MENU.md § Slot 13.
+
+**Why it matters.** This is the first time the rail has run past its originally curated model -- worth Ben's eyes on whether 13 is a one-off (Sprint 16 earns its slot, nothing else does for a while) or the first sign the curated/tail split itself needs revisiting (e.g. a fold-out overflow menu, or re-curating which of the original nine still earn a permanent slot).
+
+- Confirm slot 13 as a one-off addition, no structural change.
+- Revisit the rail's slot model now, before a 14th item makes the question harder to answer cleanly.
+
+> **Recommendation:** Confirm as a one-off for now -- Sprint 16 is the first Batch Delivery to reach the UI layer this deep, and one slot added under real pressure is better evidence than redesigning the rail speculatively. Revisit if a near-term item needs slot 14.
 
 ---
 
