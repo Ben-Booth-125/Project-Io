@@ -6,6 +6,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -168,6 +169,16 @@ void draw_selection_content(world& w, const recipe_registry& reg,
 /// card's card_resource_page / tile_metrics pairing.
 void draw_building_page_expanded(world& w, const recipe_registry& reg,
                                  const economy_report& report, ui_state& ui);
+
+/// Real name lookup for a unit's roster type (`unit_component::type` indexes
+/// `unit_roster_table()` directly). An out-of-range index falls back to the
+/// honest "Type %u" the rest of the codebase uses for opaque indices.
+///
+/// Declared here (it was previously an undeclared file-local definition) so
+/// the Contracts ledger's force picker (BL-576) can name a candidate unit
+/// through the SAME lookup the Soldier card's Roster page uses, rather than
+/// re-deriving the same name a second time and letting the two drift.
+std::string unit_roster_display_name(std::uint16_t type);
 
 /// Draw the **tile construction ledger** (BL-162) — the tile-contextual surface that
 /// actually lets the player build. Opened by the tile Selection element's "Construct

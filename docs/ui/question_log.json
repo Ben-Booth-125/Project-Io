@@ -537,6 +537,42 @@
     "src/world/nation_step.cpp"
    ],
    "status": "drafted"
+  },
+  "contracts_ledger_offers": {
+   "surface": "Contracts ledger - Offers view",
+   "answers": "Who wants to hire me, for what, and can I afford to say yes?",
+   "because": "CONTRACTS.md settles the mercenary contract as the sell side of the income loop: a client nation offers a fee to make a fact about the world true by a deadline. Without a surface listing open offers the player cannot act on the mechanism at all — offers exist in world::mercenary_offers whether or not anyone can see them, which is exactly the BL-089 activity-fog framing this view honours (an offer is hidden unless its target body is at least Known). The view is also where the force-picker lives: CONTRACTS.md Q1 rules the player chooses the force, never the contract, so the Accept press has to open onto something.",
+   "backlog_item": [
+    "BL-576"
+   ],
+   "files": [
+    "src/ui/contracts_ledger.cpp"
+   ],
+   "status": "drafted"
+  },
+  "contracts_ledger_active": {
+   "surface": "Contracts ledger - Active view",
+   "answers": "What am I on the hook for right now, and what does walking away cost?",
+   "because": "An accepted mercenary_contract commits real units and a real deposit; the player needs to see the predicate it is paying to make true (condition_text), the deadline, and the force committed to it. The Abandon press exists because CONTRACTS.md Q2 makes an early exit cheaper than a rout but never free — the reputation cost has to be shown BEFORE the press commits, not discovered afterward, or the ledger would be teaching the wrong lesson about the one number that makes abandoning a real decision.",
+   "backlog_item": [
+    "BL-576"
+   ],
+   "files": [
+    "src/ui/contracts_ledger.cpp"
+   ],
+   "status": "drafted"
+  },
+  "contracts_ledger_history": {
+   "surface": "Contracts ledger - History view",
+   "answers": "How has this line of work actually gone for me?",
+   "because": "CONTRACTS.md Q2 names three terminal states (completed / failed / abandoned) with three different money and reputation outcomes, deliberately against procurement's two — failure is the mechanism's teeth ('you are not paid for trying'). A player cannot read their own standing spiral (CONTRACTS.md: reputation falls, fees fall with it) without a record of which contracts ended which way and what they actually paid; without this view every terminal contract vanishes into the sentiment substrate with nothing on screen to show for it.",
+   "backlog_item": [
+    "BL-576"
+   ],
+   "files": [
+    "src/ui/contracts_ledger.cpp"
+   ],
+   "status": "drafted"
   }
  }
 }
