@@ -322,7 +322,7 @@
       "id": "NR-593",
       "title": "The Selection band's resting state is ~90% empty, and its action grid is six near-identical circles in every kind",
       "kind": "question",
-      "what": "Four observations on one surface, all visible in _band_strip.png. (a) The RESTING state -- no selection, so the band rests on the player's own corporation (BL-266) -- is a title row plus 'Open its ledger via [>].' over ~200px of black, and that is the state the band is in most of the time. (b) The right-hand action grid is a 2x3 of six slots, and across tile / province / own building / rival building most slots draw as an empty circle; an empty circle is indistinguishable from a disabled action and from an unimplemented one. (c) The left cell has no consistent subject: a hex neighbourhood for tile and province, a large flat grey silhouette for the Military Base, a bare X for the Extraction Site -- the last two read as missing artwork rather than as designed glyphs. (d) A click on a tile drives the BAND; no click-opened sticky card appeared, so whether BL-194/BL-195's card still exists after BL-266 made Selection always-open is a question the authority does not answer.",
+      "what": "Four observations on one surface, all visible in _band_strip.png. (a) The RESTING state -- no selection, so the band rests on the player's own corporation (BL-266) -- is a title row plus 'Open its ledger via [>].' over ~200px of black, and that is the state the band is in most of the time. (b) The right-hand action grid is a 2x3 of six slots, and across tile / province / own building / rival building most slots draw as an empty circle; an empty circle is indistinguishable from a disabled action and from an unimplemented one. (c) The left cell has no consistent subject: a hex neighbourhood for tile and province, a large flat grey silhouette for the Military Base, a bare X for the Extraction Site -- the last two read as missing artwork rather than as designed glyphs. (d) A click on a tile drives the BAND; no click-opened sticky card appeared, so whether BL-194/BL-195's card still exists after BL-266 made Selection always-open is a question the authority does not answer. UPDATE 2026-08-24, from Slice C: the dead-space half of this is now CHEAP to fix and is waiting on Ben rather than on work. BL-598 put a reusable section-toggle shape in selection_panel.cpp (about ten lines), so the resting band could take the same accordion the tile now takes. What it needs is not code - it is Ben NAMING THE SECTIONS, because naming them is the design. The slice was instructed not to take the free improvement and did not.",
       "why_it_matters": "The band is permanent chrome and the second-largest region on screen. Its resting state is the shell's biggest single piece of dead space.",
       "files": [
         "docs/ui/SELECTION.md",
@@ -501,6 +501,21 @@
       "raised": "2026-08-24",
       "status": "open",
       "source": "Sprint 17b, Slice B (BL-604 / BL-602), reported 2026-08-24."
+    },
+    {
+      "id": "NR-605",
+      "title": "The Selection band now carries two centre-column idioms - an accordion for the tile, pagers for everything else",
+      "raised": "2026-08-24",
+      "status": "open",
+      "kind": "question",
+      "source": "Sprint 17b, Slice C (BL-598), reported 2026-08-24.",
+      "what": "BL-598 replaced the tile element's three-view PAGER with a five-section ACCORDION, on Ben's ruling. The building card and the unit card still use pagers. That is defensible on its face - the tile has five sections and they have two or three, and an accordion over two sections is ceremony - but it is a fork in the shell's vocabulary, and the slice filed it as an open question in ledgers/selection.md rather than unifying on its own judgement. Which is right: a reader now learns two disclosure idioms for the same region, and 'how many sections' is not a rule a player can see.",
+      "why_it_matters": "The band is permanent chrome and the second-largest region on screen. Two idioms in one rect is the kind of thing that reads as an accident rather than a decision, and it gets more expensive to unify with every card added. Three answers: unify on the accordion, keep the split and write the rule down (pager under N sections), or let each card choose and stop treating it as one region.",
+      "files": [
+        "docs/ui/SELECTION.md",
+        "docs/ui/ledgers/selection.md",
+        "src/ui/selection_panel.cpp"
+      ]
     }
   ]
 }

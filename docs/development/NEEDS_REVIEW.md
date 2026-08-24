@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*29 entries — 29 open, 0 resolved.*
+*30 entries — 30 open, 0 resolved.*
 
 ---
 
@@ -223,7 +223,7 @@ Three things, one subject. (1) campaign_epoch_year is a hard-coded 1960 in BOTH 
 ### NR-593 — The Selection band's resting state is ~90% empty, and its action grid is six near-identical circles in every kind
 *question · raised 2026-08-24 · from The 2026-08-24 UI shell pass (scripts/verify/shell_pass.lua, 31 captures in build/screenshots).*
 
-Four observations on one surface, all visible in _band_strip.png. (a) The RESTING state -- no selection, so the band rests on the player's own corporation (BL-266) -- is a title row plus 'Open its ledger via [>].' over ~200px of black, and that is the state the band is in most of the time. (b) The right-hand action grid is a 2x3 of six slots, and across tile / province / own building / rival building most slots draw as an empty circle; an empty circle is indistinguishable from a disabled action and from an unimplemented one. (c) The left cell has no consistent subject: a hex neighbourhood for tile and province, a large flat grey silhouette for the Military Base, a bare X for the Extraction Site -- the last two read as missing artwork rather than as designed glyphs. (d) A click on a tile drives the BAND; no click-opened sticky card appeared, so whether BL-194/BL-195's card still exists after BL-266 made Selection always-open is a question the authority does not answer.
+Four observations on one surface, all visible in _band_strip.png. (a) The RESTING state -- no selection, so the band rests on the player's own corporation (BL-266) -- is a title row plus 'Open its ledger via [>].' over ~200px of black, and that is the state the band is in most of the time. (b) The right-hand action grid is a 2x3 of six slots, and across tile / province / own building / rival building most slots draw as an empty circle; an empty circle is indistinguishable from a disabled action and from an unimplemented one. (c) The left cell has no consistent subject: a hex neighbourhood for tile and province, a large flat grey silhouette for the Military Base, a bare X for the Extraction Site -- the last two read as missing artwork rather than as designed glyphs. (d) A click on a tile drives the BAND; no click-opened sticky card appeared, so whether BL-194/BL-195's card still exists after BL-266 made Selection always-open is a question the authority does not answer. UPDATE 2026-08-24, from Slice C: the dead-space half of this is now CHEAP to fix and is waiting on Ben rather than on work. BL-598 put a reusable section-toggle shape in selection_panel.cpp (about ten lines), so the resting band could take the same accordion the tile now takes. What it needs is not code - it is Ben NAMING THE SECTIONS, because naming them is the design. The slice was instructed not to take the free improvement and did not.
 
 **Why it matters.** The band is permanent chrome and the second-largest region on screen. Its resting state is the shell's biggest single piece of dead space.
 
@@ -327,6 +327,15 @@ Retiring the Production lens raised the question of whether its Circumplanetary 
 **Why it matters.** The rung-applicability table is read as a statement of what exists, and at least two of its cells were statements of what was meant to exist. Either the table is corrected against the code, or the two badges are built. It also means the table cannot be trusted as the input to BL-603's per-lens structure walk without being checked cell by cell first.
 
 *Files: `docs/ui/LENSES.md`, `src/ui/circumplanetary_canvas.cpp`*
+
+### NR-605 — The Selection band now carries two centre-column idioms - an accordion for the tile, pagers for everything else
+*question · raised 2026-08-24 · from Sprint 17b, Slice C (BL-598), reported 2026-08-24.*
+
+BL-598 replaced the tile element's three-view PAGER with a five-section ACCORDION, on Ben's ruling. The building card and the unit card still use pagers. That is defensible on its face - the tile has five sections and they have two or three, and an accordion over two sections is ceremony - but it is a fork in the shell's vocabulary, and the slice filed it as an open question in ledgers/selection.md rather than unifying on its own judgement. Which is right: a reader now learns two disclosure idioms for the same region, and 'how many sections' is not a rule a player can see.
+
+**Why it matters.** The band is permanent chrome and the second-largest region on screen. Two idioms in one rect is the kind of thing that reads as an accident rather than a decision, and it gets more expensive to unify with every card added. Three answers: unify on the accordion, keep the split and write the rule down (pager under N sections), or let each card choose and stop treating it as one region.
+
+*Files: `docs/ui/SELECTION.md`, `docs/ui/ledgers/selection.md`, `src/ui/selection_panel.cpp`*
 
 ---
 
