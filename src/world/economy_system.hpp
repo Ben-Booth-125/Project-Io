@@ -253,6 +253,14 @@ struct economy_report
     /// — it leaves the corp's balance where it found it — so it is reported here
     /// rather than folded into `budgets[corp].subsidies`. BL-555's line.
     std::vector<earmark_result> earmarks;
+
+    /// Mercenary-contract lifecycle events this tick (BL-577): offer issued,
+    /// accepted, completed, failed, abandoned — see `contract_dispatch`
+    /// (nation_step.hpp) for the shape and each producer's own comment for
+    /// exactly when it fires. `session_history::post_contract_events` is the
+    /// one reader; the Public channel is nation-voiced only (CHAT.md), so
+    /// each line speaks as `contract_dispatch::client`.
+    std::vector<contract_dispatch> contract_events;
 };
 
 /// Run one economy step over every corporation's buildings: extraction credits

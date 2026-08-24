@@ -841,6 +841,23 @@ target_link_libraries(battle_engagement_harness PRIVATE io_world_obj)
 target_compile_features(battle_engagement_harness PRIVATE cxx_std_20)
 target_compile_options(battle_engagement_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# contract_dispatch_harness (BL-577). Hand-declared for the SAME reason
+# battle_engagement_harness is, immediately above: it exercises
+# contract_dispatch_line, defined in src/core/battle_dispatch_text.cpp
+# (battle_dispatch_line's own TU, kept out of session_history.cpp for the
+# identical <SDL3/SDL.h> reason that file's own header comment gives) — so
+# the generic glob loop below (io_world_obj alone) cannot link it either.
+add_executable(contract_dispatch_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/contract_dispatch_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/battle_dispatch_text.cpp"
+)
+target_include_directories(contract_dispatch_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+target_link_libraries(contract_dispatch_harness PRIVATE io_world_obj)
+target_compile_features(contract_dispatch_harness PRIVATE cxx_std_20)
+target_compile_options(contract_dispatch_harness PRIVATE ${IO_WARNING_FLAGS})
+
 file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/*.cpp")
 
 # ---------------------------------------------------------------------------

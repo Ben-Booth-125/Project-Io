@@ -261,6 +261,25 @@ struct mercenary_contract
     std::array<entity_id, mercenary_contract_max_units> units{};
 
     mercenary_contract_state state = mercenary_contract_state::active;
+
+    /// BL-577: set true the first tick `run_mercenary_contract_tick` observes
+    /// this contract sitting in `abandoned` state, so it emits exactly one
+    /// `contract_dispatch::kind::abandoned` event per contract regardless of
+    /// how many further ticks pass. `completed`/`failed` need no equivalent —
+    /// both are set INLINE in the same pass that transitions them, so they are
+    /// naturally single-shot — but `abandoned` is set by `abandon_contract`
+    /// (corp_command.cpp), OUTSIDE that pass, with no "this tick" timestamp to
+    /// key off (unlike `accepted`, which reuses `accepted_tick`).
+    ///
+    /// DELIBERATELY NOT SERIALISED (world_save.cpp's `w_mercenary_contract`
+    /// does not write it): it is presentation bookkeeping, not simulation
+    /// state — the same "derived convenience, not authoritative" contract
+    /// `world::current_day_tick` documents for itself. The cost is a single,
+    /// honest one: a contract already abandoned before a save re-announces
+    /// itself once on the first tick after that save loads. A save-format
+    /// bump to avoid that one cosmetic repeat was judged not worth it for a
+    /// chat line (NEEDS_REVIEW.json, BL-577's novel-work entry).
+    bool abandoned_event_posted = false;
 };
 
 /// True iff @p unit appears in @p c's committed force. The single predicate

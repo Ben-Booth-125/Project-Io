@@ -341,6 +341,27 @@ struct ui_state
         selected_battle_defender = null_entity;
     }
 
+    // --- The selected mercenary contract (BL-577) ------------------------
+    // A `mercenary_contract` has no entity id — it lives in
+    // `world::mercenary_contracts`, keyed by its own stable `id` — so, exactly
+    // like the battle triple above, it cannot travel in `selected_entity` and
+    // gets its own field. A single scalar suffices here (unlike the battle's
+    // three-part key): a contract id is already globally unique, with no
+    // second axis like "which of a province's several fights" to disambiguate.
+    //
+    // MUTUALLY EXCLUSIVE with `selected_entity`/`selected_province`/the battle
+    // triple, on the same "whichever is set last clears the others" rule.
+    // There is no canvas marker for a contract (CONTRACTS.md's ledger-and-map
+    // framing puts a contract's PROVINCE on the map, not the contract itself),
+    // so the setter is a future ledger row press (BL-576, Contracts ledger) —
+    // whichever surface sets this must clear the others, the same duty every
+    // other selecting surface already carries.
+    uint32_t selected_contract_id = 0;
+
+    bool has_contract_selection() const { return selected_contract_id != 0; }
+
+    void clear_contract_selection() { selected_contract_id = 0; }
+
     /// The value of `selected_entity` the Planetary canvas last wrote, so the
     /// canvas can tell "the player clicked a province" from "some OTHER surface
     /// — a ledger row, a corp list, a just-built building — moved the entity

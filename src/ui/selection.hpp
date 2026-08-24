@@ -26,6 +26,13 @@ enum class selection_kind
     /// `selected_province` does — the precedent BL-511 set for a selection whose
     /// subject is not an entity.
     battle,
+    /// An accepted mercenary contract (BL-577), the battle card's sibling.
+    /// Like `battle`, NOT resolved by `selection_kind_of` — a `mercenary_contract`
+    /// lives in `world::mercenary_contracts` (a vector, keyed by its own stable
+    /// `id`), not in a per-type entity map, so there is no entity id to probe
+    /// for. It lives in its own `ui_state` field (`selected_contract_id`), the
+    /// same precedent `selected_province` and the battle triple established.
+    contract,
     // Future kinds (logistics vessel, …) slot in here once their component
     // stores exist; see SELECTION.md (§ Polymorphism).
 };

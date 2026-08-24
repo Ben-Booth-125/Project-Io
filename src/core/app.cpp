@@ -1300,6 +1300,11 @@ void app::step_economy()
         // post lines the player never saw, all stamped on the same day.
         if (!m_warm_starting)
             session_history::post_battle_dispatches(m_world, m_last_econ_report, m_chat, day);
+        // BL-577: contract traffic to the Public channel, on the same
+        // pre-game suppression as battle dispatches — a nation should not
+        // announce a contract the player never saw open.
+        if (!m_warm_starting)
+            session_history::post_contract_events(m_world, m_last_econ_report, m_chat, day);
         // Persona counsel is suppressed through the pre-game warm start
         // (2026-08-12): measured at ~1.05 s/tick — 93% of the AppHangB1 stall —
         // against ~80 ms for everything else combined, and what it buys there
@@ -1997,7 +2002,7 @@ void app::render()
     {
         const float header_left  = ui::shell_column_width(disp.x);
         const float header_right = ui::right_chrome_left(disp) - margin;
-        ui::draw_header_panel(m_world, m_balance_history, header_left, header_right);
+        ui::draw_header_panel(m_world, m_balance_history, m_last_econ_report, header_left, header_right);
     }
 
     // Comms chat log (BL-205) — BL-227 re-homed it from the right chrome column
@@ -2107,8 +2112,8 @@ void app::render()
         const ui::resource_history_view rhist{ &m_body_resource_hist,
                                                &m_tile_resource_hist,
                                                &m_resource_hist_days };
-        ui::draw_selection_band(m_world, m_registry, m_last_econ_report, rhist, m_ui,
-                                band_origin, band_size);
+        ui::draw_selection_band(m_world, m_registry, m_last_econ_report, m_contract_templates,
+                                rhist, m_ui, band_origin, band_size);
     }
 
     // The shell fold-out column is ledgers-only (BL-195). The one contextual, per-

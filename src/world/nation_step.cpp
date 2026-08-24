@@ -96,18 +96,18 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // (CONTRACTS.md § Where offers come from); placed after it here because
     // it landed second — the two lines draw the same treasury independently
     // and neither reads the other's spend this tick.
-    derive_contract_offers(w, reg, econ_tick);
+    derive_contract_offers(w, reg, econ_tick, contract_offer_params{}, &report);
 
     // ---- 7. Mercenary contract evaluation (BL-573) — pay or fail -----------
     // See nation_step.hpp's own comment on run_mercenary_contract_tick for
     // the four moves and why "after run_battles" is already satisfied by
     // this pass's position in the tick.
-    run_mercenary_contract_tick(w, reg, templates, econ_tick);
+    run_mercenary_contract_tick(w, reg, templates, econ_tick, &report);
 }
 
 void run_mercenary_contract_tick(world& w, const recipe_registry& reg,
                                  const contract_template_registry& templates,
-                                 int econ_tick)
+                                 int econ_tick, economy_report* report)
 {
     if (w.mercenary_contracts.empty())
         return; // EMPTY IN EVERY GENERATED WORLD until accept_offer is issued.
@@ -124,8 +124,54 @@ void run_mercenary_contract_tick(world& w, const recipe_registry& reg,
     for (const std::size_t idx : order)
     {
         mercenary_contract& c = w.mercenary_contracts[idx];
+
+        // BL-577: abandonment happens OUTSIDE this pass (abandon_contract,
+        // corp_command.cpp), so it is caught here rather than settled here —
+        // exactly once, on the first tick this walk observes it, guarded by
+        // `abandoned_event_posted` (world.hpp's own comment on why that flag
+        // exists and is deliberately unserialised).
+        if (c.state == mercenary_contract_state::abandoned)
+        {
+            // Only actually MARK it posted once a report has been given to
+            // post it to — a harness that walks ticks with no report (the
+            // default) must not silently burn the one-shot flag before a
+            // later, report-carrying caller ever sees the event.
+            if (!c.abandoned_event_posted && report)
+            {
+                contract_dispatch ev;
+                ev.what        = contract_dispatch::kind::abandoned;
+                ev.id          = c.id;
+                ev.client      = c.client;
+                ev.contractor  = c.contractor;
+                ev.province    = c.province;
+                ev.fee         = c.fee;
+                report->contract_events.push_back(ev);
+                c.abandoned_event_posted = true;
+            }
+            continue;
+        }
+
         if (c.state != mercenary_contract_state::active)
             continue;
+
+        // BL-577: "accepted" reuses accept_offer's own `accepted_tick` stamp
+        // rather than needing a fresh signal — the same tick a contract is
+        // created is exactly the tick this walk first sees it `active`, unless
+        // its deadline is degenerate (deadline_ticks == 0), which no authored
+        // template ships. Independent of the settle logic below: an accepted
+        // contract can also complete/fail same-tick without the two events
+        // disagreeing about what happened.
+        if (report && c.accepted_tick == econ_tick)
+        {
+            contract_dispatch ev;
+            ev.what       = contract_dispatch::kind::accepted;
+            ev.id         = c.id;
+            ev.client     = c.client;
+            ev.contractor = c.contractor;
+            ev.province   = c.province;
+            ev.fee        = c.fee;
+            report->contract_events.push_back(ev);
+        }
 
         // A stale/out-of-range template index cannot have been written by
         // accept_offer (it copies `mercenary_offer::template_index`
@@ -179,10 +225,34 @@ void run_mercenary_contract_tick(world& w, const recipe_registry& reg,
                 const auto cit = w.corporations.find(c.contractor);
                 if (cit != w.corporations.end())
                     cit->second.balance += remainder;
+
+                // BL-577: the direct transfer above moves the balance but,
+                // unlike an unearmarked national-budget transfer (this
+                // file's step 4, above), never touched `report->budgets`, so
+                // the Balance ledger's "Contract income" line and the header
+                // runway indicator had nothing to read — CONTRACTS.md's own
+                // "budget_result::subsidies already carries it" premise did
+                // NOT hold for BL-573's payout. Recorded here on the SAME
+                // "credit that stays on the balance" basis step 4 documents:
+                // `net()` should explain the delta, not silently absorb it.
+                if (report)
+                    report->budgets[c.contractor].subsidies += remainder;
             }
             c.state = mercenary_contract_state::completed;
             w.note_conduct(reg.sentiment(), c.client, c.contractor,
                            sentiment_factor_kind::contract_completed);
+
+            if (report)
+            {
+                contract_dispatch ev;
+                ev.what       = contract_dispatch::kind::completed;
+                ev.id         = c.id;
+                ev.client     = c.client;
+                ev.contractor = c.contractor;
+                ev.province   = c.province;
+                ev.fee        = c.fee;
+                report->contract_events.push_back(ev);
+            }
         }
         else if (settle_failed)
         {
@@ -194,6 +264,18 @@ void run_mercenary_contract_tick(world& w, const recipe_registry& reg,
             c.state = mercenary_contract_state::failed;
             w.note_conduct(reg.sentiment(), c.client, c.contractor,
                            sentiment_factor_kind::contract_failed);
+
+            if (report)
+            {
+                contract_dispatch ev;
+                ev.what       = contract_dispatch::kind::failed;
+                ev.id         = c.id;
+                ev.client     = c.client;
+                ev.contractor = c.contractor;
+                ev.province   = c.province;
+                ev.fee        = c.fee;
+                report->contract_events.push_back(ev);
+            }
         }
         // else: still active, judged again next tick.
     }
@@ -397,7 +479,7 @@ float contracted_force_share(const world& w, entity_id nid)
 } // namespace
 
 void derive_contract_offers(world& w, const recipe_registry& reg, int econ_tick,
-                            const contract_offer_params& params)
+                            const contract_offer_params& params, economy_report* report)
 {
     if (w.nations.empty() || w.provinces.provinces.empty())
         return;
@@ -489,6 +571,19 @@ void derive_contract_offers(world& w, const recipe_registry& reg, int econ_tick,
                 off.deadline        = econ_tick + params.deadline_ticks;
                 off.offer_escrow    = 0.0f;
                 w.mercenary_offers.push_back(off);
+
+                // BL-577: reported the instant the offer exists — no
+                // contractor yet (`accept_offer` is what names one).
+                if (report)
+                {
+                    contract_dispatch ev;
+                    ev.what     = contract_dispatch::kind::offer_issued;
+                    ev.id       = off.id;
+                    ev.client   = nid;
+                    ev.province = target;
+                    ev.fee      = off.fee;
+                    report->contract_events.push_back(ev);
+                }
             }
         }
 

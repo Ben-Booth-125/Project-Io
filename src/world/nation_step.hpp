@@ -73,6 +73,42 @@ struct earmark_result
     bool      dispatched = false;    ///< False: credit clawed back to the treasury.
 };
 
+// ---------------------------------------------------------------------------
+// BL-577 — contract_dispatch: a mercenary-contract lifecycle event this tick
+// ---------------------------------------------------------------------------
+// docs/economy/CONTRACTS.md § On screen: "an event lands with its message, in
+// the same change" (EVENTS.md's rule). THE WORLD REPORTS; THE PRESENTATION
+// LAYER VOICES — the same split `battle_dispatch` (battle_system.hpp)
+// established: `derive_contract_offers` and `run_mercenary_contract_tick`
+// (below) append one of these whenever a contract crosses a lifecycle edge;
+// `core/battle_dispatch_text.cpp`'s sibling bank and
+// `session_history::post_contract_events` turn it into a Public-channel line.
+// Never read by anything but presentation.
+struct contract_dispatch
+{
+    enum class kind : uint8_t
+    {
+        offer_issued, ///< A nation opened a new mercenary_offer (derive_contract_offers).
+        accepted,     ///< accept_offer turned an offer into a live mercenary_contract.
+        completed,    ///< The predicate held; the balance of the fee was paid.
+        failed,       ///< The deadline passed with the predicate false.
+        abandoned,    ///< The contractor walked away (abandon_contract).
+    };
+
+    kind      what;
+    /// The offer id (`offer_issued`) or the contract id (every other kind) —
+    /// whichever record this event is about. Not a lookup key: the fields
+    /// below carry everything a phrase needs, since the record itself may
+    /// already be gone (`offer_issued`'s originating offer is erased at
+    /// `accept_offer`) or its OWN state has moved on since (a `completed`
+    /// event's contract is read again, unchanged, next tick).
+    uint32_t  id = 0;
+    entity_id client      = null_entity; ///< The nation footing the fee — always known.
+    entity_id contractor  = null_entity; ///< The corp — null_entity for `offer_issued` (unaccepted).
+    uint32_t  province    = 0;
+    float     fee         = 0.0f;
+};
+
 /// Run the nation step for one economy tick. Mutates nation treasuries, corp
 /// balances, the survey store (via `dispatch_survey`) and `w.nation_budgets`;
 /// nothing else. Appends to `report.national_budget`, `report.nation_scores`,
@@ -236,8 +272,19 @@ struct contract_offer_params
 ///                  `offer_ttl_ticks` and `deadline_ticks` are measured
 ///                  against.
 /// @param params    Tunables. Defaults are the values named above.
+/// @param report    BL-577: OPTIONAL. When non-null, a new offer (move 3)
+///                  appends an `offer_issued` `contract_dispatch` to it —
+///                  the Public-channel line's only source, since the offer's
+///                  own record carries no "I am new this tick" signal once
+///                  move 4 has touched it. A pointer, defaulted to null, on
+///                  the same `apply_corp_command`-style optional-out-param
+///                  precedent (`entity_id* out_building`), so every existing
+///                  caller — the harnesses included — keeps compiling
+///                  unchanged; only `run_nation_step` (the live/report path)
+///                  passes one.
 void derive_contract_offers(world& w, const recipe_registry& reg, int econ_tick,
-                            const contract_offer_params& params = {});
+                            const contract_offer_params& params = {},
+                            economy_report* report = nullptr);
 
 // ---------------------------------------------------------------------------
 // BL-573 — the mercenary contract tick: evaluate, then pay or fail
@@ -280,9 +327,22 @@ void derive_contract_offers(world& w, const recipe_registry& reg, int econ_tick,
 //     measurably the harder move (see sentiment.hpp's own comment on the
 //     factor and scripts/economy.lua's authored magnitude).
 //
+// BL-577 ADDS TWO MORE EVENTS to this same walk, neither changing the four
+// moves above: an `accepted` `contract_dispatch` for any contract whose
+// `accepted_tick` equals `econ_tick` (accept_offer's own timestamp — no new
+// field needed), and an `abandoned` one the FIRST tick this pass observes a
+// contract already sitting in `abandoned` state (set by `abandon_contract`,
+// corp_command.cpp — OUTSIDE this pass, so there is no "this tick" signal to
+// key off short of the OBSERVABILITY-ONLY `abandoned_event_posted` flag
+// `mercenary_contract` carries for exactly this — see its own comment in
+// world.hpp for why it is deliberately NOT serialised). Both, like
+// `offer_issued` above, are OPTIONAL: `report` is a pointer defaulted to
+// null, so the harnesses that drive this pass directly keep compiling
+// unchanged; only `run_nation_step` passes one.
+//
 // DETERMINISTIC: `w.mercenary_contracts` walked by a stable sort on
 // ascending id (ties impossible — ids are unique); `evaluate_condition` is
 // pure; `note_conduct` is a single deterministic fold per settled contract.
 void run_mercenary_contract_tick(world& w, const recipe_registry& reg,
                                  const contract_template_registry& templates,
-                                 int econ_tick);
+                                 int econ_tick, economy_report* report = nullptr);

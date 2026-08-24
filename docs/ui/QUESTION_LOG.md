@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**33 surfaces** — 4 settled, 29 awaiting Ben's wording.
+**36 surfaces** — 4 settled, 32 awaiting Ben's wording.
 
 ---
 
@@ -27,6 +27,14 @@ alphabetical order.
 **Because:** apply_budget nets six flows into one number; a single balance tells the player they are losing without telling them what to change. Itemising income, expenditure, maintenance, wages, interest and levies is what makes bankruptcy something to act on rather than discover. BL-343 added the Laws section beneath the policy levers: the first law that is not a stub sits directly under the two that are, so the difference between a drawn lever and a working one is visible in one glance.
 
 *Demanded by BL-074, BL-112, BL-122, BL-343 · `src/ui/balance_ledger.cpp` · id `balance_ledger`*
+
+### Balance ledger — Contract income line, and the header runway tooltip
+
+**Answers:** How much of what I just earned came from mercenary work rather than trade?
+
+**Because:** A completed contract's remainder pays out as a direct transfer to the corp balance (accept_offer's own split-payment precedent, corp_command.cpp) — real money that, before this item, moved the number at the top of the Balance ledger with no line anywhere explaining where it came from, exactly the kind of unexplained jump budget_result::subsidies exists to prevent for every OTHER nation-paid credit. It earns its place by closing that one remaining gap rather than opening a new concept: subsidies already means 'a nation paid you' everywhere else it is read (the national-budget transfer case, nation_step.cpp's own step 4), so a mercenary contract's payout landing on the same field is one line, not a second mechanism. The header runway tooltip reads the same field for the reverse reason — a lump-sum contract payment would otherwise read as a steady improvement in the burn rate the 'assumes the burn holds steady' runway estimate explicitly is not built to represent.
+
+*Demanded by BL-577 · `src/ui/balance_ledger.cpp`, `src/ui/header_panel.cpp`, `src/world/nation_step.cpp` · id `balance_ledger_contract_income`*
 
 ### Battle card (Selection element, battle kind)
 
@@ -59,6 +67,22 @@ alphabetical order.
 **Because:** Placement carries terrain, deposit, slot and now logistics-reach rules (BL-323). A refusal the player cannot read is indistinguishable from a broken build, so the panel must state the reason, not merely deny.
 
 *Demanded by BL-029, BL-082, BL-095, BL-367 · `src/ui/construction_panel.cpp` · id `construction_panel`*
+
+### Contract card (Selection element, contract kind)
+
+**Answers:** What did I actually agree to, and what have I been paid for it so far?
+
+**Because:** SELECTION.md's battle element is this card's own precedent: a mercenary_contract has no entity id, so — like a battle — it resolves before selection_kind_of and owns its whole layout rather than the shared action|facts split. It earns its space by being the one place the four facts a contract's OWN record carries sit together: the predicate (via condition_text, the same reader the Balance ledger's laws listing already uses, so a contract's terms and a law's conditions never read in two different vocabularies), the committed force (CONTRACTS.md Q1 — the player names the force, never the contract, so the card is where that choice is read back), the deadline the tick-evaluation pass judges it against, and the fee SPLIT — deposit already paid versus the remainder still owed on completion — because 'the fee is 400cr' hides the one number that actually matters mid-contract: how much is still at stake.
+
+*Demanded by BL-577 · `src/ui/selection.hpp`, `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp` · id `contract_card`*
+
+### Public channel (comms dock) — mercenary-contract dispatches
+
+**Answers:** What is happening to the mercenary work I have taken or am chasing, without me having to hold the ledger open?
+
+**Because:** CONTRACTS.md's EVENTS.md-derived rule is that an event lands with its message in the SAME change: offer issued, accepted, completed, failed and abandoned are the five moments a contract's money and reputation actually move, and none of them had a surface before this — a completed contract paid out silently. The Public channel is the only correct home rather than a new channel of its own (unlike the battle dispatch stream): CHAT.md already settles Public as nation-voiced, and a contract's counterparty on the client side IS a nation, so the wording is the SAME first-person register post_nation_agency_comms already established, not a new voice to learn. Phrase selection folds the record's own stable id with the event kind (the BL-290 tongue-bank idiom battle_dispatch_line already uses), so replays read identically and no RNG draw is spent narrating a fact the simulation already decided.
+
+*Demanded by BL-577 · `src/core/battle_dispatch_text.cpp`, `src/core/session_history.cpp`, `src/world/nation_step.cpp`, `src/world/nation_step.hpp` · id `contract_events_public_channel`*
 
 ### AI decision feed
 
