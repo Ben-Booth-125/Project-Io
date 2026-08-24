@@ -241,6 +241,27 @@ end-to-end, live-confirmed by both a script and a human. Three findings carried 
 blocking: `NR-577` (BL-575's unit-visibly-moving gap), `NR-587` (battle-card observability) and
 `NR-588` (offer-deadline real-time pacing).
 
+**UPDATE, same session: the review queue closes and the backlog is purged again (2026-08-24).**
+
+Ben reviewed the eleven open-call entries the batch raised (`NR-577` through `NR-588`, minus
+`NR-583`'s renumbering) via one form, with extra explanatory context per item since several
+needed real thought. Ten were confirm/leave-as-is calls, resolved with no code change. One was a
+real fork: `NR-580` (zero starting treasury flattening both garrison sizing and offer funding)
+ruled **A) wire nation income before generation's garrison/budget passes run** — settled into
+`docs/generation/NATION_GENERATION.md` § Pass 7 and `docs/politics/NATIONS.md` § 2, filed as
+`BL-595` (NATION_STARTING_TREASURY, designed, no sprint), not built this session. Two small
+follow-through fixes landed alongside: `requirements.json`'s BL-574 M4 wording corrected from
+"the escrow returned" to "the deposit forfeit" (NR-584), and `battle_card.lua` gained the
+NR-587 fragility note in its own header. All eleven archived to
+`archive/needs-review-2026-Q3.json`.
+
+With Sprint 16 fully closed, the ten complete items are purged out of the hot `backlog.json`
+into `archive/backlog-purged-2026-08-24.json` (same shape as the 2026-08-23 purge), leaving only
+`BL-595` in the hot file — no sprint claims it yet. `REFINED.md` drained back to empty. A
+concurrent session already has a `sprint-17-kickoff` branch in flight (`BL-594` seen via
+`next_id.js`'s collision scan) — not touched here; whoever merges it next authors Sprint 17's
+items fresh against the authority docs, per the hot file's own convention.
+
 ---
 
 ## Session — The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575) (2026-08-23, latest)
