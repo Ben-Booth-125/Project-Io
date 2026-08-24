@@ -1,170 +1,191 @@
 {
- "_schema": "Ben's review queue. Canonical store; NEEDS_REVIEW.md is the readable mirror. Entry fields: id, title, raised (ISO date), kind, status, source, what, why_it_matters, options (array, only where there is a genuine fork), recommendation, files, resolution (null until Ben answers).",
- "_note": [
-  "Companion to backlog.json and review.json, NOT a replacement for either.",
-  "",
-  "PURPOSE: things awaiting BEN'S JUDGEMENT. Three kinds live here:",
-  "  - 'question'        â€” an open call nobody has made yet, usually surfaced by",
-  "                        doing adjacent work. Not blocking, or it would be a",
-  "                        backlog item with blocked_on set.",
-  "  - 'decision-taken'  â€” a call made ON BEN'S BEHALF so work could continue.",
-  "                        Recorded here so it can be OVERTURNED rather than",
-  "                        quietly becoming precedent. This is the important half:",
-  "                        an unrecorded delegated decision is indistinguishable",
-  "                        from a decision Ben made.",
-  "  - 'observation'     â€” something noticed in passing that is too small or too",
-  "                        cross-cutting to file, but which a human should see.",
-  "  - 'novel-work'      â€” raised by a SESSION about its own task (Ben, 2026-08-20):",
-  "                        the work in hand feels NOVEL â€” no owning authority doc, no",
-  "                        saved role or established pattern fits, or it quietly grows",
-  "                        the project's scope. Raise it AT THE MOMENT the feeling",
-  "                        arises, then continue (or pause, if scope growth is large).",
-  "                        Gives Ben a drift detector: novelty should be chosen, not",
-  "                        accreted.",
-  "",
-  "HOW IT DIFFERS FROM review.json: review.json is a BLOCKER list â€” items blocked",
-  "on a visual artifact only Ben can produce (a mockup, an annotated screenshot).",
-  "Work there cannot proceed at all. Entries here are not blocking; they are",
-  "questions and reversible calls. If an entry turns out to need a mockup, move it",
-  "to review.json and leave a resolution here pointing at it.",
-  "",
-  "HOW IT DIFFERS FROM backlog.json: an entry here is not work. If Ben's answer",
-  "creates work, file a backlog item and resolve the entry with that item's id.",
-  "",
-  "LIFECYCLE (revised 2026-08-14, Ben's ruling): this file is TRANSIENT â€” a live",
-  "queue of open calls, not a permanent audit trail. Append entries as they arise",
-  "and set status to 'resolved' with a resolution once answered, exactly as before.",
-  "But do NOT let resolved entries accumulate: prune them promptly rather than",
-  "holding them for posterity. The reasoning is not lost â€” it lands in code",
-  "comments, an authority doc, or a backlog item's design field at the moment the",
-  "work happens, and THAT is the durable record. Ben's own framing: 'the docs",
-  "should preserve changes made, and the review queue should only be for things",
-  "of that level of importance' â€” i.e. open and unresolved, not a history of",
-  "everything ever decided. A large housekeeping sweep this date closed 231",
-  "entries down to 2 genuinely open ones on this basis.",
-  "",
-  "ARCHIVAL (2026-08-23): 'prune' now means MOVE, not delete. Run node tools/session/archive_reviews.js to move every resolved entry, verbatim, into docs/development/archive/needs-review-<quarter>.json, then re-render the mirror. The hot file holds open entries only.",
-  "",
-  "SEEDED 2026-08-01 at Ben's request, populated from that session.",
-  "",
-  "PURGE 2026-08-23: 240 open entries -> 18. Every entry referring only to backlog ids <= BL-568 (retired by the same-day backlog purge) was retired; 16 more were answered by reading the current docs and tree. All 223 are frozen verbatim in archive/needs-review-purged-2026-08-23.json, each with a resolution saying why. The survivors are asked as a form: tools/session/register/review_queue.js, built by register/build.js, published at https://claude.ai/code/artifact/53fb4e56-2eae-439e-bcb7-121fa49bd340 . NR-576 records the calls taken in the sweep."
- ],
- "items": [
-  {
-   "id": "NR-164",
-   "title": "Re-stress generation and time-lapse feel when playable",
-   "raised": "2026-08-11",
-   "kind": "question",
-   "status": "open",
-   "source": "2026-08-11 notes session with Ben.",
-   "what": "Ben wants to re-stress-test world generation and the staged-generation time-lapse once the game is playable, to judge whether it feels alive rather than just correct. RULING 2026-08-13 (Ben, elicitation form): keep open until playable - not scheduled, not folded into another item.",
-   "files": [
-    "docs/ui/STARTUP.md"
-   ]
-  },
-  {
-   "id": "NR-532",
-   "title": "The design register is live — 41 open calls across ten sections, as a form",
-   "raised": "2026-08-22",
-   "kind": "observation",
-   "source": "Ben, 2026-08-22: \"now please revisit each one and open forms for answering the open questions.\"",
-   "what": "Published at https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc. Every open question across the eight new authority docs plus SYSTEMS.md § The progression chain plus four cross-cutting calls, gathered into one form: 41 questions in 10 sections. Each carries its evidence, 3-5 options with one marked as suggested, and a free-text field that overrides the options. Progress is tracked per section; \"Copy all answers\" puts everything on the clipboard in one block. It is a LIVE DOC - radios and contenteditable fields are captured as edits, so answers reach a watching session directly; deliberately no <textarea> and no <select>, neither of which is captured. Answers also persist to localStorage as a per-viewer draft.\n\nThe generator is committed rather than being a one-off (CLAUDE.md § Tool creation is skill creation): tools/session/register/questions.js is the canonical question set and build.js emits the HTML. Verified to regenerate byte-identically. Republish to the same URL to keep answers in place.",
-   "why_it_matters": "The open questions were the point of writing the docs as capture rather than design, and they were spread across ten files. A form is the difference between 41 questions that get answered and 41 that get skimmed. It also means the answers arrive in one structured block that can be propagated in a single pass, the way the six nations rulings were.",
-   "options": [],
-   "recommendation": "Answer in any order. The four that change the most downstream: LOGISTICS Q1 (what generates LP), EVENTS Q4 (drive the collapse metagame or express it - it decides the system's size), PEOPLE Q2 (one bias or several - cheapest to overturn now), and NATIONS Q1 (whether the grant reaches a rival, which blocks the player-facing halves of two items).",
-   "files": [
-    "tools/session/register/questions.js",
-    "tools/session/register/build.js"
-   ],
-   "status": "open",
-   "resolution": null
-  },
-  {
-   "id": "NR-577",
-   "title": "BL-572 concurrent-offer escrow split — a tick's contracted_force share fills open offers oldest-first, not a rule Ben stated",
-   "raised": "2026-08-23",
-   "kind": "decision-taken",
-   "status": "open",
-   "source": "BL-571/BL-572 design ratification, elicitation form (Ben, 2026-08-23).",
-   "what": "Ben's elicitation answer chose 'several open concurrently' over the proposed one-offer-at-a-time cadence for BL-572, but the form did not ask how one tick's `contracted_force` spendable share is allocated when more than one offer is open and filling at once. Taken on his behalf: oldest-issued offer fills first, exhausting the tick's share before a younger offer sees any of it, rather than splitting the share proportionally across open offers. Ratified into CONTRACTS.md § Where offers come from and BL-572's design field. (Renumbered from NR-576 on integrating a concurrent session's push, which had already used that id for an unrelated review-queue-purge entry now archived.)",
-   "why_it_matters": "The split rule changes how fast a province under sustained multi-front threat gets its offers funded — oldest-first means a nation's oldest want is always serviced before a newer, possibly more urgent one; a proportional split would fund all fronts slower but evenly. Either is deterministic and legal; this is a pacing/feel call, not a correctness one.",
-   "options": [
-    "Confirm oldest-issued-first.",
-    "Switch to a proportional split across all open offers each tick.",
-    "Switch to highest-value-first (by the offer's scored fee)."
-   ],
-   "recommendation": "Confirm oldest-issued-first — it is the simplest deterministic rule, matches a FIFO reading of 'the nation gets to what it can afford', and needs no additional per-offer priority field."
-  },
-  {
-   "id": "NR-578",
-   "title": "BL-575 live-click pass confirmed March is reachable and dispatches, but did not confirm the unit visibly moving",
-   "raised": "2026-08-23",
-   "kind": "observation",
-   "status": "open",
-   "source": "Main-session live verification (computer-use) of BL-575 before closing Wave 1.",
-   "what": "Opened the built app, selected the starting unit, pressed March, and clicked a confirmed-different province (verified via the repeat-click cycle showing its own province id). The mode disarmed without falling through to normal building/tile selection — the Selection panel stayed on Unit — which is strong evidence the corp_command dispatched rather than the click landing on ordinary marker resolution, and corp_command.cpp's march_unit case reads correct on inspection. What was NOT achieved: relocating the marker after the order to watch its tile position actually change. Two compounding factors: the economy/march tick in this build is QUARTERLY-cadence (the header counts down 'd to Q2/Q3'), not daily, despite the calendar advancing daily, so only one quarter boundary elapsed during the pass; and re-finding one unit marker on a freshly generated, unfamiliar world via manual pan/zoom proved impractical within reasonable effort. Halt and Disband were not individually live-clicked (same code pattern as March, confirmed by reading, not by pressing). (Renumbered from NR-577 on integrating a concurrent session's push.)",
-   "why_it_matters": "This satisfies the standing rule's core concern — BL-449 shipped clean on both compile and harness while a press rendered unreachable, and this pass proves March IS reachable and does dispatch. But it stops short of the full 'watch it work' bar the rule aspires to, and per the rule's own reasoning (a scripted capture is not enough), neither is a click that merely disarms without a rejection message.",
-   "options": [],
-   "recommendation": "Optional: a follow-up live session with more sim-time (past a quarter boundary, unit pre-located before issuing the march) to directly watch a unit's marker move. Not a blocker for Wave 1 close-out given the code-path and headless evidence."
-  },
-  {
-   "id": "NR-579",
-   "title": "scripts/contracts.lua's fee_mult and deadline_ticks (take 1.0/180, hold 1.25/90) are legible placeholders, not measured",
-   "raised": "2026-08-23",
-   "kind": "decision-taken",
-   "status": "open",
-   "source": "BL-570 (CONDITION_PROVINCE_SUBJECT), authoring scripts/contracts.lua's first two template rows.",
-   "what": "BL-570's task is the vocabulary + template table shape, not a priced contract -- nothing reads fee_mult or deadline_ticks yet (BL-572 derives the offer/fee, BL-573 builds the live contract), so there was nothing to measure against. Authored round, legible defaults instead, matching economy.lua's own stated discipline for a first cut: take = 1.0x fee, 180-tick deadline; hold = 1.25x fee (a premium for standing watch), 90-tick deadline (a defensive window is naturally shorter than an offensive one). Both numbers are a guess at the right SHAPE (hold costs more, hold is shorter), not a derived magnitude.",
-   "why_it_matters": "BL-572 (contract offers) is the first item that actually prices a fee off these multipliers against a nation's contracted_force budget line, and BL-573 (contract record) is the first to run out a real deadline. If either lands without revisiting these two rows, the mercenary vertical slice's first offers will be priced/paced on an unexamined guess rather than a playtested number.",
-   "options": [],
-   "recommendation": "Re-derive or explicitly re-affirm fee_mult and deadline_ticks once BL-572 can measure them against a real nation treasury and BL-573 against a real contract's pacing -- same discipline CONTRACTS.md and economy.lua already apply elsewhere (iterate by playtest, not by authoring once and forgetting).",
-   "files": [
-    "scripts/contracts.lua"
-   ]
-  },
-  {
-   "id": "NR-580",
-   "title": "Zero nation treasury at generation now flattens BOTH garrison sizing (BL-571) and will flatten contract-offer funding (BL-572) — the same gap seen from a second system",
-   "raised": "2026-08-23",
-   "kind": "observation",
-   "status": "open",
-   "source": "BL-571 (nation garrisons) landing; the treasury-scaling design called for it to differentiate garrison size by nation wealth.",
-   "what": "nation_component::treasury is 0.0 for every nation at generation, by existing settled design (NATIONS.md: 'zero at generation, deliberately'). BL-571's garrison sizing (nation_garrison_params: min_count=20, count_per_credit=0.05, max_count=200) was meant to scale with treasury, but since every nation starts at 0, every garrison lands on the 20-count floor with no differentiation until something credits a treasury (a levy or tariff enacted) before generation's garrison-seeding pass runs -- which nothing in the generation chain does today. This is the SAME gap the retired NR-572 named from the contract-offer side (a nation's exploration/contracted_force budget share needs a non-zero treasury to fund anything): two independent Sprint 16 systems (garrison sizing now, contract-offer funding next in BL-572) are both about to hit the same wall from opposite directions.",
-   "why_it_matters": "BL-572 (contract offers, wave 3 of this batch) derives an offer's escrow from a nation's contracted_force budget share -- if treasuries stay at 0 through generation, BL-572 will build correctly and still never produce a live offer in a default world, the same 'wired but not playing' gap NR-572 (now retired) already diagnosed. Worth deciding before BL-578 (the slice playthrough) hits it live, not after.",
-   "options": [
-    "A) Wire nation income before generation's garrison/budget passes run -- enact a starting levy or tariff during generation (not just the campaign tick), so treasury is non-zero from tick 0.",
-    "B) Accept for Sprint 16: garrisons stay floor-sized and contract offers stay rare/small until the FIRST in-campaign levy tick credits a treasury: funding arrives, just not instantly at generation. File nation-income-at-generation as separate, later work.",
-    "C) Re-scale BL-571's garrison-size anchor off something already non-zero at generation (e.g. resource_abundance or tile count) instead of treasury, decoupling garrison size from the funding question entirely."
-   ],
-   "recommendation": "B for Sprint 16 -- the mercenary slice's playthrough (BL-578) plays over enough ticks that a levy has time to credit treasuries before the slice needs a contract offer to fire; re-verify that assumption when BL-572/BL-578 land rather than gold-plating generation now. Revisit A as its own item if the playthrough shows the wait is too long to feel alive."
-  },
-  {
-   "id": "NR-581",
-   "title": "BL-572's offer fee/deadline are hardcoded, not read from the BL-570 template table — deliberately deferred to BL-573; plus one tested same-tick expire-reopen interaction",
-   "raised": "2026-08-23",
-   "kind": "observation",
-   "status": "open",
-   "source": "BL-572 (CONTRACT_OFFERS) landing; contract_offer_params (nation_step.hpp).",
-   "what": "Two things worth a look, neither blocking: (1) `contract_offer_params` hardcodes fee=400/deadline_ticks=180/template_index=0 rather than reading scripts/contracts.lua's authored 'take' row through `contract_template_registry`, because that registry needs sol2/Lua and its loader is excluded from the Lua-free world/* superset derive_contract_offers lives in (the same reason recipe_registry is threaded in as a plain parameter rather than loaded by world/* itself). The values match the authored row today, and BL-573 (accept_offer) is the natural point to thread a real contract_template_registry through — the same way recipe_registry already reaches world/* — since accepting an offer needs the template's actual predicate anyway. (2) Tested and asserted (nation_scorer_harness R8e2): because escrow refund runs before the funding gate is re-read in the same tick, an offer that expires while its nation still has budget and an eligible target reopens the SAME province in the SAME tick, funded by its own just-refunded escrow. Deterministic, conserves money exactly, not a bug — but a dispatch feed (BL-577) that later announces 'offer expired' then 'offer issued' in the same message batch would read oddly for something that never actually stopped being available.",
-   "why_it_matters": "(1) is pure sequencing information for whoever builds BL-573 — worth a one-line pointer in REFINED.md so it isn't rediscovered. (2) only matters once BL-577 (contract messages) exists to surface it; flagging now so it isn't a surprise mid-implementation.",
-   "options": [],
-   "recommendation": "No action needed now. When BL-573 lands, thread contract_template_registry through derive_contract_offers's call chain the way recipe_registry already is. When BL-577 lands, consider collapsing an expire+reopen on the same province in the same tick into one 'renewed' message rather than two."
-  },
-  {
-   "id": "NR-582",
-   "title": "contract_failed's sentiment magnitude (-4.0 Trust) is authored double contract_cancelled's (-2.0), a ratio not derived from CONTRACTS.md",
-   "raised": "2026-08-23",
-   "kind": "decision-taken",
-   "status": "open",
-   "source": "BL-573 (CONTRACT_RECORD_AND_VERBS), authoring sentiment_factor_kind::contract_failed in scripts/economy.lua.",
-   "what": "CONTRACTS.md's Q2 table settles the ORDERING — failed is 'down hardest', cancelled/abandoned is 'down, but less' — but names no numbers. contract_failed was authored at -4.0 Trust, exactly double contract_cancelled's existing -2.0, a legible round ratio rather than a measured or playtested one.",
-   "why_it_matters": "This is the first real magnitude on the mercenary loop's downside; BL-578's playthrough is the first point anyone will actually feel whether a failed contract stings twice as much as walking away, or whether that ratio reads as arbitrary. Cheap to retune (one Lua constant) if it doesn't.",
-   "options": [
-    "Confirm 2x.",
-    "Pick a different ratio.",
-    "Defer to playtest feel once BL-578's slice is playable."
-   ],
-   "recommendation": "Defer to playtest feel — this is exactly the kind of number CONTRACTS.md itself says should be iterated, not authored once and forgotten (the same discipline NR-579's fee_mult/deadline_ticks placeholders are held to)."
-  }
- ]
+  "_schema": "Ben's review queue. Canonical store; NEEDS_REVIEW.md is the readable mirror. Entry fields: id, title, raised (ISO date), kind, status, source, what, why_it_matters, options (array, only where there is a genuine fork), recommendation, files, resolution (null until Ben answers).",
+  "_note": [
+    "Companion to backlog.json and review.json, NOT a replacement for either.",
+    "",
+    "PURPOSE: things awaiting BEN'S JUDGEMENT. Three kinds live here:",
+    "  - 'question'        â€” an open call nobody has made yet, usually surfaced by",
+    "                        doing adjacent work. Not blocking, or it would be a",
+    "                        backlog item with blocked_on set.",
+    "  - 'decision-taken'  â€” a call made ON BEN'S BEHALF so work could continue.",
+    "                        Recorded here so it can be OVERTURNED rather than",
+    "                        quietly becoming precedent. This is the important half:",
+    "                        an unrecorded delegated decision is indistinguishable",
+    "                        from a decision Ben made.",
+    "  - 'observation'     â€” something noticed in passing that is too small or too",
+    "                        cross-cutting to file, but which a human should see.",
+    "  - 'novel-work'      â€” raised by a SESSION about its own task (Ben, 2026-08-20):",
+    "                        the work in hand feels NOVEL â€” no owning authority doc, no",
+    "                        saved role or established pattern fits, or it quietly grows",
+    "                        the project's scope. Raise it AT THE MOMENT the feeling",
+    "                        arises, then continue (or pause, if scope growth is large).",
+    "                        Gives Ben a drift detector: novelty should be chosen, not",
+    "                        accreted.",
+    "",
+    "HOW IT DIFFERS FROM review.json: review.json is a BLOCKER list â€” items blocked",
+    "on a visual artifact only Ben can produce (a mockup, an annotated screenshot).",
+    "Work there cannot proceed at all. Entries here are not blocking; they are",
+    "questions and reversible calls. If an entry turns out to need a mockup, move it",
+    "to review.json and leave a resolution here pointing at it.",
+    "",
+    "HOW IT DIFFERS FROM backlog.json: an entry here is not work. If Ben's answer",
+    "creates work, file a backlog item and resolve the entry with that item's id.",
+    "",
+    "LIFECYCLE (revised 2026-08-14, Ben's ruling): this file is TRANSIENT â€” a live",
+    "queue of open calls, not a permanent audit trail. Append entries as they arise",
+    "and set status to 'resolved' with a resolution once answered, exactly as before.",
+    "But do NOT let resolved entries accumulate: prune them promptly rather than",
+    "holding them for posterity. The reasoning is not lost â€” it lands in code",
+    "comments, an authority doc, or a backlog item's design field at the moment the",
+    "work happens, and THAT is the durable record. Ben's own framing: 'the docs",
+    "should preserve changes made, and the review queue should only be for things",
+    "of that level of importance' â€” i.e. open and unresolved, not a history of",
+    "everything ever decided. A large housekeeping sweep this date closed 231",
+    "entries down to 2 genuinely open ones on this basis.",
+    "",
+    "ARCHIVAL (2026-08-23): 'prune' now means MOVE, not delete. Run node tools/session/archive_reviews.js to move every resolved entry, verbatim, into docs/development/archive/needs-review-<quarter>.json, then re-render the mirror. The hot file holds open entries only.",
+    "",
+    "SEEDED 2026-08-01 at Ben's request, populated from that session.",
+    "",
+    "PURGE 2026-08-23: 240 open entries -> 18. Every entry referring only to backlog ids <= BL-568 (retired by the same-day backlog purge) was retired; 16 more were answered by reading the current docs and tree. All 223 are frozen verbatim in archive/needs-review-purged-2026-08-23.json, each with a resolution saying why. The survivors are asked as a form: tools/session/register/review_queue.js, built by register/build.js, published at https://claude.ai/code/artifact/53fb4e56-2eae-439e-bcb7-121fa49bd340 . NR-576 records the calls taken in the sweep."
+  ],
+  "items": [
+    {
+      "id": "NR-164",
+      "title": "Re-stress generation and time-lapse feel when playable",
+      "raised": "2026-08-11",
+      "kind": "question",
+      "status": "open",
+      "source": "2026-08-11 notes session with Ben.",
+      "what": "Ben wants to re-stress-test world generation and the staged-generation time-lapse once the game is playable, to judge whether it feels alive rather than just correct. RULING 2026-08-13 (Ben, elicitation form): keep open until playable - not scheduled, not folded into another item.",
+      "files": [
+        "docs/ui/STARTUP.md"
+      ]
+    },
+    {
+      "id": "NR-532",
+      "title": "The design register is live — 41 open calls across ten sections, as a form",
+      "raised": "2026-08-22",
+      "kind": "observation",
+      "source": "Ben, 2026-08-22: \"now please revisit each one and open forms for answering the open questions.\"",
+      "what": "Published at https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc. Every open question across the eight new authority docs plus SYSTEMS.md § The progression chain plus four cross-cutting calls, gathered into one form: 41 questions in 10 sections. Each carries its evidence, 3-5 options with one marked as suggested, and a free-text field that overrides the options. Progress is tracked per section; \"Copy all answers\" puts everything on the clipboard in one block. It is a LIVE DOC - radios and contenteditable fields are captured as edits, so answers reach a watching session directly; deliberately no <textarea> and no <select>, neither of which is captured. Answers also persist to localStorage as a per-viewer draft.\n\nThe generator is committed rather than being a one-off (CLAUDE.md § Tool creation is skill creation): tools/session/register/questions.js is the canonical question set and build.js emits the HTML. Verified to regenerate byte-identically. Republish to the same URL to keep answers in place.",
+      "why_it_matters": "The open questions were the point of writing the docs as capture rather than design, and they were spread across ten files. A form is the difference between 41 questions that get answered and 41 that get skimmed. It also means the answers arrive in one structured block that can be propagated in a single pass, the way the six nations rulings were.",
+      "options": [],
+      "recommendation": "Answer in any order. The four that change the most downstream: LOGISTICS Q1 (what generates LP), EVENTS Q4 (drive the collapse metagame or express it - it decides the system's size), PEOPLE Q2 (one bias or several - cheapest to overturn now), and NATIONS Q1 (whether the grant reaches a rival, which blocks the player-facing halves of two items).",
+      "files": [
+        "tools/session/register/questions.js",
+        "tools/session/register/build.js"
+      ],
+      "status": "open",
+      "resolution": null
+    },
+    {
+      "id": "NR-577",
+      "title": "BL-572 concurrent-offer escrow split — a tick's contracted_force share fills open offers oldest-first, not a rule Ben stated",
+      "raised": "2026-08-23",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "BL-571/BL-572 design ratification, elicitation form (Ben, 2026-08-23).",
+      "what": "Ben's elicitation answer chose 'several open concurrently' over the proposed one-offer-at-a-time cadence for BL-572, but the form did not ask how one tick's `contracted_force` spendable share is allocated when more than one offer is open and filling at once. Taken on his behalf: oldest-issued offer fills first, exhausting the tick's share before a younger offer sees any of it, rather than splitting the share proportionally across open offers. Ratified into CONTRACTS.md § Where offers come from and BL-572's design field. (Renumbered from NR-576 on integrating a concurrent session's push, which had already used that id for an unrelated review-queue-purge entry now archived.)",
+      "why_it_matters": "The split rule changes how fast a province under sustained multi-front threat gets its offers funded — oldest-first means a nation's oldest want is always serviced before a newer, possibly more urgent one; a proportional split would fund all fronts slower but evenly. Either is deterministic and legal; this is a pacing/feel call, not a correctness one.",
+      "options": [
+        "Confirm oldest-issued-first.",
+        "Switch to a proportional split across all open offers each tick.",
+        "Switch to highest-value-first (by the offer's scored fee)."
+      ],
+      "recommendation": "Confirm oldest-issued-first — it is the simplest deterministic rule, matches a FIFO reading of 'the nation gets to what it can afford', and needs no additional per-offer priority field."
+    },
+    {
+      "id": "NR-578",
+      "title": "BL-575 live-click pass confirmed March is reachable and dispatches, but did not confirm the unit visibly moving",
+      "raised": "2026-08-23",
+      "kind": "observation",
+      "status": "open",
+      "source": "Main-session live verification (computer-use) of BL-575 before closing Wave 1.",
+      "what": "Opened the built app, selected the starting unit, pressed March, and clicked a confirmed-different province (verified via the repeat-click cycle showing its own province id). The mode disarmed without falling through to normal building/tile selection — the Selection panel stayed on Unit — which is strong evidence the corp_command dispatched rather than the click landing on ordinary marker resolution, and corp_command.cpp's march_unit case reads correct on inspection. What was NOT achieved: relocating the marker after the order to watch its tile position actually change. Two compounding factors: the economy/march tick in this build is QUARTERLY-cadence (the header counts down 'd to Q2/Q3'), not daily, despite the calendar advancing daily, so only one quarter boundary elapsed during the pass; and re-finding one unit marker on a freshly generated, unfamiliar world via manual pan/zoom proved impractical within reasonable effort. Halt and Disband were not individually live-clicked (same code pattern as March, confirmed by reading, not by pressing). (Renumbered from NR-577 on integrating a concurrent session's push.)",
+      "why_it_matters": "This satisfies the standing rule's core concern — BL-449 shipped clean on both compile and harness while a press rendered unreachable, and this pass proves March IS reachable and does dispatch. But it stops short of the full 'watch it work' bar the rule aspires to, and per the rule's own reasoning (a scripted capture is not enough), neither is a click that merely disarms without a rejection message.",
+      "options": [],
+      "recommendation": "Optional: a follow-up live session with more sim-time (past a quarter boundary, unit pre-located before issuing the march) to directly watch a unit's marker move. Not a blocker for Wave 1 close-out given the code-path and headless evidence."
+    },
+    {
+      "id": "NR-579",
+      "title": "scripts/contracts.lua's fee_mult and deadline_ticks (take 1.0/180, hold 1.25/90) are legible placeholders, not measured",
+      "raised": "2026-08-23",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "BL-570 (CONDITION_PROVINCE_SUBJECT), authoring scripts/contracts.lua's first two template rows.",
+      "what": "BL-570's task is the vocabulary + template table shape, not a priced contract -- nothing reads fee_mult or deadline_ticks yet (BL-572 derives the offer/fee, BL-573 builds the live contract), so there was nothing to measure against. Authored round, legible defaults instead, matching economy.lua's own stated discipline for a first cut: take = 1.0x fee, 180-tick deadline; hold = 1.25x fee (a premium for standing watch), 90-tick deadline (a defensive window is naturally shorter than an offensive one). Both numbers are a guess at the right SHAPE (hold costs more, hold is shorter), not a derived magnitude.",
+      "why_it_matters": "BL-572 (contract offers) is the first item that actually prices a fee off these multipliers against a nation's contracted_force budget line, and BL-573 (contract record) is the first to run out a real deadline. If either lands without revisiting these two rows, the mercenary vertical slice's first offers will be priced/paced on an unexamined guess rather than a playtested number.",
+      "options": [],
+      "recommendation": "Re-derive or explicitly re-affirm fee_mult and deadline_ticks once BL-572 can measure them against a real nation treasury and BL-573 against a real contract's pacing -- same discipline CONTRACTS.md and economy.lua already apply elsewhere (iterate by playtest, not by authoring once and forgetting).",
+      "files": [
+        "scripts/contracts.lua"
+      ]
+    },
+    {
+      "id": "NR-580",
+      "title": "Zero nation treasury at generation now flattens BOTH garrison sizing (BL-571) and will flatten contract-offer funding (BL-572) — the same gap seen from a second system",
+      "raised": "2026-08-23",
+      "kind": "observation",
+      "status": "open",
+      "source": "BL-571 (nation garrisons) landing; the treasury-scaling design called for it to differentiate garrison size by nation wealth.",
+      "what": "nation_component::treasury is 0.0 for every nation at generation, by existing settled design (NATIONS.md: 'zero at generation, deliberately'). BL-571's garrison sizing (nation_garrison_params: min_count=20, count_per_credit=0.05, max_count=200) was meant to scale with treasury, but since every nation starts at 0, every garrison lands on the 20-count floor with no differentiation until something credits a treasury (a levy or tariff enacted) before generation's garrison-seeding pass runs -- which nothing in the generation chain does today. This is the SAME gap the retired NR-572 named from the contract-offer side (a nation's exploration/contracted_force budget share needs a non-zero treasury to fund anything): two independent Sprint 16 systems (garrison sizing now, contract-offer funding next in BL-572) are both about to hit the same wall from opposite directions.",
+      "why_it_matters": "BL-572 (contract offers, wave 3 of this batch) derives an offer's escrow from a nation's contracted_force budget share -- if treasuries stay at 0 through generation, BL-572 will build correctly and still never produce a live offer in a default world, the same 'wired but not playing' gap NR-572 (now retired) already diagnosed. Worth deciding before BL-578 (the slice playthrough) hits it live, not after.",
+      "options": [
+        "A) Wire nation income before generation's garrison/budget passes run -- enact a starting levy or tariff during generation (not just the campaign tick), so treasury is non-zero from tick 0.",
+        "B) Accept for Sprint 16: garrisons stay floor-sized and contract offers stay rare/small until the FIRST in-campaign levy tick credits a treasury: funding arrives, just not instantly at generation. File nation-income-at-generation as separate, later work.",
+        "C) Re-scale BL-571's garrison-size anchor off something already non-zero at generation (e.g. resource_abundance or tile count) instead of treasury, decoupling garrison size from the funding question entirely."
+      ],
+      "recommendation": "B for Sprint 16 -- the mercenary slice's playthrough (BL-578) plays over enough ticks that a levy has time to credit treasuries before the slice needs a contract offer to fire; re-verify that assumption when BL-572/BL-578 land rather than gold-plating generation now. Revisit A as its own item if the playthrough shows the wait is too long to feel alive."
+    },
+    {
+      "id": "NR-581",
+      "title": "BL-572's offer fee/deadline are hardcoded, not read from the BL-570 template table — deliberately deferred to BL-573; plus one tested same-tick expire-reopen interaction",
+      "raised": "2026-08-23",
+      "kind": "observation",
+      "status": "open",
+      "source": "BL-572 (CONTRACT_OFFERS) landing; contract_offer_params (nation_step.hpp).",
+      "what": "Two things worth a look, neither blocking: (1) `contract_offer_params` hardcodes fee=400/deadline_ticks=180/template_index=0 rather than reading scripts/contracts.lua's authored 'take' row through `contract_template_registry`, because that registry needs sol2/Lua and its loader is excluded from the Lua-free world/* superset derive_contract_offers lives in (the same reason recipe_registry is threaded in as a plain parameter rather than loaded by world/* itself). The values match the authored row today, and BL-573 (accept_offer) is the natural point to thread a real contract_template_registry through — the same way recipe_registry already reaches world/* — since accepting an offer needs the template's actual predicate anyway. (2) Tested and asserted (nation_scorer_harness R8e2): because escrow refund runs before the funding gate is re-read in the same tick, an offer that expires while its nation still has budget and an eligible target reopens the SAME province in the SAME tick, funded by its own just-refunded escrow. Deterministic, conserves money exactly, not a bug — but a dispatch feed (BL-577) that later announces 'offer expired' then 'offer issued' in the same message batch would read oddly for something that never actually stopped being available.",
+      "why_it_matters": "(1) is pure sequencing information for whoever builds BL-573 — worth a one-line pointer in REFINED.md so it isn't rediscovered. (2) only matters once BL-577 (contract messages) exists to surface it; flagging now so it isn't a surprise mid-implementation.",
+      "options": [],
+      "recommendation": "No action needed now. When BL-573 lands, thread contract_template_registry through derive_contract_offers's call chain the way recipe_registry already is. When BL-577 lands, consider collapsing an expire+reopen on the same province in the same tick into one 'renewed' message rather than two."
+    },
+    {
+      "id": "NR-582",
+      "title": "contract_failed's sentiment magnitude (-4.0 Trust) is authored double contract_cancelled's (-2.0), a ratio not derived from CONTRACTS.md",
+      "raised": "2026-08-23",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "BL-573 (CONTRACT_RECORD_AND_VERBS), authoring sentiment_factor_kind::contract_failed in scripts/economy.lua.",
+      "what": "CONTRACTS.md's Q2 table settles the ORDERING — failed is 'down hardest', cancelled/abandoned is 'down, but less' — but names no numbers. contract_failed was authored at -4.0 Trust, exactly double contract_cancelled's existing -2.0, a legible round ratio rather than a measured or playtested one.",
+      "why_it_matters": "This is the first real magnitude on the mercenary loop's downside; BL-578's playthrough is the first point anyone will actually feel whether a failed contract stings twice as much as walking away, or whether that ratio reads as arbitrary. Cheap to retune (one Lua constant) if it doesn't.",
+      "options": [
+        "Confirm 2x.",
+        "Pick a different ratio.",
+        "Defer to playtest feel once BL-578's slice is playable."
+      ],
+      "recommendation": "Defer to playtest feel — this is exactly the kind of number CONTRACTS.md itself says should be iterated, not authored once and forgotten (the same discipline NR-579's fee_mult/deadline_ticks placeholders are held to)."
+    },
+    {
+      "id": "NR-583",
+      "title": "Renumbered from NR-578 on merge (collision with an unrelated entry already on main) — Sprint 32 (Logistic Points + Throughput lens) pulls a v0.1.20-roadmap item forward past v0.1.16/18/19 content, under the new 3-active-sprint cap",
+      "raised": "2026-08-23",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Authoring Sprint 32, on Ben's direct instruction: author the next sprint, themed logistics/exploration/rendering through fog of war.",
+      "what": "ROADMAP.md names Logistic Points (the old BL-464, re-filed fresh as BL-595 after the 2026-08-23 purge) for v0.1.20 (\"Stance & force\"), bundled with BL-314/399/449/450/472/474/475. The two sprints already active under the new cap are v0.1.15 (16) and v0.1.17 (17) — earlier minors. Authoring Sprint 32 around BL-595/596/597 puts v0.1.20 content into the third active slot ahead of v0.1.16 (The watch, closed under the cap as W1, but not release-cut), v0.1.18 (economy tells the truth, Sprint 19 closed goal-NOT-met) and v0.1.19 (ancient conflict, uncertain completion). Checked before filing: LP's actual code prerequisites — body_reach_field, roads, stance/hostility (BL-448) — are all already built, so nothing BLOCKS the build; this is a release-numbering sequencing question, not a dependency one. Renumbered NR-578 -> NR-583 on merging into main 2026-08-24: NR-578 was already claimed by an unrelated entry (BL-575 live-click observation) filed on main while this branch was in flight.",
+      "why_it_matters": "The standing rule (io-standing-rules.md § Scope & sequence) says not to implement a milestone that depends on an earlier one not yet complete, without flagging it. Ben named this exact theme directly (logistics/exploration/fog rendering), which reads as an explicit choice to jump ahead — but the jump was not stated as a version-sequencing decision, so it is recorded rather than assumed.",
+      "options": [
+        "Confirm: build Sprint 32 now: v0.1.15/17/20 run concurrently under the cap; v0.1.16/18/19's remaining content stays parked until a future slot.",
+        "Hold Sprint 32 until v0.1.16/18/19 are release-cut, and use the third cap slot for one of those instead.",
+        "Re-home BL-595/596/597 onto whichever version_goal actually ships next, decoupling the item from the v0.1.20 label entirely."
+      ],
+      "recommendation": "Confirm — Ben asked for this theme directly and nothing in LP's dependency chain is unmet; the roadmap's version bucketing is thematic grouping for release cuts, not a build-order gate.",
+      "files": [
+        "docs/development/ROADMAP.md",
+        "docs/development/sprints.json",
+        "docs/development/backlog.json"
+      ]
+    }
+  ]
 }
