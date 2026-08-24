@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*16 entries — 14 open, 2 resolved.*
+*17 entries — 15 open, 2 resolved.*
 
 ---
 
@@ -181,6 +181,19 @@ tools/verify/build_harness.js globs every src/world/*.cpp minus LUA_TUS = {recip
 **Why it matters.** Every session that reaches for this builder against a harness pulling in contract_template.cpp (any world-superset harness, which is most of them) hits the same wall and has to rediscover the same workaround. It is the documented 'one-line builder' (NR-392) silently failing on a large slice of its own advertised surface.
 
 *Files: `tools/verify/build_harness.js`*
+
+### NR-618 — merge/17b-onto-main holds a complete, unmerged Sprint 17b (UI sweep) — a concurrent session finished it tonight and it is not on main
+*observation · raised 2026-08-24 · from Discovered indirectly: four Sprint 18 worktree agents (BL-599/600/601/602/603) all forked from a base other than main tip, whose history includes bd3f3431 ("Merge Sprint 17b (the shell stops fighting the map) into main"), reachable only via the branch merge/17b-onto-main — not from main. Investigated rather than assumed: this is a real, deliberate, well-documented merge by another concurrent session, not stale/lost data.*
+
+merge/17b-onto-main (tip bd3f3431, 2026-08-24 22:41:48) merges a complete UI sweep — icons, lenses, the Selection band accordion, a shell-pass verification script, ~72 files — cleanly resolving nine NR-id collisions against this session's own concurrent NR-589..597 filings by renumbering the 17b side to NR-607..615. It sits sandwiched between two of THIS session's own commits (93b38dc5 at 21:32 and c50a9a7c at 23:17) and was never fast-forwarded or merged into main itself. Every Sprint 18 wave-1 worktree agent (four separate Agent tool calls, each with isolation:"worktree") independently forked from this branch's tip rather than main's — meaning worktree isolation picked up whatever HEAD the shared checkout carried at creation time, not necessarily main. No work was lost or corrupted: each agent's OWN commit was cherry-picked onto main individually rather than trusting a wholesale merge, specifically because this contamination was caught.
+
+**Why it matters.** Two things. (1) A full session's worth of real UI work (Sprint 17b) is sitting ready and unintegrated — whoever owns it may still want to merge it, or may be waiting on review. (2) The worktree isolation mechanism forking from a non-main HEAD is a process risk worth knowing about for future sessions: it is exactly the shared-checkout hazard CLAUDE.md already warns about ("this checkout is shared with other sessions"), now observed concretely rather than theoretically.
+
+- Merge merge/17b-onto-main into main directly (if that session is done and it is ready)
+- Leave it for that session/Ben to merge deliberately
+- Investigate why worktree isolation forked from it rather than main tip, as a tooling fix
+
+> **Recommendation:** Leave the branch alone — it is not this session's work to merge unreviewed. Worth a deliberate merge decision the next time a session is free to review Sprint 17b's content on its own terms, not folded into Sprint 18's wave-1 integration.
 
 ---
 
