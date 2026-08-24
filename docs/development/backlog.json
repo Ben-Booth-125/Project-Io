@@ -480,7 +480,7 @@
       "design": "LOGISTICS.md § Refusal: “Throughput is a lens, extending Reach” — the reach field with LP magnitude at each city locus on the Planetary canvas. Respect the three-state tile_reach_cost read (−1 not computed / finite / infinity unreachable) LOGISTICS.md §3 names as the UI trap, and both fogs. No per-tile data exposed to Lua (standing rules). Visual requirement: a live click in the built app, not just a capture."
     },
     {
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "version_goal": "v0.1.18",
       "sprint": "18",
@@ -502,10 +502,10 @@
         "docs/ai/AI_OPPONENT.md"
       ],
       "authority_doc": "docs/ai/AI_OPPONENT.md",
-      "design": "Granted 2026-08-24 (standing rules § the dated network grant; raised on the design form rather than assumed, per the NR-517 precedent). place_road joins the scorer’s candidate verbs; port and inland-hub build candidates are scored like any building. This satisfies LP constraint 5 — a rival must be able to build the generator — and honours Ben’s 2026-08-22 “before LP lands” ordering: this item is wave 1 of the sprint, ahead of BL-596 (LP active march). Deterministic scored-utility only; the purged BL-447 prose is reference. Harness: a rival extends the lattice identically across two runs of one seed."
+      "design": "Granted 2026-08-24 (standing rules § the dated network grant; raised on the design form rather than assumed, per the NR-517 precedent). place_road joins the scorer’s candidate verbs; port and inland-hub build candidates are scored like any building. This satisfies LP constraint 5 — a rival must be able to build the generator — and honours Ben’s 2026-08-22 “before LP lands” ordering: this item is wave 1 of the sprint, ahead of BL-596 (LP active march). Deterministic scored-utility only; the purged BL-447 prose is reference. Harness: a rival extends the lattice identically across two runs of one seed. COMPLETE 2026-08-24 (Sprint 18 wave 1): corp_ai.cpp gains place_road and Port/Inland-Logistics-Hub candidates. Verified: corp_ai_harness 47/47 fresh on the merged tree; ai_skill_harness confirmed byte-identical with/without the change (both new paths inert there by the harness's own hand-built registry). Commit 327c7a3d."
     },
     {
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "version_goal": "v0.1.18",
       "sprint": "18",
@@ -527,10 +527,10 @@
         "docs/ai/AI_OPPONENT.md"
       ],
       "authority_doc": "docs/ai/AI_OPPONENT.md",
-      "design": "Granted 2026-08-24 (standing rules, same dated grant). corp_verb dispatch_convoy joins the scorer’s candidate list, through price_convoy_leg + commit_convoy — the same seam auto-dispatch and the player use; deliberately no fourth code path (SUPPLY.md § Dispatch trigger). The spend obeys the solvency gate like every other spend. Harness: a rival’s directed convoy equals a player’s of the same shape (extend convoy_command.cpp’s existing agreement rows)."
+      "design": "Granted 2026-08-24 (standing rules, same dated grant). corp_verb dispatch_convoy joins the scorer’s candidate list, through price_convoy_leg + commit_convoy — the same seam auto-dispatch and the player use; deliberately no fourth code path (SUPPLY.md § Dispatch trigger). The spend obeys the solvency gate like every other spend. Harness: a rival’s directed convoy equals a player’s of the same shape (extend convoy_command.cpp’s existing agreement rows). COMPLETE 2026-08-24 (Sprint 18 wave 1): corp_ai.cpp gains a directed dispatch_convoy candidate through the shared price_convoy_leg seam; resolve_command_body fixed to tag it correctly. Verified alongside BL-599, same byte-identical isolation test. Commit ff506a48."
     },
     {
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "version_goal": "v0.1.18",
       "sprint": "18",
@@ -551,7 +551,7 @@
         "docs/economy/SUPPLY.md"
       ],
       "authority_doc": "docs/economy/SUPPLY.md",
-      "design": "SUPPLY.md § Dispatch trigger designs it: a resource + quantity + destination-market form on the market Selection card — a form, not a press. Today no UI site issues corp_verb dispatch_convoy (the verb is wire-only; the decision feed merely renders it). Build the form, wire the verb, surface refusals inline (including BL-597’s passive-cap refusal once it lands). Live click required; question_log.json entry per the every-surface rule."
+      "design": "SUPPLY.md § Dispatch trigger designs it: a resource + quantity + destination-market form on the market Selection card — a form, not a press. Today no UI site issues corp_verb dispatch_convoy (the verb is wire-only; the decision feed merely renders it). Build the form, wire the verb, surface refusals inline (including BL-597’s passive-cap refusal once it lands). Live click required; question_log.json entry per the every-surface rule. COMPLETE 2026-08-24 (Sprint 18 wave 1): the market Selection card's Cargo/Quantity/Destination dispatch form, routed through apply_corp_command's dispatch_convoy verb. Verified: clean full ProjectIo build, smoke-launched (window opens, Lua loads, no crash). A live click is NOT yet observed -- no interactive access in this container; owed to whoever next has one. Commit 439fb0b6."
     },
     {
       "status": "complete",
