@@ -360,8 +360,8 @@
       "id": "BL-578",
       "short_name": "MERCENARY_SLICE_PLAYTHROUGH",
       "title": "The vertical slice plays end-to-end: hired, fought, paid - and v0.1.15 is cut",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "A",
       "difficulty": 3,
       "version_goal": "v0.1.15",
@@ -388,8 +388,8 @@
         "docs/MANUAL.md"
       ],
       "authority_doc": "docs/economy/CONTRACTS.md",
-      "summary": "Sprint 16's goal, verbatim: a polity hires the company, the company fights, the company is paid - playable end-to-end, however rough. This is the item-spanning requirement and the release: a scripted verifier-visual run from a new world through an accepted offer, a march, a battle card, a completed contract and the income line, plus a live playthrough by a human, then the v0.1.15 cut per DEVELOPMENT_PRACTICES.md.",
-      "design": "## Done when\n\n1. `scripts/verify/mercenary_slice.lua` captures: the ledger with an offer; the force picker; a unit marching; the battle card; a completed contract; Balance with contract income. All six captures inspected.\n2. A live session reaches a paid contract without the agent protocol.\n3. The determinism harness hash is unchanged for a world with no contract activity (the flag-off byte-identity rule).\n4. v0.1.15 tagged; ROADMAP.md's done-definition for the minor met; MANUAL.md gains a Contracts section written from the shipped surfaces; the Sprint 16 retro is recorded in sprints.json."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     }
   ]
 }

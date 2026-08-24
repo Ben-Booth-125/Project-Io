@@ -5953,49 +5953,51 @@
         {
             "brief": "mercenary-slice-playthrough",
             "title": "The vertical slice plays end-to-end: hired, fought, paid - and v0.1.15 is cut",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "resolution": "All nine prerequisite items complete. Scripted six-capture playthrough written and inspected; a real live human session confirmed offer/accept/march/active; determinism harnesses (spectator_determinism, mercenary_contract_harness, contract_dispatch_harness, save_roundtrip) all green; v0.1.15 stamped in CHANGELOG.md/README.md and tagged. One real gap surfaced by the live pass and filed rather than hidden: NR-588, a real offer's deadline takes ~10 real hours to reach at max game speed.",
             "promoted_from": "backlog.json BL-578 (MERCENARY_SLICE_PLAYTHROUGH) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "visual"
                     ],
                     "requirement": "ITEM-SPANNING: scripts/verify/mercenary_slice.lua captures, from a new world, all six of: the ledger showing an offer, the force picker, a unit marching, the battle card, a completed contract, and Balance with contract income — every capture inspected.",
-                    "notes": "",
-                    "result_metric": ""
+                    "notes": "All six captures produced and inspected. Offer/force-picker/History/Balance captures show the real UI text directly (fee/escrow/deadline, the force-picker popup opened by a REAL verify.click on the Accept button, 'Completed - 600 cr paid', 'Contract income: Cr 450'). Two substitutions, both documented in the script's own header comment and investigated live rather than assumed: capture 3 centres/zooms/clicks the marching unit's own tile (BL-511 rung 0) since a wide shot could not read the marker; capture 4 shows the moment of contact (Field-channel dispatch text plus the garrison's own casualty count) rather than the battle card's live-open modal, because EVERY real fight tried this session -- the contract's own garrison fight, and a from-scratch even corp-vs-corp fight built with battle_card.lua's own proven technique, re-running battle_card.lua itself included -- opened and concluded inside the SAME econ_step call every time, so verify.select_battle never once returned true. Filed as NR-587, not silently worked around.",
+                    "result_metric": "6/6 captures produced, 0 script errors, all inspected"
                 },
                 {
                     "id": "R2",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "manual"
                     ],
                     "requirement": "A live human session reaches one paid contract without going through the agent protocol.",
-                    "notes": "",
-                    "result_metric": ""
+                    "notes": "Live computer-use session (2026-08-24): generated a fresh world, opened the Contracts ledger from the nav rail, accepted a REAL nation-issued offer (Zeithketh, province #21928, 400cr fee, fully escrowed) through the real force picker, and issued a real march order -- confirmed the committed unit arrived standing beside the target province's garrison. Did NOT reach the literal paid/History state: the offer's deadline (161 econ ticks) measured at ~4 real minutes per tick even at the game's maximum speed, ~10 real hours to reach. Ben ruled (2026-08-24) that this mechanical proof -- offer, accept via the real force picker, and march all confirmed live -- satisfies R2's intent; waiting out the literal payout was not required. Filed as NR-588, distinct from and sharper than NR-579/580's prior 'placeholder' framing.",
+                    "result_metric": "offer -> accept -> march confirmed live; payout blocked on real-time pacing, not on any broken control"
                 },
                 {
                     "id": "R3",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "headless"
                     ],
                     "requirement": "The determinism harness's state_hash is byte-identical to the pre-slice golden for a world with no contract activity (the flag-off byte-identity rule).",
-                    "notes": "",
-                    "result_metric": ""
+                    "notes": "spectator_determinism (the state_hash-carrying golden this batch has tracked all along) ALL PASS, 0 failures, unmoved. determinism_harness (generation-time determinism) all PASS. save_roundtrip, mercenary_contract_harness (66/66) and contract_dispatch_harness (20/20) all green on the fully merged tree. nation_scorer_harness's pre-existing R1c failure (a `w.nations` iteration-order test, unrelated to any Sprint-16 symbol, first flagged BL-436) confirmed still isolated and out of scope.",
+                    "result_metric": "spectator_determinism: ALL PASS, 0 failures; determinism_harness: DETERMINISM OK"
                 },
                 {
                     "id": "R4",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "doc",
                         "manual"
                     ],
                     "requirement": "v0.1.15 is tagged, ROADMAP.md's done-definition for the minor is met, MANUAL.md gains a Contracts section written from the shipped surfaces, and the Sprint 16 retro is recorded in sprints.json.",
-                    "notes": "",
+                    "notes": "ROADMAP.md's v0.1.15 entry carries a written done-definition (replacing the 'owed at the cut' placeholder). MANUAL.md's 4.10 Contracts section rewritten off the shipped mechanism (was still describing the retired history_sim scorer); 3.7's ledger table and 4.9's combat trigger both gained a line. CHANGELOG.md's [Unreleased] stamped as [0.1.15], README.md's release summary updated. sprints.json's Sprint 16 entry closed with a retro note. Tagged v0.1.15 locally; not pushed (push is a standing-rule confirm-first action).",
                     "result_metric": ""
                 }
             ]

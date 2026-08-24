@@ -210,6 +210,49 @@
         "Revisit the rail's slot model now, before a 14th item makes the question harder to answer cleanly."
       ],
       "recommendation": "Confirm as a one-off for now -- Sprint 16 is the first Batch Delivery to reach the UI layer this deep, and one slot added under real pressure is better evidence than redesigning the rail speculatively. Revisit if a near-term item needs slot 14."
+    },
+    {
+      "id": "NR-587",
+      "title": "Every real battle tried this session opened AND concluded inside one econ_step call -- an in-progress battle card may be unobservable by construction",
+      "raised": "2026-08-24",
+      "kind": "observation",
+      "status": "open",
+      "source": "BL-578 (MERCENARY_SLICE_PLAYTHROUGH), building scripts/verify/mercenary_slice.lua's six-capture playthrough.",
+      "what": "Capture 4 (\"the battle card\") was meant to reuse battle_card.lua's own proven declare_hostile+march+step-until-select_battle-succeeds technique. It did not work -- not for the contract's own corp-vs-nation garrison fight, and not for a fresh, evenly-matched corp-vs-corp fight built from scratch with the exact same technique battle_card.lua itself uses. Re-running battle_card.lua UNMODIFIED against the current build also fails (\"no battle opened within 120 ticks of marching into contact\"), so this is not specific to this item's own setup. Root-caused with temporary debug prints (reverted, not committed): run_battles' discovery correctly finds the hostile/contracted pair co-located, opens an active_battle, and campaign_battle_params::rounds_per_tick (3) is enough for BOTH matchups tried to reach a terminal state (attacker/defender broken) inside that SAME call -- so the battle is created and erased within one economy tick, every time, and `verify.select_battle` -- which can only observe world state BETWEEN whole ticks -- never once returns true. The fight still happens for real (Field-channel dispatch text, real casualties, real province_holder flips); only the MODAL CARD's own live-open window is what could not be reached.",
+      "why_it_matters": "Two readings, and I could not settle which from this session's evidence alone. (1) This could be entirely expected/seed-dependent: battle_card.lua's own historical pass may simply have caught a closer, slower-resolving matchup by luck, and any two heavily- or evenly-matched sides in THIS build's resolver just happen to decide within <=3 rounds most of the time. If so, nothing is broken, but a `visual` requirement resting on select_battle succeeding is fragile by construction and worth a documented caveat. (2) This could be a real pacing regression -- rounds_per_tick, or something in the swing-draw tuning, changed to resolve faster than when battle_card.lua last passed -- in which case the ORIGINAL BL-469 requirement (\"open the app, click the battle, see it\") is currently unmeetable for most real fights, which is a live-verification gap on a previously-verified surface, not a new one.",
+      "options": [
+        "Treat as expected/low-priority: note the fragility in battle_card.lua and mercenary_slice.lua's own comments (already done for the latter) and move on.",
+        "Investigate rounds_per_tick / swing-draw tuning history to confirm or rule out a regression against BL-469's original passing runs.",
+        "Add a verify hook that can hand-seed an active_battle mid-fight for capture purposes (the M3 harness idiom in mercenary_contract_harness.cpp), so a capture no longer depends on catching a live, fast-resolving fight."
+      ],
+      "recommendation": "Investigate before the next combat-adjacent item lands (option 2) -- battle_card.lua going from a passing, committed check to a failing one without anyone noticing is exactly the kind of silent drift the project's verify suite exists to prevent. Low urgency otherwise: the underlying combat and its consequences are unaffected, only the modal card's OWN live-open capture is blocked.",
+      "files": [
+        "scripts/verify/battle_card.lua",
+        "scripts/verify/mercenary_slice.lua",
+        "src/world/battle_system.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-588",
+      "title": "A real mercenary offer's deadline takes ~10 real hours to reach at max game speed -- no live human session can wait out a payout today",
+      "raised": "2026-08-24",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "BL-578 (MERCENARY_SLICE_PLAYTHROUGH) R2, the live human playthrough.",
+      "what": "Accepted a REAL, nation-issued offer (Zeithketh, province #21928, fee 400cr) live through the Contracts ledger's force picker -- offer, accept, and march all confirmed reachable and correct by mouse. Its deadline read 161 econ ticks. Measured directly: at the game's maximum time control (Speed V, 16x, ~11s/quarter nominal), the deadline counter decremented roughly once per 4 real minutes of wall-clock -- 161 ticks would take on the order of 10 hours to reach. run_mercenary_contract_tick (nation_step.cpp) only evaluates a 'take' contract's predicate AT the deadline, not continuously, so there is no way to get paid sooner than that regardless of how fast the province is actually held (it was held within the first couple of ticks). Ben ruled (2026-08-24) that the mechanical proof -- offer/accept/march/active all confirmed live -- satisfies BL-578's R2 in place of literally waiting out the payout.",
+      "why_it_matters": "This is a different, sharper problem than NR-579/580's 'these are placeholder numbers' framing: it is not that the deadline is untuned, it is that the CURRENT tuning makes reaching a paid mercenary contract through ordinary play functionally impossible in a single sitting, for every offer, since offer deadlines all sit in the same 160-170 tick band (confirmed across all four Offers visible in the live session). The sprint's own stated goal -- 'a polity hires the company, the company fights, the company is paid, playable end-to-end, however rough' -- is not actually playable end-to-end today outside a script or a very patient multi-session save/reload.",
+      "options": [
+        "Shorten deadline_in in contract_template_registry (scripts/economy.lua) to something reachable in minutes at max speed -- a straightforward data change, no code.",
+        "Raise the game's maximum time-acceleration ceiling generally -- a bigger change with effects outside contracts.",
+        "Accept as a known rough edge for this slice (per the item's own 'however rough' framing) and revisit at the next contracts-focused item."
+      ],
+      "recommendation": "Shorten deadline_in as a small, low-risk follow-up -- it is a single authored value, and the sprint's whole point was proving the loop plays, not that it plays at a punishing pace. Low urgency: nothing here blocks other work, and the mechanics underneath are all sound.",
+      "files": [
+        "scripts/economy.lua",
+        "src/world/nation_step.cpp"
+      ],
+      "resolution": null
     }
   ]
 }

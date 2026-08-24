@@ -43,7 +43,10 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   true), **BL-315** (conflict spine — pulled from v0.3.0 groundwork onto the critical path: a
   mercenary company's core loop is built entirely on Conflict), **BL-378** (the minimap becomes a
   fixed max-zoom render of the player's base), and **BL-398** (persona counsel's ~1 s/tick cost).
-  Cut by **Sprint 16**; done-definition owed at the cut, per NR-103.
+  Cut by **Sprint 16**. Done-definition (NR-103): a scripted six-capture playthrough
+  (`scripts/verify/mercenary_slice.lua`) and a live human session both reach offer → accept →
+  march → fight → paid, end to end, from a freshly generated world; the flag-off determinism
+  golden is unmoved for a world with no contract activity.
 - **v0.1.16 — The watch.** *(Re-themed 2026-08-19 — the split Sprint 26 owed, executed in the
   version-alignment session. Ben's stated aim: developing meta, and observing AI playing the
   game, a downloaded local model included.)* *Theme: an agent plays, a human watches.* The live

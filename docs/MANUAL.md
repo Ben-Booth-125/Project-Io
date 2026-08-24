@@ -222,6 +222,7 @@ Each ledger has one glyph on the left icon rail. Clicking an open ledger's glyph
 | Corporations table | Diplomacy | Everyone else's, as far as you can see it |
 | Economy | Workforce | Population and labour |
 | History | History | What has happened in the world |
+| Contracts | Checkmark | Your mercenary offers, active contracts, and history |
 
 Tax and wage tiers are set in the Budget Ledger with `-` / `+`, or by clicking a Roman numeral
 `I`–`V`.
@@ -333,7 +334,9 @@ intelligence channel.
 ### 4.9 Units and combat
 
 Units are hired at a military base from an era-keyed roster. A battle opens whenever hostile units
-share a province and plays out over ticks in seeded rounds, with withdrawal priced rather than free.
+share a province — declared hostility between corporations, or an active mercenary contract's own
+force standing in its target province against that nation's garrison, no declaration needed — and
+plays out over ticks in seeded rounds, with withdrawal priced rather than free.
 Each round resolves unit class matchup by formation doctrine, modified by terrain, supply state and
 season. Winter costs the attacker attrition and the defender readiness. Your own battles show as a
 battle card and post a dispatch to the Field channel every tick.
@@ -342,15 +345,24 @@ battle card and post a dispatch to the Field channel every tick.
 
 ### 4.10 Contracts
 
-Your income. A contract is a predicate the client will pay to have become true by a deadline; you
-choose the force. Three terminal states: **completed** (paid, standing up), **failed** (deposit
-forfeit, standing down hard), and **cancelled** (deposit forfeit, standing down less).
+Your income as a mercenary company. A contract is a predicate a client nation will pay to have
+become true by a deadline; you commit the force. Open the **Contracts ledger** (nav rail) for
+three views — **Offers**, **Active**, **History** — and accept an offer through its own
+force picker. Terminal states: **completed** (paid, standing up), **failed** (deposit forfeit,
+standing down hard), **cancelled** (deposit forfeit, standing down less — you walked away), and
+**abandoned** (same cost as cancelled, your own choice mid-contract).
 
-Offers are derived from the history simulation's existing objective scorer — a polity that wants a
-province and cannot take it alone offers it as work — so offers are deterministic and their fees
-track a value the simulation actually computed.
+Offers come from a threatened nation's own budget: a nation that cannot afford to hold a
+contested border province against its highest-grudge neighbour posts the gap as work, deposit
+funded in full before the offer is even acceptable. The company you hire fights that neighbour's
+garrison directly — accepting a "take" offer and marching your committed force into the target
+province is what starts the fight; win it and hold the ground to the deadline and the contract
+pays. Every terminal event, and the deadline itself, posts to the Public channel; the Balance
+ledger's own "Contract income" line and the header runway both read the same payout the tick it
+lands.
 
-*Authority: `docs/economy/CONTRACTS.md`; the seam is BL-377 (mercenary contract).*
+*Authority: `docs/economy/CONTRACTS.md`; `docs/military/MILITARY.md` § Nation garrisons for what
+you fight.*
 
 ### 4.11 Procurement
 

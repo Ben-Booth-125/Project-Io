@@ -179,6 +179,68 @@ Item flipped `complete` for all three, design prose archived, `REFINED.md` Wave 
 Wave 6 (BL-578, the slice playthrough — needs all nine prior items) is next, not yet started;
 its brief carries a note on routing around the contract-card gap above.
 
+**UPDATE, same session: Wave 6 lands (BL-578), Sprint 16 closes, v0.1.15 is cut (2026-08-24).**
+
+`scripts/verify/mercenary_slice.lua` (new) writes the six-capture scripted playthrough from a
+fresh world — offer, force picker, marching, contact, a completed contract (History view), and
+the Balance ledger's "Contract income" line. Getting the force picker's own button pressed for
+real (`verify.click`, not staged ui_state) and the balance line's own line (scrolled into view,
+captured the same tick a payout lands, before `subsidies` resets) were the two real snags; both
+solved, documented inline. `mercenary_contract_harness`, `contract_dispatch_harness`,
+`save_roundtrip`, `determinism_harness` and `spectator_determinism` all re-run green on the
+merged tree.
+
+**A real capture-4 problem, investigated rather than routed around silently.** The plan was to
+reuse `battle_card.lua`'s own proven declare_hostile+march+step-until-select_battle technique for
+a from-scratch corp-vs-corp fight. It did not work. Debug-printed (temporarily, reverted, never
+committed) straight into `run_battles`: discovery correctly finds the co-located hostile/
+contracted pair and opens an `active_battle`, but `campaign_battle_params::rounds_per_tick` (3)
+was enough to reach a terminal state for EVERY matchup tried this session — including
+`battle_card.lua` re-run completely unmodified against the current build, which now also fails
+("no battle opened within 120 ticks") — so the fight opens and concludes inside the same
+`econ_step` call every time, and `verify.select_battle` (which can only observe state between
+whole ticks) never once returns true. Filed as `NR-587` rather than guessed at: this may be
+ordinary seed-dependent luck, or a real pacing regression against `battle_card.lua`'s own
+historical passing runs. Capture 4 instead shows the moment of contact — the Field-channel
+dispatch line plus the garrison's own casualty count — which the fight's real, observable
+consequences (province flip, contract completion) do not depend on.
+
+**Live-click pass (main session, computer-use, 2026-08-24)** confirmed the whole loop by hand: a
+fresh generated world, the Contracts ledger's nav-rail icon, a REAL nation-issued offer (Zeithketh,
+province #21928) accepted through the real force picker, and a real march order that visibly
+walked the committed unit onto the garrison's own tile. **Did not reach a literal payout**: the
+offer's deadline (161 econ ticks) measured at roughly four real minutes per tick even at the
+game's fastest speed setting — on the order of ten real hours to the deadline `run_
+mercenary_contract_tick` evaluates the "take" predicate at. Paused and asked Ben rather than
+either waiting it out or quietly calling it done; he ruled the mechanical proof (offer, accept,
+march, all confirmed live) satisfies R2 in the deadline's place. Filed as `NR-588` — sharper than
+NR-579/580's existing "these are placeholder numbers" framing, since this is not about the
+NUMBER being untuned but about the CURRENT number making a real payout unreachable in one human
+sitting, for every offer (all four seen in the live session sat in the same 160–170 tick band).
+
+**The build gate.** Two partial `ctest --test-dir build` sweeps (interrupted mid-run, ~63 and
+~42 of 114 harnesses respectively, at Ben's call once a couple of naturally slow entries —
+`era_world_harness` 118s, `haulage_measure` timing its own 60s budget out — made the full suite
+not worth the wait) covered every Sprint-16-relevant harness plus a broad cross-section of the
+rest with zero failures beyond the known pre-existing `nation_scorer_harness` R1c case. Every
+harness this batch actually touches (`mercenary_contract_harness`, `contract_dispatch_harness`,
+`save_roundtrip`, `spectator_determinism`, `determinism_harness`, `nation_scorer_harness`'s own
+R8 suite) was additionally run standalone and green. The full 114-harness sweep was not run to
+completion.
+
+**The cut.** `CHANGELOG.md`'s stale `[Unreleased]` (two orphaned BL-348/BL-349 entries from a
+prior, never-cut batch) stamped as `[0.1.15]` alongside the new Sprint 16 entries; `README.md`'s
+release summary and `ROADMAP.md`'s v0.1.15 done-definition both written (replacing "owed at the
+cut, per NR-103"); `MANUAL.md` §4.10 rewritten off the shipped mechanism (was still describing
+the retired `history_sim` scorer) with small additions to §3.7 and §4.9. `sprints.json`'s Sprint
+16 entry closed with a retro. Tagged `v0.1.15` locally on the release commit; **not pushed** —
+push is a standing confirm-first action, left for Ben.
+
+Sprint 16 is closed. All ten items (BL-569–BL-578) complete; the mercenary vertical slice plays
+end-to-end, live-confirmed by both a script and a human. Three findings carried forward, none
+blocking: `NR-577` (BL-575's unit-visibly-moving gap), `NR-587` (battle-card observability) and
+`NR-588` (offer-deadline real-time pacing).
+
 ---
 
 ## Session — The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575) (2026-08-23, latest)
