@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*11 entries — 10 open, 1 resolved.*
+*12 entries — 11 open, 1 resolved.*
 
 ---
 
@@ -137,6 +137,17 @@ A real, reproducible UI defect on scripts/verify/corp_choice.lua’s live surfac
 > **Recommendation:** File a proper BL- item and fix when it becomes a priority — likely a click-handler wired to the row highlight but not the button itself, given corp_choice.lua’s own note that the stage is reached via a re-entry path (verify.show_corp_choice) rather than the normal flow.
 
 *Files: `src/ui/*.cpp (corp choice screen, not yet located)`, `scripts/verify/corp_choice.lua`*
+
+### NR-598 — sprints.json's status_table half-contradicts SPRINTS.md, and four surviving entries appear in neither table
+*observation · raised 2026-08-24 · from Rendering the Sprint Map artifact against the canonical sprints array surfaced the drift. Two mechanical fixes applied in the same pass: SPRINTS.md's row 17 and Next-up paragraph (said 16+17 active; both closed 2026-08-24) and status_table's row 16 (said open) — both now match the canonical array and the v0.1.15/v0.1.17 tags.*
+
+Three things remain that want a call rather than a fix. (1) status_table still carries 34 rows including the sprints deleted outright in the 2026-08-24 purge (20, the 26–33 arc, etc.) — the purge removed their `sprints` entries but not their status rows. (2) Sprint 27 (the run is retained, Lane A, opened 2026-08-18, closed 2026-08-20) is a real executed sprint in the canonical array, yet '27' sits in SPRINTS.md's deleted-numbers list and the sprint appears in NEITHER status table — it looks like the Fall-arc proposed 27 was deleted by number while the executed 27 survived, and the tables never picked it up. Its retro fields are also empty strings ('' for landed/slipped/feedback), as are P1's, N1's and N2's. (3) Sprint 25b (gated) survived the purge despite never opening, and its settled gate sequence (25a → 21 → 23 → 25b, Ben 2026-08-17 on NR-312) now points at numbers 21 and 23 that the purge deleted.
+
+**Why it matters.** The status tables are the read-first surface for 'where do sprints stand'; two sessions today each fixed one half and left the other half stale in the opposite direction. And 25b cannot open as sequenced — its prerequisites no longer exist as sprints.
+
+> **Recommendation:** Rule on three small things: (a) purge the deleted sprints' rows out of status_table (mechanical once blessed — or bless a tiny regeneration script so the two tables stop drifting independently, per 'save the tool'); (b) say whether executed-but-unlisted entries (27, 18, 18 retro, 25b, 26) should appear in the tables — the Sprint Map artifact now shows all 30 either way; (c) either re-sequence 25b against the current board or park it explicitly in backlog.json like BL-518/BL-514.
+
+*Files: `docs/development/sprints.json`, `docs/development/SPRINTS.md`*
 
 ---
 

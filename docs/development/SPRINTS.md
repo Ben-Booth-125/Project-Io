@@ -75,7 +75,7 @@ ones were deleted.
 | 10–14 | Re-sequenced 2026-08-10 (the living world inserted) | **Overtaken** — Sprints 10/11 closed 2026-08-11; Sprints 12–14 superseded 2026-08-12 by the 0 CE refocus (NR-177), never opened |
 | 15 | The 0 CE refocus (retro-recorded) | **Closed 2026-08-12** — epoch 0, 3× map, Era −1 sim wired in, mercenary seam designed |
 | 16 | The mercenary vertical slice | **Closed 2026-08-24** — re-planned 2026-08-23 in dependency order (BL-569→BL-578); all ten landed; v0.1.15 cut |
-| 17 | The ancient roster becomes a ladder | **Open 2026-08-15, re-planned 2026-08-23** — ten items (BL-585..BL-594); the original set landed or was absorbed. BL-587 landed standalone 2026-08-23; the rest start now that Sprint 16 has merged; cuts v0.1.17 |
+| 17 | The ancient roster becomes a ladder | **Closed 2026-08-24** — all ten items (BL-585..BL-594) landed; the playthrough played live; v0.1.17 cut, done-definition written at the cut |
 | 18b | Roster invariants (retro-recorded) | **Closed 2026-08-16** — BL-432 landed; BL-435 paused 4/6; BL-436 filed |
 | 19 | The economy tells the truth | **Closed 2026-08-17 — goal NOT met.** The blame moved three times and landed on supply; goldens left red and unblessed |
 | 25a | The draw (upkeep, ordnance, convoy seam) | **Closed 2026-08-18** — 6/6; goldens left red and attributed |
@@ -90,11 +90,11 @@ rather than kept as closed placeholders (see the ceiling note above). If one of 
 back up, it is authored fresh against the current docs, under a number that fits the ceiling —
 not resurrected under its old number.
 
-**Next up.** As of **2026-08-24**, only **16** (mercenary vertical slice) and **17** (economy
-breadth) are active — both fit the sprint-number ceiling on their own. A third slot is open under
-the count cap, but nothing fills it yet: any candidate has to be numbered 18 or below. **BL-518**
-(the Era −1 sim redrawing borders as its wars resolve) and **BL-514** (blend all tiles, HELD) are
-not part of either active sprint and stay parked in `backlog.json`.
+**Next up.** As of **2026-08-24**, **nothing is open** — Sprints **16** (mercenary vertical
+slice) and **17** (ancient-roster ladder) both closed today, cutting v0.1.15 and v0.1.17. All
+three cap slots are free; any candidate has to be numbered 18 or below and is authored fresh
+against the current docs. **BL-518** (the Era −1 sim redrawing borders as its wars resolve) and
+**BL-514** (blend all tiles, HELD) stay parked in `backlog.json`.
 
 **Also deleted 2026-08-24, same basis:** six orphaned backlog items (BL-579–BL-584) a concurrent
 review-queue-purge session had filed with no sprint attached, plus Sprint 32's own three items

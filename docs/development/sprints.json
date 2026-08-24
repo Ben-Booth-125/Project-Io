@@ -631,7 +631,7 @@
     {
       "id": "16",
       "theme": "The mercenary vertical slice",
-      "state": "Open — re-planned 2026-08-23 on the purged backlog: BL-569..BL-578"
+      "state": "Closed 2026-08-24 — all ten (BL-569..BL-578) landed in six dependency waves; the loop live-clicked end to end; v0.1.15 cut"
     },
     {
       "id": "17",
