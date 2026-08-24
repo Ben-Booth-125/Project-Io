@@ -1,150 +1,147 @@
 # Project Io — REFINED (active worklist)
 
-## Sprint 16 — the mercenary vertical slice (v0.1.15), Batch Delivery
+## Sprint 17b — the shell stops fighting the map, Batch Delivery
 
-Ten items, promoted 2026-08-23. Goal: a polity hires the company, the company fights, the
-company is paid — playable end-to-end. Design is settled for all ten (`node
-tools/session/backlog_query.js --status designed --sprint 16 --table`); each has an
-item-spanning requirement in `req/requirements.json` (`--batch
-2026-08-23-sprint-16-mercenary-slice`).
+Seven items promoted 2026-08-24 from Ben's UI list (BL-596–BL-604; BL-599 and BL-600 landed the
+same day and are not promoted here). All four gating design calls were answered the day they were
+raised — the rulings live in each item's `design` prose, not here.
 
-**Dependency waves** (an item's `requires` in backlog.json; a wave's items build in parallel,
-waves run in order — this is the collision map's splitting heuristic, not a file-disjointness
-gate, since worktree isolation absorbs any overlap):
+**Why a batch.** Six of the seven touch `body_surface_canvas.cpp`, `overlay.cpp` or both, and five
+of the nine filed items are one design: the lens system and the selection grain rebuilt around
+**structures** rather than tiles. Run serially they would re-open the same two files, re-bless the
+same captures, and settle the same questions differently.
+
+---
+
+### Slices (Wave 1 — one barrier across all four)
+
+The collision map is a **splitting heuristic**, not a gate — worktree isolation absorbs the shared
+files. What it was used for is carving four slices that are each a coherent *subject*.
 
 ```
-Wave 1  BL-569 province holder        BL-575 unit marker + march UI
-           |                                    |
-Wave 2  BL-570 condition subject   BL-571 nation garrisons
-           |         \                 /   |
-Wave 3      \          BL-572 contract offers
-             \                   |
-Wave 4        BL-573 contract record & verbs
-                 /        |          \
-Wave 5  BL-574 harness  BL-577 messages+income  BL-576 ledger (+ needs BL-575)
-                 \        |          /
-Wave 6         BL-578 slice playthrough (needs all nine)
+A1 the ground      BL-597 blend strength ─┐
+                   BL-601 border band     │
+A2 the markers     BL-596 over-hex + ring ─┤   all four in parallel,
+B  lens roster     BL-604 retire two      ─┤   one step-4 barrier
+                   BL-602 chrome home      │
+C  the selection   BL-598 one accordion   ─┘
+                              │
+                    Wave 2 (main session)
+                    BL-603 pivot to structure
 ```
 
-Wave 1 has no shared files (battle/province vs. UI canvas) — genuinely disjoint, no worktree
-needed for the pair, though each still gets its own worktree per the standing sub-agent model.
-Every later wave is a strict sequential dependency on the wave above it; there is no same-wave
-symbol sharing beyond wave 1 and the three-way wave 5 fan-out (574/576/577 all read BL-573's
-`mercenary_contract` type but do not write each other's files).
+---
+
+### Slice A1 — the ground
+
+**Task A1.1 — dial the province blend back (BL-597).**
+`provides:` `k_province_blend_strength` (named constant, `body_surface_canvas.cpp`).
+`consumes:` —
+The corner blend takes the flat mean of a tile and its same-province corner-sharing neighbours.
+Lerp that result back toward the tile's **own** fill by the new strength: `1.0` reproduces today
+exactly, `0.0` is no blend. Ship near `0.35`; the final value is Ben's eye in the live app.
+*Guard: `1.0` must be byte-identical to the current render, or the lerp is wrong.*
+
+**Task A1.2 — the border band (BL-601).**
+`provides:` the inward-falloff nation border pass; the border hit-test band.
+`consumes:` —
+A nation reads from a band at its boundary falling off inwards, never a territory tint. Two
+neighbours meeting must not blend into a third colour. The band carries a real hit-test width —
+the drawn stroke is a line, and a line is not clickable at play zoom.
+
+**Task A1.3 — retire the nation lens, route the border (BL-601).**
+`provides:` border→nation selection route.
+`consumes:` A1.2's hit-test band.
+`overlay_mode::country` retires; its content is chrome now. Clicking the band selects the nation
+and opens its ledger — the route the lens used to own. **Build it as the general structure-grain
+case**, not a nation special case: BL-603 generalises exactly this.
+
+### Slice A2 — the markers
+
+**Task A2.1 — buildings draw over the hex (BL-596).**
+`provides:` plateless building marker draw.
+`consumes:` —
+Remove the marker's own background fill. Terrain, texture and the live lens wash keep showing
+under the glyph; legibility rests on the glyph's stroke against a live background.
+
+**Task A2.2 — the segmented ring (BL-596).**
+`provides:` `draw_stack_ring` (`icons.cpp`).
+`consumes:` A2.1's marker draw.
+One arc per building kind around the hex rim, dominant kind's glyph in the centre. Two constraints,
+neither optional: it shares the rim with the province edge stroke and the corp-border pass and must
+not be confusable with either; and below the coarse-fill threshold it **degrades to the dominant
+glyph alone**, never to an empty hex.
+
+### Slice B — the lens roster and its chrome
+
+**Task B.1 — retire two lenses (BL-604).**
+`provides:` `overlay_mode` without `opportunity` and `production`.
+`consumes:` —
+Remove both values, their keys, their rows in LENSES.md's three tables, and their `ACTIONS.json`
+entries. The cycle modulus derives from the enum sentinel, so the bar re-numbers itself.
+*Decide rather than assume: Production's Circumplanetary per-body badge is a different read — does
+it retire with the lens or survive as body-level chrome? And confirm BL-086's ambient opportunity
+cue is untouched.*
+
+**Task B.2 — one chrome home (BL-602).**
+`provides:` the minimap-header lens region (selector + key).
+`consumes:` B.1's reduced roster; `time_panel_rect` / `minimap_rect` (landed, BL-599/600).
+Today there are two legend chromes and one is invisible: six of seven gradient-bar keys are drawn
+**flush-left of the minimap**, inside the rect the always-open Selection band occupies, and render
+as unreadable ghosts (NR-601). Only the Continent key escapes, via a foreground draw. Collapse both
+chromes into one region in the minimap header, top right. **This is how six lenses get a readable
+key at all** — it is not a tidy.
+
+### Slice C — the selection element
+
+**Task C.1 — one accordion (BL-598).**
+`provides:` the merged tile/province Selection element.
+`consumes:` —
+Replace the province card and the tile card with one element, and the paged centre pane with an
+accordion ordered **Buildings → Deposits → Resources → Population → Terrain**. Keep the tile's
+available-buildings tab; drop the province buildings tab.
+
+**Task C.2 — dissolve the province rung (BL-598).**
+`provides:` repeat-click cycle without a province stop.
+`consumes:` C.1's element.
+The cycle becomes battle → unit → building → tile. **Consequence to carry, not discover:** no
+gesture then selects a province without also selecting a tile, so any code assuming the
+province-only tuple (`selected_province` set, `selected_entity` null) must keep working with both
+set — check the march-order path first. `verify.select_province` writes exactly that tuple and will
+diverge from the gesture; either the hook follows, or the scripts using it test an unreachable
+state.
 
 ---
 
-### Wave 1 — DONE (2026-08-23)
+### Cross-slice contract (the `consumes` that must match)
 
-**BL-569 (province holder)** and **BL-575 (unit marker + march UI)** landed and merged to
-`main` (worktree-agent-a85dd40a41493c103, worktree-agent-a0220dee51ed2793d); both `complete`
-in backlog.json, design prose archived. Full-suite re-verification after the merge fixed one
-save-version tripwire and re-blessed one golden — see commit `e9c2c5ac`. BL-575's live-click
-pass confirmed March is reachable and dispatches; it did not confirm the unit visibly moving
-(NR-577, not a blocker — see that entry).
+| Consumer | Needs | Provider |
+|---|---|---|
+| A1.3 border route | hit-test band | A1.2 |
+| A2.2 ring | plateless marker draw | A2.1 |
+| B.2 chrome | reduced `overlay_mode` roster | B.1 |
+| B.2 chrome | `time_panel_rect`, `minimap_rect` | landed (BL-599/600) |
+| C.2 cycle | merged element | C.1 |
+| Wave 2 BL-603 | roster, element, region walks, border-route pattern | B, C, A1 |
 
----
+Every `consumes` above names a `provides` in the same batch or an already-landed symbol. No
+unmatched entry — checked at promotion, re-checked by the review barrier against the merged diff.
 
-### Wave 2 — DONE (2026-08-23)
+### Doc coverage (fanned out across disjoint docs)
 
-**BL-570 (condition province subject)** and **BL-571 (nation garrisons)** landed and merged to
-`main` (worktree-agent-aae464e367f3fcb1d, worktree-agent-a477567f226eaa377); both `complete` in
-backlog.json, design prose archived. Both branches had merged an older `main` into themselves
-before this session's origin/main reconciliation landed, so integrating them meant resolving
-stale-base doc conflicts by hand each time (see commits `0a8f6de2`, `b409fc6f`) — and a real
-collision: both items independently bumped `world_save_version` 4→5 for different new fields;
-combined into one coherent bump to 6. `spectator_determinism`'s golden re-blessed again
-(garrisons are new units, folded into `state_hash` unconditionally).
+| Slice | Docs |
+|---|---|
+| A1 / A2 | `ui/PLANETARY.md`, `ui/ICONS.md` |
+| B | `ui/LENSES.md`, `ui/MINIMAP.md`, `ai/ACTIONS.json` |
+| C | `ui/SELECTION.md`, `ui/ledgers/selection.md`, `ui/question_log.json` |
+| landed | `ui/LAYOUT.md`, `ui/TIME_CONTROLS.md` (BL-599/600) |
 
-Two things flagged for Ben, not blockers: `NR-579` (BL-570's `fee_mult`/`deadline_ticks` are
-legible placeholders) and `NR-580` (every nation's treasury is 0 at generation, so BL-571's
-garrisons all land on the sizing floor — the same gap BL-572, next, is about to hit from the
-funding side).
+Each changed doc carries a transient `> ⟳` note and earns a standing S-tier review item. The batch
+closes with a design-direction Q&A in the DEVLOG — it makes non-trivial calls.
 
----
+### Close
 
-### Wave 3 — DONE (2026-08-23)
-
-**BL-572 (contract offers)** landed and merged to `main` (worktree-agent-a1a24b0f421a2fbf6, a
-clean fast-forward — no sibling wave-3 agent, no doc-conflict archaeology this time). `complete`
-in backlog.json, design prose archived. `nation_scorer_harness` gained R8 (34 checks, all
-pass); `save_roundtrip` clean (`world_save_version` 6→7). `spectator_determinism`'s golden did
-NOT move this time (a default world's `mercenary_offers` stays empty while treasury is 0, so no
-new state entered the hash).
-
-One thing carried forward into Wave 4, not a blocker: `NR-581` — offer fee/deadline are a
-placeholder `contract_offer_params`, not a live `contract_template_registry` lookup (that
-registry needs sol2/Lua, unreachable from `world/*`'s Lua-free superset `derive_contract_offers`
-lives in). BL-573 below is where a real lookup belongs, since accepting an offer needs the
-template's actual predicate anyway — thread `contract_template_registry` through the same way
-`recipe_registry` already reaches `world/*` (a plain parameter, loaded once at the app-layer
-boundary, never loaded by `world/*` itself).
-
----
-
-### Wave 4 — DONE (2026-08-23)
-
-**BL-573 (contract record and verbs)** landed and merged to `main`
-(worktree-agent-a426dc003723cf20f, a clean fast-forward). `complete` in backlog.json, design
-prose archived. New harness `tools/verify/mercenary_contract_harness.cpp` (51 checks) proves
-accept/evaluate/pay-or-fail works at all — **BL-574 below extends this existing file with the
-M1–M7 terminal-state cases, it does not create a new one.** `save_roundtrip` clean
-(`world_save_version` 7→8). `contract_template_registry` now threaded from the app-layer
-boundary the way `recipe_registry` is (closes NR-581's deferred half); BL-571's
-`active_mercenary_contract_for` stub now resolves for real, so the corp-vs-nation garrison
-battle trigger is live. `spectator_determinism`'s golden held.
-
-One deliberate deviation from the item's own original brief, correctly caught in-flight: payout
-is a direct transfer from the offer's already-fully-funded escrow, not a second `budget_claim`
-draw — the treasury was already debited in full while BL-572's escrow accumulated, so a fresh
-claim would double-debit the same contract. One flagged number: `NR-582`, `contract_failed`'s
-sentiment magnitude (-4.0 Trust, double `contract_cancelled`'s -2.0) is a ratio, not measured —
-same discipline as NR-579/580's placeholders, revisit at playtest.
-
----
-
-### Wave 5 — DONE (2026-08-24)
-
-**BL-574 (contract harness), BL-576 (Contracts ledger), BL-577 (messages + income)** all landed
-and merged to `main` (worktree-agent-afa7ac59bf567cd92, worktree-agent-a5991264ff4655709,
-worktree-agent-a868b5c9d8eb5bcb9 — commits `e1a1a44a`, `9e9f581d`, `9bc93591`). All three
-`complete` in backlog.json, design prose archived. Two genuine mid-batch collisions, both from a
-concurrent session sharing this checkout (a review-queue purge and a Sprint 32 branch merge
-landing on `main` between waves): an `NR-583` id collision (renamed to `NR-584`) and a
-`question_log.json` conflict between BL-576's and BL-577's own additions (resolved as a union,
-both kept). `mercenary_contract_harness` reached 66 checks; new `contract_dispatch_harness`
-(20 checks); all independently re-verified on the merged tree, `spectator_determinism`'s golden
-held.
-
-**Live-click pass (main session, computer-use, 2026-08-24)** against a real generated world
-with real live offers (a funded nation, contrary to NR-580's worst case): the Contracts
-ledger's rail slot, toggle rule, all three views, the Accept→force-picker→Confirm flow (balance
-visibly credited), and the Abandon confirm-with-reputation-cost popup all confirmed reachable
-and correct by mouse click. **BL-577's contract card was NOT reachable** — no UI control
-anywhere calls a selection trigger for a `mercenary_contract` entity, confirmed directly by
-clicking an Active-view contract row (it selects nothing). The card's rendering code exists and
-reads correct, but is unwired; a future item needs to add that trigger before it can be
-live-verified. Two design calls flagged, not blockers: `NR-585` (`abandoned_event_posted` is
-deliberately unserialized) and `NR-586` (the ledger took a new nav-rail slot 13 — the curated
-nine plus the developer tail were both full).
-
----
-
-### Wave 6 (after all nine)
-
-#### BL-578 — MERCENARY_SLICE_PLAYTHROUGH
-Requirements: § mercenary-slice-playthrough (R1–R4). Files: `scripts/verify/mercenary_slice.lua`,
-`ROADMAP.md`, `sprints.json`, `MANUAL.md`. One task: the six-capture `--verify` script, a live
-playthrough, the flag-off determinism check, then the v0.1.15 cut.
-
-**Known gap to route around, not silently paper over:** the design's "a completed contract"
-capture likely meant the contract CARD (BL-577), which has no live trigger yet (Wave 5's own
-note, above) — the ledger's History view is the reachable substitute for "a completed contract"
-on screen. Either capture History instead, or treat wiring a selection trigger for
-`mercenary_contract` as this item's own scope addition if the card specifically is wanted.
-
----
-
-Promote/build order: DELIVERY.md § The Delivery lifecycle. Step 4a (`verifier-review`) runs
-once per wave that merges more than one item, not once for the whole batch, since waves 2–5
-land on top of code the previous wave actually wrote.
+Step 4 is the barrier: **all** tasks across **all** four slices reach a terminal state before any
+item is committed. Then one `verifier-review` pass over the whole integrated set, then commits
+one-per-item, then Wave 2, then **one re-bless** of the visual set — held deliberately during the
+shell pass (NR-600) so it could happen after these alterations rather than before them.
