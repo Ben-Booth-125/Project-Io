@@ -491,6 +491,47 @@ float nation_grudge(const world& w, entity_id n, entity_id other, const nation_a
     return grudge_from_border(w, n, other, border_len, p);
 }
 
+entity_id nation_highest_grudge_neighbour(const world& w, entity_id n, const nation_ai_params& p)
+{
+    const auto nit = w.nations.find(n);
+    if (nit == w.nations.end())
+        return null_entity;
+
+    // Standalone accessor, same shape as nation_grudge above: builds its own
+    // raster and its own candidate set rather than reusing score_national_
+    // budgets' shared build_borders, so a caller can ask this question for one
+    // nation without a whole-world sweep.
+    const raster_map r = build_raster(w);
+
+    // std::map, so the argmax below walks ascending id with no separate sort —
+    // seed_nation_garrisons' (nation_generation.cpp) own idiom for the same pick.
+    std::map<entity_id, int> candidates;
+    for (const entity_id tile : nit->second.tiles)
+        for (int side = 0; side < 6; ++side)
+        {
+            const entity_id nb = neighbour_tile(w, r, tile, side);
+            if (nb == null_entity)
+                continue;
+            const entity_id other = tile_nation(w, nb);
+            if (other == null_entity || other == n)
+                continue;
+            ++candidates[other];
+        }
+
+    entity_id best        = null_entity;
+    float     best_grudge = -1.0f;
+    for (const auto& [other, len] : candidates) // ascending: strict '>' keeps the lowest tie
+    {
+        const float g = grudge_from_border(w, n, other, len, p);
+        if (g > best_grudge)
+        {
+            best_grudge = g;
+            best        = other;
+        }
+    }
+    return best;
+}
+
 std::map<entity_id, nation_budget> score_national_budgets(const world& w,
                                                           const nation_ai_params& p,
                                                           int                     econ_tick,

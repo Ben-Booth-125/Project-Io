@@ -449,6 +449,42 @@ redaction in the UI only, on the spectator pair-test. Whether the *aggregate* sh
 is open (NR-469) — and it is the opposite call to the one the dispatch stream makes, which skips
 rival fights entirely (NR-470). One question, two surfaces.
 
+### The contract element
+
+**A mercenary contract is the battle card's sibling** (BL-577, contract card): like a battle, a
+`mercenary_contract` is not an entity — it lives in `world::mercenary_contracts`, keyed by its
+own stable `id` rather than an entity id — so it cannot travel in `selected_entity` and is
+resolved **before** `selection_kind_of`, owning its whole layout rather than the shared
+action|facts split. Unlike a battle it is **not time-critical**: nothing on the card expires
+between frames the way a fight's strength does, so it resolves after the battle check but still
+ahead of the province/kind resolution.
+
+| Field | Meaning |
+|---|---|
+| `ui_state::selected_contract_id` | The selected contract's own `id`, or `0` for none. A single scalar suffices — unlike the battle triple, a contract id is already globally unique. |
+
+`has_contract_selection()` / `clear_contract_selection()` are the accessors, mirroring the battle
+pair. There is no canvas marker for a contract to select from yet (CONTRACTS.md's "a ledger and
+the map" puts a contract's *province* on the map, not the contract record itself) — the setter is
+the Contracts ledger's row press (BL-576), which must clear the other selection fields the same
+way every other selecting surface already does.
+
+**What the card carries, and why:**
+
+- **Client and contractor**, named — the two counterparties a contract's whole existence is about.
+- **The predicate**, via `condition_text` over the template's predicate bound to the contract's own
+  province — the same bind `run_mercenary_contract_tick` performs before judging it, so the card's
+  wording of the terms cannot drift from the terms actually evaluated. The same reader the Balance
+  ledger's laws listing already uses, so a contract's terms and a law's conditions share one
+  vocabulary.
+- **The committed force** — CONTRACTS.md Q1's "the player chooses the force, the contract never
+  does" is the whole shape of the mercenary company's skill; the card is where that choice reads
+  back.
+- **The deadline**, the econ tick the tick-evaluation pass judges the contract against.
+- **The fee split** — deposit already paid versus the remainder still owed on completion, not just
+  the total. "The fee is 400cr" hides the one number that matters mid-contract: how much is still
+  at stake if the job goes wrong.
+
 ### Tile repeat-click selection cycle
 
 `body_surface_canvas.cpp`'s click handler cycles **Battle → Soldier → Building → Province → Battle**
@@ -466,8 +502,11 @@ carries an explicit `stage_live[]` alongside the entity table. On a tile with no
 the stage falls back to the tile, so the cycle never strands on an empty rung.
 
 A click on a **different** tile (or the first click anywhere) goes through the marker-hit precedence
-(`resolve_marker_hit`: building > market_centre, nearest wins) and only additionally seeds the cycle
-anchor so a follow-up repeat click knows where to advance from.
+(`resolve_marker_hit`: unit > building > market_centre, nearest-wins within a kind) and only
+additionally seeds the cycle anchor so a follow-up repeat click knows where to advance from. Unit
+was raised above building by BL-575 (unit marker and march UI) to match this section's own cycle
+order, where Soldier already precedes Building — a unit standing on a built tile is reachable on
+the first click, not only after cycling past the building.
 
 ### The body element's action is the survey front door (then go-to-surface)
 

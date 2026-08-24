@@ -74,8 +74,8 @@
       "id": "BL-569",
       "short_name": "PROVINCE_HOLDER",
       "title": "A province has a holder, and a won battle moves it",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "A",
       "difficulty": 3,
       "version_goal": "v0.1.15",
@@ -94,15 +94,15 @@
         "tools/verify/battle_engagement_harness.cpp"
       ],
       "authority_doc": "docs/military/MILITARY.md",
-      "summary": "The contract predicate needs something to measure: 'province P is held by X'. Today a province has no owner by design (province.hpp: 'no name, no owner') and the only ownership signal is battle_dispatch::field_held_by, erased with the battle. This item adds world::province_holder (one entity_id per province id, ascending-id order), seeded at generation from tile_to_nation (the nation holding the plurality of the province's land tiles), and moved by run_battles when a battle closes with field_held_by set. The PARTITION stays fixed and out of state_hash; the HOLDER vector is live state, hashed and saved.",
-      "design": "## Work\n\n1. `world::province_holder` - `std::vector<entity_id>` indexed by `province::id`; `no_entity` for sea provinces. Seeded in `build_province_partition`'s caller from `tile_to_nation` plurality. Authority: MILITARY.md (field held), PROVINCES.md (partition fixed, ownership moves - the old BL-567 rule, now this item's rule).\n2. `run_battles`: when `campaign_battle_end` is attacker_broken / defender_withdrew, set `province_holder[p] = winner owner`. Stalemate and attacker_withdrew leave it. Log the change into the dispatch stream ('<corp> holds <province>').\n3. `world_save.cpp`: append the vector as a trailing section; bump the save version; `save_roundtrip.cpp` round-trips it.\n4. `state_hash` folds the vector.\n5. Harness: extend `battle_engagement_harness.cpp` with one case where a decisive battle moves the holder and one where a stalemate does not.\n\n## Not in scope\nTile ownership (`tile_to_nation`) does NOT follow the holder in this item - a held province is a military fact the contract reads; the political map changing hands is later work."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-570",
       "short_name": "CONDITION_PROVINCE_SUBJECT",
       "title": "condition_set can say 'province P held by the subject', and a contract template is an authored Lua row",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "A",
       "difficulty": 3,
       "version_goal": "v0.1.15",
@@ -123,15 +123,15 @@
         "docs/META_LAYER.md"
       ],
       "authority_doc": "docs/economy/CONTRACTS.md",
-      "summary": "CONTRACTS.md's spine - a contract IS a condition_set the client will pay to have become true - cannot be expressed: the nine subjects are world-wide corp scalars with no location qualifier, and a condition_set holds a std::string key so it is not fixed-size or serialisable. This item appends subject province_held with a province qualifier on condition, measured against world::province_holder, and adds the authored contract-template table (scripts/contracts.lua) so a contract stores a template index plus bound operands, never a free condition_set.",
-      "design": "## Work\n\n1. `condition_subject::province_held` (append-only; `condition_subject_count` bumps). `condition` gains `uint32_t province` (sentinel `no_province`). `measure_condition` returns 1 when `province_holder[province] == subject_corp`, else 0; comparator `>=` 1 is the 'hold' predicate. META_LAYER.md gets the tenth subject row.\n2. `condition_text` renders it: 'holds <province name or #id>'.\n3. `scripts/contracts.lua`: a template table `{ id, name, predicate = { subject, comparator, operand }, continuous, fee_mult, deadline_ticks }`. First two rows: **take** (province_held >= 1 at deadline) and **hold** (province_held >= 1 on every tick until deadline; `continuous = true`). Loaded through the existing sol2 registry path, protected calls only.\n4. `condition_set_harness.cpp`: province_held measures correctly for holder / non-holder / sea province; the template table loads and round-trips its index.\n\n## Rule carried\nA new contract kind is a Lua row, not a C++ change (CONTRACTS.md). This item is what makes that true."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-571",
       "short_name": "NATION_GARRISONS",
       "title": "Nations field force: a garrison per nation, and a battle can have a nation on one side",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "A",
       "difficulty": 4,
       "version_goal": "v0.1.15",
@@ -145,24 +145,28 @@
       "parked": false,
       "files": [
         "src/world/components.hpp",
-        "src/world/corporation_generation.cpp",
+        "src/world/nation_generation.hpp",
         "src/world/nation_generation.cpp",
+        "src/world/battle_system.hpp",
         "src/world/battle_system.cpp",
-        "src/world/stance.hpp",
-        "src/world/unit_upkeep.cpp",
+        "src/world/nation_step.hpp",
+        "src/world/nation_step.cpp",
+        "src/world/economy_system.cpp",
+        "src/world/world_save.hpp",
+        "src/world/world_save.cpp",
         "docs/military/MILITARY.md",
         "docs/politics/NATIONS.md"
       ],
       "authority_doc": "docs/military/MILITARY.md",
-      "summary": "A contract offer is 'a campaign a polity wants and cannot win alone' - so the thing the company fights is the OTHER polity's force. Today nations own no units (the only owner assignment is corporation_generation.cpp:1245) and run_battles triggers only on corp_hostile_pairs. Without this item every contract resolves against nothing. Design-owed on two calls: how big a garrison is (anchor: NATIONS.md's value anchor - a unit's equipment costs twice its salary - and the nation's military_research line) and whether a nation garrison marches at all in this slice (proposed: no - garrisons are static defenders; a nation that wants ground hires).",
-      "design": "## Settled (Ben, elicitation, 2026-08-23)\n\n1. **Garrison size.** Capital province + border provinces shared with the highest-grudge neighbour, count treasury-scaled (`nation_component::treasury`) against the value anchor (BL-543). Static this slice.\n2. **Trigger.** `run_battles` gains a second trigger: a unit owned by a corp holding an ACTIVE contract whose target province is held by nation N engages N's garrison there. No `declare_hostile` row needed - the contract is the hostility. Nation-vs-corp pair state is a `stance` row keyed on the contract, cleared at terminal state.\n3. **Upkeep.** YES - a `military_research`-line budget claim (the nation pays its own force).\n\nRatified into docs/military/MILITARY.md § Nation garrisons and docs/politics/NATIONS.md § A budget.\n\n## Work\n`unit_component::owner` accepts a nation entity; generation seeds garrisons; `run_battles` second trigger; `battle_engagement_harness` case: a corp-vs-nation battle opens and resolves; blackboard export lists garrisons as visible units (the competitor-visibility rule applies - count visible, internals private)."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-572",
       "short_name": "CONTRACT_OFFERS",
       "title": "A nation derives a contract offer from its budget, and the contracted_force line takes a subject",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "A",
       "difficulty": 4,
       "version_goal": "v0.1.15",
@@ -179,24 +183,26 @@
         "src/world/nation_ai.cpp",
         "src/world/nation_ai.hpp",
         "src/world/nation_step.cpp",
+        "src/world/nation_step.hpp",
         "src/world/nation_budget.hpp",
-        "src/world/nation_budget.cpp",
         "src/world/world.hpp",
         "src/world/world_save.cpp",
+        "src/world/world_save.hpp",
         "tools/verify/nation_scorer_harness.cpp",
+        "tools/verify/save_roundtrip.cpp",
         "docs/economy/CONTRACTS.md",
         "docs/politics/NATIONS.md"
       ],
       "authority_doc": "docs/economy/CONTRACTS.md",
-      "summary": "CONTRACTS.md says offers reuse history_sim's campaign scorer; the code says that scorer is an inline block in the Era -1 year loop over polity/region, unreachable from the campaign tick and typed on different data. So offer derivation is owed a design of its own, built on what IS live: score_national_budgets already pushes weight into budget_priority::contracted_force from the threat term (nation_ai.cpp:665), and the budget pass already earmarks a line's share as a whole-or-nothing claim. The shape: the contracted_force line's share funds an offer; the offer names the province; the fee is the earmark.",
-      "design": "## Settled (Ben, elicitation, 2026-08-23)\n\n1. **Which province.** Among provinces held by the nation's highest-grudge neighbour (nation_score_terms.mean_grudge, border_force), the border province with the lowest garrison strength - deterministic argmin, ties by ascending province id.\n2. **Fee.** The contracted_force line's spendable share this tick, accumulated across ticks into a dedicated `offer_escrow` until it clears the template's minimum (NR-572 showed a single-tick share cannot fund an indivisible claim; escrow is the answer, and it must be a visible treasury line). Deadline from the template.\n3. **Cadence.** SEVERAL offers open concurrently (Ben's ruling, overriding the one-at-a-time proposal), one per threatened border province; each still expires independently after `offer_ttl_ticks`, returning its escrow. The concurrent-offer budget split - a tick's `contracted_force` share applied to open offers oldest-issued-first - is a call taken on Ben's behalf, since the elicitation settled cadence but not the split rule; flagged NR-576.\n\nRatified into docs/economy/CONTRACTS.md § Where offers come from and docs/politics/NATIONS.md § A budget. NR-572's income half (nations start at treasury 0, no levy enacted by default) is UNRESOLVED - this item closes the indivisibility half only.\n\n## Work\n`mercenary_offer{id, client, target_province, template, fee, deadline, issued_tick}`; `world::mercenary_offers` (a vector, not a scalar, now that offers are concurrent); `derive_contract_offers` called from `run_nation_step` after the budget pass; `line_takes_subject(contracted_force) = true` (the comment in nation_budget.hpp:127 names this as the extension); save section + version bump; `nation_scorer_harness` R5: a threatened nation issues an offer, an unthreatened one does not, two offers can be open and filling at once, and the sequence is replayable.\n\nCONTRACTS.md's 'offers reuse the campaign scorer' line is amended by this item: the mechanism transfers (a want the polity cannot meet alone), the code does not - § Where offers come from now names the nation-budget-derived mechanism."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-573",
       "short_name": "CONTRACT_RECORD_AND_VERBS",
       "title": "The mercenary contract: accept an offer with a named force, evaluate it each tick, pay or fail",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "A",
       "difficulty": 4,
       "version_goal": "v0.1.15",
@@ -214,21 +220,29 @@
         "src/world/corp_command.hpp",
         "src/world/corp_command.cpp",
         "src/world/economy_system.cpp",
+        "src/world/nation_step.hpp",
+        "src/world/nation_step.cpp",
+        "src/world/battle_system.cpp",
         "src/world/sentiment.hpp",
         "src/world/world.hpp",
         "src/world/world_save.cpp",
+        "src/core/app.cpp",
+        "src/core/app.hpp",
+        "src/main.cpp",
+        "scripts/economy.lua",
+        "tools/verify/mercenary_contract_harness.cpp",
         "docs/ai/ACTIONS.json"
       ],
       "authority_doc": "docs/economy/CONTRACTS.md",
-      "summary": "The record CONTRACTS.md specifies and procurement cannot express: a mercenary_contract with a template index, bound operands, a committed force, a deadline, and THREE terminal states (completed / failed / abandoned). Two append-only corp_verbs: accept_offer (offer id + unit ids) and abandon_contract. Payment rides the existing nation-to-corp budget_claim rail as a split payment: deposit at accept, remainder at completion; failure forfeits the remainder and folds a new sentiment_factor_kind::contract_failed - the 'down hardest' move CONTRACTS.md rules on.",
-      "design": "## Work\n\n1. `mercenary_contract{id, client, contractor, template, province, fee, deposit_paid, deadline, accepted_tick, units[8], state}`; `world::mercenary_contracts`.\n2. `corp_verb::accept_offer` / `corp_verb::abandon_contract` appended after `withdraw_from_battle`; `corp_command` reuses `counterparty` (validated against nations, not corps - the seam's counterparty check forks on verb) and gains `units`. Reject on: offer expired, unit not owned, unit already committed. A rejection mutates nothing (the untrusted-seam rule).\n3. Evaluate in the economy tick after `run_battles`: `continuous` templates fail on the first tick the predicate is false; point templates test at the deadline. Completed -> remainder paid (budget_claim, contracted_force), `note_conduct(contract_completed)`. Failed -> `contract_failed` folded, escrow returned to the client. Abandoned -> as failed but the contractor chose it.\n4. Committed units cannot be disbanded or re-committed; `march_unit` stays free (the player chooses how to use the force).\n5. Save: section + version bump; `save_roundtrip` covers one open contract.\n6. ACTIONS.json: two new gameplay entries transcribed from the seam (`render_actions.js` is the shape check).\n\n## Settled already (CONTRACTS.md)\nThe player chooses the force; a contract is refusable; an offer is a nation's want; failure is the hardest reputation move."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-574",
       "short_name": "CONTRACT_HARNESS",
       "title": "One observed instance of every contract terminal state, conserved and replayable",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "A",
       "difficulty": 3,
       "version_goal": "v0.1.15",
@@ -246,15 +260,15 @@
         ".claude/skills/verifier-headless/SKILL.md"
       ],
       "authority_doc": "docs/economy/CONTRACTS.md",
-      "summary": "CONTRACTS.md demands one observed instance of each terminal state; no harness in the tree can observe any. This is the headless proof the slice rests on, in the procurement_harness.cpp pattern (fixture world, scripted verbs, bit-exact goldens).",
-      "design": "## Cases\n\nM1 offer issued by a threatened nation; M2 accept with a valid force, deposit moves client->contractor and conserves exactly; M3 take-template completed on a decisive battle (BL-569/BL-571 fixtures), remainder paid; M4 hold-template failed on the first lost tick, escrow returned, `contract_failed` folded and reputation lower than after a cancel; M5 abandon; M6 two runs from one seed hash-identical across all of the above; M7 save/load mid-contract round-trips. Name the harness in the verifier-headless skill."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-575",
       "short_name": "UNIT_MARKER_AND_MARCH_UI",
       "title": "A unit is visible on the Planetary canvas and can be ordered to march",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "A",
       "difficulty": 3,
       "version_goal": "v0.1.15",
@@ -275,15 +289,15 @@
         "docs/ai/ACTIONS.json"
       ],
       "authority_doc": "docs/military/MILITARY.md",
-      "summary": "The player can raise units and withdraw from a battle but cannot order a unit anywhere from the app: march_unit is reachable only through the agent protocol. A contract the player cannot march to is a mission list. This is the old unit-canvas-marker item re-filed for the slice: a unit glyph per province on the Planetary canvas, a march-target mode from the unit card, and the press dispatching corp_verb::march_unit.",
-      "design": "## Work\n\n1. `ui::icons::unit_marker` at the province anchor, count badge, owner colour from presentation.hpp; units committed to a contract carry a ring. ICONS.md row.\n2. Unit card (selection_kind::unit) gains **March** -> `ui_state::pending_march_unit`; the next province click sets `pending_march_province`; app.cpp dispatches. Halt and Disband presses alongside.\n3. question_log.json entries for the marker and the card presses; ACTIONS.json canvas-family entry for march-target mode.\n4. Live check: open the app, click a unit, march it, watch it move - a UI requirement needs a live click."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-576",
       "short_name": "CONTRACTS_LEDGER",
       "title": "The Contracts ledger: offers in, accept with a force, active and past contracts",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "A",
       "difficulty": 4,
       "version_goal": "v0.1.15",
@@ -308,15 +322,15 @@
         "docs/ai/ACTIONS.json"
       ],
       "authority_doc": "docs/economy/CONTRACTS.md",
-      "summary": "The offer has to reach a human. No contract, offer, procurement or budget surface exists; the decision feed prints 'contract #n' and that is the whole story. A fold-out ledger in the nav rail with three views - Offers (client, province, fee, deadline, the client's visible garrison), Active (predicate text from condition_text, ticks left, committed force), History (terminal state, paid) - and an Accept flow that is a unit picker over the player's uncommitted units.",
-      "design": "## Work\n\n1. Rail slot + `show_contracts_ledger`; the toggle rule (re-clicking the active tab closes).\n2. Offers view rows; the Accept press opens the force picker (owned, uncommitted units with strength); confirm dispatches `accept_offer`. Decline is local (the offer stays until expiry - refusable, not dismissable).\n3. Active view: `condition_text` line, deadline countdown, an Abandon press with the reputation cost shown.\n4. Question-log entries (the question each view answers); ACTIONS.json ledger-family entries.\n5. The fog rule: an offer is visible only if the target body is at least Known (DISCOVERY.md) - CONTRACTS.md's settled answer."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-577",
       "short_name": "CONTRACT_MESSAGES_AND_INCOME",
       "title": "A contract announces itself: Public-channel messages, a card, and contract income in the budget",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "B",
       "difficulty": 3,
       "version_goal": "v0.1.15",
@@ -339,15 +353,15 @@
         "docs/ui/question_log.json"
       ],
       "authority_doc": "docs/economy/CONTRACTS.md",
-      "summary": "An event lands with its message, in the same change (EVENTS.md's rule). Offer issued, accepted, completed, failed and abandoned each post to the Public channel through the existing session_history path; the battle card's sibling, a contract card, opens from the ledger; and the fee shows as a 'Contract income' line in the Balance ledger - budget_result::subsidies already carries it and nothing renders it.",
-      "design": "## Work\n\n1. `economy_report::contract_events` -> `session_history::post_contract_events` -> Public channel; five phrasings in the dispatch-text bank.\n2. `selection_kind::contract` card: client, predicate, force, deadline, fee split.\n3. Balance ledger line 'Contract income' from `subsidies`; the header runway reads it.\n4. Question-log entries for the card and the line."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-578",
       "short_name": "MERCENARY_SLICE_PLAYTHROUGH",
       "title": "The vertical slice plays end-to-end: hired, fought, paid - and v0.1.15 is cut",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "A",
       "difficulty": 3,
       "version_goal": "v0.1.15",
@@ -374,8 +388,8 @@
         "docs/MANUAL.md"
       ],
       "authority_doc": "docs/economy/CONTRACTS.md",
-      "summary": "Sprint 16's goal, verbatim: a polity hires the company, the company fights, the company is paid - playable end-to-end, however rough. This is the item-spanning requirement and the release: a scripted verifier-visual run from a new world through an accepted offer, a march, a battle card, a completed contract and the income line, plus a live playthrough by a human, then the v0.1.15 cut per DEVELOPMENT_PRACTICES.md.",
-      "design": "## Done when\n\n1. `scripts/verify/mercenary_slice.lua` captures: the ledger with an offer; the force picker; a unit marching; the battle card; a completed contract; Balance with contract income. All six captures inspected.\n2. A live session reaches a paid contract without the agent protocol.\n3. The determinism harness hash is unchanged for a world with no contract activity (the flag-off byte-identity rule).\n4. v0.1.15 tagged; ROADMAP.md's done-definition for the minor met; MANUAL.md gains a Contracts section written from the shipped surfaces; the Sprint 16 retro is recorded in sprints.json."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "status": "designed",
@@ -458,7 +472,7 @@
       ],
       "summary": "The measurement that overturns NR-243 rather than answering it. chain_depth’s R2 buckets every same-output sibling pair as a supply route (disjoint raws), a named precondition pair, or a genuine interchangeable method — and the third bucket is EMPTY. So the 2026-08-15 ruling (\"alternates with real trade-offs\") is mechanism without content: the Method page offers siblings, but no two of them are a choice a corp can actually make on one tile. This item authors the missing bucket.",
       "design": "## What was measured, and what it corrects\n\nPRODUCTION.md § Alternate production methods still reports four dominated sibling pairs as “Ben’s open call (NR-243)”. **That text is stale.** The guard that found them was retracted on 2026-08-16 and replaced: `recipe_switch_harness.cpp` records the retraction in its own header, and `chain_depth.cpp`’s R2 is the replacement.\n\nAll four were false positives of grouping by (primary output, era band). `steel_from_iron_nickel` vs `steel`, `peat_charcoal` vs `charcoal` and `glass` vs `trade_goods` have **disjoint raws** — which one a corp runs is decided by deposit access, not by price. The propellant pair is an explicitly named atmosphere-versus-airless precondition.\n\nThe live consequence is the opposite of a balance defect: with every pair bucketed as a route or an exemption, **no pair is a method at all**, and the no-dominance rule has nothing to guard.\n\n## What an interchangeable method actually is\n\nTwo recipes on one building, sharing at least one input, either of which a corp on a given tile could genuinely run. Ben, 2026-08-23: *“it’s not always clear that a more advanced method is better (depending on which market it builds to).”* So the axis is which market the output is going to, not which route is stronger:\n\n  * **Ratio** — a Bloomery and a larger furnace both take `iron_ore + charcoal`, differing in fuel-per-unit against throughput. Cheap fuel favours one, cheap ore the other.\n  * **Yield split** — a method with a second, lesser output: worth more where that byproduct has a market, worthless where it does not.\n  * **Labour against materials** — a hand method cheap to build and dear to run; the powered one inverts it. Note the constraint: `base_wage` lives on `building_economics`, keyed by TYPE, so this axis needs the rate on the recipe or the cost on the named building (BL-590) — there is no wage per method today.\n\nFirst cut: **three** genuine method pairs, at least one of them ancient, each authored with the market condition under which it wins stated in a comment beside it.\n\n## The guard must grow with the content\n\nR2 compares one fixed reference-price snapshot. A method that is only better “depending on which market it builds to” is invisible to a single snapshot — it will read as dominated. R2 gains a second price vector, and asserts each genuine method wins under at least one. That is the mechanical form of the ruling; the guard work itself is BL-592.\n\n## What this item deliberately does NOT do\n\nIt deletes nothing. The 2026-08-23 ruling to “delete the dominated sibling” was taken on the stale doc text above, and the four pairs it names are not dominated. Deleting them would remove the coal Smelter, the Charcoal Burner, the Potter & Weaver and the airless propellant route for no measured reason — and would strand `sand`, `peat` and `iron_nickel_ore` as orphans, failing R1 in the same pass. Recorded as a correction rather than acted on; re-rule if the deletion is still wanted.",
-      "resolution": "Two genuine interchangeable methods authored on the existing resource roster: charcoal_from_kiln (Coking Kiln, ancient) and steel_bessemer (Bessemer Converter, industrial). chain_depth R2: 2 methods, 0 dominated (was 0 methods before). recipe_switch_harness and price_band_harness re-verified clean. PRODUCTION.md corrected — NR-243 closed rather than retuned (NR-577).",
+      "resolution": "Two genuine interchangeable methods authored on the existing resource roster: charcoal_from_kiln (Coking Kiln, ancient) and steel_bessemer (Bessemer Converter, industrial). chain_depth R2: 2 methods, 0 dominated (was 0 methods before). recipe_switch_harness and price_band_harness re-verified clean. PRODUCTION.md corrected — NR-243 closed rather than retuned (NR-589).",
       "completion_note": "Built standalone ahead of Sprint 16 merging: the only Sprint 17 item with zero file overlap against Sprint 16 (scripts/recipes.lua, tools/verify/chain_depth.cpp, docs/economy/PRODUCTION.md — none in Sprint 16's set). requirements.json group interchangeable-methods-exist, all 3 rows complete."
     },
     {

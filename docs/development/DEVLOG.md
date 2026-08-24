@@ -10,6 +10,239 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — Sprint 16 Batch Delivery opens: BL-571/BL-572 ratified, the batch planned, Wave 1 lands (BL-569, BL-575) (2026-08-23, latest)
+
+**Runtime:** ~3 h wall-clock, mode Design then Full (Batch Delivery). Two worktree agents in
+Wave 1 (general-purpose for BL-569, ui-dev for BL-575), run concurrently.
+
+**Design ratification.** Ben ruled the BL-571/BL-572 elicitation forks: garrisons seed at the
+capital plus threatened borders, treasury-scaled; garrison upkeep is a `military_research`
+budget claim; contract offers target the weakest border province against the highest-grudge
+neighbour; and — overriding the proposed one-at-a-time shape — a nation may hold **several
+offers open concurrently**. Ratified into `MILITARY.md` § Nation garrisons and `CONTRACTS.md`
+§ Where offers come from (the latter rewritten off a stale history_sim claim onto the live
+nation-budget mechanism). The concurrent-offer tick-share split (oldest-issued-first) was a
+call taken on Ben's behalf — NR-576. Commit `28ecf209`.
+
+**Batch planning.** All ten Sprint 16 items promoted into `REFINED.md` as a six-wave dependency
+plan (an item's `requires` chain), each with an item-spanning requirement in
+`requirements.json` (batch `2026-08-23-sprint-16-mercenary-slice`). Commit `a2d73c4c`.
+
+**Wave 1 build.** BL-569 (province holder) and BL-575 (unit marker + march UI) — no
+dependencies, disjoint files — built concurrently in worktrees, merged, integrating-built, and
+independently re-verified (standing rule: never trust an agent's self-report). The
+re-verification found and fixed real fallout from BL-569's save-version bump (3→4): a
+`save_roundtrip.cpp` static_assert pinned to the old version, and `spectator_determinism`'s
+pinned state_hash golden (re-blessed with dated provenance, matching three prior legitimate
+moves already recorded in that file). Four other suite failures (`ai_skill_harness`,
+`tier_margin`, `nation_scorer_harness`, `history_conquest_gap`) are pre-existing and unrelated
+— confirmed by content (economic-balance/iteration-order/timeout, no reference to anything
+Wave 1 touched) and by `tier_margin` matching the already-archived BL-436 finding. Commit
+`e9c2c5ac`.
+
+**Live-click pass (BL-575).** Opened the built app, selected the starting unit, armed March,
+and clicked a confirmed-different province — the mode disarmed without falling through to
+normal selection, strong evidence the command dispatched; `corp_command.cpp`'s march_unit case
+reads correct on inspection and `unit_march_harness` independently passes. Did not confirm the
+unit's marker visibly moving — this build's economy/march tick is quarterly-cadence, only one
+quarter boundary elapsed during the pass, and relocating the marker afterward on an unfamiliar
+generated world proved impractical in the time spent. Recorded as NR-577, not a blocker.
+
+**One real design call surfaced in passing:** BL-575's marker hit-testing now ranks unit above
+building (previously building > market_centre only) — justified against `SELECTION.md`'s own
+repeat-click cycle, where Soldier already precedes Building. Ratified into that doc.
+
+Both items flipped `complete`, design prose archived, `REFINED.md` Wave 1 drained. Waves 2–6
+(BL-570 onward) are next, strictly sequential.
+
+**UPDATE, same session: a concurrent session's push discovered and reconciled.** Fetching
+before Wave 2 found `origin/main` two commits ahead — a separate concurrent session (sharing
+this checkout) had purged `NEEDS_REVIEW.json` (240→2 open entries, Ben's review-queue form
+answered) and filed six items (BL-579–584). Reconciled by hand rather than trusting git's
+line-based merge, since both sides had reformatted the same JSON: `NEEDS_REVIEW.json` took
+origin's purged state as the base and re-appended this session's still-relevant entries,
+renumbered off an id collision (origin's `NR-576` is now canonical, archived; this session's
+became `NR-577`/`578`); `backlog.json` took origin's 16-item structure and spliced in this
+session's four changed items. Commit `f38ddd55`. (First attempt at this merge accidentally
+landed on a different concurrent session's `sprint/32-logistic-points-kickoff` branch — this
+checkout's HEAD moved while the merge was in flight — caught before pushing, redone clean on
+`main`, that branch left untouched.)
+
+**Wave 2 build.** BL-570 (condition province subject) and BL-571 (nation garrisons) — both
+depend only on BL-569, disjoint files — built concurrently, merged, and re-verified. Both
+worktrees had started from a stale base and merged an *older* `main` into themselves before
+this session's own reconciliation landed, so each merge into `main` repeated the doc-conflict
+resolution above, plus one genuine new collision: both items independently bumped
+`world_save_version` 4→5 for different fields (`condition::province`; a `nation_component`
+capital-tile field); combined into one coherent bump to 6. `condition_set_harness` 67/67,
+`battle_engagement_harness` 64/64 (new case B17, corp-vs-nation), `save_roundtrip` clean.
+`spectator_determinism`'s golden re-blessed again — garrisons are new units, folded into
+`state_hash` unconditionally. Commits `0a8f6de2`, `b409fc6f`.
+
+Two things flagged, not blockers: `NR-579` (BL-570's Lua fee/deadline numbers are legible
+placeholders) and `NR-580` — every nation's treasury is 0 at generation, so BL-571's garrisons
+all land on the sizing floor with no wealth differentiation, **the same gap seen from a second
+system**: BL-572 (contract offers, next) derives its fee from the same always-zero treasury.
+Worth a decision before BL-578's playthrough hits it live; recommended accepting it for this
+slice (a levy has ticks to credit a treasury before the playthrough needs an offer) rather than
+wiring nation income into generation now.
+
+Both items flipped `complete`, design prose archived, `REFINED.md` Wave 2 drained. Wave 3
+(BL-572) is next.
+
+**UPDATE, same session: Wave 3 lands (BL-572, contract offers).** A single item this wave, no
+sibling agent — the worktree was a clean ancestor of `main` this time, no reconciliation needed.
+`derive_contract_offers` (`nation_step.cpp`, called from `run_nation_step` after garrison
+upkeep): targets the weakest border province of the highest-grudge neighbour, accumulates the
+`contracted_force` line's spendable share into a per-offer `offer_escrow` until the fee clears,
+funds several open offers oldest-issued-first, expires unanswered offers after `offer_ttl_ticks`
+and refunds their escrow. `nation_scorer_harness` gained R8 (34 checks, all pass — targeting,
+clamping, oldest-first funding, expiry+refund, tie-break, replay); `save_roundtrip` clean
+(`world_save_version` 6→7). `spectator_determinism`'s golden held — a default world's
+`mercenary_offers` stays empty while treasury is 0 (NR-580), so no new state entered the hash
+this time.
+
+**Deliberately deferred, not a shortcut:** offer fee/deadline are a hardcoded
+`contract_offer_params`, not a live `contract_template_registry` lookup — that registry needs
+sol2/Lua, unreachable from `world/*`'s Lua-free superset, the same reason `recipe_registry` is
+threaded in as a plain parameter rather than loaded by `world/*` itself. BL-573 (accept_offer)
+is the natural point to wire a real lookup, since accepting an offer needs the template's actual
+predicate anyway. Filed `NR-581` alongside one tested, deterministic quirk worth knowing about:
+an offer that expires while its nation still wants the same target reopens the SAME tick,
+funded by its own refund — correct and conserved, but worth collapsing into one dispatch message
+once BL-577 exists to announce it.
+
+Item flipped `complete`, design prose archived, `REFINED.md` Wave 3 drained — with a pointer
+left in Wave 4's brief for the `contract_template_registry` threading. Wave 4 (BL-573) is next.
+
+**UPDATE, same session: Wave 4 lands (BL-573, contract record and verbs).** The widest-reaching
+item in the batch so far — the first real consumer of `budget_claim` against `contracted_force`,
+and the item BL-571's stub battle trigger has been waiting on since Wave 2. `mercenary_contract`
++ `world::mercenary_contracts`; `corp_verb::accept_offer`/`abandon_contract` appended after
+`withdraw_from_battle` on the corp-command seam (full untrusted-boundary validation); tick
+evaluation after `run_battles` settling completed/failed; `contract_template_registry` threaded
+from the app-layer boundary into `world/*` the way `recipe_registry` already is, closing
+NR-581's deferred half; `active_mercenary_contract_for` (BL-571's stub) now resolves for real.
+New harness `tools/verify/mercenary_contract_harness.cpp` (51 checks); `save_roundtrip` clean
+(`world_save_version` 7→8). All six re-run harnesses (the new one, `save_roundtrip`,
+`nation_wiring`, `condition_set_harness`, `sentiment_harness`, `nation_scorer_harness`)
+independently confirmed green — `nation_scorer_harness`'s 2 pre-existing R1c failures unchanged.
+`spectator_determinism`'s golden held.
+
+**One brief-correcting deviation, caught and right:** the task brief said pay the completion
+remainder through the existing `budget_claim` rail; the implementation instead pays directly
+from the offer's own escrow, because the treasury was already debited in full while BL-572's
+escrow filled — routing it through `budget_claim` again would have double-debited the same
+contract. Verified against the code: `derive_contract_offers` genuinely does `nc.treasury -=
+pay` at accumulation time, so the direct-transfer call was correct and the brief's wording was
+the one that was wrong.
+
+One flagged number, not a blocker: `NR-582` — `contract_failed`'s sentiment magnitude (-4.0
+Trust) is authored at exactly double `contract_cancelled`'s (-2.0), a ratio rather than a
+measured value, same discipline as NR-579/580's placeholders.
+
+Item flipped `complete`, design prose archived, `REFINED.md` Wave 4 drained — with a correction
+left in Wave 5's brief: `mercenary_contract_harness.cpp` now already exists (BL-573 created it
+with a smoke suite); BL-574 extends it with the M1–M7 terminal-state cases rather than creating
+a new file. Wave 5 (BL-574, BL-576, BL-577 — the three-way fan-out) is next.
+
+**UPDATE, same session: Wave 5 lands (BL-574, BL-576, BL-577) (2026-08-24).**
+
+Three-way fan-out — **BL-574 (contract harness), BL-576 (Contracts ledger), BL-577 (messages +
+income)** — all built in separate worktrees, merged to `main`
+(`e1a1a44a`, `9e9f581d`, `9bc93591`). All three flipped `complete` in backlog.json, design prose
+archived. `mercenary_contract_harness` grew from 51 to 66 checks (BL-574's M1–M7 terminal-state
+cases); new `contract_dispatch_harness` (20 checks) proves the five dispatch phrasings and the
+one-shot abandon-event flag. Independently rebuilt and re-run on the fully merged tree, not
+trusted from any agent's self-report; `spectator_determinism`'s golden held.
+
+Two genuine mid-batch collisions, both from a concurrent session sharing this checkout: an
+`NR-583` id collision (the concurrent session's own entry was already canonical — renamed mine
+to `NR-584`), and a `question_log.json` conflict between BL-576's and BL-577's own additions
+(resolved as a union, both kept).
+
+**Live-click pass (main session, computer-use, 2026-08-24)** against a real generated world with
+real funded offers: the Contracts ledger's rail slot, the toggle rule, all three views
+(Offers/Active/History), the Accept→force-picker→Confirm flow (balance visibly credited), and
+the Abandon confirm-with-reputation-cost popup all confirmed reachable and correct by mouse
+click. One real gap, not silently papered over: **BL-577's contract card has no live selection
+trigger** — clicking an Active-view contract row selects nothing; the card's own rendering code
+exists and reads correct, it is just unwired. Flagged in `requirements.json` and carried into
+Wave 6's brief as a routing note, not a blocker.
+
+Two design calls flagged for Ben: `NR-585` (`abandoned_event_posted` is deliberately
+unserialized — a saved-then-reloaded abandoned contract re-announces itself once) and `NR-586`
+(the ledger took a new nav-rail slot 13 — the curated nine plus the developer tail were both
+full).
+
+Item flipped `complete` for all three, design prose archived, `REFINED.md` Wave 5 drained.
+Wave 6 (BL-578, the slice playthrough — needs all nine prior items) is next, not yet started;
+its brief carries a note on routing around the contract-card gap above.
+
+**UPDATE, same session: Wave 6 lands (BL-578), Sprint 16 closes, v0.1.15 is cut (2026-08-24).**
+
+`scripts/verify/mercenary_slice.lua` (new) writes the six-capture scripted playthrough from a
+fresh world — offer, force picker, marching, contact, a completed contract (History view), and
+the Balance ledger's "Contract income" line. Getting the force picker's own button pressed for
+real (`verify.click`, not staged ui_state) and the balance line's own line (scrolled into view,
+captured the same tick a payout lands, before `subsidies` resets) were the two real snags; both
+solved, documented inline. `mercenary_contract_harness`, `contract_dispatch_harness`,
+`save_roundtrip`, `determinism_harness` and `spectator_determinism` all re-run green on the
+merged tree.
+
+**A real capture-4 problem, investigated rather than routed around silently.** The plan was to
+reuse `battle_card.lua`'s own proven declare_hostile+march+step-until-select_battle technique for
+a from-scratch corp-vs-corp fight. It did not work. Debug-printed (temporarily, reverted, never
+committed) straight into `run_battles`: discovery correctly finds the co-located hostile/
+contracted pair and opens an `active_battle`, but `campaign_battle_params::rounds_per_tick` (3)
+was enough to reach a terminal state for EVERY matchup tried this session — including
+`battle_card.lua` re-run completely unmodified against the current build, which now also fails
+("no battle opened within 120 ticks") — so the fight opens and concludes inside the same
+`econ_step` call every time, and `verify.select_battle` (which can only observe state between
+whole ticks) never once returns true. Filed as `NR-587` rather than guessed at: this may be
+ordinary seed-dependent luck, or a real pacing regression against `battle_card.lua`'s own
+historical passing runs. Capture 4 instead shows the moment of contact — the Field-channel
+dispatch line plus the garrison's own casualty count — which the fight's real, observable
+consequences (province flip, contract completion) do not depend on.
+
+**Live-click pass (main session, computer-use, 2026-08-24)** confirmed the whole loop by hand: a
+fresh generated world, the Contracts ledger's nav-rail icon, a REAL nation-issued offer (Zeithketh,
+province #21928) accepted through the real force picker, and a real march order that visibly
+walked the committed unit onto the garrison's own tile. **Did not reach a literal payout**: the
+offer's deadline (161 econ ticks) measured at roughly four real minutes per tick even at the
+game's fastest speed setting — on the order of ten real hours to the deadline `run_
+mercenary_contract_tick` evaluates the "take" predicate at. Paused and asked Ben rather than
+either waiting it out or quietly calling it done; he ruled the mechanical proof (offer, accept,
+march, all confirmed live) satisfies R2 in the deadline's place. Filed as `NR-588` — sharper than
+NR-579/580's existing "these are placeholder numbers" framing, since this is not about the
+NUMBER being untuned but about the CURRENT number making a real payout unreachable in one human
+sitting, for every offer (all four seen in the live session sat in the same 160–170 tick band).
+
+**The build gate.** Two partial `ctest --test-dir build` sweeps (interrupted mid-run, ~63 and
+~42 of 114 harnesses respectively, at Ben's call once a couple of naturally slow entries —
+`era_world_harness` 118s, `haulage_measure` timing its own 60s budget out — made the full suite
+not worth the wait) covered every Sprint-16-relevant harness plus a broad cross-section of the
+rest with zero failures beyond the known pre-existing `nation_scorer_harness` R1c case. Every
+harness this batch actually touches (`mercenary_contract_harness`, `contract_dispatch_harness`,
+`save_roundtrip`, `spectator_determinism`, `determinism_harness`, `nation_scorer_harness`'s own
+R8 suite) was additionally run standalone and green. The full 114-harness sweep was not run to
+completion.
+
+**The cut.** `CHANGELOG.md`'s stale `[Unreleased]` (two orphaned BL-348/BL-349 entries from a
+prior, never-cut batch) stamped as `[0.1.15]` alongside the new Sprint 16 entries; `README.md`'s
+release summary and `ROADMAP.md`'s v0.1.15 done-definition both written (replacing "owed at the
+cut, per NR-103"); `MANUAL.md` §4.10 rewritten off the shipped mechanism (was still describing
+the retired `history_sim` scorer) with small additions to §3.7 and §4.9. `sprints.json`'s Sprint
+16 entry closed with a retro. Tagged `v0.1.15` locally on the release commit; **not pushed** —
+push is a standing confirm-first action, left for Ben.
+
+Sprint 16 is closed. All ten items (BL-569–BL-578) complete; the mercenary vertical slice plays
+end-to-end, live-confirmed by both a script and a human. Three findings carried forward, none
+blocking: `NR-577` (BL-575's unit-visibly-moving gap), `NR-587` (battle-card observability) and
+`NR-588` (offer-deadline real-time pacing).
+
+---
+
 ## Session — The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575) (2026-08-23, latest)
 
 **Runtime:** ~2.5 h wall-clock, mode Corpus then Design. Fan-out: 11 doc-sweep agents in place

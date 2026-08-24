@@ -849,6 +849,63 @@ void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddCircle({ centre.x + off, centre.y }, cr, colour, 0, 1.5f);
 }
 
+void contract(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A page with the top-right corner cut off for a dog-ear fold, plus a
+    // short check mark near the bottom — "a signed document". The fold is
+    // what keeps this distinct from `ledger` (a plain ruled box, no fold);
+    // the rectangle baseline keeps it distinct from `history`'s hourglass.
+    const float hw   = r * 0.62f;
+    const float hh   = r * 0.85f;
+    const float fold = r * 0.34f;
+    const ImVec2 tl{ centre.x - hw, centre.y - hh };
+    const ImVec2 tr{ centre.x + hw, centre.y - hh };
+    const ImVec2 br{ centre.x + hw, centre.y + hh };
+    const ImVec2 bl{ centre.x - hw, centre.y + hh };
+    const ImVec2 pts[5] = {
+        tl,
+        { tr.x - fold, tr.y },
+        { tr.x, tr.y + fold },
+        br,
+        bl,
+    };
+    dl->AddPolyline(pts, 5, colour, ImDrawFlags_Closed, 1.5f);
+    // Check mark: a short down-stroke then a longer up-stroke, "accepted".
+    dl->AddLine({ centre.x - hw * 0.45f, centre.y + hh * 0.30f },
+               { centre.x - hw * 0.05f, centre.y + hh * 0.62f }, colour, 1.5f);
+    dl->AddLine({ centre.x - hw * 0.05f, centre.y + hh * 0.62f },
+               { centre.x + hw * 0.55f, centre.y - hh * 0.05f }, colour, 1.5f);
+}
+
+void unit_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, bool committed)
+{
+    // Humanoid silhouette: filled circle head over a filled triangle body,
+    // the same two-primitive shape as glyph_soldier (selection_panel.cpp) so
+    // the canvas marker and the unit card's placeholder read as one
+    // vocabulary. Owner-tinted like every other entity marker's fill, with
+    // the standard dark outline stroke for contrast on any terrain.
+    const ImVec2 head{ centre.x, centre.y - r * 0.42f };
+    const float  head_r = r * 0.30f;
+    dl->AddCircleFilled(head, head_r, fill, 14);
+    dl->AddCircle(head, head_r, outline, 14, 1.0f);
+
+    const ImVec2 top{ centre.x, centre.y - r * 0.05f };
+    const ImVec2 bl { centre.x - r * 0.55f, centre.y + r * 0.80f };
+    const ImVec2 br { centre.x + r * 0.55f, centre.y + r * 0.80f };
+    dl->AddTriangleFilled(top, bl, br, fill);
+    dl->AddTriangle(top, bl, br, outline, 1.0f);
+
+    // BL-575 stub: nothing sets `committed` true yet — BL-573 (wave 4 of the
+    // same batch) adds the real per-unit contract flag this reads. Amber ring
+    // is a local convention (no palette entry exists for "under contract"
+    // yet); revisit if/when BL-573/BL-576 settle a shared contract colour.
+    if (committed)
+    {
+        constexpr ImU32 kCommittedRing = IM_COL32(255, 195, 60, 230);
+        dl->AddCircle(centre, r * 1.20f, kCommittedRing, 20, 2.0f);
+    }
+}
+
 void market_centre(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Circle outline.

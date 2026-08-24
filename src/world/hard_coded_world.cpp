@@ -1223,6 +1223,18 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // stream at all, so adding it perturbs nothing above it. See province.hpp.
     build_province_partition(w, params.seed ^ 0x50524F56u);
 
+    // BL-569: seed the province holder from tile_to_nation's plurality, now
+    // that both the partition and every tile's nation assignment exist.
+    // `run_battles` moves entries thereafter; the seed here is the only
+    // generation-time write.
+    seed_province_holders(w);
+
+    // BL-571: nation garrisons — capital plus grudge-border provinces, sized
+    // off each nation's treasury. Runs LAST of the three, because it reads
+    // both `w.provinces` (just built) and `province_holder_for` (just
+    // seeded) for the border-province test. See nation_generation.hpp.
+    seed_nation_garrisons(w);
+
     bump(12);
     return w;
 }

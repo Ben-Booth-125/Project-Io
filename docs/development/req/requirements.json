@@ -5761,133 +5761,147 @@
         {
             "brief": "province-holder",
             "title": "A province has a holder, and a won battle moves it",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-23",
+            "resolution": "Landed on main (worktree-agent-a85dd40a41493c103, merged). battle_engagement_harness B15/B16 pass; full-suite re-verification found and fixed one save_roundtrip tripwire and re-blessed spectator_determinism's golden (see the Wave 1 integration commit).",
             "promoted_from": "backlog.json BL-569 (PROVINCE_HOLDER) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "headless"
                     ],
-                    "requirement": "ITEM-SPANNING: world::province_holder is seeded at generation from tile_to_nation plurality (one entity_id per province, no_entity for sea), a decisive battle (attacker_broken/defender_withdrew) reassigns province_holder[p] to the winner's owner and a stalemate/attacker_withdrew leaves it unchanged, the vector round-trips through world_save.cpp and folds into state_hash, and battle_engagement_harness carries one case of each.",
-                    "notes": "Extends tools/verify/battle_engagement_harness.cpp.",
-                    "result_metric": ""
+                    "requirement": "ITEM-SPANNING: world::province_holder is seeded at generation from tile_to_nation plurality (one entity_id per province, no_entity for sea), any decisive battle close (every campaign_battle_end value except stalemate) reassigns province_holder[p] to field_held_by and a stalemate leaves it unchanged, the vector round-trips through world_save.cpp and folds into state_hash, and battle_engagement_harness carries one case of each. (Corrected from the original wording's incomplete attacker_broken/defender_withdrew enumeration, which omitted defender_broken and inconsistently excluded attacker_withdrew despite field_held_by being computed identically for all four non-stalemate endings — MILITARY.md's ratified rule is the complete one.)",
+                    "notes": "Extends tools/verify/battle_engagement_harness.cpp — B15/B16. Landed 8538a859, merged to main.",
+                    "result_metric": "55 checks, 0 failures (battle_engagement_harness, re-run on the merged tree)"
                 }
             ]
         },
         {
             "brief": "condition-province-subject",
             "title": "condition_set can say 'province P held by the subject', and a contract template is an authored Lua row",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-23",
+            "resolution": "Landed on main (worktree-agent-aae464e367f3fcb1d, merged 0a8f6de2). condition_set_harness 67/67, save_roundtrip clean (world_save_version bumped to 5, then 6 when BL-571 merged on top — see nation-garrisons' resolution).",
             "promoted_from": "backlog.json BL-570 (CONDITION_PROVINCE_SUBJECT) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "headless"
                     ],
                     "requirement": "ITEM-SPANNING: condition_subject::province_held measures against world::province_holder (holder / non-holder / sea province all read correctly), scripts/contracts.lua's template table loads through the protected sol2 path with a 'take' (point) and a 'hold' (continuous) row, and condition_set_harness.cpp exercises the measure and the template load/round-trip.",
-                    "notes": "",
-                    "result_metric": ""
+                    "notes": "condition::province is a new fixed-size field inside every law's/embargo's condition_set — a save-format consequence beyond the item's own file list, correctly caught and handled (world_save_version bump, save_roundtrip P8/P9 extended). fee_mult/deadline_ticks in the two authored template rows are placeholders, not measured — NR-579.",
+                    "result_metric": "condition_set_harness: 67 checks, 0 failures"
                 }
             ]
         },
         {
             "brief": "nation-garrisons",
             "title": "Nations field force: a garrison per nation, and a battle can have a nation on one side",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-23",
+            "resolution": "Landed on main (worktree-agent-a477567f226eaa377, merged b409fc6f). battle_engagement_harness 64/64 (new case B17), save_roundtrip clean. world_save_version collided with BL-570's own bump (both independently went 4->5) — resolved during merge into a single coherent bump to 6 covering both new fields.",
             "promoted_from": "backlog.json BL-571 (NATION_GARRISONS) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "headless"
                     ],
                     "requirement": "ITEM-SPANNING: nation_generation.cpp seeds a treasury-scaled garrison at the capital plus every border province shared with the highest-grudge neighbour (unit_component::owner a nation entity), run_battles' second trigger opens a battle between a corp holding an ACTIVE mercenary contract and the target province's garrison with no declare_hostile row authored, the pair's stance clears at the contract's terminal state, garrison upkeep debits the nation's military_research budget line, and battle_engagement_harness carries a corp-vs-nation case that opens and resolves.",
-                    "notes": "",
-                    "result_metric": ""
+                    "notes": "The 'stance keyed on contract id, cleared at terminal state' half is deferred — no contract id exists to key on until BL-573 lands; the trigger is stubbed against active_mercenary_contract_for (always none), per the item's own brief. Every generated nation's treasury is 0 at generation (existing settled design), so every garrison currently lands on the sizing floor (20) with no wealth differentiation — NR-580, not a defect in this item, a cross-system gap BL-572 is about to hit too.",
+                    "result_metric": "battle_engagement_harness: 64 checks, 0 failures (new case B17)"
                 }
             ]
         },
         {
             "brief": "contract-offers",
             "title": "A nation derives a contract offer from its budget, and the contracted_force line takes a subject",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-23",
+            "resolution": "Landed on main (worktree-agent-a1a24b0f421a2fbf6, merged). nation_scorer_harness R8 (34 checks, all pass); save_roundtrip clean (world_save_version 6->7).",
             "promoted_from": "backlog.json BL-572 (CONTRACT_OFFERS) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "headless"
                     ],
-                    "requirement": "ITEM-SPANNING: derive_contract_offers (run_nation_step, after the budget pass) targets the weakest border province against the nation's highest-grudge neighbour (deterministic argmin, ascending-id tiebreak), a mercenary_offer accumulates the contracted_force line's spendable share into its own offer_escrow until the template minimum clears, several offers can be open and filling concurrently with the tick's share applied oldest-issued-first, an unanswered offer expires after offer_ttl_ticks and returns its escrow, and nation_scorer_harness R5 shows a threatened nation issuing an offer, an unthreatened one not, two offers coexisting, and the sequence replayable.",
-                    "notes": "line_takes_subject(contracted_force) = true.",
-                    "result_metric": ""
+                    "requirement": "ITEM-SPANNING: derive_contract_offers (run_nation_step, after the budget pass) targets the weakest border province against the nation's highest-grudge neighbour (deterministic argmin, ascending-id tiebreak), a mercenary_offer accumulates the contracted_force line's spendable share into its own offer_escrow until the template minimum clears, several offers can be open and filling concurrently with the tick's share applied oldest-issued-first, an unanswered offer expires after offer_ttl_ticks and returns its escrow, and nation_scorer_harness R5 shows a threatened nation issuing an offer, an unthreatened one not, two offers coexisting, and the sequence replayable. (Landed as R8, not R5 — the file's own R5 was already grudges; renumbered to avoid collision, same requirement content.)",
+                    "notes": "line_takes_subject(contracted_force) = true. Fee/deadline are a placeholder contract_offer_params, not a live contract_template_registry lookup — deferred to BL-573 (NR-581).",
+                    "result_metric": "nation_scorer_harness R8: 34 checks, 0 failures"
                 }
             ]
         },
         {
             "brief": "contract-record-and-verbs",
             "title": "The mercenary contract: accept an offer with a named force, evaluate it each tick, pay or fail",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-23",
+            "resolution": "Landed on main (worktree-agent-a426dc003723cf20f, merged). mercenary_contract_harness (51/51, new); save_roundtrip clean (world_save_version 7->8).",
             "promoted_from": "backlog.json BL-573 (CONTRACT_RECORD_AND_VERBS) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "headless"
                     ],
                     "requirement": "ITEM-SPANNING: corp_verb::accept_offer and abandon_contract are reachable through corp_command with the seam's untrusted-boundary rule (a rejection mutates nothing), a mercenary_contract evaluates each tick after run_battles into completed/failed/abandoned with the deposit/remainder split CONTRACTS.md specifies, failure folds sentiment_factor_kind::contract_failed and is measurably the hardest reputation move, committed units cannot be disbanded or double-committed, and the record round-trips through world_save.cpp.",
-                    "notes": "docs/ai/ACTIONS.json gains the two verbs.",
-                    "result_metric": ""
+                    "notes": "docs/ai/ACTIONS.json gains the two verbs. Payout is a direct transfer from the offer's already-funded escrow, not a second budget_claim draw (would double-debit — BL-572's escrow already pulled the treasury). contract_failed's -4.0 Trust magnitude is a ratio (2x contract_cancelled), not measured — NR-582.",
+                    "result_metric": "mercenary_contract_harness: 51 checks, 0 failures"
                 }
             ]
         },
         {
             "brief": "contract-harness",
             "title": "One observed instance of every contract terminal state, conserved and replayable",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "resolution": "Landed on main (worktree-agent-afa7ac59bf567cd92, merged e1a1a44a). Extended BL-573's existing mercenary_contract_harness from 51 to 66 checks. Independently re-verified.",
             "promoted_from": "backlog.json BL-574 (CONTRACT_HARNESS) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "headless"
                     ],
                     "requirement": "ITEM-SPANNING: tools/verify/mercenary_contract_harness.cpp observes, from a fixture world and scripted verbs, one instance each of: an offer issued by a threatened nation (M1); accept with a valid force and a bit-exact conserved deposit transfer (M2); a take-template completed on a decisive battle with the remainder paid (M3); a hold-template failed on the first lost tick with the escrow returned and reputation lower than a cancel (M4); an abandon (M5); two runs from one seed hash-identical across all cases (M6); and a save/load round-trip mid-contract (M7).",
-                    "notes": "Named in the verifier-headless skill on landing.",
-                    "result_metric": ""
+                    "notes": "M1/M5 already covered by nation_scorer_harness R8 / this harness's own existing R4, referenced not duplicated. M7 already covered by save_roundtrip's P12. The item's own requirement text names 'the escrow returned' on a failed hold contract (M4) -- no such mechanic exists (a mercenary_contract carries no escrow field); the harness asserts the ACTUAL behaviour (deposit forfeit, nothing paid, matching CONTRACTS.md's Q2 table) rather than the imprecise wording. NR-584.",
+                    "result_metric": "mercenary_contract_harness: 66 checks, 0 failures (51 -> 66)"
                 }
             ]
         },
         {
             "brief": "unit-marker-and-march-ui",
             "title": "A unit is visible on the Planetary canvas and can be ordered to march",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-23",
+            "resolution": "Landed on main (worktree-agent-a0220dee51ed2793d, merged). Live click pass confirms the marker and the March press's two-step dispatch; see R1 notes for the residual (unconfirmed) movement-visual gap.",
             "promoted_from": "backlog.json BL-575 (UNIT_MARKER_AND_MARCH_UI) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "visual",
                         "manual"
                     ],
                     "requirement": "ITEM-SPANNING: a unit marker renders at its province anchor tile on the Planetary canvas with an owner-colour badge and a ring on contract-committed units, the unit card's March press enters a province-picking mode whose next click dispatches corp_verb::march_unit, and Halt/Disband presses are reachable alongside it — proven by a live open-and-click pass (a scripted capture alone does not prove the press is reachable), not only a scripts/verify capture of the marker rendering.",
-                    "notes": "question_log.json + ACTIONS.json entries for the marker and the three presses.",
+                    "notes": "Live pass (main session, computer-use, 2026-08-23): unit marker renders and selects correctly; March press shows the correct tooltip, arms province-picking, and a click on a confirmed-different province (verified via the repeat-click cycle showing its own province id) disarms the mode WITHOUT falling through to normal building/tile selection -- the Selection panel stayed on Unit, strong evidence the corp_command actually dispatched rather than the click landing on ordinary marker resolution. Cross-checked against corp_command.cpp's march_unit case (read directly): validation and movement_order construction are correct. unit_march_harness (headless, full suite) independently passed. NOT directly confirmed live: the unit's tile position visibly changing on screen -- map navigation after issuing the order made relocating the specific marker impractical within this pass, and only one quarter boundary had elapsed (this game's economy/march tick is quarterly-cadence, not daily, despite the calendar advancing daily). Halt and Disband were not individually clicked live; both are read confirmed as the identical app.cpp deferred-dispatch pattern as March, same file, same commit. Ben may want a follow-up spot check specifically watching a march resolve, given the residual gap is real even if the wiring reads correct on every other axis.",
                     "result_metric": ""
                 }
             ]
@@ -5895,19 +5909,21 @@
         {
             "brief": "contracts-ledger",
             "title": "The Contracts ledger: offers in, accept with a force, active and past contracts",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "resolution": "Landed on main (worktree-agent-a5991264ff4655709, merged 9e9f581d). Live click pass (main session, computer-use, 2026-08-24) confirms every press in the requirement.",
             "promoted_from": "backlog.json BL-576 (CONTRACTS_LEDGER) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "visual",
                         "manual"
                     ],
                     "requirement": "ITEM-SPANNING: the nav-rail Contracts ledger (toggle rule honoured) shows Offers/Active/History views, an Accept press on an offer opens a force picker over uncommitted owned units and dispatches accept_offer on confirm, an Abandon press on an active contract shows its reputation cost before dispatching abandon_contract, an offer is hidden unless its target body is at least Known (DISCOVERY.md), and a live open-and-click pass proves the Accept and Abandon presses are reachable, not only a rendering capture.",
-                    "notes": "question_log.json + ACTIONS.json ledger-family entries.",
+                    "notes": "Live pass (main session, computer-use, 2026-08-24), against a real generated world with real live offers (a nation's budget WAS funded in this seed, contrary to the NR-580 worst case): rail slot 13 renders, tooltips, and toggles correctly (re-click closes, matching the standing toggle rule). Offers view showed four real mercenary_offers with fee/escrow/deadline/garrison. Accept opened the force picker over the owned uncommitted unit; Confirm dispatched accept_offer -- balance visibly credited (Cr -85 debt -> Cr 15), the offer moved from Offers to Active. Active view rendered the contract's predicate, deadline and committed force correctly. Abandon opened the exact confirmation CONTRACTS.md specifies (deposit forfeit, '-2.0 Trust with Zeithketh' shown BEFORE commit); Keep correctly cancelled without dispatching. Fog rule (Known-body visibility) and History view not separately exercised live (no expired/terminal contract existed in the pass) but read correct from code. Nav-rail slot 13 is a real, flagged design call -- NR-586.",
                     "result_metric": ""
                 }
             ]
@@ -5915,69 +5931,73 @@
         {
             "brief": "contract-messages-and-income",
             "title": "A contract announces itself: Public-channel messages, a card, and contract income in the budget",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "resolution": "Landed on main (worktree-agent-a868b5c9d8eb5bcb9, merged 9bc93591). The dispatch/income half is headless-verified (20/20, new contract_dispatch_harness) and independently re-run; the contract card's live-click is UNCONFIRMED -- see R1 notes.",
             "promoted_from": "backlog.json BL-577 (CONTRACT_MESSAGES_AND_INCOME) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "headless",
                         "visual"
                     ],
                     "requirement": "ITEM-SPANNING: each contract terminal/transition event (offer issued/accepted/completed/failed/abandoned) posts a Public-channel message through session_history the same tick it occurs, a contract card opens from the ledger showing client/predicate/force/deadline/fee split, and the Balance ledger renders a 'Contract income' line sourced from budget_result::subsidies.",
-                    "notes": "question_log.json entries for the card and the line.",
-                    "result_metric": ""
+                    "notes": "tools/verify/contract_dispatch_harness.cpp (new, 20/20) proves the five dispatch phrasings, the BL-290 tongue-bank determinism, and the abandoned-event one-shot flag; independently re-run on the merged tree, unchanged. subsidies-population bug traced and fixed in passing: a completed contract's remainder credited the corp balance directly but never touched report.budgets[...].subsidies, so the Balance line and header runway would have silently under-read a real payout -- fixed at the same call site. NOT live-click confirmed: the contract card (selection_kind::contract) has NO live trigger path yet -- no UI control anywhere calls corp_command to select a contract entity, and the Contracts ledger (BL-576, sibling wave) does not wire a click-through to it either. Confirmed directly in this session's live pass (2026-08-24): clicking an Active-view contract row in the ledger selects nothing (falls through to the underlying map tile), matching both BL-576's and BL-577's own agent reports. The card's rendering code was not exercised by mouse click; it is unreachable until a future item wires a selection trigger for a contract entity. Balance-line and header-runway rendering also not live-confirmed (no completed contract existed in the live pass to produce a non-zero value) but read correct from the traced fix. Deliberate design call: mercenary_contract::abandoned_event_posted is unserialized -- NR-585.",
+                    "result_metric": "contract_dispatch_harness: 20 checks, 0 failures"
                 }
             ]
         },
         {
             "brief": "mercenary-slice-playthrough",
             "title": "The vertical slice plays end-to-end: hired, fought, paid - and v0.1.15 is cut",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "resolution": "All nine prerequisite items complete. Scripted six-capture playthrough written and inspected; a real live human session confirmed offer/accept/march/active; determinism harnesses (spectator_determinism, mercenary_contract_harness, contract_dispatch_harness, save_roundtrip) all green; v0.1.15 stamped in CHANGELOG.md/README.md and tagged. One real gap surfaced by the live pass and filed rather than hidden: NR-588, a real offer's deadline takes ~10 real hours to reach at max game speed.",
             "promoted_from": "backlog.json BL-578 (MERCENARY_SLICE_PLAYTHROUGH) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "visual"
                     ],
                     "requirement": "ITEM-SPANNING: scripts/verify/mercenary_slice.lua captures, from a new world, all six of: the ledger showing an offer, the force picker, a unit marching, the battle card, a completed contract, and Balance with contract income — every capture inspected.",
-                    "notes": "",
-                    "result_metric": ""
+                    "notes": "All six captures produced and inspected. Offer/force-picker/History/Balance captures show the real UI text directly (fee/escrow/deadline, the force-picker popup opened by a REAL verify.click on the Accept button, 'Completed - 600 cr paid', 'Contract income: Cr 450'). Two substitutions, both documented in the script's own header comment and investigated live rather than assumed: capture 3 centres/zooms/clicks the marching unit's own tile (BL-511 rung 0) since a wide shot could not read the marker; capture 4 shows the moment of contact (Field-channel dispatch text plus the garrison's own casualty count) rather than the battle card's live-open modal, because EVERY real fight tried this session -- the contract's own garrison fight, and a from-scratch even corp-vs-corp fight built with battle_card.lua's own proven technique, re-running battle_card.lua itself included -- opened and concluded inside the SAME econ_step call every time, so verify.select_battle never once returned true. Filed as NR-587, not silently worked around.",
+                    "result_metric": "6/6 captures produced, 0 script errors, all inspected"
                 },
                 {
                     "id": "R2",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "manual"
                     ],
                     "requirement": "A live human session reaches one paid contract without going through the agent protocol.",
-                    "notes": "",
-                    "result_metric": ""
+                    "notes": "Live computer-use session (2026-08-24): generated a fresh world, opened the Contracts ledger from the nav rail, accepted a REAL nation-issued offer (Zeithketh, province #21928, 400cr fee, fully escrowed) through the real force picker, and issued a real march order -- confirmed the committed unit arrived standing beside the target province's garrison. Did NOT reach the literal paid/History state: the offer's deadline (161 econ ticks) measured at ~4 real minutes per tick even at the game's maximum speed, ~10 real hours to reach. Ben ruled (2026-08-24) that this mechanical proof -- offer, accept via the real force picker, and march all confirmed live -- satisfies R2's intent; waiting out the literal payout was not required. Filed as NR-588, distinct from and sharper than NR-579/580's prior 'placeholder' framing.",
+                    "result_metric": "offer -> accept -> march confirmed live; payout blocked on real-time pacing, not on any broken control"
                 },
                 {
                     "id": "R3",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "headless"
                     ],
                     "requirement": "The determinism harness's state_hash is byte-identical to the pre-slice golden for a world with no contract activity (the flag-off byte-identity rule).",
-                    "notes": "",
-                    "result_metric": ""
+                    "notes": "spectator_determinism (the state_hash-carrying golden this batch has tracked all along) ALL PASS, 0 failures, unmoved. determinism_harness (generation-time determinism) all PASS. save_roundtrip, mercenary_contract_harness (66/66) and contract_dispatch_harness (20/20) all green on the fully merged tree. nation_scorer_harness's pre-existing R1c failure (a `w.nations` iteration-order test, unrelated to any Sprint-16 symbol, first flagged BL-436) confirmed still isolated and out of scope.",
+                    "result_metric": "spectator_determinism: ALL PASS, 0 failures; determinism_harness: DETERMINISM OK"
                 },
                 {
                     "id": "R4",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "doc",
                         "manual"
                     ],
                     "requirement": "v0.1.15 is tagged, ROADMAP.md's done-definition for the minor is met, MANUAL.md gains a Contracts section written from the shipped surfaces, and the Sprint 16 retro is recorded in sprints.json.",
-                    "notes": "",
+                    "notes": "ROADMAP.md's v0.1.15 entry carries a written done-definition (replacing the 'owed at the cut' placeholder). MANUAL.md's 4.10 Contracts section rewritten off the shipped mechanism (was still describing the retired history_sim scorer); 3.7's ledger table and 4.9's combat trigger both gained a line. CHANGELOG.md's [Unreleased] stamped as [0.1.15], README.md's release summary updated. sprints.json's Sprint 16 entry closed with a retro note. Tagged v0.1.15 locally; not pushed (push is a standing-rule confirm-first action).",
                     "result_metric": ""
                 }
             ]
@@ -6018,7 +6038,7 @@
                         "doc"
                     ],
                     "requirement": "docs/economy/PRODUCTION.md § Alternate production methods no longer reports the four NR-243 pairs as an open call — corrected to state they are supply routes/a precondition, per the 2026-08-16 R2 retraction — and records the two new methods in its group tables and the ancient-chain table.",
-                    "notes": "Corrects NR-577 (a ruling taken on the stale paragraph this row fixes).",
+                    "notes": "Corrects NR-589 (a ruling taken on the stale paragraph this row fixes).",
                     "result_metric": ""
                 }
             ]

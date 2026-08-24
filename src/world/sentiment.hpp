@@ -209,11 +209,22 @@ enum class sentiment_factor_kind : uint8_t
     /// Force was used against the observer's interest (BL-467's campaign
     /// battles). The sharpest input, and still only an input.
     force_used = 9,
+
+    /// A mercenary contract's predicate came up false at its deadline (a
+    /// "take"), or on the tick it first read false (a "hold") — CONTRACTS.md
+    /// § Q2 (BL-573). The observer is the CLIENT nation, the subject the
+    /// CONTRACTOR corp — the same direction `contract_completed`/
+    /// `contract_cancelled` already read. Authored MORE NEGATIVE than
+    /// `contract_cancelled` (scripts/economy.lua): "you fought, you were
+    /// beaten" costs more standing than an honest early withdrawal, and
+    /// CONTRACTS.md names failure as the hardest reputation move a mercenary
+    /// can make.
+    contract_failed = 10,
 };
 
 /// Number of rows in `sentiment_factor_kind`. Grows when a value is appended;
 /// it is the array bound the fold indexes with, so the two cannot drift apart.
-inline constexpr std::size_t sentiment_factor_count = 10;
+inline constexpr std::size_t sentiment_factor_count = 11;
 
 /// The AUTHORING NAME of each kind, INDEXED BY the kind — the key
 /// `scripts/economy.lua`'s `sentiment.factors` table uses for that row.
@@ -234,6 +245,7 @@ inline constexpr const char* sentiment_factor_names[sentiment_factor_count] = {
     "embargo_imposed",
     "lobbied_against",
     "force_used",
+    "contract_failed",
 };
 
 /// The AUTHORED weight of one kind of conduct: how far a single occurrence moves

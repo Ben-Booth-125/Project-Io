@@ -282,3 +282,18 @@ bool nation_is_due(const world& w, entity_id n, int econ_tick, const nation_ai_p
 /// is replaceable in one place when BL-541 lands the real Era -1 pair outcomes.
 /// Zero for a pair that shares no border, and for `n == other`.
 float nation_grudge(const world& w, entity_id n, entity_id other, const nation_ai_params& p);
+
+/// The nation `n` shares its highest grudge with, among nations bordering it
+/// on at least one tile edge — deterministic argmax over `nation_grudge`,
+/// ties broken by ascending id (the same idiom `seed_nation_garrisons`,
+/// nation_generation.cpp, uses for its own highest-grudge pick, and
+/// `score_national_budgets`'s own tie-breaks throughout this file).
+///
+/// Exposed so a second consumer (`derive_contract_offers`, BL-572,
+/// nation_step.cpp) can name the same neighbour a garrison would be seeded
+/// against, without re-deriving the border walk a third time.
+///
+/// `null_entity` for a nation `w` does not hold, or one with no bordering
+/// nation at all (a landless nation, or an island with no tile-adjacent
+/// neighbour).
+entity_id nation_highest_grudge_neighbour(const world& w, entity_id n, const nation_ai_params& p);

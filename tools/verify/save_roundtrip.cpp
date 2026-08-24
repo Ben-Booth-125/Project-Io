@@ -153,17 +153,59 @@ int main()
             check(!from_bytes(bad, victim), "P3 a mismatched version is rejected");
         }
         {
-            // Sprint N3 T2: the PREVIOUS format, by number. A v2 stream has no
-            // nation_budgets section, so a reader that accepted it would parse
-            // tile_to_nation's count as the map's count and misalign everything
-            // after. The whole stream is refused instead -- a v2 save is not
-            // migrated, it is rejected, and the destination is not touched.
-            static_assert(world_save_version == 3,
-                          "P9 names v2 as the refused predecessor; re-read this row on a bump");
+            // Sprint 16, BL-570: A v4 stream's `condition` records are one
+            // field short (no `province`), so a reader that accepted it would
+            // misread whatever bytes follow the first law's/embargo's condition
+            // as that condition's province id, and every field after it in the
+            // same record would shift with it. The whole stream is refused
+            // instead -- a v4 save is not migrated, it is rejected, and the
+            // destination is not touched.
+            static_assert(world_save_version == 8,
+                          "P9/P10/P11/P12 name v4/v5/v6/v7 as refused predecessors; re-read these "
+                          "rows on a bump");
             std::string bad = bytes_once;
-            const uint32_t v2 = 2;
-            std::memcpy(&bad[4], &v2, sizeof v2);
-            check(!from_bytes(bad, victim), "P9 a v2-versioned stream is refused (format is v3)");
+            const uint32_t v4 = 4;
+            std::memcpy(&bad[4], &v4, sizeof v4);
+            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v8)");
+        }
+        {
+            // Sprint 16, BL-571: the IMMEDIATE previous format (BL-570's v5,
+            // the version this batch actually released before BL-571 bumped
+            // again). A v5 stream's nation record is one w_id short (no
+            // capital_tile) -- not a trailing gap but a MID-RECORD one, so a
+            // reader that accepted it would misread every field of every
+            // nation after the first and everything serialised after
+            // `nations` besides. Refused whole, same contract as every prior
+            // bump.
+            std::string bad = bytes_once;
+            const uint32_t v5 = 5;
+            std::memcpy(&bad[4], &v5, sizeof v5);
+            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused (format is v8)");
+        }
+        {
+            // Sprint 16, BL-572: the IMMEDIATE previous format (BL-571's v6,
+            // the version this batch released before BL-572 bumped again). A
+            // v6 stream simply ENDS where the offers/next_offer_id trailing
+            // section now continues -- not a mid-record misalignment like
+            // P10's, but the read still must not accept a stream that is
+            // shorter than the reader now expects. Refused whole, same
+            // contract as every prior bump.
+            std::string bad = bytes_once;
+            const uint32_t v6 = 6;
+            std::memcpy(&bad[4], &v6, sizeof v6);
+            check(!from_bytes(bad, victim), "P11 a v6-versioned stream is refused (format is v8)");
+        }
+        {
+            // Sprint 16, BL-573: the IMMEDIATE previous format (BL-572's v7,
+            // the version this batch released before BL-573 bumped again). A
+            // v7 stream simply ENDS where the mercenary_contracts/
+            // next_contract_id trailing section now continues -- same shape
+            // as P11 one bump up. Refused whole, same contract as every prior
+            // bump.
+            std::string bad = bytes_once;
+            const uint32_t v7 = 7;
+            std::memcpy(&bad[4], &v7, sizeof v7);
+            check(!from_bytes(bad, victim), "P12 a v7-versioned stream is refused (format is v8)");
         }
         {
             // Truncated mid-way through the tile store -- far enough in that a
@@ -179,8 +221,11 @@ int main()
                   && victim.next_order_id == keep_order && victim.tiles.empty()
                   && victim.bodies.empty(),
               "P3 every rejected load left the destination world untouched");
-        check(victim.nations.empty() && victim.nation_budgets.empty(),
-              "P9 the v2 refusal left nations and nation_budgets untouched");
+        check(victim.nations.empty() && victim.nation_budgets.empty()
+                  && victim.province_holder.empty(),
+              "P9 the v4 refusal left nations, nation_budgets and province_holder untouched");
+        check(victim.mercenary_offers.empty() && victim.next_offer_id == 1,
+              "P11 every rejected load left mercenary_offers and its id counter untouched");
     }
 
     // -----------------------------------------------------------------------
@@ -394,6 +439,8 @@ int main()
             { "history_log", w.history_log.size(), loaded.history_log.size() },
             { "provinces", w.provinces.provinces.size(), loaded.provinces.provinces.size() },
             { "provinces.tile_province", w.provinces.tile_province.size(), loaded.provinces.tile_province.size() },
+            { "mercenary_offers", w.mercenary_offers.size(), loaded.mercenary_offers.size() },
+            { "mercenary_contracts", w.mercenary_contracts.size(), loaded.mercenary_contracts.size() },
         };
 
         bool all_match = true;
@@ -425,7 +472,9 @@ int main()
         check(loaded.next_entity_id() == w.next_entity_id()
                   && loaded.next_convoy_id == w.next_convoy_id
                   && loaded.next_order_id == w.next_order_id
-                  && loaded.next_procurement_id == w.next_procurement_id,
+                  && loaded.next_procurement_id == w.next_procurement_id
+                  && loaded.next_offer_id == w.next_offer_id
+                  && loaded.next_contract_id == w.next_contract_id,
               "P7 every id counter survives, allocator cursor included");
         check(loaded.belt.inner_radius_au == w.belt.inner_radius_au
                   && loaded.belt.outer_radius_au == w.belt.outer_radius_au,
@@ -439,6 +488,19 @@ int main()
         // why it is named here.
         check(w.nation_budgets.empty() && loaded.nation_budgets.empty(),
               "P9 an EMPTY nation_budgets map round-trips as empty (the inertness state)");
+
+        // BL-572: the same inertness proof one line over -- a generated world
+        // has never funded a contracted_force share (NR-580: every nation's
+        // treasury starts at 0.0), so derive_contract_offers has never run
+        // against a live one, and this vector must be empty on both sides.
+        check(w.mercenary_offers.empty() && loaded.mercenary_offers.empty(),
+              "P11 an EMPTY mercenary_offers vector round-trips as empty (the inertness state)");
+
+        // BL-573: same inertness proof one line over -- a generated world has
+        // never had accept_offer issued against it, so this vector must be
+        // empty on both sides too.
+        check(w.mercenary_contracts.empty() && loaded.mercenary_contracts.empty(),
+              "P12 an EMPTY mercenary_contracts vector round-trips as empty (the inertness state)");
     }
 
     // -----------------------------------------------------------------------
@@ -485,6 +547,33 @@ int main()
         f.nation_budgets[n1] = nb1;
         f.nation_budgets[n2] = nb2;
 
+        // BL-572: two offers from DIFFERENT clients, DISTINCT in every field --
+        // a reader that swapped two same-typed members (target_province and
+        // deadline are both plausible mixups; both are ints in the stream)
+        // would show here. One offer's escrow already clears its fee (the
+        // "ready to accept, nobody has yet" state); the other is still
+        // filling, so both live shapes round-trip, not just one.
+        f.mercenary_offers.push_back({ /*id*/ 12, /*client*/ n1, /*target_province*/ 4001,
+                                       /*template_index*/ 0, /*fee*/ 400.0f, /*deadline*/ 999,
+                                       /*issued_tick*/ 10, /*offer_escrow*/ 400.0f });
+        f.mercenary_offers.push_back({ /*id*/ 13, /*client*/ n2, /*target_province*/ 4002,
+                                       /*template_index*/ 1, /*fee*/ 500.0f, /*deadline*/ 1080,
+                                       /*issued_tick*/ 20, /*offer_escrow*/ 125.5f });
+        f.next_offer_id = 14;
+
+        // BL-573: one open (still `active`) mercenary contract, with a
+        // PARTIAL committed force (2 of the 8 slots) so both the populated
+        // and the null_entity-padded ends of the fixed array round-trip.
+        // Distinct from either offer above in every field, same discipline.
+        mercenary_contract mc;
+        mc.id = 21; mc.client = n1; mc.contractor = c2; mc.template_index = 0;
+        mc.province = 4001; mc.fee = 400.0f; mc.deposit_paid = 100.0f;
+        mc.deadline = 999; mc.accepted_tick = 15;
+        mc.units[0] = c1; mc.units[1] = c3; // slots 2..7 stay null_entity
+        mc.state = mercenary_contract_state::active;
+        f.mercenary_contracts.push_back(mc);
+        f.next_contract_id = 22;
+
         convoy_component cv;
         cv.source_market = 101; cv.dest_market = 202; cv.mode = convoy_mode::sea;
         cv.cargo_resource = resource_type::ordnance; cv.cargo_qty = 12.5f;
@@ -510,9 +599,13 @@ int main()
         condition_set embargo;
         embargo.all.push_back({ condition_subject::science, condition_comparator::greater_than,
                                 42.5f, resource_type::coffee, building_type::launchpad,
-                                "embargo-key" });
-        embargo.all.push_back({ condition_subject::military_units, condition_comparator::at_most,
-                                3.0f, resource_type::furs, building_type::military_base, "" });
+                                "embargo-key" }); // province defaults to no_province — untouched
+        // BL-570: the 7th positional field (province) round-trips too — a
+        // real, non-default id, so byte-equality below is not just proving the
+        // pre-existing 6 fields survive while a defaulted 7th rides along free.
+        embargo.all.push_back({ condition_subject::province_held, condition_comparator::at_least,
+                                1.0f, resource_type::furs, building_type::military_base, "",
+                                4242u });
         f.corp_embargo_conditions[c3] = embargo;
 
         f.corp_hostile_pairs.insert({ c1, c2 });
@@ -567,6 +660,8 @@ int main()
                       && e.all[0].subject == condition_subject::science
                       && e.all[1].structure == building_type::military_base,
                   "P8 a condition_set nested in a map survives, strings included");
+            check(e.all[0].province == no_province && e.all[1].province == 4242u,
+                  "P8 BL-570: condition::province round-trips (default AND a real id)");
             check(back.earned_techs.at(c1) == std::set<std::string>{ "metallurgy", "rocketry" }
                       && back.earned_techs.at(c2).count("optics") == 1,
                   "P8 the per-corp earned-tech string sets survive");
@@ -607,6 +702,50 @@ int main()
             check(budgets_exact,
                   "P9 nation_budgets round-trips exactly: nine weights + reserve for two "
                   "nations, the non-dyadic 0.3f included");
+
+            // BL-572: both offers, field by field -- including the fully-
+            // funded one (offer_escrow == fee) so a reader that clamped or
+            // re-derived escrow instead of storing it would show here.
+            check(back.mercenary_offers.size() == 2 && back.next_offer_id == 14,
+                  "P11 both mercenary_offers survive, allocator cursor included");
+            if (back.mercenary_offers.size() == 2)
+            {
+                const mercenary_offer& r1 = back.mercenary_offers[0];
+                const mercenary_offer& r2 = back.mercenary_offers[1];
+                check(r1.id == 12 && r1.client == n1 && r1.target_province == 4001
+                          && r1.template_index == 0 && r1.fee == 400.0f && r1.deadline == 999
+                          && r1.issued_tick == 10 && r1.offer_escrow == 400.0f,
+                      "P11 a fully-funded offer round-trips exactly");
+                check(r2.id == 13 && r2.client == n2 && r2.target_province == 4002
+                          && r2.template_index == 1 && r2.fee == 500.0f && r2.deadline == 1080
+                          && r2.issued_tick == 20 && r2.offer_escrow == 125.5f,
+                      "P11 a still-filling offer round-trips exactly, escrow < fee included");
+            }
+
+            // BL-573: the accepted contract, field by field -- the committed
+            // force in particular, since that fixed array is this item's own
+            // save-format addition and the one a reader most plausibly gets
+            // the wrong length or the wrong padding value for.
+            check(back.mercenary_contracts.size() == 1 && back.next_contract_id == 22,
+                  "P12 the mercenary_contract survives, allocator cursor included");
+            if (back.mercenary_contracts.size() == 1)
+            {
+                const mercenary_contract& rc = back.mercenary_contracts[0];
+                check(rc.id == 21 && rc.client == n1 && rc.contractor == c2
+                          && rc.template_index == 0 && rc.province == 4001
+                          && rc.fee == 400.0f && rc.deposit_paid == 100.0f
+                          && rc.deadline == 999 && rc.accepted_tick == 15
+                          && rc.state == mercenary_contract_state::active,
+                      "P12 the contract's scalar fields round-trip exactly");
+                check(rc.units[0] == c1 && rc.units[1] == c3,
+                      "P12 the committed force's populated slots survive");
+                bool rest_null = true;
+                for (std::size_t i = 2; i < mercenary_contract_max_units; ++i)
+                    rest_null = rest_null && rc.units[i] == null_entity;
+                check(rest_null,
+                      "P12 the committed force's unused slots stay null_entity, not padding "
+                      "leaked from a neighbouring record");
+            }
         }
     }
 

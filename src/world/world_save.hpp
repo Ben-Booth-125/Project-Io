@@ -70,7 +70,52 @@ inline constexpr uint32_t world_save_magic =
 /// its `tile_to_nation` count would be read as the map's count and everything
 /// after it misaligned; a v2 stream is therefore refused WHOLE, destination
 /// untouched (that is the existing rejection contract, not a new one).
-inline constexpr uint32_t world_save_version = 3;
+///
+/// Bumped to 4 by BL-569 (province holder): `world::province_holder` (one
+/// entity_id per province, positionally aligned with `provinces.provinces`)
+/// is written as a new TRAILING section, directly after the embedded history
+/// log + province partition stream (itself the previous last section). A v3
+/// stream simply ends where this one continues, so it is refused whole on the
+/// same strict-equality contract as every prior bump — there is no partial
+/// read of a v3 stream as a v4 with an empty holder vector.
+///
+/// Bumped to 5 by BL-570 (condition_subject::province_held): NOT a new
+/// trailing section this time — `condition` (condition_set.hpp) is a
+/// FIXED-SIZE record embedded inside every law and every corp's embargo
+/// condition_set (w_condition/r_condition), and it gained a new field
+/// (`c.province`), so every condition record written by v4 is one field short
+/// of a v5 record. A v4 stream is refused whole, on the same strict-equality
+/// contract as every prior bump — reinterpreting it would misread whatever
+/// bytes follow the first law's condition as that condition's province id.
+///
+/// Bumped to 6 by BL-571 (nation garrisons), landing the same Batch Delivery
+/// wave as BL-570 above: `nation_component::capital_tile` (one entity_id) is
+/// a new field IN THE MIDDLE of the existing per-nation record
+/// (`w_nation`/`r_nation`), not a trailing section — every nation record
+/// written before this item is one `w_id` short, so a v5 stream reads
+/// misaligned from the first nation onward rather than merely truncated. The
+/// same strict-equality contract refuses it whole. (BL-570 and BL-571 each
+/// independently bumped to 5 in their own worktrees; integrating both landed
+/// two new fields, so the version needed two bumps, not one — v5 exists only
+/// as the intermediate BL-570-alone shape and was never itself released.)
+///
+/// Bumped to 7 by BL-572 (contract offers): `world::mercenary_offers` (open
+/// mercenary-contract offers, one `mercenary_offer` record each) and
+/// `world::next_offer_id` (its allocator cursor) are written as a new TRAILING
+/// section, directly after `province_holder` (itself the previous last
+/// section) — the same shape BL-569 used to add `province_holder` onto v3. A
+/// v6 stream simply ends where this one continues, so it is refused whole on
+/// the same strict-equality contract as every prior bump.
+///
+/// Bumped to 8 by BL-573 (contract record and verbs): `world::mercenary_contracts`
+/// (accepted mercenary contracts, one `mercenary_contract` record each, fixed
+/// at `mercenary_contract_max_units` committed-unit slots) and
+/// `world::next_contract_id` (its allocator cursor) are written as a new
+/// TRAILING section, directly after `mercenary_offers` (itself the previous
+/// last section) — the same shape v7 used to add `mercenary_offers` onto v6.
+/// A v7 stream simply ends where this one continues, so it is refused whole
+/// on the same strict-equality contract as every prior bump.
+inline constexpr uint32_t world_save_version = 8;
 
 /// Write @p w as a complete world snapshot.
 ///

@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**32 surfaces** — 4 settled, 28 awaiting Ben's wording.
+**39 surfaces** — 4 settled, 35 awaiting Ben's wording.
 
 ---
 
@@ -27,6 +27,14 @@ alphabetical order.
 **Because:** apply_budget nets six flows into one number; a single balance tells the player they are losing without telling them what to change. Itemising income, expenditure, maintenance, wages, interest and levies is what makes bankruptcy something to act on rather than discover. BL-343 added the Laws section beneath the policy levers: the first law that is not a stub sits directly under the two that are, so the difference between a drawn lever and a working one is visible in one glance.
 
 *Demanded by BL-074, BL-112, BL-122, BL-343 · `src/ui/balance_ledger.cpp` · id `balance_ledger`*
+
+### Balance ledger — Contract income line, and the header runway tooltip
+
+**Answers:** How much of what I just earned came from mercenary work rather than trade?
+
+**Because:** A completed contract's remainder pays out as a direct transfer to the corp balance (accept_offer's own split-payment precedent, corp_command.cpp) — real money that, before this item, moved the number at the top of the Balance ledger with no line anywhere explaining where it came from, exactly the kind of unexplained jump budget_result::subsidies exists to prevent for every OTHER nation-paid credit. It earns its place by closing that one remaining gap rather than opening a new concept: subsidies already means 'a nation paid you' everywhere else it is read (the national-budget transfer case, nation_step.cpp's own step 4), so a mercenary contract's payout landing on the same field is one line, not a second mechanism. The header runway tooltip reads the same field for the reverse reason — a lump-sum contract payment would otherwise read as a steady improvement in the burn rate the 'assumes the burn holds steady' runway estimate explicitly is not built to represent.
+
+*Demanded by BL-577 · `src/ui/balance_ledger.cpp`, `src/ui/header_panel.cpp`, `src/world/nation_step.cpp` · id `balance_ledger_contract_income`*
 
 ### Battle card (Selection element, battle kind)
 
@@ -59,6 +67,46 @@ alphabetical order.
 **Because:** Placement carries terrain, deposit, slot and now logistics-reach rules (BL-323). A refusal the player cannot read is indistinguishable from a broken build, so the panel must state the reason, not merely deny.
 
 *Demanded by BL-029, BL-082, BL-095, BL-367 · `src/ui/construction_panel.cpp` · id `construction_panel`*
+
+### Contract card (Selection element, contract kind)
+
+**Answers:** What did I actually agree to, and what have I been paid for it so far?
+
+**Because:** SELECTION.md's battle element is this card's own precedent: a mercenary_contract has no entity id, so — like a battle — it resolves before selection_kind_of and owns its whole layout rather than the shared action|facts split. It earns its space by being the one place the four facts a contract's OWN record carries sit together: the predicate (via condition_text, the same reader the Balance ledger's laws listing already uses, so a contract's terms and a law's conditions never read in two different vocabularies), the committed force (CONTRACTS.md Q1 — the player names the force, never the contract, so the card is where that choice is read back), the deadline the tick-evaluation pass judges it against, and the fee SPLIT — deposit already paid versus the remainder still owed on completion — because 'the fee is 400cr' hides the one number that actually matters mid-contract: how much is still at stake.
+
+*Demanded by BL-577 · `src/ui/selection.hpp`, `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp` · id `contract_card`*
+
+### Public channel (comms dock) — mercenary-contract dispatches
+
+**Answers:** What is happening to the mercenary work I have taken or am chasing, without me having to hold the ledger open?
+
+**Because:** CONTRACTS.md's EVENTS.md-derived rule is that an event lands with its message in the SAME change: offer issued, accepted, completed, failed and abandoned are the five moments a contract's money and reputation actually move, and none of them had a surface before this — a completed contract paid out silently. The Public channel is the only correct home rather than a new channel of its own (unlike the battle dispatch stream): CHAT.md already settles Public as nation-voiced, and a contract's counterparty on the client side IS a nation, so the wording is the SAME first-person register post_nation_agency_comms already established, not a new voice to learn. Phrase selection folds the record's own stable id with the event kind (the BL-290 tongue-bank idiom battle_dispatch_line already uses), so replays read identically and no RNG draw is spent narrating a fact the simulation already decided.
+
+*Demanded by BL-577 · `src/core/battle_dispatch_text.cpp`, `src/core/session_history.cpp`, `src/world/nation_step.cpp`, `src/world/nation_step.hpp` · id `contract_events_public_channel`*
+
+### Contracts ledger - Active view
+
+**Answers:** What am I on the hook for right now, and what does walking away cost?
+
+**Because:** An accepted mercenary_contract commits real units and a real deposit; the player needs to see the predicate it is paying to make true (condition_text), the deadline, and the force committed to it. The Abandon press exists because CONTRACTS.md Q2 makes an early exit cheaper than a rout but never free — the reputation cost has to be shown BEFORE the press commits, not discovered afterward, or the ledger would be teaching the wrong lesson about the one number that makes abandoning a real decision.
+
+*Demanded by BL-576 · `src/ui/contracts_ledger.cpp` · id `contracts_ledger_active`*
+
+### Contracts ledger - History view
+
+**Answers:** How has this line of work actually gone for me?
+
+**Because:** CONTRACTS.md Q2 names three terminal states (completed / failed / abandoned) with three different money and reputation outcomes, deliberately against procurement's two — failure is the mechanism's teeth ('you are not paid for trying'). A player cannot read their own standing spiral (CONTRACTS.md: reputation falls, fees fall with it) without a record of which contracts ended which way and what they actually paid; without this view every terminal contract vanishes into the sentiment substrate with nothing on screen to show for it.
+
+*Demanded by BL-576 · `src/ui/contracts_ledger.cpp` · id `contracts_ledger_history`*
+
+### Contracts ledger - Offers view
+
+**Answers:** Who wants to hire me, for what, and can I afford to say yes?
+
+**Because:** CONTRACTS.md settles the mercenary contract as the sell side of the income loop: a client nation offers a fee to make a fact about the world true by a deadline. Without a surface listing open offers the player cannot act on the mechanism at all — offers exist in world::mercenary_offers whether or not anyone can see them, which is exactly the BL-089 activity-fog framing this view honours (an offer is hidden unless its target body is at least Known). The view is also where the force-picker lives: CONTRACTS.md Q1 rules the player chooses the force, never the contract, so the Accept press has to open onto something.
+
+*Demanded by BL-576 · `src/ui/contracts_ledger.cpp` · id `contracts_ledger_offers`*
 
 ### AI decision feed
 
@@ -200,9 +248,9 @@ alphabetical order.
 
 **Answers:** What is this unit/unit-stack, how strong is it, what type is it, who owns it, and can I do anything with it?
 
-**Because:** selection_kind::unit existed but fell through to the generic action/facts split with a bare Go to button - the only selection kind still on that path once the tile (BL-123) and building (BL-431 rework) cards moved to the 3-column band shape. BL-393 (UNITS_ARE_WRITE_ONLY_AND_INERT) already flags that units are largely inert in the live economy; Ben's direction was to build the CARD shape now anyway rather than wait on combat, so a unit selected today reads real unit_component fields (strength, count, roster type, owner) in the same picture/pager/actions shape as everything else, instead of standing out as the one kind that still looks unfinished. Paired with a repeat-click tile-cycle (Soldier -> Building -> Tile) in body_surface_canvas.cpp so a tile carrying a unit is actually reachable by clicking.
+**Because:** selection_kind::unit existed but fell through to the generic action/facts split with a bare Go to button - the only selection kind still on that path once the tile (BL-123) and building (BL-431 rework) cards moved to the 3-column band shape. BL-393 (UNITS_ARE_WRITE_ONLY_AND_INERT) already flags that units are largely inert in the live economy; Ben's direction was to build the CARD shape now anyway rather than wait on combat, so a unit selected today reads real unit_component fields (strength, count, roster type, owner) in the same picture/pager/actions shape as everything else, instead of standing out as the one kind that still looks unfinished. Paired with a repeat-click tile-cycle (Soldier -> Building -> Tile) in body_surface_canvas.cpp so a tile carrying a unit is actually reachable by clicking. BL-575 (unit marker + march UI, 2026-08-23) answers the "can I do anything with it" half for real: the action grid gained March (arms province-picking on the Planetary canvas, then dispatches corp_verb::march_unit on the qualifying province click), Halt (clears the standing order) and Disband (permanent, confirm popup, no refund — MILITARY.md § Marching) alongside the existing Go to, replacing three of the five reserved slots. All three route through the SAME corp-command seam corp_ai scores for rival units, so the player takes no shortcut around it.
 
-*Demanded by BL-393 · `src/ui/selection_panel.cpp`, `src/ui/selection_panel.hpp`, `src/ui/ui_state.hpp`, `src/ui/body_surface_canvas.cpp` · id `selection_unit_card`*
+*Demanded by BL-393, BL-575 · `src/ui/selection_panel.cpp`, `src/ui/selection_panel.hpp`, `src/ui/ui_state.hpp`, `src/ui/body_surface_canvas.cpp`, `src/core/app.cpp` · id `selection_unit_card`*
 
 ### Starting-corp selection stage (app_screen::choosing_corp, app::draw_corp_choice_screen)
 
@@ -243,6 +291,14 @@ alphabetical order.
 **Because:** Colour alone could not carry both halves once BL-519 split the terrain axes. The substrate and the cover blend into ONE fill, so a rocky slope with a thin wood and a sedimentary plain with a thin wood arrive at neighbouring greens and the player cannot tell which they are siting on. Texture separates the two readings onto separate channels: a faint substrate grain that says what the ground is, and a per-tile cover pattern whose mark count and weight scale with cover_density, so a sparse wood LOOKS thin exactly where the economy already CUTS it thin. It earns its space by being free of any: it adds no chrome, no legend and no control, and it is the only way a cover boundary reads as a boundary now that BL-511's province blend deliberately smooths the fills.
 
 *Demanded by BL-520, BL-519 · `src/ui/hex_render.cpp`, `src/ui/body_surface_canvas.cpp` · id `tile_texture`*
+
+### Unit marker (Planetary canvas, province anchor tile)
+
+**Answers:** Where are my (and my rivals') forces standing, and whose are they?
+
+**Because:** Units had no on-canvas glyph at all before this (ICONS.md previously documented Unit as "(no glyph)"), reachable only by clicking the exact tile a unit stood on or cycling into it — a large province full of units was otherwise invisible on the map. BL-511 made a unit's command grain the PROVINCE (march_unit targets a province, not a tile), so the marker follows the same province-anchor convention the battle marker already established: drawn once per (province, owner) GROUP at the province's lowest-member-tile anchor, with a "+N" count badge for more than one unit in the group, rather than once per unit or per tile. The humanoid silhouette echoes the unit card's own placeholder glyph (glyph_soldier) so the canvas and the card read as one vocabulary. Carries a stub ring for contract-committed units (always false today; BL-573, a later wave of the same Sprint 16 batch, adds the real per-unit flag) so that later item needs no further UI plumbing change.
+
+*Demanded by BL-575, BL-511 · `src/ui/body_surface_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/icons.hpp`, `src/ui/ui_state.hpp` · id `unit_marker`*
 
 ---
 

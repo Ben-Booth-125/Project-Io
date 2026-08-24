@@ -529,6 +529,35 @@ in `tools/verify/README.md`.
   C2/C3 go red, 4 of 7 rivals never due. **Any harness that sets `current_day_tick` before
   stepping must set `current_econ_tick` too**, or it measures a sim where only index 0 acts.
 
+- **`mercenary_contract_harness`** — The mercenary-contract seam, accept through evaluate through
+  pay-or-fail (BL-573, Sprint 16 Wave 4; extended by BL-574, Wave 5). 66 checks. BL-573's own
+  R1-R6 prove the mechanism at all: `accept_offer` as an untrusted seam (every rejection mutates
+  nothing), the double-commit/unit-lock rule, tick evaluation ("take" judges only at the deadline,
+  "hold" fails the moment its predicate goes false), abandonment as a distinct lesser penalty than
+  failure, `active_mercenary_contract_for` wired for real, and determinism by replay.
+
+  **BL-574 added M1-M7**, the item's own "one observed instance of every contract terminal state"
+  requirement. Three are already satisfied elsewhere and not duplicated: **M1** (an offer issued
+  by a threatened nation) by `nation_scorer_harness.cpp`'s own R8a-R8e, **M5** (abandon) by this
+  file's own R4, **M7** (a mid-contract save/load round trip) by `save_roundtrip.cpp`'s own P12.
+  The rest are new rows in this file: **M2** proves the OTHER half of "accept conserves exactly"
+  — the client nation's treasury is untouched by `accept_offer` itself; **M3** replays a "take"
+  completion off a REAL, hand-built decisive battle (the `battle_engagement_harness.cpp` B15
+  idiom) rather than a hand-set `province_holder`; **M4** extends the existing early-fail "hold"
+  row with the money outcome and the reputation ORDERING CONTRACTS.md § Q2 demands (a hold
+  contract's failure costs strictly more Trust than an otherwise-identical abandon); **M6**
+  extends the existing determinism row with a `world::state_hash` comparison.
+
+  **NOTE (NR-583):** the item's own requirement text describes M4's failure as having "the escrow
+  returned" — a `mercenary_contract` carries no escrow field at all, and the code never returns
+  one on failure (only a still-open OFFER's TTL expiry does, before acceptance, a different event
+  R8e already covers). M4 asserts the actually-observed behaviour instead; flagged rather than
+  silently reworded, since amending the requirement text is out of this item's scope.
+
+  Live-Lua, same shape as `condition_set_harness`'s C9 row: needs both `recipe_registry` and
+  `contract_template_registry`. Hand-declared in `CMakeLists.txt`, listed in
+  `IO_TEST_SCRIPT_ROOTED_HARNESSES` — run with the repo root as the working directory.
+
 - **`tile_axes_harness`** — The substrate/cover terrain split (BL-519, 2026-08-21). 13 checks over
   the two-axis replacement for `terrain_composition`: the density invariant (density is 0 **iff**
   cover is `none`), `cover_fraction` monotonicity, `is_biotic_cover` membership, and — the rows that
@@ -671,6 +700,31 @@ ctest --test-dir build -R determinism_harness        # one, by name
 only when building outside the CMake tree.
 
 ## Procedure
+
+0. **No configured build tree? Use the one-line builder** (Ben, 2026-08-23, ruling on NR-392):
+
+   ```
+   node tools/verify/build_harness.js <name> [--run] [--debug]
+   ```
+
+   This is the path for a **worktree agent**, a **fresh clone**, or any session whose network
+   policy refuses FetchContent — `cmake -B build` pulls SDL3, Lua, sol2 and ImGui from
+   codeload.github.com, which some sessions get a 403 for, and none of it is needed for a headless
+   check. It replaces two ad-hoc recipes that said the same thing in two dialects: the
+   agent-authored `build_gen_harness.bat`, and the Linux lib-then-link recipe.
+
+   It globs **every `src/world/*.cpp` minus the four sol2/Lua TUs** — the same set CMake's
+   `io_world_obj` uses — so the source list cannot rot the way a hand-picked one does. It picks
+   `cl` behind `vcvars64` on Windows and `g++` elsewhere, writes to `build_gen/verify/<name>`, and
+   deletes any stale binary first so a failed compile can never be mistaken for a fresh pass.
+   `--debug` adds ASan/UBSan, which is what to reach for when proving a row can fail.
+
+   It **refuses by name** the two harnesses needing a live Lua state (`pregame_balance_harness`,
+   `persona_counsel_harness`) — build those through CMake. That a headless build cannot reach the
+   shipped Lua configuration at all is a standing gap, recorded as NR-558.
+
+   Prefer `cmake --build build --target <name>` when a configured tree exists; this is the fallback,
+   not the default.
 
 1. **Compile** from the repo root, after sourcing the VS `vcvars64`. From Git Bash the quoting
    fails, so write a one-off `.bat` that `call`s vcvars then builds, and invoke it by **absolute

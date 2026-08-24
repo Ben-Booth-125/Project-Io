@@ -46,6 +46,22 @@ stopped asking "what does the median world look like?" and started asking "show 
 playing" — and immediately found both named exemplar seeds and a real defect (rivers never reached
 the inland sea) that every median-based harness had missed.
 
+**A generation pass hands the harness its own arguments back** (Ben, 2026-08-23, ruling on NR-557).
+A harness that reproduces a generation pass must not *reconstruct* the arguments that pass was
+called with — it must be **given** them. The entry point takes an optional out-parameter that
+captures what it actually used: params, seed, and whatever content registries it was handed.
+
+The reason is the one failure this project keeps meeting from new directions: **two constructions of
+one call will drift**, and the drift is silent because both sides look reasonable. A harness that
+rebuilt the arguments by hand measured a 4000-year sim against a game that runs 400, on a different
+band count, with a different seed fold — and read as authoritative for a day. Capturing beats
+mirroring, because a mirror is a second source of truth maintained by hand.
+
+This is distinct from the two nearby shapes: `generation_report` is **presentational** (what a
+reader is shown), and the Generation Ledger is a **why-surface** (what explains a tile). This is
+neither — it is the call's own inputs, returned so a second caller can be identical rather than
+similar. It applies to every generation entry point, not only the one that first needed it.
+
 ### What to test
 
 Focus on the simulation's pure, deterministic logic — the parts that transform state — in `world/*` (no SDL/Lua/ImGui):
@@ -80,6 +96,18 @@ Do not test rendering, ImGui panels, or SDL3 platform behaviour in a harness —
 - One `tools/verify/<name>.cpp` per behaviour; `#include` the `world/*` headers it needs and build a small fixture (usually `make_hard_coded_world()` or a hand-built registry).
 - Print one `PASS`/`FAIL`/`WARN` line per assertion, naming what failed, and `return` non-zero on any hard failure so CTest detects it.
 - Keep it free of SDL/Lua/ImGui so it links against the `world/*` superset (`recipe_registry.cpp` excepted — it pulls sol2/Lua). CMake's `foreach` over `tools/verify/*.cpp` wires each one into `ctest` automatically; name a genuinely new *check class* in the `verifier-headless` skill so it stays discoverable.
+- Build one without configuring CMake: `node tools/verify/build_harness.js <name> [--run]`. It globs the same `src/world/*.cpp` set minus the four sol2/Lua TUs that `io_world_obj` uses, so the source list cannot drift stale, and it works on both toolchains — `cl` behind `vcvars64`, `g++` otherwise. This is the path for a worktree agent or any session whose network policy refuses FetchContent (NR-392, NR-264). `--debug` adds ASan/UBSan. A harness needing a live Lua state is refused by name.
+
+**Prove a new row can fail (Ben, 2026-08-23, ruling on NR-547).** On a row asserting a **rule or an
+arithmetic result**, mutate the subject so the row *should* go red, and confirm it does, before
+believing a green. Cheap regression rows — a count, a round-trip, a smoke pass — are exempt; the
+ruling is deliberately not "every row", because that taxes the rows that are already fine.
+
+The evidence is three deep. Sprint N1 ran three implementing agents, each writing the code **and**
+its harness; all three harnesses passed — 17/17, 39/39, 25/25 — and **two of the three subjects were
+unsound**. Not one defect was found by reading. Separately, a mutation probe once passed because a
+fallback masked the mutation, and an 81/81 report was hollow because the process segfaulted mid-run
+and two cases never executed. A harness you have never seen fail is a harness you have not tested.
 
 ### Visual verification (rendering / lenses)
 

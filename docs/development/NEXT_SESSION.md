@@ -77,7 +77,7 @@ crying wolf.
   the *original* six-item carry set (`BL-428`/`429`/`430`/`431`/`432`/`433`),
   three of which had already landed and three of which were absorbed by other
   work. It now names the real ten-item set and the 2026-08-23 re-plan.
-- **`NR-577`** (open, `docs/development/NEEDS_REVIEW.json`) records that a
+- **`NR-589`** (open, `docs/development/NEEDS_REVIEW.json`) records that a
   ruling — "delete the dominated sibling" — was taken on that same stale
   paragraph, and was not acted on: the four pairs it names are not dominated
   under the live guard, and deleting them would have stranded three raws as
@@ -98,4 +98,4 @@ crying wolf.
 
 See also: `sprints.json`'s `"17"` entry (full rulings + notes),
 `docs/development/req/requirements.json`'s `interchangeable-methods-exist`
-group, and `NR-577`/`NR-578`/`NR-579`.
+group, and `NR-589`/`NR-590`/`NR-591`.

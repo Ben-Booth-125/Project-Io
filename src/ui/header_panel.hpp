@@ -4,6 +4,8 @@
 
 #include <vector>
 
+struct economy_report;
+
 namespace ui {
 
 /// Draw the player's persistent financial header strip.
@@ -23,10 +25,15 @@ namespace ui {
 /// @param w               Read-only world (player corporation, pools, markets).
 /// @param balance_history Recent player balances, oldest→newest, one per economy
 ///                        tick; drives the net figure and the sparkline.
+/// @param report          This tick's economy report — read only for
+///                        `budgets[player].subsidies` (BL-577), so the RUNWAY
+///                        tooltip can name a contract payment that moved the
+///                        balance rather than leaving it as an unexplained jump.
 /// @param left            Left edge of the strip (clear of the navigation pane).
 /// @param right           Right edge of the strip (clear of the time column).
 void draw_header_panel(const world& w,
                        const std::vector<float>& balance_history,
+                       const economy_report& report,
                        float left,
                        float right);
 

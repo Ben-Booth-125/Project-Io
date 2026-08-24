@@ -1188,4 +1188,23 @@ struct nation_component
     /// treasury divergence is only detectable through the debit half on corp
     /// balances (review 2026-08-19 #3).
     float treasury = 0.0f;
+
+    /// BL-571 (nation garrisons): the tile the nation's Pass-1 seed grew from —
+    /// the same "region the realm grew out of" reading Pass 5 already uses to
+    /// pick a tongue for the nation's name, restated as a tile rather than a
+    /// tongue. `null_entity` for a nation with no surviving seed to point at
+    /// (should not occur for a generated nation, but a hand-built harness
+    /// fixture may skip Pass 1 entirely).
+    ///
+    /// This is the closest thing to a "capital" the world holds today —
+    /// nothing else names one — and it exists so garrison seeding has a fixed
+    /// point to anchor the capital garrison on: `province_of(capital_tile)` is
+    /// MILITARY.md's "nation's capital province". Computed once in Pass 5
+    /// (nation_generation.cpp), before the province partition even exists, so
+    /// it is stored as a TILE rather than derived as a province at that point.
+    ///
+    /// SERIALISED (world_save.cpp's nation record) since this item, which is
+    /// why `world_save_version` moves with it — a v4 stream simply predates
+    /// the field and has nowhere to source it from.
+    entity_id capital_tile = null_entity;
 };

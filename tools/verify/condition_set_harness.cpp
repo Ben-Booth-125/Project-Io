@@ -20,11 +20,21 @@
 //   C6  A MILITARY subject works. BL-094's design test at the foundation: the
 //       type is not shaped so that only economic quantities can be asked about.
 //   C7  An unknown corporation measures zero everywhere and never throws.
+//   C8  BL-570: `province_held` reads `world::province_holder` correctly for a
+//       holder, a non-holder and a sea province, plus the unset/absent-id cases
+//       an authored contract template leaves.
+//   C9  BL-570: `scripts/contracts.lua`'s `contract_templates` table loads
+//       through the protected sol2 path (a real `lua_state`, not a hand-built
+//       fixture) and its id -> index reference round-trips.
 //
 // The process exits non-zero if any assertion FAILs.
 
 #include "world/condition_set.hpp"
+#include "world/contract_template.hpp"
+#include "world/province.hpp"
 #include "world/world.hpp"
+
+#include "scripting/lua_state.hpp"
 
 #include <cstdio>
 #include <string>
@@ -303,6 +313,105 @@ int main()
         check(!evaluate_condition(c, w, ghost), "C7b a non-empty predicate fails for an unknown corp");
     }
 
+    // --- C8: province_held (BL-570) ------------------------------------------
+    std::printf("\n-- C8  province_held (BL-570) --\n");
+    {
+        // A hand-built partition of three provinces, positionally aligned with
+        // world::province_holder exactly as province.hpp specifies -- ids need
+        // not be contiguous or match position, only ascending, which is
+        // province_partition::find's (binary search) actual contract.
+        fixture g = make_fixture();
+        const entity_id rival = g.w.create_entity();
+        g.w.corporations[rival] = corporation_component{};
+
+        province held_by_corp;   held_by_corp.id   = 10; held_by_corp.body = g.body; held_by_corp.tiles = { 100 };
+        province held_by_rival;  held_by_rival.id  = 20; held_by_rival.body = g.body; held_by_rival.tiles = { 200 };
+        // The sea case: a REAL open-ocean tile, so province_kind_of genuinely
+        // reads open_ocean here -- not just an entry that happens to be
+        // null_entity for some other reason. seed_province_holders (BL-569,
+        // its own harness) is what proves the SEEDING skips this domain; this
+        // fixture only needs to prove measure_condition reads whatever
+        // province_holder actually stores, sea included.
+        province sea; sea.id = 30; sea.body = g.body; sea.tiles = { 300 };
+        tile_component sea_tile{}; sea_tile.body = g.body; sea_tile.substrate = terrain_substrate::ocean;
+        g.w.tiles[300] = sea_tile;
+
+        g.w.provinces.provinces = { held_by_corp, held_by_rival, sea }; // ascending id, per the partition's contract
+        g.w.province_holder     = { g.corp, rival, null_entity };      // positionally aligned with the line above
+
+        check(province_kind_of(g.w, sea) == province_kind::open_ocean,
+              "C8a the fixture's sea province really is open_ocean (not a stand-in null)");
+
+        condition c = make(condition_subject::province_held, condition_comparator::at_least, 1.0f);
+        c.province = held_by_corp.id;
+        check(measure_condition(c, g.w, g.corp) == 1.0f, "C8b province_held reads 1 for the subject corp's own province");
+        check(evaluate_condition(c, g.w, g.corp), "C8c >= 1 holds for the corp's own province");
+
+        c.province = held_by_rival.id;
+        check(measure_condition(c, g.w, g.corp) == 0.0f, "C8d province_held reads 0 for a province the RIVAL holds");
+        check(!evaluate_condition(c, g.w, g.corp), "C8e >= 1 fails for a rival-held province");
+        check(measure_condition(c, g.w, rival) == 1.0f, "C8f the SAME province reads 1 for the corp that actually holds it");
+
+        c.province = sea.id;
+        check(measure_condition(c, g.w, g.corp) == 0.0f, "C8g province_held reads 0 for a sea province (no holder is ever recorded)");
+        check(measure_condition(c, g.w, rival) == 0.0f, "C8h ...for every corp, not just the subject of C8g");
+
+        // The unset default and an id no province in the partition carries --
+        // "an unset field measures 0, never guesses" (the same honesty rule
+        // C2i/C7a exercise for research/unknown-corp).
+        condition unset = make(condition_subject::province_held, condition_comparator::at_least, 1.0f);
+        check(unset.province == no_province, "C8i condition::province defaults to no_province, not 0");
+        check(measure_condition(unset, g.w, g.corp) == 0.0f, "C8j an unset province measures 0");
+        c.province = 999999u; // in range, but no province in this partition carries it
+        check(measure_condition(c, g.w, g.corp) == 0.0f, "C8k a province absent from the partition measures 0, not a crash");
+
+        check(condition_subject_is_integral(condition_subject::province_held),
+              "C8l province_held is declared integral (held or not -- never a fractional 0.5)");
+    }
+
+    // --- C9: contract-template table load + round-trip (BL-570) -------------
+    std::printf("\n-- C9  contract_templates (scripts/contracts.lua) --\n");
+    {
+        lua_state lua;
+        lua.load("scripts/contracts.lua"); // throws (protected sol2 path) on any parse/runtime error
+
+        contract_template_registry reg;
+        reg.load_from_lua(lua); // throws, naming the row/field, on anything malformed
+
+        check(reg.size() == 2, "C9a contract_templates loads exactly the two authored rows");
+
+        if (reg.size() == 2)
+        {
+            const contract_template& take = reg.at(0);
+            const contract_template& hold = reg.at(1);
+
+            check(take.id == "take" && hold.id == "hold", "C9b the two rows load in authored order (take, hold)");
+            check(!take.continuous, "C9c 'take' is point-in-time (continuous = false)");
+            check(hold.continuous, "C9d 'hold' is continuous (must hold every tick to the deadline)");
+            check(take.predicate.subject == condition_subject::province_held
+                      && hold.predicate.subject == condition_subject::province_held,
+                  "C9e both rows' predicate.subject parses as province_held");
+            check(take.predicate.comparator == condition_comparator::at_least
+                      && hold.predicate.comparator == condition_comparator::at_least,
+                  "C9f both rows' predicate.comparator parses as at_least");
+            check(take.predicate.operand == 1.0f && hold.predicate.operand == 1.0f,
+                  "C9g both rows' predicate.operand parses as 1");
+            check(take.predicate.province == no_province && hold.predicate.province == no_province,
+                  "C9h neither row authors a province -- it is bound per accepted offer, not in the template");
+            check(take.deadline_ticks > 0 && hold.deadline_ticks > 0,
+                  "C9i both rows carry a positive deadline_ticks");
+
+            // C9j: the round trip a saved contract's template reference makes --
+            // id -> index -> the SAME row, and an id that was never authored
+            // resolves to "not found" rather than to some other row.
+            check(reg.index_of("take") == 0 && reg.index_of("hold") == 1,
+                  "C9j index_of round-trips each row's own id to its own position");
+            check(&reg.at(static_cast<std::size_t>(reg.index_of("hold"))) == &hold,
+                  "C9k the resolved index names the identical row, not a coincidentally-equal one");
+            check(reg.index_of("siege") == -1, "C9l an unauthored id resolves to -1, not a guess");
+        }
+    }
+
     // --- rendering ----------------------------------------------------------
     std::printf("\n-- text rendering --\n");
     {
@@ -311,6 +420,18 @@ int main()
         const std::string t = condition_text(c);
         check(t.find(">=") != std::string::npos && t.find("100") != std::string::npos,
               "T1 condition_text renders comparator and a whole operand without a decimal tail");
+    }
+    {
+        // BL-570: province_held renders its own phrase, not the generic
+        // "<subject> <cmp> <operand>" shape -- no comparator noise, and an id
+        // since a province carries no name (province.hpp).
+        condition c = make(condition_subject::province_held, condition_comparator::at_least, 1.0f);
+        c.province = 42;
+        const std::string t = condition_text(c);
+        check(t.find("holds") != std::string::npos && t.find("42") != std::string::npos,
+              "T2 condition_text renders province_held as 'holds province #<id>'");
+        check(t.find(">=") == std::string::npos,
+              "T2b ...with no '>=' noise (the predicate is always >= 1, so restating it says nothing)");
     }
 
     std::printf("\n=== %d passed, %d failed ===\n", g_pass, g_fail);

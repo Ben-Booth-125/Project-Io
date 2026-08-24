@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*142 entries — 25 gameplay · 24 canvas · 15 lens · 45 ledger · 33 chrome.*
+*146 entries — 27 gameplay · 24 canvas · 15 lens · 47 ledger · 33 chrome.*
 
 ---
 
@@ -423,9 +423,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The universal de-escalation press — the only one of the four verbs usable from every non-neutral state, and the one that lets a corp exit hostility unilaterally even though it could not enter friendship unilaterally.
 
-### `gameplay.march_unit` — No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam.
+### `gameplay.march_unit` — The unit card's March press in the Selection element (BL-575, unit marker + march UI, landed 2026-08-23 — BL-471 was the placeholder item name; this batch folded it in). Select a unit (its own on-canvas marker, BL-575, or the repeat-click cycle), press March. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card.
 
-**Press.** No press exists. Over the seam: COMMAND corp=<id> verb=21 subject=<unit id> province=<province id>. The command is applied through apply_corp_command, which recomputes every precondition itself — a stale destination or a unit that has since been disbanded is refused, not applied.
+**Press.** Select a unit, press 'March' — this ARMS province-picking mode (the button shows the same accent-ring 'primed' state the building card's Auto press uses; pressing March again while armed CANCELS the pick, per the standing toggle rule), then click a province on the Planetary canvas to send the unit there. A click that misses every province (open ocean, off-body) is ignored and the mode stays armed. Over the seam: COMMAND corp=<id> verb=21 subject=<unit id> province=<province id>. The command is applied through apply_corp_command, which recomputes every precondition itself — a stale destination or a unit that has since been disbanded is refused, not applied.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -446,9 +446,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The only verb that moves a unit. Until it is issued, a hired unit is pinned to its muster tile forever. Two things an agent should weigh. First, movement is not free of the economy: a unit beyond the reach field loses supply_factor_permille each tick in the upkeep pass, which lowers its derived strength in the resolver — marching away from your road network makes an army measurably weaker, not merely further away. Second, ARRIVING NOW HAS A CONSEQUENCE (BL-467, 2026-08-21): standing in a province where a corp you are hostile to also has units opens a battle on the next tick, with no verb issued by anyone. Position is no longer free. And the reverse follows — this verb is REFUSED (rejected_state) for a unit already in contact, because leaving a fight is withdraw_from_battle, which is priced, not a march, which is not.
 
-### `gameplay.halt_unit` — No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam.
+### `gameplay.halt_unit` — The unit card's Halt press in the Selection element (BL-575, unit marker + march UI, landed 2026-08-23). Select a unit, press Halt. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card.
 
-**Press.** No press exists. Over the seam: COMMAND corp=<id> verb=22 subject=<unit id>. No other field is read.
+**Press.** Select a unit, press 'Halt'. Takes effect immediately — no province pick, no confirm popup (unlike Disband). Over the seam: COMMAND corp=<id> verb=22 subject=<unit id>. No other field is read.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -463,9 +463,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** You gave an order you no longer want, and the alternative — waiting for arrival — costs supply every tick out of reach. Note there is no 'resume': halting discards the path, so restarting means a fresh march_unit and a fresh route solve.
 
-### `gameplay.disband_unit` — No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam.
+### `gameplay.disband_unit` — The unit card's Disband press in the Selection element (BL-575, unit marker + march UI, landed 2026-08-23). Select a unit, press Disband, confirm in the popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card.
 
-**Press.** No press exists. Over the seam: COMMAND corp=<id> verb=23 subject=<unit id>. No other field is read.
+**Press.** Select a unit, press 'Disband' to open a confirm popup ('No refund. This cannot be undone.'), then press 'Disband' again to erase the unit or 'Keep' to back out — the same confirm-popup shape as the building card's Dismantle press. Over the seam: COMMAND corp=<id> verb=23 subject=<unit id>. No other field is read.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -497,6 +497,45 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** The withdrawal is RECORDED, not applied. It is honoured at the START of the next tick's battle pass, before that tick's round batch — which is what makes the window a real window rather than a same-instant escape. When honoured, the resolver's three-term cost (a flat base, plus a term per round already fought, plus a pursuit term scaled by how far behind the withdrawing side is) reduces that side's strength, the loss is distributed across its units proportional to count with the remainder by ascending unit id, and the side that stayed holds the field. A rejection mutates nothing at all.
 
 **Reason to select.** The ONLY decision a commander has once contact is made — a battle opens because two hostile forces share a province, not because anyone asked for it, so there is no 'attack' verb to weigh against this one. Weigh it on the cost curve rather than on the odds alone: the price rises with every round already fought AND with how badly you are losing, and the rounds themselves have already cost their own attrition, so a late withdrawal compounds twice. Breaking off early from a fight you are losing is cheap; breaking off late from one you are losing badly is where armies die. At the shipped pacing (3 rounds a tick, 6 to a stalemate) a full battle spans two ticks, so there is exactly ONE real opportunity to use this. THE CARD QUOTES THE PRICE BEFORE YOU PAY IT — base, per-round and pursuit shown separately, taken from the resolver's own arithmetic — so the cost curve is readable rather than something to infer from the rules.
+
+### `gameplay.accept_offer` — The Contracts ledger's Offers view, Accept press (BL-576). Select an offer whose escrow has cleared its fee, press Accept to open the force picker, check owned uncommitted units, press Confirm. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger.
+
+**Press.** Press 'Accept' on a fully-escrowed, unexpired offer to open a popup listing the player's own uncommitted units with a checkbox and strength each; check at least one, press 'Confirm' to dispatch, or 'Cancel' to back out with nothing sent. Over the seam: COMMAND corp=<id> verb=25 order=<offer id> counterparty=<client nation id> units=[<unit id>, ...].
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `order` | `uint32 (mercenary_offer::id)` | The offer to accept. Must name a live entry in world.mercenary_offers — consumed (erased) on success, so accepting the same id twice fails the second time. |
+| `counterparty` | `entity_id` | The offer's CLIENT NATION, not a corp — this verb's counterparty check forks on verb (corp_command.cpp). Must equal the named offer's own client field. |
+| `units` | `entity_id[8]` | The corp's OWN units to commit — unused slots are 0/null. At least one must be named, each must be owned by the acting corp and not already committed to another ACTIVE mercenary contract. CONTRACTS.md Q1: the player chooses the force, the contract never does. |
+
+**Valid when:**
+- `order` names a real, still-open offer (rejected_invalid otherwise).
+- `counterparty` names a real nation matching that offer's client (rejected_invalid otherwise).
+- `current_econ_tick < offer.deadline` — the offer has not expired (rejected_invalid otherwise).
+- `offer_escrow >= fee` — the offer is FULLY ESCROWED (rejected_state otherwise); a partially-funded offer is not yet acceptable.
+- Every named unit is real, owned by the acting corp, and not already committed to another active mercenary contract (rejected_invalid / rejected_not_owner / rejected_state otherwise); at least one unit must be named (rejected_invalid on an empty force).
+- The acting corp exists (rejected_invalid otherwise).
+
+**Expected output.** A new mercenary_contract is created: client and template copied from the offer, province bound from the offer's target, fee copied, the deposit (fee x deposit_fraction) paid straight from the offer's own already-filled escrow, deadline copied, the named units set as the committed force, state = active. The consumed offer is erased from world.mercenary_offers so it cannot be accepted twice. A rejection mutates nothing.
+
+**Reason to select.** The only way to turn a want into income. Underbidding is the loop's teeth (CONTRACTS.md): a cheap contract with too little force risks losing the fight, the fee AND the standing — reading the target's garrison strength (Offers view) against the force you are about to commit is the whole skill.
+
+### `gameplay.abandon_contract` — The Contracts ledger's Active view, Abandon press (BL-576). Select an active contract, press Abandon to see its reputation cost, confirm in the popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger.
+
+**Press.** Press 'Abandon' on an active contract to open a confirm popup showing the deposit forfeit and the reputation (Trust) cost with the client nation, then press 'Abandon' again to dispatch or 'Keep' to back out. Over the seam: COMMAND corp=<id> verb=26 order=<contract id>. No other field is read.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `order` | `uint32 (mercenary_contract::id)` | The contract to walk away from. Must be one of the acting corp's OWN contracts, still in the active state. |
+
+**Valid when:**
+- `order` names a real contract (rejected_invalid otherwise).
+- The acting corp is that contract's contractor (rejected_not_owner otherwise).
+- The contract is still active — an already-terminal contract cannot be abandoned again (rejected_state otherwise).
+
+**Expected output.** The contract's state becomes abandoned. Same money outcome as a failure — the deposit already paid at accept_offer is not clawed back, and the reserved remainder is simply never disbursed — but a DISTINCT, LESSER sentiment magnitude (contract_cancelled, not contract_failed) records that the contractor chose this rather than losing a fight (CONTRACTS.md Q2: 'an honest early exit costs less than a rout, but it still costs').
+
+**Reason to select.** An early, priced way out of a contract that reading the field has shown cannot be won — cheaper than letting it run to a failed deadline, never free. The ledger shows the exact reputation number before the press commits, not after.
 
 ---
 
@@ -723,7 +762,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `target` | `entity` | The entity under the cursor. Overlapping candidates resolve to one entity: the stack building > market > unit > PROVINCE > body is walked most-specific first, the active lens filters validity, and nearest-to-cursor (entity id breaking ties) picks a single stable winner. On the Planetary rung the ground itself resolves to the province containing the hovered tile (BL-511): the tile is still the data grain and the Selection card lists the province member tiles, their terrain and their summed deposits, but it is no longer what a plain click addresses. |
+| `target` | `entity` | The entity under the cursor. Overlapping candidates resolve to one entity: the stack UNIT > building > market > PROVINCE > body is walked most-specific first (BL-575, 2026-08-23, put the unit marker ahead of the building marker — a unit standing on a built tile must be reachable on the FIRST click, matching the repeat-click cycle's own precedence below, not only after cycling past the building), the active lens filters validity, and nearest-to-cursor (entity id breaking ties) picks a single stable winner. On the Planetary rung the ground itself resolves to the province containing the hovered tile (BL-511): the tile is still the data grain and the Selection card lists the province member tiles, their terrain and their summed deposits, but it is no longer what a plain click addresses. A unit marker (BL-575) is drawn once per (province, owner) GROUP at the province's anchor tile — the group's lowest-id unit is what a click on it resolves to; the Selection card is the same unit card either way. |
 
 **Valid when:**
 - The app is in-game (not the main menu or New World wizard).
@@ -1642,6 +1681,32 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** The view switches between the all-corporations comparison and one corporation's full profile. The selection persists across selection changes elsewhere in the game - clicking a tile does not clear it.
 
 **Reason to select.** The comparison answers 'who is winning the run and how'; the single-corp profile answers 'what is this corp's strategy made of'. Two different questions over the same window.
+
+### `ledger.nav_contracts` — Nav rail, slot 13 (Contracts icon — a page with a signed check mark)
+
+**Press.** Click the contract glyph on the left icon rail
+
+**Valid when:**
+- In-game
+
+**Expected output.** Toggles the Contracts ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows three views: Offers (open mercenary_offers the activity fog admits), Active (the player's own live mercenary_contracts), History (the player's terminal-state contracts).
+
+**Reason to select.** Answers 'who wants to hire me, what am I on the hook for, and how has it gone?' — the mercenary contract is the sell-side income loop (CONTRACTS.md) and the only door onto it.
+
+### `ledger.contracts_view_tab` — Contracts ledger, view tab strip at the top
+
+**Press.** Click the 'Offers', 'Active' or 'History' tab button
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `view` | `enum` | 'Offers' (default), 'Active' or 'History' |
+
+**Valid when:**
+- Contracts ledger is open
+
+**Expected output.** Switches the ledger to that view. Re-clicking the CURRENTLY-ACTIVE tab closes the whole Contracts ledger (toggle rule on tab strips); clicking a different tab is an ordinary view change.
+
+**Reason to select.** Offers answers 'who wants to hire me'; Active answers 'what am I on the hook for now'; History answers 'how has it gone' — three different questions over the same mercenary-contract record.
 
 ---
 

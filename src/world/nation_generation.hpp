@@ -114,3 +114,86 @@ std::vector<entity_id> generate_nations(
     const nation_params& params,
     uint32_t seed,
     struct generation_progress* progress = nullptr);
+
+// ---------------------------------------------------------------------------
+// BL-571 — nation garrisons (docs/military/MILITARY.md § Nation garrisons)
+// ---------------------------------------------------------------------------
+// Nations own units. `unit_component::owner` accepts a nation entity exactly
+// as it accepts a corp's. A garrison is seeded at generation, not hired: one
+// in the nation's capital province, plus one in each border province it
+// shares with its single highest-grudge neighbour (`nation_grudge`,
+// nation_ai.hpp). This is the FOURTH unit writer — alongside the hard-coded
+// stub, `seed_starting_military` and `hire_unit` (MILITARY.md § The unit
+// model) — and the only one whose owner is a nation rather than a corp.
+//
+// Garrisons are STATIC: they hold their seeded tile and never march. A nation
+// that wants ground HIRES — that is the whole point of the mercenary
+// contract, and a garrison that marched would make the nation its own
+// mercenary.
+
+/// Tunable parameters for garrison sizing, treasury-scaled against BL-543's
+/// value anchor (unit equipment costs ~ 2x annual salary). PLACEHOLDER
+/// NUMBERS: BL-544 (unit wage reference), the item that would give this a
+/// measured figure to derive from, has not landed — see
+/// `seed_nation_garrisons`'s own comment and BL-571's report for the flag to
+/// Ben.
+struct nation_garrison_params
+{
+    /// Floor a garrison never falls below, however poor the nation — "a poor
+    /// one a token one" (MILITARY.md), never nothing. Also the count every
+    /// nation currently gets, because `nation_component::treasury` is 0.0 at
+    /// generation for every nation (NATIONS.md: "zero at generation,
+    /// deliberately") — see the flag above.
+    int min_count = 20;
+
+    /// Additional garrison head per credit of `nation_component::treasury`.
+    float count_per_credit = 0.05f;
+
+    /// Ceiling so a large treasury cannot field an unbounded garrison.
+    int max_count = 200;
+
+    /// Roster row every garrison uses — row 0, the same default
+    /// `seed_starting_military` gives a corp's opening unit.
+    uint16_t roster_row = 0;
+};
+
+/// Seed one static garrison per nation, per `nation_garrison_params` above.
+///
+/// MUST run AFTER `build_province_partition` and `seed_province_holders`
+/// (province.hpp) — the capital-province lookup reads `w.provinces`, and the
+/// border-province test reads `province_holder_for` (BL-569), consumed here
+/// exactly as this item's brief names. `w.tile_to_nation` must also already
+/// be populated (`generate_nations` writes it).
+///
+/// DETERMINISTIC: nations walked in ascending entity id (`w.nations` is
+/// unordered); a nation's candidate neighbours and its target provinces are
+/// both gathered into `std::set`s (ascending id/province id) before any
+/// argmax or creation, so ties break on ascending id without a second sort
+/// and unit-creation order does not depend on either unordered container's
+/// layout.
+///
+/// @param w      World whose provinces, province_holder and tile_to_nation
+///               are already built; receives new nation-owned unit entities.
+/// @param params Sizing and roster tuning.
+void seed_nation_garrisons(world& w, const nation_garrison_params& params = {});
+
+/// Summed `unit_strength` (BL-459, unit_roster.hpp) of every nation-owned
+/// unit standing in the province with id @p province_id — the garrison-
+/// strength-per-province query this item provides (alongside the units
+/// themselves) for a later consumer (a contract's target-strength read,
+/// a UI surface) to read without re-deriving the ownership test.
+///
+/// At most one nation garrisons any given province BY CONSTRUCTION —
+/// `seed_nation_garrisons` places at most one — so this does not need to
+/// name which nation; a province with none, or id 0 (unpartitioned ground),
+/// returns 0.
+///
+/// ORDER-INDEPENDENT BY CONSTRUCTION: `unit_strength` is an integer, so a
+/// sum over the unordered `w.units` is associative and cannot depend on the
+/// map's layout (the same property `condition_subject::military_strength`
+/// already relies on — MILITARY.md § The unit model).
+///
+/// @param w           World whose `w.units` and `w.nations` are read.
+/// @param province_id Province to sum over.
+/// @return            Summed strength (`unit_strength`'s own `int64_t`), or 0.
+int64_t garrison_strength_in(const world& w, uint32_t province_id);

@@ -40,7 +40,25 @@ commit timestamps rather than reviving an unstarted timer.)
 
 ---
 
-## Where things stand (updated 2026-08-18)
+**Active-sprint cap (Ben, 2026-08-23).** No more than 3 sprints open/proposed at once — enough
+that a session doesn't have to weigh a long tail of undocumented parallel work.
+
+**Sprint-number ceiling (Ben, 2026-08-24): keep sprints 18 and below.** Nothing is planned or
+authored past sprint 18 — narrower than the count cap above, this bounds *how far ahead* the
+sprint horizon is allowed to reach at all.
+
+**Unstarted plans are DELETED, not archived (Ben, 2026-08-24).** A sprint that was only ever
+open/proposed and never really executed is a stale reference once dropped — closing it and
+keeping its prose around just to reopen the same number later isn't worth the upkeep. On adopting
+the cap, 27 open/proposed sprints (plus Sprint 32, authored and dropped same-day on the ceiling
+above) were removed outright from `sprints.json`, freeing their numbers rather than retiring them:
+20, 21, 22, 22-24 preamble, 23, 24, 25, 26-33, 26a, 26b, 27, 28, 29, 30, 31, 32, B1, B2, B3, C1,
+C2, C3, D2, D3, D4, N3, N4, ST1, W1. This is narrower than it looks: a sprint that actually
+**landed work** — even a partial or unsatisfying result (Sprint 19's goal NOT met, P1's rendering
+debt) — is a real historical fact and stays in the table below as closed. Only the never-executed
+ones were deleted.
+
+## Where things stand (updated 2026-08-24)
 
 | Sprint | Theme | State |
 |---|---|---|
@@ -56,52 +74,32 @@ commit timestamps rather than reviving an unstarted timer.)
 | 9 | The militia takes the field | **Closed 2026-08-10** — v0.1.5 cut; BL-325/BL-331 landed, BL-332 designed and re-versioned |
 | 10–14 | Re-sequenced 2026-08-10 (the living world inserted) | **Overtaken** — Sprints 10/11 closed 2026-08-11; Sprints 12–14 superseded 2026-08-12 by the 0 CE refocus (NR-177), never opened |
 | 15 | The 0 CE refocus (retro-recorded) | **Closed 2026-08-12** — epoch 0, 3× map, Era −1 sim wired in, mercenary seam designed |
-| 16 | The mercenary vertical slice | **Open 2026-08-12** — BL-377 playable end-to-end + BL-315 on the critical path; cuts v0.1.15 |
-| 17 | The ancient roster becomes a ladder | **Re-planned 2026-08-23** — ten items (BL-585..BL-594); the original set landed or was absorbed. Starts after Sprint 16 merges; cuts v0.1.17 |
+| 16 | The mercenary vertical slice | **Closed 2026-08-24** — re-planned 2026-08-23 in dependency order (BL-569→BL-578); all ten landed; v0.1.15 cut |
+| 17 | The ancient roster becomes a ladder | **Open 2026-08-15, re-planned 2026-08-23** — ten items (BL-585..BL-594); the original set landed or was absorbed. BL-587 landed standalone 2026-08-23; the rest start now that Sprint 16 has merged; cuts v0.1.17 |
 | 18b | Roster invariants (retro-recorded) | **Closed 2026-08-16** — BL-432 landed; BL-435 paused 4/6; BL-436 filed |
 | 19 | The economy tells the truth | **Closed 2026-08-17 — goal NOT met.** The blame moved three times and landed on supply; goldens left red and unblessed |
-| 20 | Not yet chosen | **Proposed 2026-08-17** — three candidates laid out; Ben's call |
 | 25a | The draw (upkeep, ordnance, convoy seam) | **Closed 2026-08-18** — 6/6; goldens left red and attributed |
-| 26–33 | **The Fall** — the arc to the Era −1 collapse | **Proposed 2026-08-18** — eight rulings settled; Sprint 26 is the gate. Supersedes 21, 23, 25b |
-| 26a | The three authority edits | **Open 2026-08-18** — grants landed, v0.1.11 un-parked; determinism case in flight |
-| 26b | Close-out and the doc truth pass | **Open 2026-08-18** — 6 items closed on evidence; doc pass in flight |
-| 27 | The run is retained, and its failure falsifiable | **Open 2026-08-18** — Lane A; BL-384 assertion half only, expected RED |
-| B1 | The substrate becomes a number | **Open 2026-08-18** — Lane B; substrate census harness in flight |
-| C1 | Stance, and the first cut of Logistic Points | **Open 2026-08-18** — BL-448+449+461 build, BL-464 design-only |
-| W1 | The watch — an agent plays, a human watches | **Open 2026-08-19** — all three items LANDED same day; first watch session ran (local model attached); open on the live-check rows + BL-481/BL-306 |
 | D1 | A tech can express a buff | **Closed 2026-08-19** — BL-479 complete same-day; 35/35; BL-443 rider deliberately not taken (NR-296 is Ben's) |
-| D3 | A law has an author, and a tax is a transfer | **Open 2026-08-19** — BL-480 LANDED, harnesses green; open on the NR-382 rate ruling + the live levy-line look |
-| B2 | Roads that reach, ports that mean something | **Open 2026-08-20** — Lane B; the three road_generation cuts, then BL-188 un-parked |
-| B3 | Density, and corporations stop all being the same thing | **Open 2026-08-20** — Lane B; the density clamp is still sized for the 180×84 map |
-| C3 | The engagement trigger, and the fight you can watch | **Open 2026-08-21** — BL-467 **LANDED** (26/26; a fight now happens through the real tick). Rider MEASURED not taken (NR-467); open on the rate ruling |
-| D4 | The border costs something (the international half) | **Open 2026-08-20** — depends on D3's treasury and Lane B's routes |
 | P1 | The province becomes a thing you can see, and then a thing worth seeing | **Closed 2026-08-21** — done_when met by BL-515, then overshot by five: the NR-438/439 ceiling ruling, BL-519 axis split, BL-520 texturing, BL-516 water kinds, BL-521 click injection. **Owed: nothing was rendered** |
-| ST1 | A global style sheet — narrowing down the visual language | Open 2026-08-22 — Joe's design track; drafting GLOBAL_STYLE_SHEET.md against iterated composite renders |
 | N1 | The two spines, landed inert | Closed 2026-08-23 — all three landed inert; two of the three were UNSOUND and were fixed in the closing pass (NR-546, NR-547) |
 | N2 | The spines move | Closed — three lanes merged; one lane’s interpretation withdrawn after adversarial verification (NR-554) |
-| N3 | The spines get a caller | Planned |
-| N4 | The channel becomes visible | Planned |
 
-Every other sprint number that has ever appeared in this file (3–5's original theming, 17–18,
-20–24, 25b, and the full Lane A/B/C/D breakdown of the 26–33 arc — 28, 29, 30, 31, B2, B3, C2,
-C3, D1–D4) is recorded in `sprints.json` with its full goal/planned/risk/notes prose, whether it
-closed, was superseded, or is still a live proposal awaiting Ben's pick.
+Sprint numbers 20–32 (and the lettered Fall-arc lanes B1–B3, C1–C3, D2–D4, plus N3, N4, ST1) do
+**not** appear above — they were never-executed open/proposed sprints, deleted outright 2026-08-24
+rather than kept as closed placeholders (see the ceiling note above). If one of these is picked
+back up, it is authored fresh against the current docs, under a number that fits the ceiling —
+not resurrected under its old number.
 
-**Next up.** As of **2026-08-21**, Sprint **P1 is closed** — its own done_when was met by BL-515 and
-the sprint then absorbed Ben's whole tile/province brief of that date (six items, PR #49). The lane it
-hands off to is **C3 — the engagement trigger**, and it is now unblocked: BL-448 (stance), BL-459 (the
-unit→stack bridge) and BL-515 (provinces) have all landed, and NR-439 — *is a 13–16 tile province an
-acceptable battle envelope?* — was settled on 2026-08-21, which BL-467's own design named as wanting
-settlement **before** it rather than after. The gap C3 closes is the sharpest one on the board: both
-battle resolvers are compiled, harnessed, and have **no production caller**, so the military layer can
-compute a fight but cannot have one.
+**Next up.** As of **2026-08-24**, only **16** (mercenary vertical slice) and **17** (economy
+breadth) are active — both fit the sprint-number ceiling on their own. A third slot is open under
+the count cap, but nothing fills it yet: any candidate has to be numbered 18 or below. **BL-518**
+(the Era −1 sim redrawing borders as its wars resolve) and **BL-514** (blend all tiles, HELD) are
+not part of either active sprint and stay parked in `backlog.json`.
 
-Also open: W1 (the watch), D3 and D4 as the Lane D pair, B1/B2/B3 (Lane B), C1's BL-464 design half,
-and the still-open Fall gate sprints (26a remainder, 26b remainder, 27). Sprint 20's three candidates
-remain Ben's call, unopened. **BL-518** (the Era −1 sim redrawing borders as its wars resolve) is
-carried out of P1 still design-owed, with three genuinely undecided questions; **BL-514** (blend all
-tiles) stays HELD, and BL-520 has now given it a second reason to be decided, since texture and the
-blend are in direct tension.
+**Also deleted 2026-08-24, same basis:** six orphaned backlog items (BL-579–BL-584) a concurrent
+review-queue-purge session had filed with no sprint attached, plus Sprint 32's own three items
+(BL-595–BL-597, Logistic Points / Throughput lens) — all unstarted, all removed from
+`backlog.json` outright rather than archived.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in
 that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI

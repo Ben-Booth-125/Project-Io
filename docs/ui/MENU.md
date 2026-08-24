@@ -6,7 +6,7 @@ The **navigation pane** is a fixed, full-height **icon rail** pinned to the left
 
 ## Structure
 
-- A vertical strip of **twelve square icon slots** (`nav_pane.cpp`, `tab_count`; the rail's legibility model is BL-174, nav-rail legibility): the **nine curated player slots** below, then a **three-slot developer / observability tail** (§ The tail). Of the nine, **five carry their own subject** — Corporation overview, Budget, Market Ledger, Construction, History. **Three carry a provisional occupant** — a surface standing in for the slot's subject, because that surface would otherwise have no door: Workforce hosts the **Economy panel** (BL-292, economy panel door), Research the **tech-tree design mock** (BL-310, tech-tree mock), Diplomacy the **all-corporations balance table** (NR-012). Each of the three keeps its real subject's name and glyph, lit like any other live slot, so the rail does not teach the wrong vocabulary; the tooltip says what the slot holds for now. **One is reserved** — Corp. Strategy — disabled, but carrying its own dimmed glyph so the rail teaches the shape of the game rather than showing a blank.
+- A vertical strip of **thirteen square icon slots** (`nav_pane.cpp`, `tab_count`; the rail's legibility model is BL-174, nav-rail legibility): the **nine curated player slots** below, a **three-slot developer / observability tail** (§ The tail), then **one further player-system slot** (§ Slot 13 — Contracts) appended after the tail rather than inside it. Of the nine, **five carry their own subject** — Corporation overview, Budget, Market Ledger, Construction, History. **Three carry a provisional occupant** — a surface standing in for the slot's subject, because that surface would otherwise have no door: Workforce hosts the **Economy panel** (BL-292, economy panel door), Research the **tech-tree design mock** (BL-310, tech-tree mock), Diplomacy the **all-corporations balance table** (NR-012). Each of the three keeps its real subject's name and glyph, lit like any other live slot, so the rail does not teach the wrong vocabulary; the tooltip says what the slot holds for now. **One is reserved** — Corp. Strategy — disabled, but carrying its own dimmed glyph so the rail teaches the shape of the game rather than showing a blank.
 - Each slot shows a **vector glyph** (`src/ui/icons.hpp`) instead of a worded label; the slot's name plus a one-line blurb is shown in a wrapping hover tooltip. The rail is deliberately narrow — the profile above keeps its own (wider) `profile_panel_width` rather than matching the rail.
 - Each slot toggles a panel open/closed; the open slot lights its glyph in the selection accent — the same idiom as the minimap lens bar, so the two icon strips read as one vocabulary.
 - Opened menus **fold out into the shell column** to the rail's right (`foldout_begin`, `src/ui/foldout_column.hpp` — see `LAYOUT.md` § Ledger windows). **Nothing floats and there is no ✕**: closing is the toggle — re-click the slot, re-click the active sub-view tab (the toggle rule, `.claude/rules/io-standing-rules.md`), or open another slot (accordion, `close_all_panels`).
@@ -29,6 +29,29 @@ Slots 10–12 sit after the curated nine and never displace them; the tail is wh
 | 12 | **Strategy readout** (`icons::readout`) | the feed's aggregate companion — verb mix, spend buckets and reason tally per corp over the recent run (BL-411, emergent strategy readout) |
 
 Slot 11 borrows the pennant glyph slot 7 draws dim, because its subject is exactly the strategic decision that slot is reserved for; slot 12 has its own glyph because two *lit* slots must not share a silhouette.
+
+### Slot 13 — Contracts (BL-576)
+
+The curated nine (§ Menu set and ordering) and the developer tail (§ The tail, slots
+10–12) were both already full when the Contracts ledger (`docs/economy/CONTRACTS.md`)
+needed a door. Contracts is a **broad ledger** by the menus-are-broad-ledgers test — an
+overview across every open offer and every contract the player holds, not a targeted
+per-entity action — so it earns a slot rather than living only in the Selection element.
+It is **not** a developer/observability surface, so it does not belong inside the tail's
+own stated character; it is appended as slot 13, the rail's first slot outside both the
+curated nine and the tail. A future player system that needs a door should extend this
+same tail-of-the-tail rather than displacing any of slots 1–12.
+
+| # | Slot | tier-idx | System / source |
+|---|---|---|---|
+| 13 | **Contracts** (`icons::contract`) | 5 | Contracts ([SYSTEMS.md]) — offers, active contracts and terminal history for the mercenary contract (`docs/economy/CONTRACTS.md`) |
+
+Three views, the standing button-strip split (§ One-question-per-view splits,
+`LAYOUT.md`): **Offers** — open `mercenary_offer`s the fog admits, with an Accept press
+that opens a force picker over the player's own uncommitted units; **Active** — the
+player's own live `mercenary_contract`s, predicate rendered via `condition_text`, with an
+Abandon press that shows its reputation cost before it commits; **History** — the
+player's terminal-state contracts and what they paid.
 
 ## Menus are broad ledgers
 

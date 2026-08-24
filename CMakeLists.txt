@@ -467,7 +467,11 @@ target_compile_features(commercial_fog_harness PRIVATE cxx_std_20)
 enable_testing()
 
 file(GLOB IO_WORLD_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/world/*.cpp")
-list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|works_registry|tech_tree|world_gen_config)\\.cpp$")
+# BL-570: contract_template.cpp joins this exclusion for the same reason as
+# recipe_registry.cpp -- it includes <sol/sol.hpp> directly (its load_from_lua
+# needs a live Lua table), so it cannot be part of the SDL/Lua-free world
+# superset. condition_set_harness (below) adds it back explicitly.
+list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|works_registry|tech_tree|world_gen_config|contract_template)\\.cpp$")
 
 # ---------------------------------------------------------------------------
 # The world layer, compiled ONCE (BL-287)
@@ -491,7 +495,52 @@ target_include_directories(io_world_obj PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src"
 target_compile_features(io_world_obj PUBLIC cxx_std_20)
 target_compile_options(io_world_obj PRIVATE ${IO_WARNING_FLAGS})
 
-# pregame_balance_harness is the one harness that genuinely needs a live Lua
+# condition_set_harness (BL-570) needs a live sol2/Lua state for its C9 rows:
+# it loads the REAL scripts/contracts.lua through contract_template_registry
+# (contract_template.cpp, the sol2/Lua TU the world superset above deliberately
+# excludes) rather than a hand-built fixture, so a typo in the authored table
+# is exactly what it must catch. Same shape as pregame_balance_harness below:
+# add back contract_template.cpp + scripting/lua_state.cpp, the sol2 include
+# dir, and link lua54. Declared BEFORE the generic glob so the `if(NOT TARGET
+# ...)` guard in the foreach skips redeclaring it, while the unconditional
+# add_test still registers it as a CTest test.
+add_executable(condition_set_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/condition_set_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/contract_template.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(condition_set_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(condition_set_harness PRIVATE io_world_obj lua54)
+target_compile_features(condition_set_harness PRIVATE cxx_std_20)
+target_compile_options(condition_set_harness PRIVATE ${IO_WARNING_FLAGS})
+
+# mercenary_contract_harness (BL-573) needs a live sol2/Lua state for BOTH
+# registries the item threads: recipe_registry (scripts/recipes.lua +
+# economy.lua, for the authored procurement.deposit_fraction split and the
+# sentiment factor weights the item's own terminal-state rows measure) and
+# contract_template_registry (scripts/contracts.lua, for the real take/hold
+# predicates run_mercenary_contract_tick evaluates against). Same shape as
+# condition_set_harness above: add back recipe_registry.cpp AND
+# contract_template.cpp + scripting/lua_state.cpp, the sol2 include dir, and
+# link lua54.
+add_executable(mercenary_contract_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/mercenary_contract_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/contract_template.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(mercenary_contract_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(mercenary_contract_harness PRIVATE io_world_obj lua54)
+target_compile_features(mercenary_contract_harness PRIVATE cxx_std_20)
+target_compile_options(mercenary_contract_harness PRIVATE ${IO_WARNING_FLAGS})
+
+# pregame_balance_harness is another harness that genuinely needs a live Lua
 # state: it constructs a `lua_state`, loads scripts/economy.lua + recipes.lua,
 # and calls recipe_registry::load_from_lua (defined in recipe_registry.cpp, the
 # sol2/Lua TU the world superset above deliberately excludes). So the generic
@@ -771,6 +820,44 @@ endif()
 target_compile_features(agent_seam_harness PRIVATE cxx_std_20)
 target_compile_options(agent_seam_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# battle_engagement_harness (BL-467/BL-468/BL-469, pre-existing link gap fixed
+# incidentally by BL-569). Hand-declared for the same reason agent_seam_harness
+# is: its B10-B14 rows (landed bd2d4671, 2026-08-21) call battle_dispatch_line,
+# defined in src/core/battle_dispatch_text.cpp -- deliberately its own TU
+# because its natural home, session_history.cpp, reaches <SDL3/SDL.h> and
+# cannot be linked headless (see that file's own header comment). That TU was
+# never added here, so the generic glob loop below (io_world_obj alone) has
+# left this harness unable to LINK since the commit that added the rows —
+# found while building it to verify BL-569's own new rows (B15/B16), fixed
+# here rather than left blocking every future session's build of this target.
+add_executable(battle_engagement_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/battle_engagement_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/battle_dispatch_text.cpp"
+)
+target_include_directories(battle_engagement_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+target_link_libraries(battle_engagement_harness PRIVATE io_world_obj)
+target_compile_features(battle_engagement_harness PRIVATE cxx_std_20)
+target_compile_options(battle_engagement_harness PRIVATE ${IO_WARNING_FLAGS})
+
+# contract_dispatch_harness (BL-577). Hand-declared for the SAME reason
+# battle_engagement_harness is, immediately above: it exercises
+# contract_dispatch_line, defined in src/core/battle_dispatch_text.cpp
+# (battle_dispatch_line's own TU, kept out of session_history.cpp for the
+# identical <SDL3/SDL.h> reason that file's own header comment gives) — so
+# the generic glob loop below (io_world_obj alone) cannot link it either.
+add_executable(contract_dispatch_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/contract_dispatch_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/battle_dispatch_text.cpp"
+)
+target_include_directories(contract_dispatch_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+target_link_libraries(contract_dispatch_harness PRIVATE io_world_obj)
+target_compile_features(contract_dispatch_harness PRIVATE cxx_std_20)
+target_compile_options(contract_dispatch_harness PRIVATE ${IO_WARNING_FLAGS})
+
 file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/*.cpp")
 
 # ---------------------------------------------------------------------------
@@ -994,6 +1081,16 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     # path and FATALs on an empty recipe set rather than measuring a world the
     # game never builds — but only if it is looking at the real scripts/.
     substrate_census
+    # ADDED 2026-08-23 (BL-570). C9 loads scripts/contracts.lua by relative
+    # path through contract_template_registry; without WORKING_DIRECTORY set,
+    # ctest runs from build/ and the load throws (no build/scripts/contracts.lua
+    # copy exists), which is a loud failure here rather than the silent vacuity
+    # trap the comment above warns about — but still wrong for the same reason.
+    condition_set_harness
+    # ADDED 2026-08-23 (BL-573). Loads scripts/recipes.lua, economy.lua AND
+    # contracts.lua by relative path through two registries; same reasoning
+    # as condition_set_harness above.
+    mercenary_contract_harness
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})

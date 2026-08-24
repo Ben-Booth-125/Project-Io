@@ -24,6 +24,18 @@
 //   B7  THE TERRAIN PAIR IS THE DEFENDER'S BEST GROUND, ties by ascending tile.
 //   B8  WITHDRAWAL IS PRICED, AND A REJECTED REQUEST MUTATES NOTHING.
 //   B9  A UNIT IN CONTACT CANNOT MARCH — the gap BL-470 left named.
+//   B15 BL-569: A DECISIVE CLOSE MOVES world::province_holder to the winner.
+//   B16 BL-569: A STALEMATE LEAVES IT UNTOUCHED. B15/B16 hand-build the
+//       active_battle's state (rounds_fought and starting strengths already
+//       past the swing draw's reach of the outcome) rather than trust a live
+//       fight to land on a specific ending — the swing is genuinely random
+//       per round, so an assertion tied to which ending a natural fight
+//       happens to reach would be exactly the kind of test that stops
+//       testing quietly the day the RNG stream shifts.
+//   B17 BL-571: A CORP-VS-NATION BATTLE OPENS AND RESOLVES. Drives
+//       `open_battle` directly rather than through the second trigger, which
+//       is a stub until BL-573 (contract templates, Wave 4) lands — see
+//       battle_system.hpp's own comment on `active_mercenary_contract_for`.
 //
 // Run: battle_engagement_harness
 // ---------------------------------------------------------------------------
@@ -37,6 +49,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/stance.hpp"
 #include "world/terrain_combat.hpp"
+#include "world/unit_roster.hpp" // unit_to_stack_entry -- B15/B16's hand-built battle state
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -93,6 +106,18 @@ entity_id add_corp(world& w, const char* name)
     cc.balance = 10000.0f;
     w.corporations[c] = cc;
     return c;
+}
+
+/// BL-571: a nation, for the corp-vs-nation battle case (B17). No territory,
+/// no budget — the battle mechanics under test read a unit's OWNER, never
+/// `nation_component`'s own fields.
+entity_id add_nation(world& w, const char* name)
+{
+    const entity_id n = w.create_entity();
+    nation_component nc{};
+    nc.name    = name;
+    w.nations[n] = nc;
+    return n;
 }
 
 entity_id add_unit(world& w, entity_id corp, entity_id tile, int count = 500)
@@ -573,6 +598,165 @@ int main()
 
         const std::string sample = battle_dispatch_line(f.w, seen.front());
         std::printf("        e.g. \"%s\"\n", sample.c_str());
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB15 — BL-569: a decisive close moves the province holder\n");
+    {
+        fixture f;
+        build_fixture(f, /*declare=*/false); // discovery stays off -- the battle below is hand-pushed
+        seed_province_holders(f.w);
+        check(f.w.province_holder.size() == f.w.provinces.provinces.size(),
+              "B15 setup: province_holder is sized to the partition (no nations in this fixture -> all no_entity)");
+        check(province_holder_for(f.w, f.province) == null_entity,
+              "B15 setup: the fixture's province starts with no recorded holder");
+
+        // Hand-built battle, already at its final round, with the DEFENDER
+        // preset BELOW the rout threshold (300). A round can only ever
+        // REDUCE strength, so the defender's post-round permille stays
+        // <= 250 regardless of the swing draw -- def_broken is guaranteed.
+        // The attacker starts at 1000 and the worst possible single-round
+        // loss (a full-margin round) is 490 permille, leaving >= 510 -- so
+        // atk_broken is impossible. The ending is defender_broken, by
+        // construction, not by luck.
+        active_battle b;
+        b.province        = f.province;
+        b.attacker        = f.att;
+        b.defender        = f.def;
+        b.attacker_units  = { f.ua };
+        b.defender_units  = { f.ub };
+        b.state.attacker  = { unit_to_stack_entry(f.w, f.w.units.at(f.ua)) };
+        b.state.defender  = { unit_to_stack_entry(f.w, f.w.units.at(f.ub)) };
+        b.state.attacker_strength_permille = 1000;
+        b.state.defender_strength_permille = 250;
+        b.state.rounds_fought = 0;
+        b.state.end           = campaign_battle_end::in_progress;
+        b.state.stream_seed   = 0xB569D0u;
+        b.state.rng_state     = b.state.stream_seed;
+        f.w.battles.assign(1, b); // bypass discovery entirely
+
+        const battle_tick t = run_battles(f.w, reg, 0);
+        check(!t.dispatches.empty(), "B15a the hand-seeded battle stepped and reported");
+        if (!t.dispatches.empty())
+        {
+            const battle_dispatch& d = t.dispatches.front();
+            check(d.end == campaign_battle_end::defender_broken,
+                  "B15b the defender broke -- guaranteed by the preset strengths, not the swing draw");
+            check(d.field_held_by == f.att, "B15c the attacker held the field");
+            check(province_holder_for(f.w, f.province) == f.att,
+                  "B15d THE PROVINCE HOLDER MOVED to the winner");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB16 — BL-569: a stalemate leaves the province holder untouched\n");
+    {
+        fixture f;
+        build_fixture(f, /*declare=*/false);
+        seed_province_holders(f.w);
+
+        // Seed a KNOWN holder distinct from either combatant, so "unchanged"
+        // is a real assertion rather than "still no_entity, coincidentally".
+        const entity_id third = add_corp(f.w, "ThirdParty");
+        const province*  pr   = f.w.provinces.find(f.province);
+        check(pr != nullptr, "B16 setup: the fixture's province resolves in the partition");
+        if (pr != nullptr)
+        {
+            const auto idx = static_cast<std::size_t>(pr - f.w.provinces.provinces.data());
+            f.w.province_holder[idx] = third;
+        }
+
+        // Hand-built battle, ONE ROUND SHORT of max_rounds (6), both sides at
+        // 900 permille. The worst possible single-round loss between two
+        // EQUAL stacks is bounded by the swing range alone (400..1600 permille
+        // -> margin <= 750 -> loser_loss <= 90 + 750*400/1000 = 390), so
+        // apply_loss(900, 390) = 549 -- comfortably above the 300 rout
+        // threshold whichever side the swing happens to favour. Round 6
+        // therefore concludes as a stalemate by construction, not by luck.
+        active_battle b;
+        b.province        = f.province;
+        b.attacker        = f.att;
+        b.defender        = f.def;
+        b.attacker_units  = { f.ua };
+        b.defender_units  = { f.ub };
+        b.state.attacker  = { unit_to_stack_entry(f.w, f.w.units.at(f.ua)) };
+        b.state.defender  = { unit_to_stack_entry(f.w, f.w.units.at(f.ub)) };
+        b.state.attacker_strength_permille = 900;
+        b.state.defender_strength_permille = 900;
+        b.state.rounds_fought = 5;
+        b.state.end           = campaign_battle_end::in_progress;
+        b.state.stream_seed   = 0xB569E0u;
+        b.state.rng_state     = b.state.stream_seed;
+        f.w.battles.assign(1, b);
+
+        const battle_tick t = run_battles(f.w, reg, 0);
+        check(!t.dispatches.empty(), "B16a the hand-seeded battle stepped and reported");
+        if (!t.dispatches.empty())
+        {
+            const battle_dispatch& d = t.dispatches.front();
+            check(d.end == campaign_battle_end::stalemate,
+                  "B16b round 6 elapsed with both sides still standing -- guaranteed by the preset strengths");
+            check(province_holder_for(f.w, f.province) == third,
+                  "B16c THE PROVINCE HOLDER STAYED PUT -- a stalemate mutates nothing here");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB17 — BL-571: a corp-vs-nation battle opens and resolves\n");
+    {
+        // No declare_hostile row, by design (MILITARY.md § Nation garrisons):
+        // the second trigger's whole point is that an ACTIVE MERCENARY
+        // CONTRACT is the hostility, not a stance row. That trigger is stubbed
+        // today (active_mercenary_contract_for always returns null_entity —
+        // BL-573, contract templates, is Wave 4 and has not landed), so this
+        // case drives `open_battle` DIRECTLY — exactly the call the trigger
+        // would make once the stub has a real answer — to prove the
+        // MECHANICS work for a nation defender: the battle is opened,
+        // stepped and resolved through the same code path as any corp pair.
+        world w;
+        const entity_id body = make_grid_body(w, 6, 6);
+        build_province_partition(w, PARTITION_SEED);
+        const entity_id corp    = add_corp(w, "Mercenary");
+        const entity_id nation  = add_nation(w, "GarrisonNation");
+        const entity_id t       = tile_at(w, body, 2, 2);
+        const entity_id ua      = add_unit(w, corp, t);
+        const entity_id ud      = add_unit(w, nation, t);
+        const uint32_t province = w.provinces.province_of(t);
+
+        check(active_mercenary_contract_for(w, corp, province) == null_entity,
+              "B17 setup: the contract stub returns none (BL-573 has not landed)");
+        check(w.battles.empty(), "B17 setup: no battle exists before opening one");
+
+        const bool opened = open_battle(w, 0, province, corp, nation);
+        check(opened, "B17a open_battle opens a corp-vs-nation battle");
+        check(w.battles.size() == 1, "B17b exactly one battle is live");
+        if (!w.battles.empty())
+        {
+            const active_battle& b = w.battles.front();
+            check(b.attacker == corp && b.defender == nation,
+                  "B17c the corp is the attacker, the nation-owned garrison the defender");
+            check(b.attacker_units == std::vector<entity_id>{ ua }
+                      && b.defender_units == std::vector<entity_id>{ ud },
+                  "B17d each side carries exactly the one unit that stands there");
+        }
+
+        // Step it to a conclusion, the same ten-tick idiom B11 uses — the
+        // swing is genuinely random per round, so this loops rather than
+        // asserting a specific ending.
+        const int before = total_men(w);
+        bool concluded = false;
+        for (int i = 0; i < 10 && !concluded; ++i)
+        {
+            const battle_tick bt = run_battles(w, reg, i);
+            for (const battle_dispatch& d : bt.dispatches)
+                if (d.end != campaign_battle_end::in_progress)
+                    concluded = true;
+        }
+        check(concluded, "B17e the corp-vs-nation battle RESOLVED within ten ticks");
+        check(w.battles.empty(), "B17f ...and is erased, exactly as a corp-vs-corp conclusion is");
+        const int after = total_men(w);
+        check(after < before,
+              "B17g men died through the real step -- conservation and combat both hold for a nation side");
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);

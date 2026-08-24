@@ -12,6 +12,35 @@ release.
 
 ## [Unreleased]
 
+## [0.1.15] — 2026-08-24
+
+### Added
+- **The mercenary vertical slice (Sprint 16)**: a polity hires the company, the company fights,
+  the company is paid — playable end-to-end. A province holder exists and moves on a decisive
+  battle (BL-569); nations field static garrisons sized off their own treasury (BL-571); a
+  threatened nation's budget derives real mercenary offers against its highest-grudge neighbour's
+  weakest border province, several open concurrently (BL-572); accepting an offer commits a real
+  force through the Contracts ledger's force picker, and marching that force into the target
+  province is itself the trigger for a real battle against the nation's garrison — no
+  `declare_hostile` needed (BL-573); every contract terminal event (accepted / completed / failed
+  / abandoned) posts to the Public channel, opens a contract card, and a "Contract income" line
+  now appears on the Balance ledger and header runway the tick a payout lands (BL-577). The
+  Contracts ledger (nav rail, new slot 13) gives Offers / Active / History views (BL-576). Unit
+  markers, a march command, and the march-to-contact loop are live on the Planetary canvas
+  (BL-575). `world_save_version` 3 → 8 across the batch, one bump per new persistent field.
+- `scripts/verify/mercenary_slice.lua` — a six-capture scripted playthrough of the whole loop
+  from a fresh world, and `tools/verify/mercenary_contract_harness.cpp` /
+  `contract_dispatch_harness.cpp`, new headless harnesses proving the contract and dispatch seams.
+
+### Known gaps, carried forward rather than silently closed
+- The contract card (`selection_kind::contract`) has no live selection trigger anywhere in the
+  UI yet — its rendering is built and correct but unreachable by any control. A future item owns
+  wiring the trigger.
+- A live human session confirmed offer → accept (force picker) → march → active contract, but a
+  real nation-issued offer's deadline (tuned in econ-ticks) takes on the order of ten hours of
+  real wall-clock time to reach at the game's maximum speed — no human session can realistically
+  wait out a payout today. Flagged for a pacing fix.
+
 ### Changed
 - **Province names are wholly native** (BL-348). `"<People> <Region>"` had a coined culture half and
   an English region half since BL-290 — *Reach*, *Coast*, *inland* — which read as a bug rather than
@@ -644,7 +673,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.14...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.15...HEAD
+[0.1.15]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.10...v0.1.14
 [0.1.10]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.8...v0.1.9

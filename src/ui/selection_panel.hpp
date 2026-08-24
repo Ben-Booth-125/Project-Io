@@ -1,10 +1,12 @@
 #pragma once
 
 #include "ui_state.hpp"
+#include "world/contract_template.hpp" // contract_template_registry (BL-577: the contract card's predicate)
 #include "world/economy_system.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -148,10 +150,15 @@ void draw_unit_page(const world& w, const recipe_registry& reg,
 /// @param report   Most recent economy step report — the building layout reads its
 ///                 per-building row for output/rate; the Population facts read its
 ///                 body_habitability for a population centre's workforce cap.
+/// @param templates BL-577: the authored contract-template roster, read only
+///                 for the contract card's predicate text (see
+///                 selection_card.hpp's own comment on why this is a
+///                 separate object from @p reg).
 /// @param ui       UI state; read for the selection, written by 'go to' (focus),
 ///                 the close button (hide), and the tile "Construct Buildings" button.
 void draw_selection_content(world& w, const recipe_registry& reg,
-                            const economy_report& report, ui_state& ui);
+                            const economy_report& report,
+                            const contract_template_registry& templates, ui_state& ui);
 
 /// Draw the CURRENT page of the building Selection card's accordion (the page
 /// named by ui_state::selection_building_page against that building's own
@@ -162,6 +169,16 @@ void draw_selection_content(world& w, const recipe_registry& reg,
 /// card's card_resource_page / tile_metrics pairing.
 void draw_building_page_expanded(world& w, const recipe_registry& reg,
                                  const economy_report& report, ui_state& ui);
+
+/// Real name lookup for a unit's roster type (`unit_component::type` indexes
+/// `unit_roster_table()` directly). An out-of-range index falls back to the
+/// honest "Type %u" the rest of the codebase uses for opaque indices.
+///
+/// Declared here (it was previously an undeclared file-local definition) so
+/// the Contracts ledger's force picker (BL-576) can name a candidate unit
+/// through the SAME lookup the Soldier card's Roster page uses, rather than
+/// re-deriving the same name a second time and letting the two drift.
+std::string unit_roster_display_name(std::uint16_t type);
 
 /// Draw the **tile construction ledger** (BL-162) — the tile-contextual surface that
 /// actually lets the player build. Opened by the tile Selection element's "Construct

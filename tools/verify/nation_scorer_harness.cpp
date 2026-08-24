@@ -45,6 +45,20 @@
 //       to one and are not all zero; the reference terms sit strictly INSIDE
 //       (0, 1) so no clamp is hiding a mutation; two nations really differ; and
 //       the float sum R1 guards is really order-sensitive.
+//   R8  BL-572 CONTRACT OFFERS. `derive_contract_offers` (nation_step.cpp),
+//       tested on its own fixture (real tiles + a hand-built province
+//       partition, per condition_set_harness.cpp's own idiom) rather than the
+//       fixture above, which has no bodies wired for tile adjacency and no
+//       notion of a province: a threatened (funded) nation targets the
+//       WEAKEST bordering province of its highest-grudge neighbour, never
+//       the strongest or a non-bordering one; an unthreatened (unfunded) one
+//       issues nothing at all; escrow accumulates across ticks and clamps
+//       EXACTLY at the fee, with the treasury debited by exactly what moved;
+//       a second offer opens on a second border province once the first is
+//       already claimed, and an older offer is funded before a younger one;
+//       ties break by ascending province id; an unanswered offer expires and
+//       returns its escrow; and two identical tick sequences from identical
+//       worlds replay bit-identically.
 //
 // MUTATION IS PART OF THE METHOD, NOT A BONUS. Every row here was confirmed by
 // breaking the thing it guards and watching it go red — the sorts deleted, the
@@ -63,6 +77,10 @@
 
 #include "world/nation_ai.hpp"
 #include "world/components.hpp"
+#include "world/nation_generation.hpp" // BL-572: garrison_strength_in
+#include "world/nation_step.hpp"       // BL-572: derive_contract_offers, contract_offer_params
+#include "world/province.hpp"          // BL-572: province, province_holder_for
+#include "world/recipe_registry.hpp"   // BL-572: derive_contract_offers' reg parameter
 #include "world/stance.hpp"
 #include "world/world.hpp"
 
@@ -999,6 +1017,451 @@ void run_r6_horizon()
           "R6c  control: the SAME army on the bordering nation's ground DOES move A");
 }
 
+// ---------------------------------------------------------------------------
+// R8 — BL-572 contract offers (derive_contract_offers, nation_step.cpp)
+// ---------------------------------------------------------------------------
+// A SEPARATE, self-contained fixture -- the R1-R7 fixture above has no body
+// wired for `body_tile_grid`/hex adjacency and no notion of a province at
+// all, and `derive_contract_offers` needs both. Real tiles, plus a HAND-BUILT
+// province partition positionally aligned with `province_holder` -- the same
+// idiom condition_set_harness.cpp's own C8 (province_held) uses: "ids need
+// not be contiguous or match position, only ascending".
+//
+// GEOMETRY. One row (gh=1), so only the E/W hex offsets stay in range and
+// every tile borders exactly its two column neighbours -- a controlled,
+// minimal border rather than a real partition's shape.
+//
+//   SINGLE (one bordering candidate): A at columns 0-1; B at 2-5 (2=weak
+//   border province, 3-5=non-bordering "mid"); columns 6-7 left EMPTY (no
+//   tile at all) so B's column 5 does NOT wrap around to touch A -- there is
+//   exactly one province of B's that borders A.
+//
+//   DUAL (two bordering candidates): A at columns 0-1; B at 2-7, EVERY
+//   column claimed, so column 7 wraps around to touch column 0 -- B holds
+//   TWO border provinces (2=weak, 7=strong) plus one non-bordering "mid"
+//   (3-6).
+//
+// Nation budgets are HAND-AUTHORED here (one weight, `contracted_force`,
+// `reserve_fraction` 0) rather than read off the scorer -- R1-R7 above is
+// what proves the scorer's OWN arithmetic; this section is about the
+// CONSUMER, exactly the same split nation_wiring.cpp draws between "the
+// wiring closes" and "the scorer's weights" (its own file comment).
+
+constexpr int k_offer_gh = 1;
+
+struct offer_fixture
+{
+    world     w;
+    entity_id body        = null_entity;
+    entity_id nat_a        = null_entity, nat_b = null_entity;
+    uint32_t  prov_a       = 0;
+    uint32_t  prov_weak    = 0; ///< Always borders A; the LOWER-strength candidate.
+    uint32_t  prov_mid     = 0; ///< Never borders A -- must never be picked.
+    uint32_t  prov_strong  = 0; ///< DUAL only: borders A via the column wrap.
+};
+
+entity_id offer_add_nation(world& w, const char* name)
+{
+    const entity_id  n = w.create_entity();
+    nation_component nc{};
+    nc.name      = name;
+    w.nations[n] = nc;
+    return n;
+}
+
+entity_id offer_add_tile(world& w, entity_id body, int gx, entity_id nation)
+{
+    const entity_id t = w.create_entity();
+    tile_component  tc{};
+    tc.body       = body;
+    tc.grid_x     = gx;
+    tc.grid_y     = 0;
+    w.tiles[t]    = tc;
+    if (nation != null_entity)
+    {
+        w.tile_to_nation[t] = nation;
+        w.nations.at(nation).tiles.push_back(t);
+    }
+    return t;
+}
+
+void offer_add_garrison(world& w, entity_id tile, entity_id owner, int count)
+{
+    if (count <= 0)
+        return;
+    const entity_id u = w.create_entity();
+    unit_component  uc{};
+    uc.owner                  = owner;
+    uc.position                = tile;
+    uc.count                   = count;
+    uc.type                    = 0;
+    uc.supply_factor_permille  = 1000;
+    w.units[u]                 = uc;
+}
+
+/// SINGLE: exactly one border candidate (prov_weak). `prov_strong` is left 0
+/// (there is none).
+offer_fixture make_offer_fixture_single(int weak_garrison)
+{
+    offer_fixture f;
+    f.body = f.w.create_entity();
+    body_component bc{};
+    bc.grid_width  = 8; // columns 6-7 stay empty -- no tile, no wrap-around touch
+    bc.grid_height = k_offer_gh;
+    f.w.bodies[f.body] = bc;
+
+    f.nat_a = offer_add_nation(f.w, "Subject");
+    f.nat_b = offer_add_nation(f.w, "Neighbour");
+
+    const entity_id t0 = offer_add_tile(f.w, f.body, 0, f.nat_a);
+    const entity_id t1 = offer_add_tile(f.w, f.body, 1, f.nat_a);
+    const entity_id t2 = offer_add_tile(f.w, f.body, 2, f.nat_b); // weak, borders A
+    const entity_id t3 = offer_add_tile(f.w, f.body, 3, f.nat_b);
+    const entity_id t4 = offer_add_tile(f.w, f.body, 4, f.nat_b);
+    const entity_id t5 = offer_add_tile(f.w, f.body, 5, f.nat_b);
+    // Columns 6, 7: no tile at all -- body_tile_grid leaves those raster
+    // cells null_entity, so column 5's east neighbour resolves to nothing
+    // and the wrap back to column 0 (A) never happens.
+
+    offer_add_garrison(f.w, t2, f.nat_b, weak_garrison);
+
+    province p_a;    p_a.id    = 1; p_a.body    = f.body; p_a.tiles = { t0, t1 };
+    province p_weak; p_weak.id = 2; p_weak.body = f.body; p_weak.tiles = { t2 };
+    province p_mid;  p_mid.id  = 3; p_mid.body  = f.body; p_mid.tiles = { t3, t4, t5 };
+
+    f.w.provinces.provinces = { p_a, p_weak, p_mid };       // ascending id
+    f.w.province_holder     = { f.nat_a, f.nat_b, f.nat_b }; // positionally aligned
+
+    f.w.provinces.tile_province[t0] = 1;
+    f.w.provinces.tile_province[t1] = 1;
+    f.w.provinces.tile_province[t2] = 2;
+    f.w.provinces.tile_province[t3] = 3;
+    f.w.provinces.tile_province[t4] = 3;
+    f.w.provinces.tile_province[t5] = 3;
+
+    f.prov_a = 1; f.prov_weak = 2; f.prov_mid = 3;
+    return f;
+}
+
+/// DUAL: two border candidates, `prov_weak` and `prov_strong`, plus a
+/// non-bordering `prov_mid` between them.
+offer_fixture make_offer_fixture_dual(int weak_garrison, int strong_garrison)
+{
+    offer_fixture f;
+    f.body = f.w.create_entity();
+    body_component bc{};
+    bc.grid_width  = 8; // every column claimed -- column 7 wraps to column 0 (A)
+    bc.grid_height = k_offer_gh;
+    f.w.bodies[f.body] = bc;
+
+    f.nat_a = offer_add_nation(f.w, "Subject");
+    f.nat_b = offer_add_nation(f.w, "Neighbour");
+
+    const entity_id t0 = offer_add_tile(f.w, f.body, 0, f.nat_a);
+    const entity_id t1 = offer_add_tile(f.w, f.body, 1, f.nat_a);
+    const entity_id t2 = offer_add_tile(f.w, f.body, 2, f.nat_b); // weak, borders A
+    const entity_id t3 = offer_add_tile(f.w, f.body, 3, f.nat_b);
+    const entity_id t4 = offer_add_tile(f.w, f.body, 4, f.nat_b);
+    const entity_id t5 = offer_add_tile(f.w, f.body, 5, f.nat_b);
+    const entity_id t6 = offer_add_tile(f.w, f.body, 6, f.nat_b);
+    const entity_id t7 = offer_add_tile(f.w, f.body, 7, f.nat_b); // strong, borders A (wrap)
+
+    offer_add_garrison(f.w, t2, f.nat_b, weak_garrison);
+    offer_add_garrison(f.w, t7, f.nat_b, strong_garrison);
+
+    province p_a;      p_a.id      = 1; p_a.body      = f.body; p_a.tiles = { t0, t1 };
+    province p_weak;   p_weak.id   = 2; p_weak.body   = f.body; p_weak.tiles = { t2 };
+    province p_mid;    p_mid.id    = 3; p_mid.body    = f.body; p_mid.tiles = { t3, t4, t5, t6 };
+    province p_strong; p_strong.id = 4; p_strong.body = f.body; p_strong.tiles = { t7 };
+
+    f.w.provinces.provinces = { p_a, p_weak, p_mid, p_strong };       // ascending id
+    f.w.province_holder     = { f.nat_a, f.nat_b, f.nat_b, f.nat_b }; // positionally aligned
+
+    f.w.provinces.tile_province[t0] = 1;
+    f.w.provinces.tile_province[t1] = 1;
+    f.w.provinces.tile_province[t2] = 2;
+    f.w.provinces.tile_province[t3] = 3;
+    f.w.provinces.tile_province[t4] = 3;
+    f.w.provinces.tile_province[t5] = 3;
+    f.w.provinces.tile_province[t6] = 3;
+    f.w.provinces.tile_province[t7] = 4;
+
+    f.prov_a = 1; f.prov_weak = 2; f.prov_mid = 3; f.prov_strong = 4;
+    return f;
+}
+
+/// Hand-authors a `contracted_force`-only budget for `n`, and sets its
+/// treasury -- the "fund a nation's treasury by hand" pattern nation_wiring.cpp
+/// and money_conservation.cpp use for the budget pass, applied one line
+/// (BL-572's own) further down the same chain. `weight` defaults to 1.0 so
+/// `share == spendable == treasury` exactly (reserve 0, one weight, ratio 1)
+/// and every escrow arithmetic check below can be worked out by hand.
+void offer_fund(world& w, entity_id n, float treasury, float weight = 1.0f)
+{
+    w.nations.at(n).treasury = treasury;
+    nation_budget nb;
+    nb.reserve_fraction = 0.0f;
+    nb.weights[static_cast<std::size_t>(budget_priority::contracted_force)] = weight;
+    w.nation_budgets[n] = nb;
+}
+
+const mercenary_offer* offer_targeting(const world& w, uint32_t province_id)
+{
+    for (const mercenary_offer& off : w.mercenary_offers)
+        if (off.target_province == province_id)
+            return &off;
+    return nullptr;
+}
+
+void run_r8_contract_offers()
+{
+    std::printf("\n-- R8 contract offers (BL-572) ---------------------------\n");
+
+    const recipe_registry reg; // default nation_ai_params -- derive_contract_offers
+                                // only reads reg.nation_ai() for the grudge pick
+
+    // ---- R8a: targets the WEAKEST border province, never the strongest or
+    // the non-bordering middle one -------------------------------------------
+    {
+        offer_fixture f = make_offer_fixture_dual(/*weak*/ 5, /*strong*/ 50);
+        contract_offer_params params;
+        offer_fund(f.w, f.nat_a, 1.0f); // just enough to clear the funding gate
+
+        derive_contract_offers(f.w, reg, /*econ_tick*/ 0, params);
+
+        check(f.w.mercenary_offers.size() == 1,
+              "R8a exactly one offer opens on the first tick");
+        check(offer_targeting(f.w, f.prov_weak) != nullptr,
+              "R8a the target is the WEAKEST border province");
+        check(offer_targeting(f.w, f.prov_strong) == nullptr,
+              "R8a not the STRONGEST border province");
+        check(offer_targeting(f.w, f.prov_mid) == nullptr,
+              "R8a not the non-bordering MIDDLE province, however weak it might be");
+
+        const mercenary_offer* off = offer_targeting(f.w, f.prov_weak);
+        check(off != nullptr && off->client == f.nat_a,
+              "R8a the offer's client is the nation whose budget funded it");
+        check(off != nullptr && off->fee == params.base_fee,
+              "R8a the fee is fixed at issuance to the template minimum");
+        check(off != nullptr && off->issued_tick == 0 && off->deadline == params.deadline_ticks,
+              "R8a issued_tick/deadline are set at issuance");
+    }
+
+    // ---- R8c: escrow accumulates across ticks and CLAMPS exactly at the
+    // fee; the treasury moves by exactly what the escrow gained, and nothing
+    // more once there is nowhere else for the leftover share to go ----------
+    {
+        offer_fixture f = make_offer_fixture_single(/*weak*/ 5);
+        contract_offer_params params;
+        params.base_fee = 90.0f;
+
+        offer_fund(f.w, f.nat_a, 40.0f); // less than the fee: forces multi-tick accrual
+        derive_contract_offers(f.w, reg, 0, params);
+
+        const mercenary_offer* off = offer_targeting(f.w, f.prov_weak);
+        check(off != nullptr && off->offer_escrow == 40.0f,
+              "R8c the first tick's whole share lands in escrow (40 < fee 90)");
+        check(same(f.w.nations.at(f.nat_a).treasury, 0.0f),
+              "R8c the treasury is debited by exactly what the escrow gained");
+
+        // Simulates a second tick's income (apply_budget's levy, which this
+        // harness does not run) -- the weight is already authored, so only
+        // the treasury needs topping up.
+        f.w.nations.at(f.nat_a).treasury = 30.0f;
+        derive_contract_offers(f.w, reg, 1, params);
+        off = offer_targeting(f.w, f.prov_weak);
+        check(off != nullptr && off->offer_escrow == 70.0f,
+              "R8c escrow accumulates across ticks: 40 + 30 = 70, still under the 90 fee");
+        check(f.w.mercenary_offers.size() == 1,
+              "R8c still exactly one offer -- there is no second border province to open one on");
+
+        // A third tick funds PAST the fee -- escrow must clamp EXACTLY at fee
+        // (NR-568's whole-or-nothing), and because this fixture has no second
+        // candidate for the leftover to spill onto, the UNSPENT portion of
+        // the share must not leave the treasury at all (rule 2: an
+        // underspent line accumulates rather than evaporating).
+        f.w.nations.at(f.nat_a).treasury = 100.0f;
+        derive_contract_offers(f.w, reg, 2, params);
+        off = offer_targeting(f.w, f.prov_weak);
+        check(off != nullptr && off->offer_escrow == 90.0f,
+              "R8c escrow clamps EXACTLY at the fee (70 + 100 would be 170; capped to 90)");
+        check(same(f.w.nations.at(f.nat_a).treasury, 80.0f),
+              "R8c only the 20 credits actually needed left the treasury, not the whole 100 share");
+    }
+
+    // ---- R8b: an UNTHREATENED nation -- no treasury -- issues no offer ----
+    {
+        offer_fixture f = make_offer_fixture_single(5);
+        contract_offer_params params;
+
+        derive_contract_offers(f.w, reg, 0, params);
+        check(f.w.mercenary_offers.empty(),
+              "R8b a nation with no treasury and no authored budget issues no offer");
+
+        // Same border, an authored budget this time, but ZERO treasury
+        // specifically -- the funding axis alone gates issuance (NR-580: a
+        // freshly generated world's nations all start here).
+        offer_fund(f.w, f.nat_a, 0.0f);
+        derive_contract_offers(f.w, reg, 0, params);
+        check(f.w.mercenary_offers.empty(),
+              "R8b a nation with an authored budget but ZERO treasury still issues no offer");
+    }
+
+    // ---- R8d: a SECOND border province gets its own offer once the first
+    // is already claimed -- several offers open and filling concurrently --
+    // and the OLDER offer is funded before the younger one, oldest-issued-
+    // first, falling through to the younger offer once the older is full --
+    {
+        offer_fixture f = make_offer_fixture_dual(/*weak*/ 5, /*strong*/ 50);
+        contract_offer_params params;
+        params.base_fee = 20.0f; // small: the weak province's offer clears in one tick
+
+        offer_fund(f.w, f.nat_a, 20.0f);
+        derive_contract_offers(f.w, reg, 0, params);
+        const mercenary_offer* weak_off = offer_targeting(f.w, f.prov_weak);
+        check(weak_off != nullptr && weak_off->offer_escrow == 20.0f,
+              "R8d the weak province's offer clears fully in one tick at this fee");
+        check(offer_targeting(f.w, f.prov_strong) == nullptr,
+              "R8d the strong province has no offer yet -- the weak one is still the only target");
+
+        // Next tick: prov_weak is already claimed, so THIS tick's share opens
+        // (and starts funding) prov_strong -- "several offers open and
+        // filling concurrently".
+        f.w.nations.at(f.nat_a).treasury = 8.0f;
+        derive_contract_offers(f.w, reg, 1, params);
+        check(f.w.mercenary_offers.size() == 2,
+              "R8d a second offer opens on the strong province once the weak one is claimed");
+        weak_off = offer_targeting(f.w, f.prov_weak);
+        const mercenary_offer* strong_off = offer_targeting(f.w, f.prov_strong);
+        check(weak_off != nullptr && strong_off != nullptr,
+              "R8d one offer per bordering province, weak and strong both represented");
+        check(weak_off != nullptr && weak_off->offer_escrow == 20.0f,
+              "R8d the already-full offer took nothing further -- it stops asking");
+        check(strong_off != nullptr && strong_off->offer_escrow == 8.0f,
+              "R8d the whole tick's share landed on the newer offer once the older one was full");
+
+        // Tick 2: the older (weak) offer is still full, so funding must FALL
+        // THROUGH it to reach the younger (strong) one rather than stalling.
+        f.w.nations.at(f.nat_a).treasury = 5.0f;
+        derive_contract_offers(f.w, reg, 2, params);
+        strong_off = offer_targeting(f.w, f.prov_strong);
+        check(strong_off != nullptr && strong_off->offer_escrow == 13.0f,
+              "R8d funding falls through a full older offer to reach the younger one (8 + 5 = 13)");
+    }
+
+    // ---- R8e: TTL expiry returns the escrow and removes the offer ---------
+    {
+        offer_fixture f = make_offer_fixture_single(5);
+        contract_offer_params params;
+        params.base_fee       = 90.0f;
+        params.offer_ttl_ticks = 5;
+
+        offer_fund(f.w, f.nat_a, 40.0f);
+        derive_contract_offers(f.w, reg, 0, params);
+        check(f.w.mercenary_offers.size() == 1, "R8e one offer opens at tick 0");
+
+        // Advance past the TTL with the budget WITHDRAWN, not just the
+        // treasury drained -- move 1's refund lands BEFORE move 2/3 read the
+        // treasury this same tick, so a still-authored weight would let the
+        // refunded credits fund a BRAND NEW offer on the same province in
+        // the same call, masking the expiry this row exists to isolate. That
+        // immediate-reissue behaviour is real and not itself wrong -- a
+        // nation that still wants the work and still has the money reopens
+        // it -- but it is a DIFFERENT claim from "the escrow is refunded",
+        // so this row removes the budget entirely to isolate the latter.
+        f.w.nations.at(f.nat_a).treasury = 0.0f;
+        f.w.nation_budgets.erase(f.nat_a);
+        derive_contract_offers(f.w, reg, /*econ_tick*/ 5, params); // 5 - 0 >= ttl(5)
+        check(f.w.mercenary_offers.empty(),
+              "R8e the offer expires once issued_tick is offer_ttl_ticks behind the current tick");
+        check(same(f.w.nations.at(f.nat_a).treasury, 40.0f),
+              "R8e its escrow (40) is refunded to the treasury on expiry");
+    }
+
+    // ---- R8e2: the DISCOVERED interaction, asserted rather than left
+    // implicit -- expiry (move 1) refunds the escrow BEFORE move 2 reads the
+    // treasury, so a nation whose budget is STILL authored and whose target
+    // is STILL eligible re-opens the SAME province in the SAME tick the old
+    // offer expired in. Deterministic, and arguably correct (an unmet threat
+    // that is still funded keeps asking) -- but worth a named row, since R8e
+    // above had to withdraw the budget specifically to avoid this masking it.
+    {
+        offer_fixture f = make_offer_fixture_single(5);
+        contract_offer_params params;
+        params.base_fee        = 90.0f;
+        params.offer_ttl_ticks = 5;
+
+        offer_fund(f.w, f.nat_a, 40.0f);
+        derive_contract_offers(f.w, reg, 0, params);
+        const mercenary_offer* first = offer_targeting(f.w, f.prov_weak);
+        check(first != nullptr && first->issued_tick == 0 && first->offer_escrow == 40.0f,
+              "R8e2 the first offer opens at tick 0 with escrow 40");
+
+        // Treasury drained, budget LEFT AUTHORED this time.
+        f.w.nations.at(f.nat_a).treasury = 0.0f;
+        derive_contract_offers(f.w, reg, 5, params);
+        const mercenary_offer* second = offer_targeting(f.w, f.prov_weak);
+        check(f.w.mercenary_offers.size() == 1,
+              "R8e2 exactly one offer exists after the expire-and-reopen tick");
+        check(second != nullptr && second->issued_tick == 5,
+              "R8e2 it is a NEW offer (issued_tick moved to the reopening tick)");
+        check(second != nullptr && second->offer_escrow == 40.0f,
+              "R8e2 funded by the SAME 40 credits the expiry just refunded");
+        check(same(f.w.nations.at(f.nat_a).treasury, 0.0f),
+              "R8e2 the treasury ends the tick exactly where the reissue left it");
+    }
+
+    // ---- R8f: ties break by ascending province id --------------------------
+    {
+        offer_fixture f = make_offer_fixture_dual(/*weak*/ 10, /*strong*/ 10); // EQUAL garrisons
+        contract_offer_params params;
+        offer_fund(f.w, f.nat_a, 5.0f);
+
+        derive_contract_offers(f.w, reg, 0, params);
+        check(f.w.mercenary_offers.size() == 1 && offer_targeting(f.w, f.prov_weak) != nullptr,
+              "R8f equal garrison strength ties break by ASCENDING province id "
+              "(prov_weak's id is lower than prov_strong's)");
+    }
+
+    // ---- R8g: the sequence replays -----------------------------------------
+    {
+        auto run_sequence = [&]() {
+            offer_fixture f = make_offer_fixture_dual(5, 50);
+            contract_offer_params params;
+            params.base_fee = 90.0f;
+            offer_fund(f.w, f.nat_a, 0.0f);
+            for (int t = 0; t < 6; ++t)
+            {
+                f.w.nations.at(f.nat_a).treasury += 15.0f;
+                derive_contract_offers(f.w, reg, t, params);
+            }
+            return f;
+        };
+
+        const offer_fixture r1 = run_sequence();
+        const offer_fixture r2 = run_sequence();
+
+        check(r1.nat_a == r2.nat_a && r1.prov_weak == r2.prov_weak,
+              "R8g the two runs really are built identically (same entity/province ids)");
+
+        bool same_offers = r1.w.mercenary_offers.size() == r2.w.mercenary_offers.size()
+                         && !r1.w.mercenary_offers.empty();
+        for (std::size_t i = 0; same_offers && i < r1.w.mercenary_offers.size(); ++i)
+        {
+            const mercenary_offer& a = r1.w.mercenary_offers[i];
+            const mercenary_offer& b = r2.w.mercenary_offers[i];
+            same_offers = a.id == b.id && a.client == b.client
+                       && a.target_province == b.target_province
+                       && a.template_index == b.template_index && same(a.fee, b.fee)
+                       && a.deadline == b.deadline && a.issued_tick == b.issued_tick
+                       && same(a.offer_escrow, b.offer_escrow);
+        }
+        check(same_offers, "R8g two identical tick sequences produce bit-identical offers");
+        check(same(r1.w.nations.at(r1.nat_a).treasury, r2.w.nations.at(r2.nat_a).treasury),
+              "R8g and bit-identical treasuries");
+    }
+}
+
 } // namespace
 
 int main()
@@ -1011,6 +1474,7 @@ int main()
     run_r4_conflict();
     run_r5_grudges();
     run_r6_horizon();
+    run_r8_contract_offers();
 
     std::printf("\n---------------------------------------------------------\n");
     std::printf("PASS %d   FAIL %d\n", g_pass, g_fail);

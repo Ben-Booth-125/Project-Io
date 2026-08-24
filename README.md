@@ -112,7 +112,16 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest releases — v0.1.1, v0.1.2, v0.1.8, v0.1.9, v0.1.10 and v0.1.14
+## Latest releases — v0.1.1, v0.1.2, v0.1.8, v0.1.9, v0.1.10, v0.1.14 and v0.1.15
+
+**v0.1.15 — the mercenary vertical slice.** A polity hires the company, the company fights, the
+company is paid — playable end-to-end. Nations field static garrisons sized off their own
+treasury; a threatened nation's budget derives real mercenary offers against its highest-grudge
+neighbour's weakest border province; accepting an offer through the new Contracts ledger's force
+picker and marching that force into the target province is itself what starts the fight against
+the nation's garrison, no separate declaration needed. Every terminal event posts to the Public
+channel and a "Contract income" line now credits the Balance ledger and header runway the tick a
+payout lands.
 
 **v0.1.14 — procurement, and the goods it is about.** The refocus's actual mechanic: a
 corporation can request a quote from a named supplier, accept it into a running contract (a

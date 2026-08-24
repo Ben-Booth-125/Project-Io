@@ -14,6 +14,7 @@
 #include "ui/charts.hpp"
 #include "ui/circumplanetary_canvas.hpp"
 #include "ui/construction_panel.hpp"
+#include "ui/contracts_ledger.hpp" // nav slot 13, the mercenary Contracts ledger (BL-576)
 #include "ui/detail_level.hpp" // the drill-through fold idiom (BL-214)
 #include "ui/balance_ledger.hpp"
 #include "ui/corporation_dashboard.hpp" // nav slot 1, the four roll-ups (BL-248)
@@ -1166,6 +1167,14 @@ void app::load_economy()
     m_lua.load("scripts/economy.lua");
     m_registry.load_from_lua(m_lua);
 
+    // BL-573: the mercenary-contract template roster, loaded the same way and
+    // at the same app-layer boundary as m_registry above — never a Lua load
+    // performed inside world/* itself. A separate lua_state (not m_lua) so a
+    // hot-reload of the economy tables cannot also silently reset the
+    // contract kinds a live campaign's contracts still reference by index.
+    m_contract_lua.load("scripts/contracts.lua");
+    m_contract_templates.load_from_lua(m_contract_lua);
+
     // BL-433: gate the roster on the campaign's era band, derived from the epoch
     // year the live world was actually built from. Must happen HERE, after the
     // load (which resets the band to `any`) and before anything browses recipes —
@@ -1262,7 +1271,8 @@ void app::step_economy()
     // apply_budget so the treasury holds this quarter's levy and tariff; before
     // the tech gates so a `surplus` gate reads the moved balance. Keyed on the
     // econ counter (BL-568), which step_economy set at its top.
-    run_nation_step(m_world, m_registry, m_last_econ_report, m_world.current_econ_tick);
+    run_nation_step(m_world, m_registry, m_last_econ_report, m_world.current_econ_tick,
+                    m_contract_templates);
     lap(3); // nation step (folded into the budget phase)
     // BL-344: evaluate the tech gates once per economy tick, after the money loop
     // has moved balances (a `surplus` gate should read this quarter's balance, not
@@ -1291,6 +1301,11 @@ void app::step_economy()
         // post lines the player never saw, all stamped on the same day.
         if (!m_warm_starting)
             session_history::post_battle_dispatches(m_world, m_last_econ_report, m_chat, day);
+        // BL-577: contract traffic to the Public channel, on the same
+        // pre-game suppression as battle dispatches — a nation should not
+        // announce a contract the player never saw open.
+        if (!m_warm_starting)
+            session_history::post_contract_events(m_world, m_last_econ_report, m_chat, day);
         // Persona counsel is suppressed through the pre-game warm start
         // (2026-08-12): measured at ~1.05 s/tick — 93% of the AppHangB1 stall —
         // against ~80 ms for everything else combined, and what it buys there
@@ -1988,7 +2003,7 @@ void app::render()
     {
         const float header_left  = ui::shell_column_width(disp.x);
         const float header_right = ui::right_chrome_left(disp) - margin;
-        ui::draw_header_panel(m_world, m_balance_history, header_left, header_right);
+        ui::draw_header_panel(m_world, m_balance_history, m_last_econ_report, header_left, header_right);
     }
 
     // Comms chat log (BL-205) — BL-227 re-homed it from the right chrome column
@@ -2058,6 +2073,13 @@ void app::render()
         ui::draw_balance_ledger(m_world, m_registry, m_last_econ_report, bhist,
                                 prior_rank, m_ui, m_ui.show_balance_ledger);
     }
+    // Contracts ledger (BL-576) — nav slot 13: offers, active contracts and
+    // terminal history for the mercenary contract (CONTRACTS.md). Reads the
+    // same m_contract_templates run_nation_step already threads through for
+    // the tick-evaluation pass, so the Active view's predicate wording can
+    // never disagree with what actually settles the contract.
+    ui::draw_contracts_ledger(m_world, m_registry, m_contract_templates, m_ui,
+                              m_ui.show_contracts_ledger);
     // Corporation dashboard (BL-248) — nav slot 1, MENU.md's long-named surface.
     // Replaces the all-corporations balance table that used to occupy this slot: a
     // comparison table is not "the player corporation at a glance", and the Economy
@@ -2098,8 +2120,8 @@ void app::render()
         const ui::resource_history_view rhist{ &m_body_resource_hist,
                                                &m_tile_resource_hist,
                                                &m_resource_hist_days };
-        ui::draw_selection_band(m_world, m_registry, m_last_econ_report, rhist, m_ui,
-                                band_origin, band_size);
+        ui::draw_selection_band(m_world, m_registry, m_last_econ_report, m_contract_templates,
+                                rhist, m_ui, band_origin, band_size);
     }
 
     // The shell fold-out column is ledgers-only (BL-195). The one contextual, per-
@@ -2286,6 +2308,77 @@ void app::render()
     {
         dispatch_survey(m_world, m_ui.pending_survey_dispatch);
         m_ui.pending_survey_dispatch = null_entity; // consume the request
+    }
+
+    // March / Halt / Disband (BL-575) — the unit card's three presses, all
+    // routed through the SAME corp_verb seam corp_ai scores for rival units
+    // (MILITARY.md § Marching); the player takes no shortcut around it. March
+    // is two-step: the card press only ARMS `pending_march_unit`, and the
+    // Planetary canvas fills `pending_march_dest_province` on the qualifying
+    // province click (body_surface_canvas.cpp), so this only fires once both
+    // halves are in.
+    if (m_ui.pending_march_unit != null_entity && m_ui.pending_march_dest_province != 0)
+    {
+        corp_command cmd;
+        cmd.tick     = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp     = m_world.player_entity;
+        cmd.verb     = corp_verb::march_unit;
+        cmd.subject  = m_ui.pending_march_unit;
+        cmd.province = m_ui.pending_march_dest_province;
+        const auto r = apply_corp_command(m_world, m_registry, cmd);
+        switch (r)
+        {
+            case corp_command_result::applied:
+                m_ui.construction.last_message = "Marching."; break;
+            case corp_command_result::rejected_state:
+                // Already there, or in a battle — MILITARY.md § Marching's
+                // "walking away from contact is a priced withdrawal, never a
+                // march" (withdraw_from_battle is the card's separate press).
+                m_ui.construction.last_message = "Can't march — already there, or in a fight.";
+                break;
+            default:
+                m_ui.construction.last_message = "Can't march there."; break;
+        }
+        m_ui.pending_march_unit          = null_entity; // consume the request
+        m_ui.pending_march_dest_province = 0;
+    }
+
+    if (m_ui.pending_halt_unit != null_entity)
+    {
+        corp_command cmd;
+        cmd.tick    = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp    = m_world.player_entity;
+        cmd.verb    = corp_verb::halt_unit;
+        cmd.subject = m_ui.pending_halt_unit;
+        const auto r = apply_corp_command(m_world, m_registry, cmd);
+        m_ui.construction.last_message =
+            (r == corp_command_result::applied) ? "Halted." : "Already halted.";
+        m_ui.pending_halt_unit = null_entity; // consume the request
+    }
+
+    if (m_ui.pending_disband_unit != null_entity)
+    {
+        const entity_id doomed = m_ui.pending_disband_unit;
+        corp_command    cmd;
+        cmd.tick    = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp    = m_world.player_entity;
+        cmd.verb    = corp_verb::disband_unit;
+        cmd.subject = doomed;
+        const auto r = apply_corp_command(m_world, m_registry, cmd);
+        if (r == corp_command_result::applied)
+        {
+            m_ui.construction.last_message = "Disbanded.";
+            // Same dangling-selection guard as the demolish path just above:
+            // the entity no longer exists, and manpower gets no refund
+            // (MILITARY.md § Marching), so there is nothing left to inspect.
+            if (m_ui.selected_entity == doomed)
+                m_ui.selected_entity = null_entity;
+        }
+        else
+        {
+            m_ui.construction.last_message = "Couldn't disband that.";
+        }
+        m_ui.pending_disband_unit = null_entity; // consume the request
     }
 
     // Order-book presses (BL-293) — same seam-consuming shape as the survey

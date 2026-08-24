@@ -677,7 +677,7 @@ every sibling by construction and carry no discriminating information.
 not a balance defect.** `steel_from_iron_nickel`/`steel`, `peat_charcoal`/`charcoal` and
 `glass`/`trade_goods` have disjoint raws — supply routes, not methods; the propellant pair is the
 named atmosphere-vs-airless precondition. None of the four is compared by R2 today, and NR-243 is
-closed on that basis rather than by a retune (BL-587, correcting NR-577).
+closed on that basis rather than by a retune (BL-587, correcting NR-589).
 
 **BL-587 (2026-08-23) authored the roster's first two genuine interchangeable methods**, since
 until then the "methods" bucket was empty — BL-430's ruling had mechanism (the Method page

@@ -1,14 +1,21 @@
 #include "nation_generation.hpp"
 
 #include "hard_coded_world.hpp" // generation_progress — the BL-305 carve tap
+#include "hex_neighbors.hpp"    // BL-571: garrison border-tile adjacency
+#include "logistics.hpp"        // BL-571: body_tile_grid, for the same
+#include "nation_ai.hpp"        // BL-571: nation_grudge, the highest-grudge pick
+#include "province.hpp"         // BL-571: province_holder_for, province lookup
+#include "unit_roster.hpp"      // BL-571: unit_strength, for garrison_strength_in
 
 #include "tongue.hpp"
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <queue>
 #include <random>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -818,12 +825,22 @@ std::vector<entity_id> generate_nations(
     // indexed seed still inside it (a seed absorbed by Pass 2c contributes
     // nothing — the surviving core names the realm). Ties broken on the lowest
     // index, the same rule every other selection in the layer uses.
+    //
+    // BL-571 (nation garrisons) piggybacks on the SAME walk for `capital_tile`:
+    // the lowest-indexed surviving seed for a nation IS "the region it grew
+    // from" that the comment above already names, restated as a tile rather
+    // than a tongue. Unlike the speech pick this one is unconditional (no
+    // "usable()" gate — every surviving seed has a real tile), so it is set on
+    // the FIRST si whose owner is this nation, full stop.
     std::mt19937 name_rng(seed_name);
     std::vector<tongue> nation_speech(static_cast<std::size_t>(nation_count));
     for (std::size_t si = 0; si < seeds.size(); ++si)
     {
         const int ni = owner_map[static_cast<std::size_t>(seeds[si])];
         if (ni < 0 || ni >= nation_count) continue;
+        if (nation_data[static_cast<std::size_t>(ni)].capital_tile == null_entity)
+            nation_data[static_cast<std::size_t>(ni)].capital_tile =
+                tile_ids[static_cast<std::size_t>(seeds[si])];
         if (si >= seed_speech.size() || !seed_speech[si].usable()) continue;
         if (!nation_speech[static_cast<std::size_t>(ni)].usable())
             nation_speech[static_cast<std::size_t>(ni)] = seed_speech[si];
@@ -931,4 +948,209 @@ std::vector<entity_id> generate_nations(
     }
 
     return nation_ids;
+}
+
+// ---------------------------------------------------------------------------
+// BL-571 — nation garrisons
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// The odd-r hex neighbour of @p tile on @p side (0..5), or `null_entity` when
+/// the step leaves the grid. Columns WRAP (the body is a cylinder); rows do
+/// not — the same rule every other hex-grid consumer in this layer follows
+/// (province.cpp, nation_ai.cpp).
+///
+/// DUPLICATED rather than reused: `nation_ai.cpp` carries the same ~15 lines
+/// in its own anonymous namespace, unreachable from here, and that file is a
+/// concurrent sibling item's territory this session (Sprint 16 Wave 2). Both
+/// copies read off the one shared table in hex_neighbors.hpp, so they cannot
+/// diverge on the geometry itself.
+entity_id garrison_neighbour_tile(world& w, entity_id tile, int side)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return null_entity;
+    const auto bit = w.bodies.find(tit->second.body);
+    if (bit == w.bodies.end())
+        return null_entity;
+    const int gw = bit->second.grid_width;
+    const int gh = bit->second.grid_height;
+    if (gw <= 0 || gh <= 0)
+        return null_entity;
+
+    const hex_neighbors::coord c =
+        hex_neighbors::neighbour(tit->second.grid_x, tit->second.grid_y, side);
+    if (c.gy < 0 || c.gy >= gh)
+        return null_entity;
+    int nx = c.gx % gw;
+    if (nx < 0)
+        nx += gw;
+
+    const std::vector<entity_id>& grid = body_tile_grid(w, tit->second.body);
+    const std::size_t idx = static_cast<std::size_t>(c.gy) * static_cast<std::size_t>(gw)
+                           + static_cast<std::size_t>(nx);
+    return idx < grid.size() ? grid[idx] : null_entity;
+}
+
+/// Create the one static garrison unit for @p nation in @p province_id, on
+/// the province's own anchor tile (`province::tiles.front()`, which IS
+/// `province::id` by that struct's own contract — province.hpp). No-op on a
+/// province id the partition does not resolve (defensive; provinces are
+/// never empty by the partition's own contract, so this should not fire).
+void place_garrison(world& w, entity_id nation, uint32_t province_id, int count,
+                    uint16_t roster_row)
+{
+    const province* pr = w.provinces.find(province_id);
+    if (pr == nullptr || pr->tiles.empty())
+        return;
+
+    const entity_id u = w.create_entity();
+    unit_component uc{};
+    uc.owner                  = nation;               // a nation, not a corp — the fourth writer
+    uc.position                = pr->tiles.front();
+    uc.count                   = count;
+    uc.type                    = roster_row;
+    uc.supply_factor_permille  = 1000;
+    // uc.order stays default (dest == null_entity): STATIC by ruling — "a
+    // nation that wants ground HIRES; a garrison that marched would make the
+    // nation its own mercenary" (MILITARY.md § Nation garrisons). No code
+    // path may ever hand this unit a march order.
+    // uc.muster_base stays null_entity: "a nation raises no base" (same
+    // section) — this is the orphan key run_unit_upkeep reads for a CORP
+    // unit, and a garrison is deliberately never checked against it (see
+    // run_unit_upkeep's own nation-owner branch, economy_system.cpp).
+    w.units[u] = uc;
+}
+
+} // namespace
+
+void seed_nation_garrisons(world& w, const nation_garrison_params& params)
+{
+    if (w.nations.empty() || w.provinces.provinces.empty())
+        return; // no nations, or called before the partition exists
+
+    // Ascending nation id — `w.nations` is an unordered_map.
+    std::vector<entity_id> nation_ids;
+    nation_ids.reserve(w.nations.size());
+    for (const auto& kv : w.nations)
+        nation_ids.push_back(kv.first);
+    std::sort(nation_ids.begin(), nation_ids.end());
+
+    const nation_ai_params grudge_params{}; // the scorer's own defaults — this
+                                             // item authors no tuning of its own
+
+    for (const entity_id nid : nation_ids)
+    {
+        const nation_component& nc = w.nations.at(nid);
+
+        // --- Sizing: treasury-scaled against the value anchor (BL-543) ------
+        // See nation_garrison_params' own comments for why `count_per_credit`
+        // is a placeholder rather than a measured figure, and BL-571's report
+        // for the flag: EVERY nation's treasury is 0.0 at generation
+        // (NATIONS.md — "zero at generation, deliberately"), so every
+        // garrison lands on `min_count` today; the scaling only starts to
+        // differentiate nations once something credits a treasury before
+        // this pass runs, which nothing in the generation chain does yet.
+        const int count = std::clamp(
+            params.min_count
+                + static_cast<int>(std::lround(nc.treasury * params.count_per_credit)),
+            params.min_count, params.max_count);
+
+        // --- The highest-grudge neighbour -------------------------------------
+        // Candidate neighbours: nations whose territory touches this one's on
+        // at least one tile edge, gathered into a std::set so the argmax below
+        // walks ascending id and needs no separate tie-break sort — the first
+        // strict `>` to reach a value keeps it, exactly the idiom
+        // seed_province_holders uses for its own plurality tie-break.
+        std::set<entity_id> candidates;
+        for (const entity_id tile : nc.tiles)
+            for (int side = 0; side < 6; ++side)
+            {
+                const entity_id nb = garrison_neighbour_tile(w, tile, side);
+                if (nb == null_entity)
+                    continue;
+                const auto tnit = w.tile_to_nation.find(nb);
+                if (tnit == w.tile_to_nation.end() || tnit->second == nid)
+                    continue;
+                candidates.insert(tnit->second);
+            }
+
+        entity_id best_neighbour = null_entity;
+        float      best_grudge   = -1.0f;
+        for (const entity_id other : candidates) // ascending: strict '>' keeps the lowest tie
+        {
+            const float g = nation_grudge(w, nid, other, grudge_params);
+            if (g > best_grudge)
+            {
+                best_grudge   = g;
+                best_neighbour = other;
+            }
+        }
+
+        // --- Target provinces: capital, plus border with the neighbour above -
+        // ONE set, so a capital that also happens to sit on that border gets
+        // exactly one garrison rather than two — the doc names two SOURCES of
+        // a garrisoned province, not a guarantee they are disjoint.
+        std::set<uint32_t> target_provinces;
+
+        if (nc.capital_tile != null_entity)
+        {
+            const uint32_t cap_prov = w.provinces.province_of(nc.capital_tile);
+            if (cap_prov != 0)
+                target_provinces.insert(cap_prov);
+        }
+
+        if (best_neighbour != null_entity)
+        {
+            // A province of THIS nation (by `province_holder_for`, BL-569 —
+            // consumed here exactly as the item's brief names) is a border
+            // province with `best_neighbour` iff one of its tiles is
+            // hex-adjacent to a tile `best_neighbour` holds.
+            for (const province& pr : w.provinces.provinces)
+            {
+                if (province_holder_for(w, pr.id) != nid)
+                    continue;
+                bool touches = false;
+                for (const entity_id tile : pr.tiles)
+                {
+                    for (int side = 0; side < 6 && !touches; ++side)
+                    {
+                        const entity_id nb = garrison_neighbour_tile(w, tile, side);
+                        if (nb == null_entity)
+                            continue;
+                        const auto tnit = w.tile_to_nation.find(nb);
+                        if (tnit != w.tile_to_nation.end() && tnit->second == best_neighbour)
+                            touches = true;
+                    }
+                    if (touches)
+                        break;
+                }
+                if (touches)
+                    target_provinces.insert(pr.id);
+            }
+        }
+
+        for (const uint32_t prov : target_provinces) // ascending: deterministic creation order
+            place_garrison(w, nid, prov, count, params.roster_row);
+    }
+}
+
+int64_t garrison_strength_in(const world& w, uint32_t province_id)
+{
+    if (province_id == 0)
+        return 0;
+    int64_t total = 0;
+    for (const auto& kv : w.units)
+    {
+        const unit_component& u = kv.second;
+        if (u.count <= 0 || u.position == null_entity)
+            continue;
+        if (w.nations.find(u.owner) == w.nations.end())
+            continue; // a corp-owned unit
+        if (w.provinces.province_of(u.position) != province_id)
+            continue;
+        total += unit_strength(w, u);
+    }
+    return total;
 }

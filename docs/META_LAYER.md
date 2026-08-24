@@ -39,7 +39,7 @@ That is the failure mode the meta layer exists to prevent, and it is worth remem
 **One atomic condition is `<subject> <comparator> <operand>`**, plus the qualifier its subject
 reads. A `condition_set` is **a flat AND-list** of them.
 
-**Nine subjects.** Six were promoted from `tech_tree.hpp`'s original descriptive labels — kept
+**Ten subjects.** Six were promoted from `tech_tree.hpp`'s original descriptive labels — kept
 because they were chosen against real authored content, and *"re-deriving them abstractly would be
 inventing where evidence already exists."*
 
@@ -54,6 +54,7 @@ inventing where evidence already exists."*
 | `military_units` | total unit count fielded | — |
 | `military_strength` | summed combat strength | — |
 | `science` | accumulated research points | — |
+| `province_held` | is this province held by the corp (1/0) | `province`, a province id |
 
 **Five comparators:** `at_least` (the common case), `greater_than`, `exactly`, `at_most`,
 `less_than`.
@@ -100,7 +101,12 @@ contested quantity is a predicate whose meaning is contested.
 | `corp_command.cpp` | is this buyer embargoed by this supplier? |
 
 **Quests** are the fourth reader the header names; BL-087 (era-1 tech/quest system) owns the quest
-object.
+object. **The mercenary contract is a fifth**, and it is what `province_held` exists for: BL-570
+gave `condition_set` its first location-qualified subject because `docs/economy/CONTRACTS.md`'s
+spine — *"a contract is a condition_set the client will pay to have become true"* — could not be
+expressed against the nine world-wide corp scalars above. A contract stores an INDEX into an
+authored template table (`scripts/contracts.lua`) rather than a free `condition_set`, so the
+predicate itself is still authored data, never a type enum in C++.
 
 ## The effect side — `modifier_set`
 
@@ -166,7 +172,7 @@ Worth stating plainly, because it is invisible from either file alone.
 
 | | Predicate side | Effect side |
 |---|---|---|
-| Subjects | **9** | **6** |
+| Subjects | **10** | **6** |
 | Consumers | 3 (law, tech gate, embargo) | 1 (tech, via `modified_scalar`) |
 | Included by | 7 files | **2 files** (`world.hpp`, `tech_gate.hpp`) |
 
@@ -245,4 +251,4 @@ expands), `docs/research/TECH_EFFECTS.md` (research scaffolding for what a tech 
 BL-155 (law/policy surface) holds the four-family taxonomy nothing in code names. BL-156 (tech
 system) owns the gate/quest object. BL-478 (ancient research spend) owns the spend side of science.
 BL-087 (era-1 tech/quest system) owns quests. BL-107 (save format) owns the seam both vocabularies
-cross.
+cross. BL-570 (condition province subject) owns `province_held` and the contract-template table.

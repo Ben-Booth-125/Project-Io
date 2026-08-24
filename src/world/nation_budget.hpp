@@ -118,15 +118,27 @@ enum class budget_priority : uint8_t
 inline constexpr std::size_t priority_count = 9;
 
 /// Whether a line's claims name a SUBJECT — the one thing the credit is
-/// earmarked to pay for (rule 3a). Today only `public_exploration` does: its
-/// subject is the BODY to survey (NR-568). A claim on such a line with a null
-/// subject is rejected whole at gather; a claim on any other line has its
-/// subject IGNORED (nulled at gather, so "earmarked" and "has a subject" stay
-/// one predicate downstream). Sprint N3 slice 2 extends this to
-/// `contracted_force`; extend here, not at the call sites.
+/// earmarked to pay for (rule 3a). `public_exploration`'s subject is the BODY
+/// to survey (NR-568); `contracted_force`'s is the PROVINCE a mercenary_offer
+/// targets (BL-572, CONTRACTS.md § Where offers come from) — an offer's
+/// escrow is a request that one named province's work be paid for, not a
+/// fungible credit, exactly the earmark shape rule 3a already generalises.
+/// A claim on such a line with a null subject is rejected whole at gather; a
+/// claim on any other line has its subject IGNORED (nulled at gather, so
+/// "earmarked" and "has a subject" stay one predicate downstream).
+///
+/// `derive_contract_offers` (nation_step.cpp) does not itself route through
+/// `run_national_budget`'s claim/gather machinery — like `military_research`'s
+/// garrison-upkeep consumer, a mercenary offer has no corp on the other end
+/// to be a `budget_claim`'s payee, so it recomputes the line's share directly
+/// (see `run_nation_garrison_upkeep`'s own comment for why). This predicate is
+/// still extended here — truthfully naming what the line's spend IS earmarked
+/// against — for BL-573's `accept_offer`, the consumer that turns an offer
+/// into a corp claimant and is the first thing that could reach `subject_exists`.
 inline constexpr bool line_takes_subject(budget_priority line)
 {
-    return line == budget_priority::public_exploration;
+    return line == budget_priority::public_exploration
+        || line == budget_priority::contracted_force;
 }
 
 /// What a nation cares about, and how much of its treasury it refuses to touch.

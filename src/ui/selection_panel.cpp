@@ -17,6 +17,7 @@
 
 #include "world/budget_system.hpp"    // compute_building_opex / body_mean_habitability (BL-162 estimate)
 #include "world/building_profit.hpp" // per-building profitability estimate (BL-074)
+#include "world/condition_set.hpp"   // condition_text — the contract card's predicate (BL-577)
 #include "world/corp_ai.hpp"         // corp_reserve_floor / corp_should_have_buffer — god-view corp readout (BL-408)
 #include "world/economy_system.hpp" // economy_report (workforce cap, BL-069)
 #include "world/market_clearing.hpp"
@@ -1342,10 +1343,37 @@ void glyph_auto(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
 
 // A simple X — the building card's Dismantle glyph (2026-08-15; the
 // Lifecycle page's Dismantle moved onto the action grid under this name).
+// BL-575 reuses this UNCHANGED for the unit card's Disband: the two share
+// the same meaning ("erase this asset outright, no undo"), so the shape
+// stays shared rather than growing a near-identical twin.
 void glyph_dismantle(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
 {
     dl->AddLine({c.x - r * 0.55f, c.y - r * 0.55f}, {c.x + r * 0.55f, c.y + r * 0.55f}, col, 2.4f);
     dl->AddLine({c.x + r * 0.55f, c.y - r * 0.55f}, {c.x - r * 0.55f, c.y + r * 0.55f}, col, 2.4f);
+}
+
+// A shafted arrow pointing right — the unit card's March glyph (BL-575).
+// Distinct from glyph_goto's bare chevron (which moves the CAMERA to the
+// entity, not the entity itself) by carrying a full shaft behind the head —
+// the plain "move this" pictogram, reading apart from "look at this".
+void glyph_march(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    const float y = c.y;
+    dl->AddLine({c.x - r * 0.62f, y}, {c.x + r * 0.30f, y}, col, 2.4f);
+    dl->AddLine({c.x + r * 0.62f, y}, {c.x + r * 0.12f, y - r * 0.36f}, col, 2.4f);
+    dl->AddLine({c.x + r * 0.62f, y}, {c.x + r * 0.12f, y + r * 0.36f}, col, 2.4f);
+}
+
+// Two filled vertical bars — the unit card's Halt glyph (BL-575): the
+// universal "pause" pictogram, reading apart from the X (erase) and the
+// arrow (move) it sits beside on the same grid.
+void glyph_halt(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    const float bw  = r * 0.32f;
+    const float bh  = r * 0.62f;
+    const float gap = r * 0.20f;
+    dl->AddRectFilled({c.x - gap - bw, c.y - bh}, {c.x - gap, c.y + bh}, col);
+    dl->AddRectFilled({c.x + gap, c.y - bh}, {c.x + gap + bw, c.y + bh}, col);
 }
 
 // A square icon button: an ImGui::Button frame with a glyph drawn over it and a
@@ -1767,7 +1795,8 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
     }
     ImGui::SameLine();
 
-    // ── Right quarter: 2x3 action grid — only "Go to" is real today ──
+    // ── Right quarter: 2x3 action grid — Go to, plus March/Halt/Disband
+    // (BL-575, replacing three of the five reserved slots) ──
     {
         ImGui::BeginChild("##unit_actions", {right_w, total_h}, false,
                           ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
@@ -1775,14 +1804,77 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
         const float  bh  = (total_h - 2.0f * spacing) / 3.0f;
         const ImVec2 bsz = {bw, bh};
 
+        // Units carry no corp.assets entry (unlike buildings), so ownership is
+        // read straight off unit_component::owner rather than through
+        // is_player_owned (which walks corp.assets and would always miss a
+        // unit). A rival's unit is intel-only: every press below is disabled.
+        const bool owned = (uit->second.owner == w.player_entity);
+
         if (tile_icon_button("##unit_goto", bsz, /*enabled=*/true, "Go to", glyph_goto))
             focus_on_entity(w, ui, sel);
         ImGui::SameLine();
-        tile_icon_button("##unit_reserved1", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
 
-        tile_icon_button("##unit_reserved2", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+        // March (BL-575): arms province-picking mode on the Planetary canvas
+        // (body_surface_canvas.cpp reads pending_march_unit and, on the next
+        // province click, fills pending_march_dest_province for app::render
+        // to dispatch as corp_verb::march_unit). Visible armed state via the
+        // same accent-ring "primed" idiom the building card's Auto button
+        // uses — and per the project's toggle rule (any control whose active
+        // state is visible is a toggle), pressing March again while armed for
+        // THIS unit cancels the pick rather than re-arming it.
+        {
+            const bool  armed = owned && (ui.pending_march_unit == sel);
+            const char* tip   = !owned ? "Competitor unit - intel only"
+                               : armed ? "March - click a province to send this unit (click again to cancel)"
+                                       : "March - pick a destination province";
+            if (armed)
+            {
+                const ImVec2 pmin = ImGui::GetCursorScreenPos();
+                dl->AddRect({pmin.x - 2.0f, pmin.y - 2.0f}, {pmin.x + bsz.x + 2.0f, pmin.y + bsz.y + 2.0f},
+                           palette::selection, 4.0f, 0, 2.0f);
+            }
+            if (tile_icon_button("##unit_march", bsz, owned, tip, glyph_march) && owned)
+                ui.pending_march_unit = armed ? null_entity : sel;
+        }
+
+        // Halt (BL-575): clears the movement order immediately — no
+        // destination pick needed, unlike March — deferred through
+        // pending_halt_unit for app::render, the same shape as every other
+        // world-mutating press on this card (UI surfaces hold only
+        // `const world&`).
+        {
+            const char* tip = owned ? "Halt - clear this unit's movement order"
+                                    : "Competitor unit - intel only";
+            if (tile_icon_button("##unit_halt", bsz, owned, tip, glyph_halt) && owned)
+                ui.pending_halt_unit = sel;
+        }
         ImGui::SameLine();
-        tile_icon_button("##unit_reserved3", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+
+        // Disband (BL-575): permanent, confirm popup — same pattern as the
+        // building card's Dismantle (no refund either way, MILITARY.md §
+        // Marching; a confirm step is the UI's call, not the seam's).
+        {
+            const char* tip = owned ? "Disband - permanent. No refund; manpower walks away."
+                                    : "Competitor unit - intel only";
+            if (tile_icon_button("##unit_disband", bsz, owned, tip, glyph_dismantle) && owned)
+                ImGui::OpenPopup("confirm_disband");
+        }
+        if (ImGui::BeginPopup("confirm_disband"))
+        {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                               "Disband this unit?");
+            ImGui::TextDisabled("No refund. This cannot be undone.");
+            ImGui::Separator();
+            if (ImGui::Button("Disband"))
+            {
+                ui.pending_disband_unit = sel;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Keep"))
+                ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
 
         tile_icon_button("##unit_reserved4", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
         ImGui::SameLine();
@@ -2215,6 +2307,129 @@ void draw_battle_selection(world& w, ui_state& ui)
             ImGui::EndPopup();
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// BL-577 — the contract element, the battle card's sibling
+// ---------------------------------------------------------------------------
+// docs/ui/SELECTION.md § The battle element is the structural precedent named
+// by the item's own brief: like a battle, a `mercenary_contract` has no entity
+// id, so it is resolved before `selection_kind_of` and owns its whole layout,
+// header included, rather than routing through the shared 3-column band. Unlike
+// a battle it is not time-critical — nothing here expires between frames the
+// way a fight's strength does — so it does not preempt the battle check, only
+// the (still-later) province/kind resolution.
+
+/// Resolve the selected contract, or nullptr. Also clears a stale selection —
+/// there is no equivalent to a battle "ending" (a settled contract's record is
+/// kept, per world.hpp's own comment on `mercenary_contract::state`), so the
+/// only way this returns null is a stale id from a regenerated world.
+const mercenary_contract* selected_contract(const world& w, ui_state& ui)
+{
+    if (!ui.has_contract_selection())
+        return nullptr;
+    for (const mercenary_contract& c : w.mercenary_contracts)
+        if (c.id == ui.selected_contract_id)
+            return &c;
+    ui.clear_contract_selection();
+    return nullptr;
+}
+
+const char* contract_state_word(mercenary_contract_state s)
+{
+    switch (s)
+    {
+        case mercenary_contract_state::active:    return "Active";
+        case mercenary_contract_state::completed: return "Completed";
+        case mercenary_contract_state::failed:    return "Failed";
+        case mercenary_contract_state::abandoned: return "Abandoned";
+    }
+    return "\xe2\x80\x94";
+}
+
+void draw_contract_selection(const world& w, const contract_template_registry& templates,
+                             ui_state& ui)
+{
+    // The caller has already resolved and validated the pointer — same
+    // contract `selected_battle` carries for the battle card.
+    const mercenary_contract& c = *selected_contract(w, ui);
+
+    const char* client_name = "an unrecognised polity";
+    if (const auto nit = w.nations.find(c.client); nit != w.nations.end() && !nit->second.name.empty())
+        client_name = nit->second.name.c_str();
+    const char* contractor_name = "an unmarked company";
+    if (const auto cit = w.corporations.find(c.contractor); cit != w.corporations.end()
+        && !cit->second.name.empty())
+        contractor_name = cit->second.name.c_str();
+
+    // --- header -------------------------------------------------------------
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Contract");
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", contract_state_word(c.state));
+    ImGui::Separator();
+
+    // --- client / contractor -------------------------------------------------
+    ImGui::Text("Client:");
+    ImGui::SameLine();
+    ImGui::TextUnformatted(client_name);
+    ImGui::Text("Contractor:");
+    ImGui::SameLine();
+    ImGui::TextUnformatted(contractor_name);
+
+    // --- predicate (BL-570's condition_text, the same reader the laws
+    // listing in balance_ledger.cpp uses) --------------------------------
+    ImGui::Spacing();
+    if (c.template_index >= 0 &&
+        static_cast<std::size_t>(c.template_index) < templates.size())
+    {
+        // Bound to the contract's own province, exactly as
+        // `run_mercenary_contract_tick` binds it before evaluating it — a
+        // second, disagreeing copy of that bind here is exactly the trap
+        // the battle card's withdrawal-price precedent warns against.
+        condition pred = templates.at(static_cast<std::size_t>(c.template_index)).predicate;
+        pred.province  = c.province;
+        ImGui::TextWrapped("Terms: %s",
+                           condition_text(pred, resource_name, building_type_name).c_str());
+    }
+    else
+    {
+        ImGui::TextDisabled("Terms: unresolved - the authored template is missing.");
+    }
+
+    // --- committed force (CONTRACTS.md Q1: the player names the force, never
+    // the contract) -----------------------------------------------------
+    ImGui::Spacing();
+    ImGui::SeparatorText("Committed force");
+    bool any_unit = false;
+    for (const entity_id u : c.units)
+    {
+        if (u == null_entity)
+            continue;
+        any_unit = true;
+        const auto uit = w.units.find(u);
+        if (uit == w.units.end())
+        {
+            ImGui::TextDisabled("(unit no longer exists)");
+            continue;
+        }
+        ImGui::Text("%s x%d", unit_roster_display_name(uit->second.type).c_str(),
+                   uit->second.count);
+    }
+    if (!any_unit)
+        ImGui::TextDisabled("No force committed.");
+
+    // --- deadline -------------------------------------------------------
+    ImGui::Spacing();
+    ImGui::Text("Deadline: econ tick %d", c.deadline);
+
+    // --- fee split (CONTRACTS.md § Serialisation: "reuses BL-095's split-
+    // payment model" — deposit already paid, remainder on completion) ----
+    ImGui::Spacing();
+    ImGui::SeparatorText("Fee");
+    ImGui::Text("Deposit paid: Cr %.0f", static_cast<double>(c.deposit_paid));
+    ImGui::Text("Remainder on completion: Cr %.0f",
+               static_cast<double>(c.fee - c.deposit_paid));
+    ImGui::TextDisabled("Total: Cr %.0f", static_cast<double>(c.fee));
 }
 
 void draw_tile_selection(world& w, ui_state& ui)
@@ -2891,7 +3106,8 @@ void draw_province_selection_body(world& w, ui_state& ui, const province& pv)
 } // namespace
 
 void draw_selection_content(world& w, const recipe_registry& reg,
-                            const economy_report& report, ui_state& ui)
+                            const economy_report& report,
+                            const contract_template_registry& templates, ui_state& ui)
 {
     // BL-511, refolded 2026-08-21 (Ben: "We don't need another selection element,
     // we can just use the same one as we used for tiles"). A province is resolved
@@ -2916,6 +3132,17 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     if (ui.has_battle_selection() && selected_battle(w, ui) != nullptr)
     {
         draw_battle_selection(w, ui);
+        return;
+    }
+
+    // BL-577: a contract resolves next, for the same structural reason the
+    // battle and the province do — a `mercenary_contract` is not an entity,
+    // so `selection_kind_of` cannot see it. It owns its whole card (SELECTION.md
+    // § The contract element), so it returns rather than falling through to
+    // the shared header, exactly like the battle above.
+    if (ui.has_contract_selection() && selected_contract(w, ui) != nullptr)
+    {
+        draw_contract_selection(w, templates, ui);
         return;
     }
 
