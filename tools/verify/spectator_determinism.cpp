@@ -763,8 +763,23 @@ int main()
               "R1 A/B seated + PLAYED: the corp falls silent — the prohibition follows the seat");
         check(seated_spec.player_actions > 0,
               "R1 A/B seated + SPECTATED: the corp acts — the guard lifts with no seat");
-        check(as_seated >= as_rival,
-              "R1 A/B seated + SPECTATED: it reaches every family it reached as a rival");
+
+        // RETIRED (Ben, 2026-08-24): this row asserted as_seated >= as_rival —
+        // family coverage transfers 1:1 between the rival and seated+spectated
+        // roles. BL-586 slice 2's resource_count widening (42 -> 47) shifted
+        // this specific rollout's RNG stream and broke it; a differential
+        // check (recipes.lua/economy.lua reverted, enum width unchanged)
+        // proved the break tracks the width alone, not the new content — see
+        // this file's k_unspectated_golden comment for the full trail. Put to
+        // Ben rather than silently patched or silently left failing: ruled
+        // that BIT-IDENTICAL RNG-stream determinism is not the property this
+        // harness needs to hold beyond what R2/R3 already prove (saves carry
+        // the actual state, not a replay-from-seed; occasional randomness is
+        // a deliberate strategy lever, not a defect). The two properties
+        // io-standing-rules.md's BL-409 section actually cites — defaults
+        // false, no rival's cadence slot shifts — are unaffected and still
+        // asserted above and below. Reported here rather than deleted
+        // outright, so a future width bump doesn't have to rediscover this.
     }
 
     // --- R1, the schedule half: cadence identity, checked directly ---------
