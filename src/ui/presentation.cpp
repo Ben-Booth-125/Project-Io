@@ -366,6 +366,29 @@ ImU32 nation_colour(entity_id id)
     return nation_table[h % nation_slot_count];
 }
 
+ImU32 building_kind_colour(building_type type)
+{
+    // Hue-separated by hand, not hashed: building_type is a closed enumeration of
+    // eight, and the one place these colours are read (a stacked tile's ring) is
+    // exactly where two adjacent hues would be indistinguishable. Each hue also
+    // carries a mnemonic rather than being arbitrary — ochre for what comes out of
+    // the ground, steel blue for the works that refines it, teal for the water-side
+    // port, violet for the launch to orbit, lime for the road node, crimson for the
+    // garrison, magenta for the institute.
+    switch (type)
+    {
+        case building_type::extraction_site:      return IM_COL32(222, 168,  82, 255); // ochre
+        case building_type::processing_facility:  return IM_COL32(108, 160, 220, 255); // steel blue
+        case building_type::port:                 return IM_COL32( 96, 206, 198, 255); // teal
+        case building_type::launchpad:            return IM_COL32(168, 132, 236, 255); // violet
+        case building_type::inland_logistics_hub: return IM_COL32(176, 206, 104, 255); // lime
+        case building_type::military_base:        return IM_COL32(222,  96,  92, 255); // crimson
+        case building_type::research_institute:   return IM_COL32(232, 124, 196, 255); // magenta
+        case building_type::none:                 break;
+    }
+    return neutral;
+}
+
 } // namespace palette
 
 ImU32 value_colour(fmt::sign s)

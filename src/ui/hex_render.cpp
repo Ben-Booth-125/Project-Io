@@ -507,7 +507,10 @@ void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
     const ImVec2 off          = { region_ctr.x - centre_local.x,
                                   region_ctr.y - centre_local.y };
 
-    // Tiles that carry a building (rendered as installations, not ground).
+    // Tiles that carry a building. They render as ordinary GROUND with a mark laid
+    // over them (BL-596): the plate that used to swap the hex out is gone here for
+    // the same reason it is gone on the Planetary canvas, and it has to go on BOTH
+    // surfaces at once — this file exists so the two cannot drift.
     std::unordered_set<entity_id> built;
     built.reserve(w.buildings.size());
     for (const auto& [bid, bc] : w.buildings)
@@ -516,7 +519,6 @@ void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
     dl->PushClipRect(origin, {origin.x + size.x, origin.y + size.y}, true);
 
     constexpr ImU32 outline_col = IM_COL32(24, 26, 32, 200);
-    constexpr ImU32 built_plate = IM_COL32(50, 52, 60, 255);
     constexpr ImU32 built_mark  = IM_COL32(150, 160, 190, 255);
     constexpr ImU32 hl_col      = IM_COL32(250, 235, 140, 255); // centre-tile highlight ring
 
@@ -548,22 +550,19 @@ void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
             const auto tt        = w.tiles.find(tid);
             const bool have_tile = (tt != w.tiles.end());
             const bool is_built  = built.count(tid) != 0;
-            ImU32 fill = built_plate;
-            if (!is_built)
-            {
-                fill = have_tile ? terrain_colour(tt->second.substrate, tt->second.cover,
-                                                 tt->second.cover_density)
-                                 : IM_COL32(60, 60, 60, 255);
-                // Same landform channel the Planetary canvas draws (BL-231) — this
-                // view exists so the two surfaces cannot drift apart.
-                if (have_tile)
-                    fill = landform_relief(fill, tt->second.landform);
-            }
+            // Ground first, built or not. Same landform channel the Planetary
+            // canvas draws (BL-231) — this view exists so the two surfaces cannot
+            // drift apart.
+            ImU32 fill = have_tile ? terrain_colour(tt->second.substrate, tt->second.cover,
+                                                    tt->second.cover_density)
+                                   : IM_COL32(60, 60, 60, 255);
+            if (have_tile)
+                fill = landform_relief(fill, tt->second.landform);
             dl->AddConvexPolyFilled(verts, 6, fill);
             // Terrain texture (BL-520). Drawn here as well as on the Planetary
             // canvas for the reason this whole file exists: the two surfaces must
             // not drift. No lens attenuation applies — this view has no lens.
-            if (!is_built && have_tile)
+            if (have_tile)
             {
                 const float tr = hex_sz * 0.94f;
                 draw_tile_texture(dl, lc, tr, tt->second.grid_x, tt->second.grid_y,
@@ -573,6 +572,9 @@ void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
             dl->AddPolyline(verts, 6, outline_col, ImDrawFlags_Closed, 1.0f);
             if (is_built)
             {
+                // The installation mark, drawn OVER live ground rather than on a
+                // plate of its own — the neighbourhood view's echo of the canvas's
+                // building silhouette.
                 const float m = hex_sz * 0.30f;
                 dl->AddRectFilled({lc.x - m, lc.y - m}, {lc.x + m, lc.y + m}, built_mark, 1.0f);
             }

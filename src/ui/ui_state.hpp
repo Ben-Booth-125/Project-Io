@@ -32,12 +32,23 @@ enum class overlay_mode
     none = 0,    ///< No overlay; the plain canvas.
     supply,      ///< Supply routes / convoy paths (Layer 5).
     market,      ///< Market / price lens (per-body price wash; see LENSES.md § Market lens).
-    country,     ///< Country (nation) territory tint + owner borders. See LENSES.md § Country lens.
-    corporation, ///< Corporate-owned tiles (per-corp tint; player-corp border). See LENSES.md.
+    // `country` RETIRED (BL-601, Ben 2026-08-24): "National borders should not
+    // diffuse together, instead they should borders extending their colour
+    // inwards. With this, we can drop the nation lens." The lens dissolved
+    // rather than being deleted — its content is always-on chrome now, the
+    // national border band in body_surface_canvas.cpp, drawn like roads. The
+    // selection route it owned (hovered tile → owning nation → Nation ledger)
+    // moved onto the band itself: click the border, get the nation.
+    corporation,///< Corporate-owned tiles (per-corp tint; player-corp border). See LENSES.md.
     resource,    ///< Single-resource deposit lens: flat fill over the contiguous deposit. See LENSES.md § Resource lens.
     population,  ///< Per-tile habitability tint (dark → liveable green). See LENSES.md § Population lens.
-    opportunity, ///< Per-catchment unmet-demand surface (green = market bid above base = a gap to fill). BL-112. See LENSES.md § Opportunity lens.
-    production,  ///< Per-tile production-intensity surface (Σ output×price, log scale). See LENSES.md § Production lens.
+    // Opportunity and Production were `overlay_mode` values here (BL-604, Ben
+    // 2026-08-24: "retire the opportunity lens and the production intensity
+    // lens"). Every lens costs a bar slot, a key, three doc rows and a
+    // selection-routing rule permanently; these two were per-tile value
+    // surfaces whose read the Scarcity and Industry lenses already carry
+    // between them. The sentinel below is what the cycle counts, so the roster
+    // re-numbers itself with no hand-kept constant to follow.
     scarcity,    ///< Per-market supply-shortfall blocks (hot where demand outran supply). See LENSES.md § Scarcity lens.
     industry,    ///< Per-tile nation-substrate throughput field (occupation × terrain richness). See LENSES.md § Industry lens (BL-084).
     reach,       ///< Body-level commercial reach: bodies connected via the corp's trade_route entries, tiered by recency. BL-011. See LENSES.md § Reach lens.
@@ -59,6 +70,40 @@ struct marker_hit_zone
     enum class kind : uint8_t { building, market_centre, unit } kind = kind::building;
     ImVec2    centre{};         ///< Marker centre in screen pixels (this frame).
     float     radius = 0.0f;   ///< Hit-test radius in screen pixels.
+};
+
+/// The grain of a STRUCTURE selection: a region-scale entity the player selects
+/// by its BOUNDARY rather than by anything sitting on a tile.
+///
+/// Deliberately a family and not a nation flag (BL-601, Ben 2026-08-24). The
+/// national border band is its first member — the always-on band is what carries
+/// a nation on screen now that the Country lens has retired, so the band is what
+/// opens it — but nothing about the mechanism is nation-shaped: a plate boundary,
+/// a market catchment rim or a corp territory edge is one more value here and one
+/// more producer of zones, with the resolver and the click path untouched. BL-603
+/// generalises exactly this pattern, which is why it is not a special case.
+enum class structure_kind : uint8_t
+{
+    none,        ///< No structure under the pointer, or the lens has none.
+    nation,      ///< A generated nation, selected by its national border band.
+    market,      ///< A market and its whole catchment (Market and Scarcity lenses).
+    corporation, ///< A corporation's holdings on the active body (Corporation lens).
+};
+
+/// One segment of a structure's boundary, registered by the draw pass so the
+/// click and hover paths can hit-test it.
+///
+/// A segment, not a point, because a boundary is a line — and a line is not
+/// clickable at play zoom, so `half_width` gives it a real corridor, independent
+/// of how thick the border is drawn. Cleared and rebuilt every frame by
+/// body_surface_canvas, alongside `marker_hit_zones`.
+struct structure_hit_zone
+{
+    entity_id      id   = null_entity;          ///< The structure entity (a nation, today).
+    structure_kind kind = structure_kind::nation;
+    ImVec2    a{};                              ///< Segment start, screen px (this frame).
+    ImVec2    b{};                              ///< Segment end, screen px (this frame).
+    float     half_width = 0.0f;                ///< Hit corridor half-width, screen px.
 };
 
 /// One (province, owner) GROUP of units, built each frame for the Planetary
@@ -199,11 +244,19 @@ struct ui_state
     /// player opens it. One flag serves every legend: they are mutually
     /// exclusive by construction (a lens draws at most one).
     bool lens_key_open = false;
-    /// Which view the tile Selection accordion is showing: 0 Terrain,
-    /// 1 Resources, 2 Available buildings (BL-534, Ben 2026-08-22). It used to
-    /// page one-per-deposited-resource, so the seventh deposit cost six presses
-    /// and nothing that was not a resource graph had anywhere to live.
-    /// card_resource_page still selects WHICH resource, now through a dropdown.
+    /// Which section of the tile Selection accordion stands OPEN: 0 Buildings,
+    /// 1 Deposits, 2 Resources, 3 Population, 4 Terrain — or -1 for none open
+    /// (BL-598, Ben 2026-08-24). One section at a time: the band is a fixed
+    /// ~260 px tall, so five open bodies would each get a sliver.
+    ///
+    /// -1 is REACHABLE, and it has to be: a section header shows its own open
+    /// state, which makes it a toggle under the standing Toggle rule, so
+    /// pressing the open header closes it. The five names run from what the
+    /// player can act on to what the ground merely is; the province is a
+    /// SECTION here rather than a selection of its own.
+    ///
+    /// card_resource_page still selects WHICH resource inside the Resources
+    /// section, through a dropdown.
     int card_tile_view = 0;
     /// The time panel's measured height, published each frame by time_panel so
     /// the rest of the right chrome column knows where its own ceiling is.
@@ -313,23 +366,28 @@ struct ui_state
     /// role for the new Soldier card) — Strength / Roster, whichever apply.
     int selection_unit_page = 0;
 
-    /// Province Selection accordion page index (same role again) — Tiles /
-    /// Deposits / Buildings. BL-511's refold (2026-08-21) moved the province off
-    /// its own card and onto the shared Selection element's three-column band, so
-    /// its three readings page exactly as every other selection's do. Clamped at
-    /// the draw site, like the others.
-    int selection_province_page = 0;
-
-    /// The province (BL-511) the player single-clicked, or 0 for none. The
-    /// province is the SELECTED unit on the Planetary canvas — a click that hits
-    /// no marker lands here rather than on a tile — while the tile stays the data
-    /// grain the Selection element then lists (deposits, terrain, buildings all remain
-    /// tile-keyed). Province ids are derived, never allocated (world/province.hpp),
-    /// so this is a plain id, not an entity: `selected_entity` and this field are
-    /// mutually exclusive, and whichever is set last clears the other. The
-    /// Selection element dispatches on this BEFORE `selection_kind_of`, so the
-    /// band's "substitute the player corp when nothing is selected" rule (BL-266)
-    /// cannot swallow a province selection. See SELECTION.md § Province.
+    /// The province the CURRENT SELECTION stands in, or 0 when the selection is
+    /// not a tile. A DERIVED MIRROR, not a selection channel (BL-598).
+    ///
+    /// It was a selection channel: a click on bare ground selected the province
+    /// and left `selected_entity` null, and the two fields were mutually
+    /// exclusive. The province is now a SECTION of the tile element rather than
+    /// a kind of its own, so there is no longer any gesture that selects a
+    /// province without also selecting a tile, and the exclusivity is gone —
+    /// both are set together, or neither is.
+    ///
+    /// What it is still FOR is the canvas: the province outline traces the cell
+    /// the selected tile belongs to, which is the affordance that says "the
+    /// Deposits / Buildings / Population sections you are reading are about
+    /// THIS ground". Province ids are derived, never allocated
+    /// (world/province.hpp), so this is a plain id, not an entity.
+    ///
+    /// It has exactly two writers, both in body_surface_canvas.cpp: the click
+    /// handler, and the reconciliation arm that catches a selection some OTHER
+    /// surface made (a ledger row, a just-built building). No surface reads it
+    /// to decide WHAT to draw — the Selection element derives the province from
+    /// `selected_entity` itself, so a stale mirror can never mis-route a card.
+    /// See SELECTION.md § The tile element's accordion.
     uint32_t selected_province = 0;
 
     /// The province under the cursor this frame, or 0. Written by the Planetary
@@ -348,10 +406,11 @@ struct ui_state
     // against each participant rather than joining theirs. Keying on the province
     // alone would silently select whichever sorted lowest.
     //
-    // MUTUALLY EXCLUSIVE with `selected_entity` and `selected_province`, on the
-    // same "whichever is set last clears the others" rule — and the Selection
-    // element dispatches on the battle FIRST, because a fight on ground you are
-    // looking at is the most urgent thing that ground has to say.
+    // MUTUALLY EXCLUSIVE with `selected_entity` — and the Selection element
+    // dispatches on the battle FIRST, because a fight on ground you are
+    // looking at is the most urgent thing that ground has to say. (It is NOT
+    // exclusive with `selected_province`, which since BL-598 is a derived
+    // mirror of the selection's ground rather than a selection of its own.)
     uint32_t  selected_battle_province = 0;
     entity_id selected_battle_attacker = null_entity;
     entity_id selected_battle_defender = null_entity;
@@ -381,8 +440,8 @@ struct ui_state
     // three-part key): a contract id is already globally unique, with no
     // second axis like "which of a province's several fights" to disambiguate.
     //
-    // MUTUALLY EXCLUSIVE with `selected_entity`/`selected_province`/the battle
-    // triple, on the same "whichever is set last clears the others" rule.
+    // MUTUALLY EXCLUSIVE with `selected_entity` and the battle triple, on the
+    // same "whichever is set last clears the others" rule.
     // There is no canvas marker for a contract (CONTRACTS.md's ledger-and-map
     // framing puts a contract's PROVINCE on the map, not the contract itself),
     // so the setter is a future ledger row press (BL-576, Contracts ledger) —
@@ -395,37 +454,38 @@ struct ui_state
     void clear_contract_selection() { selected_contract_id = 0; }
 
     /// The value of `selected_entity` the Planetary canvas last wrote, so the
-    /// canvas can tell "the player clicked a province" from "some OTHER surface
-    /// — a ledger row, a corp list, a just-built building — moved the entity
-    /// selection". The canvas is the only writer of `selected_province`, so
-    /// without this the two fields could both read as set at once and the
-    /// Selection element would have two things to draw. On a mismatch the entity
-    /// selection wins and the province clears; see body_surface_canvas.cpp.
+    /// canvas can tell its OWN selection from one some other surface made — a
+    /// ledger row, a corp list, a just-built building. On a mismatch the canvas
+    /// re-derives `selected_province` from the new selection and drops any stale
+    /// battle selection; see body_surface_canvas.cpp.
     entity_id province_sync_entity = null_entity;
 
-    // --- Tile repeat-click selection cycle (placeholder unit-loop scaffolding) ---
-    // Which tile the loop is currently anchored to, and which of the three fixed
-    // stages (0 = unit, 1 = building, 2 = province) the selection currently sits
-    // on. BL-511 moved the terminal stage from the tile to its province; a tile is
-    // reached from the Selection element's Tiles page instead.
-    // A click on hovered_tile == selection_cycle_tile advances the stage
-    // (skipping stages with nothing there); a click elsewhere reseeds both.
-    // Mirrors card_resource_page's per-selection reset idiom rather than adding a
-    // separate "is this a repeat click" flag.
+    // --- Tile repeat-click selection cycle ------------------------------
+    // Which tile the loop is currently anchored to, and which of the four fixed
+    // stages the selection currently sits on. A click on hovered_tile ==
+    // selection_cycle_tile advances the stage (skipping stages with nothing
+    // there); a click elsewhere reseeds both. Mirrors card_resource_page's
+    // per-selection reset idiom rather than adding a separate "is this a repeat
+    // click" flag.
     ///
-    /// Stage numbering, after BL-469 (2026-08-21) put the battle on the front:
-    /// **0 = battle, 1 = unit, 2 = province, 3 = building, 4 = tile.** Five rungs.
+    /// Stage numbering: **0 = battle, 1 = unit, 2 = building, 3 = tile.**
     ///
-    /// Ben ruled the four-rung order (unit, province, building, tile) earlier the
-    /// same day; BL-469's own design says the cycle "extends to battle -> unit ->
-    /// building -> tile", which OMITS the province because the item was written
-    /// before that ruling. Merged rather than chosen between: the battle goes
-    /// first as BL-469 asks, and the province stays where Ben put it. Stage 0 is
-    /// skipped when no battle stands here, as every empty stage is.
+    /// BL-598 (Ben, 2026-08-24) DISSOLVED the province rung. It sat between unit
+    /// and building and expressed itself as `null_entity` plus a province id;
+    /// the province is now a SECTION of the tile element, so the tile rung
+    /// reaches it and a rung of its own would select the same ground twice.
+    /// Rungs 1..3 are entities again, so a null check IS their liveness test;
+    /// the `stage_live[]` table stays only because rung 0 (the battle) is still
+    /// not an entity and cannot be tested that way.
     ///
-    /// This is the CYCLE order only; the canvas hit-test still
-    /// resolves most-specific-first, so a first click on a building selects the
-    /// building rather than its province.
+    /// CONSEQUENCE, stated rather than discovered: on bare ground with no unit,
+    /// no building and no battle, exactly ONE rung is live, so a repeat click
+    /// re-selects the same tile. That is the honest reading — there is nothing
+    /// else on that ground to cycle to.
+    ///
+    /// This is the CYCLE order only; the canvas hit-test still resolves
+    /// most-specific-first, so a first click on a building selects the building
+    /// rather than the tile under it.
     entity_id selection_cycle_tile  = null_entity;
     int       selection_cycle_stage = 0;
 
@@ -599,6 +659,31 @@ struct ui_state
     /// the top of body_surface_canvas each frame and rebuilt during the draw pass
     /// so click/hover handling can hit-test in priority order. See marker_hit_zone.
     std::vector<marker_hit_zone> marker_hit_zones;
+
+    /// Per-frame list of on-canvas STRUCTURE boundaries (national borders today).
+    /// Cleared and rebuilt with `marker_hit_zones`, and hit-tested after it: a
+    /// marker is a specific thing the player aimed at, a boundary is a region.
+    /// See structure_hit_zone.
+    std::vector<structure_hit_zone> structure_hit_zones;
+
+    /// BL-603 — the STRUCTURE under the pointer, as the active lens defines it.
+    ///
+    /// Ben, 2026-08-24: "When a lens reveals any large structure, the selection
+    /// should pivot to the entire structure, and no longer provinces. So for the
+    /// market lens, the entire market gets highlighted on mouse over, and clicking
+    /// opens up our market ledger for that market."
+    ///
+    /// This is the AREA counterpart to `structure_hit_zones`, which resolves a
+    /// structure by its BOUNDARY (the national border band). A catchment has no
+    /// boundary the player aims at — they aim at ground inside it — so the lens
+    /// answers "which structure is this tile part of?" instead.
+    ///
+    /// Written by the canvas AFTER its tile loop, so the highlight it feeds is one
+    /// frame behind, exactly as `hovered_province` already is and for the same
+    /// reason: the loop must know the answer before it has drawn the tile that
+    /// produces it. Invisible at any frame rate the canvas runs at.
+    entity_id      hovered_structure      = null_entity;
+    structure_kind hovered_structure_kind = structure_kind::none;
 
     /// Building-placement interaction state (Layer 4 UI groundwork scaffold). See construction_state.
     construction_state construction;

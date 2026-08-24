@@ -29,6 +29,32 @@ namespace ui::icons {
 void building(ImDrawList* dl, ImVec2 centre, float r, building_type type,
              resource_type identity, ImU32 fill);
 
+/// Draw the **stacked-tile ring** — one coloured arc per building KIND standing on
+/// a tile, laid around the inside of the hex rim (BL-596). The dominant kind's own
+/// building glyph draws in the centre, so the ring names the tile's contents while
+/// the centre names which of them leads. Read CLOCKWISE FROM THE TOP: the first
+/// segment (12 o'clock) is the dominant kind, i.e. the one the centre glyph depicts.
+///
+/// **Three things keep it off the rim's existing vocabulary** — the player-footprint
+/// outline and, under the Country lens, the nation-border segments both live there.
+/// The ring is a CIRCLE among hexagons (curved, never straight-sided), it is INSET to
+/// 0.76 r so it clears both the hex edges and their midpoints, and it is BROKEN by a
+/// gap between every segment, which no border pass ever is.
+///
+/// **Draws nothing below two kinds.** A single-kind tile is already fully described by
+/// its centre glyph, and a ring on every built tile in the world would be chrome, not
+/// information. The caller owns the level-of-detail gate (see PLANETARY.md § Building
+/// markers): below it the tile degrades to the dominant glyph alone, never to nothing.
+///
+/// @param dl            Draw list to render into.
+/// @param centre        Hex centre, screen pixels.
+/// @param r             Half-extent — the hex circumradius the ring fits inside.
+/// @param kind_colours  One colour per kind, dominant FIRST, then the remainder in a
+///                      stable order. Source: palette::building_kind_colour.
+/// @param kinds         Number of entries in @p kind_colours. Under 2 draws nothing.
+void stack_ring(ImDrawList* dl, ImVec2 centre, float r,
+                const ImU32* kind_colours, int kinds);
+
 /// Draw a resource pip — a small filled diamond in the resource's identity
 /// colour (see presentation_of). For resource strips and deposit markers.
 ///

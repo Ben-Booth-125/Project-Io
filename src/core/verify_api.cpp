@@ -64,13 +64,18 @@ overlay_mode overlay_from_name(const std::string& s)
 {
     if (s == "supply")      return overlay_mode::supply;
     if (s == "market")      return overlay_mode::market;
-    if (s == "country")     return overlay_mode::country;
-    if (s == "faction")     return overlay_mode::country; // legacy alias (renamed BL-052)
+    // "country" / "faction" (the legacy alias, renamed BL-052) resolve to NONE:
+    // the Country lens retired with BL-601 and its content is always-on chrome,
+    // so a script naming it still captures national borders — on the plain
+    // canvas, which is where they now live. Kept as an explicit row rather than
+    // deleted, so the retirement reads here instead of hiding in the fallback.
+    if (s == "country" || s == "faction") return overlay_mode::none;
     if (s == "corporation") return overlay_mode::corporation;
     if (s == "resource")    return overlay_mode::resource;
     if (s == "population")  return overlay_mode::population;
-    if (s == "opportunity") return overlay_mode::opportunity;
-    if (s == "production")  return overlay_mode::production;
+    // "opportunity" and "production" were names here until BL-604 retired both
+    // lenses. They now take the unknown-name fallback below, so a stale script
+    // captures the plain canvas rather than failing to build.
     if (s == "scarcity")    return overlay_mode::scarcity;
     if (s == "industry")    return overlay_mode::industry;
     if (s == "reach")       return overlay_mode::reach;
@@ -742,6 +747,27 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["hovered_province"]  = static_cast<unsigned int>(m_ui.hovered_province);
         out["selected_province"] = static_cast<unsigned int>(m_ui.selected_province);
         out["has_selection"]     = (m_ui.selected_entity != null_entity);
+        // WHAT is selected, not merely whether (added at Sprint 17b's integration).
+        // `has_selection` cannot tell a nation from a building, and a structure
+        // press and a marker press both clear the province mirror — so a check on
+        // structure-grain selection (BL-601, and BL-603 after it) could assert the
+        // side effect and never the subject. Exposed as the same word the Selection
+        // element renders, so a script asserts on what the player reads.
+        {
+            const char* k = "none";
+            switch (ui::selection_kind_of(m_world, m_ui.selected_entity))
+            {
+            case ui::selection_kind::body:        k = "body";        break;
+            case ui::selection_kind::tile:        k = "tile";        break;
+            case ui::selection_kind::building:    k = "building";    break;
+            case ui::selection_kind::market:      k = "market";      break;
+            case ui::selection_kind::unit:        k = "unit";        break;
+            case ui::selection_kind::nation:      k = "nation";      break;
+            case ui::selection_kind::corporation: k = "corporation"; break;
+            default:                              k = "none";        break;
+            }
+            out["selection_kind"] = std::string(k);
+        }
         // BL-469: the battle selection is a third channel into the same element,
         // so the assertion half needs it too — without these every expect() about
         // a battle card would be a proxy for something else.
@@ -751,6 +777,23 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // The hover half of the same seam: dwell is reached by frame COUNT
         // (hover(x, y, frames)), and these say whether the glance card came up
         // and whether it has stuck. Booleans, not contents.
+        // Which fold-out ledger is open (BL-603's other half: a structure click
+        // must OPEN its ledger, not merely select the thing). One string rather
+        // than a flag per panel, because the column shows one at a time.
+        {
+            const char* panel = "none";
+            if (m_ui.show_market_ledger)           panel = "market";
+            else if (m_ui.show_balance_ledger)     panel = "balance";
+            else if (m_ui.show_corporation_panel)  panel = "corporation";
+            else if (m_ui.show_economy_panel)      panel = "economy";
+            else if (m_ui.show_construction_panel) panel = "construction";
+            else if (m_ui.show_tile_ledger)        panel = "tile";
+            else if (m_ui.show_contracts_ledger)   panel = "contracts";
+            out["open_panel"] = std::string(panel);
+        }
+        // Which section of the tile Selection element's top nav is showing, so a
+        // check can assert the chevrons MOVED it rather than assuming they did.
+        out["selection_section"] = m_ui.card_tile_view;
         out["hover_card"]        = (m_ui.hover_card_entity != null_entity);
         out["hover_card_stuck"]  = m_ui.hover_card_stuck;
         out["x"]                 = m_pointer_x;
@@ -890,6 +933,15 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "decisions")    m_ui.show_decision_feed = open; // AI decision feed (BL-407)
         else if (name == "strategy")     m_ui.show_strategy_readout = open; // Strategy readout (BL-411)
         else if (name == "contracts")    m_ui.show_contracts_ledger = open; // Contracts ledger (BL-576)
+        // Nav slot 8's all-corporations table. It had no name here, so the one
+        // rail slot whose panel a script could not open was also the only one
+        // with no capture — green-but-blind by omission rather than by design.
+        else if (name == "corporations_table") m_ui.show_corporations_table = open;
+        // The in-session system menu (the header-corner popup, time_panel.cpp).
+        // `show_menu` sounds like this and is not: it re-enters the LAUNCH screen.
+        // The popup that holds save/load/options/quit had no hook at all, so the
+        // one surface a player must reach to leave a session was uncapturable.
+        else if (name == "system_menu")         m_ui.show_system_menu = open;
         // BL-536: the Generation Ledger had no name here, so no script could open
         // it. That mattered the moment a save had to prove it restores the
         // generation_report — this ledger is one of the two surfaces that read it.
@@ -1609,26 +1661,46 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("select_tile", [this](int col, int row) {
         for (const auto& [tid, tc] : m_world.tiles)
             if (tc.body == m_ui.active_body && tc.grid_x == col && tc.grid_y == row)
-            { m_ui.selected_entity = tid; break; }
+            {
+                m_ui.selected_entity = tid;
+                // BL-598: write the province MIRROR the gesture writes, so a
+                // staged tile selection renders exactly as a clicked one does —
+                // province outline included. The canvas re-derives it anyway on
+                // its next frame, but a capture taken before that frame (or on a
+                // rung with no Planetary canvas) would otherwise differ from the
+                // gesture this shortcut stands in for.
+                m_ui.selected_province    = m_world.provinces.province_of(tid);
+                m_ui.province_sync_entity = tid;
+                break;
+            }
     });
-    // BL-511: select the PROVINCE containing the tile at (col,row) on the active
-    // surface body — the province is what a canvas click now lands on. A SHORTCUT:
-    // since BL-521 verify.click_tile(col,row) performs the real gesture, and
-    // click_injection.lua asserts the two agree. Prefer the click where the check
-    // is about the gesture; this stays for staging a selection cheaply, without
-    // the pan click_tile performs. Mirrors select_tile's shape and is equally
-    // non-mutating. Sets province_sync_entity too, so the canvas's next-frame
-    // reconciliation (which clears the province when some other surface moved the
-    // entity selection) does not immediately undo this. Returns the province id,
-    // or 0 when the tile is ocean / unpartitioned / absent.
+    // BL-598: THE HOOK FOLLOWS THE GESTURE. This used to write the province-only
+    // selection tuple — `selected_province` set, `selected_entity` null — which
+    // was exactly what a click on bare ground produced. It no longer is: the
+    // province folded into the tile Selection element, so a click selects the
+    // TILE and carries its province as a mirror, and no gesture reaches the old
+    // tuple at all. A hook that still wrote it would be staging a state a player
+    // cannot get to, and every script asserting on it would be testing fiction.
+    //
+    // So this now does what `select_tile` does and RETURNS the province id, which
+    // is what its callers outside this file actually want it for (staging a
+    // battle, a contract, a march target). Kept rather than deleted for that
+    // return value and for the name's readability at the call site: "select the
+    // tile, and tell me the province it stands in".
+    //
+    // Still a SHORTCUT: since BL-521 verify.click_tile(col,row) performs the real
+    // gesture, and click_injection.lua asserts the two agree. Prefer the click
+    // where the check is about the gesture; this stays for staging a selection
+    // cheaply, without the pan click_tile performs. Returns 0 when the tile is
+    // ocean / unpartitioned / absent.
     v.set_function("select_province", [this](int col, int row) -> unsigned int {
         for (const auto& [tid, tc] : m_world.tiles)
         {
             if (tc.body != m_ui.active_body || tc.grid_x != col || tc.grid_y != row)
                 continue;
             const uint32_t pid = m_world.provinces.province_of(tid);
-            m_ui.selected_entity      = null_entity;
-            m_ui.province_sync_entity = null_entity;
+            m_ui.selected_entity      = tid;
+            m_ui.province_sync_entity = tid;
             m_ui.selected_province    = pid;
             return pid;
         }
@@ -1709,7 +1781,15 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             if (tit == m_world.tiles.end()) continue;
             if (tit->second.body == m_ui.active_body &&
                 tit->second.grid_x == col && tit->second.grid_y == row)
-            { m_ui.selected_entity = bid; break; }
+            {
+                m_ui.selected_entity = bid;
+                // BL-598: a marker hit carries NO province mirror — a building
+                // card has no province section for the outline to be about — so
+                // this shortcut clears it, exactly as the click handler does.
+                m_ui.selected_province    = 0;
+                m_ui.province_sync_entity = bid;
+                break;
+            }
         }
     });
     // Switch the construction panel's sub-view (0 = Construction/queue, 1 = Buildings/

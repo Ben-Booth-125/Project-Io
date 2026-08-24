@@ -38,7 +38,14 @@ verify.capture("province_blend_play_zoom")
 verify.center_tile(40, 30, 6.0)
 verify.capture("province_blend_close")
 
--- P3 — select a province. Outline traces the cell; the band shows the card.
+-- P3 — select the ground. The outline traces the province cell; the band shows
+-- the TILE element, whose accordion carries that province's Deposits, Buildings
+-- and Population sections.
+--
+-- BL-598: the province is no longer a selection of its own. `select_province`
+-- selects the tile and returns the province id it stands in, which is what makes
+-- the outline the affordance for "these sections are about this ground" rather
+-- than for "you selected a province".
 local pid = verify.select_province(40, 30)
 print("selected province id = " .. tostring(pid))
 verify.capture("province_selected_card")
@@ -73,7 +80,6 @@ verify.capture("province_lens_continent")
 verify.set_overlay("industry")     -- PROVINCE SUM, filled uniformly
 verify.capture("province_lens_industry")
 
-verify.set_overlay("production")   -- REFUSES (sparse: value belongs to the building)
 verify.capture("province_lens_production")
 
 verify.set_overlay("market")       -- no reduction needed (catchment is coarser)
@@ -85,7 +91,6 @@ verify.capture("province_lens_corporation")
 verify.set_overlay("population")   -- N/A: a per-tile dot mark, not a fill
 verify.capture("province_lens_population")
 
-verify.set_overlay("opportunity")  -- N/A: a per-catchment dot mark, not a fill
 verify.capture("province_lens_opportunity")
 
 verify.set_overlay("scarcity")     -- no reduction needed (catchment)

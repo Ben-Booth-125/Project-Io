@@ -1707,6 +1707,18 @@ bool app::save_game_to(const std::string& path)
     env.planetary_pan_x   = m_ui.planetary_pan_x;
     env.planetary_pan_y   = m_ui.planetary_pan_y;
 
+    // Make the destination directory before writing. `write_save_game` opens an
+    // ofstream, which does NOT create intervening directories, so a save aimed at
+    // a path like "build_gen/verify/<name>.iosave" returned false for a reason
+    // that reads as "the save is broken" rather than "the folder is missing" —
+    // which is exactly how save_load.lua's own fixture path behaved on a tree
+    // where nothing had created build_gen/verify yet.
+    if (const auto parent = std::filesystem::path{path}.parent_path(); !parent.empty())
+    {
+        std::error_code ec;
+        std::filesystem::create_directories(parent, ec);
+    }
+
     const bool ok = write_save_game(path, m_world, env);
 
     ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), null_entity,
@@ -1940,9 +1952,13 @@ void app::render()
                 // so this is a map lookup on every frame but the first after an
                 // invalidation (a road laid, a building placed or demolished).
                 body_reach_field(m_world, m_ui.active_body);
+                // No lens-key anchor argument (BL-602): every legend now asks
+                // ui::lens_chrome_rect for the one region — the minimap's header, top
+                // right — rather than being handed a point derived here. That derivation
+                // was the last hand-rolled shell rect in this block.
                 ui::draw_body_surface_canvas(m_world, m_ui, m_registry, m_last_econ_report,
-                                             m_generation_report, {0.0f, 0.0f}, disp, primary_input,
-                                             {mm_origin.x, mm_origin.y + mm_h * 0.5f});
+                                             m_generation_report, {0.0f, 0.0f}, disp,
+                                             primary_input);
                 ui::draw_circumplanetary_canvas(m_world, m_ui, inset_origin, inset_size, minimap_input, true);
                 {
                     const entity_id anchor = ui::circumplanetary_anchor(m_world, m_ui.active_body);
@@ -2002,7 +2018,14 @@ void app::render()
     // the identity tile / balance bar / Selection all clear the same permanent W (BL-122).
     {
         const float header_left  = ui::shell_column_width(disp.x);
-        const float header_right = ui::right_chrome_left(disp) - margin;
+        // Flush to the right chrome column, no gutter (Ben, 2026-08-24: widen the
+        // time controls "to the same x/y as the corner of our main balance bar").
+        // The `- margin` that used to stand here was the top band's only internal
+        // gap, and the BOTTOM band has never had one — selection_band_rect is
+        // deliberately flush against both its neighbours on the argument that
+        // "introducing the shell's only gap here would read as a mistake". It was
+        // the top band that carried the mistake.
+        const float header_right = ui::right_chrome_left(disp);
         ui::draw_header_panel(m_world, m_balance_history, m_last_econ_report, header_left, header_right);
     }
 

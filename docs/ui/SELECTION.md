@@ -43,7 +43,8 @@ Two gestures, applied uniformly across all three canvases:
 - **Single-click an entity → select it.** Sets `selected_entity`, opens (or
   re-points) the Selection info element. **No view change** — same rung, same
   pan, same zoom. *On the Planetary canvas, a click that hits no marker selects
-  the **province** rather than the tile — see § The province element.*
+  the **tile**, and the tile carries its province — see § The province is a
+  section, not a selection.*
 - **Double-click an entity → navigate to it.** Routes through
   `ui::focus_on_entity`, which resolves the entity to its most informative view
   (descend a rung, focus a surface/tile, or — for non-spatial entities — open
@@ -102,32 +103,74 @@ horizontal columns (Ben, 2026-07-28):
 1. **Left quarter — zoomed hex neighbourhood.** A bordered render of the selected tile and its
    immediate ring (`draw_tile_neighbourhood`, radius 2), the selected tile picked out — the
    actual terrain render, not a placeholder image.
-2. **Centre half — a paged accordion of three VIEWS** (‹ Name (i/3) › pager,
-   `ui_state::card_tile_view`). The three views are **Terrain**, **Resources** and **Available
-   buildings** — the set Ben named on 2026-08-22; Province and Ownership were offered and
-   not picked, so the array is the ruling, not a starting point to grow.
-   - **Terrain** — the tile's own **Habitability** and **Hazard** scalars, each charted against
-     this body's average ("Body avg" muted), so a barren tile still has something to read.
-   - **Resources** — one chart per resource **deposited on the tile**, chosen through a
-     **dropdown** rather than paged (reading the seventh deposit must not cost six presses):
+2. **Centre half — a SECTION TOP NAV over five sections**, in this order
+   (`ui_state::card_tile_view` holds which is showing):
+
+   > **Buildings → Deposits → Resources → Population → Terrain**
+
+   **The order is the argument, not a shuffle.** It runs from what the player can *act on* —
+   what can still be built here — through what is there to be taken (the stock, its yield, the
+   workforce that would take it) to what the ground merely *is*. The reading you can do
+   nothing about is last.
+
+   **The nav is one row, and the section below it takes the whole body.** Ben, 2026-08-24:
+   *"a topnav left and right chevron, with a full canvas expansion button… straddle left and
+   right buttons across the entire span, excepting the expand chevron. And our open accordion
+   element title should be centred."*
+
+   - **The chevrons straddle the span** — hard left, hard right — rather than clustering
+     around the title, so the two presses sit the largest possible distance apart.
+   - **The title is centred on the run between them**, with an `i/N` count that says how many
+     readings exist. That count is what an accordion's stack of headers was buying, at one row
+     instead of five.
+   - **The full-canvas control keeps the rightmost slot** and is excepted from the straddle —
+     the same two-control disclosure idiom every other surface uses, and `disclosure_controls`
+     owns its glyph. `in_place` is false here: a section is already the whole body, so the only
+     larger state is the canvas.
+   - **The nav wraps** in both directions, so five presses of either chevron return to where
+     you started.
+
+   *A vertical accordion was built first, on Ben's earlier ruling the same day, and ruled out
+   on sight. The measurement is why: five stacked headers spent **169 of the band's 258 px** on
+   chrome to leave the open section **89**. The nav spends one frame height.*
+
+   - **Buildings** — a table **per province throughout** (Ben, 2026-08-22), the selected tile
+     serving only to name which province is meant: the province's total building count against
+     its ceiling (`-1` is UNKNOWN and is said, never rendered as room), then one row per
+     workable resource with **Built** (extraction sites in the province targeting it) and
+     **Max** (the province's placement capacity for it — summed `stack_capacity` over member
+     tiles that would accept an extraction site, computed through the same `can_place_in_world`
+     the placement seam uses so the table cannot disagree with the build button). No chart: the
+     question is a comparison of small integers.
+   - **Deposits** — the province's deposits **summed** across its member tiles, richest first.
+     Summing is the right reduction because a deposit is a **stock**: for a player deciding
+     whether a locality is worth a mine, several tiles each holding a little iron *is* one
+     province holding that much iron. On unpartitioned ground (ocean) the section falls back to
+     the tile's own deposits and says so, rather than reading as "nothing here".
+   - **Resources** — one chart per resource **deposited on the selected tile**, chosen through
+     a **dropdown** rather than paged (reading the seventh deposit must not cost six presses):
      this tile's hazard-adjusted production vs. the top-decile tile for that resource, a
      **clustered column pair** sharing a baseline — "Tile" green, "Top 10%" muted, nice
      1/2/5-rounded ceiling, dotted gridlines. `ui_state::card_resource_page` selects the
-     resource. Only these pages are click-drillable into a time-series history (BL-196,
-     resource drill-down); habitability/hazard carry no per-tile history, so their chart is not
-     a click target. Both views draw through one `tile_metrics` list — the full-canvas fold
-     charts the same pages by index, so the split is a filter, not a second builder.
-   - **Available buildings** — a table **per province throughout** (Ben, 2026-08-22), the
-     selected tile serving only to name which province is meant: the province's total
-     building count against its ceiling (`-1` is UNKNOWN and is said, never rendered as room),
-     then one row per workable resource with **Built** (extraction sites in the province
-     targeting it) and **Max** (the province's placement capacity for it — summed
-     `stack_capacity` over member tiles that would accept an extraction site, computed through
-     the same `can_place_in_world` the placement seam uses so the table cannot disagree with the
-     build button). No chart: the question is a comparison of small integers.
+     resource. Only these charts are click-drillable into a time-series history (BL-196,
+     resource drill-down). Deposits *sums* where Resources *charts*: the two ask different
+     questions of the same ground, which is why both earn a section.
+   - **Population** — the population centres standing in the tile's province: the province
+     total in thousands, then each centre by name with its scale word (Outpost / Settlement /
+     Town / City / Metropolis, POPULATION.md § Scale bonus model), headcount and habitability,
+     largest first; a centre standing on the *selected tile itself* is marked. This section is
+     province-grain because the **data model** is — population lives on population centres, not
+     on arbitrary tiles — so a per-tile version would have to invent a number.
+   - **Terrain** — the tile's own **Habitability** and **Hazard** scalars, each charted against
+     this body's average ("Body avg" muted), so a barren tile still has something to read.
+     Chosen through the same dropdown Resources uses; they carry no per-tile history, so their
+     chart is not a click target.
 
-   Atmospheric pollution and per-tile population are **not modelled** (population lives on
-   population centres, not arbitrary tiles) and so have no view.
+   Resources and Terrain draw through one `tile_metrics` list — the full-canvas fold charts the
+   same pages by index, so the split is a filter, not a second builder — and share one chart
+   body, so the drill and the disclosure control cannot come to differ between them.
+
+   Atmospheric pollution is **not modelled** and so has no section.
 3. **Right quarter — a 2×3 action button grid** (2 columns × 3 rows — the quarter-width
    column is too narrow for 3-across to read as bigger than an icon strip): **Construct
    Buildings** (opens the **tile construction ledger** — `draw_construction_ledger`, see below;
@@ -334,85 +377,59 @@ card's shape is built ahead of units carrying much in the live economy (Ben's di
 
 `ui_state::selection_unit_page` is the pager index, mirroring `selection_building_page`.
 
-### The province element
+### The province is a section, not a selection
 
-**On the Planetary canvas the selected unit is the PROVINCE, not the tile** (BL-511, province
-selection). A click that hits no marker glyph lands on the hovered tile's province
-(`world/province.hpp` — the small multi-tile cell of `docs/generation/PROVINCES.md`; the
-partition owns its size and may change it, so no surface here assumes a member count). The
-tile is **not retired**: deposits, terrain, buildings and richness all stay tile-keyed, and
-Ben's ruling is explicit that tiles "are just going to be rendered differently, but still
-instrumental unit values". What differs is which of the two the player *presses*.
+**The province is reached through the tile element, not beside it** (Ben, 2026-08-24):
 
-A province is not an entity, so it cannot travel in `selected_entity`. It has its own field:
+> *"Province selection element must be bundled into the tile selection element. By this I mean,
+> we just use a longer accordion."*
+
+A province is **not** a kind the Selection element can be. Selecting a tile *is* selecting its
+province: the tile element's accordion carries the province readings — **Buildings** (its
+placement capacity), **Deposits** (its stock, summed) and **Population** (its centres) — resolved
+from the selected tile at the draw site. The three tile-grain readings and the three
+province-grain ones sit in **one** list because they are answers about **one piece of ground**,
+and splitting them across two elements made the player choose which grain to ask at before
+knowing what they wanted to know.
+
+**Two things this dissolves:**
+
+- **The province's own Buildings page is gone.** It rolled up what already stands in the
+  province, which is the same question the Buildings section's **Built** column answers, at a
+  grain the player does not build at. Placement is tile-grain; the roll-up was reference, and
+  reference lives in the ledgers.
+- **The province's member-tile list is gone.** Its job was to *give the tile back* — to undo a
+  selection that had taken the tile away. With the tile selected in the first place there is
+  nothing to give back, and a list of tiles a single canvas click already reaches is a list
+  worth no space.
+
+**The consequence, stated rather than discovered.** After this, **no gesture selects a province
+without also selecting a tile.** The province is still the march target and the render unit, and
+both are unaffected: the march destination has always travelled in its own field
+(`ui_state::pending_march_dest_province`, deliberately kept distinct so that picking a
+destination does not change what the Selection element shows), and the canvas resolves a
+destination province from the *hovered* tile, never from the selection.
 
 | Field | Meaning |
 |---|---|
-| `ui_state::selected_province` | The selected province id, or `0` for none. |
+| `ui_state::selected_province` | The province the **current selection stands in**, or `0` when the selection is not a tile. A **derived mirror**, not a selection channel. |
 | `ui_state::hovered_province` | The province under the cursor, driving the hover outline. |
 | `ui_state::province_sync_entity` | The `selected_entity` value the canvas last wrote. |
 
-**The two selections are mutually exclusive**, and the canvas is the single place that keeps them
-so. `selected_province` has exactly one writer (the Planetary canvas); `selected_entity` has many
-(ledger rows, the corporation list, "inspect the thing I just built"). Each frame the canvas
-compares `selected_entity` against `province_sync_entity`: a mismatch means some *other* surface
-moved the entity selection, that surface wins, and the province clears. Keeping the reconciliation
-in one place beats adding a clear-me duty to every selecting surface.
+`selected_province` was a selection channel — mutually exclusive with `selected_entity`,
+whichever was set last clearing the other — and is not one any more: **both are set together, or
+neither is.** What it is still *for* is the canvas. The province outline traces the cell the
+selected tile belongs to, which is the affordance that says *"the Deposits, Buildings and
+Population sections you are reading are about this ground"*. It has exactly two writers, both on
+the Planetary canvas: the click handler, and the reconciliation arm that catches a selection some
+*other* surface made (a ledger row, a just-built building) and re-derives the mirror from it —
+which is what lets a tile selected from anywhere at all still get its outline, without adding a
+set-the-mirror duty to every selecting surface. **No surface reads it to decide what to draw**:
+the element derives the province from `selected_entity` itself, so a stale mirror can never
+mis-route a card.
 
-`draw_selection_content` therefore **resolves** `selected_province` **before** `selection_kind_of`.
-It has to: the band substitutes the player's corporation whenever the entity selection is empty
-(§ Always open), which is exactly the state a province selection leaves behind, so a later test
-would be swallowed by the substitution. A province id that no longer resolves (a regenerated
-world) clears itself there and the element falls through to the ordinary kind resolution — the
-fallback is a normal selection, never a broken card.
-
-#### It is a BODY of the one element, not a second element (Ben, 2026-08-21)
-
-*"We don't need another selection element, we can just use the same one as we used for
-tiles."* A province is **one more thing the single polymorphic panel can be showing**.
-Resolving it early chooses only *what* the element shows; from there it runs the same code
-every other kind runs — the shared header (icon / title / muted trailing label / right-aligned
-`>`), the separator, and then `draw_province_selection_body`, which takes the **same
-three-column band** as `draw_building_selection_body` and `draw_unit_selection_body`. It
-borrows the **tile** kind for its header icon: a province is a cluster of tiles, not a new kind
-of thing.
-
-Two header slots are filled from the province rather than from `selection_title` /
-`selection_kind_name` (which key off an entity id): the title is `Province [x, y]`, anchored on the
-lowest-id member tile's grid position — province ids are derived and opaque (body rank | block
-raster | component), so the raw id is not a name a player can hold, and the anchor coordinate is —
-and the muted trailing label is `N tiles` rather than a kind name. The `>` and the icon act on the
-anchor tile.
-
-**The content's job is to give the tile back.** The canvas blends the member tiles into one soft
-shape; the body un-blends them:
-
-- **Left quarter — the province in situ, over its mixture bar.** The same slot the tile card gives
-  the zoomed hex neighbourhood: the neighbourhood centres on the anchor tile, and the **mixture
-  bar** runs along the bottom of the same panel — one band per member tile, in the province's own
-  ascending-tile-id order, each in exactly the colour the canvas gives that tile. This is the
-  blend's legend, so it stays permanently visible beside the gradient it explains rather than
-  living on a page you have to reach.
-- **Centre half — a paged accordion** (`ui_state::selection_province_page`), same pager chrome as
-  every other card:
-  - **Tiles** — every member tile as a press. Selecting one clears the province and hands over the
-    full tile card (deposits, the neighbourhood hex view, the Construct door). **Building placement
-    is tile-grain**, so this list is also the route to building.
-  - **Deposits** — summed across the province. A deposit is a stock, and for a player deciding
-    whether a locality is worth a mine, several tiles each holding a little iron is one province
-    holding that much iron.
-  - **Buildings** — the roll-up of what already stands here, each a press that selects the
-    building. A locality question answered without clicking every hex in turn.
-- **Right quarter — a 2×3 action grid**, `Go to` plus five reserved slots, exactly as the unit card.
-  Construct is deliberately **not** here: placement is tile-grain, so the Construct door stays on
-  the tile card and the Tiles page is the route to it.
-
-Nothing in the body assumes a province **size** — the member list is walked and divided by, never
-indexed against a constant — so a repartition changes only how many bands the mixture bar has.
-
-An ocean or otherwise unpartitioned tile has no province and still selects as a **tile**, so
-clicking water selects something rather than nothing.
-
+An ocean or otherwise unpartitioned tile has no province. It still selects as a tile, with the
+province-grain sections saying so and falling back to the tile's own figures where one exists.
 ### The battle element
 
 **A live battle selects ahead of everything else** (BL-469, battle card). `draw_battle_selection`
@@ -469,7 +486,7 @@ own stable `id` rather than an entity id — so it cannot travel in `selected_en
 resolved **before** `selection_kind_of`, owning its whole layout rather than the shared
 action|facts split. Unlike a battle it is **not time-critical**: nothing on the card expires
 between frames the way a fight's strength does, so it resolves after the battle check but still
-ahead of the province/kind resolution.
+ahead of the kind resolution.
 
 | Field | Meaning |
 |---|---|
@@ -499,19 +516,26 @@ way every other selecting surface already does.
 
 ### Tile repeat-click selection cycle
 
-`body_surface_canvas.cpp`'s click handler cycles **Battle → Soldier → Building → Province → Battle**
-on a **repeat** click at the same tile the selection already sits on, skipping any stage with nothing
-there (no unit on the tile skips straight to Building; no building skips to Province).
+`body_surface_canvas.cpp`'s click handler cycles **Battle → Soldier → Building → Tile → Battle**
+on a **repeat** click at the same tile the selection already sits on, skipping any stage with
+nothing there (no unit on the tile skips straight to Building; no building skips to Tile).
 `ui_state::selection_cycle_tile` / `selection_cycle_stage` track the anchor tile and current stage.
+
+**Four rungs, not five.** The province rung sat between Soldier and Building and is **dissolved**
+(Ben, 2026-08-24): the province is a set of sections in the tile element, so the Tile rung reaches
+it and a rung of its own selected the same ground twice.
 
 The battle rung leads because a live battle is the time-limited reading of that ground; the other
 rungs are standing facts about it. It is live only when `first_battle_in()` finds a fight in the
-tile's province, so on peaceful ground the cycle runs Soldier → Building → Province.
+tile's province, so on peaceful ground the cycle runs Soldier → Building → Tile.
 
-Because a province is expressed as `selected_entity = null_entity` **plus** a province id, the
-stage table's "nothing here, skip it" test cannot be a null check on the last stage — the handler
-carries an explicit `stage_live[]` alongside the entity table. On a tile with no province (ocean)
-the stage falls back to the tile, so the cycle never strands on an empty rung.
+Rungs 1–3 are entities, so a null check *is* their liveness test. Rung 0 is not — a battle has no
+entity id — so the handler keeps an explicit `stage_live[]` alongside the entity table for that
+one rung.
+
+**On bare ground with no unit, no building and no battle exactly one rung is live**, so a repeat
+click re-selects the same tile. That is the honest reading: there is nothing else on that ground
+to cycle to.
 
 A click on a **different** tile (or the first click anywhere) goes through the marker-hit precedence
 (`resolve_marker_hit`: unit > building > market_centre, nearest-wins within a kind) and only
@@ -648,7 +672,7 @@ building → market → unit  →  tile  →  body
 entity the active lens deems valid**. Validity is not fixed: it is **the active lens's question**
 (§ Per-lens selection validity in LENSES.md). With **no lens** every drawn kind is valid, so
 resolution returns the literal lowest entity (a building over a tile resolves to the building; bare
-terrain resolves to the tile — or its province, on the Planetary canvas). Under a lens, kinds the
+terrain resolves to the tile, whose element carries its province). Under a lens, kinds the
 lens does not care about are *skipped*, so the same pointer position can resolve to a **different
 entity per lens**.
 

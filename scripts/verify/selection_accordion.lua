@@ -1,70 +1,86 @@
--- BL-534 (tile selection becomes an accordion) — the three views and the
--- available-buildings table.
+-- The tile Selection element's section TOP NAV (BL-598, revised 2026-08-24).
 --
--- WHY. The Selection band's centre column used to page ONE-PER-DEPOSITED-
--- RESOURCE: "Iron Ore (1/7)" with prev/next arrows, so reading the seventh
--- deposit cost six presses, and anything that was not a resource graph had
--- nowhere to live. Ben's ruling (2026-08-22): page VIEWS instead, bundle the
--- resource choice into a dropdown, and add an available-buildings view.
+-- Ben ruled the accordion on 2026-08-24 and, the same day on seeing it, ruled it
+-- out again: "I meant a topnav left and right chevron, with a full canvas
+-- expansion button... straddle left and right buttons across the entire span,
+-- excepting the expand chevron. And our open accordion element title should be
+-- centred. This is opposed to a vertical accordion."
 --
--- The three views are Terrain, Resources, Available buildings. Ben named that
--- set and did NOT pick Province or Ownership, which were offered.
+-- The numbers behind the reversal, measured off the accordion before it went:
+-- five stacked headers spent 169 of the band's 258 px on chrome to give the open
+-- section 89. The nav spends one frame height.
 --
--- The claims:
---   S1  the accordion pages three VIEWS, not N resources
---   S2  the Resources view offers a dropdown, not a carousel
---   S3  Available buildings reads PER PROVINCE — built vs max per resource,
---       over the province's own BL-513 total ceiling
+-- WHY THIS SCRIPT NO LONGER PRESSES MEASURED PIXEL ROWS. Its previous version
+-- drove the accordion by clicking header rows at coordinates measured from probe
+-- captures (HDR_Y0 = 512, pitch 23.25). When the accordion became a nav those rows
+-- stopped existing — and the check kept PASSING, capturing the same section five
+-- times under five different names. That is the third instance of the same rot in
+-- one sprint, so this version asserts on state (`selection_section`) and drives the
+-- real chevrons, which cannot both be wrong and green.
+
 verify.window(1280, 720)
 
+local s = stage_ui_fixture()
 verify.goto_surface("home")
-verify.set_overlay("none")
+verify.select_tile(s.unit.col, s.unit.row)
+verify.frames(3)
+
+local NAMES = { "Buildings", "Deposits", "Resources", "Population", "Terrain" }
+
+-- The nav row sits at the top of the centre column, between the hex cell and the
+-- action grid. These ARE screen coordinates, and after three coordinate failures in
+-- one sprint that deserves its defence: they are safe here because every press is
+-- followed by an assertion that the section ACTUALLY MOVED. A drifted coordinate
+-- makes this check fail loudly on the next run; it cannot make it pass vacuously,
+-- which is exactly what the version this replaced did — five captures of the same
+-- section under five different names, green throughout.
+--
+-- Measured 2026-08-24 at 1280x720: centre column x 478..763, nav row y 495..528.
+local NAV_Y  = 512
+local COL_L  = 494                        -- left chevron, hard against the column edge
+local COL_R  = 719                        -- right chevron, immediately left of the expand slot
+
+local function section() return verify.pointer_target().selection_section end
+
+verify.expect(section() ~= nil, "the element reports which section is showing")
+local start = section()
+
+-- Forward through every section with the RIGHT chevron, and prove each press
+-- advances by exactly one. A nav that moved by two, or not at all, would look
+-- identical in a capture.
+local seen_forward = {}
+for i = 1, #NAMES do
+    local before = section()
+    seen_forward[#seen_forward + 1] = before
+    verify.click(COL_R, NAV_Y)
+    verify.frames(2)
+    local after = section()
+    verify.expect(after == (before + 1) % #NAMES,
+                  "right chevron: section " .. tostring(before) .. " -> " ..
+                  tostring(after) .. " (expected " .. tostring((before + 1) % #NAMES) .. ")")
+    shot("nav_fwd_" .. tostring(i) .. "_" .. NAMES[after + 1])
+end
+
+verify.expect(section() == start, "five presses of the right chevron return to the start")
+
+-- And back the other way, which is the half a one-directional pager never had.
+local before = section()
+verify.click(COL_L, NAV_Y)
 verify.frames(2)
+verify.expect(section() == (before - 1 + #NAMES) % #NAMES,
+              "left chevron steps backwards")
+shot("nav_back_" .. NAMES[section() + 1])
 
--- A tile with deposits, so the Resources view has more than one entry to offer.
--- (40,30) is the tile province_render.lua frames and is confirmed workable land.
-verify.center_tile(40, 30, 6)
-verify.select_tile(40, 30)
-verify.frames(2)
+-- Every section must have rendered at least once across the walk, so a section
+-- that draws nothing is caught here rather than by someone noticing later.
+local hit = {}
+for _, v in ipairs(seen_forward) do hit[v] = true end
+local missing = {}
+for i = 0, #NAMES - 1 do
+    if not hit[i] then missing[#missing + 1] = NAMES[i + 1] end
+end
+verify.expect(#missing == 0,
+              "every section was reached by the nav" ..
+              (#missing > 0 and (" (missed " .. table.concat(missing, ", ") .. ")") or ""))
 
--- ---------------------------------------------------------------------------
--- S1 / default — view 0 is Terrain. The header reads "Terrain  (1/3)".
--- ---------------------------------------------------------------------------
-verify.capture("accordion_view_terrain")
-
--- ---------------------------------------------------------------------------
--- S2 — view 1 is Resources, with the dropdown where the carousel used to be.
--- ---------------------------------------------------------------------------
--- The pager's next arrow sits at the right edge of the centre column. The band
--- is `minimap_height + chrome_margin` tall and flush to the screen bottom; the
--- centre column is the middle half of the span between the comms dock and the
--- right chrome. Derived rather than hardcoded so a window change does not
--- silently re-aim this at nothing (NR-508 — panels publish no rect to ask).
--- MEASURED off accordion_view_terrain.png, not derived. Deriving it needs the
--- comms-dock width, the band split and the pager row offset, and getting any of
--- the three wrong aims the press at nothing and silently does something else.
--- Ben accepted that cost on NR-508 rather than build a target registry, so this
--- is the accepted shape: pixels, named, from a capture that is in the repo.
-local prev_x, next_x, pager_y = 491, 711, 515
-
-verify.hover(next_x, pager_y, 2)
-verify.click(next_x, pager_y)
-verify.frames(2)
-verify.capture("accordion_view_resources")
-
--- ---------------------------------------------------------------------------
--- S3 — view 2 is Available buildings: the province table.
--- ---------------------------------------------------------------------------
--- Expect a "Province capacity  N / M (K free)" line over a three-column table
--- of Resource / Built / Max. Every number is a PROVINCE number, per Ben's
--- ruling on the grain — the selected tile only names which province is meant.
-verify.hover(next_x, pager_y, 2)
-verify.click(next_x, pager_y)
-verify.frames(2)
-verify.capture("accordion_view_buildings")
-
--- Paging back returns to Terrain, so the pager is symmetric.
-verify.hover(prev_x, pager_y, 2)
-verify.click(prev_x, pager_y)
-verify.frames(2)
-verify.capture("accordion_back_to_resources")
+verify.expect_no_clipping("selection_top_nav")
