@@ -554,7 +554,7 @@
       "design": "SUPPLY.md § Dispatch trigger designs it: a resource + quantity + destination-market form on the market Selection card — a form, not a press. Today no UI site issues corp_verb dispatch_convoy (the verb is wire-only; the decision feed merely renders it). Build the form, wire the verb, surface refusals inline (including BL-597’s passive-cap refusal once it lands). Live click required; question_log.json entry per the every-surface rule."
     },
     {
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "version_goal": "v0.1.18",
       "sprint": "18",
@@ -577,10 +577,10 @@
         "docs/economy/LOGISTICS.md"
       ],
       "authority_doc": "docs/economy/SUPPLY.md",
-      "design": "Park lifted 2026-08-24 (design form; the coastal-ports design was parked 2026-08-21). SUPPLY.md § Infrastructure gates: sea requires a Port at both endpoints; today the path picks sea mode ungated. Scope is the GATE: author the Port building (already named in reach’s anchor vocabulary, LOGISTICS.md §3), enforce the two-endpoint check at dispatch, surface the refusal. The wider archived BL-188 coastal-trade model stays reference, not scope. Golden churn from newly-refused sea legs is expected and must be attributed, never blessed away."
+      "design": "Park lifted 2026-08-24 (design form; the coastal-ports design was parked 2026-08-21). SUPPLY.md § Infrastructure gates: sea requires a Port at both endpoints; today the path picks sea mode ungated. Scope is the GATE: author the Port building (already named in reach’s anchor vocabulary, LOGISTICS.md §3), enforce the two-endpoint check at dispatch, surface the refusal. The wider archived BL-188 coastal-trade model stays reference, not scope. Golden churn from newly-refused sea legs is expected and must be attributed, never blessed away. COMPLETE 2026-08-24 (Sprint 18 wave 1): tile_has_active_port added to supply_system.cpp, gating price_convoy_leg on an active Port at both endpoints; ungated water-crossing legs are refused (rejected_placement, mutates nothing) rather than falling back to land pricing. Verified 23/23 in tools/verify/sea_port_gate.cpp. Golden churn: none in the standing suite; ai_skill_harness pre-existing red bands unrelated (NR-616). Commit b15d663e."
     },
     {
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "version_goal": "v0.1.18",
       "sprint": "18",
@@ -601,7 +601,7 @@
         "docs/military/MILITARY.md"
       ],
       "authority_doc": "docs/military/MILITARY.md",
-      "design": "MILITARY.md § Upkeep designs one decay rule with two triggers; every rate in scripts/economy.lua § upkeep is zero today, so the wired code path is inert by data. Author non-zero decay/recovery/out_of_supply_reach and the ordnance draw, argued against BL-543 (value anchor); first-cut-then-tune, flagged for Ben’s calibration (NR-600). Harness: the reach trigger fires beyond out_of_supply_reach and recovery restores inside it; existing goldens that legitimately move are attributed."
+      "design": "MILITARY.md § Upkeep designs one decay rule with two triggers; every rate in scripts/economy.lua § upkeep is zero today, so the wired code path is inert by data. Author non-zero decay/recovery/out_of_supply_reach and the ordnance draw, argued against BL-543 (value anchor); first-cut-then-tune, flagged for Ben’s calibration (NR-600). Harness: the reach trigger fires beyond out_of_supply_reach and recovery restores inside it; existing goldens that legitimately move are attributed. COMPLETE 2026-08-24 (Sprint 18 wave 1): rates landed in scripts/economy.lua (credits_per_head=6.0, credits_per_head_per_power=0.004, ordnance=0.14, food_rations=1.0, supply_decay_permille=50, supply_recovery_permille=100, out_of_supply_reach=24.0), verified against value_anchor (22/22) and the new upkeep_harness (19/19). tier_margin R2 failure confirmed pre-existing, independent of this change. Commit 4fff7972."
     }
   ]
 }
