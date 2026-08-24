@@ -25,7 +25,6 @@ re-anchor rule, so the cycle reaches every lens.
 | `overlay_mode` | Bar | Surface (one line) |
 |---|---|---|
 | `corporation` | 1 | Planetary tile tint per owning corp, player/rival HQ markers |
-| `country` | 2 | Planetary nation tint + owner borders + per-nation key |
 | `resource` | 3 | Planetary contiguous-deposit flat fill; good selector in the legend |
 | `market` | 4 | Planetary **catchment tint** — one colour per market + city-name key; Circumplanetary price strip |
 | `population` | 5 | Per-tile red→green **value mark** (workforce efficiency) + gradient key |
@@ -46,7 +45,7 @@ Identity colours live in `presentation.hpp`; the corporation-identity helper is
 ## Rung applicability
 
 The lens bar — on the **minimap** (see [MINIMAP.md](MINIMAP.md)) — presents a
-**curated subset** in this order: **Corporation → Country → Resource → Market →
+**curated subset** in this order: **Corporation → Resource → Market →
 Population → Opportunity → Production → Continent**. **Scarcity** and
 **Industry** are off the bar, reached by **keyboard lens-cycle only** — joining
 **Supply**, **Reach** and **Supply-routes**, which do not fit the strip. The
@@ -68,7 +67,6 @@ representation intended.
 |---|---|---|---|
 | Supply *(keyboard-cycle only)* | per-convoy route lines | per-body convoy-count badge | per-tile convoy glyph |
 | **Corporation** | — | — | tile tint + player/rival HQ markers |
-| **Country** | — | — | tile tint + owner borders + nation key |
 | **Resource** | — | — | contiguous-deposit flat fill + key |
 | **Market** | — | per-body price strip | catchment tint + city-name key |
 | **Population** | — | — | per-tile value marks, workforce efficiency |
@@ -80,11 +78,10 @@ representation intended.
 | **Reach** *(keyboard-cycle only)* | connected-body glow | — | connection-list key |
 | **Supply-routes** *(keyboard-cycle only)* | aggregated graph edges | — | lane-list key, log-scaled thickness |
 
-**Per-lens rung notes.** Corporation, Country, Resource, Population,
+**Per-lens rung notes.** Corporation, Resource, Population,
 Opportunity, Industry, and Continent are **Planetary-only** — their unit of meaning
 (a tile, a building, a deposit, a margin, a background-plant reading, a plate)
-is sub-body and has no coherent inter-body surface, and nations are sub-body
-political units. Market and Supply are the genuinely multi-rung lenses (prices per
+is sub-body and has no coherent inter-body surface. Market and Supply are the genuinely multi-rung lenses (prices per
 body-market; logistics span the ladder). Reach and Supply-routes are body-level
 reads whose natural home is the Solar rung — the connected-body glow and the
 aggregated graph — with the Planetary keys as their per-body read. Production and
@@ -105,8 +102,8 @@ Every lens legend is keyed off the active `overlay_mode` and drawn in
 `body_surface_canvas.cpp`, before the input early-out so it shows in headless
 captures too. Two chromes:
 
-- **Count-driven keys** — Country, Market, Reach, Supply-routes, whose row list
-  grows with the world (nations / markets / lanes present) — share
+- **Count-driven keys** — Market, Reach, Supply-routes, whose row list
+  grows with the world (markets / lanes present) — share
   `draw_scroll_list_key`. The box lives in the **right chrome column**, aligned
   with the minimap (right edge on the screen edge), filling the otherwise-unused
   space above it, and it is a **dropdown, collapsed by default**
@@ -139,8 +136,9 @@ legend).
 
 **Intent.** Read the map as a *corporate landscape*: where corporations operate,
 who owns what, and how the player's footprint sits against rivals. National
-territory is the Country lens's job — this lens is about **corporate-owned tiles**
-first; nation context is deliberately absent.
+territory is the border band's job (always-on chrome, [PLANETARY.md](PLANETARY.md)
+§ The national border band) — this lens is about **corporate-owned tiles**
+first; nation context is deliberately absent from its fill.
 
 **Ownership definition (settled).** A *corporate-owned tile* is any tile on which
 a corporation holds a building. The mapping is derived at draw time from
@@ -155,8 +153,8 @@ pass is guarded entirely behind `overlay_mode::corporation` in
 nothing on the other two canvases.
 
 **Colour.**
-- **Owned tiles** are tinted their owning corporation's identity colour (a direct
-  replacement of the terrain hue, matching the Country lens's tint convention).
+- **Owned tiles** are tinted their owning corporation's identity colour — a direct
+  replacement of the terrain hue, not a blend.
 - The **player corporation** (`w.player_entity`) uses
   `presentation::faction_colour(0)` for its tile fill and additionally gets a thin
   border in `palette::selection` (white) so the player's holdings contrast against
@@ -173,9 +171,9 @@ extraction-site filled diamond, the processing-facility plain filled square, and
 the port/unit filled triangle.
 
 **Legend.** The active lens is named by the strip glyph highlight and its hover
-tooltip (`overlay_mode_name` → "Corporation ownership"). A per-corp colour key —
-the counterpart of the Country lens's per-nation key — is the lens's legend; it
-shares the Country key's `draw_scroll_list_key` chrome.
+tooltip (`overlay_mode_name` → "Corporation ownership"). A per-corp colour key is the
+lens's legend, sharing the `draw_scroll_list_key` chrome with the other
+count-driven keys (§ Legend placement).
 
 **Player identity chrome.** The player's white outline above is drawn as part of the
 Corporation lens's own fill/border pass, but the *general* player-identity accent — a subtle wash
@@ -203,52 +201,86 @@ levers) is BL-182's (corporate borders). See `scripts/verify/corporate_reach.lua
 
 ---
 
-## Country lens
+## The Country lens has retired — national borders are chrome
 
-*(The lens shows **national** territory, so its name is Country; `overlay_mode::country`,
-glyph `icons::country`. `"faction"` remains a legacy alias in the verify-script name parser.)*
+*(`overlay_mode::country` no longer exists. `"country"` and its legacy alias
+`"faction"` still parse in the verify-script name parser, resolving to
+`overlay_mode::none` — the plain canvas, which is where national borders now
+live.)*
 
-**Intent.** Read the map as a *political landscape*: which nation holds which
-tile, and where the borders between them fall. This is the national counterpart
-to the Corporation lens — territory, not corporate holdings.
+Ben, 2026-08-24: *"National borders should not diffuse together, instead they
+should borders extending their colour inwards. With this, we can drop the nation
+lens."*
 
-**Ownership definition.** A tile's owner is its nation entity id, derived from the
-`world` tile→nation ownership map (stored off-tile so the nation and tile-tuning
-groups stay disjoint; see [NATION_GENERATION.md](../generation/NATION_GENERATION.md)).
-Unclaimed tiles have no owner.
+**The lens dissolved rather than being deleted: its content became chrome.** A
+nation's identity colour sits at its frontier and falls off inwards over three
+tiles, drawn always — under every lens and on the plain canvas — exactly as
+roads are. The full render spec, the falloff table, and the
+never-average-two-nations constraint that decides both halves of the pass are in
+[PLANETARY.md](PLANETARY.md) § The national border band.
 
-**Rung.** Planetary only. No Solar or Circumplanetary representation is intended:
-nations are sub-body political units and have no coherent expression on the
-inter-body rungs. The render pass is guarded behind `overlay_mode::country` in
-[`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
+**Why a lens was the wrong home for it, in this system's own terms.** A lens is a
+*mode*: one is active at a time, and it re-skins the map to answer one question at
+the cost of every other. Territory is not that kind of question — it is context
+the player wants while reading prices, deposits or output, not instead of them. A
+territory-wide tint forced the trade; a band at the boundary does not, because it
+leaves the middle of a territory free.
 
-**Colour.**
-- **Claimed tiles** are tinted their owning nation's identity colour
-  (`palette::nation_colour`, keyed by nation entity id), a direct replacement of
-  the terrain hue.
-- **Borders:** a dark stroke is drawn on every hex edge shared with a neighbour of
-  a *different* owner — including the claimed/unclaimed boundary — so contiguous
-  territory reads as a filled region with a hard outline.
-- **Unclaimed tiles** keep their plain terrain hue with no tint.
+**And the tint had a defect a band does not.** Under BL-532's ruling the Country
+lens vertex-blended like everything else, so a province straddling a frontier could
+tint toward a nation it did not belong to — the mean of two nation colours is a
+third nation's colour. The band is composited per tile after the blend, and its
+boundary stroke is inset inside each tile rather than laid on the shared edge, so
+no pixel can belong to a colour that is neither neighbour's.
 
-**Glyph.** A downward-pointing shield silhouette with a dark outline
-(`icons::country`). Distinct from the corporation seal-square and the resource
-strata.
+**Its per-nation key retired with it.** A scroll-list of every nation on the body
+was the legend for a wash that no longer exists; the band answers the same question
+at the thing itself, by hovering the border.
 
-**Legend.** Named by the strip glyph highlight and its hover tooltip
-(`overlay_mode_name` → "Countries"), plus a **per-nation key** (`draw_country_key`,
-`body_surface_canvas.cpp`): one `palette::nation_colour` swatch + name per nation
-present on the active body, sorted by id, in the collapsed-by-default right-column
-chrome (§ Legend placement).
+## Structure-grain selection & routing
 
-**Interaction notes.** Planetary-only, single-select. Borders are recomputed at
-draw time from the neighbour ownership comparison; no border data is persisted.
+**A structure is selected by its boundary, not by anything under a single tile.**
+This is a selection grain of its own, sitting between the per-lens routing table
+below (which resolves what a *tile* means under the active lens) and the markers.
+It is **lens-agnostic**: a structure boundary is chrome, so it resolves the same
+way whatever lens is active, and it is not a row in the per-lens table.
+
+| Structure | Target on canvas | Routes selection to |
+|---|---|---|
+| **Nation** | the **national border band** (§ above) | the nation — the Nation ledger |
+
+Ben's ruling of 2026-08-24, on where the nation ledger is reached now that the
+lens that owned the route has gone: **"click the border itself."** The border is
+what carries a nation on screen, so the border is what opens it — a rail slot
+would have put a nation behind a menu while its territory sat under the pointer,
+and routing through the province card would have made it reachable only via a
+grain the player may not care about.
+
+Two things the pattern requires, neither optional:
+
+- **A real hit width.** The drawn stroke is a line, and a line is not clickable at
+  play zoom. Each drawn boundary segment registers a hit **corridor** whose width is
+  independent of the stroke's thickness (`structure_hit_zone`, `ui_state.hpp`).
+- **A hover read that names the structure before the click commits.** An immediate
+  label at the cursor — not the glance-then-stick hover card
+  ([TOOLTIP.md](TOOLTIP.md)), which waits out an appear delay by design.
+
+**Priority:** markers (building > market centre > unit) outrank a structure
+boundary, and a boundary outranks the tile/province under it. A marker is a
+specific thing the player aimed at; inside the corridor, the boundary *is* what the
+pointer is on.
+
+**This is the general case on purpose.** A `structure_hit_zone` carries its own
+kind and its own corridor width, and the resolver is a nearest-segment walk that
+knows nothing about nations. A plate rim, a market-catchment edge or a corp
+territory boundary joins the table by producing zones; the resolver and the click
+path do not change.
 
 ## Supply lens
 
 **Intent.** Read the map as a *logistics network*: where goods move, along which
-routes, and where throughput concentrates. The economic counterpart to Country's
-political read.
+routes, and where throughput concentrates. The economic counterpart to the border
+band's political read.
 
 **Rung applicability.** Supply is the one lens with a meaningful representation on
 *every* rung, because logistics span the zoom ladder. `supply_system.cpp`
@@ -323,7 +355,6 @@ resolution owns the stack-walk; this is the per-lens table it reads.
 |---|---|---|
 | **none** | the lowest drawn entity (marker, else tile/province) | Tile Ledger |
 | **Corporation** | the **owning corporation** of the tile/building | Balance Ledger |
-| **Country** | the **owning nation** of the tile | Nation ledger |
 | **Resource** | the tile's **deposit** profile | Tile Ledger (deposit detail) |
 | **Market** | the body's **market** / the listing under the pointer | Market Ledger |
 | **Opportunity** | the tile (and its best-building margin breakdown) | Tile Ledger |
@@ -331,6 +362,9 @@ resolution owns the stack-walk; this is the per-lens table it reads.
 | **Scarcity** | the tile's **market** (the catchment under the pointer) | Market Ledger |
 | **Industry** | the tile (no dedicated ledger route; falls through to the tile) | Tile Ledger |
 | **Supply** | the **route segment / stockpile** under the pointer | Supply surface |
+
+**Country has no row because it is not a lens.** A nation is reached by its border
+band under *every* lens — see § Structure-grain selection & routing above.
 
 A lens skips kinds it does not validate: beneath the Corporation lens a hovered
 *building* resolves *through* to its owning corporation, because the corporation
@@ -364,7 +398,7 @@ flood-fill grouping, so no flood-fill pass is built.
 **Rung.** Planetary only — deposits are per-tile and have no inter-body surface.
 The render pass is guarded behind `overlay_mode::resource` in
 [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp), matching the
-Corporation/Country pattern.
+Corporation pattern.
 
 **Colour.** Resource identity colours from
 [`presentation.hpp`](../../src/ui/presentation.hpp) (`presentation_of(res).colour`),
@@ -605,7 +639,7 @@ Two constraints the palette encodes:
 - The palette must be genuinely **categorical**. Muted mineral tones at luminance ~100–130 with
   almost no hue spread collapse into one grey wash. The table keeps the earthy cast that separates
   it from `palette::nation_colour` — plates are *substrate*, not identity, and this must not read as
-  a second Country lens — but alternates light/dark so adjacent slots differ even in greyscale.
+  a national territory — but alternates light/dark so adjacent slots differ even in greyscale.
 
 **Glyph.** Two interlocking plates split by a diagonal seam (`icons::continent`; see
 [ICONS.md](ICONS.md)). The **seam** is the load-bearing shape: it distinguishes the glyph from the

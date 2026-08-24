@@ -119,6 +119,57 @@ constexpr int k_side_verts[6][2] = { {5,0}, {4,5}, {3,4}, {2,3}, {1,2}, {0,1} };
 /// (`scripts/verify/zoom_ladder.lua`).
 constexpr float k_land_blend_strength = 0.35f;
 
+// ---------------------------------------------------------------------------
+// BL-601 — the national border band (always-on chrome, no longer a lens)
+// ---------------------------------------------------------------------------
+// Ben, 2026-08-24: "National borders should not diffuse together, instead they
+// should borders extending their colour inwards. With this, we can drop the
+// nation lens."
+//
+// A nation reads as a BORDERED REGION, not a tinted field. Its identity colour
+// lives at the boundary and falls off inwards over a few tiles, which is what
+// makes an always-on read affordable at all: the middle of a territory stays
+// free for terrain, texture and whatever lens is active, which a full-territory
+// tint cannot do. Roads set the precedent — drawn always, not behind a lens.
+//
+// TWO NEIGHBOURS MEETING MUST NEVER BLEND INTO A THIRD COLOUR. That is exactly
+// the objection PLANETARY.md's categorical refusal raised against blending the
+// old Country lens (overruled by BL-532, and reinstated here in a shape that
+// does not need the refusal): the band is composited PER TILE, after the
+// province blend has already run, and each tile takes only its OWN nation's
+// colour. Nothing in this pass ever averages two nations' hues.
+
+/// Depth of the inward band, in tiles. Depth 0 is a tile touching a foreign
+/// owner — another nation, or unclaimed ground, so a coastline is a border too.
+constexpr int k_border_band_tiles = 3;
+
+/// Wash opacity by depth. Falls off steeply so the band reads as an edge effect
+/// rather than as a tint: past the third ring the ground is plain again.
+constexpr float k_border_band_alpha[k_border_band_tiles] = { 0.50f, 0.26f, 0.11f };
+
+/// The boundary stroke is INSET toward the drawing tile's own centre by this
+/// fraction of the circumradius, rather than laid along the shared edge. That is
+/// what keeps two neighbours' colours apart: each nation paints a rule just
+/// inside its own side of the frontier, so a border reads as two parallel
+/// coloured lines with the seam between them — never one line of a mixed hue.
+constexpr float k_border_stroke_inset = 0.18f;
+constexpr float k_border_stroke_px    = 2.2f;
+
+/// Hit corridor half-width, in screen pixels, around each drawn boundary
+/// segment. The drawn stroke is a line and a line is not clickable at play zoom
+/// (Ben's ruling on the nation-ledger route), so the band carries a real hit
+/// width that is independent of how thick it is drawn.
+///
+/// CAPPED AS A FRACTION OF THE HEX as well, because a fixed pixel width is only
+/// thin at close zoom. A frontier tile can face several foreign neighbours at
+/// once, so its corridors ring most of its rim; at play zoom that still leaves
+/// the middle of the hex selecting the tile, but a 7 px corridor on a 17 px
+/// inradius would swallow the tile whole. The effective width is therefore
+/// min(k_border_hit_px, draw_r * k_border_hit_frac) — 7 px wherever a hex is
+/// large enough to spare it, and proportional below that.
+constexpr float k_border_hit_px   = 7.0f;
+constexpr float k_border_hit_frac = 0.18f;
+
 /// Per-tile shade, computed one pass ahead of the draw loop so a tile's
 /// neighbours' colours are in hand when its corners are blended.
 struct tile_shade
@@ -191,7 +242,6 @@ bool lens_blend_mode(overlay_mode m)
     {
         case overlay_mode::none:
         case overlay_mode::resource:
-        case overlay_mode::country:
         case overlay_mode::continent:
         case overlay_mode::market:
         case overlay_mode::scarcity:  return true;
@@ -708,54 +758,12 @@ void draw_market_key(ImVec2 anchor, float top_limit, float bottom_limit, const w
                          "Market catchments", box_w, rows, "No markets", &state, state);
 }
 
-/// On-canvas legend for the Country lens (BL-133): one colour swatch + nation name
-/// per nation present on the active body, sorted by nation id for a stable order.
-/// Modelled on draw_market_key; the box auto-sizes to the widest name so every
-/// label guaranteed-fits (CalcTextSize pattern draw_market_key already uses).
-/// Colour source is palette::nation_colour — the same source the tile tint itself
-/// uses (the country lens's tile-tint pass, above).
-void draw_country_key(ImVec2 anchor, float top_limit, float bottom_limit,
-                      const world& w, ui_state& state)
-{
-    std::vector<entity_id> present;
-    for (const auto& [tid, nid] : w.tile_to_nation)
-    {
-        const auto tile_it = w.tiles.find(tid);
-        if (tile_it == w.tiles.end() || tile_it->second.body != state.active_body)
-            continue;
-        if (std::find(present.begin(), present.end(), nid) == present.end())
-            present.push_back(nid);
-    }
-    std::sort(present.begin(), present.end());
-
-    const float pad    = 8.0f;
-    const float line_h = ImGui::GetTextLineHeight();
-    const float swatch = line_h;
-
-    float name_w = ui::fit_width("Countries");
-    for (const entity_id nid : present)
-    {
-        const auto nat_it = w.nations.find(nid);
-        if (nat_it == w.nations.end())
-            continue;
-        name_w = std::max(name_w, ui::fit_width(nat_it->second.name.c_str()));
-    }
-    const float box_w = pad * 2.0f + swatch + 4.0f + name_w;
-
-    std::vector<key_row> rows;
-    rows.reserve(present.size());
-    for (const entity_id nid : present)
-    {
-        const auto nat_it = w.nations.find(nid);
-        if (nat_it == w.nations.end())
-            continue;
-        rows.push_back({ palette::nation_colour(nid), IM_COL32(220, 220, 220, 255),
-                         nat_it->second.name, key_marker::swatch, 0.0f });
-    }
-
-    draw_scroll_list_key(anchor, top_limit, bottom_limit, "##lens_key_country",
-                         "Countries", box_w, rows, "No nations", nullptr, state);
-}
+// The Country lens's per-nation key (BL-133, draw_country_key) RETIRED with the
+// lens (BL-601). A scroll-list of every nation on the body was the legend for a
+// territory-wide tint — it answered "which colour is whose?" for a wash that no
+// longer exists. The band answers it in place: a nation's colour sits on its own
+// border, and hovering that border names the nation outright, so the read is at
+// the thing rather than in a list beside it.
 
 /// On-canvas legend for the Population lens: a low→high habitability gradient bar
 /// (dark substrate → liveable green). Same left-edge placement as the other keys.
@@ -1100,6 +1108,48 @@ entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx
     return unit != null_entity ? unit : (bld != null_entity ? bld : mkt);
 }
 
+/// Nearest-wins STRUCTURE hit resolution (BL-601) — resolve_marker_hit's
+/// region-grain sibling, and deliberately the general case rather than a nation
+/// lookup: a boundary segment carries its own kind and its own corridor width,
+/// so a plate rim or a catchment edge joins by producing zones, not by editing
+/// this. BL-603 generalises the pattern.
+///
+/// A point-to-SEGMENT distance, not point-to-point: the target is a line, and a
+/// line is only clickable if it is given a corridor. `half_width` is that
+/// corridor, and it has nothing to do with how thick the border is drawn.
+///
+/// @param zones      This frame's boundary segments.
+/// @param mx,my      Cursor position, screen px.
+/// @param out_kind   Optional; receives the winning zone's kind.
+/// @return           The closest structure whose corridor contains the cursor,
+///                   or null_entity.
+entity_id resolve_structure_hit(const std::vector<structure_hit_zone>& zones,
+                                float mx, float my,
+                                structure_kind* out_kind = nullptr)
+{
+    float     best_d2 = std::numeric_limits<float>::max();
+    entity_id best    = null_entity;
+    for (const structure_hit_zone& hz : zones)
+    {
+        const float ax = hz.b.x - hz.a.x;
+        const float ay = hz.b.y - hz.a.y;
+        const float len2 = ax * ax + ay * ay;
+        float t = 0.0f;
+        if (len2 > 0.0f)
+            t = std::clamp(((mx - hz.a.x) * ax + (my - hz.a.y) * ay) / len2, 0.0f, 1.0f);
+        const float dx = mx - (hz.a.x + ax * t);
+        const float dy = my - (hz.a.y + ay * t);
+        const float d2 = dx * dx + dy * dy;
+        if (d2 > hz.half_width * hz.half_width || d2 >= best_d2)
+            continue;
+        best_d2 = d2;
+        best    = hz.id;
+        if (out_kind != nullptr)
+            *out_kind = hz.kind;
+    }
+    return best;
+}
+
 } // namespace
 
 void update_body_vision(world& w, ui_state& state, double now_days)
@@ -1340,6 +1390,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // Rebuild per-frame marker hit-zone list (BL-059). Cleared here so every draw
     // call starts fresh; the tile loop and the market-centre pass below fill it.
     state.marker_hit_zones.clear();
+    // Same contract at STRUCTURE grain (BL-601): the national border pass in the
+    // tile loop fills this with one corridor segment per drawn frontier edge.
+    state.structure_hit_zones.clear();
 
     // BL-511 selection reconciliation. The canvas is the only writer of
     // `selected_province`, but `selected_entity` has many writers (ledger rows,
@@ -2020,16 +2073,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                             : IM_COL32(255, 255, 255, 255);
         ImU32 fill = built ? built_plate_colour(has_owner, owner_col)
                            : terrain_colour(tile.substrate, tile.cover, tile.cover_density);
-        if (state.overlay == overlay_mode::country)
-        {
-            const auto nat_it = w.tile_to_nation.find(id);
-            if (nat_it != w.tile_to_nation.end())
-                fill = palette::nation_colour(nat_it->second);
-        }
+        // The Country lens's whole-tile nation tint USED TO LAND HERE, inside the
+        // blended fill (BL-601 removes it). It was the wrong place twice over:
+        // it made a nation a field rather than a bordered region, and being part
+        // of the blended fill it let two neighbours' hues average into a third
+        // nation's colour at a shared corner. The national read is the border
+        // band now — always-on chrome, composited per tile AFTER the blend.
         // Corporation lens: tint a tile that carries a corporate building with its
-        // owning corp's colour (direct replacement, like the faction tint). Tiles
+        // owning corp's colour (a direct replacement of the terrain hue). Tiles
         // with no corporate building keep their terrain hue — no nation underlay.
-        else if (state.overlay == overlay_mode::corporation)
+        if (state.overlay == overlay_mode::corporation)
         {
             if (has_owner)
                 fill = owner_col;
@@ -2251,6 +2304,93 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                    && !is_water(ct.substrate);
     }
 
+    // --- BL-601: the national border band's inward falloff ------------------
+    // Per-tile depth from the nation's frontier: 0 = touching a foreign owner
+    // (another nation, or unclaimed ground — a coastline is a border too), 1 and
+    // 2 = one and two tiles in, 0xFF = beyond the band or claimed by nobody.
+    // This is the "colour extending inwards" of Ben's ruling, made a scalar: the
+    // wash below reads it straight out of k_border_band_alpha.
+    //
+    // Computed over the visible band PLUS the band depth in rows each way, so a
+    // visible tile's chain back to its own frontier is complete. Depth 0 is
+    // marked from `nation_of` directly (a raster index, not the cache), so the
+    // top and bottom rows of the computed range are still correct; only the
+    // relaxation is short there, and those rows are already off screen.
+    //
+    // COARSE ZOOM TAKES DEPTH 0 ONLY. At the whole-grid view every one of the
+    // ~15k hexes is in range and a three-ring relaxation over all of them is the
+    // one place this pass could cost real time. A single ring still draws the
+    // political outline, which is the whole read at that zoom.
+    static std::vector<uint8_t> border_depth;
+    border_depth.assign(static_cast<std::size_t>(gw) * gh, 0xFFu);
+    const int band_depth = coarse_fill ? 1 : k_border_band_tiles;
+    const int band_lo    = std::max(0,      row_lo - band_depth);
+    const int band_hi    = std::min(gh - 1, row_hi + band_depth);
+    if (raster_ok && !w.tile_to_nation.empty())
+    {
+        for (int cr = band_lo; cr <= band_hi; ++cr)
+        for (int cc = 0; cc < gw; ++cc)
+        {
+            const std::size_t ci = static_cast<std::size_t>(cr) * gw + cc;
+            const entity_id cid  = raster[ci];
+            if (cid == null_entity)
+                continue;
+            const entity_id nat = nation_of(cid);
+            if (nat == null_entity)
+                continue; // Unclaimed ground has no colour to extend inwards.
+            const int (*off)[2] = hex_neighbors::offsets(cr);
+            for (int n = 0; n < 6; ++n)
+            {
+                const int nrow = cr + off[n][1];
+                if (nrow < 0 || nrow >= gh)
+                    continue; // Off the pole: no neighbour, so not a frontier.
+                int ncol = (cc + off[n][0]) % gw;
+                if (ncol < 0)
+                    ncol += gw;
+                if (nation_of(tile_at_rc(ncol, nrow)) != nat)
+                {
+                    border_depth[ci] = 0u;
+                    break;
+                }
+            }
+        }
+        for (uint8_t d = 1; d < static_cast<uint8_t>(band_depth); ++d)
+        {
+            for (int cr = band_lo; cr <= band_hi; ++cr)
+            for (int cc = 0; cc < gw; ++cc)
+            {
+                const std::size_t ci = static_cast<std::size_t>(cr) * gw + cc;
+                if (border_depth[ci] != 0xFFu)
+                    continue;
+                const entity_id cid = raster[ci];
+                if (cid == null_entity)
+                    continue;
+                const entity_id nat = nation_of(cid);
+                if (nat == null_entity)
+                    continue;
+                const int (*off)[2] = hex_neighbors::offsets(cr);
+                for (int n = 0; n < 6; ++n)
+                {
+                    const int nrow = cr + off[n][1];
+                    if (nrow < band_lo || nrow > band_hi)
+                        continue;
+                    int ncol = (cc + off[n][0]) % gw;
+                    if (ncol < 0)
+                        ncol += gw;
+                    const std::size_t ni = static_cast<std::size_t>(nrow) * gw + ncol;
+                    // Same nation only: depth propagates INSIDE a territory. A
+                    // neighbour across the frontier is a different nation's
+                    // band and must never seed this one's.
+                    if (border_depth[ni] == d - 1u && nation_of(raster[ni]) == nat)
+                    {
+                        border_depth[ci] = d;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     for (int t_row = row_lo; t_row <= row_hi; ++t_row)
     for (int t_col = 0; t_col < gw; ++t_col)
     {
@@ -2465,6 +2605,44 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (!revealed)
                 continue;
 
+            // National border band — the inward falloff (BL-601). Always-on
+            // chrome, drawn under every lens exactly as roads are: the national
+            // read is terrain-grade context now, not a mode the player enters.
+            //
+            // Each tile takes ITS OWN nation's colour at an alpha keyed to its
+            // depth from the frontier, composited over the finished fill. That
+            // per-tile compositing is the guarantee Ben's ruling asks for: two
+            // neighbours meeting draw two different colours side by side and
+            // never average into a third nation's hue, because no arithmetic in
+            // this pass sees more than one nation.
+            //
+            // Gated on `revealed` for the same reason the province edge was: a
+            // border drawn through the survey mask would leak the political
+            // shape of ground the player has not paid to survey.
+            if (const uint8_t depth = border_depth[shade_idx]; depth < band_depth)
+            {
+                const entity_id nat = nation_of(id);
+                if (nat != null_entity)
+                {
+                    const ImU32 nc = palette::nation_colour(nat);
+                    const int   a  = static_cast<int>(k_border_band_alpha[depth] * 255.0f);
+                    const ImU32 wash = IM_COL32((nc >> IM_COL32_R_SHIFT) & 0xFFu,
+                                                (nc >> IM_COL32_G_SHIFT) & 0xFFu,
+                                                (nc >> IM_COL32_B_SHIFT) & 0xFFu, a);
+                    if (coarse_fill)
+                    {
+                        const float step = draw_r + 1.0f;
+                        const float hw   = kSqrt3 * step * 0.5f - 0.5f;
+                        const float hh   = 1.5f   * step * 0.5f - 0.5f;
+                        dl->AddRectFilled({ cx - hw, cy - hh }, { cx + hw, cy + hh }, wash);
+                    }
+                    else
+                    {
+                        dl->AddConvexPolyFilled(verts, 6, wash);
+                    }
+                }
+            }
+
             // Road network (BL-146/BL-172 generated + BL-147/BL-172 player-placed). Always-on
             // under every lens (roads are terrain, not an overlay). BL-172 span/symmetry fix:
             // each roaded tile draws its OWN half of every shared road edge — from its centre to
@@ -2609,62 +2787,103 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
-            // Nation borders (Country lens only). Draw a dark line on every hex
-            // edge shared with a neighbour of a different owner — including the
-            // claimed/unclaimed boundary. The grid is odd-r offset, so the six
-            // neighbour offsets differ between even and odd rows.
-            if (state.overlay == overlay_mode::country)
+            // National borders - the coloured rule (BL-601). The band's wash
+            // above says "this ground is near a frontier"; this pass says WHICH
+            // frontier and whose, and it is what carries the hit corridor.
+            //
+            // ALWAYS ON, under every lens. `overlay_mode::country` retired with
+            // this item (Ben, 2026-08-24: "with this, we can drop the nation
+            // lens") - the national read is chrome now, on the same footing as
+            // roads and rivers, and it is drawn here rather than earlier so it
+            // stays legible over a road span.
+            //
+            // THE STROKE IS INSET, not laid along the shared edge, and that is
+            // the whole answer to "borders should not diffuse together". A
+            // shared edge can only carry one colour, so two neighbours would
+            // fight for it and whichever drew last would win - or, worse, be
+            // averaged into a third nation's hue. Inset toward the drawing
+            // tile's own centre, each nation paints a rule just inside its own
+            // side: the pair reads as two parallel coloured lines with the
+            // frontier between them, and no pixel ever belongs to a colour that
+            // is neither neighbour's.
             {
                 const entity_id own_nation = nation_of(id);
-
-                // Standard odd-r neighbour offsets (col, row deltas; canonical table, BL-363).
-                const int (*off)[2] = hex_neighbors::offsets(tile.grid_y);
-
-                for (int n = 0; n < 6; ++n)
+                if (own_nation != null_entity)
                 {
-                    const int nrow = tile.grid_y + off[n][1];
-                    if (nrow < 0 || nrow >= gh)
-                        continue; // Off the top/bottom edge: no neighbour tile.
+                    const ImU32 border_col = palette::nation_colour(own_nation);
 
-                    // Columns wrap on the horizontal cylinder.
-                    int ncol = (tile.grid_x + off[n][0]) % gw;
-                    if (ncol < 0)
-                        ncol += gw;
+                    // Standard odd-r neighbour offsets (col, row deltas; canonical table, BL-363).
+                    const int (*off)[2] = hex_neighbors::offsets(tile.grid_y);
 
-                    const entity_id nb_id = tile_at_rc(ncol, nrow);
-                    if (nb_id == null_entity)
-                        continue;
-                    if (nation_of(nb_id) == own_nation)
-                        continue; // Same owner: interior edge, no border.
+                    for (int n = 0; n < 6; ++n)
+                    {
+                        const int nrow = tile.grid_y + off[n][1];
+                        if (nrow < 0 || nrow >= gh)
+                            continue; // Off the top/bottom edge: no neighbour tile.
 
-                    // Draw the shared edge via the midpoint-perpendicular method:
-                    // place the segment at the midpoint of the centre-to-centre
-                    // line, perpendicular to it, with length equal to one hex side
-                    // (== circumradius draw_r for a regular hexagon). This avoids
-                    // mapping neighbour directions to per-vertex pairs, which the
-                    // offset-row vertex ordering makes error-prone. The neighbour's
-                    // screen centre is taken at the SAME wrap offset k as this tile.
-                    const ImVec2 nb_lc = hex_local_centre(ncol, nrow, hex_size);
-                    ImVec2 nb_sc = to_screen(nb_lc);
-                    nb_sc.x += static_cast<float>(k) * period_px;
+                        // Columns wrap on the horizontal cylinder.
+                        int ncol = (tile.grid_x + off[n][0]) % gw;
+                        if (ncol < 0)
+                            ncol += gw;
 
-                    float dirx = nb_sc.x - cx;
-                    float diry = nb_sc.y - cy;
-                    const float len = std::sqrt(dirx * dirx + diry * diry);
-                    if (len <= 0.0f)
-                        continue;
-                    dirx /= len;
-                    diry /= len;
+                        const entity_id nb_id = tile_at_rc(ncol, nrow);
+                        if (nb_id == null_entity)
+                            continue;
+                        if (nation_of(nb_id) == own_nation)
+                            continue; // Same owner: interior edge, no border.
 
-                    const float mx = (cx + nb_sc.x) * 0.5f;
-                    const float my = (cy + nb_sc.y) * 0.5f;
-                    const float px = -diry; // perpendicular to the centre line
-                    const float py =  dirx;
-                    const float half = draw_r * 0.5f;
+                        // The shared edge via the midpoint-perpendicular method:
+                        // place the segment at the midpoint of the centre-to-centre
+                        // line, perpendicular to it, with length equal to one hex side
+                        // (== circumradius draw_r for a regular hexagon). This avoids
+                        // mapping neighbour directions to per-vertex pairs, which the
+                        // offset-row vertex ordering makes error-prone. The neighbour's
+                        // screen centre is taken at the SAME wrap offset k as this tile.
+                        const ImVec2 nb_lc = hex_local_centre(ncol, nrow, hex_size);
+                        ImVec2 nb_sc = to_screen(nb_lc);
+                        nb_sc.x += static_cast<float>(k) * period_px;
 
-                    dl->AddLine({mx - px * half, my - py * half},
-                                {mx + px * half, my + py * half},
-                                IM_COL32(20, 20, 20, 200), 1.5f);
+                        float dirx = nb_sc.x - cx;
+                        float diry = nb_sc.y - cy;
+                        const float len = std::sqrt(dirx * dirx + diry * diry);
+                        if (len <= 0.0f)
+                            continue;
+                        dirx /= len;
+                        diry /= len;
+
+                        // Pulled back along the centre line by the inset, so the
+                        // rule sits inside this tile rather than on the seam.
+                        const float inset = draw_r * k_border_stroke_inset;
+                        const float mx = (cx + nb_sc.x) * 0.5f - dirx * inset;
+                        const float my = (cy + nb_sc.y) * 0.5f - diry * inset;
+                        const float px = -diry; // perpendicular to the centre line
+                        const float py =  dirx;
+                        const float half = draw_r * 0.5f;
+
+                        const ImVec2 e0 { mx - px * half, my - py * half };
+                        const ImVec2 e1 { mx + px * half, my + py * half };
+                        dl->AddLine(e0, e1, border_col,
+                                    std::max(1.0f, k_border_stroke_px));
+
+                        // The hit corridor (BL-601, and the general structure-grain
+                        // case BL-603 builds on). Registered per DRAWN segment, so
+                        // it follows the wrap copies and the survey mask for free -
+                        // a border the player cannot see is a border they cannot
+                        // click. Coarse zoom registers nothing: at draw_r <= 7 px
+                        // a tile is barely wider than the corridor, and the whole
+                        // canvas would resolve to a nation.
+                        if (!coarse_fill)
+                        {
+                            structure_hit_zone sz;
+                            sz.id         = own_nation;
+                            sz.kind       = structure_kind::nation;
+                            sz.a          = e0;
+                            sz.b          = e1;
+                            sz.half_width = std::min(k_border_hit_px,
+                                                     draw_r * k_border_hit_frac);
+                            state.structure_hit_zones.push_back(sz);
+                        }
+                    }
                 }
             }
 
@@ -3187,13 +3406,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 continue;
             const pop_centre& a = pcs[c.anchor];
 
-            ImU32 col = palette::settlement;
-            if (state.overlay == overlay_mode::country)
-            {
-                const auto nit = w.tile_to_nation.find(a.tile);
-                if (nit != w.tile_to_nation.end())
-                    col = palette::nation_colour(nit->second);
-            }
+            // Civic-neutral under every lens (BL-601). The host-nation tint that
+            // used to apply under the Country lens went with the lens: a
+            // settlement is a civic fact, and the national read now lives at the
+            // border where it cannot be confused with one.
+            const ImU32 col = palette::settlement;
 
             const float sr = std::max(3.0f, draw_r * (0.30f + 0.11f * static_cast<float>(c.tier)));
             const ImVec2 lc = hex_local_centre(a.col, a.row, hex_size);
@@ -3338,14 +3555,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // On-canvas lens key (drawn unclipped, flush-left of the minimap so it reads as a
     // drawer folding out from it — anchor passed in as lens_key_anchor; before the
     // input early-out so it shows in headless captures too).
-    // Count-driven keys (Country/Market/Reach/Supply) are bounded to the canvas
+    // Count-driven keys (Market/Reach/Supply) are bounded to the canvas
     // vertical span [key_top, key_bot] so a long entry list scrolls inside the box
-    // rather than overrunning the canvas edges (BL-163/164).
+    // rather than overrunning the canvas edges (BL-163/164). The Country key went
+    // with its lens (BL-601) — the border band names its nation on hover instead.
     const float key_top = grid_area_origin.y + 8.0f;
     const float key_bot = origin.y + size.y - 8.0f;
-    if (state.overlay == overlay_mode::country)
-        draw_country_key(lens_key_anchor, key_top, key_bot, w, state);
-    else if (state.overlay == overlay_mode::resource)
+    if (state.overlay == overlay_mode::resource)
         draw_resource_key(dl, lens_key_anchor, state);
     else if (state.overlay == overlay_mode::market)
         draw_market_key(lens_key_anchor, key_top, key_bot, w, state, market_catchment_colour);
@@ -3371,6 +3587,46 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
     if (!input_enabled)
         return;
+
+    // The border band's hover read (BL-601). Ben's ruling asked for a read that
+    // NAMES the nation before the click commits - a corridor the player cannot
+    // see is a click they cannot predict, and the band's own colour says "a
+    // nation" without saying which.
+    //
+    // Deliberately NOT the glance-then-stick hover card below: that card waits
+    // out an appear delay by design, and a target that only announces itself
+    // after a dwell fails the "before the click commits" test. This is an
+    // immediate label at the cursor, on the foreground list so the always-open
+    // Selection band cannot bury it.
+    //
+    // Written against the general resolver, so a second structure kind names
+    // itself here by extending the switch, not by adding a branch.
+    {
+        structure_kind hk = structure_kind::nation;
+        const entity_id hovered_structure =
+            resolve_structure_hit(state.structure_hit_zones, mouse.x, mouse.y, &hk);
+        const char* label = nullptr;
+        ImU32       label_col = palette::neutral;
+        if (hovered_structure != null_entity && hk == structure_kind::nation)
+        {
+            if (const auto nit = w.nations.find(hovered_structure); nit != w.nations.end())
+            {
+                label     = nit->second.name.c_str();
+                label_col = palette::nation_colour(hovered_structure);
+            }
+        }
+        if (label != nullptr && label[0] != '\0')
+        {
+            ImDrawList* fdl = ImGui::GetForegroundDrawList();
+            const ImVec2 ts  = ImGui::CalcTextSize(label);
+            const float  pad = 5.0f;
+            const ImVec2 tl { mouse.x + 14.0f, mouse.y + 14.0f };
+            const ImVec2 br { tl.x + ts.x + pad * 2.0f, tl.y + ts.y + pad * 2.0f };
+            fdl->AddRectFilled(tl, br, IM_COL32(18, 18, 24, 235), 3.0f);
+            fdl->AddRect(tl, br, label_col, 3.0f, 0, 1.5f);
+            fdl->AddText({ tl.x + pad, tl.y + pad }, IM_COL32(230, 230, 235, 255), label);
+        }
+    }
 
     // Hover-card (BL-060, BL-020). Resolve the hovered entity in marker-priority
     // order (building > market_centre > tile — mirroring click priority). Track
@@ -3527,6 +3783,44 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const entity_id marker_hit =
                 resolve_marker_hit(state.marker_hit_zones, mouse.x, mouse.y);
 
+            // STRUCTURE-GRAIN selection (BL-601), between the markers and the
+            // tile/province fallback. A marker is a specific thing the player
+            // aimed at and still outranks a boundary; a boundary in turn
+            // outranks the ground it runs across, because inside the corridor
+            // the border IS what the pointer is on.
+            //
+            // This is the route the retired Country lens used to own - LENSES.md
+            // sent a hovered tile under that lens to its owning nation. Ben's
+            // ruling of 2026-08-24 moved it onto the band: "click the border
+            // itself". The border is what carries the nation on screen now, so
+            // it is the thing that opens it; a rail slot would have put a nation
+            // behind a menu while its territory sat under the pointer.
+            //
+            // Written against the general resolver, not against nations: a plate
+            // rim or a catchment edge routes through this same branch once it
+            // produces zones, which is what BL-603 generalises.
+            structure_kind struct_kind = structure_kind::nation;
+            const entity_id structure_hit =
+                (marker_hit == null_entity)
+                    ? resolve_structure_hit(state.structure_hit_zones, mouse.x, mouse.y,
+                                            &struct_kind)
+                    : null_entity;
+            if (structure_hit != null_entity)
+            {
+                // A structure is an ENTITY selection, so it takes the same
+                // mutual exclusion every marker hit does: the province clears,
+                // the battle clears, and the repeat-click cycle's tile anchor is
+                // dropped so the next click on the ground starts a fresh cycle
+                // rather than resuming one this selection interrupted.
+                state.selected_entity      = structure_hit;
+                state.selected_province    = 0u;
+                state.province_sync_entity = structure_hit;
+                state.selection_cycle_tile = null_entity;
+                state.clear_battle_selection();
+            }
+            else
+            {
+
             // Falling through to the tile means the click missed every marker glyph.
             // On a BUILT tile that still selects the building: the whole hex belongs to
             // the installation, so the tile element is unreachable there (Ben's
@@ -3675,6 +3969,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     state.selection_cycle_tile = null_entity;
                 }
             }
+            } // else: the click missed every structure boundary
         }
         else if (hovered_tile != null_entity)
         {

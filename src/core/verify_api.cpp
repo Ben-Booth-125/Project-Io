@@ -64,8 +64,12 @@ overlay_mode overlay_from_name(const std::string& s)
 {
     if (s == "supply")      return overlay_mode::supply;
     if (s == "market")      return overlay_mode::market;
-    if (s == "country")     return overlay_mode::country;
-    if (s == "faction")     return overlay_mode::country; // legacy alias (renamed BL-052)
+    // "country" / "faction" (the legacy alias, renamed BL-052) resolve to NONE:
+    // the Country lens retired with BL-601 and its content is always-on chrome,
+    // so a script naming it still captures national borders — on the plain
+    // canvas, which is where they now live. Kept as an explicit row rather than
+    // deleted, so the retirement reads here instead of hiding in the fallback.
+    if (s == "country" || s == "faction") return overlay_mode::none;
     if (s == "corporation") return overlay_mode::corporation;
     if (s == "resource")    return overlay_mode::resource;
     if (s == "population")  return overlay_mode::population;

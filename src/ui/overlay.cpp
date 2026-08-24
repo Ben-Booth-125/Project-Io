@@ -20,7 +20,6 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
     {
         case overlay_mode::supply:      icons::supply     (dl, centre, r, colour); break;
         case overlay_mode::market:      icons::market     (dl, centre, r, colour); break;
-        case overlay_mode::country:     icons::country    (dl, centre, r, colour); break;
         case overlay_mode::corporation: icons::corporation(dl, centre, r, colour); break;
         case overlay_mode::resource:    icons::resource   (dl, centre, r, colour); break;
         case overlay_mode::population:  icons::population (dl, centre, r, colour); break;
@@ -47,7 +46,6 @@ const char* overlay_mode_name(overlay_mode m)
     {
         case overlay_mode::supply:      return "Supply routes";
         case overlay_mode::market:      return "Market catchment boundaries";
-        case overlay_mode::country:     return "Countries";
         case overlay_mode::corporation: return "Corporation ownership";
         case overlay_mode::resource:    return "Resource deposits";
         case overlay_mode::population:  return "Workforce efficiency";
@@ -68,7 +66,6 @@ const char* overlay_mode_short_name(overlay_mode m)
     {
         case overlay_mode::supply:      return "Supply";
         case overlay_mode::market:      return "Market";
-        case overlay_mode::country:     return "Country";
         case overlay_mode::corporation: return "Corp";
         case overlay_mode::resource:    return "Resource";
         case overlay_mode::population:  return "Population";
@@ -90,8 +87,9 @@ void toggle_overlay(ui_state& ui, overlay_mode m)
 
 void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
 {
-    // The seven on-screen lenses, in settled order (BL-013, trimmed BL-093):
-    // Corp → Country → Resource → Market → Population → Opportunity → Production.
+    // The on-screen lenses, in settled order (BL-013, trimmed BL-093, Country
+    // retired BL-601):
+    // Corp → Resource → Market → Population → Opportunity → Production.
     // Scarcity and Industry are keyboard-cycle only (like Supply); Reach and
     // Supply-routes (BL-011/BL-014) join them off-strip too — they do not fit
     // the 240 px minimap bar this row now lives on. Single-select with a null state:
@@ -100,8 +98,11 @@ void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
     // keyboard-only shelf because it answers a question the player asks at first
     // sight of a body ("why is the land shaped like that?"), which is exactly the
     // moment they are looking at the strip.
-    constexpr overlay_mode modes[8] = {
-        overlay_mode::corporation, overlay_mode::country, overlay_mode::resource,
+    // BL-601 retires Country from the strip (and from the enum): national
+    // borders are always-on chrome now, so the lens has nothing left to toggle.
+    // The strip re-numbers itself around the gap; no slot is held open.
+    constexpr overlay_mode modes[7] = {
+        overlay_mode::corporation, overlay_mode::resource,
         overlay_mode::market, overlay_mode::population, overlay_mode::opportunity,
         overlay_mode::production, overlay_mode::continent };
 

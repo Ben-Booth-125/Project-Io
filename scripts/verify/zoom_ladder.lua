@@ -22,6 +22,11 @@
 -- byte** — set it to 1.0, re-run this ladder, and the captures must match the
 -- pre-change ones exactly. If they do not, the lerp is wrong, not the value.
 --
+-- The lens rungs use the Corporation lens. They used the Country lens until
+-- BL-601 retired it: national borders are always-on chrome now, so a "lens frame"
+-- had to be a lens that still exists. Any lens attenuates texture to 0.45, which
+-- is all these two rungs are testing.
+--
 -- Run: ProjectIo --verify scripts/verify/zoom_ladder.lua
 
 verify.window(1280, 720)
@@ -35,7 +40,7 @@ end
 
 -- The same ladder under a lens, since the 0.45 attenuation compounds with whatever
 -- the base pass is already doing.
-verify.set_overlay("country")
+verify.set_overlay("corporation")
 for i, z in ipairs({ 3.5, 7.0 }) do
     verify.center_tile(s.unit.col, s.unit.row, z)
     verify.frames(4)
