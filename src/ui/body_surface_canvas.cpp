@@ -1052,6 +1052,65 @@ entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx
 /// @param out_kind   Optional; receives the winning zone's kind.
 /// @return           The closest structure whose corridor contains the cursor,
 ///                   or null_entity.
+/// BL-603 — which STRUCTURE is this tile part of, as the ACTIVE LENS defines it?
+///
+/// The area counterpart to `resolve_structure_hit`, which resolves a structure by
+/// its boundary. A catchment has no boundary the player aims at — they aim at
+/// ground inside it — so this asks the tile instead.
+///
+/// LENSES.md's routing table has said since 2026-06-15 that "the active lens does
+/// not only re-skin the canvas: it DEFINES what the pointer resolves to". This is
+/// that rule at the grain the lens actually DRAWS. A lens whose subject is the
+/// tile itself (Population, Industry) returns none and keeps tile grain — the
+/// selection grain follows the drawing, which is the whole rule.
+///
+/// A structure must be an ENTITY here, because that is what a selection is. The
+/// Resource lens's contiguous deposit and the Continent lens's plate are regions
+/// with no entity id, so they are absent rather than half-supported: highlighting
+/// a region the player then cannot select would promise a pivot that does not
+/// arrive.
+///
+/// @param tile_to_corp This frame's tile→owning-corp index, already built by the
+///                     caller for the Corporation lens's own tint.
+structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
+                                      entity_id tile,
+                                      const std::unordered_map<entity_id, entity_id>& tile_to_corp,
+                                      entity_id* out_id)
+{
+    if (out_id != nullptr)
+        *out_id = null_entity;
+    if (tile == null_entity)
+        return structure_kind::none;
+
+    switch (state.overlay)
+    {
+    case overlay_mode::market:
+    case overlay_mode::scarcity:
+    {
+        // Both lenses draw the catchment: Market tints it, Scarcity blocks it.
+        // Same structure, so the same pivot — and `market_for_tile` is the very
+        // function the two fills already key on, so the highlight can never
+        // disagree with the wash it sits under.
+        const entity_id m = market_for_tile(w, tile);
+        if (m == null_entity)
+            return structure_kind::none;
+        if (out_id != nullptr)
+            *out_id = m;
+        return structure_kind::market;
+    }
+    // The Corporation lens is DELIBERATELY absent, and finding out why is worth
+    // recording. Its structure is exactly the set of tiles carrying that corp's
+    // buildings — so every tile in it also carries a MARKER, and a marker
+    // outranks a structure by design ("a marker is a specific thing the player
+    // aimed at"). An area pivot here could therefore never fire: measured, not
+    // reasoned — the first draft of this switch included it and the check
+    // reported `tile` on empty ground and `building` on owned ground, never
+    // `corporation`. The lens resolves through the marker instead, below.
+    default:
+        return structure_kind::none;
+    }
+}
+
 entity_id resolve_structure_hit(const std::vector<structure_hit_zone>& zones,
                                 float mx, float my,
                                 structure_kind* out_kind = nullptr)
@@ -2539,6 +2598,39 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
+            // BL-603: the hovered STRUCTURE lights whole. Ben, 2026-08-24 — "the
+            // entire market gets highlighted on mouse over". One frame behind, as
+            // the province outline already is (see where it is written, below the
+            // loop): the loop cannot know the answer before it has drawn the tile
+            // that produces it.
+            //
+            // A wash rather than an outline, deliberately. Outlining a catchment
+            // means walking its boundary every frame to find which edges face out;
+            // a wash is per tile and costs one test, and it is the truer read
+            // anyway — the claim is "all of THIS is one thing", which is an area
+            // statement, not an edge one.
+            if (state.hovered_structure != null_entity)
+            {
+                entity_id            tile_struct = null_entity;
+                const structure_kind sk = lens_structure_of_tile(w, state, id,
+                                                                 tile_to_corp, &tile_struct);
+                if (sk == state.hovered_structure_kind && tile_struct == state.hovered_structure)
+                {
+                    constexpr ImU32 lit = IM_COL32(255, 255, 255, 34);
+                    if (coarse_fill)
+                    {
+                        const float step = draw_r + 1.0f;
+                        const float hw   = kSqrt3 * step * 0.5f - 0.5f;
+                        const float hh   = 1.5f   * step * 0.5f - 0.5f;
+                        dl->AddRectFilled({ cx - hw, cy - hh }, { cx + hw, cy + hh }, lit);
+                    }
+                    else
+                    {
+                        dl->AddConvexPolyFilled(verts, 6, lit);
+                    }
+                }
+            }
+
             // Road network (BL-146/BL-172 generated + BL-147/BL-172 player-placed). Always-on
             // under every lens (roads are terrain, not an overlay). BL-172 span/symmetry fix:
             // each roaded tile draws its OWN half of every shared road edge — from its centre to
@@ -3231,6 +3323,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     state.hovered_province = (hovered_tile != null_entity)
                              ? w.provinces.province_of(hovered_tile) : 0u;
 
+    // BL-603: and the hovered STRUCTURE, on the same one-frame lag and for the
+    // same reason. Cleared when the pointer leaves the canvas or the lens has no
+    // structure, so a stale region cannot stay lit after a lens switch.
+    {
+        entity_id sid = null_entity;
+        const structure_kind sk =
+            lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &sid);
+        state.hovered_structure      = sid;
+        state.hovered_structure_kind = sk;
+    }
+
     // Market-centre markers (BL-059). Draw a circle+cross glyph at each market's
     // centre tile position and register a hit zone for click-selection (BL-031).
     // Drawn after the tile loop so markers sit above all tile chrome. Only markets
@@ -3744,11 +3847,54 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // rim or a catchment edge routes through this same branch once it
             // produces zones, which is what BL-603 generalises.
             structure_kind struct_kind = structure_kind::nation;
-            const entity_id structure_hit =
+            entity_id structure_hit =
                 (marker_hit == null_entity)
                     ? resolve_structure_hit(state.structure_hit_zones, mouse.x, mouse.y,
                                             &struct_kind)
                     : null_entity;
+
+            // BL-603, the Corporation lens's half: a hovered/clicked BUILDING
+            // resolves THROUGH to its owning corporation. LENSES.md's routing
+            // table has said exactly this since 2026-06-15 — "beneath the
+            // Corporation lens a hovered building resolves through to its owning
+            // corporation, because the corporation is that lens's unit of
+            // meaning" — and nothing implemented it; a click gave the building.
+            //
+            // It lands here rather than in the area resolver because this lens's
+            // structure IS its marker tiles, so there is no ground to pivot from.
+            entity_id lens_through = null_entity;
+            if (marker_hit != null_entity && state.overlay == overlay_mode::corporation)
+            {
+                if (const auto bit = w.buildings.find(marker_hit); bit != w.buildings.end())
+                {
+                    const auto tc = tile_to_corp.find(bit->second.tile);
+                    if (tc != tile_to_corp.end())
+                        lens_through = tc->second;
+                }
+            }
+
+            // BL-603: the AREA structure, if the boundary one did not answer. The
+            // boundary resolver wins where both do, and that ordering is the whole
+            // reason a border is still clickable under a lens: a nation's rule is a
+            // thing the player AIMED at, a catchment is the ground they happen to be
+            // over. Same branch, same mutual exclusion, one resolver later.
+            if (lens_through != null_entity)
+            {
+                structure_hit = lens_through;
+                struct_kind   = structure_kind::corporation;
+            }
+            else if (structure_hit == null_entity && marker_hit == null_entity)
+            {
+                entity_id area_id = null_entity;
+                const structure_kind area_kind =
+                    lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &area_id);
+                if (area_kind != structure_kind::none && area_id != null_entity)
+                {
+                    structure_hit = area_id;
+                    struct_kind   = area_kind;
+                }
+            }
+
             if (structure_hit != null_entity)
             {
                 // A structure is an ENTITY selection, so it takes the same
@@ -3761,6 +3907,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 state.province_sync_entity = structure_hit;
                 state.selection_cycle_tile = null_entity;
                 state.clear_battle_selection();
+
+                // "Clicking opens up our market ledger for THAT market" (Ben,
+                // 2026-08-24). The ledger already follows the selection - BL-159
+                // wired `draw_market_ledger` to jump its body/market combos to a
+                // market selected anywhere - so this opens the panel and the
+                // existing route aims it. Nothing new is invented to point it.
+                if (struct_kind == structure_kind::market)
+                {
+                    close_all_panels(state);
+                    state.show_market_ledger = true;
+                }
+                else if (struct_kind == structure_kind::corporation)
+                {
+                    close_all_panels(state);
+                    state.show_balance_ledger = true;
+                }
             }
             else
             {

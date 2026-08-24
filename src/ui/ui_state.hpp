@@ -84,7 +84,10 @@ struct marker_hit_zone
 /// generalises exactly this pattern, which is why it is not a special case.
 enum class structure_kind : uint8_t
 {
-    nation,  ///< A generated nation, selected by its national border band.
+    none,        ///< No structure under the pointer, or the lens has none.
+    nation,      ///< A generated nation, selected by its national border band.
+    market,      ///< A market and its whole catchment (Market and Scarcity lenses).
+    corporation, ///< A corporation's holdings on the active body (Corporation lens).
 };
 
 /// One segment of a structure's boundary, registered by the draw pass so the
@@ -662,6 +665,25 @@ struct ui_state
     /// marker is a specific thing the player aimed at, a boundary is a region.
     /// See structure_hit_zone.
     std::vector<structure_hit_zone> structure_hit_zones;
+
+    /// BL-603 — the STRUCTURE under the pointer, as the active lens defines it.
+    ///
+    /// Ben, 2026-08-24: "When a lens reveals any large structure, the selection
+    /// should pivot to the entire structure, and no longer provinces. So for the
+    /// market lens, the entire market gets highlighted on mouse over, and clicking
+    /// opens up our market ledger for that market."
+    ///
+    /// This is the AREA counterpart to `structure_hit_zones`, which resolves a
+    /// structure by its BOUNDARY (the national border band). A catchment has no
+    /// boundary the player aims at — they aim at ground inside it — so the lens
+    /// answers "which structure is this tile part of?" instead.
+    ///
+    /// Written by the canvas AFTER its tile loop, so the highlight it feeds is one
+    /// frame behind, exactly as `hovered_province` already is and for the same
+    /// reason: the loop must know the answer before it has drawn the tile that
+    /// produces it. Invisible at any frame rate the canvas runs at.
+    entity_id      hovered_structure      = null_entity;
+    structure_kind hovered_structure_kind = structure_kind::none;
 
     /// Building-placement interaction state (Layer 4 UI groundwork scaffold). See construction_state.
     construction_state construction;

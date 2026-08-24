@@ -768,6 +768,20 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // The hover half of the same seam: dwell is reached by frame COUNT
         // (hover(x, y, frames)), and these say whether the glance card came up
         // and whether it has stuck. Booleans, not contents.
+        // Which fold-out ledger is open (BL-603's other half: a structure click
+        // must OPEN its ledger, not merely select the thing). One string rather
+        // than a flag per panel, because the column shows one at a time.
+        {
+            const char* panel = "none";
+            if (m_ui.show_market_ledger)           panel = "market";
+            else if (m_ui.show_balance_ledger)     panel = "balance";
+            else if (m_ui.show_corporation_panel)  panel = "corporation";
+            else if (m_ui.show_economy_panel)      panel = "economy";
+            else if (m_ui.show_construction_panel) panel = "construction";
+            else if (m_ui.show_tile_ledger)        panel = "tile";
+            else if (m_ui.show_contracts_ledger)   panel = "contracts";
+            out["open_panel"] = std::string(panel);
+        }
         out["hover_card"]        = (m_ui.hover_card_entity != null_entity);
         out["hover_card_stuck"]  = m_ui.hover_card_stuck;
         out["x"]                 = m_pointer_x;

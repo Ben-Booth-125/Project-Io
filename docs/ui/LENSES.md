@@ -272,6 +272,54 @@ at the thing itself, by hovering the border.
 
 ## Structure-grain selection & routing
 
+**The lens defines what the pointer resolves to — at the grain the lens DRAWS.** That principle
+is not new; the routing table below has carried it since 2026-06-15. What BL-603 adds is that the
+rule now works on whole **structures**, and says so *before* the click. Ben, 2026-08-24: *"When a
+lens reveals any large structure, the selection should pivot to the entire structure, and no longer
+provinces. So for the market lens, the entire market gets highlighted on mouse over, and clicking
+opens up our market ledger for that market."*
+
+### Two resolvers, and which wins
+
+| Resolver | Answers | Used by |
+|---|---|---|
+| **Boundary** (`resolve_structure_hit`) | "am I on this structure's edge?" | The national border band — always-on chrome, not a lens |
+| **Area** (`lens_structure_of_tile`) | "which structure is this ground part of?" | The active lens |
+
+**A marker outranks both, and a boundary outranks an area.** The order is not arbitrary: a marker
+and a border are things the player *aimed at*, while a catchment is ground they happen to be over.
+That ordering is also what keeps a border clickable while a lens is active.
+
+### Which lenses carry a structure
+
+| Lens | Structure | Resolves at | Opens |
+|---|---|---|---|
+| **Market**, **Scarcity** | The market's whole **catchment** | Area — any ground inside it | Market Ledger, aimed at that market |
+| **Corporation** | The corp's **holdings** on this body | The **marker** — see below | Budget ledger |
+| Population, Industry, Resource, Continent | *(none — tile grain)* | — | Tile Ledger |
+
+**Why Corporation resolves at the marker and not the ground.** Its structure is exactly the set of
+tiles carrying that corp's buildings — so every tile in it *also* carries a marker, and a marker
+outranks a structure. An area pivot there could never fire. It resolves *through* the building
+instead, which is what this document has described since 2026-06-15 and what nothing implemented
+until BL-603.
+
+**Why Resource and Continent carry none.** Their regions — a contiguous deposit, a tectonic plate —
+have no **entity id**, and a selection is an entity. Lighting a region the player then cannot select
+would promise a pivot that never arrives, so they keep tile grain rather than being half-supported.
+
+### The hover half
+
+The structure lights **whole** on hover, as a wash rather than an outline: outlining a catchment
+means walking its boundary every frame to find the outward-facing edges, while a wash costs one test
+per drawn tile — and it is the truer read, because the claim is *"all of this is one thing"*, which
+is an area statement rather than an edge one. It lands one frame behind the pointer, exactly as the
+hovered-province outline already does and for the same reason: the tile loop must know the answer
+before it has drawn the tile that produces it.
+
+**Check:** `scripts/verify/lens_structure_pivot.lua`.
+
+
 **A structure is selected by its boundary, not by anything under a single tile.**
 This is a selection grain of its own, sitting between the per-lens routing table
 below (which resolves what a *tile* means under the active lens) and the markers.
