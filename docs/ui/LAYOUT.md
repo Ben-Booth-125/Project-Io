@@ -27,6 +27,15 @@ The prototype UI is built with Dear ImGui (see TECH_FOUNDATIONS). Everything her
 └─────┴───────────────────┴──────────────────────┴──────────────┘
 ```
 
+**The top band is one row of three tiles sharing a bottom edge** — profile, balance bar, time
+controls — exactly as the bottom band is one row of three sharing a top edge. No internal
+gutter in either: the balance bar runs to the right chrome column's edge, and the time panel's
+height is floored at `profile_panel_height` rather than ending wherever its content happens to
+stop. Ben, 2026-08-24: widen the time controls *"to the same x/y as the corner of our main
+balance bar"*. The gap that used to sit between the balance bar and the time panel was the
+shell's only internal one, which is the argument `selection_band_rect` already made for the
+bottom band — *"introducing the shell's only gap here would read as a mistake"*.
+
 The nav rail runs the **full screen height**. The screen's **bottom strip** is one
 solid band, all three tiles sharing a top edge that lands exactly on the minimap's:
 the **comms dock** bottom-left (`comms_dock_rect`, three quarters of the fold-out

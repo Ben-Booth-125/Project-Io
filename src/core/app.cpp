@@ -2018,7 +2018,14 @@ void app::render()
     // the identity tile / balance bar / Selection all clear the same permanent W (BL-122).
     {
         const float header_left  = ui::shell_column_width(disp.x);
-        const float header_right = ui::right_chrome_left(disp) - margin;
+        // Flush to the right chrome column, no gutter (Ben, 2026-08-24: widen the
+        // time controls "to the same x/y as the corner of our main balance bar").
+        // The `- margin` that used to stand here was the top band's only internal
+        // gap, and the BOTTOM band has never had one — selection_band_rect is
+        // deliberately flush against both its neighbours on the argument that
+        // "introducing the shell's only gap here would read as a mistake". It was
+        // the top band that carried the mistake.
+        const float header_right = ui::right_chrome_left(disp);
         ui::draw_header_panel(m_world, m_balance_history, m_last_econ_report, header_left, header_right);
     }
 

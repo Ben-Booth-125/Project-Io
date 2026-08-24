@@ -11,6 +11,7 @@
 
 #include <imgui.h>
 
+#include "profile_panel.hpp" // profile_panel_height — the top band's shared height
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -101,7 +102,16 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
     const float prog_col_h     = time_prog_h;
     const float ctrl_col_h     = time_btn_h + time_rate_h + time_spacing;
     const float time_content_h = time_line_h + std::max(prog_col_h, ctrl_col_h);
-    const float time_h         = time_content_h + ImGui::GetStyle().WindowPadding.y * 2.0f;
+    // FLOORED at the header's height (Ben, 2026-08-24). The three tiles of the top
+    // band — profile, balance bar, time controls — now share a bottom edge, the way
+    // the three tiles of the bottom band already share a top one.
+    //
+    // This does not undo BL-313's two-column layout, which exists so the CONTENT
+    // fits under the header height rather than overflowing it. That still holds and
+    // is still why the row is one frame tall; the panel simply stops ending early
+    // when its content happens to be shorter than its neighbours.
+    const float time_h         = std::max(time_content_h + ImGui::GetStyle().WindowPadding.y * 2.0f,
+                                          ui::profile_panel_height);
     // Publish it: the right chrome column below this panel needs to know where
     // its ceiling is, and this is the only place the number exists (BL-533).
     state.time_panel_h = time_h;
