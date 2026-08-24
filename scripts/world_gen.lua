@@ -112,6 +112,15 @@ world_gen = {
             -- BL-286's placeholder luxury, given a producer at last (the potter's
             -- and weaver's output). Priced as a modest trade good, not a treasure.
             trade_goods_misc       = 8.0,
+
+            -- BL-585/BL-586 (2026-08-24) — the wide ancient roster's first slice.
+            -- Every price DERIVED at the roster's observed ~1.433x markup over
+            -- its input basket (id 27 ordnance's own ratio, recipes.lua), not
+            -- picked. Re-derive if an input quantity in recipes.lua changes.
+            ceramics               = 3.4,  -- clay 2.0 * 1.2 = 2.4; 2.4 * 1.433
+            dressed_stone          = 2.9,  -- stone 2.0 * 1.0 = 2.0; 2.0 * 1.433
+            planks                 = 4.3,  -- timber 2.0 * 1.5 = 3.0; 3.0 * 1.433
+            tools                  = 25.5, -- iron_blooms 1.5*9.0 + planks 1.0*4.3 = 17.8; 17.8 * 1.433
         },
 
         -- Nation tradeable-resource concentration gates (BL-096): a nation

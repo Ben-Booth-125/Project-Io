@@ -529,6 +529,80 @@ recipes = {
         inputs       = { iron_ore = 1.5, coal = 0.5, machinery = 0.15 },
         outputs      = { steel = 1.0 },
     },
+
+    -- =====================================================================
+    -- BL-585/BL-586 (2026-08-24) — the wide ancient roster's first slice:
+    -- four named buildings on EXISTING raws (clay, stone, timber,
+    -- iron_blooms), no new deposit or extraction target. `hides` and its
+    -- leather/cloth consumers are a later slice — they need a new
+    -- extractable raw with real tile-generation deposits, deliberately not
+    -- attempted here (components.hpp's enum comment names the deferral).
+    --
+    -- PRICE IS DERIVED, NOT PICKED, same method id 27's comment states: the
+    -- processing roster prices an output at ~1.42x its input basket
+    -- (ordnance's own ratio, 1.433). Every base_price below in world_gen.lua
+    -- follows that ratio; re-derive rather than hand-tuning if an input
+    -- quantity changes.
+    -- =====================================================================
+
+    -- id 31 — Potter's Kiln: clay -> ceramics. Clay's SECOND consumer
+    -- (alongside id 20's Potter & Weaver, which uses clay for
+    -- trade_goods_misc) — a distinct terminal good, not an alternate method:
+    -- the two recipes share clay but produce different outputs, so
+    -- chain_depth's R2 never even pairs them (its grouping key is primary
+    -- output resource, not input).
+    {
+        name         = "ceramics_kiln",
+        display_name = "Potter's Kiln",
+        era          = "ancient",
+        group        = "Construction Materials", -- BL-434, new group — see PRODUCTION.md
+        inputs       = { clay = 2.0 },
+        outputs      = { ceramics = 1.0 },
+    },
+
+    -- id 32 — Stonemason: stone -> dressed_stone. Stone's second consumer
+    -- (alongside id 21's Miller, which uses stone as a millstone reagent) —
+    -- a terminal good sold to the market, same shape as ceramics above.
+    {
+        name         = "stonemason",
+        display_name = "Stonemason",
+        era          = "ancient",
+        group        = "Construction Materials", -- BL-434, with the Kiln above
+        inputs       = { stone = 2.0 },
+        outputs      = { dressed_stone = 1.0 },
+    },
+
+    -- id 33 — Sawmill: timber -> planks. Timber's third consumer (alongside
+    -- id 17's Charcoal Burner and id 20's Potter & Weaver). Unlike those
+    -- two, planks is NOT terminal — it feeds the Toolmaker below, so the
+    -- Sawmill is the roster's first ancient building whose whole purpose is
+    -- an intermediate rather than a sale.
+    {
+        name         = "sawmill",
+        display_name = "Sawmill",
+        era          = "ancient",
+        group        = "Construction Materials", -- BL-434, with the Kiln and Stonemason
+        inputs       = { timber = 2.0 },
+        outputs      = { planks = 1.0 },
+    },
+
+    -- id 34 — Toolmaker: iron_blooms + planks -> tools. Required depth is
+    -- max(depth(blooms)=2, depth(planks)=1) = 2, so depth(tools) = 1+2 = 3 —
+    -- TIED with the ancient ceiling (steel_from_blooms, ordnance_from_blooms),
+    -- not past it (chain_depth's D6 confirms: ancient max stays 3). Still the
+    -- roster's first chain that needs BOTH a smelted good and a milled one at
+    -- once — proof depth composes ACROSS chains, not just within one — which
+    -- is worth keeping even though it does not raise the ceiling. Terminal
+    -- for now (sold to the market); BL-590 gives it a construction-material
+    -- consumer later.
+    {
+        name         = "toolmaker",
+        display_name = "Toolmaker",
+        era          = "ancient",
+        group        = "Metal Foundry", -- BL-434, with the Bloomery/Smithy chain — its deepest member
+        inputs       = { iron_blooms = 1.5, planks = 1.0 },
+        outputs      = { tools = 1.0 },
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))

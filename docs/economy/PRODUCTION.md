@@ -487,11 +487,22 @@ every one of them is priced and consumed, per the admission rule.
 | Potter & Weaver | 2 clay + 1 timber → 1 trade goods | 1 |
 | Glassworks | 2 sand → 1 trade goods | 1 |
 | Miller | 2 agricultural produce + 1 stone → 1 food rations | 1 |
+| Potter's Kiln | 2 clay → 1 ceramics | 1 |
+| Stonemason | 2 stone → 1 dressed stone | 1 |
+| Sawmill | 2 timber → 1 planks | 1 |
+| Toolmaker | 1.5 iron blooms + 1 planks → 1 tools | 3 |
 
 \* The Coking Kiln's own required depth, not `charcoal`'s overall depth — the Burner keeps that at
 1, since chain depth is a **min across recipes** (§ Chain depth below). The Kiln is BL-587's
 alternate method: unreachable until a corp has already smelted blooms, cheaper by the guard's
 reference prices once it is. See § Alternate production methods.
+
+**The last four rows are BL-585/BL-586's first slice of the wide ancient roster** (2026-08-24) —
+named buildings on existing raws, no new deposit or extraction target. The Toolmaker is the
+roster's first chain needing both a smelted good and a milled one at once (required depth 2 from
+`max(depth(blooms)=2, depth(planks)=1)`, so `depth(tools) = 3`), tied with the existing ceiling
+rather than past it. `hides` and its leather/cloth consumers are deferred — they need a new
+extractable raw with real tile-generation deposits, a separate change from this slice.
 
 **The Smithy's second recipe is the ancient arc's route to `ordnance`** (BL-460, ancient
 ordnance) — the same building, same `iron_blooms + charcoal` basket as its steel recipe,
@@ -719,8 +730,9 @@ sits in the `"General"` catch-all:
 
 | Group | Recipes (era) | Notes |
 |---|---|---|
-| Metal Foundry | `steel` (industrial), `steel_from_iron_nickel` (industrial), `steel_from_regolith` "In-Situ Smelter" (industrial), `steel_bessemer` "Bessemer Converter" (industrial), `refined_copper` (any), `iron_blooms` "Bloomery" (ancient), `steel_from_blooms` "Smithy" (ancient), `ordnance_from_blooms` "Smithy" (ancient) | Every route that smelts or shapes a structural metal — the industrial Smelter and the ancient Bloomery/Smithy chain both land here, since they reach the same terminal goods by different roads. The Bessemer Converter (BL-587) is the roster's first genuine interchangeable method rather than a disjoint-raw supply route — see § Alternate production methods. |
+| Metal Foundry | `steel` (industrial), `steel_from_iron_nickel` (industrial), `steel_from_regolith` "In-Situ Smelter" (industrial), `steel_bessemer` "Bessemer Converter" (industrial), `refined_copper` (any), `iron_blooms` "Bloomery" (ancient), `steel_from_blooms` "Smithy" (ancient), `ordnance_from_blooms` "Smithy" (ancient), `toolmaker` "Toolmaker" (ancient) | Every route that smelts or shapes a structural metal — the industrial Smelter and the ancient Bloomery/Smithy chain both land here, since they reach the same terminal goods by different roads. The Bessemer Converter (BL-587) is the roster's first genuine interchangeable method rather than a disjoint-raw supply route — see § Alternate production methods. The Toolmaker (BL-586) is its deepest ancient member, needing a milled good (`planks`) alongside the smelted one. |
 | Refinery | `refined_fuel` (industrial) | A singleton — a real, specific kind (distinct from Metal Foundry's smelting), not a forced catch-all; more refined-fuel-family recipes would join it rather than needing a rename. |
+| Construction Materials | `ceramics_kiln` "Potter's Kiln" (ancient), `stonemason` "Stonemason" (ancient), `sawmill` "Sawmill" (ancient) | BL-586's new group: named buildings on existing raws (clay, stone, timber) that make construction-grade goods rather than trade goods or fuel — distinct from Artisan Goods below even though the Kiln and Potter & Weaver share `clay`, since the two produce different terminal goods and are never compared as siblings (chain_depth's R2 groups by output, not input). |
 | Food Processing | `food_rations` (any), `hydroponics_bay` (industrial), `food_rations_milled` "Miller" (ancient) | Feeding the population, whether growing the produce (Hydroponics Bay) or milling it into rations (Food Processor, Miller). |
 | Chemical Works | `propellant_atmospheric` (industrial), `propellant_electrolysis` (industrial) | The Chemical Plant's two propellant routes. |
 | Electronics | `silicon` (industrial), `ree_alloy` (industrial), `electronics` (industrial), `electronics_contact_grade` "Contact-Grade Electronics Lab" (industrial) | The silicon/REE/electronics chain. |

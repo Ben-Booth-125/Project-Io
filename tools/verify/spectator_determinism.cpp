@@ -187,7 +187,18 @@ constexpr int      k_ticks = 300;
 // province_holder was. Confirmed reproducible: R2's own row passed alongside
 // this one, both producing 607026DE2C20D27A, and every other assertion in
 // this file passed unchanged.
-constexpr uint64_t k_unspectated_golden = 0x607026DE2C20D27Aull;
+// Re-blessed 2026-08-24 (BL-585, ancient goods append): four new
+// `resource_type` values (`ceramics`, `dressed_stone`, `planks`, `tools`)
+// widen `resource_count` 38 -> 42, which widens the length of EVERY
+// per-resource array `state_hash` walks (stockpiles, prices, tile deposits,
+// ...) — the same structural-move class NR-257's removal caused in the
+// opposite direction, not a behavioural one; no scorer, price or verb
+// changed. Confirmed reproducible: R2's own row (two independently built
+// worlds, same seed) passed alongside this one, both producing
+// 2FB3C201D7C4B1FA, and every other assertion in this file — the
+// prohibition, the cadence rows, the A/B seat rows, R3's divergence row —
+// passed unchanged.
+constexpr uint64_t k_unspectated_golden = 0x2FB3C201D7C4B1FAull;
 
 /// Hand-built registry mirroring scripts/economy.lua + scripts/recipes.lua for
 /// the building types the generator places. Copied from ai_skill_harness so the

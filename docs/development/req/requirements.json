@@ -6042,6 +6042,51 @@
                     "result_metric": ""
                 }
             ]
+        },
+        {
+            "brief": "ancient-goods-append-and-slice-1",
+            "title": "The save-format bump for four new goods, and the wide roster’s first slice",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-585 (ANCIENT_GOODS_APPEND, complete) + BL-586 (ANCIENT_ROSTER_WIDE, slice 1) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (R1, R1b)"
+                    ],
+                    "requirement": "ITEM-SPANNING (BL-585): four resource_type values appended at the end of the enum (ceramics, dressed_stone, planks, tools), each produced by an authored recipe and either consumed by another recipe or named in chain_depth’s R1/R1b actor-consumed tables as a terminal market-sold good. world_save_version bumped with the read path’s strict-equality rejection extended (no migration).",
+                    "notes": "chain_depth: \"42 resources: 0 unobtainable, 0 unwanted, 14 actor-consumed exemptions\" / R1b \"0 stranded, 5 known-and-tracked gaps\". save_roundtrip gained P13 (v8-versioned stream refused). world_save_version 8 -> 9.",
+                    "result_metric": "4 new resource_type values, resource_count 38 -> 42, 0 orphans"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (D6, R2)"
+                    ],
+                    "requirement": "BL-586 slice 1: four named ancient buildings on existing raws (Potter’s Kiln, Stonemason, Sawmill, Toolmaker), each following the generic-building-plus-recipe pattern (no new building_type enum value), each declaring a BL-434 sub-facility group. No dominated method introduced; ancient depth ceiling unchanged.",
+                    "notes": "Construction Materials is a new group (Kiln/Stonemason/Sawmill); Toolmaker joined Metal Foundry as its deepest member (required depth 2, depth(tools)=3, tied with the existing ceiling). D6: \"max depth: industrial 4, ancient 3\" — unchanged from before this item.",
+                    "result_metric": "4 named buildings, 1 new sub-facility group, ancient max depth unchanged at 3"
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "headless: recipe_switch_harness",
+                        "headless: price_band_harness",
+                        "headless: save_roundtrip",
+                        "headless: determinism_harness",
+                        "headless: spectator_determinism",
+                        "build: full tree (cmake --build build, every target)"
+                    ],
+                    "requirement": "The widened enum and the save-format bump do not regress any other harness or the GUI build. Two guarded exhaustiveness checks (src/core/verify_api.cpp k_resource_slugs, src/world/resource_names.cpp) found and fixed beyond the item’s own declared file list. spectator_determinism’s golden re-blessed on the structural move, confirmed reproducible across two independently built worlds before blessing, per this file’s own standing policy.",
+                    "notes": "save_roundtrip: ALL PASS including new P13. determinism_harness: ALL PASS. spectator_determinism: re-blessed 2FB3C201D7C4B1FA, ALL PASS after. recipe_switch_harness / price_band_harness: unchanged, ALL PASS. Full tree build (cmake --build build): zero errors, zero warnings introduced.",
+                    "result_metric": "6 harnesses + full GUI build, 0 failures after the re-bless"
+                }
+            ]
         }
     ]
 }

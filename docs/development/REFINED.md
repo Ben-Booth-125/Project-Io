@@ -151,14 +151,13 @@ land on top of code the previous wave actually wrote.
 
 ---
 
-## Sprint 17 — the ancient roster becomes a ladder (v0.1.17), one item ahead of the batch
+## Sprint 17 — the ancient roster becomes a ladder (v0.1.17)
 
-Ben's sequencing ruling holds Sprint 17 to start only after Sprint 16 merges to `main`. One item
-is promoted ahead of that gate because it touches no file Sprint 16 owns (checked against Sprint
-16's full file set, `backlog_query.js --sprint 16`): `scripts/recipes.lua`,
-`tools/verify/chain_depth.cpp` and `docs/economy/PRODUCTION.md` appear nowhere in it. The other
-nine items wait for the merge — several depend on this one's chains, and the rest touch
-`world_save.cpp`, `selection_panel.cpp` or `icons.cpp`, all live under Sprint 16.
+**Sprint 16 merged to `main` 2026-08-24** (all ten items, v0.1.15 cut) and this branch merged
+`origin/main` the same day — the sequencing gate is open. `BL-587` had already landed standalone
+ahead of the merge (see below); `BL-585` and `BL-586` (wave 1) landed together immediately after,
+since `BL-585`'s own design named the exact new-goods list as settled WITH `BL-586`'s chains, not
+before. Remaining: `BL-588` through `BL-594`.
 
 #### BL-587 — INTERCHANGEABLE_METHODS_EXIST — COMPLETE 2026-08-23
 
@@ -181,3 +180,44 @@ Requirements: `req/requirements.json` § interchangeable-methods-exist. Files: `
    "dominated" (NR-243) are supply routes/a precondition, not methods — closed rather than
    retuned (NR-589) — and the new pairs are recorded in the Metal Foundry / Fuel Production group
    tables and the ancient-chain table.
+
+---
+
+#### BL-585 — ANCIENT_GOODS_APPEND — COMPLETE 2026-08-24
+
+Requirements: `req/requirements.json` § ancient-goods-append-and-slice-1 (R1). Files:
+`src/world/components.hpp`, `world_save.{hpp,cpp}`, `scripts/world_gen.lua`,
+`tools/verify/chain_depth.cpp`, `docs/economy/RESOURCES.md`, plus two guarded exhaustiveness
+checks found while building and fixed in the same pass: `src/core/verify_api.cpp`
+(`k_resource_slugs`, the GUI build's own static_assert) and `src/world/resource_names.cpp` (the
+one mapping both `recipes.lua` and `world_gen.lua` load Lua resource names through — the exact
+NR-237 defect class, so every new value goes here THE SAME CHANGE, not after).
+
+1. Four `resource_type` values appended (`ceramics`, `dressed_stone`, `planks`, `tools`),
+   `resource_count` 38 → 42. `world_save_version` 8 → 9 — structural, not additive: every
+   per-resource array in the stream widens, so a v8 stream is refused whole, same contract as
+   every prior bump. `save_roundtrip` gained **P13** (v8 refusal).
+2. `world_gen.lua` `base_price` for all four, derived at the roster's observed ~1.433x markup.
+3. `chain_depth` R1/R1b re-run clean; `tools`/`ceramics`/`dressed_stone` added to R1's
+   actor-consumed table (terminal, market-sold) and deliberately **NOT** added to R1b's narrower
+   table, matching that row's own documented rule for `trade_goods_misc`.
+4. Full tree (`cmake --build build`, every target) and the whole ctest suite verified clean.
+   `spectator_determinism`'s golden re-blessed (`2FB3C201D7C4B1FA`) — the structural array-width
+   move this append causes, confirmed reproducible across two independently built worlds before
+   blessing, per that file's own standing policy.
+
+#### BL-586 — ANCIENT_ROSTER_WIDE — SLICE 1 LANDED 2026-08-24 (still `designed`)
+
+Requirements: `req/requirements.json` § ancient-goods-append-and-slice-1 (R2). Files:
+`scripts/recipes.lua`, `docs/economy/PRODUCTION.md`.
+
+1. Four named buildings on **existing** raws — no new deposit, no new extraction target, so
+   `placement_rules.cpp` and `icons.cpp` are untouched this slice (icon fallback renders them
+   without a crash, same precedent as BL-429's own slice 1): Potter's Kiln (clay → ceramics),
+   Stonemason (stone → dressed_stone), Sawmill (timber → planks), Toolmaker (blooms + planks →
+   tools, required depth 2, `depth(tools) = 3` — tied with the ancient ceiling, not past it).
+2. New sub-facility group `Construction Materials` (Kiln/Stonemason/Sawmill); Toolmaker joined
+   `Metal Foundry`.
+3. **Deliberately not this slice**: Tannery/Weaver/Shipwright — all three need `hides`, a new
+   extractable raw with real tile-generation deposits, a materially bigger change than a recipe.
+   BL-586 stays `designed` rather than flipping to `complete` for exactly this reason.

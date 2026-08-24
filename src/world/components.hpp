@@ -142,7 +142,31 @@ enum class resource_type : uint8_t
     // or medical draw later is an APPEND with its behaviour filed in the same
     // change — never a re-insertion here, which would repoint every id after it.
     ordnance               = 37, ///< Fabricator, from steel + machinery. Terminal military good; drawn per-tick by unit upkeep (BL-454).
-    count                  = 38
+    // --- Ancient roster, slice 1 (BL-585/BL-586, 2026-08-24) ---
+    //
+    // The wide ancient roster's first slice: four processing outputs from
+    // EXISTING raws (clay, stone, timber, iron_blooms) — no new tile deposit,
+    // no new extraction target, no new placement rule. `hides` and its two
+    // consumers (`leather`, `cloth`) are deliberately NOT in this slice: they
+    // need a new extractable raw with real tile-generation deposits, which is
+    // a separate change (BL-586's own design names the deferral).
+    //
+    // Admission rule (PRODUCTION.md / BL-340): PRODUCED by an authored recipe
+    // (recipes.lua, this same change). CONSUMED: `planks` by the Toolmaker
+    // recipe below (a real recipe input); `ceramics`, `dressed_stone` and
+    // `tools` are TERMINAL — sold on the market, reprocessed by nothing —
+    // same shape as `trade_goods_misc`, and named in chain_depth's R1
+    // exemption table for exactly that reason rather than left to read as an
+    // orphan. `tools` gains a second, real consumer (a construction-material
+    // draw) when BL-590 lands; the exemption is not a promise, it is today's
+    // honest state.
+    //
+    // world_save_version bumped 8 -> 9 for this append (world_save.hpp).
+    ceramics               = 38, ///< Potter, from clay. Terminal — sold, not reprocessed.
+    dressed_stone          = 39, ///< Stonemason, from stone. Terminal — sold, not reprocessed.
+    planks                 = 40, ///< Sawmill, from timber. Consumed by the Toolmaker.
+    tools                  = 41, ///< Toolmaker, from iron_blooms + planks. Ancient depth 3, tied with the existing ceiling. Terminal for now.
+    count                  = 42
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);

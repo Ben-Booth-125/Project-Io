@@ -135,12 +135,28 @@ Three Tier 2 goods belong to the ancient (pre-coal) chain rather than the indust
 
 | Resource | Tier | Base price | Produced by | Notes |
 |----------|------|-----------|-------------|-------|
-| Charcoal | 2 (refined) | 4.0 | Charcoal Burner / Peat Kiln | Refined fuel-wood; pre-coal smelting/heating input. Dearer than the timber it comes from — a burn takes days and loses mass. |
+| Charcoal | 2 (refined) | 4.0 | Charcoal Burner / Peat Kiln / Coking Kiln | Refined fuel-wood; pre-coal smelting/heating input. Dearer than the timber it comes from — a burn takes days and loses mass. The Coking Kiln (BL-587) is a genuine alternate method, not a third route — see PRODUCTION.md § Alternate production methods. |
 | Iron blooms | 2 (refined) | 9.0 | Bloomery | Bloomery-refined iron intermediate — distinct from raw iron ore / iron-nickel ore. Carries the charcoal plus the ore. |
 | Trade goods (misc) | 1 (endemic, placeholder) | 8.0 | Potter & Weaver, Glassworks | Generic endemic-luxury-class placeholder, priced as a modest trade good, not a treasure. A specific luxury name is a separate design step. |
 
 **Adding a resource is an append at the END of the enum, with its behaviour filed in the same
 change** — never an insertion at an interior position, which would repoint every id after it.
+
+### Ancient roster, slice 1 (BL-585/BL-586, 2026-08-24)
+
+Four more processing outputs, all on **existing** raws — no new tile deposit, no new extraction
+target. `hides` and its two consumers (`leather`, `cloth`) are a deferred later slice: they need
+a new extractable raw with real tile-generation deposits, deliberately not attempted here.
+
+| Resource | Tier | Base price | Produced by | Notes |
+|----------|------|-----------|-------------|-------|
+| Ceramics | 2 (refined) | 3.4 | Potter's Kiln | Clay's second consumer, alongside Potter & Weaver's `trade_goods_misc`. Terminal — sold, not reprocessed. |
+| Dressed stone | 2 (refined) | 2.9 | Stonemason | Stone's second consumer, alongside the Miller. Terminal — sold, not reprocessed. |
+| Planks | 2 (refined) | 4.3 | Sawmill | Timber's third consumer. NOT terminal — feeds the Toolmaker below. |
+| Tools | 2 (refined) | 25.5 | Toolmaker (blooms + planks) | Required depth 2 (both inputs' depth), so `depth(tools) = 3` — tied with the existing ancient ceiling, not past it. Terminal for now; BL-590 (per-building materials) gives it a real construction-material consumer. |
+
+Every price above is DERIVED at the roster's observed ~1.433x markup over its input basket
+(`recipes.lua`'s id-27 ordnance comment states the method), not picked.
 
 ---
 

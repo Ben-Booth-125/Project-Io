@@ -410,6 +410,14 @@ int main()
             // a lie and the row is supposed to catch it — delete the exemption
             // with the consumer, not after someone notices the good is dead.
             { resource_type::ordnance,              "BL-454 unit upkeep draw (per-tick, per unit)" },
+            // BL-585/BL-586 (2026-08-24). Three of the ancient roster's slice-1
+            // outputs are TERMINAL — sold to the market, reprocessed by nothing —
+            // same shape as trade_goods_misc above. `tools` gains a real second
+            // consumer (a construction-material draw) when BL-590 lands; this
+            // exemption names that as the plan rather than assuming it now.
+            { resource_type::ceramics,              "mercantile demand, terminal artisan good (BL-586)" },
+            { resource_type::dressed_stone,         "mercantile demand, terminal construction good (BL-586)" },
+            { resource_type::tools,                 "mercantile demand for now; BL-590 construction-material draw when it lands" },
         };
         auto exempt_consumer = [&](std::size_t r) -> const char* {
             for (const exemption& e : k_actor_consumed)
@@ -530,6 +538,11 @@ int main()
             resource_type::spacecraft_components, resource_type::propellant,
             resource_type::clean_water,           resource_type::consumer_goods,
             resource_type::medical_supplies,      resource_type::ordnance,
+            // BL-585/BL-586's ceramics/dressed_stone/tools are DELIBERATELY NOT
+            // here, same reasoning as the excluded tobacco/spices/coffee/furs/
+            // trade_goods_misc above: "mercantile demand" in R1's table means
+            // sellable-on-the-market, not a real programmatic draw, so it must
+            // not force a band-independent want here.
         };
         auto actor_consumed = [&](std::size_t r) {
             for (const resource_type e : k_actor_consumed)
