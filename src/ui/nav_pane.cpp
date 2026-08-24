@@ -50,6 +50,7 @@ void close_all_panels(ui_state& state)
     state.show_build_ledger      = false; // tile build ledger (BL-162) is a column occupant too
     state.show_decision_feed     = false; // AI decision feed (BL-407)
     state.show_strategy_readout  = false; // Strategy readout (BL-411)
+    state.show_contracts_ledger  = false; // Contracts ledger (BL-576)
     // BL-310 round 4: the tech-tree era-selector menu is now a real shell-
     // column occupant (draw_tech_tree_menu), so it must yield to every other
     // ledger the same way they yield to it — its canvas takeover closes with it.
@@ -63,7 +64,8 @@ bool any_panel_open(const ui_state& state)
            state.show_market_ledger     || state.show_construction_panel ||
            state.show_tile_ledger       || state.show_economy_panel ||
            state.show_generation_ledger || state.show_tech_tree ||
-           state.show_decision_feed     || state.show_strategy_readout;
+           state.show_decision_feed     || state.show_strategy_readout ||
+           state.show_contracts_ledger;
 }
 
 void draw_nav_pane(ui_state& state, float top_offset)
@@ -113,7 +115,13 @@ void draw_nav_pane(ui_state& state, float top_offset)
     // Slot 12 (BL-411, the Strategy readout) is the third tail occupant under
     // that rule: the feed's aggregate companion — verb mix, spend buckets and
     // reason tally per corp, the SHAPE of a run where the feed lists the moves.
-    constexpr int tab_count = 12;
+    // Slot 13 (BL-576, the Contracts ledger) is appended after the developer
+    // tail: the curated nine (MENU.md § Menu set and ordering) and the tail
+    // (slots 10-12) were both already full when this landed, and unlike the
+    // tail's own occupants Contracts IS a player system — offers, active
+    // contracts, terminal history — so it does not belong inside a tail whose
+    // stated character is "not a player system". See MENU.md § Slot 13.
+    constexpr int tab_count = 13;
 
     // Square slots; Selectable treats a nonzero size as literal, so derive the
     // rail width explicitly rather than passing -1.
@@ -242,7 +250,15 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("Strategy readout", "What strategy is emerging - each corporation's decision mix, spend priorities and reasons over the recent run.", false);
             break;
-        default: // Unreachable — tab_count is 12 and every slot is handled above.
+        case 13: // Contracts ledger (BL-576) — offers, active contracts, history
+            if (ImGui::Selectable(id, state.show_contracts_ledger, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_contracts_ledger;
+                close_all_panels(state);
+                state.show_contracts_ledger = !was_open;
+            }
+            slot_tooltip("Contracts", "Offers, active contracts and terminal history for the mercenary contract.", false);
+            break;
+        default: // Unreachable — tab_count is 13 and every slot is handled above.
             break;
         }
 
@@ -299,6 +315,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
         // pennant, and two lit slots sharing a silhouette is exactly the
         // collision BL-174 exists to prevent.
         case 12: icons::readout(dl, centre, r, lit(state.show_strategy_readout));      break;
+        case 13: icons::contract(dl, centre, r, lit(state.show_contracts_ledger));     break;
         default: icons::placeholder(dl, centre, r, dim); break;
         }
     }

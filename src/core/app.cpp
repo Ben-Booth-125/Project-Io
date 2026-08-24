@@ -14,6 +14,7 @@
 #include "ui/charts.hpp"
 #include "ui/circumplanetary_canvas.hpp"
 #include "ui/construction_panel.hpp"
+#include "ui/contracts_ledger.hpp" // nav slot 13, the mercenary Contracts ledger (BL-576)
 #include "ui/detail_level.hpp" // the drill-through fold idiom (BL-214)
 #include "ui/balance_ledger.hpp"
 #include "ui/corporation_dashboard.hpp" // nav slot 1, the four roll-ups (BL-248)
@@ -2067,6 +2068,13 @@ void app::render()
         ui::draw_balance_ledger(m_world, m_registry, m_last_econ_report, bhist,
                                 prior_rank, m_ui, m_ui.show_balance_ledger);
     }
+    // Contracts ledger (BL-576) — nav slot 13: offers, active contracts and
+    // terminal history for the mercenary contract (CONTRACTS.md). Reads the
+    // same m_contract_templates run_nation_step already threads through for
+    // the tick-evaluation pass, so the Active view's predicate wording can
+    // never disagree with what actually settles the contract.
+    ui::draw_contracts_ledger(m_world, m_registry, m_contract_templates, m_ui,
+                              m_ui.show_contracts_ledger);
     // Corporation dashboard (BL-248) — nav slot 1, MENU.md's long-named surface.
     // Replaces the all-corporations balance table that used to occupy this slot: a
     // comparison table is not "the player corporation at a glance", and the Economy

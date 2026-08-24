@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**33 surfaces** — 4 settled, 29 awaiting Ben's wording.
+**36 surfaces** — 4 settled, 32 awaiting Ben's wording.
 
 ---
 
@@ -59,6 +59,30 @@ alphabetical order.
 **Because:** Placement carries terrain, deposit, slot and now logistics-reach rules (BL-323). A refusal the player cannot read is indistinguishable from a broken build, so the panel must state the reason, not merely deny.
 
 *Demanded by BL-029, BL-082, BL-095, BL-367 · `src/ui/construction_panel.cpp` · id `construction_panel`*
+
+### Contracts ledger - Active view
+
+**Answers:** What am I on the hook for right now, and what does walking away cost?
+
+**Because:** An accepted mercenary_contract commits real units and a real deposit; the player needs to see the predicate it is paying to make true (condition_text), the deadline, and the force committed to it. The Abandon press exists because CONTRACTS.md Q2 makes an early exit cheaper than a rout but never free — the reputation cost has to be shown BEFORE the press commits, not discovered afterward, or the ledger would be teaching the wrong lesson about the one number that makes abandoning a real decision.
+
+*Demanded by BL-576 · `src/ui/contracts_ledger.cpp` · id `contracts_ledger_active`*
+
+### Contracts ledger - History view
+
+**Answers:** How has this line of work actually gone for me?
+
+**Because:** CONTRACTS.md Q2 names three terminal states (completed / failed / abandoned) with three different money and reputation outcomes, deliberately against procurement's two — failure is the mechanism's teeth ('you are not paid for trying'). A player cannot read their own standing spiral (CONTRACTS.md: reputation falls, fees fall with it) without a record of which contracts ended which way and what they actually paid; without this view every terminal contract vanishes into the sentiment substrate with nothing on screen to show for it.
+
+*Demanded by BL-576 · `src/ui/contracts_ledger.cpp` · id `contracts_ledger_history`*
+
+### Contracts ledger - Offers view
+
+**Answers:** Who wants to hire me, for what, and can I afford to say yes?
+
+**Because:** CONTRACTS.md settles the mercenary contract as the sell side of the income loop: a client nation offers a fee to make a fact about the world true by a deadline. Without a surface listing open offers the player cannot act on the mechanism at all — offers exist in world::mercenary_offers whether or not anyone can see them, which is exactly the BL-089 activity-fog framing this view honours (an offer is hidden unless its target body is at least Known). The view is also where the force-picker lives: CONTRACTS.md Q1 rules the player chooses the force, never the contract, so the Accept press has to open onto something.
+
+*Demanded by BL-576 · `src/ui/contracts_ledger.cpp` · id `contracts_ledger_offers`*
 
 ### AI decision feed
 

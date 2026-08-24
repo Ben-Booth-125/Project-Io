@@ -342,6 +342,19 @@ void readout(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour of both outlines.
 void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the Contracts nav-rail glyph — a page with its top-right corner cut
+/// away (a dog-ear fold) plus a short check mark near the bottom (a signed
+/// document motif) — in @p colour. Distinct from `ledger` (a plain ruled
+/// box) by the fold and the check, and from `history` (the hourglass) by
+/// having a baseline rectangle at all. Nav rail slot 13, the Contracts
+/// ledger (BL-576). See ICONS.md § Nav-rail affordances.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour of the page outline and the check mark.
+void contract(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw a unit marker — a humanoid silhouette (a filled circle "head" over a
 /// triangle "body") in @p fill, with the standard dark outline — in @p fill.
 /// Echoes `glyph_soldier`, the unit card's left-column placeholder

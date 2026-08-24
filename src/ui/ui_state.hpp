@@ -6,6 +6,7 @@
 #include "world/entity.hpp"
 
 #include <imgui.h>
+#include <array>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -222,6 +223,37 @@ struct ui_state
     bool show_build_ledger = false;       ///< Whether the tile-contextual construction ledger is open (BL-162). Opened by the tile Selection element's "Construct Buildings" button; reads selected_entity as the target tile. Not a nav-rail ledger — closed by close_all_panels and by selecting a new entity. The Selection element itself lives in the bottom band (BL-213), not the fold-out column.
     bool show_market_ledger = false; ///< Whether the Market Ledger is open.
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
+
+    /// Whether the Contracts ledger is open (BL-576). Nav-rail slot 13 —
+    /// the curated nine and the developer/observability tail (slots 1-12,
+    /// MENU.md) were already full when this landed, so Contracts is a new
+    /// PLAYER-system slot appended after the tail rather than inside it (see
+    /// nav_pane.cpp's own comment on slot 13 for the reasoning).
+    bool show_contracts_ledger = false;
+
+    /// Contracts ledger view tab: 0=Offers, 1=Active, 2=History — the same
+    /// `ui::nav_button` button-strip idiom every split ledger uses
+    /// (LAYOUT.md § One-question-per-view splits).
+    int contracts_ledger_view = 0;
+
+    /// The Accept press's force picker (BL-576). Non-zero names the
+    /// `mercenary_offer::id` currently being staffed; the popup lists the
+    /// player's own uncommitted units with a checkbox each, writing into
+    /// `contracts_picker_units` below. Reset to 0 when the popup closes
+    /// (Confirm or Cancel) — there is no cross-frame "armed" state visible
+    /// outside the popup itself, unlike March's canvas-spanning two-step,
+    /// because picking a force needs no second surface: everything the
+    /// player touches lives inside this one ledger.
+    uint32_t contracts_picker_offer = 0;
+
+    /// Which owned units are checked in the open force picker, indexed
+    /// arbitrarily (unused slots stay `null_entity`) — the exact shape
+    /// `corp_command::units` and `mercenary_contract::units` already carry,
+    /// so Confirm copies this straight into the command with no translation.
+    /// Cleared whenever `contracts_picker_offer` changes to a different
+    /// offer (or to 0), so a stale pick from one offer cannot leak into
+    /// another's Accept.
+    std::array<entity_id, mercenary_contract_max_units> contracts_picker_units{};
 
     /// Whether the Generation Ledger is open (BL-303). A DEVELOPER TUNING surface,
     /// not shipped chrome — it explains why a tile generated as it did — so like

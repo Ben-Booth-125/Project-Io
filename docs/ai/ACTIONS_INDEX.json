@@ -559,11 +559,11 @@
   ],
   [
    "gameplay.accept_offer",
-   "A corp_verb on the corp-command seam (ProjectIo --serve, COMMAND opcode). No in-app press yet — the Contracts ledger (BL-576, a later wave) is the intended surface; this item is the data model and the two verbs only."
+   "The Contracts ledger's Offers view, Accept press (BL-576). Select an offer whose escrow has cleared its fee, press Accept to open the force picker, check owned uncommitted units, press Confirm. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger."
   ],
   [
    "gameplay.abandon_contract",
-   "A corp_verb on the corp-command seam (ProjectIo --serve, COMMAND opcode). No in-app press yet — see accept_offer's own surface note."
+   "The Contracts ledger's Active view, Abandon press (BL-576). Select an active contract, press Abandon to see its reputation cost, confirm in the popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger."
   ],
   [
    "chrome.quick_save_key",
@@ -576,6 +576,14 @@
   [
    "chrome.load_cli",
    "Command line."
+  ],
+  [
+   "ledger.nav_contracts",
+   "Nav rail, slot 13 (Contracts icon — a page with a signed check mark)"
+  ],
+  [
+   "ledger.contracts_view_tab",
+   "Contracts ledger, view tab strip at the top"
   ]
  ]
 }

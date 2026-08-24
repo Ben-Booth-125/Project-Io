@@ -2361,55 +2361,55 @@
   {
    "id": "gameplay.accept_offer",
    "family": "gameplay",
-   "surface": "A corp_verb on the corp-command seam (ProjectIo --serve, COMMAND opcode). No in-app press yet — the Contracts ledger (BL-576, a later wave) is the intended surface; this item is the data model and the two verbs only.",
-   "press": "Over the seam: COMMAND corp=<id> verb=25 order=<mercenary_offer id> counterparty=<nation id> units=<up to 8 of the corp's own unit ids>. Applied through apply_corp_command, which recomputes every precondition itself and mutates nothing on any rejection.",
+   "surface": "The Contracts ledger's Offers view, Accept press (BL-576). Select an offer whose escrow has cleared its fee, press Accept to open the force picker, check owned uncommitted units, press Confirm. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger.",
+   "press": "Press 'Accept' on a fully-escrowed, unexpired offer to open a popup listing the player's own uncommitted units with a checkbox and strength each; check at least one, press 'Confirm' to dispatch, or 'Cancel' to back out with nothing sent. Over the seam: COMMAND corp=<id> verb=25 order=<offer id> counterparty=<client nation id> units=[<unit id>, ...].",
    "args": [
     {
      "name": "order",
      "type": "uint32 (mercenary_offer::id)",
-     "meaning": "The offer being accepted. 0 is refused (rejected_invalid) — no offer is ever id 0."
+     "meaning": "The offer to accept. Must name a live entry in world.mercenary_offers — consumed (erased) on success, so accepting the same id twice fails the second time."
     },
     {
      "name": "counterparty",
      "type": "entity_id",
-     "meaning": "The offer's CLIENT NATION, not a corp — this verb forks the seam's usual corp-counterparty reading. Must name a real entry in world.nations AND match the offer's own client, so an id that merely fits the type is still refused (rejected_invalid) if it names the wrong nation or no nation at all."
+     "meaning": "The offer's CLIENT NATION, not a corp — this verb's counterparty check forks on verb (corp_command.cpp). Must equal the named offer's own client field."
     },
     {
      "name": "units",
      "type": "entity_id[8]",
-     "meaning": "The committed force — the corp's OWN units, named by the caller (unused slots are null_entity/omitted). \"The player chooses the force, the contract never does\" (CONTRACTS.md Q1): this field is the whole mechanism. At least one unit must be named."
+     "meaning": "The corp's OWN units to commit — unused slots are 0/null. At least one must be named, each must be owned by the acting corp and not already committed to another ACTIVE mercenary contract. CONTRACTS.md Q1: the player chooses the force, the contract never does."
     }
    ],
    "preconditions": [
-    "`order` names a live entry in world.mercenary_offers (rejected_invalid otherwise — including an offer already consumed by a prior accept_offer).",
-    "`counterparty` names a real nation (rejected_invalid otherwise) that is exactly this offer's `client` (rejected_invalid otherwise).",
-    "The offer has not expired: `w.current_econ_tick` is still before the offer's own `deadline` (rejected_invalid otherwise) — accepting a contract that could not possibly complete in time is refused.",
-    "The offer is FULLY escrowed — `offer_escrow >= fee` (rejected_state otherwise): CONTRACTS.md's \"the fee this offer's escrow must clear before the contract it names is postable\".",
-    "Every non-null `units` slot names a real unit (rejected_invalid otherwise), owned by the acting corp (rejected_not_owner otherwise), and not already committed to another ACTIVE mercenary_contract (rejected_state otherwise — no double-commit).",
-    "At least one unit is named (rejected_invalid on an empty force)."
+    "`order` names a real, still-open offer (rejected_invalid otherwise).",
+    "`counterparty` names a real nation matching that offer's client (rejected_invalid otherwise).",
+    "`current_econ_tick < offer.deadline` — the offer has not expired (rejected_invalid otherwise).",
+    "`offer_escrow >= fee` — the offer is FULLY ESCROWED (rejected_state otherwise); a partially-funded offer is not yet acceptable.",
+    "Every named unit is real, owned by the acting corp, and not already committed to another active mercenary contract (rejected_invalid / rejected_not_owner / rejected_state otherwise); at least one unit must be named (rejected_invalid on an empty force).",
+    "The acting corp exists (rejected_invalid otherwise)."
    ],
-   "expected_output": "A new world.mercenary_contracts entry in the `active` state, copying client/template/province/fee/deadline from the offer and accepted_tick from the current econ tick. The deposit (fee × economy.procurement.deposit_fraction) is credited to the acting corp's balance immediately, straight from the offer's already-fully-funded escrow — not a fresh nation-budget draw, since the full fee already left the client nation's treasury while the offer's escrow was filling. The consumed offer is erased from world.mercenary_offers. The named units are locked to this contract: they cannot be disbanded (rejected_state) or committed to a second contract while it stays active, though marching them stays free (BL-573 does not touch unit position or order).",
-   "reason_to_select": "The whole reason to hold force at all outside extraction — CONTRACTS.md's income-that-is-not-extraction loop. Weigh the fee against what the objective actually needs: underbidding is the loop's teeth (send too little, lose the fight the tick evaluation pass judges, and both the fee and standing go with it), and every named unit is frozen out of any OTHER contract until this one resolves. Reachable only once an offer exists (BL-572, derive_contract_offers) and only while it is fully escrowed — a nation still filling one has nothing to accept yet."
+   "expected_output": "A new mercenary_contract is created: client and template copied from the offer, province bound from the offer's target, fee copied, the deposit (fee x deposit_fraction) paid straight from the offer's own already-filled escrow, deadline copied, the named units set as the committed force, state = active. The consumed offer is erased from world.mercenary_offers so it cannot be accepted twice. A rejection mutates nothing.",
+   "reason_to_select": "The only way to turn a want into income. Underbidding is the loop's teeth (CONTRACTS.md): a cheap contract with too little force risks losing the fight, the fee AND the standing — reading the target's garrison strength (Offers view) against the force you are about to commit is the whole skill."
   },
   {
    "id": "gameplay.abandon_contract",
    "family": "gameplay",
-   "surface": "A corp_verb on the corp-command seam (ProjectIo --serve, COMMAND opcode). No in-app press yet — see accept_offer's own surface note.",
-   "press": "Over the seam: COMMAND corp=<id> verb=26 order=<mercenary_contract id>. Applied through apply_corp_command.",
+   "surface": "The Contracts ledger's Active view, Abandon press (BL-576). Select an active contract, press Abandon to see its reputation cost, confirm in the popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger.",
+   "press": "Press 'Abandon' on an active contract to open a confirm popup showing the deposit forfeit and the reputation (Trust) cost with the client nation, then press 'Abandon' again to dispatch or 'Keep' to back out. Over the seam: COMMAND corp=<id> verb=26 order=<contract id>. No other field is read.",
    "args": [
     {
      "name": "order",
      "type": "uint32 (mercenary_contract::id)",
-     "meaning": "The contract being abandoned. 0 is refused (rejected_invalid)."
+     "meaning": "The contract to walk away from. Must be one of the acting corp's OWN contracts, still in the active state."
     }
    ],
    "preconditions": [
-    "`order` names a live entry in world.mercenary_contracts (rejected_invalid otherwise).",
-    "The acting corp is that contract's `contractor` (rejected_not_owner otherwise) — only the company that took the job can walk away from it.",
-    "That contract is still `active` (rejected_state otherwise) — one already completed, failed, or abandoned has nothing left to abandon."
+    "`order` names a real contract (rejected_invalid otherwise).",
+    "The acting corp is that contract's contractor (rejected_not_owner otherwise).",
+    "The contract is still active — an already-terminal contract cannot be abandoned again (rejected_state otherwise)."
    ],
-   "expected_output": "The contract's state becomes `abandoned`. No money moves — the deposit paid at accept_offer is not clawed back, and the reserved remainder (fee minus deposit) is simply never disbursed, the same money outcome CONTRACTS.md § Q2 gives a failure. `sentiment_factor_kind::contract_cancelled` is folded (client observes contractor) at a magnitude LESS severe than a failure's `contract_failed` (scripts/economy.lua) — the distinct, lesser penalty CONTRACTS.md's Q2 table names for an honest early exit. The committed units are freed: they may be disbanded or committed to a new contract immediately, with no separate release step.",
-   "reason_to_select": "An honest exit from a job that has turned bad, priced cheaper than losing the fight would be. Weigh it the moment the predicate looks unwinnable before the deadline — CONTRACTS.md: \"an honest early exit costs less than a rout\" — against holding on for the (increasingly unlikely) full fee. There is no partial credit either way; the only question is which of the two lesser penalties to take."
+   "expected_output": "The contract's state becomes abandoned. Same money outcome as a failure — the deposit already paid at accept_offer is not clawed back, and the reserved remainder is simply never disbursed — but a DISTINCT, LESSER sentiment magnitude (contract_cancelled, not contract_failed) records that the contractor chose this rather than losing a fight (CONTRACTS.md Q2: 'an honest early exit costs less than a rout, but it still costs').",
+   "reason_to_select": "An early, priced way out of a contract that reading the field has shown cannot be won — cheaper than letting it run to a failed deadline, never free. The ledger shows the exact reputation number before the press commits, not after."
   },
   {
    "id": "chrome.quick_save_key",
@@ -2453,6 +2453,36 @@
    ],
    "expected_output": "Opens straight into the saved campaign, skipping the main menu, the New World wizard, and the world generation plus pre-game warm start that follow them (~30-45 s). A failed load falls through to the main menu with the reason printed, rather than exiting — a missing file must not look like a crash.",
    "reason_to_select": "Resume a campaign directly, or open a fixed world for a capture run without paying generation on every launch — the reason the save format exists (BL-536)."
+  },
+  {
+   "id": "ledger.nav_contracts",
+   "family": "ledger",
+   "surface": "Nav rail, slot 13 (Contracts icon — a page with a signed check mark)",
+   "press": "Click the contract glyph on the left icon rail",
+   "args": [],
+   "preconditions": [
+    "In-game"
+   ],
+   "expected_output": "Toggles the Contracts ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows three views: Offers (open mercenary_offers the activity fog admits), Active (the player's own live mercenary_contracts), History (the player's terminal-state contracts).",
+   "reason_to_select": "Answers 'who wants to hire me, what am I on the hook for, and how has it gone?' — the mercenary contract is the sell-side income loop (CONTRACTS.md) and the only door onto it."
+  },
+  {
+   "id": "ledger.contracts_view_tab",
+   "family": "ledger",
+   "surface": "Contracts ledger, view tab strip at the top",
+   "press": "Click the 'Offers', 'Active' or 'History' tab button",
+   "args": [
+    {
+     "name": "view",
+     "type": "enum",
+     "meaning": "'Offers' (default), 'Active' or 'History'"
+    }
+   ],
+   "preconditions": [
+    "Contracts ledger is open"
+   ],
+   "expected_output": "Switches the ledger to that view. Re-clicking the CURRENTLY-ACTIVE tab closes the whole Contracts ledger (toggle rule on tab strips); clicking a different tab is an ordinary view change.",
+   "reason_to_select": "Offers answers 'who wants to hire me'; Active answers 'what am I on the hook for now'; History answers 'how has it gone' — three different questions over the same mercenary-contract record."
   }
  ]
 }
