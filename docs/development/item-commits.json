@@ -1974,9 +1974,14 @@
       "message": "Regenerate item-commits.json after BL-588"
     },
     "BL-590": {
-      "commit": "6dcefdb",
+      "commit": "864ee36",
       "date": "2026-08-24",
-      "message": "BL-590: construction materials vary per named building, not per type"
+      "message": "Regenerate item-commits.json after BL-590"
+    },
+    "BL-591": {
+      "commit": "3db486f",
+      "date": "2026-08-24",
+      "message": "BL-591: the growth track is visible, not just a gate"
     },
     "BL-594": {
       "commit": "401eae7",
