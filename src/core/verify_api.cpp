@@ -1609,26 +1609,46 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("select_tile", [this](int col, int row) {
         for (const auto& [tid, tc] : m_world.tiles)
             if (tc.body == m_ui.active_body && tc.grid_x == col && tc.grid_y == row)
-            { m_ui.selected_entity = tid; break; }
+            {
+                m_ui.selected_entity = tid;
+                // BL-598: write the province MIRROR the gesture writes, so a
+                // staged tile selection renders exactly as a clicked one does —
+                // province outline included. The canvas re-derives it anyway on
+                // its next frame, but a capture taken before that frame (or on a
+                // rung with no Planetary canvas) would otherwise differ from the
+                // gesture this shortcut stands in for.
+                m_ui.selected_province    = m_world.provinces.province_of(tid);
+                m_ui.province_sync_entity = tid;
+                break;
+            }
     });
-    // BL-511: select the PROVINCE containing the tile at (col,row) on the active
-    // surface body — the province is what a canvas click now lands on. A SHORTCUT:
-    // since BL-521 verify.click_tile(col,row) performs the real gesture, and
-    // click_injection.lua asserts the two agree. Prefer the click where the check
-    // is about the gesture; this stays for staging a selection cheaply, without
-    // the pan click_tile performs. Mirrors select_tile's shape and is equally
-    // non-mutating. Sets province_sync_entity too, so the canvas's next-frame
-    // reconciliation (which clears the province when some other surface moved the
-    // entity selection) does not immediately undo this. Returns the province id,
-    // or 0 when the tile is ocean / unpartitioned / absent.
+    // BL-598: THE HOOK FOLLOWS THE GESTURE. This used to write the province-only
+    // selection tuple — `selected_province` set, `selected_entity` null — which
+    // was exactly what a click on bare ground produced. It no longer is: the
+    // province folded into the tile Selection element, so a click selects the
+    // TILE and carries its province as a mirror, and no gesture reaches the old
+    // tuple at all. A hook that still wrote it would be staging a state a player
+    // cannot get to, and every script asserting on it would be testing fiction.
+    //
+    // So this now does what `select_tile` does and RETURNS the province id, which
+    // is what its callers outside this file actually want it for (staging a
+    // battle, a contract, a march target). Kept rather than deleted for that
+    // return value and for the name's readability at the call site: "select the
+    // tile, and tell me the province it stands in".
+    //
+    // Still a SHORTCUT: since BL-521 verify.click_tile(col,row) performs the real
+    // gesture, and click_injection.lua asserts the two agree. Prefer the click
+    // where the check is about the gesture; this stays for staging a selection
+    // cheaply, without the pan click_tile performs. Returns 0 when the tile is
+    // ocean / unpartitioned / absent.
     v.set_function("select_province", [this](int col, int row) -> unsigned int {
         for (const auto& [tid, tc] : m_world.tiles)
         {
             if (tc.body != m_ui.active_body || tc.grid_x != col || tc.grid_y != row)
                 continue;
             const uint32_t pid = m_world.provinces.province_of(tid);
-            m_ui.selected_entity      = null_entity;
-            m_ui.province_sync_entity = null_entity;
+            m_ui.selected_entity      = tid;
+            m_ui.province_sync_entity = tid;
             m_ui.selected_province    = pid;
             return pid;
         }
@@ -1709,7 +1729,15 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             if (tit == m_world.tiles.end()) continue;
             if (tit->second.body == m_ui.active_body &&
                 tit->second.grid_x == col && tit->second.grid_y == row)
-            { m_ui.selected_entity = bid; break; }
+            {
+                m_ui.selected_entity = bid;
+                // BL-598: a marker hit carries NO province mirror — a building
+                // card has no province section for the outline to be about — so
+                // this shortcut clears it, exactly as the click handler does.
+                m_ui.selected_province    = 0;
+                m_ui.province_sync_entity = bid;
+                break;
+            }
         }
     });
     // Switch the construction panel's sub-view (0 = Construction/queue, 1 = Buildings/

@@ -1313,16 +1313,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // call starts fresh; the tile loop and the market-centre pass below fill it.
     state.marker_hit_zones.clear();
 
-    // BL-511 selection reconciliation. The canvas is the only writer of
-    // `selected_province`, but `selected_entity` has many writers (ledger rows,
-    // the corporation list, "inspect the thing I just built"). If the entity
-    // selection moved since this canvas last wrote it, that surface's selection
-    // wins and the province clears — so the Selection element never has both a
-    // province and an entity to draw. Cheap, and it keeps the invariant in ONE
-    // place rather than as a clear-me duty on every other selecting surface.
+    // Selection reconciliation. `selected_entity` has many writers (ledger rows,
+    // the corporation list, "inspect the thing I just built"); this canvas owns
+    // the two fields that hang off it.
+    //
+    // BL-598: `selected_province` is no longer a rival selection to be CLEARED
+    // here — it is the province of whatever tile is selected, so this arm
+    // RE-DERIVES it. That is what lets a tile selected from somewhere other than
+    // the canvas (a ledger row, the verify harness) still get its province
+    // outline, without adding a set-the-mirror duty to every selecting surface.
+    // `province_of` returns 0 for anything that is not a tile, so a building or
+    // unit selection lands on 0 without a kind test.
     if (state.selected_entity != state.province_sync_entity)
     {
-        state.selected_province    = 0;
+        state.selected_province    = w.provinces.province_of(state.selected_entity);
         // BL-469: the battle selection is a THIRD channel into the same one
         // element, so it clears on the same reconciliation. Without this arm a
         // battle card would survive a click on a building and the Selection
@@ -2956,12 +2960,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             draw_hex_highlight(dl, verts,
                 resolve_highlight(selected, /*hovered=*/false, /*pinned=*/false));
 
-            // Province outline (BL-511). The province is what a click selects, so
-            // it is what the selection ring must trace: the OUTER boundary of the
-            // cell, drawn edge by edge on every side facing a different province,
-            // never the interior seams. This is the crisp affordance the faint
-            // always-on edge deliberately is not. Hover uses the same shape at the
-            // hover colour and yields to selection, per the highlight convention.
+            // Province outline (BL-511). The OUTER boundary of the cell, drawn
+            // edge by edge on every side facing a different province, never the
+            // interior seams. This is the crisp affordance the faint always-on
+            // edge deliberately is not. Hover uses the same shape at the hover
+            // colour and yields to selection, per the highlight convention.
+            //
+            // BL-598: a click no longer selects the province — it selects the
+            // TILE, whose element carries the province as a set of sections. So
+            // the outline now reads as "the ground your Deposits / Buildings /
+            // Population sections are about", drawn around the selected tile's
+            // own cell. `selected_province` is the derived mirror that says which.
             if (revealed && prov_id != 0)
             {
                 const bool prov_selected = (prov_id == state.selected_province);
@@ -3502,14 +3511,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // exactly one building — once BL-366 lets a tile stack several, the hex
             // stays reachable as the grouped-by-stack tile view instead.
             //
-            // BL-511: the fallback is now the hovered tile's PROVINCE, not the
-            // tile. The province is the selected unit; the tile stays the data
-            // grain, reached from the province card's member-tile list. A tile
-            // with no province (ocean, unpartitioned) falls back to itself, so
-            // clicking water still selects something rather than nothing.
+            // BL-511 made the fallback the hovered tile's PROVINCE rather than
+            // the tile; BL-598 puts it back on the tile. The province folded
+            // into the tile Selection element as a set of accordion sections, so
+            // selecting the tile IS selecting the province — with the tile's own
+            // deposits, terrain and Construct door still reachable, which the
+            // province-only selection cost a press each. `hovered_prov` survives
+            // as the MIRROR (`selected_province`) the province outline reads.
             const uint32_t hovered_prov = (hovered_tile != null_entity)
                                           ? w.provinces.province_of(hovered_tile) : 0u;
-            entity_id fallback = (hovered_prov != 0) ? null_entity : hovered_tile;
+            entity_id fallback = hovered_tile;
             if (hovered_tile != null_entity)
             {
                 const auto tb = tile_to_bld.find(hovered_tile);
@@ -3543,48 +3554,49 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 if (const auto tb2 = tile_to_bld.find(hovered_tile); tb2 != tile_to_bld.end())
                     building_here = tb2->second;
 
-                // Cycle order, ruled by Ben 2026-08-21: UNIT > PROVINCE > BUILDING
-                // > TILE. Four rungs, not three — the province was stage 2 when
-                // BL-511 landed it, and the tile shared that rung; they are now
-                // separate, so a repeat click walks all the way down to the bare
-                // tile rather than stopping at whichever of the two was live.
+                // Cycle order, ruled by Ben 2026-08-24 (BL-598): BATTLE > UNIT >
+                // BUILDING > TILE. FOUR rungs. The province rung sat between unit
+                // and building until that ruling dissolved it: the province folded
+                // into the tile Selection element as a set of sections, so the
+                // tile rung reaches it and a rung of its own selected the same
+                // ground twice.
                 //
                 // This is the CYCLE order only. The hit-test above is unchanged
                 // and still resolves most-specific-first, so a building is still
-                // reachable on the FIRST click — putting the province ahead of it
-                // here would otherwise have made buildings unclickable, which is
-                // the reading Ben explicitly did not pick.
+                // reachable on the FIRST click.
                 //
-                // The province rung is expressed as null_entity + a province id,
-                // so "nothing here, skip it" cannot be a null check on that rung —
-                // hence the explicit `stage_live` table.
-                // BL-469 put the BATTLE on the front: five rungs now, and rung 0
-                // is expressed the same way the province rung is — null_entity
-                // plus a key that is not an entity — so `stage_live` carries its
-                // liveness too rather than a null check standing in for it.
+                // Rungs 1..3 are entities, so a null check is their liveness test.
+                // Rung 0 is not — a battle has no entity id — so `stage_live`
+                // stays, carrying that one rung's test rather than a null check
+                // standing in for it.
+                //
+                // On bare ground with no unit, no building and no battle exactly
+                // ONE rung is live and a repeat click re-selects the same tile.
+                // That is the honest reading: there is nothing else there.
                 const active_battle* battle_here =
                     (hovered_prov != 0) ? first_battle_in(w, hovered_prov) : nullptr;
 
-                const entity_id stages[5] = { null_entity,      // battle rung
+                const entity_id stages[4] = { null_entity,      // battle rung
                                               unit_here,
-                                              null_entity,      // province rung
                                               building_here,
                                               hovered_tile };
-                const bool stage_live[5] = { battle_here != nullptr,
+                const bool stage_live[4] = { battle_here != nullptr,
                                              unit_here != null_entity,
-                                             hovered_prov != 0,
                                              building_here != null_entity,
                                              hovered_tile != null_entity };
                 int stage = state.selection_cycle_stage;
-                for (int i = 0; i < 5; ++i)
+                for (int i = 0; i < 4; ++i)
                 {
-                    stage = (stage + 1) % 5;
+                    stage = (stage + 1) % 4;
                     if (stage_live[stage])
                         break;
                 }
                 state.selection_cycle_stage = stage;
                 state.selected_entity       = stages[stage];
-                state.selected_province     = (stage == 2) ? hovered_prov : 0u;
+                // The mirror: the province of the selection, which is non-zero
+                // only on the TILE rung — the one card that has province sections
+                // to show, and so the only one whose outline says anything.
+                state.selected_province     = (stage == 3) ? hovered_prov : 0u;
                 state.province_sync_entity  = state.selected_entity;
                 if (stage == 0 && battle_here != nullptr)
                 {
@@ -3600,12 +3612,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             else
             {
                 state.selected_entity = (marker_hit != null_entity) ? marker_hit : fallback;
-                // Province and entity selection are mutually exclusive: a marker
-                // hit (or an ocean tile) clears the province, and a plain click on
-                // ground sets it with no entity. Whichever is set last wins, so
-                // the Selection element never has two things to draw.
+                // BL-598: the mirror, not a rival selection. A click that lands
+                // on the TILE carries its province (the tile element has the
+                // sections that read it); a marker hit does not, because a
+                // building or unit card has no province section for the outline
+                // to be about.
                 state.selected_province =
-                    (marker_hit == null_entity && fallback == null_entity) ? hovered_prov : 0u;
+                    (marker_hit == null_entity) ? hovered_prov : 0u;
                 state.province_sync_entity = state.selected_entity;
 
                 // Seed/reset the cycle anchor so a follow-up repeat click on this
@@ -3621,19 +3634,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
                     state.selection_cycle_tile  = hovered_tile;
                     // Seed the anchor at the rung this click actually landed on,
-                    // in the FIVE-rung order above, so the NEXT repeat click
+                    // in the FOUR-rung order above, so the NEXT repeat click
                     // advances from the right place rather than replaying a rung.
-                    // These indices must track `stages[5]` exactly: BATTLE 0,
-                    // UNIT 1, PROVINCE 2, BUILDING 3, TILE 4. They were the
-                    // four-rung indices until 2026-08-22 and were never shifted
-                    // when BL-469 inserted the battle rung at 0, so plain ground
-                    // seeded 1 (the UNIT rung); a repeat click then advanced
-                    // 1 -> 2 and landed back on the province, which read as the
-                    // cycle not firing at all (NR-504).
+                    // These indices must track `stages[4]` exactly: BATTLE 0,
+                    // UNIT 1, BUILDING 2, TILE 3. (Getting this wrong is not a
+                    // compile error and not a visual one either — it reads as
+                    // "the cycle does not fire", which is how NR-504 was found.)
+                    // The fallback is the tile itself since BL-598, so a plain
+                    // click on ground seeds the TILE rung.
                     state.selection_cycle_stage = (marker_hit != null_entity && unit_here == marker_hit) ? 1
-                                                 : (marker_hit != null_entity) ? 3   // a building marker
-                                                 : (fallback != null_entity)   ? 3
-                                                                               : 2;  // plain ground = province
+                                                 : (marker_hit != null_entity) ? 2   // a building marker
+                                                 : (building_here != null_entity && fallback == building_here) ? 2
+                                                                               : 3;  // plain ground = the tile
                 }
                 else
                 {
