@@ -1954,19 +1954,24 @@
       "message": "Close Wave 6: BL-578 lands, Sprint 16 closes, v0.1.15 is cut"
     },
     "BL-585": {
-      "commit": "9cf1336",
+      "commit": "52dd45c",
       "date": "2026-08-24",
-      "message": "BL-585 + BL-586 slice 1: four new goods, four named ancient buildings"
+      "message": "Regenerate item-commits.json after BL-585/BL-586"
     },
     "BL-586": {
-      "commit": "9cf1336",
+      "commit": "52dd45c",
       "date": "2026-08-24",
-      "message": "BL-585 + BL-586 slice 1: four new goods, four named ancient buildings"
+      "message": "Regenerate item-commits.json after BL-585/BL-586"
     },
     "BL-587": {
       "commit": "5a665b2",
       "date": "2026-08-23",
       "message": "Regenerate item-commits.json after BL-587"
+    },
+    "BL-588": {
+      "commit": "a1b4541",
+      "date": "2026-08-24",
+      "message": "BL-588: a tech can unlock a recipe, not just a building type"
     },
     "BL-594": {
       "commit": "401eae7",
