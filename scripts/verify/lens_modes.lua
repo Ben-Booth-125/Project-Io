@@ -7,12 +7,6 @@ verify.capture("lens_corporation")
 verify.set_overlay("country")
 verify.capture("lens_country")
 
-verify.set_overlay("production")
-verify.capture("lens_production")
-
-verify.set_overlay("opportunity")
-verify.capture("lens_opportunity")
-
 verify.set_overlay("scarcity")
 verify.capture("lens_scarcity")
 

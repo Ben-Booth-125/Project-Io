@@ -128,15 +128,14 @@ ImU32 mean_colour(const ImU32* c, int n)
 ///     nation colours is a third nation's colour, and the mean of two plate
 ///     colours is a plate that does not exist. A province straddling a border is
 ///     a real fact the lens exists to show.
-///   - CATCHMENT fields (market, scarcity, opportunity) are already coarser than
-///     a province; blending would soften the catchment boundary the lens is about.
-///   - SPARSE fields (corporation, production, industry) are attributes of one
+///   - CATCHMENT fields (market, scarcity) are already coarser than a province;
+///     blending would soften the catchment boundary the lens is about.
+///   - SPARSE fields (corporation, industry) are attributes of one
 ///     building on one tile. Smearing a point value over the empty ground beside
 ///     it is exactly the "one tile's value standing for the whole province"
 ///     defect — so these reduce per PROVINCE instead (see the uniform pass), not
 ///     per vertex.
-///   - Population and Opportunity draw a per-tile DOT, not a fill, so there is no
-///     fill to blend.
+///   - Population draws a per-tile DOT, not a fill, so there is no fill to blend.
 ///   - Reach and Supply-routes are body-level and paint no tile fill at all.
 bool lens_blend_mode(overlay_mode m)
 {
@@ -249,10 +248,6 @@ ImU32 ryg_colour(float t)
     return t < 0.5f ? lerp_colour(red,    yellow, t * 2.0f)
                     : lerp_colour(yellow, green,  (t - 0.5f) * 2.0f);
 }
-
-/// Diverging red→green colour for a ratio relative to 1.0 (defined below); forward
-/// declared so the Production key (above its definition) can sample the same band.
-ImU32 production_colour(float ratio);
 
 /// Shared chrome for an on-canvas lens key: a rounded dark panel of @p box_w ×
 /// @p body_h at the left edge (inset past the nav rail), vertically centred —
@@ -567,78 +562,6 @@ void draw_resource_key(ImDrawList* dl, ImVec2 anchor,
                 presentation_of(state.lens_resource).name);
     y += line_h + 4.0f;
     dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "filled = deposit present"); // fit-exempt: legend box sized to its measured entries (container 2)
-}
-
-/// On-canvas legend for the Opportunity lens (BL-136): a body-relative red→green
-/// rank bar over the volume-weighted unmet-demand-gap field — each market's
-/// demand-gap × demand-volume score, ranked against the body max (mirrors the
-/// Scarcity lens's per-market normalisation). Standard key width — the former
-/// "(unmet demand)" qualifier that widened this box is gone (BL-136).
-void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
-{
-    const float pad    = 8.0f;
-    const float line_h = ImGui::GetTextLineHeight();
-    const float bar_h  = 10.0f;
-    const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
-    float x, y, bar_w;
-    begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
-
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Opportunity"); // fit-exempt: legend box sized to its measured entries (container 2)
-    y += line_h + 4.0f;
-    constexpr int segs = 24;
-    for (int i = 0; i < segs; ++i)
-    {
-        const float t = static_cast<float>(i) / (segs - 1);
-        const ImU32 c = ryg_colour(t);
-        dl->AddRectFilled({ x + bar_w * static_cast<float>(i) / segs, y },
-                          { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
-    }
-    y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low"); // fit-exempt: legend box sized to its measured entries (container 2)
-    const ImVec2 ts = ImGui::CalcTextSize("high");
-    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "high"); // fit-exempt: legend box sized to its measured entries (container 2)
-}
-
-/// On-canvas legend for the Production lens (BL-009): a diverging cool→warm bar
-/// (below/above the body's mean output value) over the production-intensity surface.
-void draw_production_key(ImDrawList* dl, ImVec2 anchor)
-{
-    const float pad    = 8.0f;
-    const float line_h = ImGui::GetTextLineHeight();
-    const float bar_h  = 10.0f;
-    const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
-    float x, y, bar_w;
-    begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
-
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Production intensity"); // fit-exempt: legend box sized to its measured entries (container 2)
-    y += line_h + 4.0f;
-    constexpr int segs = 24;
-    for (int i = 0; i < segs; ++i)
-    {
-        const float t = static_cast<float>(i) / (segs - 1);
-        const ImU32 c = production_colour(std::pow(4.0f, t * 2.0f - 1.0f));
-        dl->AddRectFilled({ x + bar_w * static_cast<float>(i) / segs, y },
-                          { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
-    }
-    y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low"); // fit-exempt: legend box sized to its measured entries (container 2)
-    const ImVec2 ts = ImGui::CalcTextSize("high");
-    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "high"); // fit-exempt: legend box sized to its measured entries (container 2)
-}
-
-/// Diverging red→yellow→green colour for a ratio relative to 1.0 (BL-137, Production
-/// lens): `ratio = value / mean`; 1.0 is the yellow mid-tone, < 1 (below mean) trends
-/// red, > 1 (above mean) trends green. Centred on the log of the ratio so the
-/// symmetric band `[0.25×, 4×]` maps to the full span, routed through the shared
-/// ryg_colour ramp.
-ImU32 production_colour(float ratio)
-{
-    ratio = std::clamp(ratio, 0.25f, 4.0f);
-    const float d = std::log(ratio) / std::log(4.0f); // [-1, 1]
-    // Map the diverging axis onto the shared red→yellow→green ramp so the mean
-    // (d = 0) reads yellow, below-mean red, above-mean green — one vocabulary
-    // across the red-to-green lenses (Ben's directive 2026-07-10).
-    return ryg_colour((d + 1.0f) * 0.5f);
 }
 
 /// On-canvas legend for the Market lens: a diverging cheap↔dear gradient bar plus
@@ -1532,85 +1455,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
-    // Production lens pre-pass (BL-009): per producing tile, the sell value of its
-    // building's outputs this tick = Σ(output qty × resolved price). Read from the
-    // economy report (output_quantity) + the tile's market prices; a processor's
-    // total output is split across its recipe's products by their batch
-    // proportions. Idle / exhausted buildings produce nothing → no entry → cold.
-    // The geometric-style mean of producing tiles anchors the log scale.
-    std::unordered_map<entity_id, float> prod_value; // tile id → output sell value
-    float prod_log_sum = 0.0f;
-    int   prod_count   = 0;
-    if (state.overlay == overlay_mode::production)
-    {
-        for (const building_report& br : report.buildings)
-        {
-            if (br.body != state.active_body || br.output_quantity <= 0.0f || !br.active)
-                continue;
-            const auto bld_it = w.buildings.find(br.building);
-            if (bld_it == w.buildings.end())
-                continue;
-            const entity_id tile_id = bld_it->second.tile;
-            const entity_id mid     = market_for_tile(w, tile_id);
-            const auto      mk_it   = w.markets.find(mid);
-            if (mk_it == w.markets.end())
-                continue;
-            const auto& price = mk_it->second.price;
-
-            float value = 0.0f;
-            if (br.type == building_type::extraction_site)
-            {
-                value = br.output_quantity * price[static_cast<std::size_t>(br.target_resource)];
-            }
-            else if (const recipe* rec = reg.get_recipe(br.recipe))
-            {
-                float out_total = 0.0f, weighted = 0.0f;
-                for (std::size_t r = 0; r < resource_count; ++r)
-                {
-                    out_total += rec->outputs[r];
-                    weighted  += rec->outputs[r] * price[r];
-                }
-                if (out_total > 0.0f)
-                    value = br.output_quantity * weighted / out_total;
-            }
-            if (value > 0.0f)
-            {
-                prod_value[tile_id] += value;
-                prod_log_sum += std::log(value);
-                ++prod_count;
-            }
-        }
-    }
-    const float prod_mean = prod_count > 0 ? std::exp(prod_log_sum / static_cast<float>(prod_count)) : 0.0f;
-
-    // Opportunity lens pre-pass (BL-136): a body-relative, volume-weighted rank of
-    // the unmet-demand gap, replacing the old max-absolute price/base ratio (which
-    // saturated green in the saturated economy — every market bids over its floor).
-    // For each market: sum the per-good demand gap (demand outrunning supply, like
-    // the Scarcity pre-pass) and weight it by the market's total demand volume, so
-    // a large market's real gap outranks a tiny market's high-ratio blip. Scores are
-    // then ranked against the body max (mirrors the Scarcity lens's normalisation) —
-    // strongest gaps read green, met markets read low/red.
-    std::unordered_map<entity_id, float> opp_score; // market id → volume-weighted demand-gap score
-    float opp_max_score = 0.0f;
-    if (state.overlay == overlay_mode::opportunity)
-    {
-        for (const auto& [mid, mk] : w.markets)
-        {
-            if (mk.body != state.active_body)
-                continue;
-            float gap = 0.0f, volume = 0.0f;
-            for (std::size_t r = 0; r < resource_count; ++r)
-            {
-                gap    += std::max(0.0f, mk.demand[r] - mk.supply[r]);
-                volume += mk.demand[r];
-            }
-            const float score = gap * volume;
-            opp_score[mid] = score;
-            opp_max_score  = std::max(opp_max_score, score);
-        }
-    }
-
     // Supply lens pre-pass: check whether the active body has any player convoys
     // (source or destination). Used inside the tile loop to gate the per-tile glyph.
     // w.convoys is populated by dispatch_convoys (supply_system.cpp) each tick.
@@ -2027,19 +1871,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (col_it != market_catchment_colour.end())
                 fill = lerp_colour(fill, col_it->second, 0.55f);
         }
-        // Population (Workforce) and Opportunity lenses (BL-135): no longer a
-        // full-tile tint — each reads as a per-tile red→green dot mark, drawn
-        // below alongside the building glyph (workforce_efficiency / the
-        // body-relative demand-gap rank respectively). Tiles keep terrain hue here.
-        // Production lens (BL-009): tint a producing tile by output sell value this
-        // tick, log-scaled relative to the body's producing-tile mean (above mean
-        // warm, below cool). Idle / exhausted / unbuilt tiles read cold (no tint).
-        else if (state.overlay == overlay_mode::production)
-        {
-            const auto it = prod_value.find(id);
-            if (it != prod_value.end() && prod_mean > 0.0f)
-                fill = lerp_colour(fill, production_colour(it->second / prod_mean), 0.6f);
-        }
+        // Population (Workforce) lens (BL-135): not a full-tile tint — it reads as
+        // a per-tile red→green dot mark, drawn below in place of the building glyph
+        // (workforce_efficiency). Tiles keep their terrain hue here.
         // Scarcity lens (BL-018): a market-level shortfall field. Every tile in a
         // market's catchment reads as one chunky block tinted by that market's
         // supply shortfall of the selected good (demand outran supply last tick),
@@ -2681,11 +2515,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     }
                 }
 
-                // The Workforce (Population lens) and Opportunity lenses replace the
-                // building silhouette with the per-tile value mark drawn below
-                // (BL-135) — the mark reads the tile's rank, not its installation.
-                if (state.overlay != overlay_mode::population &&
-                    state.overlay != overlay_mode::opportunity)
+                // The Workforce (Population) lens replaces the building silhouette
+                // with the per-tile value mark drawn below (BL-135) — the mark reads
+                // the tile's rank, not its installation.
+                if (state.overlay != overlay_mode::population)
                 {
                     if (under_construction)
                         icons::under_construction(dl, {cx, cy}, sil_r, marker_col);
@@ -2775,8 +2608,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // is a blob, not a line. The all-four-neighbours "filled interior" case that
             // was designed alongside this was CANCELLED on the same measurement: not one
             // tile in the system has four, so it would have been dead code on every seed.
-            if (!built && state.overlay != overlay_mode::population &&
-                state.overlay != overlay_mode::opportunity)
+            if (!built && state.overlay != overlay_mode::population)
             {
                 const ImU32 ink = contrast_ink(fill);
                 bool        spanned = false;
@@ -2825,29 +2657,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                     tile.landform, ink);
             }
 
-            // Value-lens tile marks (BL-135): Workforce (Population lens) and
-            // Opportunity replace their old full-tile tint with a per-tile red→green
-            // dot on every BUILDABLE tile (valid terrain for activity — ocean
-            // excluded), not just occupied ones. Workforce reads
-            // workforce_efficiency(habitability); Opportunity reads the same
-            // body-relative demand-gap rank as its (now-removed) tile tint (BL-136).
-            // Drawn instead of, not blended with, the building glyph on occupied
-            // tiles (suppressed above).
-            if ((state.overlay == overlay_mode::population ||
-                 state.overlay == overlay_mode::opportunity) &&
+            // Value-lens tile marks (BL-135): the Workforce (Population) lens draws
+            // a per-tile red→green dot on every BUILDABLE tile (valid terrain for
+            // activity — ocean excluded), not just occupied ones, reading
+            // workforce_efficiency(habitability). Drawn instead of, not blended with,
+            // the building glyph on occupied tiles (suppressed above). Opportunity
+            // shared this idiom until BL-604 retired it; the shape stays keyed on one
+            // lens rather than pretending to a family of one.
+            if (state.overlay == overlay_mode::population &&
                 !placement_rules::is_water_tile(tile.substrate))
             {
-                float t = 0.0f; // body-relative rank, [0, 1], red(low) -> green(high)
-                if (state.overlay == overlay_mode::population)
-                {
-                    t = workforce_efficiency(std::clamp(tile.habitability, 0.0f, 1.0f));
-                }
-                else // opportunity
-                {
-                    const auto it = opp_score.find(market_for_tile(w, id));
-                    if (it != opp_score.end() && opp_max_score > 0.0f)
-                        t = std::clamp(it->second / opp_max_score, 0.0f, 1.0f);
-                }
+                const float t = workforce_efficiency(std::clamp(tile.habitability, 0.0f, 1.0f));
                 const float mr = std::max(2.0f, draw_r * 0.22f);
                 icons::value_mark(dl, {cx, cy}, mr, ryg_colour(t));
             }
@@ -3316,10 +3136,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         draw_market_key(lens_key_anchor, key_top, key_bot, w, state, market_catchment_colour);
     else if (state.overlay == overlay_mode::population)
         draw_population_key(dl, lens_key_anchor);
-    else if (state.overlay == overlay_mode::opportunity)
-        draw_opportunity_key(dl, lens_key_anchor);
-    else if (state.overlay == overlay_mode::production)
-        draw_production_key(dl, lens_key_anchor);
     else if (state.overlay == overlay_mode::scarcity)
         draw_scarcity_key(dl, lens_key_anchor, state);
     else if (state.overlay == overlay_mode::industry)

@@ -30,11 +30,9 @@ verify.capture("built_tile_plain")
 verify.set_overlay("resource")
 verify.capture("built_tile_resource")
 
--- Population and Opportunity deliberately REPLACE the silhouette with a per-tile value
--- mark (BL-135). These two frames are the regression guard on that suppression: the
--- plate stays, the silhouette must not come back.
+-- Population deliberately REPLACES the silhouette with a per-tile value mark
+-- (BL-135). This frame is the regression guard on that suppression: the plate
+-- stays, the silhouette must not come back. Opportunity shared the idiom and had
+-- its own frame here until BL-604 retired it.
 verify.set_overlay("population")
 verify.capture("built_tile_population")
-
-verify.set_overlay("opportunity")
-verify.capture("built_tile_opportunity")

@@ -171,7 +171,7 @@
   ],
   [
    "lens.continent",
-   "Minimap lens bar, slot 8 (the two-interlocking-plates-split-by-a-diagonal-seam glyph)"
+   "Minimap lens bar, slot 6 (the two-interlocking-plates-split-by-a-diagonal-seam glyph)"
   ],
   [
    "lens.corporation",
@@ -194,16 +194,8 @@
    "Minimap lens bar, slot 4 (the three-ascending-vertical-bars glyph)"
   ],
   [
-   "lens.opportunity",
-   "Minimap lens bar, slot 6 (the open circle with inner plus glyph)"
-  ],
-  [
    "lens.population",
    "Minimap lens bar, slot 5 (the small figure glyph: round head over tapered torso)"
-  ],
-  [
-   "lens.production",
-   "Minimap lens bar, slot 7 (the filled upward triangle over a baseline glyph)"
   ],
   [
    "lens.reach",
@@ -215,7 +207,7 @@
   ],
   [
    "lens.scarcity",
-   "Off the lens bar (dropped in the BL-093 trim to 7-then-8 glyphs); the hollow downward-triangle glyph exists but is not on the strip"
+   "Off the lens bar; the hollow downward-triangle glyph exists but is not on the strip. Reached by the keyboard lens-cycle only — an off-strip status that is a width call, never a data gate."
   ],
   [
    "lens.supply",

@@ -36,8 +36,13 @@ enum class overlay_mode
     corporation, ///< Corporate-owned tiles (per-corp tint; player-corp border). See LENSES.md.
     resource,    ///< Single-resource deposit lens: flat fill over the contiguous deposit. See LENSES.md § Resource lens.
     population,  ///< Per-tile habitability tint (dark → liveable green). See LENSES.md § Population lens.
-    opportunity, ///< Per-catchment unmet-demand surface (green = market bid above base = a gap to fill). BL-112. See LENSES.md § Opportunity lens.
-    production,  ///< Per-tile production-intensity surface (Σ output×price, log scale). See LENSES.md § Production lens.
+    // Opportunity and Production were `overlay_mode` values here (BL-604, Ben
+    // 2026-08-24: "retire the opportunity lens and the production intensity
+    // lens"). Every lens costs a bar slot, a key, three doc rows and a
+    // selection-routing rule permanently; these two were per-tile value
+    // surfaces whose read the Scarcity and Industry lenses already carry
+    // between them. The sentinel below is what the cycle counts, so the roster
+    // re-numbers itself with no hand-kept constant to follow.
     scarcity,    ///< Per-market supply-shortfall blocks (hot where demand outran supply). See LENSES.md § Scarcity lens.
     industry,    ///< Per-tile nation-substrate throughput field (occupation × terrain richness). See LENSES.md § Industry lens (BL-084).
     reach,       ///< Body-level commercial reach: bodies connected via the corp's trade_route entries, tiered by recency. BL-011. See LENSES.md § Reach lens.

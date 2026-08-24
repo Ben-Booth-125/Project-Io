@@ -128,7 +128,7 @@ rather than a floating thumbnail. The minimap box is three tiers: **title bar**
 │   [ inset canvas ]      │   ← the zoom-out neighbour, drawn at reduced scale
 │                         │
 ├─────────────────────────┤
-│ [Co][Ctr][Rs][Mk][Pop][Op][Pr][Cn] │ ← lens mode bar: 8 glyph buttons
+│ [Co][Ctr][Rs][Mk][Pop][Cn]         │ ← lens mode bar: 6 glyph buttons
 └─────────────────────────┘
 ```
 
@@ -155,15 +155,19 @@ The lens toggles live on the minimap (BL-093, Selection element redesign + lens
 strip on the minimap) as a **lens mode bar** running along the bottom of the
 minimap box, under the inset canvas.
 
-The bar is a single row of **8 lens glyphs**: **Corp, Country, Resource,
-Market, Population, Opportunity, Production, Continent** — single-select with a
-null state (clicking the active glyph clears the lens). This is a curated subset
-of the full lens family in [LENSES.md](LENSES.md); **Scarcity** and **Industry**
-are keyboard-cycle only, joining **Supply**, **Reach** and **Supply-routes** off
-the strip — the off-strip status is purely a width call, not a data gate. The
-**resource/good selector** — needed by the Resource, Market and Scarcity lenses
-— lives in the **on-canvas lens legend** (BL-134, legend-hosted selector; see
-below), so the bar carries glyphs only.
+The bar is a single row of **6 lens glyphs**: **Corp, Country, Resource,
+Market, Population, Continent** — single-select with a null state (clicking the
+active glyph clears the lens). This is a curated subset of the full lens family in
+[LENSES.md](LENSES.md); **Scarcity** and **Industry** are keyboard-cycle only,
+joining **Supply**, **Reach** and **Supply-routes** off the strip — the off-strip
+status is purely a width call, not a data gate. The **resource/good selector** —
+needed by the Resource, Market and Scarcity lenses — lives in the lens chrome
+region, not on this bar, so the bar carries glyphs only.
+
+The row is sized by the roster, not by a written count: `draw_overlay_controls`
+deduces the array extent, so a lens leaving the bar re-numbers the rest with
+nothing to keep in step. The bar was eight wide before Opportunity and Production
+were retired (LENSES.md § Rung applicability).
 
 The bar is `draw_overlay_controls(ui, x, top_y, w)` in `src/ui/overlay.hpp`,
 called from the minimap block in `src/core/app.cpp` rather than from a
@@ -249,8 +253,9 @@ canvas holds the primary slot; the minimap always renders the default framing.
 
 ## Open questions
 
-- **Lens bar width ceiling.** Eight glyphs fit the bar without widening the
-  minimap or adding a second row. A *ninth* on-screen lens reopens the question.
+- **Lens bar width ceiling.** Eight glyphs fitted the bar without widening the
+  minimap or adding a second row, so the six it now carries have room to spare. A
+  *ninth* on-screen lens reopens the question.
 - **Circumplanetary framing** for a planet with many vs. zero moons — how much
   local space to show, and at what scale, is for `CIRCUMPLANETARY.md`.
 - **Overlays.** Does the minimap mirror supply routes / units on the canvases,
@@ -264,5 +269,5 @@ canvas holds the primary slot; the minimap always renders the default framing.
 - `SOLAR.md`, `CIRCUMPLANETARY.md`, `PLANETARY.md` — the three rungs.
 - `LAYOUT.md` — placement in the shell.
 - `LENSES.md` — the full lens family, each mode's surface and key; the minimap
-  bar surfaces an 8-lens curated subset of it.
+  bar surfaces a curated subset of it.
 - `SELECTION.md` — the Selection element (BL-093).

@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*146 entries — 27 gameplay · 24 canvas · 15 lens · 47 ledger · 33 chrome.*
+*144 entries — 27 gameplay · 24 canvas · 13 lens · 47 ledger · 33 chrome.*
 
 ---
 
@@ -874,12 +874,13 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Valid when:**
 - A bar lens must currently be active — with no lens active there is no highlighted glyph and this press does not exist.
 - Selecting a different lens is an ordinary switch, not a clear; only re-clicking the active one clears.
+- The bar carries six glyphs — Corporation, Country, Resource, Market, Population, Continent. Opportunity and Production were bar lenses until BL-604 retired both; a press on either no longer exists, and neither is reachable by the keyboard cycle.
 
 **Expected output.** The canvas returns to plain terrain (overlay_mode::none) — the state the campaign opens in. All lens tints, marks, and keys disappear. Always-on chrome survives, now at FULL strength rather than the 0.45 a lens attenuates it to (BL-520): the substrate grain and cover pattern that texture the ground, the player-identity tile wash and outline, the player's home ring and HQ star, selection outlines, and building/unit markers are not lens-dependent. Pointer clicks revert to resolving the lowest drawn entity (marker, else tile), routing to the Tile Ledger.
 
 **Reason to select.** Return to the unskinned terrain read — when the current lens's tint is obscuring terrain, markers, or colours you need, or when a plain click should select the thing under the pointer rather than the lens's unit of meaning.
 
-### `lens.continent` — Minimap lens bar, slot 8 (the two-interlocking-plates-split-by-a-diagonal-seam glyph)
+### `lens.continent` — Minimap lens bar, slot 6 (the two-interlocking-plates-split-by-a-diagonal-seam glyph)
 
 **Press.** Single left-click on the Continent glyph in the lens bar.
 
@@ -963,19 +964,6 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Which market does a tile clear against, and where do market boundaries fall? Decide which catchment to build in (your output sells to the nearest centre) and read per-body prices on the Circumplanetary rung to pick where a good is dear enough to sell.
 
-### `lens.opportunity` — Minimap lens bar, slot 6 (the open circle with inner plus glyph)
-
-**Press.** Single left-click on the Opportunity glyph in the lens bar.
-
-**Valid when:**
-- Always pressable; Planetary-only.
-- The economy must have ticked so market prices have diverged from base — before that the surface reads flat/neutral.
-- Re-clicking while active clears the lens (see lens.clear).
-
-**Expected output.** Per-tile red-to-green value marks (same mark idiom as Population), keyed to each tile's catchment market's demand-gap rank — a body-relative ranking on gap × volume — unmet demand quantity weighted by traded volume, not a price-above-base measure. All tiles of one catchment read uniformly (the market is the unit), so the surface shows blocks per catchment. Tiles with no catchment market keep plain terrain. Key is the red-to-green rank bar. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.
-
-**Reason to select.** Where is demand going unmet, so the market will pay a premium to whoever supplies it? The forward-looking siting lens: green catchments are markets bidding above base — build or route supply there. Reads potential; the Production lens reads what is realised.
-
 ### `lens.population` — Minimap lens bar, slot 5 (the small figure glyph: round head over tapered torso)
 
 **Press.** Single left-click on the Population glyph in the lens bar.
@@ -987,19 +975,6 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** Every buildable tile gets a small per-tile red-to-green value mark keyed by workforce efficiency — the same habitability-to-labour curve the economy applies (full 1.0x efficiency at habitability >= 0.6, ramping down to 0.5x at habitability 0). Tiles keep their terrain hue; the marks carry the signal. A gradient key labelled 'Workforce efficiency' labels the bar's ends 'low' and 'high' (the underlying curve spans 0.5x to 1.0x, but the key does not print the numbers). Note: this is the labour consequence, not raw habitability, and not population density (that lives on the population-centre markers). Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.
 
 **Reason to select.** Where does labour run at full efficiency? Site buildings where the marks read green (habitability >= 0.6 = full workforce), because the same wages buy less output on the red end. The siting complement to Resource's material read.
-
-### `lens.production` — Minimap lens bar, slot 7 (the filled upward triangle over a baseline glyph)
-
-**Press.** Single left-click on the Production glyph in the lens bar.
-
-**Valid when:**
-- Always pressable; Planetary today (a Circumplanetary per-body output badge is specified but owed).
-- The economy must have ticked so buildings have produced and the economy report is populated — otherwise everything reads cold.
-- Re-clicking while active clears the lens (see lens.clear).
-
-**Expected output.** Each producing tile tints on the production ramp (production_colour: red → yellow → green) by its output value this tick (sum of output quantity x resolved price) relative to the body's producing-tile geometric mean, composited at 0.6 over terrain. Above-mean producers read green, below-mean red; idle, exhausted, or unbuilt tiles produce nothing and stay untinted. Honest caveat: a body of similar producers reads near-neutral — little spread to show. Low-to-high key. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.
-
-**Reason to select.** Where is value actually being made right now? The realised-output counterpart to Opportunity's potential: spot the hot producers worth expanding and the cold ones worth investigating or idling.
 
 ### `lens.reach` — Off the lens bar; currently reuses the convoy glyph (a dedicated glyph is an open TODO)
 
@@ -1031,7 +1006,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Where can a chosen good be extracted? The pre-economy siting lens: find the deposit blobs of iron, copper, etc. before placing extraction. Answers 'where is the iron' by shape; how rich each tile is comes from clicking it.
 
-### `lens.scarcity` — Off the lens bar (dropped in the BL-093 trim to 7-then-8 glyphs); the hollow downward-triangle glyph exists but is not on the strip
+### `lens.scarcity` — Off the lens bar; the hollow downward-triangle glyph exists but is not on the strip. Reached by the keyboard lens-cycle only — an off-strip status that is a width call, never a data gate.
 
 **Press.** No bar press — reachable only via the keyboard lens-cycle (L / Shift+L; those hotkeys are catalogued in the controls family, not here).
 
