@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 179 entries across 2 volume(s).
+One line per session, newest first — 180 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-24 | [The shell gets looked at: a UI pass, then Sprint 17b delivers it (BL-596–BL-604; NR-589–NR-606)](DEVLOG.md) | BL-070 BL-086 BL-376 BL-514 BL-596 BL-597 BL-598 BL-601 BL-603 BL-604 | DEVLOG.md |
 | 2026-08-23 | [Sprint 16 Batch Delivery opens: BL-571/BL-572 ratified, the batch planned, Wave 1 lands (BL-569, BL-575)](DEVLOG.md) | BL-348 BL-349 BL-436 BL-569 BL-570 BL-571 BL-572 BL-573 BL-574 BL-575 BL-576 BL-577 BL-578 BL-579 | DEVLOG.md |
 | 2026-08-23 | [The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575)](DEVLOG.md) | BL-569 BL-570 BL-571 BL-572 BL-573 BL-574 BL-575 BL-576 BL-577 BL-578 | DEVLOG.md |
 | 2026-08-23 | [Housekeeping, and the nation spines go live (BL-568, Sprint N3 slice 1; NR-566–NR-572)](DEVLOG.md) | BL-462 BL-537 BL-542 BL-555 BL-556 BL-558 BL-559 BL-568 | DEVLOG.md |

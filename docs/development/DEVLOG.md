@@ -10,7 +10,184 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Sprint 16 Batch Delivery opens: BL-571/BL-572 ratified, the batch planned, Wave 1 lands (BL-569, BL-575) (2026-08-23, latest)
+## Session — The shell gets looked at: a UI pass, then Sprint 17b delivers it (BL-596–BL-604; NR-589–NR-606) (2026-08-24, latest)
+
+**Runtime:** ~8 h wall-clock (estimated — the four worktree agents alone ran 79–99 min each,
+concurrently). Modes in sequence: Light (the ROADMAP trim) → Review (the shell pass) → Design (the
+nine-item list) → Full, Batch Delivery (Sprint 17b) → Light (Ben's two closing changes).
+
+---
+
+### 1. ROADMAP.md: 1,336 lines → 119
+
+Ben: *"I don't think we need versioned releases right now, but in any case ROADMAP.md should not be
+so verbose."* It had become a devlog with a version number attached — eight done-definitions for
+minors already tagged, per-minor cut findings, the v0.1.0 audit results, superseded status banners.
+All of that is *state*, which DEVLOG/SPRINTS/backlog own.
+
+Item ids came out throughout: since the 2026-08-23 purge the hot backlog carries no `version` field,
+so every `BL-` in the roadmap pointed at nothing queryable. The old text is archived verbatim at
+`archive/ROADMAP-2026-08-24.md` — the done-definitions written at each past cut are the reason to
+keep it.
+
+**NR-589** files the versioning question rather than acting on it, with the observation that
+supports it: item-level versioning *already* ended with the purge, and the nation/province/watch
+lanes have been landing real work under no tag at all.
+
+---
+
+### 2. The shell pass — 31 captures, 13 findings
+
+Ben's plan was: make a save game, load it, bless goldens off it. The save works. **The load does
+not give back the world it took**, and finding that out was the pass's first result.
+
+- The world half is exact — `player_balance` returns bit-identical. But `state_hash` does not
+  round-trip once any econ tick has run, while a world with *zero* ticks does. That localises it:
+  `verify.econ_step` advances `world::current_day_tick` and never `sim_loop`, so the save writes the
+  loop's day (0 under `--verify`) and the load hands it back. The hash is keyed on that day.
+- The visible consequence is the one that matters: the activity fog ages every glimpse against that
+  tick, so **a loaded campaign renders dimmed**. And the comms log is not in the envelope at all, so
+  the dock comes back empty. (**NR-590**, **NR-591**.)
+
+So `shell_pass.lua` stages its own world (`stage_ui_fixture` in `lib.lua`) rather than opening the
+snapshot; `ui_shell_fixture.lua` still writes it and captures *both sides of the round trip*, which
+is where that evidence lives.
+
+The findings, filed **NR-592–NR-602**. The largest:
+
+- **Every date reads 1960.** `campaign_epoch_year` is hard-coded in two headers while
+  `world_params::epoch_year` defaults to 0, and *nothing* under `src/ui` reads that field. On one
+  frame the header said 19 quarters elapsed, the time panel said Jan 1st Q1, and the decision feed
+  said the 13th.
+- **Six of seven gradient lens keys were drawn and buried** under the always-open Selection band,
+  rendering as ghosts at a tenth of their contrast. Only the Continent key had ever been fixed
+  (BL-376); the collision was never generalised, and nothing had captured the other six to notice.
+  I got this one wrong twice before measuring it properly — first cropping to the minimap and
+  reporting the legend missing, then reporting the Population lens keyed nothing.
+- **Nav slot 8's corporations table** draws its name column ~10 px wide, one letter per row. It was
+  also the one rail slot with no `show_panel` hook — so no script could open it and nothing had ever
+  captured it. Direct evidence for the rule the battle-card check states.
+- **`expect_no_clipping` returned "0 records" over 31 visibly-clipping frames.** It only sees
+  draw-list text; the ~524 `ImGui::Text*` sites are clipped by ImGui and invisible to it.
+- **There is no way to save from the UI** — Resume and Exit Game are the whole menu, and BL-070
+  shipped exactly that scope. The gap is an unclaimed seam between two landed items.
+
+Published as an artifact for Ben to comment on, which is how the nine-item list came back.
+
+**Goldens deliberately held** (NR-600): the captures are full frames dominated by the canvas, and
+the pass existed to change several of these surfaces. Blessed once at the sprint's close instead.
+
+---
+
+### 3. Sprint 17b — the shell stops fighting the map
+
+Ben's nine improvements, filed as **BL-596–BL-604** and slotted between Sprints 17 and 18, which is
+also the only place they fit: SPRINTS.md carries a sprint-number ceiling of 18 and a count cap with
+exactly one free slot.
+
+**Batched on Ben's instruction**, and the batch paid for itself: six of the seven waved items touch
+`body_surface_canvas.cpp` or `overlay.cpp`, and the answers genuinely depended on each other — two
+slices each retired an `overlay_mode` value and their strip edits had to be *unioned* at the merge;
+one slice's plate removal and another's country-tint removal were the same three lines of one
+function.
+
+**Four calls went to Ben as an elicitation form and came back the same day.** Three changed the
+shape of the work:
+
+- **The blend stays and is dialled back** — *"just reduce the amount of smearing"*. The smallest of
+  the three options offered, and the best: it turned BL-597 from a redesign into one named constant
+  and **decoupled it from BL-601**, which had been filed as one design with it.
+- **The border is the nation's click target**, making BL-601 the first structure-grain selection in
+  the shell — so it was built as the general case, because BL-603 generalises exactly it.
+- **The province rung dissolves**, so no gesture selects a province without a tile.
+
+**Wave 1 — four `ui-dev` slices in worktrees**, carved by subject rather than by disjoint files:
+the ground (BL-597/601), the markers (BL-596), the lens roster and its chrome (BL-604/602), the
+selection element (BL-598). **Wave 2 — BL-603** in the main session, because the pivot consumes all
+four.
+
+---
+
+### 4. What the work found that nobody went looking for
+
+- **BL-514 is not held — it landed**, 2026-08-22, and it is *what made the land smear*. Its design
+  prose still says "held awaiting Ben's look"; the code says the blend crosses province borders and
+  the edge stroke is gone. So the chain is three rulings and the middle one is the cause, and
+  BL-597 reverses the 2026-08-22 widening rather than the original province-grain design.
+- **BL-086's ambient opportunity read was the Opportunity lens itself** — it closed with *no new
+  code* — so retiring the lens retires it (**NR-603**). Ben asked for the lens to go, not for that.
+- **Four doc fictions.** LENSES.md's rung table claims Circumplanetary/Solar surfaces for Scarcity,
+  Reach and Supply-routes that were never built (Production's retired with its lens); censused
+  mechanically, every lens is Planetary-only except Market and Supply. A fourth was in the routing
+  table — *"a building under the Corporation lens resolves through to its corporation"*, stated
+  since 2026-06-15, never implemented — found because BL-603's check asserted the **documented**
+  behaviour and failed. That one is now implemented; the other three stay as **work**, since
+  authority docs are state-independent (**NR-604**).
+- **Four verify scripts are rotten**, found by the first full sweep anyone has run: two on a stale
+  fixture, one asserting a building at 100% workforce produces output and measuring **0.0**, and
+  `battle_card` dying on `verify.goto_surface()` with no argument — a script that had **never
+  executed** (**NR-606**).
+
+---
+
+### 5. The method lesson, four times in one sprint
+
+**A check that hard-codes a screen coordinate has a shelf life, and two of these were green while
+looking at nothing:**
+
+1. `built_tile_render.lua` was framing open ocean and passing (found by the markers slice).
+2. `border_band.lua` passed in its author's worktree and failed the instant four slices merged.
+3. `lens_structure_pivot.lua` failed its own control twice — once pressing a tile that had a marker
+   on it, once on a point cached before a press that *opened a ledger and narrowed the canvas*.
+4. `selection_accordion.lua` drove the accordion by clicking header rows at measured offsets; when
+   the accordion became a nav those rows stopped existing and it **kept passing**, capturing the
+   same section five times under five different names.
+
+Each fix resolves from the world at the point of use, or — where a coordinate is unavoidable —
+follows every press with an assertion that it *worked*, so a drift fails loudly instead of going
+quiet. Three seams were added to make that assertable: `pointer_target` now reports
+`selection_kind`, `open_panel` and `selection_section`.
+
+---
+
+### 6. Ben's three closing changes
+
+- **Reduce the band on edges facing unclaimed ground** → `k_border_unclaimed_scale = 0.40` on wash
+  *and* stroke, with political winning where both meet (so the depth-0 scan no longer breaks on the
+  first foreign edge) and the stroke resolving per **edge** while the wash inherits per tile.
+- **Widen the time controls to the balance bar's corner** → the top band becomes one row of three
+  tiles sharing a bottom edge. The `- margin` the header carried was the shell's only internal
+  gutter; the bottom band never had one. Free consequence: the extra width let the header fit a
+  RUNWAY field it had been eliding.
+- **The accordion out, a section top nav in** — Ben ruled the accordion in the morning and ruled it
+  out on sight the same day. The numbers are why: five stacked headers spent **169 of the band's
+  258 px** on chrome to leave the open section **89**. The nav spends one frame height. What the
+  accordion was *for* survives as the `i/N` beside the title. It also closes **NR-605** by removing
+  its subject.
+
+---
+
+### Left open
+
+- The four rotten checks (NR-606), `recipe_workforce` first — a building at full workforce producing
+  nothing is either a real economy defect or a stale fixture, and Sprint 17 is about to lean on that
+  area.
+- The three unbuilt lens rungs (NR-604): work, or a ruling that removes them from the design.
+- A glanceable "where is demand unmet" read, if Ben wants one back (NR-603).
+- The Selection band's resting state, still ~90% empty (NR-593). Cheap now that the section machinery
+  exists; what it needs is Ben naming the sections, because naming them is the design.
+- `backlog_lint` reports its fusion check INERT while the hot backlog is empty. Not a defect —
+  an empty file is the intended resting state between sprints — but the wording says "shape has
+  changed", which will read as alarming to whoever sees it next. It resolves itself the moment the
+  next sprint files an item.
+
+**Sprint 16 closed** (v0.1.15 cut) and **Sprint 17b closed, goal met**. Nineteen completed items
+archived to `archive/backlog-complete-2026-08-24.json`; the hot backlog is empty, which is this
+convention's resting state between sprints.
+
+---
+
+## Session — Sprint 16 Batch Delivery opens: BL-571/BL-572 ratified, the batch planned, Wave 1 lands (BL-569, BL-575) (2026-08-23)
 
 **Runtime:** ~3 h wall-clock, mode Design then Full (Batch Delivery). Two worktree agents in
 Wave 1 (general-purpose for BL-569, ui-dev for BL-575), run concurrently.
@@ -243,7 +420,7 @@ blocking: `NR-577` (BL-575's unit-visibly-moving gap), `NR-587` (battle-card obs
 
 ---
 
-## Session — The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575) (2026-08-23, latest)
+## Session — The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575) (2026-08-23)
 
 **Runtime:** ~2.5 h wall-clock, mode Corpus then Design. Fan-out: 11 doc-sweep agents in place
 (disjoint files), one gap-map agent; main session took the rules, CLAUDE.md, the backlog.
