@@ -375,6 +375,23 @@
       ],
       "status": "open",
       "resolution": null
+    },
+    {
+      "id": "NR-596",
+      "title": "spectator_determinism’s R1 A/B family-coverage check retired — bit-identical RNG-stream determinism is not a property this harness needs to hold",
+      "raised": "2026-08-24",
+      "kind": "decision-taken",
+      "source": "BL-586 slice 2 (Tannery/Weaver/Shipwright): widening resource_count 42->47 shifted an RNG stream and broke the \"seated+spectated reaches every family it reached as a rival\" assertion, unrelated to the new content itself (differentially confirmed: identical failure with recipes.lua/economy.lua reverted to pre-slice-2, enum width unchanged).",
+      "what": "The check compared as_seated (family coverage in a seated+spectated 300-tick rollout) against as_rival (the same corp’s coverage as an ordinary rival) and required as_seated >= as_rival. Put to Ben rather than silently patched (per the standing rule against weakening a failing test) or silently left failing. Ruled: bit-identical RNG-stream determinism is not the property this harness needs to prove beyond what R2/R3 already assert — saves carry the actual state, not a replay-from-seed, and occasional randomness is a deliberate strategy lever, not a defect. The check is retired (commented out with the ruling and full provenance trail, not deleted) rather than weakened to pass; the two properties io-standing-rules.md’s BL-409 section actually cites by name (defaults false, no rival’s cadence slot shifts) are untouched and still pass.",
+      "why_it_matters": "io-standing-rules.md’s Determinism & data model section cites spectator_determinism.cpp by name as the harness proving the BL-409 spectator grant’s two load-bearing properties. This ruling narrows what that citation is understood to guarantee — worth a standing-rules note so a future reader does not assume EVERY assertion in that file is load-bearing.",
+      "options": [],
+      "recommendation": "Add a one-line clarifying note to io-standing-rules.md’s BL-409 paragraph: the harness proves the two named properties (default-false, no cadence-slot shift), not RNG-stream-identical behavioural outcomes across a content change — that expectation was explicitly ruled out 2026-08-24.",
+      "files": [
+        "tools/verify/spectator_determinism.cpp",
+        ".claude/rules/io-standing-rules.md"
+      ],
+      "status": "open",
+      "resolution": null
     }
   ]
 }
