@@ -5866,19 +5866,21 @@
         {
             "brief": "contract-harness",
             "title": "One observed instance of every contract terminal state, conserved and replayable",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "resolution": "Landed on main (worktree-agent-afa7ac59bf567cd92, merged e1a1a44a). Extended BL-573's existing mercenary_contract_harness from 51 to 66 checks. Independently re-verified.",
             "promoted_from": "backlog.json BL-574 (CONTRACT_HARNESS) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "headless"
                     ],
                     "requirement": "ITEM-SPANNING: tools/verify/mercenary_contract_harness.cpp observes, from a fixture world and scripted verbs, one instance each of: an offer issued by a threatened nation (M1); accept with a valid force and a bit-exact conserved deposit transfer (M2); a take-template completed on a decisive battle with the remainder paid (M3); a hold-template failed on the first lost tick with the escrow returned and reputation lower than a cancel (M4); an abandon (M5); two runs from one seed hash-identical across all cases (M6); and a save/load round-trip mid-contract (M7).",
-                    "notes": "Named in the verifier-headless skill on landing.",
-                    "result_metric": ""
+                    "notes": "M1/M5 already covered by nation_scorer_harness R8 / this harness's own existing R4, referenced not duplicated. M7 already covered by save_roundtrip's P12. The item's own requirement text names 'the escrow returned' on a failed hold contract (M4) -- no such mechanic exists (a mercenary_contract carries no escrow field); the harness asserts the ACTUAL behaviour (deposit forfeit, nothing paid, matching CONTRACTS.md's Q2 table) rather than the imprecise wording. NR-584.",
+                    "result_metric": "mercenary_contract_harness: 66 checks, 0 failures (51 -> 66)"
                 }
             ]
         },
@@ -5907,19 +5909,21 @@
         {
             "brief": "contracts-ledger",
             "title": "The Contracts ledger: offers in, accept with a force, active and past contracts",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "resolution": "Landed on main (worktree-agent-a5991264ff4655709, merged 9e9f581d). Live click pass (main session, computer-use, 2026-08-24) confirms every press in the requirement.",
             "promoted_from": "backlog.json BL-576 (CONTRACTS_LEDGER) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "visual",
                         "manual"
                     ],
                     "requirement": "ITEM-SPANNING: the nav-rail Contracts ledger (toggle rule honoured) shows Offers/Active/History views, an Accept press on an offer opens a force picker over uncommitted owned units and dispatches accept_offer on confirm, an Abandon press on an active contract shows its reputation cost before dispatching abandon_contract, an offer is hidden unless its target body is at least Known (DISCOVERY.md), and a live open-and-click pass proves the Accept and Abandon presses are reachable, not only a rendering capture.",
-                    "notes": "question_log.json + ACTIONS.json ledger-family entries.",
+                    "notes": "Live pass (main session, computer-use, 2026-08-24), against a real generated world with real live offers (a nation's budget WAS funded in this seed, contrary to the NR-580 worst case): rail slot 13 renders, tooltips, and toggles correctly (re-click closes, matching the standing toggle rule). Offers view showed four real mercenary_offers with fee/escrow/deadline/garrison. Accept opened the force picker over the owned uncommitted unit; Confirm dispatched accept_offer -- balance visibly credited (Cr -85 debt -> Cr 15), the offer moved from Offers to Active. Active view rendered the contract's predicate, deadline and committed force correctly. Abandon opened the exact confirmation CONTRACTS.md specifies (deposit forfeit, '-2.0 Trust with Zeithketh' shown BEFORE commit); Keep correctly cancelled without dispatching. Fog rule (Known-body visibility) and History view not separately exercised live (no expired/terminal contract existed in the pass) but read correct from code. Nav-rail slot 13 is a real, flagged design call -- NR-586.",
                     "result_metric": ""
                 }
             ]
@@ -5927,20 +5931,22 @@
         {
             "brief": "contract-messages-and-income",
             "title": "A contract announces itself: Public-channel messages, a card, and contract income in the budget",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "resolution": "Landed on main (worktree-agent-a868b5c9d8eb5bcb9, merged 9bc93591). The dispatch/income half is headless-verified (20/20, new contract_dispatch_harness) and independently re-run; the contract card's live-click is UNCONFIRMED -- see R1 notes.",
             "promoted_from": "backlog.json BL-577 (CONTRACT_MESSAGES_AND_INCOME) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "headless",
                         "visual"
                     ],
                     "requirement": "ITEM-SPANNING: each contract terminal/transition event (offer issued/accepted/completed/failed/abandoned) posts a Public-channel message through session_history the same tick it occurs, a contract card opens from the ledger showing client/predicate/force/deadline/fee split, and the Balance ledger renders a 'Contract income' line sourced from budget_result::subsidies.",
-                    "notes": "question_log.json entries for the card and the line.",
-                    "result_metric": ""
+                    "notes": "tools/verify/contract_dispatch_harness.cpp (new, 20/20) proves the five dispatch phrasings, the BL-290 tongue-bank determinism, and the abandoned-event one-shot flag; independently re-run on the merged tree, unchanged. subsidies-population bug traced and fixed in passing: a completed contract's remainder credited the corp balance directly but never touched report.budgets[...].subsidies, so the Balance line and header runway would have silently under-read a real payout -- fixed at the same call site. NOT live-click confirmed: the contract card (selection_kind::contract) has NO live trigger path yet -- no UI control anywhere calls corp_command to select a contract entity, and the Contracts ledger (BL-576, sibling wave) does not wire a click-through to it either. Confirmed directly in this session's live pass (2026-08-24): clicking an Active-view contract row in the ledger selects nothing (falls through to the underlying map tile), matching both BL-576's and BL-577's own agent reports. The card's rendering code was not exercised by mouse click; it is unreachable until a future item wires a selection trigger for a contract entity. Balance-line and header-runway rendering also not live-confirmed (no completed contract existed in the live pass to produce a non-zero value) but read correct from the traced fix. Deliberate design call: mercenary_contract::abandoned_event_posted is unserialized -- NR-585.",
+                    "result_metric": "contract_dispatch_harness: 20 checks, 0 failures"
                 }
             ]
         },

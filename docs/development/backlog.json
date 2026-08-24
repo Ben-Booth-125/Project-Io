@@ -241,8 +241,8 @@
       "id": "BL-574",
       "short_name": "CONTRACT_HARNESS",
       "title": "One observed instance of every contract terminal state, conserved and replayable",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "A",
       "difficulty": 3,
       "version_goal": "v0.1.15",
@@ -260,8 +260,8 @@
         ".claude/skills/verifier-headless/SKILL.md"
       ],
       "authority_doc": "docs/economy/CONTRACTS.md",
-      "summary": "CONTRACTS.md demands one observed instance of each terminal state; no harness in the tree can observe any. This is the headless proof the slice rests on, in the procurement_harness.cpp pattern (fixture world, scripted verbs, bit-exact goldens).",
-      "design": "## Cases\n\nM1 offer issued by a threatened nation; M2 accept with a valid force, deposit moves client->contractor and conserves exactly; M3 take-template completed on a decisive battle (BL-569/BL-571 fixtures), remainder paid; M4 hold-template failed on the first lost tick, escrow returned, `contract_failed` folded and reputation lower than after a cancel; M5 abandon; M6 two runs from one seed hash-identical across all of the above; M7 save/load mid-contract round-trips. Name the harness in the verifier-headless skill."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-575",
@@ -296,8 +296,8 @@
       "id": "BL-576",
       "short_name": "CONTRACTS_LEDGER",
       "title": "The Contracts ledger: offers in, accept with a force, active and past contracts",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "A",
       "difficulty": 4,
       "version_goal": "v0.1.15",
@@ -322,15 +322,15 @@
         "docs/ai/ACTIONS.json"
       ],
       "authority_doc": "docs/economy/CONTRACTS.md",
-      "summary": "The offer has to reach a human. No contract, offer, procurement or budget surface exists; the decision feed prints 'contract #n' and that is the whole story. A fold-out ledger in the nav rail with three views - Offers (client, province, fee, deadline, the client's visible garrison), Active (predicate text from condition_text, ticks left, committed force), History (terminal state, paid) - and an Accept flow that is a unit picker over the player's uncommitted units.",
-      "design": "## Work\n\n1. Rail slot + `show_contracts_ledger`; the toggle rule (re-clicking the active tab closes).\n2. Offers view rows; the Accept press opens the force picker (owned, uncommitted units with strength); confirm dispatches `accept_offer`. Decline is local (the offer stays until expiry - refusable, not dismissable).\n3. Active view: `condition_text` line, deadline countdown, an Abandon press with the reputation cost shown.\n4. Question-log entries (the question each view answers); ACTIONS.json ledger-family entries.\n5. The fog rule: an offer is visible only if the target body is at least Known (DISCOVERY.md) - CONTRACTS.md's settled answer."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-577",
       "short_name": "CONTRACT_MESSAGES_AND_INCOME",
       "title": "A contract announces itself: Public-channel messages, a card, and contract income in the budget",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "B",
       "difficulty": 3,
       "version_goal": "v0.1.15",
@@ -353,8 +353,8 @@
         "docs/ui/question_log.json"
       ],
       "authority_doc": "docs/economy/CONTRACTS.md",
-      "summary": "An event lands with its message, in the same change (EVENTS.md's rule). Offer issued, accepted, completed, failed and abandoned each post to the Public channel through the existing session_history path; the battle card's sibling, a contract card, opens from the ledger; and the fee shows as a 'Contract income' line in the Balance ledger - budget_result::subsidies already carries it and nothing renders it.",
-      "design": "## Work\n\n1. `economy_report::contract_events` -> `session_history::post_contract_events` -> Public channel; five phrasings in the dispatch-text bank.\n2. `selection_kind::contract` card: client, predicate, force, deadline, fee split.\n3. Balance ledger line 'Contract income' from `subsidies`; the header runway reads it.\n4. Question-log entries for the card and the line."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-578",

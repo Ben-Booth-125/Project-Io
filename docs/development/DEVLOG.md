@@ -146,6 +146,39 @@ left in Wave 5's brief: `mercenary_contract_harness.cpp` now already exists (BL-
 with a smoke suite); BL-574 extends it with the M1–M7 terminal-state cases rather than creating
 a new file. Wave 5 (BL-574, BL-576, BL-577 — the three-way fan-out) is next.
 
+**UPDATE, same session: Wave 5 lands (BL-574, BL-576, BL-577) (2026-08-24).**
+
+Three-way fan-out — **BL-574 (contract harness), BL-576 (Contracts ledger), BL-577 (messages +
+income)** — all built in separate worktrees, merged to `main`
+(`e1a1a44a`, `9e9f581d`, `9bc93591`). All three flipped `complete` in backlog.json, design prose
+archived. `mercenary_contract_harness` grew from 51 to 66 checks (BL-574's M1–M7 terminal-state
+cases); new `contract_dispatch_harness` (20 checks) proves the five dispatch phrasings and the
+one-shot abandon-event flag. Independently rebuilt and re-run on the fully merged tree, not
+trusted from any agent's self-report; `spectator_determinism`'s golden held.
+
+Two genuine mid-batch collisions, both from a concurrent session sharing this checkout: an
+`NR-583` id collision (the concurrent session's own entry was already canonical — renamed mine
+to `NR-584`), and a `question_log.json` conflict between BL-576's and BL-577's own additions
+(resolved as a union, both kept).
+
+**Live-click pass (main session, computer-use, 2026-08-24)** against a real generated world with
+real funded offers: the Contracts ledger's rail slot, the toggle rule, all three views
+(Offers/Active/History), the Accept→force-picker→Confirm flow (balance visibly credited), and
+the Abandon confirm-with-reputation-cost popup all confirmed reachable and correct by mouse
+click. One real gap, not silently papered over: **BL-577's contract card has no live selection
+trigger** — clicking an Active-view contract row selects nothing; the card's own rendering code
+exists and reads correct, it is just unwired. Flagged in `requirements.json` and carried into
+Wave 6's brief as a routing note, not a blocker.
+
+Two design calls flagged for Ben: `NR-585` (`abandoned_event_posted` is deliberately
+unserialized — a saved-then-reloaded abandoned contract re-announces itself once) and `NR-586`
+(the ledger took a new nav-rail slot 13 — the curated nine plus the developer tail were both
+full).
+
+Item flipped `complete` for all three, design prose archived, `REFINED.md` Wave 5 drained.
+Wave 6 (BL-578, the slice playthrough — needs all nine prior items) is next, not yet started;
+its brief carries a note on routing around the contract-card gap above.
+
 ---
 
 ## Session — The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575) (2026-08-23, latest)

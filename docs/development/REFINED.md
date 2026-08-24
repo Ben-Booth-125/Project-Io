@@ -103,27 +103,30 @@ same discipline as NR-579/580's placeholders, revisit at playtest.
 
 ---
 
-### Wave 5 (after BL-573; BL-576 also needs BL-575)
+### Wave 5 — DONE (2026-08-24)
 
-#### BL-574 — CONTRACT_HARNESS
-Requirements: § contract-harness. Files: `tools/verify/mercenary_contract_harness.cpp` —
-**this file already exists** (BL-573 created it with an accept/evaluate/pay-or-fail smoke
-suite); extend it, do not replace or duplicate it.
-**Consumes:** `mercenary_contract` + verbs (BL-573, landed). One task: M1–M7 cases per the item
-design.
+**BL-574 (contract harness), BL-576 (Contracts ledger), BL-577 (messages + income)** all landed
+and merged to `main` (worktree-agent-afa7ac59bf567cd92, worktree-agent-a5991264ff4655709,
+worktree-agent-a868b5c9d8eb5bcb9 — commits `e1a1a44a`, `9e9f581d`, `9bc93591`). All three
+`complete` in backlog.json, design prose archived. Two genuine mid-batch collisions, both from a
+concurrent session sharing this checkout (a review-queue purge and a Sprint 32 branch merge
+landing on `main` between waves): an `NR-583` id collision (renamed to `NR-584`) and a
+`question_log.json` conflict between BL-576's and BL-577's own additions (resolved as a union,
+both kept). `mercenary_contract_harness` reached 66 checks; new `contract_dispatch_harness`
+(20 checks); all independently re-verified on the merged tree, `spectator_determinism`'s golden
+held.
 
-#### BL-576 — CONTRACTS_LEDGER
-Requirements: § contracts-ledger. Files: `src/ui/contracts_ledger.{hpp,cpp}`, `nav_pane.cpp`,
-`ui_state.hpp`, `src/core/app.cpp`. **Consumes:** `mercenary_contract`/offers (BL-573,
-BL-572), the unit-summary `committed` field stub (BL-575). Tasks: rail slot + toggle rule;
-Offers/Active/History views; Accept force-picker flow; Abandon press; question_log +
-ACTIONS.json; live click pass.
-
-#### BL-577 — CONTRACT_MESSAGES_AND_INCOME
-Requirements: § contract-messages-and-income. Files: `session_history.cpp`,
-`battle_dispatch_text.cpp`, `selection_panel.cpp`, `balance_ledger.cpp`, `header_panel.cpp`.
-**Consumes:** `mercenary_contract` events (BL-573). Tasks: five dispatch-text phrasings +
-Public-channel post; contract card; Balance "Contract income" line from `subsidies`.
+**Live-click pass (main session, computer-use, 2026-08-24)** against a real generated world
+with real live offers (a funded nation, contrary to NR-580's worst case): the Contracts
+ledger's rail slot, toggle rule, all three views, the Accept→force-picker→Confirm flow (balance
+visibly credited), and the Abandon confirm-with-reputation-cost popup all confirmed reachable
+and correct by mouse click. **BL-577's contract card was NOT reachable** — no UI control
+anywhere calls a selection trigger for a `mercenary_contract` entity, confirmed directly by
+clicking an Active-view contract row (it selects nothing). The card's rendering code exists and
+reads correct, but is unwired; a future item needs to add that trigger before it can be
+live-verified. Two design calls flagged, not blockers: `NR-585` (`abandoned_event_posted` is
+deliberately unserialized) and `NR-586` (the ledger took a new nav-rail slot 13 — the curated
+nine plus the developer tail were both full).
 
 ---
 
@@ -133,6 +136,12 @@ Public-channel post; contract card; Balance "Contract income" line from `subsidi
 Requirements: § mercenary-slice-playthrough (R1–R4). Files: `scripts/verify/mercenary_slice.lua`,
 `ROADMAP.md`, `sprints.json`, `MANUAL.md`. One task: the six-capture `--verify` script, a live
 playthrough, the flag-off determinism check, then the v0.1.15 cut.
+
+**Known gap to route around, not silently paper over:** the design's "a completed contract"
+capture likely meant the contract CARD (BL-577), which has no live trigger yet (Wave 5's own
+note, above) — the ledger's History view is the reachable substitute for "a completed contract"
+on screen. Either capture History instead, or treat wiring a selection trigger for
+`mercenary_contract` as this item's own scope addition if the card specifically is wanted.
 
 ---
 
