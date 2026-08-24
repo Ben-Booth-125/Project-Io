@@ -668,7 +668,10 @@ First-cut authored gates (`tech_gate.cpp`): `E0-EC-01` unlocks the Toolmaker (BL
 processing facility and a Cr 500 surplus; `E1-EC-01` unlocks the Bessemer Converter (BL-587) on
 already holding `machinery` in stockpile — the Converter's own reagent, not a cash figure, after a
 surplus-only first draft proved satisfiable by any solvent corp regardless of what it had actually
-built (caught by `tech_gate_harness`'s T3 fixture, corrected before landing).
+built (caught by `tech_gate_harness`'s T3 fixture, corrected before landing); `E0-EC-03` unlocks
+`refined_copper` (BL-589) on owning a processing facility and a Cr 400 surplus — the roster's
+widest anachronism before this gate, since `refined_copper` is `any`-band at required depth 0 and
+could be smelted for free on tick one of an ancient campaign with no ancient identity to it at all.
 
 **The readout lives on the corporation dashboard, not the building card** (BL-591, 2026-08-24).
 `corp_reached_depth` gates six places (construction, the recipe switch, the AI scorer, two Build
@@ -688,6 +691,37 @@ accordion and the full-canvas takeover, BL-265's own shared-body pattern):
 
 A rival's reached depth is private by construction, not by an added check: the dashboard only
 ever renders `world::player_entity`, so the question of a rival's card never arises.
+
+---
+
+## The start gate — what a fresh corp actually sees (BL-589, 2026-08-24)
+
+Ben's steer authoring Sprint 17: *"most building types, and most recipes are not buildable on
+game start."* Measured against it: a fresh ancient corp (reached depth 0, no tech earned) saw
+**five** of the Build door's processing groups open, not the "extraction, one food route, one
+fuel route" first cut the item began with — Metal Foundry, Fuel Production, Food Processing,
+Artisan Goods and Construction Materials all offered something on tick one.
+
+**The ruled opening** (Ben, 2026-08-24, the start-gate elicitation form) is wider than that first
+cut, and is now the authoritative shape — not a compromise, a decision:
+
+| Group | Open at tick 0 | Why |
+|---|---|---|
+| Fuel Production | Charcoal Burner, Peat Kiln | A genuine supply-route pair (disjoint raws — R2's own classification), not a duplicate; both stay. |
+| Food Processing | Food Rations, Miller | Both stay — the any-band/ancient pair is not narrowed. |
+| Artisan Goods | Potter & Weaver, Glassworks | Left open — an early corp may sell trade goods without earning anything. |
+| Construction Materials | Potter's Kiln, Stonemason, Sawmill | Left open — BL-586's slice-1 buildings are foundational, not earned content. |
+| Metal Foundry | *(nothing — the one closure)* | `refined_copper` gated by `E0-EC-03`; see § Chain depth's gate table. |
+
+**Only Metal Foundry closes**, and only because `refined_copper` (`any`-band, required depth 0)
+was the roster's widest anachronism — free industrial-grade copper smelting on turn one of a 0 CE
+campaign, with no ancient identity to it. The any-band depth exemption itself is **not** narrowed
+by this ruling; every other `any`-band recipe (Food Rations included) is deliberately untouched.
+
+Guard: `tools/verify/chain_depth.cpp`'s **G5** row asserts the ruled opening exactly — every
+recipe outside the one deliberate lock matches its ruled open/closed state, `refined_copper`
+reads `tech_locked` at tick 0, and `E0-EC-03` genuinely resolves (not a permanent orphan) once its
+own authored predicate is met.
 
 ---
 

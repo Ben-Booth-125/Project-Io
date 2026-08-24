@@ -6221,6 +6221,56 @@
                     "result_metric": "7 resource_type entries authored (3 backfilled, 4 new)"
                 }
             ]
+        },
+        {
+            "brief": "start-gate-audit",
+            "title": "A fresh ancient corp sees a stated, ruled opening — not an accidental one",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-589 (START_GATE_AUDIT) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (G5)"
+                    ],
+                    "requirement": "ITEM-SPANNING: measure what a fresh ancient corp (reached depth 0, no tech earned) can actually place, get Ben’s ruling on which of it should stay open versus be earned (the item’s own “state the call, do not let it stand as a default” instruction), then assert the ruled opening exactly in chain_depth — not a narrower default this session might have preferred.",
+                    "notes": "Measured via a live-Lua probe (temporary CMake target, built/run/deleted): five processing groups open at tick 0 (Metal Foundry via the any-band escape, Fuel Production, Food Processing, Artisan Goods, Construction Materials), wider than the item’s own “extraction, one food, one fuel” first cut. Elicitation form put five concrete calls to Ben; the ruling closed only Metal Foundry’s refined_copper (via a new tech gate, E0-EC-03) and left every other group as measured. chain_depth’s new G5 row: 4/4 pass — the ruled open/closed state matches exactly, refined_copper reads tech_locked at tick 0, and E0-EC-03 genuinely resolves (not a permanent orphan) once its own predicate is met.",
+                    "result_metric": "1 recipe newly gated (refined_copper); 4 groups left open as ruled; 4/4 G5 assertions"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: full tree build",
+                        "headless: tech_gate_harness",
+                        "headless: tech_effect_union_harness",
+                        "headless: construction_gate_harness",
+                        "headless: construction_harness",
+                        "headless: corp_ai_harness",
+                        "headless: recipe_switch_harness",
+                        "headless: price_band_harness",
+                        "headless: save_roundtrip",
+                        "headless: determinism_harness",
+                        "headless: spectator_determinism"
+                    ],
+                    "requirement": "The new gate (E0-EC-03) integrates cleanly with the whole tech-gate/depth-gate machinery BL-588 built — no regression to any existing gate, the recipe-unlock filter, or determinism.",
+                    "notes": "Full tree build (every target, zero errors) and 11 harnesses all clean. spectator_determinism’s golden held — no re-bless needed (the new gate’s predicate is not satisfied in that harness’s scenario).",
+                    "result_metric": "0 regressions across 11 harnesses"
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "observation, filed"
+                    ],
+                    "requirement": "A real coverage gap found while authoring this item’s gate, recorded rather than silently left or over-scoped into a fix: tech_gate_harness.cpp only exercises E0-ML-01 directly; the three economy gates (E0-EC-01/E1-EC-01 from BL-588, E0-EC-03 from this item) are proven correct only indirectly, scattered across three other harnesses.",
+                    "notes": "Filed as NR-594 rather than expanded into this item’s scope — no gap has actually bitten (E1-EC-01’s own defect WAS caught, just incidentally by T3 rather than a dedicated row), but the collision surface grows with each gate.",
+                    "result_metric": "1 observation filed (NR-594)"
+                }
+            ]
         }
     ]
 }

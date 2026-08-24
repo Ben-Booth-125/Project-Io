@@ -120,6 +120,37 @@ std::vector<tech_gate> build_gates()
     }
     gates.push_back(converter_practice);
 
+    // E0-EC-03 "Copper Smelting Practice" — unlocks refined_copper (BL-589, the
+    // start-gate audit). Measured: refined_copper is `era = "any"`, required
+    // depth 0 (copper_ore is a raw), so it was the roster's widest anachronism —
+    // an ancient campaign could smelt refined copper for free on tick one, with
+    // no ancient identity to it at all. Ben's ruling (2026-08-24, the start-gate
+    // form): the any-band depth exemption itself stays as-is (Metal Foundry's
+    // other any-band members are not touched), but THIS one recipe earns a tech
+    // gate specifically, the same shape as E0-EC-01/E1-EC-01. Predicate: a
+    // processing facility already stands (any of the five open ancient/any
+    // recipes gets a corp there — non-circular) and a Cr 400 surplus, between
+    // Tool-and-Die's 500 and Converter Practice's stockpile-only bar.
+    tech_gate copper_smelting;
+    copper_smelting.id = "E0-EC-03";
+    copper_smelting.add_effect(tech_effect::unlock(std::string("refined_copper")));
+    {
+        condition c;
+        c.subject    = condition_subject::structure;
+        c.structure  = building_type::processing_facility;
+        c.comparator = condition_comparator::at_least;
+        c.operand    = 1.0f;
+        copper_smelting.condition.all.push_back(c);
+    }
+    {
+        condition c;
+        c.subject    = condition_subject::surplus;
+        c.comparator = condition_comparator::at_least;
+        c.operand    = 400.0f;
+        copper_smelting.condition.all.push_back(c);
+    }
+    gates.push_back(copper_smelting);
+
     return gates;
 }
 

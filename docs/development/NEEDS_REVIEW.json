@@ -340,6 +340,23 @@
       ],
       "status": "open",
       "resolution": null
+    },
+    {
+      "id": "NR-594",
+      "title": "tech_gate_harness only exercises E0-ML-01 — the three economy gates (E0-EC-01/02/03) are proven live but not covered by a dedicated T-row",
+      "raised": "2026-08-24",
+      "kind": "observation",
+      "source": "Measured while authoring BL-589 (start-gate audit): tech_gate_harness.cpp's full T1-T7 suite only names \"E0-ML-01\" (the original garrison gate).",
+      "what": "BL-588 authored E0-EC-01 (Toolmaker) and E1-EC-01 (Bessemer Converter); BL-589 added E0-EC-03 (refined_copper). None of the three has its own T1-style existence/predicate-isolation/determinism coverage the way E0-ML-01 does — they are proven correct only indirectly: tech_effect_union_harness exercises the unlock_recipe ARM generically, chain_depth's G5 row proves E0-EC-03 specifically resolves under its own predicate, and the full-suite pass (construction_gate_harness, corp_ai_harness, etc.) never regressed. That is real coverage, but it is scattered across three files rather than living in the one harness whose whole job is this table.",
+      "why_it_matters": "If a future edit to any of the three gates' predicates breaks its intended isolation (e.g. E0-EC-01's structure condition accidentally also satisfies E1-EC-01), nothing named after this file catches it directly — same failure class E1-EC-01's own surplus-only first draft was caught by (T3's incidental collision, not a dedicated E1-EC-01 test).",
+      "options": [],
+      "recommendation": "A follow-on pass extending tech_gate_harness.cpp with T-rows per economy gate (T8-ish for each), or folding them into chain_depth's roster-breadth guard (BL-592) if that is a better home. Not urgent — no gap has actually bitten yet — but worth doing before a fourth gate makes the collision surface bigger.",
+      "files": [
+        "tools/verify/tech_gate_harness.cpp",
+        "src/world/tech_gate.cpp"
+      ],
+      "status": "open",
+      "resolution": null
     }
   ]
 }

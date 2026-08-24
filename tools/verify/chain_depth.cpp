@@ -71,6 +71,8 @@
 #include "world/components.hpp"
 #include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/tech_gate.hpp" // BL-589: the start-gate audit reads recipe_unlocked/advance_tech_gates
+#include "world/world.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -363,6 +365,99 @@ int main()
         check(x.recipe_required_depth(x.recipe_id("deep"))
                   == y.recipe_required_depth(y.recipe_id("deep")),
               "insertion order does not change a recipe's required depth");
+    }
+
+    // --- G5: the start gate — a STATED opening, ruled by Ben (BL-589) ---------
+    //
+    // Measured before this row existed: five processing groups were open to a
+    // fresh ancient corp (Metal Foundry, Fuel Production, Food Processing,
+    // Artisan Goods, Construction Materials), one of them — Metal Foundry —
+    // open ONLY through `refined_copper`, an `any`-band recipe with no ancient
+    // identity at all (required depth 0, so the ladder never touched it).
+    //
+    // Ben's ruling (2026-08-24, the start-gate elicitation form): gate
+    // refined_copper by tech specifically (E0-EC-03); leave every other open
+    // recipe as-is — Food Processing keeps BOTH Food Rations and Miller, Fuel
+    // Production keeps BOTH Charcoal Burner and Peat Kiln (a genuine supply-
+    // route pair, R2's own classification), Artisan Goods and Construction
+    // Materials stay fully open, and the any-band depth exemption itself is
+    // NOT narrowed. So this row asserts the RULED opening exactly — not a
+    // narrower one this session might have preferred — and that the one newly
+    // locked recipe is not a permanent orphan (its gate actually resolves).
+    std::printf("\nG5 - the start gate: the ruled opening, exactly, and nothing stranded\n");
+    {
+        lua_state lua;
+        lua.load("scripts/recipes.lua");
+        lua.load("scripts/economy.lua");
+        recipe_registry reg;
+        reg.load_from_lua(lua);
+        reg.set_era(era_band::ancient);
+
+        world w;
+        const entity_id corp = w.create_entity();
+        w.corporations[corp] = corporation_component{}; // fresh: depth 0, no tech, no balance
+
+        // The ruled opening, by recipe NAME (not display_name — the Smithy's two
+        // recipes share a display_name and must not collide here).
+        static const char* const k_open[] = {
+            "charcoal", "peat_charcoal",                 // Fuel Production
+            "food_rations", "food_rations_milled",        // Food Processing
+            "trade_goods", "glass",                       // Artisan Goods
+            "ceramics_kiln", "stonemason", "sawmill",      // Construction Materials
+        };
+        auto expected_open = [&](const std::string& name) {
+            for (const char* n : k_open)
+                if (name == n)
+                    return true;
+            return false;
+        };
+
+        std::vector<std::string> mismatches;
+        bool saw_refined_copper_locked = false;
+        const int n = reg.recipe_count(building_type::processing_facility);
+        for (int i = 0; i < n; ++i)
+        {
+            const recipe&  rc  = reg.recipe_at(building_type::processing_facility, i);
+            const uint16_t rid = reg.recipe_id(rc.name);
+            const int      required = reg.recipe_required_depth(rid);
+            const bool     depth_ok = !(rc.era == era_band::ancient
+                                        && (required < 0 || required > 0));
+            const bool     placeable = depth_ok && recipe_unlocked(w, reg, corp, rid);
+
+            if (rc.name == "refined_copper")
+            {
+                saw_refined_copper_locked = !placeable;
+                continue; // asserted separately below — it is the one deliberate lock
+            }
+            const bool should_be_open = expected_open(rc.name);
+            if (placeable != should_be_open)
+                mismatches.push_back(rc.name + (placeable ? " is open, ruled locked"
+                                                          : " is locked, ruled open"));
+        }
+        for (const std::string& m : mismatches)
+            std::printf("      MISMATCH: %s\n", m.c_str());
+        check(mismatches.empty(),
+              "every recipe outside the one ruled lock matches the ruled opening exactly");
+        check(saw_refined_copper_locked,
+              "refined_copper is tech_locked at tick 0 (E0-EC-03), the one deliberate closure");
+
+        // Not a permanent orphan: build a corp whose state satisfies E0-EC-03's
+        // own authored predicate (one processing facility, Cr 400+ surplus) and
+        // confirm advance_tech_gates actually earns it and recipe_unlocked
+        // flips — proving the closure is a gate, not a silent dead end.
+        const entity_id tile = w.create_entity();
+        const entity_id bld  = w.create_entity();
+        building_component bc{};
+        bc.tile = tile;
+        bc.type = building_type::processing_facility;
+        w.buildings[bld] = bc;
+        w.corporations[corp].assets.push_back(bld);
+        w.corporations[corp].balance = 500.0f;
+        const int earned = advance_tech_gates(w);
+        check(earned >= 1 && w.has_tech(corp, "E0-EC-03"),
+              "E0-EC-03 resolves once its own authored predicate is met");
+        check(recipe_unlocked(w, reg, corp, reg.recipe_id("refined_copper")),
+              "...and refined_copper is placeable immediately after");
     }
 
     // --- R1: no orphan resources, either direction ----------------------------

@@ -324,3 +324,41 @@ table) to `PRODUCTION.md` (which owns the depth mechanism itself).
    cut outright in the 2026-08-15 playtest rework and never actually built there — corrected to
    the surface this item actually shipped, rather than left claiming coverage for a page that
    does not exist.
+
+---
+
+## Sprint 17 — wave 2 (after wave 1)
+
+#### BL-589 — START_GATE_AUDIT — COMPLETE 2026-08-24
+
+Requirements: `req/requirements.json` § start-gate-audit. Files: `scripts/recipes.lua`,
+`scripts/economy.lua`, `src/world/tech_gate.cpp`, `tools/verify/chain_depth.cpp`,
+`docs/economy/PRODUCTION.md`.
+
+1. **Measured before ruling anything**: a fresh ancient corp (reached depth 0, no tech earned)
+   saw FIVE Build-door processing groups open — Metal Foundry, Fuel Production, Food Processing,
+   Artisan Goods, Construction Materials — not the item's own "extraction, one food route, one
+   fuel route" first-cut guess. Metal Foundry was open only through `refined_copper`, an
+   `any`-band recipe with no ancient identity and no depth gate — the roster's widest anachronism.
+2. **Put five concrete calls to Ben** (elicitation form, per the item's own "state the call, do
+   not let it stand as a default" instruction) rather than picking silently. The ruling: gate
+   `refined_copper` by tech (`E0-EC-03`, owning a processing facility + Cr 400 surplus); leave
+   every other group exactly as measured — Fuel Production keeps both Charcoal Burner and Peat
+   Kiln (a genuine supply-route pair, R2's own classification), Food Processing keeps both Food
+   Rations and Miller, Artisan Goods and Construction Materials stay fully open, and the any-band
+   depth exemption itself is **not** narrowed.
+3. `chain_depth.cpp`'s new **G5** row asserts the ruled opening exactly: every recipe outside the
+   one deliberate lock matches its ruled open/closed state (4/4), `refined_copper` reads
+   `tech_locked` at tick 0, and `E0-EC-03` is confirmed NOT a permanent orphan — it genuinely
+   resolves once a corp meets its own authored predicate.
+4. Full tree build and 11 relevant harnesses all clean (`tech_gate_harness`,
+   `tech_effect_union_harness`, `construction_gate_harness`, `construction_harness`,
+   `corp_ai_harness`, `recipe_switch_harness`, `price_band_harness`, `save_roundtrip`,
+   `determinism_harness`, `spectator_determinism` — golden held, no re-bless needed — and
+   `chain_depth` itself).
+5. **A real coverage gap found and recorded, not fixed**: `tech_gate_harness.cpp` only exercises
+   the original garrison gate (`E0-ML-01`) with dedicated T-rows; the three economy gates
+   (`E0-EC-01`/`E1-EC-01` from BL-588, `E0-EC-03` from this item) are proven correct only
+   indirectly, scattered across `tech_effect_union_harness`, `chain_depth`'s G5, and the
+   full-suite pass. Filed as `NR-594` — real coverage, just not consolidated, and not urgent
+   enough to expand this item's scope over.
