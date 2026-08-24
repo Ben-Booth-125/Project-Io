@@ -497,19 +497,20 @@
         "pillars": ["Trade"],
         "systems": ["Resources"],
         "surfaces": [
-          { "doc": "docs/ui/SELECTION.md", "surface": "Building element — Depth readout (BL-431)" }
+          { "doc": "docs/economy/PRODUCTION.md", "surface": "Corporation dashboard — Production card, Growth track (BL-591)" }
         ],
-        "backlog": ["BL-431", "BL-428"],
-        "requirements": ["production-method-chain-ui"]
+        "backlog": ["BL-428", "BL-591"],
+        "requirements": ["depth-readout-on-dashboard"]
       },
       "walkthrough": [
-        "Single-click a player-owned building -> the Facts column shows Depth reached: <N> / <ceiling>, read from the corp's own completed extraction sites and processing facilities, against recipe_registry::max_depth().",
-        "Pressing 'What's next?' lists every good sitting exactly one depth past the corp's reached depth.",
-        "For each, the goods its recipe still needs that the corp has not reached are called out, so the gap is a shopping list rather than a mystery."
+        "Open the Corporation dashboard and expand the Production card (the ledger column accordion, or the full-canvas takeover — both draw the same shared body).",
+        "The Growth track reads the corp's reached depth (corp_reached_depth, the deepest good ever produced) and names the good that set it.",
+        "Next names every era-allowed recipe whose required depth is exactly reached+1 — the buildings one step past what the corp can place today.",
+        "Needs names every input those recipes need that the corp has never produced — the concrete instruction that turns a lock into a move."
       ],
-      "friction": "Reads the CORP's aggregate reached depth, not a per-building figure — a corp with one deep outlier building and many shallow ones reads as 'reached' at the outlier's depth, which is the intended growth-spine reading (Ben, BL-428 design note) but is worth watching if it proves misleading in play.",
+      "friction": "STALE SURFACE CORRECTED 2026-08-24 (BL-591): this story was originally written 2026-08-15 against the Building element's own Depth readout (BL-431) — cut outright in a playtest rework the same period, per PRODUCTION.md's own note, and never actually built at that surface. Re-pointed to the dashboard readout BL-591 actually shipped, rather than left claiming coverage for a page that does not exist. Corporation-grain only, by design (Ben's ruling) — a rival's reached depth is private and this surface never shows one; the dashboard already only ever renders the player's own corp, so no separate gating was needed.",
       "written": "2026-08-15",
-      "testing": {"mode": "manual", "note": "No headless/visual check yet — a build-time deferral logged in NEEDS_REVIEW.json. Compiles clean under the GUI target; live-app visual read owed."}
+      "testing": {"mode": "manual", "note": "scripts/verify/corp_dashboard.lua's capture-only corp_rollup_production frame confirms the three lines render with real content (a fresh corp: \"Reached depth 0, via Iron Ore / Next: Bloomery / Needs: Charcoal\"). No computer-use access this session for a literal mouse-click pass — the capture drives the identical rollup_body() code path a click reaches, and the fold/expand control itself predates this item (BL-248, already live-verified); the residual literal-click gap is filed as NR-593."}
     }
   ]
 }

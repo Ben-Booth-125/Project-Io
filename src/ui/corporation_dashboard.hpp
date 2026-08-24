@@ -72,12 +72,38 @@ struct corp_rollups
     /// True when the last economy report carried no budget breakdown — the Finance
     /// card says so rather than drawing five zeroes as though they were measured.
     bool budget_measured = false;
+
+    // --- Growth track: how far has this corp's production reached? (BL-591) ---
+    // Lives on the Production card, per Ben's ruling — a corporation-grain fact
+    // (`corp_reached_depth` reads `corporation_component::produced_ever`), not a
+    // per-building one, which is why the 2026-08-15 playtest rework was right to
+    // cut it from the building card even though the idea itself was not the
+    // problem. See PRODUCTION.md § Chain depth — the growth track.
+    int reached_depth = 0; ///< 0 for a fresh corp — it has reached the raws and nothing beyond.
+
+    /// The display name of a good at `reached_depth` the corp has actually
+    /// produced, or empty for a fresh corp that has produced nothing at all
+    /// (`reached_depth` is then trivially 0 with no good to name).
+    std::string reached_good;
+
+    /// Display names of the buildings whose `recipe_required_depth` is exactly
+    /// `reached_depth + 1` — comma-joined, or empty when nothing in the
+    /// era-allowed roster sits at that rung (the corp has already climbed the
+    /// era's whole ladder).
+    std::string next_rung;
+
+    /// Display names of the goods those next-rung recipes need that the corp has
+    /// never produced — comma-joined, or empty when `next_rung` is empty. This is
+    /// the line that turns a lock into an instruction: not just "you can't build
+    /// this yet" but "build a Charcoal Burner first".
+    std::string missing_inputs;
 };
 
 /// Derive the four roll-ups for @p corp. Pure: reads, allocates, returns; touches
 /// neither the world nor the UI state. Exposed so a headless harness can check the
 /// arithmetic without an ImGui context.
-corp_rollups derive_corp_rollups(const world& w, const economy_report& report, entity_id corp);
+corp_rollups derive_corp_rollups(const world& w, const recipe_registry& reg,
+                                 const economy_report& report, entity_id corp);
 
 /// Draw the Corporation dashboard into the shell fold-out column, plus the
 /// full-canvas takeover when one is open. In the column each card rests as a

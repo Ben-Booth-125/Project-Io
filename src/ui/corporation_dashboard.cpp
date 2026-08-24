@@ -208,6 +208,31 @@ int rollup_body(const corp_rollups& r, int card, bool drillable)
         return -1;
     }
 
+    // BL-591: the growth track sits at the TOP of Production, above the
+    // per-building list — a corporation-grain fact (Ben's ruling), shown once
+    // for the whole card rather than repeated per building. Shared between
+    // both hosts (the in-place expansion and the full-canvas takeover) since
+    // this function draws for both — the whole reason rollup_body was
+    // extracted by BL-265.
+    if (card == 0)
+    {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Growth track");
+        if (r.reached_good.empty())
+            ImGui::TextDisabled("Reached depth 0 — nothing produced yet.");
+        else
+            ImGui::Text("Reached depth %d, via %s", r.reached_depth, r.reached_good.c_str());
+
+        if (r.next_rung.empty())
+            ImGui::TextDisabled("At the era's depth ceiling — nothing further to unlock.");
+        else
+        {
+            ImGui::Text("Next: %s", r.next_rung.c_str());
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                               "Needs: %s", r.missing_inputs.c_str());
+        }
+        ImGui::Spacing();
+    }
+
     const std::vector<rollup_item>& items = card_items(r, card);
     if (items.empty())
     {
@@ -234,7 +259,8 @@ int rollup_body(const corp_rollups& r, int card, bool drillable)
 
 } // namespace
 
-corp_rollups derive_corp_rollups(const world& w, const economy_report& report, entity_id corp)
+corp_rollups derive_corp_rollups(const world& w, const recipe_registry& reg,
+                                 const economy_report& report, entity_id corp)
 {
     corp_rollups r;
 
@@ -242,6 +268,79 @@ corp_rollups derive_corp_rollups(const world& w, const economy_report& report, e
     if (cit == w.corporations.end())
         return r;
     r.balance = cit->second.balance;
+
+    // --- Growth track (BL-591): reached depth, the good that set it, what's
+    // next, and what's missing to get there. -----------------------------
+    {
+        const corporation_component& cc = cit->second;
+        r.reached_depth = corp_reached_depth(cc, reg);
+
+        // The good that set the reached depth: the first (ascending resource_type
+        // id — deterministic, BL-406's lesson) produced-ever good at exactly that
+        // depth. A fresh corp (reached_depth == 0, nothing produced) leaves this
+        // empty rather than naming an arbitrary depth-0 raw it has never touched.
+        for (std::size_t ri = 0; ri < resource_count; ++ri)
+        {
+            if (!cc.produced_ever[ri])
+                continue;
+            if (reg.depth_of(static_cast<resource_type>(ri)) != r.reached_depth)
+                continue;
+            r.reached_good = ui::resource_name(static_cast<resource_type>(ri));
+            break;
+        }
+
+        // Next rung: every era-allowed processing recipe whose required depth is
+        // EXACTLY reached_depth + 1. Only processing_facility carries a recipe
+        // (extraction sits at depth 0, no required_depth to ask about), so that
+        // is the whole search space — recipe_required_depth is a recipe property,
+        // not a building_type one, so recipe_at/recipe_count is the right walk.
+        const int target_depth = r.reached_depth + 1;
+        const int n = reg.recipe_count(building_type::processing_facility);
+        std::vector<uint16_t> next_rung_ids; // absolute ids, for the missing-input pass below
+        for (int i = 0; i < n; ++i)
+        {
+            const recipe&  rc  = reg.recipe_at(building_type::processing_facility, i);
+            const uint16_t rid = reg.recipe_id(rc.name);
+            if (rid == no_recipe || reg.recipe_required_depth(rid) != target_depth)
+                continue;
+            next_rung_ids.push_back(rid);
+            if (!r.next_rung.empty())
+                r.next_rung += ", ";
+            r.next_rung += rc.display_name;
+        }
+
+        // Missing inputs: across every next-rung recipe, every input this corp
+        // has never produced — not just the recipe's single deepest input,
+        // since the design's own wording is "the input those recipes need that
+        // the corp has never produced", plain and unrestricted. A recipe at
+        // reached_depth + 1 always has AT LEAST ONE such input by construction
+        // (its deepest one, at depth reached_depth + 1, cannot have been
+        // produced without the corp already having reached that depth) — this
+        // walk also surfaces any shallower input the corp simply hasn't gotten
+        // around to yet, which is real instruction, not noise: "build a
+        // Charcoal Burner" is exactly as actionable as "smelt your first
+        // blooms". Collected once per resource, in resource_type order, so two
+        // recipes needing the same good name it once.
+        if (!next_rung_ids.empty())
+        {
+            std::array<bool, resource_count> named{};
+            for (const uint16_t rid : next_rung_ids)
+            {
+                const recipe* rc = reg.get_recipe(rid);
+                if (!rc)
+                    continue;
+                for (std::size_t ri = 0; ri < resource_count; ++ri)
+                {
+                    if (rc->inputs[ri] <= 0.0f || named[ri] || cc.produced_ever[ri])
+                        continue;
+                    named[ri] = true;
+                    if (!r.missing_inputs.empty())
+                        r.missing_inputs += ", ";
+                    r.missing_inputs += ui::resource_name(static_cast<resource_type>(ri));
+                }
+            }
+        }
+    }
 
     // --- Finance: the five flows, straight from the budget step. -------------
     const auto bit = report.budgets.find(corp);
@@ -313,7 +412,7 @@ void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
     const auto      cit  = w.corporations.find(corp);
     const char*     name = (cit == w.corporations.end()) ? "Corporation" : cit->second.name.c_str();
 
-    const corp_rollups r = derive_corp_rollups(w, report, corp);
+    const corp_rollups r = derive_corp_rollups(w, reg, report, corp);
 
     // ── The folded column: four verdict lines and nothing else ──
     if (ui::foldout_begin("Corporation"))

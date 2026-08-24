@@ -670,6 +670,25 @@ already holding `machinery` in stockpile — the Converter's own reagent, not a 
 surplus-only first draft proved satisfiable by any solvent corp regardless of what it had actually
 built (caught by `tech_gate_harness`'s T3 fixture, corrected before landing).
 
+**The readout lives on the corporation dashboard, not the building card** (BL-591, 2026-08-24).
+`corp_reached_depth` gates six places (construction, the recipe switch, the AI scorer, two Build
+door filters) and, until this item, displayed in none of them — the growth track this whole minor
+is named for was only ever felt as a lock, never seen as a ladder. Ben's ruling: reached depth is
+a **corporation-grain** fact (it reads `corporation_component::produced_ever`, not any one
+building), which is why the 2026-08-15 playtest rework was right to cut the building card's old
+Depth page — the surface was wrong, not the idea. The dashboard's Production card now opens with
+three lines, computed once in `derive_corp_rollups` and shared by both hosts (the in-place
+accordion and the full-canvas takeover, BL-265's own shared-body pattern):
+1. **Reached depth**, and the good that set it — the first (ascending `resource_type` id)
+   produced-ever good found at that depth.
+2. **Next** — the display names of every era-allowed recipe whose `recipe_required_depth` is
+   exactly `reached + 1`, comma-joined.
+3. **Needs** — every input those recipes need that the corp has never produced, comma-joined —
+   the line that turns a lock into an instruction.
+
+A rival's reached depth is private by construction, not by an added check: the dashboard only
+ever renders `world::player_entity`, so the question of a rival's card never arises.
+
 ---
 
 ## The era band — which roster a campaign sees

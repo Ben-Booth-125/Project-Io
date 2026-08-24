@@ -286,3 +286,41 @@ Requirements: `req/requirements.json` § per-building-materials. Files: `scripts
    temporary live-Lua probe confirming the authored `economy.lua` tables actually resolve through
    `load_from_lua` (built, run, deleted — not a committed harness). `spectator_determinism`'s golden
    held — material overrides change nothing `state_hash` folds.
+
+---
+
+#### BL-591 — DEPTH_READOUT_ON_DASHBOARD — COMPLETE 2026-08-24
+
+Requirements: `req/requirements.json` § depth-readout-on-dashboard. Files: `src/ui/corporation_dashboard.{hpp,cpp}`,
+`src/ui/presentation.cpp`, `docs/ui/question_log.json`, `docs/development/user_stories.json`,
+`docs/economy/PRODUCTION.md`. **Authority doc corrected** from the item's original `SELECTION.md`
+(which does not cover the Corporation dashboard — that surface lives in `LAYOUT.md`'s disclosure
+table) to `PRODUCTION.md` (which owns the depth mechanism itself).
+
+1. `corp_rollups` gains four fields (`reached_depth`, `reached_good`, `next_rung`,
+   `missing_inputs`), computed once in `derive_corp_rollups` (now takes `recipe_registry`) and
+   rendered at the top of the Production card by the shared `rollup_body()` — both dashboard hosts
+   (in-place accordion, full-canvas takeover) draw the identical three lines, per BL-265's own
+   shared-body pattern.
+2. **A real pre-existing UI defect found and fixed**, not merely worked around: `ui::resource_name`
+   carried explicit nulls for `charcoal`, `iron_blooms` and `trade_goods_misc` — a "still
+   unauthored" comment left over from BL-286 that had been stale for over a week, since BL-429
+   (2026-08-15) gave all three real producers and consumers. Exactly the kind of good this readout
+   needs to name. Backfilled, plus entries for the four BL-585 goods (`ceramics`, `dressed_stone`,
+   `planks`, `tools`), which would otherwise have rendered `(unnamed resource)` the moment
+   anything named them.
+3. **Render-confirmed, not click-confirmed** (NR-593). `scripts/verify/corp_dashboard.lua`'s
+   `corp_rollup_production` capture — driven by `verify.fold("corp_rollup", 0)`, the identical
+   `rollup_body()` code path a real click reaches — shows the three lines with real content: a
+   fresh corp reads "Reached depth 0, via Iron Ore / Next: Bloomery / Needs: Charcoal". No
+   `computer-use` access this session for a literal mouse-click pass; the fold/expand control
+   itself is not new to this item (BL-248, already live-verified in earlier work), so BL-591 only
+   added content inside an already-reachable surface. Accepted as sufficient per Ben's ruling
+   (2026-08-24), following BL-575's own precedent for shipping with a named residual verification
+   gap rather than blocking.
+4. `question_log.json`'s `corporation_dashboard` entry updated in place (the growth track answers
+   the same "how is my corporation doing" question, not a new one). `user_stories.json`'s US-016
+   — already exactly this intent, but pointed at the Building element's own Depth readout (BL-431),
+   cut outright in the 2026-08-15 playtest rework and never actually built there — corrected to
+   the surface this item actually shipped, rather than left claiming coverage for a page that
+   does not exist.

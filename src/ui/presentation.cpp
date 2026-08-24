@@ -50,12 +50,18 @@ constexpr resource_presentation resource_table[resource_count] = {
     { "Steel",             "Stl", IM_COL32(150, 165, 185, 255) }, // blue-grey alloy
     { "Refined Fuel",      "Fuel",IM_COL32(210, 160,  80, 255) }, // amber fuel
     { "Food Rations",      "Food",IM_COL32(220, 180, 120, 255) }, // warm ration tan
-    // --- Logistics goods (BL-286) — still unauthored; these eight rows are
-    // explicit nulls so presentation_of()'s fallback keeps handling them, and so
-    // a later row can be authored past them without a silent index shift.
-    { nullptr, nullptr, 0 }, // charcoal
-    { nullptr, nullptr, 0 }, // iron_blooms
-    { nullptr, nullptr, 0 }, // trade_goods_misc
+    // --- Ancient intermediates (BL-286/BL-429). STALE COMMENT REMOVED
+    // (BL-591, 2026-08-24): these three were left as explicit nulls with a
+    // "still unauthored" note that predates BL-429 (2026-08-15) giving all
+    // three real producers and consumers — they have been live, produced
+    // goods for over a week with no display name, the exact "(unnamed
+    // resource)" defect this file's own comment on Ordnance already
+    // documents happening once before. Found while authoring the depth
+    // readout (BL-591), which needs to NAME the good that set a corp's
+    // reached depth — charcoal is the ancient chain's very first output.
+    { "Charcoal",           "Chr", IM_COL32( 90,  68,  56, 255) }, // dark burnt-wood brown
+    { "Iron Blooms",        "FeBl",IM_COL32(172, 122,  96, 255) }, // rough smelted rust, between Iron Ore and Steel
+    { "Trade Goods",        "Trd", IM_COL32(200, 172, 112, 255) }, // modest warm gold — a luxury, not a treasure
     // --- Propellant (BL-308). Authored, unlike the eight above: a corp holds it
     // in its (corp, body) pool and the Launchpad burns it, so it reaches the
     // stockpile strips the moment a Chemical Plant runs.
@@ -93,6 +99,13 @@ constexpr resource_presentation resource_table[resource_count] = {
     // distinguishable at a glance — gold for the space road, oxblood for the
     // military one.
     { "Ordnance",           "Ord", IM_COL32(178,  66,  78, 255) }, // oxblood — terminal military good
+    // --- Ancient roster, slice 1 (BL-585/BL-586, 2026-08-24) — authored WITH
+    // the append this time, not left null: the depth readout (BL-591) needs
+    // to name whichever of these a corp reaches next.
+    { "Ceramics",           "Cer", IM_COL32(188, 128,  92, 255) }, // fired terracotta, warmer than raw Clay
+    { "Dressed Stone",      "DStn",IM_COL32(180, 178, 170, 255) }, // paler, worked grey against raw Stone
+    { "Planks",             "Plk", IM_COL32(196, 158, 104, 255) }, // milled wood tan, against Timber's foliage green
+    { "Tools",              "Tool",IM_COL32(158, 148, 128, 255) }, // worked bronze-grey, cooler than Iron Blooms
 };
 
 // Reserved corporation identity colours. Slot 0 is the player's corporation; the
