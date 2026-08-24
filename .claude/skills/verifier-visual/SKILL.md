@@ -23,8 +23,8 @@ Every `scripts/verify/*.lua` (except `lib.lua`) is a runnable check — the list
 **auto-discovered** from the directory, so a newly committed script is available
 without editing this file. The lens / canvas / panel checks form the bulk
 (`corporation_lens`, `country_lens`, `market_lens`, `population_lens`,
-`resource_lens`, `scarcity_lens`, `supply_lens`, `opportunity_lens`,
-`production_lens`; `building_management`, `construction_panel`, `selection_go_to`,
+`resource_lens`, `scarcity_lens`, `supply_lens`;
+`building_management`, `construction_panel`, `selection_go_to`,
 the ledger checks, …). v0.0.8 (Discovery & Intelligence) additions, named here per
 the "authorising a new check = naming it" convention:
 

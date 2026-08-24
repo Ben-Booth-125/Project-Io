@@ -171,7 +171,7 @@
   ],
   [
    "lens.continent",
-   "Minimap lens bar, slot 8 (the two-interlocking-plates-split-by-a-diagonal-seam glyph)"
+   "Minimap lens bar, slot 6 (the two-interlocking-plates-split-by-a-diagonal-seam glyph)"
   ],
   [
    "lens.corporation",
@@ -183,27 +183,23 @@
   ],
   [
    "lens.good_selector",
-   "The on-canvas lens legend — the key box that folds out flush-left of the minimap while the Resource, Market, or Scarcity lens is active. One shared combo (bound to a single shared lens_resource value), not three separate controls."
+   "The lens chrome region — the minimap's header, top right (BL-602). One region hosts the selector and whichever key the active lens draws; the selector sits directly above that key while the Resource, Market, or Scarcity lens is active. One shared combo bound to a single shared lens_resource value, not three separate controls. It is NOT on the minimap's lens bar, which carries glyphs only."
   ],
   [
    "lens.industry",
    "Off the lens bar (trimmed in BL-093 the day it shipped); the factory-silhouette glyph exists but is not on the strip"
   ],
   [
+   "lens.key_toggle",
+   "The lens chrome region's header bar — the minimap's header, top right (BL-602). The bar carries a caret, the key's title, and its row count, e.g. '^ Countries (44)'. Its foot rests on the minimap's top edge and stays there whether the list is open or shut."
+  ],
+  [
    "lens.market",
    "Minimap lens bar, slot 4 (the three-ascending-vertical-bars glyph)"
   ],
   [
-   "lens.opportunity",
-   "Minimap lens bar, slot 6 (the open circle with inner plus glyph)"
-  ],
-  [
    "lens.population",
    "Minimap lens bar, slot 5 (the small figure glyph: round head over tapered torso)"
-  ],
-  [
-   "lens.production",
-   "Minimap lens bar, slot 7 (the filled upward triangle over a baseline glyph)"
   ],
   [
    "lens.reach",
@@ -215,7 +211,7 @@
   ],
   [
    "lens.scarcity",
-   "Off the lens bar (dropped in the BL-093 trim to 7-then-8 glyphs); the hollow downward-triangle glyph exists but is not on the strip"
+   "Off the lens bar; the hollow downward-triangle glyph exists but is not on the strip. Reached by the keyboard lens-cycle only — an off-strip status that is a width call, never a data gate."
   ],
   [
    "lens.supply",

@@ -196,6 +196,14 @@ alphabetical order.
 
 *Demanded by BL-228, BL-230 · `src/ui/hover_card.cpp` · id `hover_card`*
 
+### Lens chrome region (minimap header, top right) — the lens selector and the active lens's key
+
+**Answers:** What do these colours mean, and which good am I asking about?
+
+**Because:** A lens re-skins the whole canvas and the re-skin is meaningless without its key: a nation tint is a colour until the key names the nation, a red-to-green mark is decoration until the key says which end is good. The region earns its space by being the ONLY place any of that lives — selector and key share one home because a lens draws at most one key, so a roster of any size costs exactly this rect and no more. It also earns it by fixing a measured failure rather than tidying a working one: there were TWO legend chromes, and the gradient-bar one was anchored flush-left of the minimap, inside the rect the always-open Selection band occupies. Six of seven keys rendered as ghosts through the band at roughly a tenth of their contrast (NR-601, measured 2026-08-24) — drawn, and unreadable. Only the Continent key escaped, because it alone had been moved to the foreground draw list (BL-376); one of seven was fixed and the collision was never generalised, and nothing had ever captured the other six to notice. So this region is not a tidy: it is how six lenses get a readable key at all.
+
+*Demanded by BL-602 · `src/ui/shell_metrics.cpp`, `src/ui/shell_metrics.hpp`, `src/ui/body_surface_canvas.cpp` · id `lens_chrome_region`*
+
 ### Market Ledger
 
 **Answers:** What is this good worth here, and who is willing to trade it?

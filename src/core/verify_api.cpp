@@ -73,8 +73,9 @@ overlay_mode overlay_from_name(const std::string& s)
     if (s == "corporation") return overlay_mode::corporation;
     if (s == "resource")    return overlay_mode::resource;
     if (s == "population")  return overlay_mode::population;
-    if (s == "opportunity") return overlay_mode::opportunity;
-    if (s == "production")  return overlay_mode::production;
+    // "opportunity" and "production" were names here until BL-604 retired both
+    // lenses. They now take the unknown-name fallback below, so a stale script
+    // captures the plain canvas rather than failing to build.
     if (s == "scarcity")    return overlay_mode::scarcity;
     if (s == "industry")    return overlay_mode::industry;
     if (s == "reach")       return overlay_mode::reach;

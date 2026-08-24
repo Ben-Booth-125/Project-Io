@@ -16,11 +16,11 @@ Glyph shapes live in [ICONS.md](ICONS.md); identity colours live in
 
 ## Roster
 
-The whole `overlay_mode` family at a glance. Bar slots 1–8 are the minimap strip
+The whole `overlay_mode` family at a glance. Bar slots 1–6 are the minimap strip
 order; "off the bar" lenses are reached by the keyboard lens-cycle (`L` /
 `Shift+L`, `0` clears). `canvas_command.cpp` anchors `overlay_mode_count` to the
-last enumerator (`supply_routes` + 1 = 14) with a `static_assert` naming the
-re-anchor rule, so the cycle reaches every lens.
+last enumerator with a `static_assert` naming the re-anchor rule, so the cycle
+reaches every lens and the roster re-numbers itself when one leaves it.
 
 | `overlay_mode` | Bar | Surface (one line) |
 |---|---|---|
@@ -28,9 +28,7 @@ re-anchor rule, so the cycle reaches every lens.
 | `resource` | 3 | Planetary contiguous-deposit flat fill; good selector in the legend |
 | `market` | 4 | Planetary **catchment tint** — one colour per market + city-name key; Circumplanetary price strip |
 | `population` | 5 | Per-tile red→green **value mark** (workforce efficiency) + gradient key |
-| `opportunity` | 6 | Per-tile red→green **value mark** (catchment demand-gap rank) + key |
-| `production` | 7 | Planetary intensity tint, red→yellow→green vs body mean + key |
-| `continent` | 8 | Planetary plate tint + boundary lift + plate-count key |
+| `continent` | 6 | Planetary plate tint + boundary lift + plate-count key |
 | `scarcity` | off the bar | Per-market shortfall blocks + key |
 | `industry` | off the bar | Background-firm plant amber tint + key |
 | `supply` | off the bar | Solar per-convoy lines · Circumplanetary convoy-count badge · Planetary per-tile convoy glyph |
@@ -46,12 +44,12 @@ Identity colours live in `presentation.hpp`; the corporation-identity helper is
 
 The lens bar — on the **minimap** (see [MINIMAP.md](MINIMAP.md)) — presents a
 **curated subset** in this order: **Corporation → Resource → Market →
-Population → Opportunity → Production → Continent**. **Scarcity** and
-**Industry** are off the bar, reached by **keyboard lens-cycle only** — joining
-**Supply**, **Reach** and **Supply-routes**, which do not fit the strip. The
-Continent lens earns its bar slot over the keyboard-only shelf because it answers
-a question the player asks at *first sight* of a body — "why is the land shaped
-like that?" — which is exactly the moment they are looking at the strip.
+Population → Continent**. **Scarcity** and **Industry** are off the bar, reached
+by **keyboard lens-cycle only** — joining **Supply**, **Reach** and
+**Supply-routes**, which do not fit the strip. The Continent lens earns its bar
+slot over the keyboard-only shelf because it answers a question the player asks at
+*first sight* of a body — "why is the land shaped like that?" — which is exactly
+the moment they are looking at the strip.
 
 The campaign opens on **no lens** (`overlay_mode::none`, the plain canvas) — a
 click only updates the Selection element and never re-skins the canvas, so the
@@ -70,24 +68,29 @@ representation intended.
 | **Resource** | — | — | contiguous-deposit flat fill + key |
 | **Market** | — | per-body price strip | catchment tint + city-name key |
 | **Population** | — | — | per-tile value marks, workforce efficiency |
-| **Opportunity** | — | — | per-tile value marks, demand-gap rank |
-| **Production** | — | per-body output-throughput badge | production-intensity tint + key |
 | **Scarcity** *(keyboard-cycle only)* | — | per-body shortfall badge | per-market shortfall blocks + key |
 | **Industry** *(keyboard-cycle only)* | — | — | background-firm plant amber tint + key |
 | **Continent** | — | — | plate tint + boundary lift + key |
 | **Reach** *(keyboard-cycle only)* | connected-body glow | — | connection-list key |
 | **Supply-routes** *(keyboard-cycle only)* | aggregated graph edges | — | lane-list key, log-scaled thickness |
 
-**Per-lens rung notes.** Corporation, Resource, Population,
-Opportunity, Industry, and Continent are **Planetary-only** — their unit of meaning
-(a tile, a building, a deposit, a margin, a background-plant reading, a plate)
-is sub-body and has no coherent inter-body surface. Market and Supply are the genuinely multi-rung lenses (prices per
+**Per-lens rung notes.** Corporation, Resource, Population, Industry and Continent
+are **Planetary-only** — their unit of meaning (a tile, a building, a deposit, a
+background-plant reading, a plate) is sub-body and has no coherent inter-body
+surface. Market and Supply are the genuinely multi-rung lenses (prices per
 body-market; logistics span the ladder). Reach and Supply-routes are body-level
 reads whose natural home is the Solar rung — the connected-body glow and the
-aggregated graph — with the Planetary keys as their per-body read. Production and
-Scarcity each carry a **Circumplanetary per-body badge** (total output / aggregate
-shortfall for the anchor body) — additive passes guarded behind the same
+aggregated graph — with the Planetary keys as their per-body read. Scarcity is
+documented as carrying a **Circumplanetary per-body badge** (the anchor body's
+aggregate shortfall) — an additive pass guarded behind the same
 `overlay_mode`, not changing the Planetary behaviour.
+
+A retired lens takes its coarser rungs with it. Production's Circumplanetary
+per-body output badge was a *different read* from its Planetary intensity tint — a
+body-level throughput total rather than a per-tile comparison — but it was reached
+only by selecting the lens, so with the lens gone there is no control that shows it.
+A body-level output badge that stood on its own would be **new always-on chrome**
+with its own question to answer, not a survivor of the Production lens.
 
 Interaction notes shared by all lenses: lenses are **Planetary-first** in this
 prototype, single-select (one `overlay_mode` at a time). The mode bar lives on the
@@ -96,39 +99,69 @@ Solar/Circumplanetary representations, where specified, are additive render
 passes guarded behind the same `overlay_mode` — they do not change the Planetary
 behaviour.
 
-### Legend placement
+### Legend placement — one chrome home
 
-Every lens legend is keyed off the active `overlay_mode` and drawn in
+**Everything a lens puts on screen beside the canvas lives in one region: the
+minimap's header, top right.** Ben, 2026-08-24 (BL-602, one chrome home): *"This
+selection element for lenses should always fit in the header for the minimap, at
+the top right corner."* The selector and the key share that home, because a lens
+draws **at most one** key — so one region serves the whole roster and there is
+nothing for a new lens to choose between.
+
+This supersedes two earlier rulings on the same region. BL-533 (legend in minimap
+quadrant) moved legends off the canvas into the right chrome column; BL-566
+(legend inside minimap) revised that to put them inside the minimap box. The
+current placement is the minimap **header**.
+
+**The rect.** Same x and width as the minimap (`ui::minimap_rect`), so the two read
+as one stack of chrome flush to the right screen edge; **bottom edge on the
+minimap's top edge**, growing **upward** into the column's otherwise-unused space
+and ceilinged one margin below the time panel's foot. `ui::lens_chrome_rect`
+(`shell_metrics.hpp`) owns that algebra and every legend asks it — no key takes a
+position argument, so there is no second derivation to drift.
+
+**Bottom-anchored, and that is load-bearing.** A box that grows upward from a
+fixed top takes its own header, and therefore its toggle, with it: opening the
+list moved the control a third of the screen and the second press landed on the
+canvas instead of closing it, so the toggle worked exactly once. Anchoring the
+**bottom** keeps the header on the minimap's edge open or shut, and the list reads
+as a drawer sliding up out of the minimap.
+
+Every legend is keyed off the active `overlay_mode` and drawn in
 `body_surface_canvas.cpp`, before the input early-out so it shows in headless
-captures too. Two chromes:
+captures too. Two shapes share the one region:
 
 - **Count-driven keys** — Market, Reach, Supply-routes, whose row list
   grows with the world (markets / lanes present) — share
-  `draw_scroll_list_key`. The box lives in the **right chrome column**, aligned
-  with the minimap (right edge on the screen edge), filling the otherwise-unused
-  space above it, and it is a **dropdown, collapsed by default**
+  `draw_scroll_list_key`. They are a **dropdown, collapsed by default**
   (`ui_state::lens_key_open`; one flag serves every legend, since a lens draws at
-  most one) — so a lens switch never throws a forty-row list over the map (Ben,
-  2026-08-22, NR-503). The box is pinned at its **top** (the time panel's
-  published height, `ui_state::time_panel_h`, is its ceiling) and grows
-  **downward** toward the minimap, so the header — and its toggle — stays in one
-  place open or shut. Rows live in a bounded, wheel/drag-scrolling ImGui child;
-  long labels **wrap** rather than widening the box (Ben: "keep names shorter,
-  and use text wrapping"). The Market lens's good-selector combo sits above the
-  header.
-- **Fixed-height gradient-bar keys** — Resource, Production, Scarcity,
-  Population, Industry, Opportunity, Continent — use the simpler `begin_lens_key`
-  chrome: a box anchored **flush-left of the minimap**, its right edge at the
-  minimap's left edge and vertically centred on it (a `lens_key_anchor` passed
-  from `app.cpp`), reading as a drawer folding out from the minimap's left side.
-  The Continent key alone draws on ImGui's **foreground** draw list with an
-  opaque fill, so it floats over the always-open Selection band rather than
-  being buried by it (BL-376, continent key z-order).
+  most one), so a lens switch never throws a forty-row list across the column
+  (Ben, 2026-08-22, NR-503). The header bar sits at the box's **foot**, on the
+  minimap's edge, carrying a caret, the title and the row count — the count so a
+  collapsed legend still says how much it is hiding. Rows live in a bounded,
+  wheel/drag-scrolling ImGui child; long labels **wrap** rather than widening the
+  box (Ben: "keep names shorter, and use text wrapping").
+- **Fixed-height gradient-bar keys** — Resource, Scarcity, Population, Industry,
+  Continent — use `begin_lens_key` and draw **open**. The collapse affordance
+  belongs only to the lists, because a list that grows with the world is the only
+  thing it was ever for; a key with nothing to overflow gains nothing from a press
+  that hides it.
+
+**Z-order is a placement consequence, not a patch.** The gradient keys used to
+anchor flush-**left** of the minimap, vertically centred — inside the rect the
+always-open Selection band occupies — so they drew as ghosts through the band at
+roughly a tenth of their contrast, and only the Continent key escaped by taking
+ImGui's foreground draw list with an opaque fill (BL-376, continent key z-order).
+One of seven was fixed and the collision was never generalised. In the region the
+keys no longer overlap any window, so every key draws on the shared background
+list and the foreground special case is gone. An **input blocker** over the whole
+region is what remains necessary: a draw list paints pixels and registers no
+window, so without it a press on the legend would also select the tile underneath.
 
 The resource/good selector shared by the Resource, Market and Scarcity lenses is
-one combo bound to `ui_state.lens_resource` (`draw_lens_resource_combo`), hosted
-at the top of the lens legend — not on the minimap bar (BL-134, lens selector in
-legend).
+one combo bound to `ui_state.lens_resource` (`draw_lens_resource_combo`), sitting
+directly above the active key in the same region — never on the minimap bar, which
+carries glyphs only (BL-134, lens selector in legend).
 
 ---
 
@@ -335,8 +368,8 @@ Distinct from the supply horizontal pair and the resource horizontal strata
 (market bars are vertical and outlined).
 
 **Legend.** Strip glyph highlight + tooltip ("Market catchment boundaries") plus a
-city-name swatch key (`draw_market_key`) in the right-column scroll-list chrome,
-the good-selector combo above its header.
+city-name swatch key (`draw_market_key`) in the shared lens chrome region, the
+good-selector combo directly above its header bar (§ Legend placement).
 
 **Interaction notes.** Single-select. The Circumplanetary strip and the Planetary
 surface share the resolved `market_component.price`. Verified by
@@ -357,8 +390,6 @@ resolution owns the stack-walk; this is the per-lens table it reads.
 | **Corporation** | the **owning corporation** of the tile/building | Balance Ledger |
 | **Resource** | the tile's **deposit** profile | Tile Ledger (deposit detail) |
 | **Market** | the body's **market** / the listing under the pointer | Market Ledger |
-| **Opportunity** | the tile (and its best-building margin breakdown) | Tile Ledger |
-| **Production** | the producing **building** under the pointer | Balance Ledger |
 | **Scarcity** | the tile's **market** (the catchment under the pointer) | Market Ledger |
 | **Industry** | the tile (no dedicated ledger route; falls through to the tile) | Tile Ledger |
 | **Supply** | the **route segment / stockpile** under the pointer | Supply surface |
@@ -412,8 +443,8 @@ full-width, equal), the market *vertical* bars, the country shield, and the
 corporation seal-square; and distinct from the resource *pip* diamond (the
 `resource_type` overload) it shares a name with.
 
-**Legend.** Strip glyph highlight + tooltip ("Resource deposits"), plus an
-on-canvas key: the selected resource's identity swatch + name and the note
+**Legend.** Strip glyph highlight + tooltip ("Resource deposits"), plus a key in
+the shared lens chrome region: the selected resource's identity swatch + name and the note
 "filled = deposit present". Flat, not a gradient — the lens shows deposit *shape*.
 
 **Interaction notes.** Planetary-only, single-select. The resource selector is the
@@ -442,8 +473,8 @@ behind `overlay_mode::population` in [`body_surface_canvas.cpp`](../../src/ui/bo
 **Surface.** A per-tile red→green **value mark** (`icons::value_mark`, BL-135, value-lens tile
 marks) on every **buildable** tile (valid terrain for activity — ocean excluded), coloured by
 `ryg_colour(workforce_efficiency)`; tiles keep their terrain hue so terrain still reads. Drawn
-instead of, not blended with, the building glyph on occupied tiles. Shared idiom with the
-Opportunity lens.
+instead of, not blended with, the building glyph on occupied tiles. It is the **only** lens
+drawing the value mark: Opportunity shared the idiom until BL-604 retired it.
 
 **Glyph.** A small figure — round head over a tapered torso (`icons::population`); reads as
 "people / workforce", distinct from the other lens glyphs.
@@ -454,66 +485,6 @@ key reads the same labour multiplier the marks show. Tooltip "Workforce efficien
 
 **Interaction notes.** Planetary-only, single-select, no selector (the whole-body efficiency
 surface needs no resource pick). Verified by `scripts/verify/population_lens.lua`.
-
-## Opportunity lens
-
-**Intent.** Read the map as an *opportunity surface*: where is demand going unmet, so the
-market will pay a premium to whoever supplies it? Under the elastic economy the fillable
-gap is a first-class, legible thing — a market bidding above base price — and this lens surfaces
-it directly. Paired with Population on the strip.
-
-**Data definition (BL-136, opportunity demand signal).** Per body market, a volume-weighted
-**demand-gap score**: `gap · volume`, where `gap = Σ_r max(0, demand[r] − supply[r])` and
-`volume = Σ_r demand[r]` over the market's goods — so a large market with a wide unmet gap reads
-hottest, and a met market reads low. The score is ranked against the body maximum (the same
-normalisation the Scarcity lens uses). Each tile takes its **catchment market's** rank via
-`market_for_tile`, so the surface reads as uniform blocks per catchment. No new data — it reads
-the live `market_component` supply/demand.
-
-**Rung.** Planetary only. Guarded behind `overlay_mode::opportunity`.
-
-**Surface.** The per-tile red→green **value mark** (`icons::value_mark`) on every buildable tile,
-coloured by the catchment's rank — strongest gaps green, met markets red. Tiles with no catchment
-market carry no mark. Shared idiom with the Population lens.
-
-**Glyph.** An open circle with an inner "+" (`icons::opportunity`) — a potential-gain motif.
-
-**Legend.** Strip glyph + tooltip ("Opportunity") + an on-canvas supplied→unmet red→green rank
-bar.
-
-**Interaction notes.** Planetary-only, single-select; the verify script ticks the economy
-first so prices have resolved. Verified by `scripts/verify/opportunity_lens.lua`.
-
-## Production lens
-
-**Intent.** Read the map as a *production-intensity surface*: where value is actually
-being made right now. Complements Opportunity (potential) with the realised output.
-
-**Data definition (settled).** Per producing tile, intensity = **Σ(output qty ×
-resolved price)** across the building's outputs this tick, read from the
-`economy_report` (`output_quantity`) and the tile's market prices; a processor's
-total output is split across its recipe's products by their batch proportions.
-Idle / exhausted / unbuilt tiles produce nothing → no entry → cold.
-
-**Rung.** Planetary, plus a Circumplanetary per-body output badge (rung table).
-Guarded behind `overlay_mode::production`.
-
-**Colour.** Each producing tile's value is taken **relative to the body's
-producing-tile geometric mean** and run through the dedicated red→yellow→green ramp
-(`production_colour`): above the mean reads green, below red, the mean yellow,
-composited at 0.6 over terrain. So contrast is meaningful across bodies of very
-different absolute output; a body of similar producers reads near-neutral (honest —
-there is little intensity spread to show).
-
-**Glyph.** A filled upward triangle over a baseline (`icons::production`) — output
-rising.
-
-**Legend.** Strip glyph + tooltip ("Production intensity") + an on-canvas low→high
-diverging key.
-
-**Interaction notes.** Planetary-only, single-select; the verify script ticks the economy
-so buildings produce and the report populates before capture. Verified by
-`scripts/verify/production_lens.lua`.
 
 ## Scarcity lens
 
@@ -546,7 +517,7 @@ exactly as much spatial variation as the body has markets.
 the inverse of the filled resource pip.
 
 **Legend.** An abundant→scarce gradient bar ("Market scarcity", met → scarce) plus the selected
-resource's name and identity swatch, same placement as the other gradient keys. Tooltip "Market
+resource's name and identity swatch, in the shared lens chrome region. Tooltip "Market
 scarcity". The resource selector appears in the lens legend (shared with Resource/Market).
 
 **Interaction notes.** Planetary-only, single-select. The verify script runs `verify.econ_step(12)`
@@ -559,9 +530,8 @@ so market supply/demand populate before capture. Verified by `scripts/verify/sca
 the `overlay_mode::industry` render pass is unaffected by its absence from the bar.
 
 **Intent.** Read the map as a *rival-plant surface*: where the industry the player did **not**
-build already stands — distinct from where people live (the population-centre markers), where
-labour is efficient (Population), or how hard everything on the body is running (Production,
-which counts the player's own holdings). One of a three-layer read: Settlements (discrete
+build already stands — distinct from where people live (the population-centre markers) and from
+where labour is efficient (Population). One of a three-layer read: Settlements (discrete
 markers) · Industry (this lens) · You (identity chrome).
 
 **Data definition (BL-373, industry lens re-point).** The lens reads the **buildings owned by
@@ -575,9 +545,10 @@ tile stack. **Pure rendering**: nothing is written back. `tile.substrate_density
 this lens (it is retained on the tile only because removing it would be a save-format touch for
 no gain — Ben, 2026-08-12).
 
-The question it answers is **"where is the industry I did not build?"** — deliberately distinct
-from the **Production** lens, which is body-relative output intensity *including the player's own
-holdings*. Both are kept.
+The question it answers is **"where is the industry I did not build?"** — an *ownership*
+question, which is why it survived the roster pruning that retired the Production lens (§ Rung
+applicability): body-relative output intensity *including the player's own holdings* answered no
+question the player was asking at the strip, whereas "whose plant is already standing here" does.
 
 **Rung.** Planetary only — the field is per-tile and has no inter-body surface. Guarded
 behind `overlay_mode::industry` in
@@ -590,12 +561,12 @@ their terrain hue untinted. Sequential (not diverging) — density has a single 
 per-faction colours.
 
 **Glyph.** A factory silhouette — a sawtooth-roofed block with a chimney (`icons::industry`; see
-[ICONS.md](ICONS.md)) — distinct from the Production lens's up-triangle and every other lens glyph.
+[ICONS.md](ICONS.md)) — distinct from every other lens glyph.
 
 **Legend.** Strip glyph highlight + tooltip (`overlay_mode_name` → "Industry density"), plus an
 on-canvas **low→high amber gradient key** (`draw_industry_key` in
 [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp)) — a bar running the terrain-hue
-base to full industrial amber, in the gradient-key placement.
+base to full industrial amber, in the shared lens chrome region (§ Legend placement).
 
 **Interaction notes.** Planetary-only, single-select; the verify script's `verify.econ_step(4)` is
 load-bearing — the field is read from the economy report, so it needs a tick to exist at all.
@@ -647,18 +618,18 @@ Country glyph's bordered territory and from any solid landmass blob, because wha
 the boundary, not the area.
 
 **Legend.** Strip glyph highlight + tooltip (`overlay_mode_name` → "Continents (tectonic plates)"),
-plus an on-canvas key (`draw_continent_key`) at the flush-left-of-the-minimap anchor. Unlike the
+plus a key (`draw_continent_key`) in the shared lens chrome region (§ Legend placement). Unlike the
 gradient keys it has no scale to explain — the tint is categorical — so it explains the one thing
 that is not self-evident: that the **pale** tiles are boundaries. It also reports the plate count,
 and degrades honestly: a body with no plate record says so, and a **stagnant-lid** body
 (`plate_count == 1`) says "one immobile plate" rather than drawing a meaningless single tint.
 
-**Z-order** (BL-376, continent key z-order). The key keeps that anchor — it does **not** move to a
-corner and does **not** dock into the minimap lens bar — but is drawn on ImGui's **foreground** draw
-list rather than the background one shared by the other `ImDrawList` keys, so it floats over the
-always-open Selection band instead of being buried by it. It takes an **opaque** panel fill
-(`begin_lens_key`'s `bg` argument) rather than the 210-alpha default: what sits underneath it is a
-window background, not the canvas, and the plate swatches are the one thing this key exists to show.
+**Z-order.** This key was for a while the only one that read at all, because it alone drew on
+ImGui's **foreground** list with an opaque fill (BL-376, continent key z-order) while the other
+gradient keys were buried under the always-open Selection band at the old flush-left anchor. That
+was a z-order patch standing in for a placement fix. In the shared region no key overlaps a window,
+so this one draws on the same background list as the rest — the plate swatches, which are the one
+thing it exists to show, read on their own without a special case.
 
 **Interaction notes.** Planetary-only, single-select. Verified by
 `scripts/verify/continents_terrain.lua`, which captures the lens on **Kepler** and on **Selene** (the

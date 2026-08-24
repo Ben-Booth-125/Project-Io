@@ -83,6 +83,40 @@ float bottom_band_budget(ImVec2 disp);
 /// mistake. Height and top edge are `selection_band_height`'s, shared with the dock.
 shell_rect selection_band_rect(ImVec2 disp);
 
+/// **The lens chrome region** (BL-602) — the ONE home for everything a lens puts
+/// on screen beside the canvas: the shared resource/good combo and whichever key the
+/// active lens draws. Ben, 2026-08-24: *"This selection element for lenses should
+/// always fit in the header for the minimap, at the top right corner."*
+///
+/// There were two homes before, and one of them was invisible. Count-driven keys sat
+/// in the right chrome column pinned under the time panel; fixed-height gradient keys
+/// sat flush-LEFT of the minimap, vertically centred — inside the rect the always-open
+/// Selection band occupies, so six of the seven rendered as ghosts through the band at
+/// roughly a tenth of their contrast (NR-601). Only the Continent key escaped, by
+/// drawing on the foreground list (BL-376): one of seven fixed, the collision never
+/// generalised. Moving every key here fixes the *placement*, which is what the z-order
+/// patch was standing in for.
+///
+/// The rect is anchored to the minimap's **top-right corner**: same x and width as
+/// `minimap_rect` (so it is flush to the right screen edge and reads as one stack of
+/// chrome with the minimap), **bottom edge on the minimap's top edge**, growing
+/// **upward** into the column's otherwise-unused space and ceilinged one margin below
+/// the time panel's foot.
+///
+/// Bottom-anchored, not top-anchored, and that is load-bearing. A box that grows
+/// upward from a fixed top takes its own header — and therefore its toggle — with it:
+/// opening the list moved the control ~320 px up the screen and a second press at the
+/// same point landed on the canvas instead of closing it, so the toggle worked exactly
+/// once. Anchoring the bottom keeps the header on the minimap's edge whether the
+/// region is open or shut, so open/close is one repeatable press in one place.
+///
+/// @param time_h  Measured time-panel height (`ui_state::time_panel_h`). 0 on the
+///                first frame before that panel has drawn; the ceiling then falls back
+///                to one margin from the screen top rather than to zero.
+/// @param want_h  Height the active lens's content asks for. The result is capped to
+///                the space between the ceiling and the minimap, never beyond it.
+shell_rect lens_chrome_rect(ImVec2 disp, float time_h, float want_h);
+
 /// The **freed centre-right slot** (BL-216) — the exact rect the comms log vacated
 /// when BL-227 moved it to the bottom strip, now the home of the pinned-items watch
 /// list. Sits between the time panel and the minimap; the right column's split stays

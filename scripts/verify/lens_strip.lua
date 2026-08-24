@@ -16,9 +16,11 @@ verify.goto_surface("home")
 verify.set_overlay("corporation")
 verify.capture("lens_strip_corporation")
 
--- Switching to Production highlights only that glyph (single-select).
-verify.set_overlay("production")
-verify.capture("lens_strip_production")
+-- Switching to Population highlights only that glyph (single-select). This was
+-- Production until BL-604 retired that lens; the check is about the highlight
+-- being exclusive, so any glyph but the first serves.
+verify.set_overlay("population")
+verify.capture("lens_strip_population")
 
 -- Clearing to none leaves plain terrain with no glyph highlighted.
 verify.set_overlay("none")
