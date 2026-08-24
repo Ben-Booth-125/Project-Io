@@ -77,7 +77,19 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   narrow start gate, per-building materials, the dashboard depth readout, the breadth guard, the
   Build door and the playthrough/cut. Sprint 17 holds to start after **Sprint 16** merges to
   `main`, except **BL-587** (alternate methods), which touches no file Sprint 16 owns and landed
-  standalone 2026-08-23. Cut by **Sprint 17**; done-definition owed at the cut, per NR-103.
+  standalone 2026-08-23.
+  **Done-definition, written at the cut 2026-08-24, per NR-103.** All ten items (BL-585–BL-594)
+  landed. The ancient roster reaches 23 named buildings across 47 resources (up from 7 named
+  buildings, 8 recipes, 42 resources at the sprint's own opening measurement); 0 orphan resources
+  in either direction; chain depth reaches 2 on this sprint's own new content (Shipwright) and 3
+  on the pre-existing ceiling (Toolmaker); one tech gate (`E0-EC-03`) closes a recipe and reopens
+  it on an earned predicate; the start gate is ruled and asserted exactly; and the growth track is
+  visible on the corporation dashboard, confirmed by a **live playthrough** across two separate
+  corps/worlds (BL-594) — not merely a scripted capture. Excluded, named explicitly: a live click
+  through an actual tech-gate resolving and an actual method-switch-for-a-market-reason, both
+  deferred past this cut for want of session time to simulate the economy that far (not a defect);
+  a pre-existing, unrelated corp-selection screen defect found along the way (NR-597) is logged,
+  not fixed, by Ben's ruling.
 - **v0.1.18 — The economy tells the truth.** *(Defined 2026-08-19 — Ben chose define over
   dissolve; the version had existed in the backlog since the Sprint 25a era while the Sprint-26
   split that owed its ROADMAP entry was dropped, NR-377.)* *Theme: the measured economy

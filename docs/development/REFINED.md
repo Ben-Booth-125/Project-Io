@@ -474,3 +474,41 @@ Requirements: `req/requirements.json` § ancient-roster-slice-2. Files: `src/wor
    `recipe_switch_harness`, `price_band_harness`, `construction_gate_harness`, `construction_harness`,
    `corp_ai_harness`, `save_roundtrip`, `determinism_harness`, `spectator_determinism`,
    `tech_gate_harness` all clean.
+
+#### BL-594 — ROSTER_PLAYTHROUGH_AND_CUT — COMPLETE 2026-08-24
+
+Requirements: `req/requirements.json` § roster-playthrough-and-cut. Files: `docs/development/ROADMAP.md`,
+`docs/development/sprints.json`, `docs/MANUAL.md`, `tools/session/backlog_lint.js` (NEVER_WRITTEN_OK entry).
+
+1. **Played live, not scripted** — computer-use against the built exe, across TWO separate
+   generated worlds/corps. A Start Menu shortcut was created for `ProjectIo.exe` so
+   `request_access` could resolve it, closing the `NR-593`/`NR-595` computer-use gap this
+   sprint kept hitting for future sessions.
+2. **Confirmed live**: the narrow opening set (`BL-589`) — the Build door on a fresh corp shows
+   only the ruled opening, with a reason-coded Military Base lock, never a filtered-out recipe as
+   a group’s representative; the dashboard growth track (`BL-591`) — legible plain text on both
+   corps (“Reached depth 0, via Agricultural Produce. Next: Bloomery, Shipwright. Needs: Iron Ore,
+   Charcoal, Planks, Cloth”); `BL-586` slice 2’s new content (Fibre, Shipwright) live and reachable
+   in both the dashboard and the Build door; and an actual successful construction click
+   (“Construction started”, Clay Pit, 103cr against a 257cr balance) confirming the general build
+   flow and `BL-590`’s per-building material lookup end to end, not only in a harness.
+3. **Not reached live this session**: a method-switch for a stated market reason (`BL-587`) and a
+   tech gate resolving (`BL-588`) — both need more simulated economy time than one sitting’s clock-
+   advance covers. The first corp tried started Cr -5.9k in debt and could not afford to build
+   anything at all — a real, non-defect finding about starting-solvency variance across seeds.
+   Ben’s ruling: accept as substantially confirmed, close now rather than push further.
+4. **Two real findings surfaced and logged, not silently absorbed**: `NR-597` — the corp-selection
+   screen’s per-row “Choose” buttons do not respond to clicks, reproduced 2-for-2 across two
+   sessions; Ben’s ruling: not urgent, logged in `NEEDS_REVIEW.json` rather than filed as a
+   backlog item, since `KNOWN_BUGS.md` is retired. One LOW-CONFIDENCE, unreproduced anomaly also
+   reported: a full-canvas takeover control once returned the app to the main menu in the very
+   first session, not reproduced on two later clean attempts of the same control — reported, not
+   asserted as a confirmed defect.
+5. **The cut**: `ROADMAP.md`’s v0.1.17 bullet gained its done-definition (`NR-103`), naming what
+   shipped (all ten items, the roster’s exact numbers) and what was explicitly excluded. `MANUAL.md`
+   §4.4 gained the three-lock model (era/depth/tech) and the growth-track readout — the player-
+   facing half of a content sprint. `sprints.json`’s Sprint 17 entry closed with a retro below.
+6. `scripts/verify/ancient_roster.lua` was never authored — the item’s own design draws the
+   distinction explicitly (“a scripted capture proves a surface renders, not that a press on it is
+   reachable”) and this item’s verification method WAS the live click, not a script. Added to
+   `backlog_lint.js`’s `NEVER_WRITTEN_OK` with that reason rather than left as a silent gap.

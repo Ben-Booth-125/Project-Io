@@ -253,6 +253,11 @@ const NEVER_WRITTEN_OK = new Set([
   'BL-263:src/world/serialisation.cpp',             // no serialiser exists at all — NR-349, BL-107
   'BL-517:src/world/serialisation.cpp',             // same
   'BL-448:src/world/serialization.cpp',             // same, US spelling
+  'BL-594:scripts/verify/ancient_roster.lua',       // verified by a LIVE playthrough (computer-use
+                                                     // against the built exe) instead — a scripted
+                                                     // capture proves a surface renders, not that a
+                                                     // press on it is reachable, and this item's own
+                                                     // design names that distinction explicitly
 ]);
 
 function checkStatusDrift() {

@@ -6430,6 +6430,76 @@
                     "result_metric": "1 regression differentially isolated, 1 check retired on ruling"
                 }
             ]
+        },
+        {
+            "brief": "roster-playthrough-and-cut",
+            "title": "BL-594 — the sprint’s own done-definition, played rather than asserted",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-594 (ROSTER_PLAYTHROUGH_AND_CUT) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "visual: live click, computer-use against the built exe"
+                    ],
+                    "requirement": "A fresh ancient corp is offered the authored opening set and no more (BL-589) — a live click, not a scripted capture.",
+                    "notes": "Confirmed across TWO separate generated worlds/corps. The Build door on a fresh corp shows only extraction targets, Infrastructure, and a reason-coded-locked Military Base (“Locked - the technology that permits...”); never a filtered-out recipe standing in as a processing group’s representative.",
+                    "result_metric": "2 corps/worlds checked, 0 unruled rows shown"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "visual: live click"
+                    ],
+                    "requirement": "Building a fuel route makes the next rung placeable, legible from the dashboard readout (BL-591), not from a wiki.",
+                    "notes": "The corporation dashboard’s growth track read live, plain text, on both corps tried: “Reached depth 0, via Agricultural Produce. Next: Bloomery, Shipwright. Needs: Iron Ore, Charcoal, Planks, Cloth.” BL-586 slice 2’s Shipwright named as a live next-rung candidate.",
+                    "result_metric": "2/2 corps show a legible growth track"
+                },
+                {
+                    "id": "R3",
+                    "status": "partial",
+                    "verification": [
+                        "visual: live click attempted"
+                    ],
+                    "requirement": "A method choice is made for a stated reason about which market the output is going to (BL-587), and a tech gate resolves and opens a different recipe (BL-588) — both as live clicks.",
+                    "notes": "NOT reached live this session — both need more simulated economy time (earning a tech’s stockpile/surplus predicate) than one sitting’s clock-advance covered. The first corp tried (Cr -5.9k starting debt) could not afford to build anything at all, a real but non-defect finding about starting-solvency variance across seeds. Ben’s ruling: accept as substantially confirmed, close now rather than push further.",
+                    "result_metric": "0/2 reached live; deferred by ruling, not silently dropped"
+                },
+                {
+                    "id": "R4",
+                    "status": "complete",
+                    "verification": [
+                        "visual: live click"
+                    ],
+                    "requirement": "A building is placed whose material basket is not steel (BL-590) — an actual successful construction click, not an assertion.",
+                    "notes": "Clay Pit built live (“Construction started”, 103cr against a 257cr balance) on the solvent second corp. Confirms the general build flow and BL-590’s per-building material-cost lookup work end to end in the running app, not only in a harness.",
+                    "result_metric": "1 live construction, general flow confirmed"
+                },
+                {
+                    "id": "R5",
+                    "status": "complete",
+                    "verification": [
+                        "code"
+                    ],
+                    "requirement": "The v0.1.17 cut: ROADMAP.md’s done-definition written at the cut (NR-103), MANUAL.md gains the ancient roster and the earned locks, sprints.json’s Sprint 17 entry closed with a retro.",
+                    "notes": "ROADMAP.md’s v0.1.17 bullet carries a done-definition naming what shipped and what was explicitly excluded. MANUAL.md §4.4 gained the three-lock model (era/depth/tech) and the growth-track readout. sprints.json closed below.",
+                    "result_metric": "3 docs updated at the cut"
+                },
+                {
+                    "id": "R6",
+                    "status": "complete",
+                    "verification": [
+                        "visual: live click, reported not fixed"
+                    ],
+                    "requirement": "Real findings surfaced by the live playthrough are reported, not silently absorbed or silently dropped.",
+                    "notes": "NR-597: the corp-selection screen’s per-row “Choose” buttons do not respond to clicks, reproduced 2-for-2 across two sessions; Ben’s ruling: not urgent, logged (KNOWN_BUGS.md is retired) rather than filed as a backlog item. One LOW-CONFIDENCE, unreproduced anomaly also reported: a full-canvas takeover control once returned the app to the main menu in the very first session, not reproduced on two later clean attempts of the same control.",
+                    "result_metric": "1 confirmed defect logged, 1 unreproduced anomaly reported honestly"
+                }
+            ]
         }
     ]
 }

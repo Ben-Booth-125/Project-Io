@@ -392,6 +392,23 @@
       ],
       "status": "resolved",
       "resolution": "Note added to io-standing-rules.md’s BL-409 paragraph (2026-08-24): the harness guarantees the two named properties (defaults false, no cadence-slot shift), not RNG-stream-identical behaviour across a content change. The retired check itself stays retired in spectator_determinism.cpp with its own provenance comment."
+    },
+    {
+      "id": "NR-597",
+      "title": "The corp-selection screen’s per-row \"Choose\" buttons do not respond to clicks",
+      "raised": "2026-08-24",
+      "kind": "novel-work",
+      "source": "BL-594’s live playthrough (two separate game sessions, two different generated worlds) — every individual \"Choose\" button on the \"Choose your corporation\" screen was clicked and did nothing, reproduced 2-for-2; only \"Surprise me\" (the seed-default pick) responded.",
+      "what": "A real, reproducible UI defect on scripts/verify/corp_choice.lua’s live surface (BL-435). Not investigated further — this item’s scope is the ancient-roster playthrough, not this pre-existing screen. Ben’s ruling: not urgent, keep it out of the backlog for now (KNOWN_BUGS.md is retired per CLAUDE.md, so this is the durable record instead of a filed item).",
+      "why_it_matters": "A player who wants a SPECIFIC starting corporation (not the seed default) currently cannot choose one — the screen offers 8 rows and only the escape hatch works.",
+      "options": [],
+      "recommendation": "File a proper BL- item and fix when it becomes a priority — likely a click-handler wired to the row highlight but not the button itself, given corp_choice.lua’s own note that the stage is reached via a re-entry path (verify.show_corp_choice) rather than the normal flow.",
+      "files": [
+        "src/ui/*.cpp (corp choice screen, not yet located)",
+        "scripts/verify/corp_choice.lua"
+      ],
+      "status": "open",
+      "resolution": null
     }
   ]
 }
