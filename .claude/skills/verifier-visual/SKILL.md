@@ -255,9 +255,11 @@ runs capture-only.
 ## The shell pass (2026-08-24)
 
 **`shell_pass.lua`** — the ubiquitous-chrome review: profile tile, header strip, time panel, nav
-rail and its tooltip, comms dock, Selection band in four kinds, minimap at each rung of the
+rail and its tooltip, comms dock, Selection band in three kinds, minimap at each rung of the
 ladder, the lens region, the hover card, the launch screen, the in-session system menu, and each
-of the thirteen rail ledgers. 31 captures from one world. It is a **design review, not a gate** —
+of the thirteen rail ledgers. 30 captures from one world. (The band's fourth kind was the
+**province**; BL-598 folded it into the tile element as accordion sections, so the two captures
+would have been the same picture. `selection_accordion.lua` is where that element is checked.) It is a **design review, not a gate** —
 no goldens, and its only assertion is the clipping ledger's.
 
 Two things about it are worth copying, and one is worth not copying.

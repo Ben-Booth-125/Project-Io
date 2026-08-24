@@ -111,8 +111,13 @@ verify.command("pause_toggle")
 verify.frames(1)
 
 -- ===========================================================================
--- 3. The selection band — the four kinds a player meets most
+-- 3. The selection band — the three kinds a player meets most
 -- ===========================================================================
+-- It was FOUR until BL-598. The fourth was the PROVINCE, and it is gone as a
+-- kind: the province folded into the tile element as three of its five accordion
+-- sections, so `verify.select_province` and `verify.select_tile` now stage the
+-- same selection and the two captures would have been the same picture. The
+-- tile capture below is where the province is now read.
 -- The band never hides (BL-266): with nothing selected it rests on the player's
 -- own corporation, which is the first capture below rather than an empty frame.
 close_all()
@@ -127,9 +132,6 @@ local mine = staged.unit
 
 verify.select_tile(mine.col, mine.row)
 shot("shell_07_selection_tile")
-
-verify.select_province(mine.col, mine.row)
-shot("shell_08_selection_province")
 
 -- The player's own building, then a rival's — the pair that carries the
 -- visibility rule (BL-068): full detail on one, `private` placeholders on the other.

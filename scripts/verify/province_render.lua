@@ -38,7 +38,14 @@ verify.capture("province_blend_play_zoom")
 verify.center_tile(40, 30, 6.0)
 verify.capture("province_blend_close")
 
--- P3 — select a province. Outline traces the cell; the band shows the card.
+-- P3 — select the ground. The outline traces the province cell; the band shows
+-- the TILE element, whose accordion carries that province's Deposits, Buildings
+-- and Population sections.
+--
+-- BL-598: the province is no longer a selection of its own. `select_province`
+-- selects the tile and returns the province id it stands in, which is what makes
+-- the outline the affordance for "these sections are about this ground" rather
+-- than for "you selected a province".
 local pid = verify.select_province(40, 30)
 print("selected province id = " .. tostring(pid))
 verify.capture("province_selected_card")
