@@ -1988,10 +1988,15 @@
       "date": "2026-08-24",
       "message": "Regenerate item-commits.json after BL-591"
     },
-    "BL-593": {
-      "commit": "8dc7f7d",
+    "BL-592": {
+      "commit": "5d5c75c",
       "date": "2026-08-24",
-      "message": "BL-593: the Build door filters a tech-locked recipe out, not just in"
+      "message": "BL-592: roster-breadth guard rows land in chain_depth"
+    },
+    "BL-593": {
+      "commit": "d02f022",
+      "date": "2026-08-24",
+      "message": "Regenerate item-commits.json after BL-593"
     },
     "BL-594": {
       "commit": "401eae7",
