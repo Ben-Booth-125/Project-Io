@@ -303,9 +303,10 @@ Each rejected an earlier cut. Two are structural.
    cost is proportional to distance, LP *is* haulage cost again; if flat, the sort degenerates.
 4. **The base allowance must not be the whole mechanic.** No corp is seeded a hub, so "your own
    nodes decide how much you may move" is fictional; city generation is what makes the rate real.
-5. **A rival must be able to build the generator.** The scorer's road/hub verbs are granted
-   (2026-08-24; BL-599 (rival roads and hubs) owns them, sequenced ahead of the LP landing per
-   Ben's 2026-08-22 "before LP lands"), so the rate is not an asymmetric tax on rivals.
+5. **A rival must be able to build the generator.** `corp_ai.cpp`'s scorer carries `place_road`
+   and a port / inland-hub build candidate (Ben, 2026-08-22: yes, and before LP lands; BL-599
+   (rival roads and hubs) is the scorer's road/anchor item), so the rate is not an asymmetric tax
+   on rivals.
 6. **No reserved military share.** Two budgets means guns and butter stop competing, which is the
    whole point of one rate.
 7. **No one-way ratchet.** A `supply_decay_permille` with zero recovery is a stock, not a rate.

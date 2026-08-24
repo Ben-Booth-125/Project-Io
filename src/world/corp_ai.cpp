@@ -919,6 +919,139 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
         }
 
+        // ---- Road & anchor candidates: extend the network toward ground -----
+        // the corp cannot yet reach (BL-599, LOGISTICS.md § Roads / § Reach;
+        // dated grant in io-standing-rules.md § Determinism & data model —
+        // "Rivals may EXTEND THE NETWORK... place_road, plus port/inland-hub
+        // build candidates scored like any building", Ben, 2026-08-24).
+        //
+        // The extraction build-candidate loop above deliberately proposes a
+        // site WITHOUT checking the logistics-reach budget (the BL-162 /
+        // BL-379 note a few screens up: checking it there would reshuffle
+        // which sites every rival attempts, hence world evolution, hence
+        // every blessed golden, for no player-visible gain). That means an
+        // out-of-reach site is proposed, scored, and then silently refused by
+        // the REAL seam (construction.cpp's `max_logistics_reach`) every
+        // single evaluation until something extends the network. This block
+        // is that something: it re-derives the same reach refusal
+        // construct_building would hit at apply time, so it only ever
+        // targets ground actually blocked by distance, never an arbitrary
+        // tile.
+        {
+            const float reach_budget = reg.construction().max_logistics_reach;
+            if (reach_budget >= 0.0f)
+            {
+                const building_economics& ex = reg.economics(building_type::extraction_site);
+                entity_id    best_tile = null_entity;
+                entity_id    best_body = null_entity;
+                float        best_net  = 0.0f;
+                std::uint8_t best_tier = 1;
+                for (const extraction_site& s : ranked_sites)
+                {
+                    // Tile-level placement must still hold (terrain, tech,
+                    // stack) — only the REACH half is this block's concern,
+                    // so it asks the question both ways: viable without the
+                    // budget, refused with it.
+                    if (!placement_rules::can_place_in_world(w, s.tile, building_type::extraction_site,
+                                                              s.target))
+                        continue;
+                    if (placement_rules::can_place_in_world(w, s.tile, building_type::extraction_site,
+                                                             s.target, reach_budget, corp))
+                        continue; // already reachable — nothing here for a road to fix
+
+                    const entity_id body = tile_body(w, s.tile);
+                    if (body == null_entity)
+                        continue;
+                    body_reach_field(w, body); // warm before tile_reach_cost, as the muster-base block does
+                    if (tile_reach_cost(w, s.tile) < 0.0f)
+                        continue; // reach field not computed for this body — skip, do not guess
+
+                    const tile_component& tc  = w.tiles.at(s.tile);
+                    const std::size_t     ri  = static_cast<std::size_t>(s.target);
+                    const float wf      = 0.5f; // construct_building staffs at 0.5, as the build candidate above
+                    const float rich    = richness_rate_scalar(ex, tc.resource_deposit[ri]);
+                    const float price   = local_price(w, s.tile, ri);
+                    const float revenue = ex.base_rate * rich * wf * (1.0f - tc.hazard_level) * price;
+                    const float net     = revenue - ex.maintenance - ex.base_wage * wf;
+                    if (net <= best_net)
+                        continue; // never extend toward a loss, and keep only the single best
+
+                    best_net  = net;
+                    best_tile = s.tile;
+                    best_body = body;
+                    // Raise one tier past whatever is there, capped at
+                    // Highway — a repeat eval against the same still-
+                    // unreached tile upgrades it rather than re-requesting a
+                    // tier it already holds (which `place_road` refuses as
+                    // `invalid_tile`, benign per APPLY THEN COUNT below).
+                    best_tier = std::min<std::uint8_t>(3, static_cast<std::uint8_t>(tc.road_level + 1));
+                }
+
+                if (best_tile != null_entity)
+                {
+                    // ROAD candidate: raising this tile's own road_level
+                    // discounts its traversal cost (road_traversal_multiplier),
+                    // which feeds directly into body_reach_field's Dijkstra
+                    // edge costs — the same mechanism the Reach lens reads.
+                    {
+                        const road_economics& rex = reg.road_econ(best_tier);
+                        candidate c;
+                        c.cmd.tick      = tick; c.cmd.corp = corp;
+                        c.cmd.verb      = corp_verb::place_road;
+                        c.cmd.tile      = best_tile;
+                        c.cmd.road_tier = best_tier;
+                        // Modest relative to the site it targets: a road does
+                        // not itself earn revenue, it unlocks a FUTURE
+                        // build's, so it is priced under the BL-417
+                        // net^2/capex curve rather than matching it.
+                        c.score  = 0.3f * best_net * best_net / std::max(1.0f, rex.build_cost) * jitter;
+                        c.spend  = std::max(1.0f, rex.build_cost);
+                        c.reason = corp_decision_reason::best_build;
+                        c.bucket = bucket_for_reason(c.reason);
+                        cands.push_back(c);
+                    }
+
+                    // ANCHOR candidate: only where the road above can never be
+                    // enough — a body with NO supply anchor at all fails
+                    // every tile's reach check, because there is no anchor
+                    // for the Dijkstra to run from; a road only discounts a
+                    // PATH between two anchors, and none exists yet to path
+                    // from. Placing the first port/hub is the one placement
+                    // `can_place_in_world` exempts from the reach rule while
+                    // a body holds zero of them (the bootstrap rule,
+                    // LOGISTICS.md § Reach), so it is the only way out of
+                    // that state. This is LP constraint 5 answered directly —
+                    // "a rival must be able to build the generator".
+                    if (!body_has_supply_anchor(w, best_body))
+                    {
+                        const building_type atype = placement_rules::is_coastal(w, best_tile)
+                                                   ? building_type::port
+                                                   : building_type::inland_logistics_hub;
+                        if (placement_rules::can_place_in_world(w, best_tile, atype,
+                                                                 resource_type::iron_ore, reach_budget, corp))
+                        {
+                            const building_economics& aex = reg.economics(atype);
+                            candidate c;
+                            c.cmd.tick = tick; c.cmd.corp = corp;
+                            c.cmd.verb = corp_verb::build;
+                            c.cmd.tile = best_tile;
+                            c.cmd.type = atype;
+                            // Flat, modest score — same shape and reasoning as
+                            // the muster-base candidate below: neither
+                            // building produces a tradeable good, so there is
+                            // no net/capex curve to price it against, and it
+                            // must never out-bid a genuine economic build.
+                            c.score  = 0.4f * jitter;
+                            c.spend  = std::max(1.0f, aex.build_cost);
+                            c.reason = corp_decision_reason::best_build;
+                            c.bucket = bucket_for_reason(c.reason);
+                            cands.push_back(c);
+                        }
+                    }
+                }
+            }
+        }
+
         // ---- Dial candidates: per owned, operating, off-cooldown building --
         for (const entity_id bid : cc.assets)
         {
