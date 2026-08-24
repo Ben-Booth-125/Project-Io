@@ -74,8 +74,9 @@ ones were deleted.
 | 9 | The militia takes the field | **Closed 2026-08-10** — v0.1.5 cut; BL-325/BL-331 landed, BL-332 designed and re-versioned |
 | 10–14 | Re-sequenced 2026-08-10 (the living world inserted) | **Overtaken** — Sprints 10/11 closed 2026-08-11; Sprints 12–14 superseded 2026-08-12 by the 0 CE refocus (NR-177), never opened |
 | 15 | The 0 CE refocus (retro-recorded) | **Closed 2026-08-12** — epoch 0, 3× map, Era −1 sim wired in, mercenary seam designed |
-| 16 | The mercenary vertical slice | **Open 2026-08-12** — re-planned 2026-08-23 in dependency order (BL-569→BL-578); cuts v0.1.15 |
+| 16 | The mercenary vertical slice | **Closed 2026-08-24** — re-planned 2026-08-23 in dependency order (BL-569→BL-578); all ten landed and v0.1.15 was cut |
 | 17 | Economy breadth: the chain is the growth track | **Open 2026-08-15** — chain-depth spine (BL-428) → roster/methods (BL-429/430) → UI (BL-431) → guard harness (BL-432); cuts v0.1.17 |
+| 17b | The shell stops fighting the map | **Open 2026-08-24** — batch delivery over BL-596–BL-604 in three parallel slices; BL-599/BL-600 landed same-day; four design calls gate three of the remaining items |
 | 18b | Roster invariants (retro-recorded) | **Closed 2026-08-16** — BL-432 landed; BL-435 paused 4/6; BL-436 filed |
 | 19 | The economy tells the truth | **Closed 2026-08-17 — goal NOT met.** The blame moved three times and landed on supply; goldens left red and unblessed |
 | 25a | The draw (upkeep, ordnance, convoy seam) | **Closed 2026-08-18** — 6/6; goldens left red and attributed |
@@ -90,11 +91,19 @@ rather than kept as closed placeholders (see the ceiling note above). If one of 
 back up, it is authored fresh against the current docs, under a number that fits the ceiling —
 not resurrected under its old number.
 
-**Next up.** As of **2026-08-24**, only **16** (mercenary vertical slice) and **17** (economy
-breadth) are active — both fit the sprint-number ceiling on their own. A third slot is open under
-the count cap, but nothing fills it yet: any candidate has to be numbered 18 or below. **BL-518**
-(the Era −1 sim redrawing borders as its wars resolve) and **BL-514** (blend all tiles, HELD) are
-not part of either active sprint and stay parked in `backlog.json`.
+**Next up.** As of **2026-08-24**, Sprint **16** closed with v0.1.15 cut, **17** (economy breadth)
+runs on, and the third slot the count cap left open is now filled by **17b** — numbered under the
+ceiling by construction, and slotted between 17 and 18 on Ben's instruction because 17 is the
+economy work in the same span and this is the UI work beside it. It is the project's first
+deliberate **batch delivery of a UI theme**: nine items filed together, three parallel slices,
+one cross-slice review, one re-bless at the close.
+
+**BL-514** (blend all tiles) stops being parked with this sprint. It was held on Ben's own
+sequencing — *"hold off on that until I see what it looks like with larger provinces"* — and
+the look has now happened at 7–12 tiles: he called the result a blur. So the held question is
+answered, against the direction it proposed, and it is folded into **BL-597** rather than left
+waiting. **BL-518** (the Era −1 sim redrawing borders as its wars resolve) is still not part of
+any active sprint and stays parked in `backlog.json`.
 
 **Also deleted 2026-08-24, same basis:** six orphaned backlog items (BL-579–BL-584) a concurrent
 review-queue-purge session had filed with no sprint attached, plus Sprint 32's own three items
