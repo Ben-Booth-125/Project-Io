@@ -431,3 +431,46 @@ Requirements: `req/requirements.json` § roster-breadth-guard. Files: `tools/ver
 5. Full tree build clean; 8 relevant harnesses clean (`chain_depth`, `recipe_switch_harness`,
    `price_band_harness`, `construction_gate_harness`, `construction_harness`, `corp_ai_harness`,
    `save_roundtrip`, `determinism_harness`).
+
+#### BL-586 — ANCIENT_ROSTER_WIDE — COMPLETE 2026-08-24 (slice 2 of 2)
+
+Requirements: `req/requirements.json` § ancient-roster-slice-2. Files: `src/world/components.hpp`,
+`world_save.hpp`, `resource_names.cpp`, `tile_generation.cpp`, `planetology.cpp`,
+`placement_rules.hpp`, `src/core/verify_api.cpp`, `src/ui/icons.cpp`, `presentation.cpp`,
+`scripts/recipes.lua`, `economy.lua`, `world_gen.lua`, `tools/verify/chain_depth.cpp`,
+`save_roundtrip.cpp`, `spectator_determinism.cpp`.
+
+1. **Five new resources complete the design table**: `hides`, `fibre` (raw), `leather`, `cloth`,
+   `rigging` (processed) — `resource_count` 42 → 47. Tannery (`hides` → `leather`), Weaver
+   (`fibre` → `cloth`), Shipwright (`planks` + `cloth` → `rigging`, a new “Advanced Fabrication”
+   group) are the table’s last three named buildings. All 7 rows from the item’s own design table are
+   now landed across the two slices.
+2. **Two open design calls put to Ben before any code** (elicitation form, 2026-08-24): hides’ deposit
+   mechanism ruled **endemic** (like `furs` — lat/sector-restricted, richness-scored,
+   `terrain_cover::grass`, the pasture reading); fibre ruled **ordinary cover-based/biotic**, alongside
+   `agricultural_produce` on grass/marsh, no rarity gate. Shipwright’s output ruled a **new named good**
+   (“rigging”) rather than reusing the `trade_goods_misc` placeholder. Both new raws registered in
+   `placement_rules::k_extractable` so they’re reachable end to end — the four pre-existing endemic
+   goods (`tobacco`/`spices`/`coffee`/`furs`) share that same gap and are left unfixed, out of scope.
+3. **Depth confirmed by the harness, not hand-computed**: `leather`/`cloth` at depth 1, Shipwright/
+   `rigging` at depth 2 (`max(depth(planks)=1, depth(cloth)=1) + 1`) — the item’s own “depth is the
+   point” instruction, satisfied and checked against `chain_depth`’s own report.
+4. `world_save_version` bumped 9 → 10 (structural, every per-resource array widens), with a new
+   `save_roundtrip` P14 row proving a v9 stream is refused. Every mechanical seam BL-585/slice 1
+   needed is repeated here in full — enum, names, icon slugs, presentation table, base prices,
+   material overrides, glyphs.
+5. **A real regression found, differentially proven, and put to Ben rather than silently patched**:
+   the bare `resource_count` widening (not the new economic content — confirmed by temporarily
+   reverting `recipes.lua`/`economy.lua` while keeping the wider enum, which reproduced the identical
+   failure and hash) shifted an RNG stream and broke `spectator_determinism`’s R1 A/B “reaches every
+   family it reached as a rival” check. Ruled: bit-identical RNG-stream determinism across a content
+   change is not a property this harness needs to hold beyond what R2/R3 already assert — saves carry
+   the actual state, occasional randomness is a strategy lever, not a defect. The check is **retired**
+   (commented out with full provenance, not deleted, not weakened to pass) — filed as `NR-596`, with a
+   follow-up note owed to `io-standing-rules.md`’s BL-409 section on what the harness still proves.
+   The golden hash re-blessed to `71273F6FEDE03965`, confirmed across two independent builds.
+6. Full tree build clean (both the isolated worktree and after merge to the sprint branch);
+   `chain_depth` (23 named buildings with overrides, 47 resources, 0 orphans),
+   `recipe_switch_harness`, `price_band_harness`, `construction_gate_harness`, `construction_harness`,
+   `corp_ai_harness`, `save_roundtrip`, `determinism_harness`, `spectator_determinism`,
+   `tech_gate_harness` all clean.

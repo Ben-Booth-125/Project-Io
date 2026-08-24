@@ -6368,6 +6368,68 @@
                     "result_metric": "2 new row entries, 2 stale claims corrected"
                 }
             ]
+        },
+        {
+            "brief": "ancient-roster-slice-2",
+            "title": "BL-586 slice 2 — the hides/fibre chain completes the ancient roster table",
+            "status": "complete",
+            "resolved": "2026-08-24",
+            "promoted_from": "backlog.json BL-586 (ANCIENT_ROSTER_WIDE) — Sprint 17, the ancient roster becomes a ladder",
+            "batch": null,
+            "rows": [
+                {
+                    "id": "R1",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (R1, R1b)"
+                    ],
+                    "requirement": "Tannery (hides -> leather), Weaver (fibre -> cloth) and Shipwright (planks + cloth -> rigging) complete the design table’s remaining three chains; no orphan resource in either direction, band-reachable.",
+                    "notes": "47 resources total (up from 42), 0 unobtainable, 0 unwanted; R1b shows 0 stranded beyond the pre-existing 5 tracked space-era gaps. 23 named buildings now carry a material override (up from 18).",
+                    "result_metric": "47 resources, 0 orphans, 23 named buildings"
+                },
+                {
+                    "id": "R2",
+                    "status": "complete",
+                    "verification": [
+                        "headless: chain_depth (D6/G1 depth report)"
+                    ],
+                    "requirement": "Depth is the point, not a side effect (the item’s own instruction): the deepest new chain should clear depth 2, confirmed by the harness’s own report, not hand-computed.",
+                    "notes": "leather and cloth land at depth 1 (one step above their depth-0 raw); Shipwright/rigging lands at depth 2 (max(depth(planks)=1, depth(cloth)=1) + 1), the roster’s first chain past the earlier Toolmaker-only depth-2+ example within this item’s own new content.",
+                    "result_metric": "rigging at depth 2"
+                },
+                {
+                    "id": "R3",
+                    "status": "complete",
+                    "verification": [
+                        "code",
+                        "design ruling (elicitation form, 2026-08-24)"
+                    ],
+                    "requirement": "hides’ deposit-generation mechanism and fibre’s were unsettled design calls (cover-based vs endemic; new resource vs reuse) — put to Ben rather than assumed, before any code.",
+                    "notes": "Ruled: hides ENDEMIC (like furs — lat/sector-restricted, richness-scored, terrain_cover::grass); fibre ORDINARY cover-based/biotic (grass/marsh, alongside agricultural_produce, no rarity gate); Shipwright’s output a new named good (“rigging”) rather than reusing trade_goods_misc; whole slice built in one pass rather than split further.",
+                    "result_metric": "4 design calls ruled before implementation"
+                },
+                {
+                    "id": "R4",
+                    "status": "complete",
+                    "verification": [
+                        "headless: save_roundtrip, spectator_determinism"
+                    ],
+                    "requirement": "world_save_version bumps for the structural resource_count widening (9 -> 10), a refused-predecessor row proves the old format is rejected, and the spectator-mode golden is re-blessed only after confirmed reproducibility across independent builds.",
+                    "notes": "save_roundtrip P14 confirms a v9 stream is refused. spectator_determinism’s k_unspectated_golden re-blessed to 71273F6FEDE03965, confirmed across two independent builds.",
+                    "result_metric": "1 new P-row, 1 re-blessed golden"
+                },
+                {
+                    "id": "R5",
+                    "status": "complete",
+                    "verification": [
+                        "headless: spectator_determinism",
+                        "design ruling"
+                    ],
+                    "requirement": "A real regression found by the resource_count widening (spectator_determinism’s R1 A/B family-coverage check breaking, unrelated to this item’s new content) is differentially proven, not silently patched, and put to Ben before any fix.",
+                    "notes": "Differential test (recipes.lua/economy.lua reverted to pre-slice-2, enum width unchanged) reproduced the identical failure and hash, isolating the cause to the bare width change. Ben ruled the check retired (commented, with full provenance, not deleted or weakened) rather than patched around — filed as NR-596, with a follow-up note owed to io-standing-rules.md’s BL-409 section on what the harness still guarantees.",
+                    "result_metric": "1 regression differentially isolated, 1 check retired on ruling"
+                }
+            ]
         }
     ]
 }

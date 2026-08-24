@@ -390,8 +390,8 @@
         "tools/verify/spectator_determinism.cpp",
         ".claude/rules/io-standing-rules.md"
       ],
-      "status": "open",
-      "resolution": null
+      "status": "resolved",
+      "resolution": "Note added to io-standing-rules.md’s BL-409 paragraph (2026-08-24): the harness guarantees the two named properties (defaults false, no cadence-slot shift), not RNG-stream-identical behaviour across a content change. The retired check itself stays retired in spectator_determinism.cpp with its own provenance comment."
     }
   ]
 }

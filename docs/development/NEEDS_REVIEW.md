@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*21 entries — 21 open, 0 resolved.*
+*21 entries — 20 open, 1 resolved.*
 
 ---
 
@@ -261,6 +261,13 @@ Two separate verification limits, not one: (1) computer-use reconnected mid-sess
 
 *Files: `scripts/verify/build_door_wide_roster.lua`, `src/core/verify_api.cpp`, `src/ui/selection_panel.cpp`*
 
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
+
 ### NR-596 — spectator_determinism’s R1 A/B family-coverage check retired — bit-identical RNG-stream determinism is not a property this harness needs to hold
 *decision taken on your behalf · raised 2026-08-24 · from BL-586 slice 2 (Tannery/Weaver/Shipwright): widening resource_count 42->47 shifted an RNG stream and broke the "seated+spectated reaches every family it reached as a rival" assertion, unrelated to the new content itself (differentially confirmed: identical failure with recipes.lua/economy.lua reverted to pre-slice-2, enum width unchanged).*
 
@@ -270,12 +277,7 @@ The check compared as_seated (family coverage in a seated+spectated 300-tick rol
 
 > **Recommendation:** Add a one-line clarifying note to io-standing-rules.md’s BL-409 paragraph: the harness proves the two named properties (default-false, no cadence-slot shift), not RNG-stream-identical behavioural outcomes across a content change — that expectation was explicitly ruled out 2026-08-24.
 
+> **RESOLVED.** Note added to io-standing-rules.md’s BL-409 paragraph (2026-08-24): the harness guarantees the two named properties (defaults false, no cadence-slot shift), not RNG-stream-identical behaviour across a content change. The retired check itself stays retired in spectator_determinism.cpp with its own provenance comment.
+
 *Files: `tools/verify/spectator_determinism.cpp`, `.claude/rules/io-standing-rules.md`*
-
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
 
