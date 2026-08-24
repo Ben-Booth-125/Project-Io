@@ -125,6 +125,18 @@ struct construction_state
     entity_id     pending_hire_tile      = null_entity;
     std::uint16_t pending_hire_unit_type = 0;
 
+    /// Pending player convoy-dispatch request (BL-601) — set by the market
+    /// Selection card's dispatch form and executed by `app::render` via
+    /// `apply_corp_command`'s `dispatch_convoy` verb (BL-452's own player seam;
+    /// the form is the front door onto it SUPPLY.md always specified but nothing
+    /// built). Same deferred path as `pending_tile`, for the same reason (UI
+    /// surfaces hold only `const world&`). `pending_dispatch_source` = null_entity
+    /// means nothing pending; the other three fields are meaningless until it is set.
+    entity_id     pending_dispatch_source = null_entity; ///< Source market (the card's own selection).
+    entity_id     pending_dispatch_dest   = null_entity; ///< Destination market.
+    resource_type pending_dispatch_good   = resource_type::iron_ore;
+    float         pending_dispatch_qty    = 0.0f;
+
     /// Pending demolition request — set by the building Selection element's Demolish
     /// control and executed by `app::render` via `demolish_building`. Takes the same
     /// deferred path as `pending_tile` for the same reason (UI surfaces hold only

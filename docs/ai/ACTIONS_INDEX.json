@@ -63,7 +63,7 @@
   ],
   [
    "gameplay.dispatch_convoy",
-   "A corp_verb with no dedicated in-app form yet (BL-452, 2026-08-17). Issued against the corp-command seam, or over --serve, which needed no new wire key: it reuses subject / counterparty / target / quantity. The Market Ledger's Convoys tab (BL-453) shows the RESULT and carries the Hold press, but composes no dispatch."
+   "The market Selection card's Dispatch convoy form (BL-601, 2026-08-24) — a resource picker (the market's own tradeable goods), a quantity field and a destination-market picker (every other market, by city name), opened by selecting a market and reached without a nav-rail slot. Issued the same way against the corp-command seam, or over --serve, which needed no new wire key: it reuses subject / counterparty / target / quantity. The Market Ledger's Convoys tab (BL-453) shows the RESULT and carries the Hold press, but composes no dispatch."
   ],
   [
    "gameplay.hold_convoy",

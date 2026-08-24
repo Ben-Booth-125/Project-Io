@@ -361,6 +361,19 @@
    ],
    "status": "drafted"
   },
+  "selection_market_dispatch": {
+   "surface": "Selection band - Market card, Dispatch convoy form",
+   "answers": "How much of what do I send from the market I'm looking at, to where?",
+   "because": "SUPPLY.md always specified this front door -- 'a dispatch starts from a source you are looking at, and it is a resource + quantity + destination-market form, not a press' -- but BL-452 only ever wired dispatch_convoy onto the wire/agent dictionary; no UI site issued it, so the player's own corp had no way to direct a convoy at all (only the automatic shortfall scan moved goods). The form reuses the Sell Orders tab's own tradeable-resource test and the Convoys tab's market_city_name identity, so it cannot show a resource or destination the player couldn't already see traded or in flight, and a rejection (no route, insufficient funds) is surfaced inline rather than silently dropped.",
+   "backlog_item": [
+    "BL-601",
+    "BL-452"
+   ],
+   "files": [
+    "src/ui/selection_panel.cpp"
+   ],
+   "status": "drafted"
+  },
   "corporation_panel": {
    "surface": "Corporation panel — stance column",
    "answers": "What is my stance toward this rival, and can I change it?",

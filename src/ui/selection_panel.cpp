@@ -10,6 +10,7 @@
 #include "format.hpp"         // fmt::credits — the god-view corp readout (BL-408)
 #include "hex_render.hpp"      // draw_tile_neighbourhood — the card's zoomed tile view
 #include "icons.hpp"
+#include "market_ledger.hpp"   // market_city_name — the dispatch form's destination identity (BL-601)
 #include "presentation.hpp"
 #include "selection.hpp"
 #include "text_fit.hpp"
@@ -807,6 +808,124 @@ void draw_selection_icon(const world& w, ImDrawList* dl, selection_kind kind,
     }
 }
 
+// --- BL-601: the convoy dispatch form -----------------------------------
+//
+// SUPPLY.md § Dispatch trigger: "The in-app dispatch form lives on the market
+// Selection card — a dispatch starts from a source you are looking at, and it
+// is a resource + quantity + destination-market form, not a press." BL-452
+// gave the world a player-facing `dispatch_convoy` corp_verb but no UI site
+// ever issued it; this is that front door. The resource set is exactly the
+// Sell Orders tab's own test (`market->base_price[r] > 0`,
+// market_ledger.cpp's draw_sell_orders_tab) and the destination identity is
+// market_city_name (market_ledger.hpp) — the same lookup the Convoys tab
+// already lists arrivals/departures by — so this form cannot show a
+// different resource or market set than either surface already does.
+//
+// The press only ENQUEUES `ui_state::pending_dispatch_*`; the const `world&`
+// here cannot be mutated, and app::render applies it through
+// apply_corp_command — the same seam the AI's own dispatch candidate and the
+// wire/agent dictionary use, so a player's convoy and a rival's of the same
+// shape cost the same and travel the same (SUPPLY.md § Player-direction).
+void draw_market_dispatch_form(const world& w, ui_state& ui, entity_id source_market)
+{
+    const auto mit = w.markets.find(source_market);
+    if (mit == w.markets.end())
+        return;
+    const market_component& mc = mit->second;
+
+    // Per-market form memory, reset when the selection moves to a different
+    // market — the same guard draw_sell_orders_tab's form_body uses, for the
+    // same reason (the statics would otherwise carry one market's picks onto
+    // another).
+    static entity_id form_source   = null_entity;
+    static int       form_resource = -1;
+    static float     form_qty      = 10.0f;
+    static entity_id form_dest     = null_entity;
+    if (form_source != source_market)
+    {
+        form_source   = source_market;
+        form_resource = -1;
+        form_qty      = 10.0f;
+        form_dest     = null_entity;
+    }
+
+    if (form_resource < 0 || mc.base_price[static_cast<std::size_t>(form_resource)] <= 0.0f)
+    {
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (mc.base_price[r] > 0.0f) { form_resource = static_cast<int>(r); break; }
+    }
+
+    if (form_resource < 0)
+    {
+        ImGui::TextDisabled("No tradeable goods at this market.");
+        return;
+    }
+
+    const char* good_preview = resource_name(static_cast<resource_type>(form_resource));
+    if (ImGui::BeginCombo("Cargo", good_preview))
+    {
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (mc.base_price[r] <= 0.0f)
+                continue;
+            const bool sel = (form_resource == static_cast<int>(r));
+            if (ImGui::Selectable(resource_name(static_cast<resource_type>(r)), sel))
+                form_resource = static_cast<int>(r);
+        }
+        ImGui::EndCombo();
+    }
+
+    ImGui::InputFloat("Quantity", &form_qty, 1.0f, 10.0f, "%.0f");
+    if (form_qty < 0.0f) form_qty = 0.0f;
+
+    // Destination — every other market, named by its city.
+    std::vector<entity_id> others;
+    for (const auto& [mid, other_mc] : w.markets)
+        if (mid != source_market)
+            others.push_back(mid);
+    std::sort(others.begin(), others.end());
+
+    if (form_dest == null_entity ||
+        std::find(others.begin(), others.end(), form_dest) == others.end())
+        form_dest = others.empty() ? null_entity : others.front();
+
+    const std::string dest_preview =
+        (form_dest != null_entity) ? market_city_name(w, form_dest) : "-";
+    if (ImGui::BeginCombo("Destination", dest_preview.c_str()))
+    {
+        for (entity_id mid : others)
+        {
+            const bool sel = (mid == form_dest);
+            if (ImGui::Selectable(market_city_name(w, mid).c_str(), sel))
+                form_dest = mid;
+            if (sel)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    if (others.empty())
+        ImGui::TextDisabled("No other market to dispatch to.");
+
+    const bool can_submit = (form_dest != null_entity) && form_qty > 0.0f;
+    ImGui::BeginDisabled(!can_submit);
+    if (ImGui::Button("Dispatch"))
+    {
+        ui.construction.pending_dispatch_source = source_market;
+        ui.construction.pending_dispatch_dest   = form_dest;
+        ui.construction.pending_dispatch_good   = static_cast<resource_type>(form_resource);
+        ui.construction.pending_dispatch_qty    = form_qty;
+    }
+    ImGui::EndDisabled();
+
+    // Inline refusal surfacing (2026-08-14 standing convention: reject the
+    // whole command, mutate nothing, tell the user why) — the same feedback
+    // field the construction ledger reads, set by app::render after the
+    // apply_corp_command call above resolves.
+    if (!ui.construction.last_message.empty())
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::neutral), "%s",
+                           ui.construction.last_message.c_str());
+}
+
 // The hero: the ONE primary action for this selection kind (BL-093). Actions are
 // the panel's reason to exist, so they lead; reference detail is the ledgers' job.
 void draw_selection_action(const world& w, const recipe_registry& reg,
@@ -848,6 +967,9 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Locate");
             if (ImGui::Button("Go to"))
                 focus_on_entity(w, ui, sel);
+            ImGui::Separator();
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Dispatch convoy");
+            draw_market_dispatch_form(w, ui, sel);
             break;
 
         case selection_kind::nation:
