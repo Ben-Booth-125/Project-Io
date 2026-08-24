@@ -317,8 +317,24 @@ This is the binding constraint, not a nicety, and it decides both halves of the 
 
 Depth is the tile's distance, in tiles, from its nation's frontier — depth 0 being a tile that
 touches a foreign owner. **Unclaimed ground is its own owner**, so a coastline is a border: a
-nation's shore carries the band exactly as its land frontier does. Unclaimed tiles draw no band;
-they have no colour to extend.
+nation's shore carries the band too. Unclaimed tiles draw no band; they have no colour to extend.
+
+**But a shore is not the same claim as a neighbour, and it is not drawn at the same weight.** An
+edge facing unclaimed ground takes `k_border_unclaimed_scale` — wash *and* stroke, colour and
+thickness — where an edge facing another nation takes full strength. Ben, 2026-08-24: *"reduce the
+border band on edges facing unclaimed ground."*
+
+The reason is a shape problem rather than a taste one. A country of small islands is nearly *all*
+frontier, so at one uniform weight the treatment meant to be an edge effect became a tint again —
+and it did so on precisely the nations least able to spare the ground. Two rules keep the reduction
+honest:
+
+- **Political wins where both meet.** A tile touching a foreign nation *and* open ground counts as
+  political, so a coastal frontier between two countries does not quietly fade into its own sea.
+- **The stroke resolves per edge, the wash per tile.** The stroke already knows what lies across
+  each individual edge, so a headland facing water on three sides and a neighbour on the fourth
+  draws three light rules and one full one. The wash cannot: a depth-1 tile is not on the frontier
+  and has no neighbour to ask, so it *inherits* its kind from the frontier tile that seeded it.
 
 | Depth | Wash opacity | Reads as |
 |---|---|---|

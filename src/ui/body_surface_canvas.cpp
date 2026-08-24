@@ -147,6 +147,22 @@ constexpr int k_border_band_tiles = 3;
 /// rather than as a tint: past the third ring the ground is plain again.
 constexpr float k_border_band_alpha[k_border_band_tiles] = { 0.50f, 0.26f, 0.11f };
 
+/// Scale applied to the whole treatment — wash AND stroke — where the frontier
+/// faces UNCLAIMED ground rather than another nation (Ben, 2026-08-24: "reduce
+/// the border band on edges facing unclaimed ground").
+///
+/// Both kinds of edge are still borders — a coastline is where a nation stops —
+/// but they are not the same claim, and drawing them at the same weight made the
+/// band read as heavy on exactly the nations that have the most of it. A country
+/// of small islands is nearly all frontier, so at full strength almost none of
+/// its land showed plain terrain: the treatment that was meant to be an edge
+/// effect became a tint again for the shapes least able to afford it.
+///
+/// A tile touching BOTH a foreign nation and unclaimed ground counts as
+/// political — the stronger claim wins, so a coastal frontier between two
+/// countries does not quietly fade.
+constexpr float k_border_unclaimed_scale = 0.40f;
+
 /// The boundary stroke is INSET toward the drawing tile's own centre by this
 /// fraction of the circumradius, rather than laid along the shared edge. That is
 /// what keeps two neighbours' colours apart: each nation paints a rule just
@@ -2183,6 +2199,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // political outline, which is the whole read at that zoom.
     static std::vector<uint8_t> border_depth;
     border_depth.assign(static_cast<std::size_t>(gw) * gh, 0xFFu);
+    // Which KIND of frontier a banded tile belongs to: 1 where the nation faces
+    // another nation, 0 where it faces only unclaimed ground (Ben, 2026-08-24).
+    // Carried beside the depth rather than recomputed at the wash, because a
+    // depth-1 or depth-2 tile is not on the frontier at all and cannot answer the
+    // question by looking at its own neighbours — it inherits the answer from the
+    // frontier tile that seeded it.
+    static std::vector<uint8_t> border_political;
+    border_political.assign(static_cast<std::size_t>(gw) * gh, 0u);
     const int band_depth = coarse_fill ? 1 : k_border_band_tiles;
     const int band_lo    = std::max(0,      row_lo - band_depth);
     const int band_hi    = std::min(gh - 1, row_hi + band_depth);
@@ -2207,10 +2231,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 int ncol = (cc + off[n][0]) % gw;
                 if (ncol < 0)
                     ncol += gw;
-                if (nation_of(tile_at_rc(ncol, nrow)) != nat)
+                const entity_id nb_nat = nation_of(tile_at_rc(ncol, nrow));
+                if (nb_nat != nat)
                 {
                     border_depth[ci] = 0u;
-                    break;
+                    // Do NOT break on the first foreign edge: a tile can face
+                    // both a neighbour nation and open ground, and the political
+                    // claim is the stronger one. Keep looking until a political
+                    // edge is found, so a coastal frontier between two countries
+                    // is not quietly faded by the sea on its other side.
+                    if (nb_nat != null_entity)
+                    {
+                        border_political[ci] = 1u;
+                        break;
+                    }
                 }
             }
         }
@@ -2243,7 +2277,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     // band and must never seed this one's.
                     if (border_depth[ni] == d - 1u && nation_of(raster[ni]) == nat)
                     {
-                        border_depth[ci] = d;
+                        border_depth[ci]     = d;
+                        border_political[ci] = border_political[ni];
                         break;
                     }
                 }
@@ -2484,7 +2519,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 if (nat != null_entity)
                 {
                     const ImU32 nc = palette::nation_colour(nat);
-                    const int   a  = static_cast<int>(k_border_band_alpha[depth] * 255.0f);
+                    const float scale = border_political[shade_idx]
+                                        ? 1.0f : k_border_unclaimed_scale;
+                    const int   a  = static_cast<int>(k_border_band_alpha[depth] * scale * 255.0f);
                     const ImU32 wash = IM_COL32((nc >> IM_COL32_R_SHIFT) & 0xFFu,
                                                 (nc >> IM_COL32_G_SHIFT) & 0xFFu,
                                                 (nc >> IM_COL32_B_SHIFT) & 0xFFu, a);
@@ -2688,8 +2725,21 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         const entity_id nb_id = tile_at_rc(ncol, nrow);
                         if (nb_id == null_entity)
                             continue;
-                        if (nation_of(nb_id) == own_nation)
+                        const entity_id nb_nation = nation_of(nb_id);
+                        if (nb_nation == own_nation)
                             continue; // Same owner: interior edge, no border.
+
+                        // An edge facing UNCLAIMED ground is drawn lighter and
+                        // thinner than one facing another nation (Ben,
+                        // 2026-08-24). The wash carries this per TILE, inherited
+                        // inward from the frontier; the stroke can do better,
+                        // because it already knows what is on the other side of
+                        // each individual edge — so a headland that faces the sea
+                        // on three sides and a neighbour on the fourth draws three
+                        // light rules and one full one, rather than four of a
+                        // single averaged weight.
+                        const bool  political  = (nb_nation != null_entity);
+                        const float edge_scale = political ? 1.0f : k_border_unclaimed_scale;
 
                         // The shared edge via the midpoint-perpendicular method:
                         // place the segment at the midpoint of the centre-to-centre
@@ -2721,8 +2771,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
                         const ImVec2 e0 { mx - px * half, my - py * half };
                         const ImVec2 e1 { mx + px * half, my + py * half };
-                        dl->AddLine(e0, e1, border_col,
-                                    std::max(1.0f, k_border_stroke_px));
+                        const ImU32 edge_col =
+                            political ? border_col
+                                      : IM_COL32((border_col >> IM_COL32_R_SHIFT) & 0xFFu,
+                                                 (border_col >> IM_COL32_G_SHIFT) & 0xFFu,
+                                                 (border_col >> IM_COL32_B_SHIFT) & 0xFFu,
+                                                 static_cast<int>(255.0f * k_border_unclaimed_scale));
+                        dl->AddLine(e0, e1, edge_col,
+                                    std::max(1.0f, k_border_stroke_px * edge_scale));
 
                         // The hit corridor (BL-601, and the general structure-grain
                         // case BL-603 builds on). Registered per DRAWN segment, so
