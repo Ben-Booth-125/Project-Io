@@ -1973,15 +1973,20 @@
       "date": "2026-08-24",
       "message": "Regenerate item-commits.json after BL-588"
     },
+    "BL-589": {
+      "commit": "39eb1b1",
+      "date": "2026-08-24",
+      "message": "BL-589: measured the start gate, then ruled it, then asserted it"
+    },
     "BL-590": {
       "commit": "864ee36",
       "date": "2026-08-24",
       "message": "Regenerate item-commits.json after BL-590"
     },
     "BL-591": {
-      "commit": "3db486f",
+      "commit": "ee17c52",
       "date": "2026-08-24",
-      "message": "BL-591: the growth track is visible, not just a gate"
+      "message": "Regenerate item-commits.json after BL-591"
     },
     "BL-594": {
       "commit": "401eae7",
