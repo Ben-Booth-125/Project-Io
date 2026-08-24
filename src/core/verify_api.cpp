@@ -738,6 +738,27 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["hovered_province"]  = static_cast<unsigned int>(m_ui.hovered_province);
         out["selected_province"] = static_cast<unsigned int>(m_ui.selected_province);
         out["has_selection"]     = (m_ui.selected_entity != null_entity);
+        // WHAT is selected, not merely whether (added at Sprint 17b's integration).
+        // `has_selection` cannot tell a nation from a building, and a structure
+        // press and a marker press both clear the province mirror — so a check on
+        // structure-grain selection (BL-601, and BL-603 after it) could assert the
+        // side effect and never the subject. Exposed as the same word the Selection
+        // element renders, so a script asserts on what the player reads.
+        {
+            const char* k = "none";
+            switch (ui::selection_kind_of(m_world, m_ui.selected_entity))
+            {
+            case ui::selection_kind::body:        k = "body";        break;
+            case ui::selection_kind::tile:        k = "tile";        break;
+            case ui::selection_kind::building:    k = "building";    break;
+            case ui::selection_kind::market:      k = "market";      break;
+            case ui::selection_kind::unit:        k = "unit";        break;
+            case ui::selection_kind::nation:      k = "nation";      break;
+            case ui::selection_kind::corporation: k = "corporation"; break;
+            default:                              k = "none";        break;
+            }
+            out["selection_kind"] = std::string(k);
+        }
         // BL-469: the battle selection is a third channel into the same element,
         // so the assertion half needs it too — without these every expect() about
         // a battle card would be a proxy for something else.
