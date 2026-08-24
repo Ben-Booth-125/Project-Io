@@ -339,6 +339,17 @@ struct unit_march_tick
     int marching  = 0; ///< Units that held a live order when the pass started.
     int arrived   = 0; ///< Orders that reached their destination this tick.
     int recomputed = 0; ///< Paths recomputed after a blocked step this tick.
+
+    /// BL-596: orders refused outright this tick for want of active Logistic
+    /// Points at the unit's nearest anchor (no reachable anchor at all, or
+    /// that anchor's pool already exhausted by higher-priority draws this
+    /// tick). A refusal MUTATES NOTHING — order, position, next_index,
+    /// progress and the owning corp's balance are all left exactly as they
+    /// were — so this is the only signal a caller has that the tick happened
+    /// and did nothing; surfacing it here follows the marching/arrived/
+    /// recomputed counter style rather than inventing a narration pathway
+    /// (nothing narrates unit movement today; see the doc comment below).
+    int refused_no_lp = 0;
 };
 
 /// NR-344's mobilisation test — see run_unit_march's doc comment. Exposed
@@ -355,11 +366,35 @@ bool corp_is_mobilised(const world& w, entity_id corp);
 /// this item): a corp party to ANY declared hostility (either direction —
 /// being attacked mobilises too, `is_hostile` checked both ways against
 /// `w.corp_hostile_pairs`) has its units visited FIRST this tick; every other
-/// corp's units follow, in ascending unit id within each group. At peace
-/// this changes nothing observable YET — there is no shared logistics-point
-/// pool for a march and a convoy to actually contend over until BL-464 lands
-/// one — so the rule ships the same way BL-454's upkeep rates did: real,
-/// written down, and inert until something exists to contend over.
+/// corp's units follow, in ascending unit id within each group. This order is
+/// what BL-596 (active Logistic Points) resolves contention with: it now IS
+/// the "deterministic priority over a sorted set" LOGISTICS.md's Refusal
+/// section calls for, reused rather than re-invented.
+///
+/// BL-596 (LOGISTICS.md § Logistic Points): before spending march points, a
+/// unit draws against its NEAREST supply anchor's active-LP pool for this
+/// tick (`active_lp_anchor_pools`, logistics.hpp — a fresh, uncached map per
+/// body, decremented as this pass's units draw from it; never persisted,
+/// because LP is a per-tick RATE, never a stock). "Nearest" is NOT specified
+/// by LOGISTICS.md for a mid-route unit — this is a reasoned interpretation:
+/// the anchor with the lowest `intra_body_path` cost from the unit's CURRENT
+/// position, among the body's anchor set, reusing the exact anchor
+/// enumeration `body_reach_field` seeds its Dijkstra from (never a second
+/// distance model — BL-325 ruling 3). An anchor with insufficient pool (or a
+/// body with no reachable anchor at all) REFUSES the unit's move outright
+/// this tick — no partial draw, no order/position/balance mutation,
+/// `unit_march_tick::refused_no_lp` counts it. A granted draw both consumes
+/// the anchor's pool AND debits the owning corp's credit balance
+/// (`active_lp_credit_per_unit_distance`) — LP is the cap, credits are the
+/// separate price (LOGISTICS.md rule 1). A nation-owned garrison (no
+/// `w.corporations` entry, BL-571) still draws against the LP cap but pays
+/// no credits — its upkeep is a nation-budget line, not a corp balance.
+///
+/// At peace this now DOES change something observable where it did not
+/// before: BL-464's shared pool exists (as of BL-596, for the active half
+/// only — BL-597 lands the passive convoy half in the same sprint), so two
+/// corps' units converging on one anchor genuinely contend for it, resolved
+/// by the visit order above.
 ///
 /// Called from run_economy_step in the slot BL-467's (not-yet-built)
 /// battle-discovery phase will occupy — see that call site's comment for why

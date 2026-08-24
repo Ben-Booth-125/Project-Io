@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*17 entries — 15 open, 2 resolved.*
+*18 entries — 16 open, 2 resolved.*
 
 ---
 
@@ -194,6 +194,20 @@ merge/17b-onto-main (tip bd3f3431, 2026-08-24 22:41:48) merges a complete UI swe
 - Investigate why worktree isolation forked from it rather than main tip, as a tooling fix
 
 > **Recommendation:** Leave the branch alone — it is not this session's work to merge unreviewed. Worth a deliberate merge decision the next time a session is free to review Sprint 17b's content on its own terms, not folded into Sprint 18's wave-1 integration.
+
+### NR-619 — BL-596 active LP: nearest-anchor rule and refusal surfacing are reasoned interpretations, not lookups
+*decision taken on your behalf · raised 2026-08-25 · from BL-596 (LP_ACTIVE_MARCH) landing — LOGISTICS.md does not name the mid-route anchor-attachment rule or a narration pathway for a refused march.*
+
+Two calls made so the item could land: (1) a marching unit draws from the anchor with the LOWEST intra_body_path cost from its CURRENT position, recomputed fresh each tick (never cached per-unit) — reusing the exact anchor enumeration body_reach_field seeds its Dijkstra from. (2) a refusal is surfaced only via unit_march_tick::refused_no_lp, a counter, matching the marching/arrived/recomputed style — this codebase has no existing per-unit-movement narration pathway (no agency_event/world_history_entry equivalent fires from run_unit_march today), so no comms/UI surface was invented for this first cut.
+
+**Why it matters.** LOGISTICS.md (Refusal, surfacing and determinism) requires refusal to be non-optional and legible to the player — a counter on a return struct nobody currently reads UI-side is real but not yet PLAYER-visible. BL-598 (the Throughput lens) is the named surface; until it lands, a refused march is legible only to a harness, not to Ben in play.
+
+- Leave refused_no_lp as the sole signal until BL-598 lands the lens
+- Add a lightweight comms-log line now (piggybacking the pattern BL-458 interdiction uses) ahead of BL-598
+
+> **Recommendation:** Leave it — BL-598 is already scoped to be the throughput surface, and a second ad-hoc narration path now would likely be thrown away when it lands.
+
+*Files: `src/world/economy_system.cpp`, `src/world/economy_system.hpp`, `src/world/logistics.hpp`, `src/world/logistics.cpp`, `docs/economy/LOGISTICS.md`*
 
 ---
 

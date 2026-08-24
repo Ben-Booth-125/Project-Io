@@ -386,6 +386,43 @@ economy = {
             siege    = 0.5,
             naval    = 0.0,
         },
+
+        -- BL-596 (LP_ACTIVE_MARCH, 2026-08-25): active Logistic Points — the
+        -- first real consumer of LOGISTICS.md's Logistic Points design.
+        -- NR-600 flags both numbers below for Ben's calibration by playtest;
+        -- this is a reasoned first cut, not a final ruling (LOGISTICS.md
+        -- "Active lands first", 2026-08-24).
+        --
+        -- CAPACITY. active_lp_per_anchor_tick is in the SAME units as
+        -- march_points_per_class above — one active LP admits one
+        -- march-point's worth of movement, so the cap shares a scale with
+        -- the thing it caps rather than needing an invented conversion. An
+        -- infantry unit's whole tick (1.0 march points, roughly one plains
+        -- tile) costs 1.0 active LP; a cavalry unit's tick (1.5) costs 1.5.
+        -- 20.0 per anchor per tick is sized to let a real column (a dozen-
+        -- plus units, cavalry and infantry mixed) march through one city or
+        -- hub in a tick without the cap binding on ordinary peacetime
+        -- movement, while a multi-corp war converging on one anchor can
+        -- still exhaust it — the contention the design exists to make
+        -- explicit (LOGISTICS.md "the finding worth keeping").
+        active_lp_per_anchor_tick = 20.0,
+
+        -- PRICE. active_lp_credit_per_unit_distance is argued against
+        -- logistics.base_cost_per_unit_distance.land (0.02, below) rather
+        -- than guessed — same "credits per unit-distance" shape the convoy
+        -- layer already prices with. Doubled to 0.04: moving armed units
+        -- costs more than routine cargo the way the convoy table itself
+        -- already prices mode by burden (land 0.02 < sea 0.05 < air 0.15 <
+        -- space 1.00) — a marching column's escort/coordination overhead
+        -- sits above a cargo haul's, so a flat 2x on the cheapest (land)
+        -- rate is the conservative first step up that ladder rather than a
+        -- reach for the next rung. Charged per (active-LP-unit drawn x head
+        -- in the unit), so a company of 200 drawing 1.0 LP this tick pays
+        -- 200 x 1.0 x 0.04 = 8.0 credits — well under hire_base_cost (40,
+        -- above), so marching an already-raised unit stays far cheaper than
+        -- raising a fresh one, the same relationship BL-603's upkeep
+        -- derivation keeps for standing-force wages.
+        active_lp_credit_per_unit_distance = 0.04,
     },
 
     -- BL-350: the procurement/contract seam — "a build order placed with

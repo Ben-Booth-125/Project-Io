@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -133,6 +134,29 @@ inline bool building_affects_logistics(building_type t)
 {
     return t == building_type::port || t == building_type::inland_logistics_hub;
 }
+
+// ---------------------------------------------------------------------------
+// Active Logistic Points (BL-596 — LOGISTICS.md § Logistic Points)
+// ---------------------------------------------------------------------------
+// LP is a per-tick RATE, never a stock (Ben, ruling on NR-343, 2026-08-20):
+// this function is PURE and UNCACHED — call it fresh every tick, never store
+// its result on `world` or across a call boundary. A generator per anchor
+// tile only (cities, built-and-active ports/inland hubs — the SAME anchor
+// set body_reach_field seeds from, never a per-corp pool).
+
+/// This tick's ephemeral active-LP capacity at every supply anchor on @p
+/// body, keyed by anchor tile, at @p lp_per_anchor_tick each. An anchorless
+/// body (or one where @p lp_per_anchor_tick <= 0) returns an empty map —
+/// "no active LP exists here", not an error.
+///
+/// FIRST CONSUMER: BL-596's `run_unit_march` (economy_system.cpp), which
+/// builds one of these per body it encounters marching units on, then
+/// decrements it as units draw against their nearest anchor this tick.
+/// EXTENSION POINT for BL-597 (passive convoy LP draw, a later item): call
+/// this again for the convoy layer's own draw against the same anchor set,
+/// rather than re-deriving it.
+std::unordered_map<entity_id, float> active_lp_anchor_pools(world& w, entity_id body,
+                                                             float lp_per_anchor_tick);
 
 // ---------------------------------------------------------------------------
 // Physical scale and travel time (Ben, 2026-08-12)

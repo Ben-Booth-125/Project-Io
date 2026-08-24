@@ -16,6 +16,7 @@
 #include <cmath>
 #include <limits>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -1770,6 +1771,21 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
     const auto& table = unit_roster_table();
     const military_capability_params& mil = reg.military();
 
+    // BL-596: this tick's active-LP pools, one per body, built lazily on
+    // first encounter and decremented as this pass's units draw from it.
+    // Local to this call — NOT cached on `world` — because LP is a per-tick
+    // RATE, never a stock (LOGISTICS.md § Logistic Points, ruling on
+    // NR-343). See run_unit_march's own doc comment for the nearest-anchor
+    // interpretation and the refusal contract.
+    std::unordered_map<entity_id, std::unordered_map<entity_id, float>> lp_pools_by_body;
+    auto lp_pool_for_body = [&](entity_id body) -> std::unordered_map<entity_id, float>& {
+        auto it = lp_pools_by_body.find(body);
+        if (it == lp_pools_by_body.end())
+            it = lp_pools_by_body.emplace(body,
+                    active_lp_anchor_pools(w, body, mil.active_lp_per_anchor_tick)).first;
+        return it->second;
+    };
+
     for (const entity_id id : ids)
     {
         unit_component& u = w.units.at(id);
@@ -1782,11 +1798,86 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
         // "an unknown index is a data problem, not a reason to make a unit
         // free" tolerance resolve_unit_upkeep already applies (unit_roster.cpp).
         const unit_class cls = (u.type < table.size()) ? table[u.type].cls : unit_class::infantry;
-        float points = mil.march_points_per_class[static_cast<std::size_t>(cls)];
-        if (points <= 0.0f)
+        const float base_points = mil.march_points_per_class[static_cast<std::size_t>(cls)];
+        if (base_points <= 0.0f)
             continue; // this class cannot march under the authored data
 
-        points += u.order.progress;
+        // The full tick's movement budget, banked carry-over included — this
+        // is also exactly the active-LP amount the gate below checks and
+        // draws (BL-596: one active LP admits one march-point's worth of
+        // movement), computed BEFORE anything mutates so a refusal can still
+        // leave u.order.progress untouched.
+        const float would_be_points = base_points + u.order.progress;
+
+        // --- BL-596: the active-LP gate, before any state mutates ---------
+        const auto cur_it0 = w.tiles.find(u.position);
+        if (cur_it0 != w.tiles.end())
+        {
+            const entity_id body = cur_it0->second.body;
+            std::unordered_map<entity_id, float>& pools = lp_pool_for_body(body);
+
+            // Nearest anchor by intra_body_path cost from the unit's CURRENT
+            // position — reasoned interpretation (LOGISTICS.md does not name
+            // the mid-route locus rule), reusing the same cost function/cache
+            // every other consumer of this pathing does. Deterministic
+            // regardless of `pools`' hash-map iteration order: this is a pure
+            // min-with-tiebreak reduction over (cost, then lowest tile id).
+            entity_id nearest_anchor = null_entity;
+            float best_cost = std::numeric_limits<float>::infinity();
+            for (const auto& kv : pools)
+            {
+                const entity_id anchor_tile = kv.first;
+                const logistics_path& p = intra_body_path(w, body, u.position, anchor_tile);
+                if (!p.reachable)
+                    continue;
+                if (nearest_anchor == null_entity || p.cost < best_cost
+                    || (p.cost == best_cost && anchor_tile < nearest_anchor))
+                {
+                    best_cost      = p.cost;
+                    nearest_anchor = anchor_tile;
+                }
+            }
+
+            if (nearest_anchor == null_entity)
+            {
+                // No reachable anchor on this body at all — no active LP
+                // exists to draw against. Refused outright: nothing about
+                // this unit's state changes this tick.
+                ++out.refused_no_lp;
+                continue;
+            }
+
+            float& pool = pools.at(nearest_anchor);
+            if (pool + 1e-6f < would_be_points)
+            {
+                // The nearest anchor's pool is already exhausted (by a
+                // higher-priority draw earlier THIS tick, or simply too
+                // small) — refused outright, same "mutates nothing" contract.
+                ++out.refused_no_lp;
+                continue;
+            }
+
+            // Granted: consume the anchor's pool, then price the draw in
+            // credits — LP is the CAP, credits are the separate PRICE
+            // (LOGISTICS.md rule 1; Ben, 2026-08-22, "it should cost actual
+            // money... moving units"). A nation-owned garrison (BL-571) has
+            // no `w.corporations` entry — it still draws against the LP cap
+            // (the physical constraint applies to everyone) but pays no
+            // credits, matching MILITARY.md's "a garrison does not draw the
+            // credits+goods vector run_unit_upkeep charges corp units".
+            pool -= would_be_points;
+            if (const auto corp_it = w.corporations.find(u.owner); corp_it != w.corporations.end())
+            {
+                const float credit_cost = mil.active_lp_credit_per_unit_distance
+                                         * would_be_points * static_cast<float>(u.count);
+                corp_it->second.balance -= credit_cost;
+            }
+        }
+        // else: the unit's own tile is gone (defensive — see the blocked-step
+        // comment inside the loop below); no LP question to ask about a unit
+        // that isn't anywhere, so it falls through to the existing handling.
+
+        float points = would_be_points;
         u.order.progress = 0.0f;
 
         while (points > 0.0f && u.order.next_index < u.order.path.size())
