@@ -763,7 +763,8 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
     return recipe_switch_result::applied;
 }
 
-economy_report run_economy_step(world& w, const recipe_registry& reg, bool spectating)
+economy_report run_economy_step(world& w, const recipe_registry& reg, bool spectating,
+                                lp_pool_map* shared_lp_pools)
 {
     economy_report report;
 
@@ -1567,7 +1568,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         report.battle_dispatches = std::move(bt.dispatches);
     }
 
-    run_unit_march(w, reg);
+    run_unit_march(w, reg, shared_lp_pools);
 
     // BL-454: the unit pass — goods draw, the decay rule, orphan cleanup. LAST,
     // deliberately: the strategic tier above demolishes at tick rate, so running
@@ -1742,7 +1743,8 @@ bool corp_is_mobilised(const world& w, entity_id corp)
     return false;
 }
 
-unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
+unit_march_tick run_unit_march(world& w, const recipe_registry& reg,
+                               lp_pool_map* shared_lp_pools)
 {
     unit_march_tick out;
     if (w.units.empty())
@@ -1773,18 +1775,20 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
 
     // BL-596: this tick's active-LP pools, one per body, built lazily on
     // first encounter and decremented as this pass's units draw from it.
-    // Local to this call — NOT cached on `world` — because LP is a per-tick
-    // RATE, never a stock (LOGISTICS.md § Logistic Points, ruling on
-    // NR-343). See run_unit_march's own doc comment for the nearest-anchor
-    // interpretation and the refusal contract.
-    std::unordered_map<entity_id, std::unordered_map<entity_id, float>> lp_pools_by_body;
-    auto lp_pool_for_body = [&](entity_id body) -> std::unordered_map<entity_id, float>& {
-        auto it = lp_pools_by_body.find(body);
-        if (it == lp_pools_by_body.end())
-            it = lp_pools_by_body.emplace(body,
-                    active_lp_anchor_pools(w, body, mil.active_lp_per_anchor_tick)).first;
-        return it->second;
-    };
+    // NOT cached on `world` — because LP is a per-tick RATE, never a stock
+    // (LOGISTICS.md § Logistic Points, ruling on NR-343). See run_unit_march's
+    // own doc comment for the nearest-anchor interpretation and the refusal
+    // contract.
+    //
+    // BL-597: `local_pools` backs this ONLY when the caller did not hand us
+    // a shared instance — the byte-identical-to-BL-596 path every existing
+    // caller still takes. When `shared_lp_pools` is non-null (the real
+    // per-tick driver, once wired) this pass draws down the SAME map
+    // `commit_convoy`'s passive draws (supply_system.cpp) already touched
+    // this tick, and `lp_pool_for_body` (logistics.hpp, factored out of the
+    // lambda this replaced) is the one fetch-or-build both consumers call.
+    lp_pool_map local_pools;
+    lp_pool_map& lp_pools_by_body = shared_lp_pools ? *shared_lp_pools : local_pools;
 
     for (const entity_id id : ids)
     {
@@ -1814,7 +1818,8 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
         if (cur_it0 != w.tiles.end())
         {
             const entity_id body = cur_it0->second.body;
-            std::unordered_map<entity_id, float>& pools = lp_pool_for_body(body);
+            std::unordered_map<entity_id, float>& pools =
+                lp_pool_for_body(lp_pools_by_body, w, body, mil.active_lp_per_anchor_tick);
 
             // Nearest anchor by intra_body_path cost from the unit's CURRENT
             // position — reasoned interpretation (LOGISTICS.md does not name
@@ -1822,21 +1827,11 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
             // every other consumer of this pathing does. Deterministic
             // regardless of `pools`' hash-map iteration order: this is a pure
             // min-with-tiebreak reduction over (cost, then lowest tile id).
-            entity_id nearest_anchor = null_entity;
-            float best_cost = std::numeric_limits<float>::infinity();
-            for (const auto& kv : pools)
-            {
-                const entity_id anchor_tile = kv.first;
-                const logistics_path& p = intra_body_path(w, body, u.position, anchor_tile);
-                if (!p.reachable)
-                    continue;
-                if (nearest_anchor == null_entity || p.cost < best_cost
-                    || (p.cost == best_cost && anchor_tile < nearest_anchor))
-                {
-                    best_cost      = p.cost;
-                    nearest_anchor = anchor_tile;
-                }
-            }
+            // BL-597 factored this reduction into `nearest_lp_anchor`
+            // (logistics.hpp/cpp) so `commit_convoy`'s passive draw
+            // (supply_system.cpp) reuses this exact rule for a convoy's
+            // dispatch tile rather than a second copy of it.
+            const entity_id nearest_anchor = nearest_lp_anchor(w, body, u.position, pools);
 
             if (nearest_anchor == null_entity)
             {

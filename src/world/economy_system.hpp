@@ -6,6 +6,7 @@
 #include "nation_ai.hpp"     // nation_scorer_report (BL-542; Sprint N3 T4)
 #include "nation_budget.hpp" // budget_claim, national_budget_tick (BL-537; Sprint N3 T4)
 #include "nation_step.hpp"   // earmark_result (Sprint N3 T6)
+#include "logistics.hpp"     // lp_pool_map (BL-596/BL-597, shared active+passive LP pool)
 #include "world.hpp"
 
 #include <array>
@@ -276,9 +277,17 @@ struct economy_report
 /// @param spectating BL-409: when true the session has no human seat, so the
 ///        strategic tier evaluates EVERY corp including `w.player_entity`.
 ///        Defaulted so no existing caller (harnesses included) changes.
+/// @param shared_lp_pools BL-597: forwarded to `run_unit_march`'s own
+///        parameter of the same name — see that function's doc comment. Null
+///        (the default) keeps every existing caller's behaviour byte-for-byte
+///        unchanged (a private, always-fresh pool per call, as BL-596 built
+///        it); the real per-tick driver (app.cpp/main.cpp) passes the SAME
+///        `lp_pool_map` it handed `dispatch_convoys` moments earlier this
+///        tick, so active and passive draws genuinely contend.
 /// @return    The step report (building states + auto-bought shortfalls).
 economy_report run_economy_step(world& w, const recipe_registry& reg,
-                                bool spectating = false);
+                                bool spectating = false,
+                                lp_pool_map* shared_lp_pools = nullptr);
 
 // ---------------------------------------------------------------------------
 // BL-454 — the unit pass
@@ -399,7 +408,19 @@ bool corp_is_mobilised(const world& w, entity_id corp);
 /// Called from run_economy_step in the slot BL-467's (not-yet-built)
 /// battle-discovery phase will occupy — see that call site's comment for why
 /// there is nothing to run after yet.
-unit_march_tick run_unit_march(world& w, const recipe_registry& reg);
+///
+/// @param shared_lp_pools BL-597 (LOGISTICS.md § Logistic Points, passive
+///        convoy admissibility): when non-null, this pass draws against —
+///        and leaves its draws visible in — the CALLER'S `lp_pool_map`
+///        rather than a private one, so a passive draw (`commit_convoy`,
+///        supply_system.cpp) earlier THIS tick against the same instance is
+///        already reflected in the pool a march contends for, and vice
+///        versa. Null (the default) reproduces BL-596's original behaviour
+///        exactly: a fresh, private map built and discarded within this one
+///        call, so every existing caller (every harness, and any call site
+///        not yet updated to share a pool) is unaffected byte-for-byte.
+unit_march_tick run_unit_march(world& w, const recipe_registry& reg,
+                               lp_pool_map* shared_lp_pools = nullptr);
 
 /// BL-430: outcome of a PLAYER-grade recipe-switch attempt (try_switch_recipe).
 enum class recipe_switch_result : uint8_t

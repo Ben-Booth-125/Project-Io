@@ -275,7 +275,9 @@ does not live between ticks.
 
 **1. LP is a CAP, not a price.** The convoy already charges distance in credits. Adding LP as a
 second price would double-charge distance and move every economy golden. **Credits stay the price;
-LP decides whether the leg is admissible at all.**
+LP decides whether the leg is admissible at all.** A draw measured in *distance* breaks this rule
+however it is dressed up — see constraint 3 for the settled formula, and NR-620 for what it cost
+to learn: a distance draw cut real convoy traffic by 73% while every golden held steady.
 
 **2. Adopt the node half; refuse the link half.** The reference system runs two currencies —
 throughput from nodes, and distance from links. **Io already owns the link half, twice over:**
@@ -301,6 +303,10 @@ Each rejected an earlier cut. Two are structural.
    `military_points` was deleted for.** Cities are the locus.
 3. **Specify the LP cost formula before the allocation sort key**, which is a function of it. If
    cost is proportional to distance, LP *is* haulage cost again; if flat, the sort degenerates.
+   **Settled (Ben, 2026-08-25): the draw is what MOVES, not how far.** A passive convoy draw is
+   its **cargo quantity**; an active march draw is its **march points**. One rate serves both, so
+   a unit of goods and a march-point's worth of movement burden an anchor equally — the implicit
+   exchange rate, and a first cut. Distance stays priced in credits and only in credits.
 4. **The base allowance must not be the whole mechanic.** No corp is seeded a hub, so "your own
    nodes decide how much you may move" is fictional; city generation is what makes the rate real.
 5. **A rival must be able to build the generator.** `corp_ai.cpp`'s scorer carries `place_road`

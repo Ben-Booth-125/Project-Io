@@ -302,7 +302,21 @@ int main()
 {
     std::printf("=== sea_port_gate (BL-602: the Port building gates the sea leg) ===\n");
 
-    const recipe_registry reg;
+    recipe_registry reg;
+    {
+        // BL-597: a deliberately generous per-anchor LP rate, same reasoning as
+        // convoy_command.cpp and unit_march_harness.cpp — this file's subject is
+        // BL-602's PORT gate, not BL-597's passive-LP admissibility gate, so the
+        // latter is set up never to bind here. No anchor needs planting: R0's
+        // Port on `src_tile` IS a supply anchor (LOGISTICS.md § 3, "a city, or a
+        // built and active port or inland logistics hub"), so the only thing the
+        // default registry lacks is a non-zero rate for it to generate against.
+        // R1's port-less cases are refused by `price_convoy_leg` before the LP
+        // gate is ever reached, so their `rejected_placement` reason is unchanged.
+        military_capability_params mp = reg.military();
+        mp.active_lp_per_anchor_tick = 1.0e6f;
+        reg.set_military(mp);
+    }
 
     const std::string trace1 = run_sequence(reg);
     const std::string trace2 = run_sequence(reg);

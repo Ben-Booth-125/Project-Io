@@ -206,6 +206,19 @@ scenario make_scenario(float stock = 100.0f, float balance = 1000.0f)
     s.w.corporations[s.corp] = cc;
     s.w.player_entity = s.corp;
 
+    // BL-597: a supply anchor (city) near — but NOT on — the corp's own
+    // haul route, so every intra-body dispatch in this file clears the
+    // passive-LP admissibility gate (a short, cheap, always-affordable draw
+    // against the generous rate `main()`'s `reg` sets below) WITHOUT also
+    // tripping BL-148/149's node discount, which shares the exact same
+    // `w.population_centre_tile` vocabulary — an anchor ON the route would
+    // silently discount R0.8's exact cost assertion. One column over, same
+    // row: reachable from the dispatch tile at a short A* hop, off the
+    // straight column-0 path every haul in this file actually travels
+    // (mirrors unit_march_harness.cpp's own fix when BL-596 landed its
+    // gate — a generous rate paired with a reachable anchor).
+    s.w.population_centre_tile[s.w.create_entity()] = tile_at(s.w, s.body, 1, 0);
+
     s.src_market = s.w.create_entity();
     market_component sm{};
     sm.body          = s.body;
@@ -286,7 +299,17 @@ int main()
     std::printf("=== convoy_command (BL-452: the logistics layer joins the seam) ===\n");
 
     // Default per-mode logistics costs {land .02, sea .05, air .15, space 1.0}.
-    const recipe_registry reg;
+    recipe_registry reg;
+    {
+        // BL-597: a deliberately generous per-anchor LP rate, same reasoning
+        // as unit_march_harness.cpp's `registry_with_march` — this file's
+        // subject is BL-452's verb contract, not BL-597's admissibility gate,
+        // so the gate is set up to never bind here (paired with the anchor
+        // make_scenario now places at zero distance from every dispatch).
+        military_capability_params mp = reg.military();
+        mp.active_lp_per_anchor_tick = 1.0e6f;
+        reg.set_military(mp);
+    }
 
     // -----------------------------------------------------------------------
     // R0 — the verb works, and moves exactly what it should

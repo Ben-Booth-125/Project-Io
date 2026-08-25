@@ -503,6 +503,40 @@ std::unordered_map<entity_id, float> active_lp_anchor_pools(world& w, entity_id 
 }
 
 // ---------------------------------------------------------------------------
+// Passive Logistic Points scaffolding (BL-597 — LOGISTICS.md § Logistic Points)
+// ---------------------------------------------------------------------------
+
+std::unordered_map<entity_id, float>& lp_pool_for_body(lp_pool_map& pools_by_body, world& w,
+                                                        entity_id body, float lp_per_anchor_tick)
+{
+    auto it = pools_by_body.find(body);
+    if (it == pools_by_body.end())
+        it = pools_by_body.emplace(body, active_lp_anchor_pools(w, body, lp_per_anchor_tick)).first;
+    return it->second;
+}
+
+entity_id nearest_lp_anchor(world& w, entity_id body, entity_id from_tile,
+                            const std::unordered_map<entity_id, float>& pool)
+{
+    entity_id nearest_anchor = null_entity;
+    float best_cost = std::numeric_limits<float>::infinity();
+    for (const auto& kv : pool)
+    {
+        const entity_id anchor_tile = kv.first;
+        const logistics_path& p = intra_body_path(w, body, from_tile, anchor_tile);
+        if (!p.reachable)
+            continue;
+        if (nearest_anchor == null_entity || p.cost < best_cost
+            || (p.cost == best_cost && anchor_tile < nearest_anchor))
+        {
+            best_cost      = p.cost;
+            nearest_anchor = anchor_tile;
+        }
+    }
+    return nearest_anchor;
+}
+
+// ---------------------------------------------------------------------------
 // Physical scale and travel time (Ben, 2026-08-12)
 // ---------------------------------------------------------------------------
 

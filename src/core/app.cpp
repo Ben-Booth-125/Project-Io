@@ -1250,15 +1250,21 @@ void app::step_economy()
     // --verify, which is the schedule every harness already certifies.
     m_world.current_econ_tick = static_cast<int>(m_econ_steps++);
 
+    // BL-597: one shared passive/active Logistic Point pool for this tick —
+    // handed to both dispatch_convoys (passive) and run_economy_step's march
+    // pass (active) so the two genuinely contend for one anchor's capacity,
+    // per LOGISTICS.md's bifold table. Local to this tick; never persisted
+    // (LP is a per-tick RATE, ruling on NR-343).
+    lp_pool_map tick_lp_pools;
     dispatch_convoys(m_world, m_registry,
                      m_registry.logistics_cost(convoy_mode::land),
-                     m_registry.logistics_cost(convoy_mode::space));
+                     m_registry.logistics_cost(convoy_mode::space), &tick_lp_pools);
     advance_convoys(m_world);
     lap(0); // convoys
     // BL-409: under spectate the session has no human seat, so the strategic
     // tier evaluates every corp — the player's included. Default false, so an
     // ordinary played session runs exactly as before.
-    m_last_econ_report = run_economy_step(m_world, m_registry, m_ui.spectating);
+    m_last_econ_report = run_economy_step(m_world, m_registry, m_ui.spectating, &tick_lp_pools);
     lap(1); // economy step (production + corp AI)
     auto flows = clear_markets(m_world, m_registry, m_last_econ_report);
     lap(2); // market clearing

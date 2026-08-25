@@ -380,8 +380,9 @@
         "scripts/economy.lua",
         "tools/verify/haulage_measure.cpp"
       ],
-      "status": "open",
-      "resolution": null
+      "status": "resolved",
+      "resolution": "RESOLVED 2026-08-25 — Ben: \"go with quantity-based draw\". commit_convoy now draws the leg's CARGO QUANTITY; leg.dist was removed rather than left write-only. Measured against the same instrument that found the problem (haulage_measure, real generated world): 1041 convoys dispatched / 789 intra-body, against the 1055/802 no-gate baseline — 98.7% of baseline trade restored, with ~14 legs a run still refused, so the cap is felt rather than decorative (rule 3). The same 20.0 rate needed no change; only the formula was wrong. Settled into LOGISTICS.md constraint 3 and rule 1, and into scripts/economy.lua's derivation comment with the measurement. TWO THINGS STILL OPEN, both first cuts flagged under NR-600 rather than re-filed: (a) one rate serves both halves, so a unit of goods and a march-point of movement burden an anchor equally — nothing measured says they should; (b) the anchor attribution is still corp_representative_tile, i.e. a corp's whole convoy traffic on a body draws from the anchor nearest its LOWEST-ID BUILDING regardless of where the cargo goes.",
+      "resolved_on": "2026-08-25"
     },
     {
       "id": "NR-621",

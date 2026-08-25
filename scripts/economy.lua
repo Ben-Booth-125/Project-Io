@@ -393,18 +393,33 @@ economy = {
         -- this is a reasoned first cut, not a final ruling (LOGISTICS.md
         -- "Active lands first", 2026-08-24).
         --
-        -- CAPACITY. active_lp_per_anchor_tick is in the SAME units as
-        -- march_points_per_class above — one active LP admits one
-        -- march-point's worth of movement, so the cap shares a scale with
-        -- the thing it caps rather than needing an invented conversion. An
-        -- infantry unit's whole tick (1.0 march points, roughly one plains
-        -- tile) costs 1.0 active LP; a cavalry unit's tick (1.5) costs 1.5.
-        -- 20.0 per anchor per tick is sized to let a real column (a dozen-
-        -- plus units, cavalry and infantry mixed) march through one city or
-        -- hub in a tick without the cap binding on ordinary peacetime
-        -- movement, while a multi-corp war converging on one anchor can
-        -- still exhaust it — the contention the design exists to make
-        -- explicit (LOGISTICS.md "the finding worth keeping").
+        -- CAPACITY, and it is ONE rate for BOTH halves of the bifold split
+        -- (LOGISTICS.md rule 6, "no reserved military share... guns and
+        -- butter stop competing" is the thing to avoid). The anchor passes
+        -- so much THROUGH ITSELF per tick, and what flows is either goods or
+        -- soldiers:
+        --   * an active draw is march points (march_points_per_class above)
+        --     — an infantry unit's whole tick costs 1.0, a cavalry unit 1.5;
+        --   * a passive draw is CARGO UNITS — a 30-unit convoy costs 30.
+        -- Treating one march-point as one cargo unit is the implicit exchange
+        -- rate, and it is a first cut: nothing measured says a soldier-tick
+        -- and a unit of grain burden a city equally. Flagged with the rest
+        -- for calibration (NR-600).
+        --
+        -- The passive draw is QUANTITY and NOT DISTANCE (Ben, 2026-08-25,
+        -- ruling on NR-620). Distance is already priced, in credits, by
+        -- base_cost_per_unit_distance below; charging it again here is what
+        -- LOGISTICS.md constraint 3 means by "LP *is* haulage cost again".
+        --
+        -- 20.0 MEASURED, not guessed. Against the real generated world
+        -- (tools/verify/haulage_measure.cpp): the no-gate baseline dispatches
+        -- 1055 convoys (802 intra-body); at this rate the quantity draw
+        -- dispatches 1041 (789) — 98.7% of baseline, so ordinary peacetime
+        -- trade flows, while ~14 legs a run still hit the cap, so it is felt
+        -- rather than decorative (rule 3: a point generated and never spent
+        -- is the military_points defect renamed). Re-run that harness against
+        -- 1055/802 after ANY change here. For scale, the same rate under the
+        -- rejected distance draw dispatched 284.
         active_lp_per_anchor_tick = 20.0,
 
         -- PRICE. active_lp_credit_per_unit_distance is argued against

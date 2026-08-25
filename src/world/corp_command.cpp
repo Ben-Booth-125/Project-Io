@@ -894,11 +894,16 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (!leg.viable)
                 return corp_command_result::rejected_placement;
 
-            // The solvency gate lives inside commit_convoy, in one place for
-            // both callers; a refusal there mutates nothing.
-            if (!commit_convoy(w, cmd.corp, src_body, cmd.subject, cmd.counterparty,
-                               r, cmd.quantity, leg))
-                return corp_command_result::rejected_funds;
+            // The solvency gate, and (BL-597) the passive-LP admissibility
+            // gate, live inside commit_convoy, in one place for both
+            // callers; a refusal there mutates nothing. `refused_no_lp`
+            // distinguishes "no passive LP at the source anchor" from plain
+            // insolvency so the player sees the right reason.
+            bool refused_no_lp = false;
+            if (!commit_convoy(w, reg, cmd.corp, src_body, cmd.subject, cmd.counterparty,
+                               r, cmd.quantity, leg, nullptr, &refused_no_lp))
+                return refused_no_lp ? corp_command_result::rejected_no_lp
+                                      : corp_command_result::rejected_funds;
             return corp_command_result::applied;
         }
 

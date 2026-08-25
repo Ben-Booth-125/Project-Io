@@ -159,6 +159,51 @@ std::unordered_map<entity_id, float> active_lp_anchor_pools(world& w, entity_id 
                                                              float lp_per_anchor_tick);
 
 // ---------------------------------------------------------------------------
+// Passive Logistic Points (BL-597 — LOGISTICS.md § Logistic Points, the bifold
+// half BL-596 left as an extension point)
+// ---------------------------------------------------------------------------
+// LOGISTICS.md's bifold table names ONE generated rate per anchor, split by
+// USE — "Passive LP | Drawn by: the market's own flow" vs "Active LP | Drawn
+// by: militaries draw active only" — never two authored numbers. So BL-597
+// does not add a second `passive_lp_per_anchor_tick`; both halves draw the
+// SAME per-anchor pool this scaffolding builds, contested within one tick by
+// whichever consumer reaches an anchor first. That contention is what makes
+// "war flips the queue" (LOGISTICS.md's "finding worth keeping") observable
+// rather than a written rule with nothing to bite on.
+
+/// Per-body -> per-anchor-tile -> LP remaining THIS TICK. The shared shape
+/// both `run_unit_march` (active) and `commit_convoy` (passive, BL-597) draw
+/// down. Never stored on `world` — a caller-owned scratch object, exactly
+/// like the local `lp_pools_by_body` BL-596 built inside `run_unit_march`
+/// alone; BL-597 promotes that shape here so ANY caller wanting the two
+/// halves to contend can hand the SAME instance to both, while a caller that
+/// wants one consumer tested in isolation (a harness exercising only the
+/// march pass, say) can pass none and get a private, always-fresh map,
+/// unchanged from BL-596's original behaviour.
+using lp_pool_map = std::unordered_map<entity_id, std::unordered_map<entity_id, float>>;
+
+/// Fetch (or lazily build via `active_lp_anchor_pools`) @p body's entry inside
+/// @p pools_by_body, so two consumers sharing one `lp_pool_map` instance
+/// within a tick see each other's draws on first touch rather than each
+/// re-deriving their own copy. Factored out of BL-596's `run_unit_march` (its
+/// own inline lazy-build lambda) so BL-597's `commit_convoy` calls the exact
+/// same fetch-or-build rather than a second copy of it.
+std::unordered_map<entity_id, float>& lp_pool_for_body(lp_pool_map& pools_by_body, world& w,
+                                                        entity_id body, float lp_per_anchor_tick);
+
+/// The anchor tile in @p pool (a body's per-anchor LP pool) nearest to
+/// @p from_tile by `intra_body_path` cost — deterministic tiebreak: lowest
+/// cost, then lowest tile id, so hash-map iteration over @p pool cannot
+/// matter. Returns `null_entity` if none of @p pool's anchors is reachable
+/// from @p from_tile. Factored out of BL-596's `run_unit_march` (its own
+/// inline nearest-anchor reduction over a marching unit's current position)
+/// so BL-597's `commit_convoy` reuses it for a convoy's dispatch tile rather
+/// than inventing a second anchor-selection rule (LOGISTICS.md rule 2: adopt
+/// the node half, refuse a second distance model).
+entity_id nearest_lp_anchor(world& w, entity_id body, entity_id from_tile,
+                            const std::unordered_map<entity_id, float>& pool);
+
+// ---------------------------------------------------------------------------
 // Physical scale and travel time (Ben, 2026-08-12)
 // ---------------------------------------------------------------------------
 //
