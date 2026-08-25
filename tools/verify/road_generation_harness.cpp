@@ -2,8 +2,18 @@
 // Builds the hard-coded world and asserts:
 //   R1 presence   — road generation stamps road_level > 0 on some Kepler land
 //                   tiles (the lattice exists), and never on ocean tiles.
-//   R2 three-tier — all three tiers appear — Track (1), Road (2), Highway (3) —
-//                   and no tile carries a tier beyond Highway (generation ceiling).
+//   R2 three-tier — the tier ladder obeys BL-618 (roads scale with qualification):
+//                   the no_prehistory world's nations all sit at the never-
+//                   industrialised qualification floor (0.05), below both tier
+//                   gates, so the PRIMARY world is an all-Track lattice; the full
+//                   ladder — Road, and Highway across a seed sweep — is asserted
+//                   on a QUALIFIED regeneration (every nation's qualification
+//                   overridden high, road_level reset, generate_roads re-run).
+//                   No tile ever carries a tier beyond Highway (ceiling).
+//   Q  differential — the same world regenerated at floor vs high qualification
+//                   produces measurably different lattices (BL-618's contract):
+//                   promoted tiers appear only on the qualified run, and the
+//                   qualified lattice is at least as large (redundancy loops).
 //   R3 connectivity — every non-anchor population centre with >=1 same-nation peer
 //                   sits on, or orthogonally adjacent to, a roaded tile (its lattice
 //                   reached it); province-anchor foundings (BL-611) are exempt, and
@@ -14,6 +24,7 @@
 
 #include "world/components.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/road_generation.hpp"
 #include "harness_params.hpp"
 #include "world/world.hpp"
 
@@ -26,6 +37,34 @@ static void check(bool ok, const char* what)
 {
     std::printf("[%s] %s\n", ok ? "PASS" : "FAIL", what);
     if (!ok) ++g_fail;
+}
+
+/// Re-run road generation on @p w's body with every nation's qualification forced to
+/// @p qual: reset the body's road_level field, drop the A*/reach caches (they embed the
+/// road discount), and call generate_roads again. The BL-618 differential instrument —
+/// all else fixed, only the qualification input moves.
+static void regen_roads_at_qualification(world& w, entity_id body, float qual)
+{
+    for (auto& [nid, nc] : w.nations)
+        nc.qualification = qual;
+    for (auto& [tid, tc] : w.tiles)
+        if (tc.body == body)
+            tc.road_level = 0;
+    w.astar_cost_cache.clear();
+    w.body_reach_cost.clear();
+    generate_roads(w, body);
+}
+
+/// Tier census of @p body's road_level field: counts[1..3], plus total in counts[0].
+static void tier_census(const world& w, entity_id body, int counts[4])
+{
+    counts[0] = counts[1] = counts[2] = counts[3] = 0;
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (tc.body != body || tc.road_level == 0 || tc.road_level > 3) continue;
+        ++counts[0];
+        ++counts[tc.road_level];
+    }
 }
 
 int main()
@@ -61,41 +100,45 @@ int main()
     check(roaded_land > 0, "R1 road lattice exists (some Kepler land tile has road_level > 0)");
     check(roaded_ocean == 0, "R1 no road_level stamped on ocean tiles");
 
-    // R2 three-tier ladder (BL-172): Track (1) / Road (2) / Highway (3).
-    std::printf("      (tiers: track=%d road=%d highway=%d over=%d)\n",
+    // R2 three-tier ladder (BL-172), gated by qualification (BL-618). The
+    // no_prehistory world's nations never industrialised, so every one sits at the
+    // qualification floor — below both tier gates: the primary world is an
+    // all-Track lattice, and that IS the assertion (the modulation bites).
+    std::printf("      (tiers at the qualification floor: track=%d road=%d highway=%d over=%d)\n",
                 track_tiles, road_tiles, highway_tiles, over_highway);
     check(track_tiles > 0, "R2 track roads present (road_level 1)");
-    check(road_tiles > 0, "R2 road-tier roads present (road_level 2)");
+    check(road_tiles == 0 && highway_tiles == 0,
+          "R2 a qualification-floor world promotes no edge past Track (BL-618)");
 
-    // The highway tier needs two City+ centres to land ADJACENT in the backbone
-    // graph (edge_tier requires both endpoints at scale >= 3; since BL-620 the
-    // backbone spans towns-and-up only). Centre scales are carved from the Era -1
-    // demography (BL-610) and City+ centres are rare, so whether any such PAIR
-    // ends up adjacent is spatial luck, not a property of the generator.
-    //
-    // Asserting it on one world therefore makes this check seed-fragile: it broke
-    // when BL-167 began rolling the homeworld's ocean fraction, which reshuffled
-    // population placement without changing anything about roads. Assert instead
-    // that the tier is REACHABLE, by scanning a handful of seeds. If no seed
-    // produces one, that is a real regression and this still fails.
+    // The full ladder needs qualified nations. The highway tier further needs two
+    // City+ centres ADJACENT in the backbone graph (both endpoints scale >= 3;
+    // since BL-620 the backbone spans towns-and-up only). Centre scales are carved
+    // from the Era -1 demography (BL-610) and City+ centres are rare, so whether
+    // any such PAIR shares a nation is spatial luck, not a property of the
+    // generator — assert the tier is REACHABLE across a seed sweep, each world
+    // regenerated at high qualification. If no seed produces one, that is a real
+    // regression and this still fails.
     {
-        int seeds_with_highway = 0, first = -1;
+        int seeds_with_highway = 0, seeds_with_road = 0, first = -1;
         for (uint32_t s = 0; s < 8; ++s)
         {
             world_params wp;
             wp.seed = s * 0x9E3779B1u;
-            const world ws = make_hard_coded_world(no_prehistory(wp));
-            for (const auto& [tid, tc] : ws.tiles)
-                if (tc.road_level == 3)
-                {
-                    ++seeds_with_highway;
-                    if (first < 0) first = static_cast<int>(s);
-                    break;
-                }
+            world ws = make_hard_coded_world(no_prehistory(wp));
+            regen_roads_at_qualification(ws, ws.home_body, 0.6f);
+            int tc4[4];
+            tier_census(ws, ws.home_body, tc4);
+            if (tc4[2] > 0) ++seeds_with_road;
+            if (tc4[3] > 0)
+            {
+                ++seeds_with_highway;
+                if (first < 0) first = static_cast<int>(s);
+            }
         }
-        std::printf("      (highway tier present on %d of 8 seeds; first at seed index %d)\n",
-                    seeds_with_highway, first);
-        check(seeds_with_highway > 0, "R2 highway tier (road_level 3) is reachable");
+        std::printf("      (qualified regen: road tier on %d of 8 seeds; highway on %d of 8, first at seed index %d)\n",
+                    seeds_with_road, seeds_with_highway, first);
+        check(seeds_with_road == 8, "R2 road tier (road_level 2) appears on every qualified seed");
+        check(seeds_with_highway > 0, "R2 highway tier (road_level 3) is reachable when qualified");
     }
     check(over_highway == 0, "R2 no tile exceeds the highway tier (road_level <= 3)");
 
@@ -163,6 +206,28 @@ int main()
         if (it == w2.tiles.end() || it->second.road_level != tc.road_level) ++mismatches;
     }
     check(mismatches == 0, "R4 road_level field identical across two generations");
+
+    // Q — the BL-618 differential: the same world, roads regenerated at the
+    // qualification floor vs high, all else fixed. (Mutates w and w2; keep last.)
+    {
+        regen_roads_at_qualification(w,  kepler, 0.05f); // the floor
+        regen_roads_at_qualification(w2, kepler, 0.60f); // fully qualified
+        int lo[4], hi[4];
+        tier_census(w,  kepler, lo);
+        tier_census(w2, kepler, hi);
+        std::printf("      (differential: floor total=%d t/r/h=%d/%d/%d | qualified total=%d t/r/h=%d/%d/%d)\n",
+                    lo[0], lo[1], lo[2], lo[3], hi[0], hi[1], hi[2], hi[3]);
+        check(lo[2] + lo[3] == 0, "Q1 floor regen promotes no edge past Track");
+        check(hi[2] > 0, "Q2 qualified regen promotes edges (road tier appears)");
+        check(hi[0] >= lo[0],
+              "Q3 the qualified lattice is at least as large (redundancy loops rationed, never added, at the floor)");
+        // Determinism of the instrument itself: the floor regen equals a second floor regen.
+        regen_roads_at_qualification(w2, kepler, 0.05f);
+        int lo2[4];
+        tier_census(w2, kepler, lo2);
+        check(lo[0] == lo2[0] && lo[1] == lo2[1] && lo[2] == lo2[2] && lo[3] == lo2[3],
+              "Q4 the regeneration instrument is deterministic (two floor regens agree)");
+    }
 
     std::printf("%s (%d failure(s))\n", g_fail ? "ROAD GEN AUDIT FAILED" : "ROAD GEN AUDIT OK", g_fail);
     return g_fail ? 1 : 0;

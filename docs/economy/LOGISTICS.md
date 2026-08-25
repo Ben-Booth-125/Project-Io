@@ -131,6 +131,13 @@ qualification): a nation's qualification fraction (`docs/economy/POPULATION.md` 
 modulates its redundancy-edge count and tier promotion, so a low-qualification nation generates a
 sparser, lower-tier lattice. A national development level the map already shows, not a new dial.
 
+Tier promotion is **gated**: a Highway needs its two major endpoints *and* qualification ≥ 0.30;
+a Road needs its Town+ endpoint *and* qualification ≥ 0.10; a gated-out edge demotes one rung,
+never disappears. Redundancy loops are **rationed** cheapest-first — the kept fraction is
+qualification / 0.40, so the MST always survives whole and the loops are the qualified-labour
+luxury. The never-industrialised floor (0.05) sits below both gates: a pre-industrial nation
+lays an all-Track lattice, because engineering above the track is a qualified-labour product.
+
 **Roads are a land feature.** Water tiles are skipped, and an edge whose route crosses *open* ocean
 is not stamped at all — that is a sea route, and stamping it would scatter fragments on distant
 shores. A short crossing made of shore (a strait, TILES.md § Water kinds) does get a road.

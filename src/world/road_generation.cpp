@@ -68,12 +68,33 @@ constexpr int kMaxSpurGridDist = 40;
 // (distance^2, then tile ids).
 constexpr int kBorderProbePairs = 24;
 
-// Tier for an edge between two centres of the given scales (BL-172).
-std::uint8_t edge_tier(int scale_a, int scale_b)
+// BL-618 (roads scale with qualification; LOGISTICS.md § Roads): the nation's qualification
+// fraction (nation_component::qualification, POPULATION.md § Qualification) modulates the
+// backbone. First-cut mapping, tune-not-restructure:
+//   - Tier promotion is GATED: a Highway needs two major endpoints AND qualification >=
+//     kHighwayQualification; a Road needs one Town+ endpoint AND qualification >=
+//     kRoadQualification; a gated-out edge demotes one rung, never disappears. The floor
+//     (0.05, a nation that never industrialised) sits below both gates, so a pre-industrial
+//     world generates an all-Track lattice — engineering above the track is a qualified-
+//     labour product. 0.10 clears the late-industrialiser base (0.12); 0.30 needs the early
+//     base (0.35), or the mid base (0.22) with broad industrialisation.
+//   - Redundancy loops are RATIONED: the relative-neighbour edges are kept cheapest-first,
+//     floor(count * qualification / kFullRedundancyQualification) of them (clamped to all),
+//     so a low-qualification nation keeps the MST but few loops.
+// Spurs, local streets and border links are Tracks already and are not modulated.
+constexpr float kRoadQualification           = 0.10f;
+constexpr float kHighwayQualification        = 0.30f;
+constexpr float kFullRedundancyQualification = 0.40f;
+
+// Tier for a backbone edge between two centres of the given scales (BL-172), gated by the
+// owning nation's qualification (BL-618).
+std::uint8_t edge_tier(int scale_a, int scale_b, float qualification)
 {
-    if (scale_a >= kMajorScale && scale_b >= kMajorScale)
+    if (scale_a >= kMajorScale && scale_b >= kMajorScale
+        && qualification >= kHighwayQualification)
         return kHighway;
-    if (scale_a >= kMidScale || scale_b >= kMidScale)
+    if ((scale_a >= kMidScale || scale_b >= kMidScale)
+        && qualification >= kRoadQualification)
         return kRoad;
     return kTrack;
 }
@@ -214,6 +235,12 @@ void generate_roads(world& w, entity_id body)
     //      lattice locally with a Track spur.
     for (const auto& [nation, members] : by_nation)
     {
+        // BL-618: the nation's qualification fraction gates tier promotion and rations
+        // the redundancy loops below. Unowned centres (null nation) read 0 — the floor.
+        float qualification = 0.0f;
+        if (const auto nit = w.nations.find(nation); nit != w.nations.end())
+            qualification = nit->second.qualification;
+
         // Spur target set: this nation's already-roaded tiles — every member centre's own
         // street (stamped in 1b) plus, below, the backbone raster and earlier spurs. The
         // std::set only dedupes; candidate order never depends on it (the nearest-target
@@ -289,6 +316,7 @@ void generate_roads(world& w, entity_id body)
             // town c is closer to BOTH endpoints than they are to each other — i.e.
             // max(d[a][c], d[b][c]) < d[a][b] for some c disqualifies it. Adds the short
             // loops a bare MST misses without cluttering the lattice.
+            std::vector<std::pair<int, int>> loops;
             for (const edge& e : edges)
             {
                 if (in_mst[e.a][e.b])
@@ -305,15 +333,25 @@ void generate_roads(world& w, entity_id body)
                     }
                 }
                 if (keep)
-                    chosen.emplace_back(e.a, e.b);
+                    loops.emplace_back(e.a, e.b);
             }
+            // BL-618: ration the loops by qualification, cheapest-first (`loops` inherits
+            // the deterministic (cost, lo, hi) edge order). The MST is never rationed —
+            // a nation's towns connect regardless; loops are the qualified-labour luxury.
+            const float loop_frac =
+                std::clamp(qualification / kFullRedundancyQualification, 0.0f, 1.0f);
+            const int loops_kept =
+                static_cast<int>(static_cast<float>(loops.size()) * loop_frac);
+            for (int i = 0; i < loops_kept; ++i)
+                chosen.push_back(loops[static_cast<std::size_t>(i)]);
 
-            // Rasterise: tier by the two towns' scales (Highway / Road / Track), and feed
-            // this nation's stamped tiles into the spur target set.
+            // Rasterise: tier by the two towns' scales gated by qualification (BL-618),
+            // and feed this nation's stamped tiles into the spur target set.
             std::vector<entity_id> stamped;
             for (const auto& [a, b] : chosen)
             {
-                const std::uint8_t tier = edge_tier(nodes[towns[a]].scale, nodes[towns[b]].scale);
+                const std::uint8_t tier =
+                    edge_tier(nodes[towns[a]].scale, nodes[towns[b]].scale, qualification);
                 stamped.clear();
                 stamp_edge(w, body, nodes[towns[a]].tile, nodes[towns[b]].tile, tier, &stamped);
                 for (const entity_id t : stamped)
