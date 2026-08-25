@@ -10,7 +10,45 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Population design settles, Sprint 19 opens and lands both build waves (BL-610–BL-618, BL-620; NR-628–NR-641) (2026-08-25, latest)
+## Session — The warm-start stall found and killed; settlements become visible (flood-field pathfinding; BL-625; NR-645) (2026-08-25, latest)
+
+**Runtime:** ~3.5 h wall-clock. Modes in sequence: Design (perf assessment on Ben's "20 years
+of history hangs" report) → Delivery (the flood-field fix, Rule 0a-B) → branch surgery
+(Ui-Development bugfixes cherry-picked to main) → Delivery (BL-625) → close-out.
+
+**The stall, measured.** Ben reported the wizard hanging at the market-stabilisation step.
+Timed headless: generation + 12 warm ticks took **35m23s** — two causes stacked. (1) The play
+build was the Debug config (`/Od /RTC1`); a Release build of the same workload took 5m01s
+(7×). (2) Inside that, per-phase instrumentation put the whole cost in `dispatch_convoys`:
+76–109 s per warm tick, because rival `place_road` (BL-599) clears the A* cache at tick rate
+and the pair search re-flooded 45,240 tiles per priced pair — the 2026-08-12 AppHangB1
+disease, new carrier.
+
+**The fix.** The pair search was already Dijkstra with an early exit, so it now runs once to
+completion per anchor tile and is kept (`world.logistics_flood_fields`);
+`intra_body_path` reconstructs any pair from the field at walk cost, byte-identical answers.
+Same invalidation contract. Measured: gen+12 ticks 5m01s → **19.8 s**; steady state ~1 s/tick.
+Verified: interdiction, save_roundtrip, supply_advance, spectator_determinism, haulage_measure
+(1,722 convoys — trade flows). logistics_harness's six T7 dispatch fails reproduce at pristine
+HEAD — pre-existing drift, filed NR-645, not touched.
+
+**Settlements visible (BL-625).** Ben saw no settlements in play: the conurbation clustering
+(authored for 20–40 centres/body) collapsed the post-BL-623 density — 1,823 centres → 49
+marks, measured. Replaced with the LOD ladder on the canvas's two existing pivots: far zoom
+scale≥3 skylines + a civic density dot for the tail, mid adds towns, close shows every centre
+with razed ones as the new `settlement_razed` ruin glyph. Captures confirm the region reads
+settled; Ben approved live.
+
+**Housekeeping.** Build trees trimmed to `build/` (Debug) + `build_rel/` (Release play build;
+`build_app.bat` header updated); Ui-Development pushed with the tech-tree restyle and left
+behind; bugfixes cherry-picked to main; landed items archived (BL-621, BL-623–BL-625).
+
+**Open.** BL-619 (research system) still design-gated; far-zoom density-dot legibility is
+tuning Ben may yet call; NR-645 (logistics_harness drift) awaits a rebase session.
+
+---
+
+## Session — Population design settles, Sprint 19 opens and lands both build waves (BL-610–BL-618, BL-620; NR-628–NR-641) (2026-08-25)
 
 **Runtime:** ~5 h wall-clock (estimated). Modes in sequence: Design (the population session —
 doc summaries, Ben's four ideas, the elicitation form, the settled design written into
