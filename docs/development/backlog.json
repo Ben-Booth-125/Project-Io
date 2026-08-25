@@ -667,7 +667,7 @@
    "id": "BL-610",
    "short_name": "CENTRES_FROM_DEMOGRAPHY",
    "title": "Population-centre count and scale derive from Era -1 region demography",
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "A",
    "difficulty": 4,
@@ -685,13 +685,13 @@
     "docs/economy/POPULATION.md"
    ],
    "authority_doc": "docs/economy/POPULATION.md",
-   "design": "Ruled 2026-08-25 (Ben, population design form): density is history's consequence. Centre count and scale draw from the Era -1 regions' simulated populations, replacing BOTH the land-area divisor (k_land_tiles_per_centre, ~410) and the authored 40/30/20/8/2 weighted scale draw. k_population_for_scale stays as the scale->headcount mapping. Density must be high enough that every land province can anchor a centre (BL-611) - roughly one centre per ~10 land tiles against ~410 today, a ~40x recalibration whose downstream effects NR-630 records. Also aggregates industrialisation timing into each nation's opening qualification fraction (BL-613). Design settled in docs/economy/POPULATION.md sections Generation and Region demography - read before implementing."
+   "design": "Ruled 2026-08-25 (Ben, population design form): density is history's consequence. Centre count and scale draw from the Era -1 regions' simulated populations, replacing BOTH the land-area divisor (k_land_tiles_per_centre, ~410) and the authored 40/30/20/8/2 weighted scale draw. k_population_for_scale stays as the scale->headcount mapping. Density must be high enough that every land province can anchor a centre (BL-611) - roughly one centre per ~10 land tiles against ~410 today, a ~40x recalibration whose downstream effects NR-630 records. Also aggregates industrialisation timing into each nation's opening qualification fraction (BL-613). Design settled in docs/economy/POPULATION.md sections Generation and Region demography - read before implementing. COMPLETION: Landed 2026-08-25 (Agent G, merged main @ wave-1 integration). Density measured: 8.76/8.04/6.18 land tiles per centre seeds 0-2 pre-anchor, 6.04 post; histogram s1=4928 s2=206 s3=45 s4=11 s5=1. Harnesses green incl. world_determinism."
   },
   {
    "id": "BL-611",
    "short_name": "PROVINCE_CENTRE_ANCHOR",
    "title": "Every land province is anchored by a population centre, and the centre decides its nation",
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "A",
    "difficulty": 4,
@@ -710,13 +710,13 @@
     "docs/economy/POPULATION.md"
    ],
    "authority_doc": "docs/generation/PROVINCES.md",
-   "design": "Ruled 2026-08-25 (Ben, population design form: 'a centre of any scale each'). Every land province seeds from a centre of some scale; the hinterland (least-accessible-tile) seeding retires on land and survives only for water domains. The anchor is the political decider: the centre's nation is the province's nation - at generation they agree by construction (partition ruling 5 unchanged); after generation, taking the centre takes the province, giving BL-567 (province is the conquest unit) and BL-518 (war redraws borders) their mechanism, and making every anchor a strategic objective. Answers PROVINCES.md open question 1. Design settled in docs/generation/PROVINCES.md section The partition (ruling 3) - read before implementing."
+   "design": "Ruled 2026-08-25 (Ben, population design form: 'a centre of any scale each'). Every land province seeds from a centre of some scale; the hinterland (least-accessible-tile) seeding retires on land and survives only for water domains. The anchor is the political decider: the centre's nation is the province's nation - at generation they agree by construction (partition ruling 5 unchanged); after generation, taking the centre takes the province, giving BL-567 (province is the conquest unit) and BL-518 (war redraws borders) their mechanism, and making every anchor a strategic objective. Answers PROVINCES.md open question 1. Design settled in docs/generation/PROVINCES.md section The partition (ruling 3) - read before implementing. COMPLETION: Landed 2026-08-25 (Agent G). 45/45 partition rows; 6,266/6,266 land provinces anchored across seeds 0-2; nation lock makes anchor==tile owner by construction (NR-636 records the scope growth)."
   },
   {
    "id": "BL-612",
    "short_name": "URBAN_GROUND_STAMPED",
    "title": "Generation stamps urban land-use footprints under population centres, scaled by tier",
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "B",
    "difficulty": 2,
@@ -734,13 +734,13 @@
     "docs/economy/TILES.md"
    ],
    "authority_doc": "docs/economy/POPULATION.md",
-   "design": "Ruled 2026-08-25 (Ben: 'simply, yes it does stamp urban ground', dependent on population and settlement tier). A centre arrives with an urban land_use footprint sized by its scale, so city ground is scarce and contested from turn one and placement near cities is a real decision. Uses the existing land_use_component states; the urban cover transform (TILES.md section Urban transform) is the tile-axis rule it composes with. Design in docs/economy/POPULATION.md section Generation."
+   "design": "Ruled 2026-08-25 (Ben: 'simply, yes it does stamp urban ground', dependent on population and settlement tier). A centre arrives with an urban land_use footprint sized by its scale, so city ground is scarce and contested from turn one and placement near cities is a real decision. Uses the existing land_use_component states; the urban cover transform (TILES.md section Urban transform) is the tile-axis rule it composes with. Design in docs/economy/POPULATION.md section Generation. COMPLETION: Landed 2026-08-25 (Agent G). world_audit BL-612 row: 1,449 centres / 1,456 urban tiles / budget 1,457, zero unstamped, zero orphans."
   },
   {
    "id": "BL-613",
    "short_name": "QUALIFICATION_FRACTION",
    "title": "Nations carry a qualification fraction; complicated methods consume qualified workers",
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "A",
    "difficulty": 3,
@@ -758,13 +758,13 @@
     "docs/economy/POPULATION.md"
    ],
    "authority_doc": "docs/economy/POPULATION.md",
-   "design": "Ruled 2026-08-25 (Ben, population design form: grain per nation). nation_component gains a qualification fraction - the share of workforce that is qualified. Raised by schooling buildings and universities (BL-619's RP output is separate); consumed by buildings running complicated production methods, which require that many QUALIFIED workers alongside ordinary labour - the non-purchasable constraint that gates organically scaling building levels. Seeded at generation from Era -1 industrialisation timing aggregated per nation (BL-610). Read by road generation (BL-618) and moved by migration (BL-617, brain drain). Design settled in docs/economy/POPULATION.md section Qualification - read before implementing."
+   "design": "Ruled 2026-08-25 (Ben, population design form: grain per nation). nation_component gains a qualification fraction - the share of workforce that is qualified. Raised by schooling buildings and universities (BL-619's RP output is separate); consumed by buildings running complicated production methods, which require that many QUALIFIED workers alongside ordinary labour - the non-purchasable constraint that gates organically scaling building levels. Seeded at generation from Era -1 industrialisation timing aggregated per nation (BL-610). Read by road generation (BL-618) and moved by migration (BL-617, brain drain). Design settled in docs/economy/POPULATION.md section Qualification - read before implementing. COMPLETION: Landed 2026-08-25 (Agent E). Seeded from first_furnace terciles; save v13 (renumbered at merge); econ_harness QF.R1-R4 prove the throttle; education seam wired to BL-615's roster at integration."
   },
   {
    "id": "BL-614",
    "short_name": "WAGE_COMPETITION",
    "title": "Contended labour clears by wage competition instead of proportional rationing",
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "B",
    "difficulty": 4,
@@ -782,13 +782,13 @@
     "docs/economy/PRODUCTION.md"
    ],
    "authority_doc": "docs/economy/POPULATION.md",
-   "design": "Ruled 2026-08-25 (Ben: 'wage competition is preferred'; building counts lean on available land, not the pool). When demand > supply in a (corp, body) labour pool, scarce labour goes to the buildings offering the higher wage, deterministic order (wage, then building id), superseding the uniform supply/demand contention scalar. Open detail this item owns: whether corps set a wage dial per body or per building, or accept a derived clearing wage; and how the qualified pool (BL-613) clears against the ordinary one. Couples to BL-544 (unit wage reference). Design in docs/economy/POPULATION.md sections Contention and Open items. NR-629 flags the supersession for overturn."
+   "design": "Ruled 2026-08-25 (Ben: 'wage competition is preferred'; building counts lean on available land, not the pool). When demand > supply in a (corp, body) labour pool, scarce labour goes to the buildings offering the higher wage, deterministic order (wage, then building id), superseding the uniform supply/demand contention scalar. Open detail this item owns: whether corps set a wage dial per body or per building, or accept a derived clearing wage; and how the qualified pool (BL-613) clears against the ordinary one. Couples to BL-544 (unit wage reference). Design in docs/economy/POPULATION.md sections Contention and Open items. NR-629 flags the supersession for overturn. COMPLETION: Landed 2026-08-25 (Agent E). Wage-descending allocation, offered-rate wages, qualified-then-ordinary product fold; econ_harness WF rows re-specified + WF.R6 differential bid row; money_conservation green; save v14."
   },
   {
    "id": "BL-615",
    "short_name": "STRATUM_PLACEMENT_GATES",
    "title": "Some buildings are placeable only in a centre, some only at a minimum stratum",
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "B",
    "difficulty": 2,
@@ -806,7 +806,7 @@
     "docs/economy/PRODUCTION.md"
    ],
    "authority_doc": "docs/economy/POPULATION.md",
-   "design": "Ruled 2026-08-25 (Ben: 'you can't build a university in a town, and you can't build a steel mill far from a population centre'; stratum = the existing scale ladder). A placement-rule axis through placement_rules::can_place: schooling needs any centre; a university City (4)+; heavy processors (steel-mill class) must sit near a centre. Which buildings take which gate is authored data. Design in docs/economy/POPULATION.md section Strata gate buildings."
+   "design": "Ruled 2026-08-25 (Ben: 'you can't build a university in a town, and you can't build a steel mill far from a population centre'; stratum = the existing scale ladder). A placement-rule axis through placement_rules::can_place: schooling needs any centre; a university City (4)+; heavy processors (steel-mill class) must sit near a centre. Which buildings take which gate is authored data. Design in docs/economy/POPULATION.md section Strata gate buildings. COMPLETION: Landed 2026-08-25 (Agent P). stratum_gate_harness 16/16; gates wired to door/ghost previews and presentation/icon rows at integration. R2 live click pending computer-use access - render check via build-door capture, NR-622 precedent."
   },
   {
    "id": "BL-616",

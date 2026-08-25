@@ -6504,14 +6504,14 @@
   {
    "brief": "centres-from-demography",
    "title": "BL-610 - centre count and scale derive from Era -1 demography",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-25",
    "promoted_from": "backlog.json BL-610 (CENTRES_FROM_DEMOGRAPHY) - Sprint 19, the world reads lived-in",
    "batch": "sprint-19-wave-1",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism + demography_harness / world_audit extension"
      ],
@@ -6520,26 +6520,26 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: measurement run, numbers in the item's completion notes"
      ],
      "requirement": "The resulting density is MEASURED and reported: centres per land tile, scale histogram, and per-province coverage - numbers for the NR-630 retune, not assertions.",
-     "notes": ""
+     "notes": "Measured seeds 0-2: 8.76/8.04/6.18 tiles/centre pre-anchor (6.04 post-anchor), s1=4928 s2=206 s3=45 s4=11 s5=1, coverage 100% post-BL-611. NR-630/NR-635 carry the retune numbers."
     }
    ]
   },
   {
    "brief": "province-centre-anchor",
    "title": "BL-611 - every land province anchored by a centre that decides its nation",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-25",
    "promoted_from": "backlog.json BL-611 (PROVINCE_CENTRE_ANCHOR) - Sprint 19, the world reads lived-in",
    "batch": "sprint-19-wave-1",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: province_partition_harness new rows"
      ],
@@ -6551,14 +6551,14 @@
   {
    "brief": "urban-ground-stamped",
    "title": "BL-612 - generation stamps urban footprints under centres",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-25",
    "promoted_from": "backlog.json BL-612 (URBAN_GROUND_STAMPED) - Sprint 19, the world reads lived-in",
    "batch": "sprint-19-wave-1",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_audit extension"
      ],
@@ -6570,14 +6570,14 @@
   {
    "brief": "qualification-fraction",
    "title": "BL-613 - nations carry a qualification fraction consumed by complicated methods",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-25",
    "promoted_from": "backlog.json BL-613 (QUALIFICATION_FRACTION) - Sprint 19, the world reads lived-in",
    "batch": "sprint-19-wave-1",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: generation determinism + save round-trip rows"
      ],
@@ -6586,7 +6586,7 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: economy harness row + money_conservation"
      ],
@@ -6598,14 +6598,14 @@
   {
    "brief": "wage-competition",
    "title": "BL-614 - contended labour clears by offered wage",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-25",
    "promoted_from": "backlog.json BL-614 (WAGE_COMPETITION) - Sprint 19, the world reads lived-in",
    "batch": "sprint-19-wave-1",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: economy harness rows + money_conservation"
      ],
@@ -6624,7 +6624,7 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: placement harness rows"
      ],
@@ -6638,6 +6638,90 @@
       "visual: live click, deferred to wave 3"
      ],
      "requirement": "The tile build door surfaces the new gates as reason-coded locks (the BL-589 idiom) - a live click at integration, not a capture.",
+     "notes": "Live click blocked: container cannot approve OS-level computer-use (NR-622 precedent). Render check owed via build_door capture; row stays pending until a session with access clicks the lock."
+    }
+   ]
+  },
+  {
+   "brief": "centre-promotion-decline",
+   "title": "BL-616 - centres promote on met preconditions; decay shrinks; only razing destroys",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-616 (CENTRE_PROMOTION_DECLINE) - Sprint 19, the world reads lived-in",
+   "batch": "sprint-19-wave-2",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: economy/population harness rows"
+     ],
+     "requirement": "A centre with sustained met supply, habitability and population above the next tier's threshold promotes one scale tier deterministically; a centre failing its conditions shrinks and never drops below scale 1 passively.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: command harness row"
+     ],
+     "requirement": "A raze verb (occupation context) destroys a centre through the corp_command seam; the ACTIONS.json entry lands in the same change; a razed anchor's province conquest consequence is stated or deferred with an owner.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "population-migration",
+   "title": "BL-617 - stance-gated migration carrying qualification",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-617 (POPULATION_MIGRATION) - Sprint 19, the world reads lived-in",
+   "batch": "sprint-19-wave-2",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: migration harness rows"
+     ],
+     "requirement": "A deterministic per-tick flow moves heads from low- to high-attractiveness centres (habitability + clearing wage); between nations it is stance-gated (friendly open, hostile closed); replay-identical across two runs.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: conservation row"
+     ],
+     "requirement": "Migrants carry qualification: emigration debits the origin nation's fraction and credits the destination's, conserving the qualified-head total.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "road-gen-scales",
+   "title": "BL-620 + BL-618 - road generation survives village density and reads qualification",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-620 (ROAD_GEN_SCALES_TO_DENSITY) + BL-618 (ROADS_SCALE_WITH_QUALIFICATION) - Sprint 19, the world reads lived-in",
+   "batch": "sprint-19-wave-2",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: road_generation_harness + timed measurement"
+     ],
+     "requirement": "generate_roads at the new density (~1,450-2,000 centres) completes in single-digit seconds: backbone over towns-and-up, villages join locally; the lattice stays connected per road_generation_harness; deterministic.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: differential harness row"
+     ],
+     "requirement": "A nation's qualification fraction modulates redundancy-edge count and tier promotion - a low-qualification nation generates a measurably sparser, lower-tier lattice, deterministically.",
      "notes": ""
     }
    ]

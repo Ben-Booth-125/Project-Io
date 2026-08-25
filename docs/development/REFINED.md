@@ -52,10 +52,35 @@ three worktree agents; wave 2 promotes after the wave-1 merge. Batch: `sprint-19
   - provides: placement gate fields + reason codes; schooling/university building types
   - consumes: nothing new (existing centres suffice for the harness)
 
-## Wave 2 — promoted after the wave-1 merge
+## Wave 2 — promoted 2026-08-25 after the wave-1 merge (batch `sprint-19-wave-2`)
 
-- BL-616 (centre promotion/decline) · BL-617 (population migration) · BL-618 (roads scale with
-  qualification). BL-618 consumes T4's field; BL-617 consumes T4 + T5 + stance.
+*Wave 1 (T1–T6) is MERGED to main; only BL-615's R2 live-click row stays open (NR-622 access).*
+
+### Agent W2E (economy-dev, worktree), sequential
+
+- [ ] **T7 (BL-616, centre promotion/decline)** — `src/world/economy_system.cpp` +
+  `src/world/corp_command.hpp`: precondition-gated promotion (sustained met supply,
+  habitability, population over the next tier's threshold); passive decline shrinks, floor at
+  scale 1; a raze verb through the corp_command seam (ACTIONS.json in the same change).
+  - provides: promotion/decline pass; `raze_centre` verb
+  - consumes: centre density (landed), growth gating (landed)
+- [ ] **T8 (BL-617, population migration)** — `src/world/economy_system.cpp`: deterministic
+  per-tick flows by habitability + clearing wage attractiveness; stance-gated between nations;
+  migrants carry qualification (conserved total).
+  - provides: migration pass; qualification transfer
+  - consumes: `nation_component::qualification` (landed), wage clearing (landed), stance read
+
+### Agent W2G (generation-dev, worktree), sequential
+
+- [ ] **T9 (BL-620, road gen scales to density)** — `src/world/road_generation.cpp`: backbone
+  over towns-and-up (scale ≥ 2), villages join locally via distance-prefiltered spur tracks;
+  single-digit seconds at ~1,450–2,000 centres; lattice stays connected; deterministic.
+  - provides: scalable road pass
+  - consumes: demography density (landed)
+- [ ] **T10 (BL-618, roads scale with qualification)** — same file: nation qualification
+  modulates redundancy-edge count and tier promotion, over T9's shape.
+  - provides: qualification-modulated lattice
+  - consumes: T9's pass; `nation_component::qualification` (landed)
 
 ## Wave 3 — main session
 
