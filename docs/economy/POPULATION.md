@@ -132,7 +132,10 @@ during play.
 Decline is asymmetric by design: **passive failure only shrinks a centre — it never destroys
 one.** Outright destruction is a deliberate agent action (razing, in occupation), and it should
 be rare because the occupier almost always prefers to occupy. A shrunk centre keeps its urban
-ground — a fading town reads as historied, not deleted.
+ground — a fading town reads as historied, not deleted — and **so does a razed one**: the
+stamp outlives the people, so razed ground stays built-over and extraction-blocked, a ruin
+rather than a reset (Ben-delegated call, NR-638). Razing is a `corp_verb` under the ordinary
+command seam; no rival-AI grant covers it, so only a human presses it today.
 
 ---
 

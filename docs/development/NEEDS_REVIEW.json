@@ -770,6 +770,33 @@
     "src/ui/body_surface_canvas.cpp",
     "docs/economy/POPULATION.md"
    ]
+  },
+  {
+   "id": "NR-638",
+   "title": "BL-616/BL-617 first-cut calls: raze precondition unit-on-body, stance gate latent (all-neutral), selectivity 1.5 makes brain drain bite, raze keeps urban ground",
+   "raised": "2026-08-25",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Agent W2E's report, commits be4c9588 (BL-616) and bc1ea38b (BL-617) on its worktree branch.",
+   "what": "Four calls, each overturnable: (1) raze_centre's occupation precondition = the acting corp owns a unit positioned on the centre's BODY (a stricter on-centre-tile rule is a one-line change); the verb is deliberately NOT in the corp-AI candidate list - no standing-rules grant covers a rival razing. (2) The migration stance gate reads the existing stance tables by nation entity id, but nothing DECLARES nation stance yet, so live inter-nation flows all clear at the neutral throttle (250 permille) - the gate is real but latent until a nation-stance verb exists. (3) qualified_selectivity = 1.5: migrants skew qualified, so emigration lowers the origin's FRACTION, not just its headcount - at exactly 1.0 the fraction would be invariant, contradicting the doc's 'debits the fraction' reading. (4) Razing leaves the urban land-use stamp (historied ground; extraction stays blocked) - now written into POPULATION.md. Growth/decline constants: step 10 ticks, shed/gain pop/25, promotion window 50 ticks; migration rate 10 permille, wage_weight 0.02 - all data or constexpr, first-cut-then-tune.",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/corp_command.hpp",
+    "scripts/economy.lua"
+   ]
+  },
+  {
+   "id": "NR-639",
+   "title": "tools/mcp/server.js VERBS array is stale by 10 verbs (stops at hold_convoy) - index-is-value, so the whole tail is missing",
+   "raised": "2026-08-25",
+   "kind": "observation",
+   "status": "open",
+   "source": "Agent W2E, observed in passing while appending raze_centre (verb 27).",
+   "what": "The MCP server's VERBS name array has 17 entries while corp_verb now counts 28 - every verb since BL-448 is unaddressable over the wire, and because index-is-value the fix is appending the full ordered tail, not one name. Compounding: tools/session/verb_coverage.js lists raze_centre unmapped alongside the pre-existing withdraw_from_battle / accept_offer / abandon_contract. An AI-facing seam drifted silently; worth a small owned fix plus a lint that diffs the array length against corp_verb_count.",
+   "files": [
+    "tools/mcp/server.js",
+    "tools/session/verb_coverage.js"
+   ]
   }
  ]
 }
