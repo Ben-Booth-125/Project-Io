@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*18 entries — 16 open, 2 resolved.*
+*19 entries — 17 open, 2 resolved.*
 
 ---
 
@@ -208,6 +208,22 @@ Two calls made so the item could land: (1) a marching unit draws from the anchor
 > **Recommendation:** Leave it — BL-598 is already scoped to be the throughput surface, and a second ad-hoc narration path now would likely be thrown away when it lands.
 
 *Files: `src/world/economy_system.cpp`, `src/world/economy_system.hpp`, `src/world/logistics.hpp`, `src/world/logistics.cpp`, `docs/economy/LOGISTICS.md`*
+
+### NR-620 — BL-597 as built collapses trade 73% — its LP draw is distance-proportional, which LOGISTICS.md constraint 3 explicitly forbids
+*question · raised 2026-08-25 · from Sprint 18 wave 3 integration. The item passed its own harness 34/34; haulage_measure (real tick loop, real Lua, counts real dispatches) is what caught it.*
+
+MEASURED on the real generated world: baseline 1055 convoys dispatched (802 intra-body); with BL-597, 284 (246 intra-body). A 73% collapse in total convoy traffic, 69% intra-body, in ordinary peacetime. Cause is the draw formula, not a coding bug: commit_convoy draws leg.dist, the terrain-weighted A* route cost. LOGISTICS.md § Logistic Points constraint 3 says verbatim "If cost is proportional to distance, LP *is* haulage cost again", and rule 1 says "LP is a CAP, not a price... Adding LP as a second price would double-charge distance". The draw is both. Mechanically it shows up as a unit mismatch: active_lp_per_anchor_tick is 20.0 and its own comment sizes it against MARCH POINTS (~1.0-1.5 per unit per tick, BL-596), while a passive convoy draw is a whole route cost (tens of units on a 312-column map) charged once at dispatch against that same pool — one convoy can exhaust an anchor for the tick. The work is preserved, not discarded, on branch wip/bl-597-lp-passive-convoys (commit 3ab3b452); main is untouched.
+
+**Why it matters.** The mechanism is otherwise good and does the thing the item existed to do — its harness demonstrates "war flips the queue" for real, with a convoy starving a mobilised march deterministically. Only the formula is wrong, and it is one line plus its assertions. It also exposes a coverage hole worth keeping: NO existing harness catches this. ai_skill_harness never dispatches a convoy, data_creep_harness seeds them directly and bypasses the gate, and the item own harness uses synthetic fixtures with a generous rate — so the goldens came back digit-for-digit identical while trade quietly died. haulage_measure was the only instrument that could see it.
+
+- Draw proportional to cargo QUANTITY — "how much can move through HERE" read as throughput; satisfies constraint 3 and rule 1 both. The candidate I would pick.
+- Flat per-convoy draw — the other formula constraint 3 names, and it warns this one degenerates the allocation sort
+- Keep the distance draw and raise the rate far enough that it stops binding — rejected on its face: it leaves LP as a second haulage price, which rule 1 forbids, and only moves where the chokehold sits
+- Something else — the formula is load-bearing enough that constraint 3 says specify it BEFORE the allocation sort key
+
+> **Recommendation:** Rule on the formula, then the fix is small. Quantity-proportional is the reading that satisfies both the constraint and the rule, and it is what "how much can move through HERE" actually says. Whatever is chosen, re-run haulage_measure against the 1055/802 baseline as the acceptance check rather than trusting the item own harness, and keep the sea_port_gate.cpp fixture fix on the branch (BL-602 harness regressed 23/23 -> 6 failures because its default registry leaves the LP rate at zero; its Port already IS an anchor, it only lacked a rate).
+
+*Files: `src/world/supply_system.cpp`, `docs/economy/LOGISTICS.md`, `scripts/economy.lua`, `tools/verify/haulage_measure.cpp`*
 
 ---
 

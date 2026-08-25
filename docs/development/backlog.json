@@ -425,7 +425,7 @@
       "design": "Ruled 2026-08-24 (Sprint 18 design form: shape A, active first): the LP substrate and its FIRST consumer land together, per settled rule 3 — read docs/economy/LOGISTICS.md § Logistic Points whole before implementing; all seven cut constraints bind. Cities generate the bifold per-tick rate (a RATE, not a stock: computed, spent or wasted, never banked, never serialised, no state_hash entry). Active LP prices run_unit_march in credits — march points still spend against traversal cost; active LP is what makes that march cost money (the 2026-08-22 ruling). A refused march is announced, never silently queued. Allocation is a deterministic priority over sorted city ids. First-cut rates authored here, argued against BL-543 (value anchor) and flagged for tuning (NR-600). Fresh authoring: BL-464 and the purged Sprint 32 item prose are reference only. Harness: generation determinism across two runs of one seed, march debit exactness, a refusal mutates nothing. COMPLETE 2026-08-24 (Sprint 18 wave 2, built in place on main): active_lp_anchor_pools (logistics.cpp/hpp), run_unit_march gated on nearest-anchor active LP with credit debit, refused draws mutate nothing (unit_march_tick::refused_no_lp). First-cut rates in scripts/economy.lua (NR-600). Verified independently: logistic_points_harness 27/27 fresh rebuild; unit_march_harness 89/90, the one failure (corp_verb_count staleness) confirmed pre-existing since Sprint 16's BL-573, unrelated; full ProjectIo rebuild clean. NR-619 filed for the nearest-anchor interpretation and refusal-surfacing gap (owed to BL-598). Commit 3cd0204c."
     },
     {
-      "status": "designed",
+      "status": "paused",
       "glyph": "✓",
       "version_goal": "v0.1.18",
       "sprint": "18",
@@ -434,7 +434,7 @@
       "requires": [
         "BL-596"
       ],
-      "blocked_on": null,
+      "blocked_on": "NR-620",
       "parked": false,
       "id": "BL-597",
       "short_name": "LP_PASSIVE_CONVOYS",
@@ -450,7 +450,7 @@
         "docs/economy/LOGISTICS.md"
       ],
       "authority_doc": "docs/economy/LOGISTICS.md",
-      "design": "The second consumer, same sprint (active landed first by ruling). Passive LP caps the automatic trade flow: each dispatch leg draws passive throughput at its route’s city loci; an over-cap leg is REFUSED outright and announced (a refusal nobody sees is silent interdiction again), never queued or clamped. LP is a cap, not a price — credits stay the price (settled rule 1). With both halves live, the built mobilised-first visit order (economy_system.cpp § run order) finally contends for a real pool: goods-vs-force priority becomes an explicit design instead of a tick-phase accident. Harness: admit/refuse boundary exactness, order-independence under contention (two iteration orders, one allocation), the queue flip observable under mobilisation."
+      "design": "The second consumer, same sprint (active landed first by ruling). Passive LP caps the automatic trade flow: each dispatch leg draws passive throughput at its route’s city loci; an over-cap leg is REFUSED outright and announced (a refusal nobody sees is silent interdiction again), never queued or clamped. LP is a cap, not a price — credits stay the price (settled rule 1). With both halves live, the built mobilised-first visit order (economy_system.cpp § run order) finally contends for a real pool: goods-vs-force priority becomes an explicit design instead of a tick-phase accident. Harness: admit/refuse boundary exactness, order-independence under contention (two iteration orders, one allocation), the queue flip observable under mobilisation. PAUSED 2026-08-25 (Sprint 18 wave 3), NOT merged. Built and harness-green (34/34, including a real demonstration of war-flips-the-queue), but haulage_measure measured a 73% collapse in real convoy traffic (1055 -> 284 dispatched; 802 -> 246 intra-body). Cause is the draw formula: commit_convoy draws leg.dist, and LOGISTICS.md constraint 3 forbids a distance-proportional LP cost outright (\"LP *is* haulage cost again\"), as does rule 1 (double-charging distance). Work preserved on branch wip/bl-597-lp-passive-convoys (3ab3b452); main untouched. Awaiting Ben's ruling on the formula — NR-620."
     },
     {
       "status": "designed",
