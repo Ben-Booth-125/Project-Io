@@ -255,15 +255,21 @@ int main()
           "WF.R5 single-building corp is uncontended (scalar 1.0)",
           rep.workforce_contention[{corp_e, body}], 1.0f);
 
-    // --- Workforce pool, step 1: contention throttles an over-built (corp, body) ---
-    // Four extraction sites (workforce 1.0 each) -> demand 4.0 > default supply 3.0
-    // -> contention 3/4 = 0.75. Each building's effective workforce is 0.75, so
-    // output = base_rate 20 * richness 1 * 0.75 = 15; wages bill 1.0*0.75*base_wage.
+    // --- Workforce pool, step 1: a contended (corp, body) clears by WAGE ---
+    // BL-614 (wage competition, POPULATION.md § Contention): four extraction
+    // sites (workforce 1.0 each) -> demand 4.0 > default supply 3.0. The pool
+    // AGGREGATE min(1, supply/demand) = 0.75 survives as the report figure, but
+    // allocation is per building: with no wage_bid set every offered wage ties,
+    // the id-ascending order decides, and the pool staffs the first three sites
+    // IN FULL and the fourth NOT AT ALL — priced scarcity, not silent averaging.
+    // Total effective labour (3.0) and total output (60) match the superseded
+    // proportional model exactly; where the labour LANDS is what changed.
     {
         world ww;
         const entity_id wb = ww.create_entity(); ww.bodies[wb] = body_component{};
         corporation_component cc; cc.balance = 1000.0f;
         cc.is_player = true; // not AI-driven — see corp_e above
+        std::vector<entity_id> site_ids;
         for (int i = 0; i < 4; ++i)
         {
             const entity_id t = ww.create_entity();
@@ -276,31 +282,95 @@ int main()
             b.workforce_assigned = 1.0f; b.target_resource = resource_type::iron_ore;
             ww.buildings[eb] = b;
             cc.assets.push_back(eb);
+            site_ids.push_back(eb);
         }
         const entity_id wc = ww.create_entity();
         ww.corporations[wc] = cc;
 
         economy_report wr = run_economy_step(ww, reg);
         check(near(wr.workforce_contention[{wc, wb}], 0.75f),
-              "WF.R2 contention = min(1, supply/demand) = 3/4",
+              "WF.R2 pool aggregate = min(1, supply/demand) = 3/4",
               wr.workforce_contention[{wc, wb}], 0.75f);
 
-        float each_out = 0.0f, each_eff = 0.0f;
-        for (const auto& br : wr.buildings)
-            if (br.corp == wc) { each_out = br.output_quantity; each_eff = br.effective_workforce; }
-        check(near(each_out, 15.0f), "WF.R3 output scaled by effective workforce (20*1*0.75)", each_out, 15.0f);
-        check(near(each_eff, 0.75f), "WF.R3 effective_workforce reported (1.0*0.75)", each_eff, 0.75f);
+        check(near(wr.building_labour[site_ids[0]], 1.0f)
+                  && near(wr.building_labour[site_ids[1]], 1.0f)
+                  && near(wr.building_labour[site_ids[2]], 1.0f),
+              "WF.R3 (BL-614) the first three sites by id are staffed in full",
+              wr.building_labour[site_ids[0]], 1.0f);
+        check(near(wr.building_labour[site_ids[3]], 0.0f),
+              "WF.R3 (BL-614) the marginal site gets nothing (pool spent)",
+              wr.building_labour[site_ids[3]], 0.0f);
 
-        // Wages on effective workforce: 4 buildings * (1.0 * 0.75 * base_wage 8) = 24.
+        float total_out = 0.0f;
+        for (const auto& br : wr.buildings)
+            if (br.corp == wc) total_out += br.output_quantity;
+        check(near(total_out, 60.0f),
+              "WF.R3 (BL-614) total output = supply's worth (3 * 20), conserved vs the proportional model",
+              total_out, 60.0f);
+
+        // Wages on ALLOCATED workforce: 3 staffed * (1.0 * base_wage 8) = 24 —
+        // the same bill the proportional 4 * 0.75 * 8 charged, landing on the
+        // staffed buildings only. Passing building_labour exercises the BL-614
+        // per-building wage path in apply_budget.
         auto wf = clear_markets(ww, reg, wr);
         const float before = ww.corporations[wc].balance;
-        apply_budget(ww, reg, wf, wr.workforce_contention);
-        // delta = sales - maint(4*5=20) - wages(24); sales valued at resolved price.
-        // Assert the wage component by reconstructing: balance fell by at least 44
-        // less whatever the (no-market) sales earned -> here no market, so income 0.
+        apply_budget(ww, reg, wf, wr.workforce_contention, nullptr, nullptr,
+                     &wr.building_labour);
         check(near(before - ww.corporations[wc].balance, 20.0f + 24.0f),
-              "WF.R4 wages paid on effective workforce (maint 20 + wages 24)",
+              "WF.R4 wages paid on allocated workforce (maint 20 + wages 24)",
               before - ww.corporations[wc].balance, 44.0f);
+    }
+
+    // --- BL-614: a wage bid MOVES the allocation, and is paid as offered ---
+    // Same fixture, but the LAST-placed site bids +50 % (offered 12 vs 8). It
+    // now sorts first and staffs in full; the tie among the other three breaks
+    // by id, so the THIRD-placed site is the one squeezed out. Wages: the
+    // bidder pays 12, the two staffed non-bidders 8 each -> 28 total, against
+    // 24 had nobody bid — outbidding your own buildings costs real money.
+    {
+        world ww;
+        const entity_id wb = ww.create_entity(); ww.bodies[wb] = body_component{};
+        corporation_component cc; cc.balance = 1000.0f;
+        cc.is_player = true;
+        std::vector<entity_id> site_ids;
+        for (int i = 0; i < 4; ++i)
+        {
+            const entity_id t = ww.create_entity();
+            tile_component tc{}; tc.body = wb;
+            tc.resource_deposit[ri(resource_type::iron_ore)]   = 1.0f;
+            tc.resource_remaining[ri(resource_type::iron_ore)] = 1.0e6f;
+            ww.tiles[t] = tc;
+            const entity_id eb = ww.create_entity();
+            building_component b{}; b.tile = t; b.type = building_type::extraction_site;
+            b.workforce_assigned = 1.0f; b.target_resource = resource_type::iron_ore;
+            if (i == 3)
+                b.wage_bid = 0.5f; // offered wage 8 * 1.5 = 12
+            ww.buildings[eb] = b;
+            cc.assets.push_back(eb);
+            site_ids.push_back(eb);
+        }
+        const entity_id wc = ww.create_entity();
+        ww.corporations[wc] = cc;
+
+        economy_report wr = run_economy_step(ww, reg);
+        check(near(wr.building_labour[site_ids[3]], 1.0f),
+              "WF.R6 (BL-614) the bidding site wins full staffing over lower ids",
+              wr.building_labour[site_ids[3]], 1.0f);
+        check(near(wr.building_labour[site_ids[0]], 1.0f)
+                  && near(wr.building_labour[site_ids[1]], 1.0f),
+              "WF.R6 (BL-614) the first two non-bidders keep their staffing",
+              wr.building_labour[site_ids[0]], 1.0f);
+        check(near(wr.building_labour[site_ids[2]], 0.0f),
+              "WF.R6 (BL-614) the last non-bidder by id is the one squeezed out",
+              wr.building_labour[site_ids[2]], 0.0f);
+
+        auto wf = clear_markets(ww, reg, wr);
+        const float before = ww.corporations[wc].balance;
+        apply_budget(ww, reg, wf, wr.workforce_contention, nullptr, nullptr,
+                     &wr.building_labour);
+        check(near(before - ww.corporations[wc].balance, 20.0f + 28.0f),
+              "WF.R6 (BL-614) wages paid at the OFFERED rate (maint 20 + wages 8+8+12)",
+              before - ww.corporations[wc].balance, 48.0f);
     }
 
     // --- Player sell orders: the floor is a reservation price (BL-386) ---

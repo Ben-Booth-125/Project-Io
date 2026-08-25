@@ -1048,17 +1048,37 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // beats a tree whose nodes are allocated and freed once per corp per tick. The
     // walk becomes first-touch order over `cc.assets` (stored order) instead of
     // ascending body id — still deterministic, and the result is keyed either way.
+    //
+    // BL-614 (wage competition; POPULATION.md § Contention): when a pool is
+    // contended (demand > supply), the uniform proportional scalar is SUPERSEDED —
+    // scarce labour allocates building by building, offered wage descending
+    // (offered = base_wage × (1 + wage_bid)), building id ascending on a tie, each
+    // building granted up to its demand until the pool is spent. The marginal
+    // building gets a partial grant; those below it get none. The pool-level
+    // min(1, supply/demand) survives in `report.workforce_contention` as the
+    // reporting aggregate (and the wage fallback for hand-built reports); the
+    // factor a building actually runs at is `report.building_labour[id]`.
+    struct labour_claim
+    {
+        entity_id body;
+        entity_id id;
+        float     demand;
+        float     offered;
+    };
     std::vector<std::pair<entity_id, float>> demand_by_body;
+    std::vector<labour_claim>                claims;
+    std::vector<const labour_claim*>         pool_claims;
     for (const entity_id corp : corp_ids)
     {
         const corporation_component& cc = w.corporations.at(corp);
 
         // Workforce pool, step 1: sum this corp's labour demand on each body
         // (the requested workforce_assigned of every producing building there),
-        // then derive a per-body contention scalar min(1, supply/demand). Below 1
-        // it throttles every building on that (corp, body) uniformly.
+        // then derive the per-body supply and clear each pool — by wage when
+        // contended, everyone staffed at request when not.
         // BL-041: demand is capped by the body's habitability scalar before summing.
         demand_by_body.clear();
+        claims.clear();
         for (const entity_id building_id : cc.assets)
         {
             const auto bit = w.buildings.find(building_id);
@@ -1074,6 +1094,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             if (body == null_entity)
                 continue;
             const float add = b.workforce_assigned * hab_cap_for(body);
+            claims.push_back({ body, building_id, add,
+                               reg.economics(b.type).base_wage * (1.0f + b.wage_bid) });
             const auto  it  = std::find_if(demand_by_body.begin(), demand_by_body.end(),
                                            [body](const std::pair<entity_id, float>& e) {
                                                return e.first == body;
@@ -1100,26 +1122,65 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             const float supply = (pop_total > 0.0f) ? pop_total * share : w.workforce_supply(corp, body);
             const float scalar = (demand > supply && demand > 0.0f) ? supply / demand : 1.0f;
             report.workforce_contention[std::make_pair(corp, body)] = scalar;
+
+            // BL-614: clear the pool building by building. Uncontended, every
+            // claim is granted in full — the factor is 1.0, exactly the scalar
+            // above, so the shipped uncontended world is bit-identical to the
+            // proportional model it supersedes.
+            if (scalar >= 1.0f)
+            {
+                for (const labour_claim& c : claims)
+                    if (c.body == body)
+                        report.building_labour[c.id] = 1.0f;
+                continue;
+            }
+            // Contended: offered wage descending, building id ascending — the
+            // deterministic order POPULATION.md § Contention rules. With no
+            // wage_bid set anywhere (the data-only first cut) every offered
+            // wage inside one type ties and the id order decides, so a corp's
+            // OLDEST buildings staff first — priced scarcity replaces silent
+            // averaging the moment anything bids.
+            pool_claims.clear();
+            for (const labour_claim& c : claims)
+                if (c.body == body)
+                    pool_claims.push_back(&c);
+            std::sort(pool_claims.begin(), pool_claims.end(),
+                      [](const labour_claim* a, const labour_claim* b) {
+                          if (a->offered != b->offered) return a->offered > b->offered;
+                          return a->id < b->id;
+                      });
+            float remaining = supply;
+            for (const labour_claim* c : pool_claims)
+            {
+                const float alloc = (remaining > 0.0f) ? std::min(c->demand, remaining) : 0.0f;
+                report.building_labour[c->id] =
+                    (c->demand > 0.0f) ? alloc / c->demand : 1.0f;
+                remaining -= alloc;
+            }
         }
     }
-
-    auto contention_for = [&](entity_id corp, entity_id body) -> float {
-        const auto it = report.workforce_contention.find({corp, body});
-        return (it != report.workforce_contention.end()) ? it->second : 1.0f;
-    };
 
     // ── Pass 1b (BL-613): the QUALIFIED pool, per (nation, body).
     //
     // A recipe carrying a `qualified_workforce` requirement draws that fraction
     // of its labour from the host NATION's qualified pool —
     // `nation_component::qualification` × the labour the nation's centres
-    // contribute on the body — and is throttled by min(1, supply/demand) over it,
-    // a second factor beside the (corp, body) scalar above, same shape
-    // (POPULATION.md § Qualification). Keyed by nation because the pool is
-    // national: every corp running deep methods inside one nation contends for
-    // the same qualified heads. Demand sums in ascending (nation, body) via the
-    // std::map; the walk below is the same sorted corp/stored-asset order the
-    // ordinary pass uses, so the accumulation order is fixed.
+    // contribute on the body — a second constraint beside the (corp, body) pool
+    // above, same shape (POPULATION.md § Qualification). Keyed by nation because
+    // the pool is national: every corp running deep methods inside one nation
+    // contends for the same qualified heads. Demand sums in ascending
+    // (nation, body) via the std::map; the walk below is the same sorted
+    // corp/stored-asset order the ordinary pass uses, so the accumulation order
+    // is fixed.
+    //
+    // BL-614: a contended qualified pool clears BY THE SAME RULE as the ordinary
+    // one — offered wage descending, building id ascending — and it settles
+    // first (POPULATION.md § Contention: "the qualified pool clears by the same
+    // rule before the ordinary pool"). The two pools are independent
+    // constraints: a building's final factor is the PRODUCT of its ordinary and
+    // qualified grants, folded below — qualified heads are not subtracted from
+    // the ordinary pool (they are counted inside it), the scarcer constraint
+    // simply bites harder.
     //
     // A building outside every nation (unclaimed tile, off-nation body) is
     // ungated — the same jurisdiction reading the levy pass uses: no nation, no
@@ -1127,7 +1188,13 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // contribute no labour on the body has an EMPTY qualified pool there, and
     // its deep methods idle — no people, no qualified people.
     {
-        std::map<std::pair<entity_id, entity_id>, float> qual_demand; // (nation, body)
+        struct qual_claim
+        {
+            entity_id id;
+            float     demand;
+            float     offered;
+        };
+        std::map<std::pair<entity_id, entity_id>, std::vector<qual_claim>> qual_claims;
         for (const entity_id corp : corp_ids)
         {
             const corporation_component& cc = w.corporations.at(corp);
@@ -1152,12 +1219,17 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     continue; // outside every jurisdiction: ungated
                 // Mirror the ordinary pool's demand shape: the assigned request,
                 // capped by habitability, scaled by the qualified fraction.
-                qual_demand[{tn->second, body}] +=
-                    b.workforce_assigned * rcp->qualified_workforce * hab_cap_for(body);
+                qual_claims[{tn->second, body}].push_back(
+                    { building_id,
+                      b.workforce_assigned * rcp->qualified_workforce * hab_cap_for(body),
+                      reg.economics(b.type).base_wage * (1.0f + b.wage_bid) });
             }
         }
-        for (const auto& [key, demand] : qual_demand)
+        for (auto& [key, list] : qual_claims)
         {
+            float demand = 0.0f;
+            for (const qual_claim& c : list)
+                demand += c.demand; // insertion order (sorted corp walk) — fixed
             const auto nit = w.nations.find(key.first);
             const float qual = (nit != w.nations.end()) ? nit->second.qualification : 0.0f;
             const auto  pit  = pop_supply_by_body_nation.find({key.second, key.first});
@@ -1165,22 +1237,40 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             const float supply = qual * pool;
             const float scalar = (demand > supply && demand > 0.0f) ? supply / demand : 1.0f;
             report.qualified_contention[key] = scalar;
+            if (scalar >= 1.0f)
+                continue; // every claim granted in full — no factor below 1 to fold
+            std::sort(list.begin(), list.end(),
+                      [](const qual_claim& a, const qual_claim& b) {
+                          if (a.offered != b.offered) return a.offered > b.offered;
+                          return a.id < b.id;
+                      });
+            float remaining = supply;
+            for (const qual_claim& c : list)
+            {
+                const float alloc = (remaining > 0.0f) ? std::min(c.demand, remaining) : 0.0f;
+                const float grant = (c.demand > 0.0f) ? alloc / c.demand : 1.0f;
+                remaining -= alloc;
+                // Fold into the building's ordinary grant: the product of the
+                // two independent constraints. The ordinary pass above wrote an
+                // entry for every producing building, this one included.
+                const auto blit = report.building_labour.find(c.id);
+                if (blit != report.building_labour.end())
+                    blit->second *= grant;
+                else
+                    report.building_labour[c.id] = grant;
+            }
         }
     }
 
-    /// The qualified throttle for one building: 1.0 unless it runs a qualified
-    /// method inside a nation, in which case the (nation, body) scalar above.
-    auto qualified_factor_for = [&](const building_component& b, entity_id body) -> float {
-        if (b.type != building_type::processing_facility)
-            return 1.0f;
-        const recipe* rcp = reg.get_recipe(b.recipe);
-        if (rcp == nullptr || rcp->qualified_workforce <= 0.0f)
-            return 1.0f;
-        const auto tn = w.tile_to_nation.find(b.tile);
-        if (tn == w.tile_to_nation.end())
-            return 1.0f;
-        const auto it = report.qualified_contention.find({tn->second, body});
-        return (it != report.qualified_contention.end()) ? it->second : 1.0f;
+    /// The labour a building actually runs at this tick: its per-building grant
+    /// (ordinary × qualified), falling back to the pool aggregate for a
+    /// building the allocation pass never saw.
+    auto labour_for = [&](entity_id building_id, entity_id corp, entity_id body) -> float {
+        const auto it = report.building_labour.find(building_id);
+        if (it != report.building_labour.end())
+            return it->second;
+        const auto cit = report.workforce_contention.find({corp, body});
+        return (cit != report.workforce_contention.end()) ? cit->second : 1.0f;
     };
 
     // ── Pass 2: BL-193 stack grouping — who shares a deposit, and at what rank.
@@ -1280,14 +1370,12 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             if (b.type != building_type::extraction_site &&
                 b.type != building_type::processing_facility)
                 continue;
-            // BL-613: the solver optimises against the labour the building can
-            // actually reach, qualified throttle included — same product the
-            // production pass applies below.
-            const entity_id solve_body = building_body(w, b);
+            // BL-613/BL-614: the solver optimises against the labour the
+            // building can actually reach — its own per-building grant,
+            // ordinary and qualified constraints folded.
             b.workforce_target = solve_workforce_target(
                 w, reg, b,
-                contention_for(w.player_entity, solve_body)
-                    * qualified_factor_for(b, solve_body),
+                labour_for(building_id, w.player_entity, building_body(w, b)),
                 rank_of(building_id));
         }
     }
@@ -1334,7 +1422,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 // sizes the shared taper at the figure that member will draw.
                 const entity_id member_owner = owner_of(sites[i].id);
                 const float n =
-                    extraction_nominal(w, reg, b, contention_for(member_owner, body),
+                    extraction_nominal(w, reg, b,
+                                       labour_for(sites[i].id, member_owner, body),
                                        member_owner)
                     * placement_rules::stack_output_scalar(static_cast<int>(i - first) + 1);
                 if (n > 0.0f)
@@ -1390,7 +1479,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                         (sit != stack_by_building.end()) ? &sit->second : nullptr;
                     report.buildings.push_back(
                         run_extraction(w, reg, corp, building_id, b,
-                                       contention_for(corp, body), stack));
+                                       labour_for(building_id, corp, body), stack));
                     break;
                 }
                 case building_type::processing_facility:
@@ -1399,12 +1488,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     // market on the body" — a multi-market body, BL-096/BL-263,
                     // must draw its own centre's stock, not a sibling market's).
                     const entity_id market_id = market_for_tile(w, b.tile);
-                    // BL-613: the qualified throttle rides beside the ordinary
-                    // contention scalar — a second factor, same shape.
+                    // BL-613/BL-614: the building's own grant — ordinary pool
+                    // cleared by wage, qualified constraint folded in.
                     report.buildings.push_back(
                         run_processing(w, reg, corp, building_id, b, market_id,
-                                       contention_for(corp, body)
-                                           * qualified_factor_for(b, body),
+                                       labour_for(building_id, corp, body),
                                        report));
                     break;
                 }
@@ -1456,6 +1544,19 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             const auto hit = report.body_habitability.find(body);
             const float hab = (hit != report.body_habitability.end()) ? hit->second : 1.0f;
             contention *= workforce_efficiency(hab);
+        }
+        // BL-614: the per-building grants ride the same rescale, so the wages
+        // apply_budget pays off them carry exactly the efficiency the pool
+        // aggregate always carried. std::map walk — ascending building id.
+        for (auto& [bid, grant] : report.building_labour)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end())
+                continue;
+            const entity_id body = building_body(w, bit->second);
+            const auto hit = report.body_habitability.find(body);
+            const float hab = (hit != report.body_habitability.end()) ? hit->second : 1.0f;
+            grant *= workforce_efficiency(hab);
         }
     }
 

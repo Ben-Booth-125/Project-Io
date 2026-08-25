@@ -659,6 +659,23 @@ struct building_component
     /// owning corp. Never set on player buildings.
     int  ai_cooldown = 0;
 
+    /// BL-614 (wage competition; docs/economy/POPULATION.md § Contention): this
+    /// building's wage premium over its type's authored `base_wage`, as a
+    /// fraction — offered wage = base_wage × (1 + wage_bid). When a (corp,
+    /// body) labour pool is contended, scarce labour allocates to the buildings
+    /// offering the higher wage (offered wage descending, then building id
+    /// ascending), superseding the uniform proportional scalar; wages are then
+    /// paid AT THE OFFERED RATE on the labour actually allocated
+    /// (compute_building_opex). FIRST CUT, flagged for overturn (NR-629):
+    /// data-only, no UI and no verb sets it, so every offered wage is currently
+    /// base_wage and contention resolves by building id — the per-building dial
+    /// vs per-body dial vs derived clearing wage question stays open on the
+    /// item. Non-negative by contract (a bid raises, never undercuts, in this
+    /// cut). SERIALISED (world_save.cpp's building record) —
+    /// `world_save_version` 11 → 12 moved with it; a non-finite or negative
+    /// value refuses the whole stream.
+    float wage_bid = 0.0f;
+
     /// BL-430: economy ticks remaining before this building's recipe may be
     /// switched again through the PLAYER-grade seam (corp_command's set_recipe
     /// verb, and the construction_panel UI, which shares its gate). Set from

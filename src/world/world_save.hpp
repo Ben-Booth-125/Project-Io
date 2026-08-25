@@ -141,7 +141,15 @@ inline constexpr uint32_t world_save_magic =
 /// whole on the same strict-equality contract as every prior bump. The reader
 /// additionally refuses a non-finite or out-of-[0, 1] value: the writer
 /// cannot have produced one, so the stream is corrupt rather than odd.
-inline constexpr uint32_t world_save_version = 11;
+///
+/// Bumped to 12 by BL-614 (wage competition): the building record
+/// (`w_building` / `r_building`) gains `building_component::wage_bid` — one
+/// float in declaration order, between `ai_cooldown` and
+/// `recipe_switch_cooldown`. A v11 stream's building records are one f32 short, a MID-RECORD
+/// gap, so it is refused whole on the same strict-equality contract as every
+/// prior bump. The reader additionally refuses a non-finite or negative
+/// value — the writer cannot have produced one.
+inline constexpr uint32_t world_save_version = 12;
 
 /// Write @p w as a complete world snapshot.
 ///

@@ -48,9 +48,13 @@ building_opex compute_building_opex(const building_component& b,
     // Guard against negative labour_cost when wt_scalar < 0.3 (the material floor
     // already covers more than the scaled total in that edge case).
     o.maintenance = material_cost + std::max(0.0f, labour_cost);
+    // BL-614: wages are paid AT THE OFFERED RATE — base_wage × (1 + wage_bid) —
+    // on the labour actually allocated. A zero bid multiplies by exactly 1.0f,
+    // so every pre-BL-614 wage is bit-identical.
     o.wages       = b.decommissioned
                     ? 0.0f
-                    : b.workforce_assigned * contention_scalar * e.base_wage * wt_scalar * hab;
+                    : b.workforce_assigned * contention_scalar * e.base_wage
+                          * (1.0f + b.wage_bid) * wt_scalar * hab;
     return o;
 }
 
@@ -59,7 +63,8 @@ void apply_budget(world& w,
                   const std::unordered_map<entity_id, corp_cash_flow>& flows,
                   const std::map<std::pair<entity_id, entity_id>, float>& contention,
                   std::map<entity_id, corp_budget>* breakdown,
-                  const std::vector<building_report>* production)
+                  const std::vector<building_report>* production,
+                  const std::map<entity_id, float>* building_labour)
 {
     // BL-343 law enforcement. Skipped entirely when nothing is enacted, so a
     // world with no laws runs the pre-BL-343 arithmetic untouched.
@@ -149,6 +154,14 @@ void apply_budget(world& w,
             const auto cit = contention.find(std::make_pair(corp, body));
             if (cit != contention.end())
                 scalar = cit->second;
+            // BL-614: prefer the building's OWN allocation grant where the
+            // caller supplied the map — wages then follow the wage-competition
+            // allocation (qualified constraint folded) rather than the pool
+            // aggregate. In an uncontended pool the grant IS the aggregate
+            // (both 1.0 × habitability efficiency), so nothing moves.
+            if (building_labour != nullptr)
+                if (const auto bl = building_labour->find(bid); bl != building_labour->end())
+                    scalar = bl->second;
 
             // Maintenance + wages via the shared formula (BL-074), so the balance
             // loop and the per-building profitability estimate never diverge. Kept

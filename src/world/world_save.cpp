@@ -133,18 +133,26 @@ void w_building(std::ostream& o, const building_component& b)
     w_f32(o, b.construction_progress);
     w_int(o, b.loss_streak);
     w_int(o, b.ai_cooldown);
+    w_f32(o, b.wage_bid); // BL-614: world_save_version 12
     w_int(o, b.recipe_switch_cooldown);
 }
 
 bool r_building(std::istream& i, building_component& b)
 {
-    return r_id(i, b.tile) && r_enum(i, b.type, max_building)
+    if (!(r_id(i, b.tile) && r_enum(i, b.type, max_building)
         && r_f32(i, b.workforce_assigned) && r_enum(i, b.target_resource, max_resource)
         && r_u16(i, b.recipe) && r_int(i, b.workforce_target)
         && r_bool(i, b.workforce_auto) && r_bool(i, b.decommissioned)
         && r_int(i, b.active_recipe_index) && r_int(i, b.ticks_remaining)
         && r_f32(i, b.construction_progress) && r_int(i, b.loss_streak)
-        && r_int(i, b.ai_cooldown) && r_int(i, b.recipe_switch_cooldown);
+        && r_int(i, b.ai_cooldown) && r_f32(i, b.wage_bid)
+        && r_int(i, b.recipe_switch_cooldown)))
+        return false;
+    // BL-614: `wage_bid` is non-negative by contract (a bid raises, never
+    // undercuts, in this cut). The writer cannot have produced a NaN or a
+    // negative, so a stream carrying one is corrupt — refuse whole, never
+    // clamp (the r_nation qualification precedent one record up).
+    return std::isfinite(b.wage_bid) && b.wage_bid >= 0.0f;
 }
 
 void w_stockpile(std::ostream& o, const stockpile_component& s) { w_f32_array(o, s.quantities); }
