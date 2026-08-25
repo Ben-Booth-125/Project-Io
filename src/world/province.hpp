@@ -53,9 +53,11 @@
 //   1. Provinces GROW FROM POPULATION CENTRES, and seed strength scales with
 //      the centre's scale (1-5): a metropolis draws a larger province than a
 //      village does.
-//   2. BOUNDARIES ARE RIVERS, ELEVATION DIFFERENCE, AND SOMETIMES ROADS — but
-//      a ROAD BINDS. Tiles a road links tend to share a province; a road is
-//      never a divider.
+//   2. BOUNDARIES ARE RIVERS AND ELEVATION DIFFERENCE. Roads are NOT an input
+//      (Ben, 2026-08-25; BL-623, provinces before roads — overturning the
+//      2026-08-21 road-binds half of this ruling): the partition runs BEFORE
+//      generate_roads, so every province's settlement exists when the lattice
+//      is laid. Roads still never divide — they simply are not read.
 //   3. Country no centre reaches becomes HINTERLAND provinces under the same
 //      boundary rules, seeded from the LEAST-ACCESSIBLE tile so a hinterland is
 //      shaped by its terrain rather than being whatever was left over.
@@ -204,7 +206,12 @@ inline constexpr std::size_t k_sea_province_soft_target = 42;
 // province stops at. Costs are INTEGERS so a tie is exact and breaks on a
 // stable key, never on float noise or container order.
 //
-//   cost(a, b) = ( base + river + elevation + jitter )  [ / road divisor ]
+//   cost(a, b) = base + river + elevation + jitter
+//
+// Roads are deliberately ABSENT from the model (BL-623, provinces before
+// roads): the partition runs before generate_roads, so there is no road field
+// worth reading when the borders are drawn. The road-bind divisor that used to
+// close this formula retired with that reorder.
 //
 // Every coefficient below is either STRUCTURAL (read off a domain the codebase
 // already defines) or PINNED BY MEASUREMENT (BL-463's discipline), and says
@@ -245,41 +252,6 @@ inline constexpr int k_province_river_edge_cost = 40;
 /// It is measured on TERRAIN ALONE, so re-pinning it does not chase its own
 /// tail: the |dh| distribution does not depend on the partition it feeds.
 inline constexpr int k_province_height_cost = 683;
-
-/// A ROAD BINDS (Ben, 2026-08-21). When BOTH tiles carry a road, the whole edge
-/// cost is divided by this — the road does not annihilate the terrain (a bridge
-/// over a gorge is still a gorge), it makes the link that much more binding.
-///
-/// PINNED BY MEASUREMENT, 2026-08-21.
-///
-/// THE PIN RULE: the SMALLEST divisor at which a road link is more binding than
-/// plain ground EVEN WHERE IT CROSSES A RIVER — so "a road binds" holds against
-/// the strongest boundary the terrain offers, which is what the ruling says,
-/// while the road stays as weak as that requirement allows. Read off the
-/// measured median edge: plain ground is base 10 + median elevation 13 + mean
-/// jitter 2 = 25, and a roaded river edge is 10 + 40 + 13 + 2 = 65 before the
-/// divide. 65 / d < 25 needs d >= 3; 4 is the next power of two and leaves
-/// margin for the seeds whose relief runs above the median.
-///
-/// THE MEASURED EFFECT, so the rule is not taken on trust. The instrument is
-/// the share of roaded adjacent-land edges that end up INTERNAL to a province
-/// rather than on its border, against the same share for plain edges;
-/// `province_partition_harness` C2 prints the shipped row on every run, and
-/// changing this constant and re-running produces the rest of the table
-/// (default world, k_province_height_cost = 683):
-///
-///   divisor   roaded internal   plain internal   lift      world mean size
-///      1          56.85%            56.20%       +0.65pp        8.00
-///      2          67.96%            55.85%      +12.11pp        7.94
-///      4          74.81%            55.34%      +19.47pp        7.87
-///      8          78.89%            55.19%      +23.70pp        7.86
-///
-/// At 1 the road does not bind at all (+0.65pp is noise) — which is the honest
-/// evidence that the divisor, not the base cost, is what carries the ruling.
-/// The lift is concave with NO sharp knee, so the table alone would not pick a
-/// value; the pin rule above is what picks it, and the table is what confirms
-/// the choice buys a real effect.
-inline constexpr int k_province_road_bind_divisor = 4;
 
 /// Seeded jitter added to every edge cost, as `fold(seed, lo, hi) % this` — so
 /// 0..4 on a base of 10.
@@ -437,8 +409,11 @@ province_kind province_kind_of(const world& w, uint32_t id);
 /// Build @p w's province partition from its tiles, REPLACING `w.provinces`.
 ///
 /// Pure in everything but its inputs: the result is a function of (@p seed, each
-/// body's grid dimensions, its land mask, its tiles' height / river edges / road
-/// level, and its population centres) alone. NO RNG STREAM IS CONSUMED — every
+/// body's grid dimensions, its land mask, its tiles' height / river edges, its
+/// nation assignment, and its non-anchor population centres) alone — the
+/// PRE-ROAD world (BL-623, provinces before roads: road_level is deliberately
+/// not an input, so a recompute on a world whose roads have since been stamped
+/// reproduces the partition exactly). NO RNG STREAM IS CONSUMED — every
 /// draw is a stateless fold from @p seed, the campaign_battle identity idiom, so
 /// the partition can never perturb another generation pass's draws no matter
 /// where it is called.

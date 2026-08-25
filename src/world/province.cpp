@@ -168,8 +168,11 @@ struct frontier_worse
 
 /// The cost model, on already-fetched tiles. See province.hpp for what pins
 /// each coefficient. Symmetric in (a, b): the river term takes EITHER side's
-/// bit, the height term is an absolute difference, the jitter fold is over the
-/// sorted id pair, and the road term needs both tiles roaded.
+/// bit, the height term is an absolute difference, and the jitter fold is over
+/// the sorted id pair. Roads are NOT read (BL-623, provinces before roads):
+/// the partition runs before generate_roads, so road_level is unstamped when
+/// the borders are drawn, and reading it would make a later recompute depend
+/// on state the original fill never saw.
 int edge_cost_impl(uint32_t seed, entity_id a_id, const tile_component& a, entity_id b_id,
                    const tile_component& b, int side)
 {
@@ -186,10 +189,6 @@ int edge_cost_impl(uint32_t seed, entity_id a_id, const tile_component& a, entit
     const uint64_t lo = std::min(a_id, b_id);
     const uint64_t hi = std::max(a_id, b_id);
     c += static_cast<int>(fold(seed, lo, hi) % static_cast<uint64_t>(k_province_edge_jitter));
-
-    // A ROAD BINDS. Divided, not zeroed: a bridge over a gorge is still a gorge.
-    if (a.road_level > 0 && b.road_level > 0)
-        c = (c + k_province_road_bind_divisor - 1) / k_province_road_bind_divisor;
 
     return c < 1 ? 1 : c;
 }

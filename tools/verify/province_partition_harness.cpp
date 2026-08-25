@@ -7,10 +7,11 @@
 //       2026-08-21, NR-438), the ascending-id contract, seeded determinism,
 //       THE DERIVED-IDENTITY CONTRACT (P8: an id IS its lowest member tile),
 //       and the settlement seeds (P9).
-//   C — THE COST MODEL, MEASURED. The pinning instrument for the two
-//       coefficients province.hpp declares measurement-pinned, plus the
+//   C — THE COST MODEL, MEASURED. The pinning instrument for the height
+//       coefficient province.hpp declares measurement-pinned, plus the
 //       direction checks that prove the model draws the borders Ben ruled:
-//       rivers and slopes divide, and a ROAD BINDS.
+//       rivers and slopes divide. (The road-bind rows retired with BL-623,
+//       provinces before roads — roads are no longer a partition input.)
 //   D — the SIZE DISTRIBUTION across a seed sweep. REPORTED, not engineered:
 //       organic borders are meant to be irregular, so D describes what the cost
 //       model produced against the superseded 3x3 partition's numbers rather
@@ -237,7 +238,6 @@ int main()
         int       side = 0;
         float     dh = 0.0f;
         bool      river = false;
-        bool      roaded = false;
     };
 
     std::map<entity_id, std::vector<entity_id>> grids;
@@ -287,7 +287,6 @@ int main()
                     e.dh     = std::fabs(tc.height - nit->second.height);
                     e.river  = ((tc.river_edges >> s) & 1u) != 0u
                               || ((nit->second.river_edges >> ((s + 3) % 6)) & 1u) != 0u;
-                    e.roaded = tc.road_level > 0 && nit->second.road_level > 0;
                     out.push_back(e);
                 }
             }
@@ -529,7 +528,13 @@ int main()
     }
 
     // P6 — determinism: recomputing from the stored seed reproduces the
-    // partition exactly. The replay guard.
+    // partition exactly. The replay guard — and, since BL-623 (provinces
+    // before roads), the guard of the two-call generation shape: the world
+    // recomputed from here carries stamped roads and post-partition anchor
+    // foundings, and the fill must reproduce anyway, because road_level is not
+    // an input and `province_anchor` centres are seed-skipped. The homeworld's
+    // early partition and the end-of-generation rebuild agree by exactly this
+    // property.
     {
         world w2 = w;
         build_province_partition(w2, part.seed);
@@ -777,11 +782,12 @@ int main()
     //       it implies under the pinning rule: a gradient at the 90th
     //       percentile of steepness costs the same to cross as a river.
     //   C2  does the cost model actually draw the borders Ben ruled? Border
-    //       share by edge class — river, steep, roaded, plain. A road that
-    //       BINDS shows up as roaded edges being borders LESS often than plain
-    //       ones; a river that divides shows up as the opposite. The roaded
-    //       internal share is also the instrument that pinned
-    //       k_province_road_bind_divisor (sweep the constant, re-run, compare).
+    //       share by edge class — river, steep, plain. A river that divides
+    //       shows up as river edges being borders MORE often than plain ones,
+    //       and a steep edge likewise. The roaded class (C2c) RETIRED with
+    //       BL-623 (provinces before roads): roads are no longer a partition
+    //       input, and measuring them against a partition drawn before they
+    //       existed would report a settlement-clustering confound, not a rule.
     // -----------------------------------------------------------------------
     std::printf("\nC — the cost model, measured\n");
     float p90_dh = 0.0f;
@@ -840,7 +846,7 @@ int main()
 
     {
         struct tally { std::size_t n = 0, border = 0; };
-        tally river, steep, roaded, plain, all;
+        tally river, steep, plain, all;
         for (const land_edge& e : edges)
         {
             const bool is_border = part.province_of(e.a) != part.province_of(e.b);
@@ -848,30 +854,24 @@ int main()
             bump(all);
             if (e.river)               bump(river);
             if (e.dh >= p90_dh)        bump(steep);
-            if (e.roaded)              bump(roaded);
-            if (!e.river && !e.roaded && e.dh < p90_dh) bump(plain);
+            if (!e.river && e.dh < p90_dh) bump(plain);
         }
         const auto pctf = [](const tally& t) {
             return t.n ? 100.0 * double(t.border) / double(t.n) : 0.0;
         };
         std::printf("  C2  border share by edge class — all %.2f%% (%zu edges)\n", pctf(all),
                     all.n);
-        std::printf("      river  %6.2f%% (%zu)   steep(>=p90) %6.2f%% (%zu)\n", pctf(river),
-                    river.n, pctf(steep), steep.n);
-        std::printf("      roaded %6.2f%% (%zu)   plain        %6.2f%% (%zu)\n", pctf(roaded),
-                    roaded.n, pctf(plain), plain.n);
-        std::printf("      roaded INTERNAL share %.2f%% vs plain %.2f%%  (lift %+.2fpp) —"
-                    " the divisor's pinning instrument\n",
-                    100.0 - pctf(roaded), 100.0 - pctf(plain),
-                    pctf(plain) - pctf(roaded));
+        std::printf("      river  %6.2f%% (%zu)   steep(>=p90) %6.2f%% (%zu)   plain %6.2f%%"
+                    " (%zu)\n",
+                    pctf(river), river.n, pctf(steep), steep.n, pctf(plain), plain.n);
 
-        // The three claims the ruling makes about what a boundary IS.
+        // The two claims the ruling makes about what a boundary IS. C2c (a road
+        // binds) RETIRED with BL-623: roads are laid after the partition and
+        // are not an input to it.
         check(river.n > 0 && pctf(river) > pctf(plain),
               "C2a a river edge is a border more often than plain ground (rivers divide)");
         check(steep.n > 0 && pctf(steep) > pctf(plain),
               "C2b a steep edge is a border more often than plain ground (elevation divides)");
-        check(roaded.n > 0 && pctf(roaded) < pctf(plain),
-              "C2c a roaded edge is a border LESS often than plain ground (a ROAD BINDS)");
     }
 
     // -----------------------------------------------------------------------

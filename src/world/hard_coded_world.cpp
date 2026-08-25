@@ -756,8 +756,42 @@ world make_hard_coded_world(world_params params, generation_report* report,
         }
     }
 
+    // BL-623 (provinces before roads; Ben, 2026-08-25, resolving NR-640 as
+    // option c): the homeworld's province partition runs HERE, before
+    // generate_roads — the partition reads rivers and urban transforms but NOT
+    // roads (the road-bind divisor retired with this reorder), and every
+    // settlement-less province receives its anchor founding NOW, so the road
+    // pass below stamps the lattice over the COMPLETE settlement set and every
+    // anchor joins it like any village. The partition consumes no RNG stream
+    // (stateless folds), so inserting it here perturbs nothing around it.
+    //
+    // Selene and the asteroids do not exist yet — they are authored below,
+    // after the homeworld's political pipeline — so this call partitions the
+    // bodies that do, and the CANONICAL whole-world partition is rebuilt at
+    // the end of this function once every body's tiles exist. The rebuild
+    // reproduces this partition byte-identically for the bodies present here:
+    // the fill is a pure function of the pre-road world and the seed, none of
+    // its inputs (heights, rivers, nation assignment, the non-anchor centre
+    // set) changes after this point, and the anchors founded between the two
+    // calls are skipped as seeds by their `province_anchor` flag
+    // (province_partition_harness P6 is the identity's guard).
+    build_province_partition(w, params.seed ^ 0x50524F56u);
+
+    // BL-611 (province centre anchor): every land province on the settled body
+    // holds a centre — the leftover pockets the centre-seeded fill could not
+    // reach get a scale-1 anchor founded on their best ground. RNG-free. The
+    // re-name is the byte-stable re-run name_population_centres documents (new
+    // ids sort last, the existing prefix of draws reproduces exactly); the
+    // re-stamp is idempotent and paves only the new anchors' footprints.
+    ensure_province_anchor_centres(w, kepler);
+    name_population_centres(w, kepler, home_grid_width, kepler_settlement, kepler_creeds,
+                            /*seed=*/params.seed ^ 0xC17910E6u);
+    stamp_urban_land_use(w, kepler);
+
     // Road network (BL-146): stamp each nation's road lattice onto tile.road_level,
-    // after nations + population centres exist. Deterministic; no seed of its own —
+    // after nations + population centres exist — anchor foundings included
+    // (BL-623), so they take local streets and spurs like any village and the
+    // off-lattice centre class ends here. Deterministic; no seed of its own —
     // a pure function of the generated tiles/nations/centres.
     bump(10);
     generate_roads(w, kepler);
@@ -1238,32 +1272,18 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // reads. See law.hpp.
     seed_prototype_laws(w);
 
-    // BL-466: the province partition — every body's land carved into 3-5 tile
-    // locality cells. LAST, so it reads the finished tile map (rivers, roads,
-    // urban transforms all applied). Its own XOR offset keeps the fold
-    // uncorrelated with the tile/nation/corp streams, and it consumes no RNG
-    // stream at all, so adding it perturbs nothing above it. See province.hpp.
+    // BL-466/BL-623: the CANONICAL whole-world province partition. The
+    // homeworld was partitioned before its roads (BL-623, provinces before
+    // roads — see that call above for the ordering rationale); Selene and the
+    // asteroids were authored after it, so the partition is rebuilt here, LAST,
+    // once every body's tiles exist. For the bodies the early call covered the
+    // rebuild is byte-identical (the fill reads no road data and none of its
+    // other inputs changed; anchor foundings are seed-skipped by their
+    // `province_anchor` flag), so every anchor founded above still anchors the
+    // same province. On every other body the partition runs here for the first
+    // and only time. Same XOR offset — it IS the same partition; no RNG stream
+    // is consumed, so this call perturbs nothing above it. See province.hpp.
     build_province_partition(w, params.seed ^ 0x50524F56u);
-
-    // BL-611 (province centre anchor): every land province on the settled
-    // body holds a centre — the leftover pockets the centre-seeded fill could
-    // not reach get a scale-1 anchor founded on their best ground, BEFORE the
-    // holder is derived from the anchors below. RNG-free. The re-name is the
-    // byte-stable re-run name_population_centres documents (new ids sort
-    // last, the existing prefix of draws reproduces exactly); the re-stamp is
-    // idempotent and paves only the new anchors' footprints.
-    ensure_province_anchor_centres(w, kepler);
-    name_population_centres(w, kepler, home_grid_width, kepler_settlement, kepler_creeds,
-                            /*seed=*/params.seed ^ 0xC17910E6u);
-    stamp_urban_land_use(w, kepler);
-    // NOTE (BL-620): these anchor foundings land AFTER generate_roads by structural
-    // necessity — they need the partition, and the partition reads the finished road
-    // raster — so they carry NO street or spur. Stamping roads for them here would
-    // change road_level after build_province_partition read it, breaking the
-    // partition-recompute contract (province_partition_harness P6) and the road-binds
-    // instrument (C2c). Whether anchors should join the lattice via a partition
-    // rebuild is an open design call; road_generation_harness R3 exempts
-    // province_anchor centres for exactly this reason.
 
     // BL-569: seed the province holder — since BL-611 from each land
     // province's ANCHOR centre's nation (plurality is the no-centre
