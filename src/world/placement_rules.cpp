@@ -29,6 +29,9 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::out_of_logistics_range: return "Too far from a city, port or logistics hub to be supplied";
         case placement_reason::tech_locked: return "Locked - the technology that permits this has not been researched";
         case placement_reason::province_full: return "This land already sustains as much as it can - improve it, or build elsewhere";
+        case placement_reason::needs_centre: return "Must be built in a population centre";
+        case placement_reason::centre_too_small: return "This settlement is too small to host it - a larger centre is needed";
+        case placement_reason::far_from_centre: return "Too far from a population centre to draw a workforce";
     }
     return "Cannot build here";
 }
@@ -221,9 +224,63 @@ bool is_coastal(const world& w, entity_id tile_id)
     return false;
 }
 
+namespace {
+
+/// BL-615: the highest stratum among population centres anchored on
+/// @p tile_id, or -1 when none is. A max over `world::population_centres`'
+/// unordered iteration is order-independent, so the answer is deterministic
+/// whatever the container's layout.
+int centre_scale_on_tile(const world& w, entity_id tile_id)
+{
+    int best = -1;
+    for (const auto& [pid, pcc] : w.population_centres)
+    {
+        const auto it = w.population_centre_tile.find(pid);
+        if (it != w.population_centre_tile.end() && it->second == tile_id && pcc.scale > best)
+            best = pcc.scale;
+    }
+    return best;
+}
+
+/// BL-615: true if SOME population centre on @p tc's body sits within
+/// @p radius grid steps of it. Wrapped squared grid distance — columns wrap
+/// (the body is a horizontal cylinder), rows do not — the same metric every
+/// other proximity read in the codebase uses (nearest_market, corp-holding
+/// contiguity, cradle spacing). An existence test over an unordered container
+/// is order-independent: deterministic by construction.
+bool centre_within_radius(const world& w, const tile_component& tc, int radius)
+{
+    int gw = 0;
+    if (const auto bit = w.bodies.find(tc.body); bit != w.bodies.end())
+        gw = bit->second.grid_width;
+
+    const long long r2 = static_cast<long long>(radius) * radius;
+    for (const auto& [pid, pcc] : w.population_centres)
+    {
+        const auto tit = w.population_centre_tile.find(pid);
+        if (tit == w.population_centre_tile.end())
+            continue;
+        const auto ctc_it = w.tiles.find(tit->second);
+        if (ctc_it == w.tiles.end() || ctc_it->second.body != tc.body)
+            continue;
+        long long dx = ctc_it->second.grid_x - tc.grid_x;
+        if (dx < 0) dx = -dx;
+        if (gw > 0 && gw - dx < dx)
+            dx = gw - dx; // shorter way round the cylinder
+        long long dy = ctc_it->second.grid_y - tc.grid_y;
+        if (dy < 0) dy = -dy;
+        if (dx * dx + dy * dy <= r2)
+            return true;
+    }
+    return false;
+}
+
+} // namespace
+
 placement_result can_place_in_world(const world& w, entity_id tile_id,
                                     building_type type, resource_type target,
-                                    float max_reach, entity_id corp)
+                                    float max_reach, entity_id corp,
+                                    placement_gate gate)
 {
     const auto tc_it = w.tiles.find(tile_id);
     if (tc_it == w.tiles.end())
@@ -265,6 +322,26 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
                 return placement_reason::launchpad_exists; // Already one on this body.
         }
     }
+
+    // BL-615 stratum placement gates (POPULATION.md § Strata gate buildings):
+    // where the workforce lives decides where some buildings may stand. Checked
+    // after the terrain/type reasons (which teach more about THIS tile) and
+    // before the logistics reach rule (this one names the missing thing — a
+    // settlement — where reach names only a cost). The gate is authored DATA on
+    // the building definition, resolved by the caller
+    // (recipe_registry::placement_gate_for); a default gate gates nothing, so
+    // every pre-BL-615 call site is unchanged.
+    if (gate.requires_centre || gate.min_centre_scale > 0)
+    {
+        const int scale = centre_scale_on_tile(w, tile_id);
+        if (scale < 0)
+            return placement_reason::needs_centre;
+        if (scale < gate.min_centre_scale)
+            return placement_reason::centre_too_small;
+    }
+    if (gate.centre_proximity_radius > 0
+        && !centre_within_radius(w, tc_it->second, gate.centre_proximity_radius))
+        return placement_reason::far_from_centre;
 
     // Logistics reach (BL-323 S2): the site must be suppliable. Checked after the
     // terrain reasons (which teach more) and before the stack ceiling (which teaches

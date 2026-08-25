@@ -80,6 +80,16 @@ struct recipe
     /// has SOME group to compare against in the cross-group-switch cost check
     /// (economy_system.cpp's try_switch_recipe) without a special empty-string case.
     std::string group = "General";
+
+    /// BL-615: per-recipe stratum-gate radius — this NAMED processing building
+    /// must stand within this grid distance of a population centre (the heavy
+    /// processor class: steel-mill-like recipes). 0 (the default) = ungated.
+    /// Per-recipe rather than per-type because a recipe IS the named-building
+    /// identity for processing (the BL-590 override precedent): a steel mill
+    /// needs a workforce pool nearby, a miller does not, and both are the one
+    /// processing_facility type. Overrides the type-level gate's radius when
+    /// non-zero — see `placement_gate_for`.
+    int centre_proximity_radius = 0;
 };
 
 /// The primary output resource of a recipe — the argmax of its outputs. Used
@@ -147,6 +157,14 @@ struct building_economics
     /// gating it needs no mask — `recipe_registry::building_available` reads
     /// this directly.
     era_band era = era_band::any;
+
+    /// BL-615: this type's stratum placement gate (components.hpp holds the
+    /// struct and its contract; POPULATION.md § Strata gate buildings the
+    /// design). Authored per building in scripts/economy.lua
+    /// (`requires_centre` / `min_centre_scale` / `centre_proximity_radius`);
+    /// the default gates nothing, so an unauthored type — and every
+    /// hand-built harness registry — places exactly as before.
+    placement_gate gate = {};
 };
 
 /// Convert a raw deposit richness into the extraction RATE multiplier, per the
@@ -623,6 +641,22 @@ public:
         return economics(type).resource_build_cost;
     }
 
+    /// BL-615: the stratum placement gate for a SPECIFIC named building — the
+    /// type's authored gate, with a processing recipe's own
+    /// `centre_proximity_radius` overriding the type's when non-zero. The same
+    /// per-named-building fallback shape as `resource_build_cost_for` above,
+    /// and for the same reason: the caller that gates placement
+    /// (construct_building) and any preview must resolve the SAME gate.
+    /// Pass `no_recipe` for non-processing types (it is ignored for them).
+    placement_gate placement_gate_for(building_type type, std::uint16_t id) const
+    {
+        placement_gate g = economics(type).gate;
+        if (type == building_type::processing_facility)
+            if (const recipe* r = get_recipe(id); r != nullptr && r->centre_proximity_radius > 0)
+                g.centre_proximity_radius = r->centre_proximity_radius;
+        return g;
+    }
+
     float t_full() const { return m_t_full; }
     float t_idle() const { return m_t_idle; }
 
@@ -1019,10 +1053,11 @@ private:
     /// rebuild_depth's tail.
     std::vector<int> m_required_depth;
 
-    /// Indexed by building_type (none / extraction_site / processing_facility / port /
-    /// launchpad / inland_logistics_hub / military_base / research_institute — BL-332
-    /// bumped the count 7 → 8).
-    std::array<building_economics, 8> m_building_econ = {};
+    /// Indexed by building_type. Sized off `building_type_count` since BL-615
+    /// (which appended schooling / university) rather than a hand-kept literal
+    /// — appending a type means moving the enum's tail constant, and this
+    /// array follows it.
+    std::array<building_economics, building_type_count> m_building_econ = {};
 
     /// BL-590: per-named-building material overrides, populated by `load_from_lua`
     /// from `buildings.extraction_site.material_overrides` /

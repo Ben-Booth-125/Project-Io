@@ -74,7 +74,11 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     const placement_rules::placement_result pr =
         placement_rules::can_place_in_world(w, tile, type, target,
                                             reg.construction().max_logistics_reach,
-                                            corp); // BL-344: the tech gate asks WHO is building
+                                            corp, // BL-344: the tech gate asks WHO is building
+                                            // BL-615: the stratum gate asks WHICH named
+                                            // building — the type's authored gate, with a
+                                            // processing recipe's own radius override.
+                                            reg.placement_gate_for(type, recipe));
     if (!pr)
     {
         if (pr.reason == placement_rules::placement_reason::out_of_logistics_range)
