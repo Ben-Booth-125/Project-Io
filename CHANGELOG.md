@@ -12,6 +12,56 @@ release.
 
 ## [Unreleased]
 
+## [0.1.19] — 2026-08-25
+
+*Sprint 19 — the world reads lived-in (population foundations). The AI SOTA sweep for this
+minor cut was skipped by ruling (Ben, 2026-08-25); the next minor owes a diff against the
+2026-08-13 baseline.*
+
+### Added
+- **Population density is history** (BL-610): centre count and scale derive from the Era −1
+  regions' simulated populations — ~1,450 centres on the home body (one per ~6 land tiles),
+  rank-size scales, no divisor, no weighted draw.
+- **Every land province is anchored by a centre that decides its nation** (BL-611): the
+  nation-locked partition makes anchor and tile-owner agree by construction; anchor foundings
+  fill the pockets; the centre is the conquest objective.
+- **Urban ground at generation** (BL-612): footprints 1/1/2/4/7 tiles by scale; city ground is
+  scarce from turn one. `world_save_version` 10 → 14 across the wave (land_use, province
+  anchor, qualification, wage_bid).
+- **Qualification** (BL-613): a per-nation qualified-workforce fraction, seeded from
+  industrialisation timing, consumed by deep production methods, raised by the new schooling
+  and university buildings (BL-615 — university needs a City), carried by migrants.
+- **Wage-competition labour clearing** (BL-614): contended pools staff the highest offered
+  wage first; wages paid at the offered rate.
+- **Centres promote, decline, and can be razed — never passively destroyed** (BL-616);
+  `raze_centre` joins the command seam (verb 27).
+- **Migration with brain drain** (BL-617): deterministic stance-gated flows moving heads and
+  qualification between centres and friendly nations.
+- **Road generation scales** (BL-620): backbone over towns-and-up, villages join as Track
+  spurs — world build 2.9 s → 0.7 s (g++); and **era-relative tier gates** (BL-618/BL-621):
+  the antiquity world keeps a Roads backbone; industrial leaders earn Highways, laggards fall
+  to Track.
+- **RESEARCH.md** stub authority doc: universities produce RP; RP purchases unlocks (BL-619
+  owns the full design).
+
+### Fixed
+- The MCP server's verb table restored to lockstep (28 verbs) with a failing drift guard
+  (NR-639); `build_harness.js`'s Lua-TU exclusion list caught up (`contract_template`).
+
+## [0.1.18] — 2026-08-24
+
+*Stamped retroactively at the v0.1.19 cut (Ben, 2026-08-25) — the tag sits on the Sprint 18
+merge commit; the release was left uncut at sprint close.*
+
+### Added
+- **Logistic Points land with both consumers (Sprint 18)**: the bifold city-generated
+  throughput rate, the priced march first (BL-596), convoy admissibility second (BL-597);
+  upkeep zeros make the reach field bite (BL-603).
+- **Rivals extend the network**: scored `place_road` and port/hub builds (BL-599) and directed
+  `dispatch_convoy` through the shared seam (BL-600) — the 2026-08-24 grants.
+- **The Throughput lens** (BL-606) and its strip slot (BL-605); the **dispatch form** on the
+  market Selection card (BL-607); the **Port gates the sea leg** (BL-608).
+
 ## [0.1.17] — 2026-08-24
 
 ### Added

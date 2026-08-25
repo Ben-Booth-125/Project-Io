@@ -112,7 +112,21 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest releases — v0.1.1, v0.1.2, v0.1.8, v0.1.9, v0.1.10, v0.1.14, v0.1.15 and v0.1.17
+## Latest releases — v0.1.14, v0.1.15, v0.1.17, v0.1.18 and v0.1.19
+
+**v0.1.19 — the world reads lived-in.** Population density becomes a consequence of the
+simulated Era −1 history (~1,450 centres, one per ~6 land tiles), every land province is
+anchored by a centre that decides its nation, urban ground is stamped at generation, and the
+economy gains its first non-purchasable constraints: a per-nation qualification fraction that
+deep methods consume, wage-competition labour clearing, and stance-gated migration that
+carries qualified workers with it. Road generation scales to the new density (2.9 s → 0.7 s)
+with era-relative tier gates — the antiquity world keeps its Roads backbone.
+
+**v0.1.18 — Logistic Points land with their consumers.** The network gets its ceiling: the
+bifold city throughput rate with the priced march and convoy admissibility, rival road/hub
+building and directed dispatch under the 2026-08-24 grants, the Throughput lens, the dispatch
+form, and the Port gating the sea leg.
+
 
 **v0.1.17 — the ancient roster becomes a ladder.** Seven named buildings is no longer a roster:
 Tannery, Weaver, Potter's Kiln, Sawmill, Stonemason, Toolmaker and Shipwright grow it to 23,

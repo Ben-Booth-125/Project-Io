@@ -45,24 +45,7 @@ and/or a version goal (v0.1.1 etc.).
 
 ## Open now
 
-### Sprint 19 — The world reads lived-in - population foundations
-*Open · opened 2026-08-25*
-
-**Goal.** The 2026-08-25 population design session lands: density from Era -1 demography, every land province anchored by a centre that decides its nation, urban ground stamped, a nation-grain qualification fraction with wage-competition labour clearing, stratum placement gates, promotion/decline, stance-gated migration carrying qualification, and roads scaled by qualification. Cuts v0.1.19. The felt goal: a fresh world presents as an economy already running - viable, not wealthy, corps on lived-in ground.
-
-**Planned.**
-- BL-610 (centres from demography) - wave 1, agent G: count+scale from region demography, ~40x density (NR-630 owns the retune list)
-- BL-612 (urban ground stamped) - wave 1, agent G: footprints by tier, after BL-610
-- BL-611 (province centre anchor) - wave 1, agent G: land partition seeds from centres, anchor decides the nation, after BL-610
-- BL-613 (qualification fraction) - wave 1, agent E: nation field + seeding + qualified consumption by complicated methods
-- BL-614 (wage competition) - wave 1, agent E: contended labour clears by offered wage, after BL-613
-- BL-615 (stratum placement gates) - wave 1, agent P: placement axis + schooling/university roster entries
-- BL-616 (centre promotion/decline) - wave 2: thresholds need wave 1's density and wage landed
-- BL-617 (population migration) - wave 2: reads qualification, wage and stance
-- BL-618 (roads scale with qualification) - wave 2: consumes BL-613's nation field
-- BL-619 (research system) - GATED: a design session with Ben, not a build slice; RESEARCH.md stub is its floor
-
-Number collision, handled per the '18 (2026-08-25)' idiom: an executed Sprint 19 exists in archive/sprints-2026-Q3.json (goal not met, per the deletion ruling's own text); this entry archives as '19 (2026-08-25)'. The 2026-08-24 sprint-number ceiling ('keep sprints 18 and below') is superseded by Ben's 2026-08-25 instruction ('Open sprint 19 with these items') - ruling annotated. Owed alongside, inherited from Sprint 18's close: two live clicks (dispatch form, Throughput lens) and the v0.1.18 tag (Ben's call). Wave 3 is main-session: merge in dependency order, verifier-review barrier, integrating build, harness sweep, the NR-630 measured retunes, and a Population-lens capture of the new density.
+*Nothing open.*
 
 ## Where things stand
 
@@ -99,10 +82,10 @@ Number collision, handled per the '18 (2026-08-25)' idiom: an executed Sprint 19
 | 17b | The shell stops fighting the map | Closed 2026-08-24 — goal met. All nine items; 93 scripts / 4 failures, all four pre-existing (NR-606). Four doc fictions found, one fixed |
 | 18 | Logistic Points land with their consumers | Closed 2026-08-25 — all eight landed (BL-596..BL-603, BL-606..BL-608); Sprint 17b merged alongside; v0.1.18 uncut pending Ben |
 | 26 | Re-baseline (the gate; nothing else may open first) | Subsumed — split at execution into 26a/26b, themselves deleted in the 2026-08-24 purge |
-| 19 | The world reads lived-in - population foundations | 2026-08-25: waves 1+2 LANDED and merged (BL-610..BL-618, BL-620 - ten of eleven items). Open: BL-619 (research design session, gated on Ben), BL-615's live click (NR-622 access), and the review-queue calls NR-637/640/641 plus the NR-630 retunes. |
+| 19 | The world reads lived-in - population foundations | Closed 2026-08-25 - eleven of twelve items landed (BL-610..BL-618, BL-620, BL-621); v0.1.19 cut with v0.1.18 stamped retroactively |
 
 **Next up.** Sprint 19 (opened 2026-08-25) is the active sprint - population foundations, BL-610..BL-619. Owed with it: two live clicks (dispatch form, Throughput lens) and the v0.1.18 tag, left uncut because a release is Ben's to call.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*31 sprints archived cold; 1 open/gated in the hot store.*
+*31 sprints archived cold; 0 open/gated in the hot store (1 completed and awaiting archive_sprints.js).*
