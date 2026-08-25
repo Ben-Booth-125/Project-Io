@@ -124,15 +124,27 @@ captures too. Two chromes:
   header.
 - **Fixed-height gradient-bar keys** — Resource, Production, Scarcity,
   Population, Industry, Opportunity, Continent, Throughput — use the simpler
-  `begin_lens_key` chrome: a box anchored **flush-left of the minimap**, its right
-  edge at the minimap's left edge and vertically centred on it (a `lens_key_anchor`
-  passed from `app.cpp`), reading as a drawer folding out from the minimap's left
-  side. The Continent and Throughput keys draw on ImGui's **foreground** draw list
-  with an opaque fill, so they float over the always-open Selection band rather
-  than being buried by it (BL-376, continent key z-order). **That is the correct
-  treatment for this chrome, and the other six not having it is a defect, not a
-  distinction** — a key drawn on the background list at this anchor is drawn under
-  the band and cannot be read.
+  `begin_lens_key` chrome.
+
+> **A legend TAKES THE MINIMAP'S SPACE (Ben, 2026-08-25). Standing rule for every
+> lens, not a one-off.** When a lens needs a legend, the legend occupies the
+> minimap's own rect — the minimap yields to it — rather than being drawn beside
+> or on top of anything else. *"It just looks sloppy popped out over the selection
+> element."*
+>
+> This **overturns the flush-left anchor** the gradient-bar chrome used until now:
+> a box hung off the minimap's left edge and vertically centred on it, which put it
+> over the always-open Selection band. The two workarounds that anchor produced are
+> overturned with it — drawing on ImGui's **foreground** list with an opaque fill so
+> the key floated above the band (BL-376's continent-key z-order, which Throughput
+> then copied) was the right fix for the wrong layout, and is not needed once the
+> legend has space of its own. The reading it replaces is simply that a legend and
+> the minimap are both *reference* chrome, wanted at different moments, so they can
+> share one rect; a legend and the Selection band are both wanted at once, so they
+> cannot overlap.
+>
+> Owed: the swap itself, and the question of what the minimap does while displaced
+> (hidden outright, or restored the moment the lens clears).
 
 The resource/good selector shared by the Resource, Market and Scarcity lenses is
 one combo bound to `ui_state.lens_resource` (`draw_lens_resource_combo`), hosted
