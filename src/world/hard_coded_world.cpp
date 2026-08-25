@@ -454,9 +454,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // Kepler is the only body with a political layer in the prototype; its nation
     // count is derived, not authored. Selene/Cinder/Pallas stay unclaimed.
     // See docs/generation/NATION_GENERATION.md.
-    // Population centres must be placed before generate_nations so that Pass 6
-    // (substrate density) can reference them during nation territory assignment.
-    generate_population_centres(w, kepler, /*seed=*/params.seed ^ 0x70701001u);
+    //
+    // POPULATION CENTRES MOVED (BL-610, centres from demography): the centre
+    // pass lived here, before the ladder, until 2026-08-25. It now runs INSIDE
+    // the settlement block below — after the Era -1 sim, whose region
+    // populations decide the centre count and scales — and still before
+    // generate_nations, so Pass 6 (substrate density) reads the centres during
+    // nation territory assignment exactly as it always has.
 
     // The nation count is a CONSEQUENCE of Kepler's geography, not a target: seeds
     // scale with its habitable land area and every nation below the minimum viable
@@ -622,6 +626,16 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 fixture->years     = hs.years;
             }
         }
+
+        // Population centres (BL-610, centres from demography): placed HERE,
+        // after the Era -1 sim has grown, warred and plagued the regions'
+        // populations, so the centre count and scale distribution are the
+        // history's consequence rather than a land-area divisor and an
+        // authored weighted draw. Same seed derivation as the pre-BL-610 call
+        // site; only the position in the chain and the settlement argument
+        // changed.
+        generate_population_centres(w, kepler, /*seed=*/params.seed ^ 0x70701001u,
+                                    &kepler_settlement);
 
         kepler_np.seed_tiles = settlement_seed_tiles(kepler_settlement);
 

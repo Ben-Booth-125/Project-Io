@@ -31,6 +31,14 @@ settled rather than the other way round.
   (§ Region demography) decide how many centres a body carries and how large each is, replacing
   the land-area divisor and the authored weighted scale draw. `k_population_for_scale` =
   10 / 50 / 200 / 1,000 / 5,000 thousand heads remains the scale→headcount mapping.
+  The carve is a pure integer function of the region populations, no RNG: an urban share
+  (a tenth, `k_demography_urban_share_q`) of each living region's headcount towns; the
+  **count** is each region's urban headcount over one village's-worth
+  (`k_demography_heads_per_centre` = `k_population_for_scale[0]`), floored at one — a razed
+  region contributes nothing; the **scales** are a rank-size share-out of the body's whole
+  urban headcount, banded to the nearest `k_population_for_scale` rung in log space — a few
+  cities over many towns over a train of villages, real settlement concentration as mechanism,
+  never a name. A body with no settlement record keeps a land-area fallback.
 - **Every province is anchored by a centre** (Ben, 2026-08-25; BL-611, province centre anchor).
   A centre of *any* scale — most are small; towns stand where history earned them. The anchor
   is the province's political decider: the centre's nation is the province's nation, and taking
