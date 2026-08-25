@@ -862,6 +862,20 @@
    "files": [
     "src/world/world.cpp"
    ]
+  },
+  {
+   "id": "NR-644",
+   "title": "Stale tech-tree goldens (1720x1080, blessed 2026-08-15) fail every verify run on size alone - delete or deliberately re-admit",
+   "raised": "2026-08-25",
+   "kind": "question",
+   "status": "open",
+   "source": "Tech tree restyle session (wide8 verdicts, GLOBAL_STYLE_SHEET.md) - first verify run after the restyle.",
+   "what": "scripts/verify/golden/tech_tree_{tabs,era1,antiquity}.png are 1720x1080 against the harness's fixed 1280x720, so every tech_tree_panel.lua run reports 3 golden FAILs regardless of content. They were blessed the same day the golden demotion ruling landed (NR-237: curated world-independent set only, currently the icon_silhouettes pair) and these frames carry shell/world content, so they sit outside the policy anyway. Recommend deleting the three; re-admitting the surface would be a deliberate copy-in after the restyle is eyeballed.",
+   "files": [
+    "scripts/verify/golden/tech_tree_tabs.png",
+    "scripts/verify/golden/tech_tree_era1.png",
+    "scripts/verify/golden/tech_tree_antiquity.png"
+   ]
   }
  ]
 }
