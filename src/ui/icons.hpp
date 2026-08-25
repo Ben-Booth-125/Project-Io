@@ -445,6 +445,18 @@ void market_centre(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour of the towers.
 void settlement(ImDrawList* dl, ImVec2 centre, float r, int tier, ImU32 colour);
 
+/// Draw a razed-settlement marker (BL-624's razed tier; BL-625) — the skyline
+/// reduced to ruin: two hollow, outline-only tower shells of unequal height on a
+/// faint rubble baseline, no fill. Reads as "a settlement stood here" without
+/// reading as a live one; same civic-neutral colour contract as `settlement`
+/// (the alpha dim is applied inside).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Civic colour; drawn dimmed, outline-only.
+void settlement_razed(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw the player's headquarters marker — a ringed eight-point star — in @p colour.
 /// Distinguishes the player's HQ building from ordinary holdings on the Planetary
 /// canvas (BL-085, folding BL-092). Distinct from the building glyphs, the market

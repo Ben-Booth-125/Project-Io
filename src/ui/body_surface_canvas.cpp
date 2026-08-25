@@ -3622,17 +3622,32 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
-    // Population-centre markers (BL-083). The generated settlements are drawn as
-    // always-on civic chrome (not lens-gated) so the surface reads as inhabited, not
-    // "resources with industry on top". Contiguous centres are clustered into
-    // conurbations for display — a handful of legible cities + towns rather than a
-    // dust of villages — each rendered at its highest-scale member with a tier glyph
-    // whose size grows with scale; only City+ conurbations are labelled to avoid
-    // clutter. Colour is civic-neutral except under the Country lens, where the host
-    // nation's tint applies (tier is carried by size, keeping colour out of ownership).
+    // Population-centre markers (BL-083; LOD ladder, BL-625). Every generated
+    // settlement is drawn — the world genuinely carries one per province
+    // (BL-623: 1,823 on the canonical homeworld) — and the FORM follows the
+    // zoom, on the canvas's two existing detail pivots (k_lod_radius_px = 7,
+    // the coarse-fill LOD; 14, where terrain texture fades in). Far zoom keeps
+    // the long tail of villages as a density field of dots rather than glyph
+    // soup; close zoom shows every centre as its tier skyline, razed centres
+    // included. This replaces the conurbation clustering (Chebyshev <= 3,
+    // transitive), authored for a 20-40-centre world — at the post-BL-623
+    // density it collapsed the map to 49 marks (the measured diagnosis on
+    // BL-625) and hid the settled world it was meant to organise.
     if (!w.population_centres.empty())
     {
-        struct pop_centre { int col; int row; int scale; entity_id tile; entity_id centre; };
+        // Ladder rungs. close: every centre is a skyline and ruins surface.
+        // mid: towns (scale 2) join the skylines. far: only scale >= 3 carries
+        // a glyph; smaller centres are the density field.
+        const bool close_zoom = draw_r >= 14.0f;
+        const bool mid_zoom   = draw_r > k_lod_radius_px;
+        const int  skyline_min_scale = close_zoom ? 1 : (mid_zoom ? 2 : 3);
+
+        const float visible_top    = grid_area_origin.y - hit_r;
+        const float visible_bottom = grid_area_origin.y + grid_area_size.y + hit_r;
+
+        // Sorted gather: the store is an unordered_map, and overlapping marks
+        // must overdraw in one deterministic order for the capture harness.
+        struct pop_centre { int col; int row; int scale; bool razed; entity_id centre; };
         std::vector<pop_centre> pcs;
         pcs.reserve(w.population_centres.size());
         for (const auto& [pid, pc] : w.population_centres)
@@ -3643,80 +3658,41 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const auto til = w.tiles.find(tit->second);
             if (til == w.tiles.end() || til->second.body != state.active_body)
                 continue;
-            pcs.push_back({ til->second.grid_x, til->second.grid_y, pc.scale, tit->second, pid });
+            pcs.push_back({ til->second.grid_x, til->second.grid_y,
+                            std::clamp(pc.scale, 1, 5), pc.razed, pid });
         }
+        std::sort(pcs.begin(), pcs.end(),
+                  [](const pop_centre& a, const pop_centre& b) { return a.centre < b.centre; });
 
-        // Cluster contiguous centres (transitive, Chebyshev grid distance <= 3,
-        // cylinder-wrapped in columns). Small counts (20-40/body) so O(n^2) is fine.
-        constexpr int cluster_dist = 3;
-        std::vector<int> cl(pcs.size(), -1);
-        int cluster_count = 0;
-        for (std::size_t i = 0; i < pcs.size(); ++i)
+        for (const pop_centre& a : pcs)
         {
-            if (cl[i] != -1)
+            // A ruin is a tile-scale fact, not a region-scale one (BL-624):
+            // razed centres surface only at close zoom, as the razed mark.
+            if (a.razed && !close_zoom)
                 continue;
-            cl[i] = cluster_count;
-            std::vector<std::size_t> stack{ i };
-            while (!stack.empty())
-            {
-                const std::size_t a = stack.back();
-                stack.pop_back();
-                for (std::size_t j = 0; j < pcs.size(); ++j)
-                {
-                    if (cl[j] != -1)
-                        continue;
-                    int dcol = std::abs(pcs[a].col - pcs[j].col);
-                    dcol = std::min(dcol, gw - dcol); // east-west cylinder wrap
-                    const int drow = std::abs(pcs[a].row - pcs[j].row);
-                    if (std::max(dcol, drow) <= cluster_dist)
-                    {
-                        cl[j] = cluster_count;
-                        stack.push_back(j);
-                    }
-                }
-            }
-            ++cluster_count;
-        }
 
-        // Per cluster: anchor at the highest-scale member; tier = that max scale.
-        struct conurbation { int anchor = -1; int tier = 0; };
-        std::vector<conurbation> cons(cluster_count);
-        for (std::size_t i = 0; i < pcs.size(); ++i)
-        {
-            conurbation& c = cons[cl[i]];
-            if (c.anchor == -1 || pcs[i].scale > c.tier)
-            {
-                c.anchor = static_cast<int>(i);
-                c.tier   = pcs[i].scale;
-            }
-        }
-
-        // A City+ conurbation is labelled with its anchor centre's PERSISTED name —
-        // generated by the seeded tongue system (generate_city_name, BL-290) and
-        // re-named to the settling culture's speech in name_population_centres, so
-        // the label is deterministic per campaign and speaks the world's own
-        // language. (The old static Earth-flavoured bank was removed, BL-363.)
-
-        for (const conurbation& c : cons)
-        {
-            if (c.anchor < 0)
-                continue;
-            const pop_centre& a = pcs[c.anchor];
-
-            // Civic-neutral under every lens (BL-601). The host-nation tint that
-            // used to apply under the Country lens went with the lens: a
-            // settlement is a civic fact, and the national read now lives at the
-            // border where it cannot be confused with one.
-            const ImU32 col = palette::settlement;
-
-            const float sr = std::max(3.0f, draw_r * (0.30f + 0.11f * static_cast<float>(c.tier)));
             const ImVec2 lc = hex_local_centre(a.col, a.row, hex_size);
             const ImVec2 sc = to_screen(lc);
+            if (sc.y < visible_top || sc.y > visible_bottom)
+                continue; // vertical cull — at 1,800+ centres dead marks are real vertices
 
-            const auto name_it = w.population_centre_name.find(a.centre);
-            const char* name = (name_it != w.population_centre_name.end()
-                                && !name_it->second.empty())
-                ? name_it->second.c_str() : nullptr;
+            // Civic-neutral under every lens (BL-601): tier is carried by the
+            // glyph, ownership by the national border band, never by colour.
+            const ImU32 col = palette::settlement;
+            const float sr  = std::max(3.0f, draw_r * (0.30f + 0.11f * static_cast<float>(a.scale)));
+
+            // A City+ centre is labelled with its PERSISTED name — generated by
+            // the seeded tongue system (generate_city_name, BL-290) and re-named
+            // to the settling culture's speech in name_population_centres, so the
+            // label is deterministic per campaign and speaks the world's own
+            // language. (The old static Earth-flavoured bank was removed, BL-363.)
+            const char* name = nullptr;
+            if (a.scale >= 4 && !a.razed)
+            {
+                const auto name_it = w.population_centre_name.find(a.centre);
+                if (name_it != w.population_centre_name.end() && !name_it->second.empty())
+                    name = name_it->second.c_str();
+            }
 
             const int k_min = (period_px > 0.0f)
                 ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
@@ -3725,10 +3701,21 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             for (int k = k_min; k <= k_max; ++k)
             {
                 const ImVec2 mc = { sc.x + static_cast<float>(k) * period_px, sc.y };
-                icons::settlement(dl, mc, sr, c.tier, col);
+                if (a.razed)
+                    icons::settlement_razed(dl, mc, sr, col);
+                else if (a.scale >= skyline_min_scale)
+                    icons::settlement(dl, mc, sr, a.scale, col);
+                else
+                {
+                    // The density field: below its skyline rung a centre is a
+                    // small civic dot — the "many population centres" read at
+                    // region scale, without 1,700 skylines of glyph soup.
+                    const float dot_r = std::max(1.2f, draw_r * 0.16f);
+                    dl->AddCircleFilled(mc, dot_r, (col & 0x00FFFFFFu) | 0xA5000000u);
+                }
 
-                // Label City+ conurbations (tier >= 4) only, to keep the map legible.
-                if (c.tier >= 4 && name)
+                // Label City+ centres (tier >= 4) only, to keep the map legible.
+                if (name)
                 {
                     const ImVec2 tp{ mc.x + sr + 3.0f, mc.y - sr };
                     dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(20, 22, 28, 200), name); // shadow // fit-exempt: legend box sized to its measured entries (container 2)

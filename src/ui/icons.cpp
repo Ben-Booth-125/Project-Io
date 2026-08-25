@@ -1137,6 +1137,24 @@ void settlement(ImDrawList* dl, ImVec2 centre, float r, int tier, ImU32 colour)
     }
 }
 
+void settlement_razed(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // The skyline's silhouette with the life taken out: two hollow tower shells
+    // of unequal height, outline only, on a faint rubble baseline. Dimmed here
+    // rather than by the caller so every razed mark reads identically.
+    const float baseline = centre.y + r * 0.85f;
+    const ImU32 dim = (colour & 0x00FFFFFFu) | 0x96000000u;
+    const float bw  = r * 0.55f;
+    const ImVec2 a1{ centre.x - bw * 1.15f, baseline - r * 1.30f };
+    const ImVec2 b1{ centre.x - bw * 0.15f, baseline };
+    const ImVec2 a2{ centre.x + bw * 0.25f, baseline - r * 0.70f };
+    const ImVec2 b2{ centre.x + bw * 1.15f, baseline };
+    dl->AddRect(a1, b1, dim, 0.0f, 0, 1.0f);
+    dl->AddRect(a2, b2, dim, 0.0f, 0, 1.0f);
+    dl->AddLine({ centre.x - bw * 1.35f, baseline },
+                { centre.x + bw * 1.35f, baseline }, dim, 1.0f);
+}
+
 void hq(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Eight-point star = a diamond (N/E/S/W points) overlaid with an axis-aligned
