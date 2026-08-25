@@ -76,6 +76,14 @@ const VERBS = [
   'place_sell_order', 'remove_sell_order', 'set_workforce_auto', // BL-293
   'request_quote', 'accept_quote', 'cancel_contract',  // BL-350
   'dispatch_convoy', 'hold_convoy',                    // BL-452
+  // Tail restored 2026-08-25 (NR-639): the array had silently stopped at
+  // hold_convoy while corp_verb grew by ten. Index-is-value, so the tail is
+  // appended whole, in enum order — keep in lockstep with corp_command.hpp.
+  'declare_hostile', 'offer_friendship', 'accept_friendship', 'return_to_neutral', // BL-448
+  'march_unit', 'halt_unit', 'disband_unit',           // BL-470 (march payload is a PROVINCE since BL-511)
+  'withdraw_from_battle',                              // BL-467
+  'accept_offer', 'abandon_contract',                  // BL-573
+  'raze_centre',                                       // BL-616
 ];
 
 // ---------------------------------------------------------------------------
@@ -219,8 +227,14 @@ const TOOLS = [
         unit_type: { type: 'integer', description: 'hire_unit: index into unit_roster_table() (BL-324).' },
         quantity: { type: 'number', description: 'place_sell_order: max units offered per tick (> 0). request_quote: units sought. dispatch_convoy: units of cargo to haul (> 0, and no more than the source pool holds).' },
         floor_price: { type: 'number', description: 'place_sell_order: minimum unit price (>= 0; 0 means accept the market price).' },
-        order: { type: 'integer', description: 'remove_sell_order: the sell_order id to erase. accept_quote / cancel_contract: the procurement quote / contract id. hold_convoy: the convoy id to stop or release — TRANSIENT, valid only while that convoy is in flight (a handful of ticks).' },
-        counterparty: { type: 'integer', description: 'request_quote: the supplier corporation being asked (BL-350). dispatch_convoy: the DESTINATION market entity (BL-452; `subject` is the source market).' },
+        order: { type: 'integer', description: 'remove_sell_order: the sell_order id to erase. accept_quote / cancel_contract: the procurement quote / contract id. hold_convoy: the convoy id to stop or release — TRANSIENT, valid only while that convoy is in flight (a handful of ticks). accept_offer / abandon_contract: the mercenary offer / contract id (BL-573).' },
+        counterparty: { type: 'integer', description: 'request_quote: the supplier corporation being asked (BL-350). dispatch_convoy: the DESTINATION market entity (BL-452; `subject` is the source market). Stance verbs (declare_hostile / offer_friendship / accept_friendship / return_to_neutral): the other corporation (BL-448). withdraw_from_battle: the opposing corp, null for first-in-sorted-order (BL-467). accept_offer: the client NATION (BL-573 — the one verb whose counterparty is not a corp).' },
+        province: { type: 'integer', description: 'march_unit: destination province id (BL-511 — unit position is province grain). withdraw_from_battle: the province the battle is in. raze_centre: unused. Province id 0 is a real province, never a sentinel.' },
+        // NB no `units` arg: agent_protocol.cpp parses no such key, so
+        // accept_offer's unit commitment cannot cross the wire yet — the verb
+        // is listed (index-is-value demands it) but a wire accept_offer will
+        // be refused by the seam's own validation. Recorded 2026-08-25 with
+        // the NR-639 fix; adding the key is agent_protocol work, not schema work.
       },
       required: ['corp', 'verb'],
     },

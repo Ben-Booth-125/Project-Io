@@ -156,6 +156,21 @@ const SUBSYSTEM_MAP = [
         verbs: ['declare_hostile', 'offer_friendship', 'accept_friendship', 'return_to_neutral'],
     },
     {
+        subsystem: 'Battle',
+        files: ['battle_system.cpp', 'campaign_battle.cpp'],
+        verbs: ['withdraw_from_battle'],
+    },
+    {
+        subsystem: 'Contracts / Mercenary',
+        files: ['contracts.cpp', 'mercenary.cpp'],
+        verbs: ['accept_offer', 'abandon_contract'],
+    },
+    {
+        subsystem: 'Population / Centres',
+        files: ['population_generation.cpp', 'economy_system.cpp'],
+        verbs: ['raze_centre'],
+    },
+    {
         subsystem: 'Research / Tech tree',
         files: ['tech_tree.cpp', 'tech_gate.cpp'],
         verbs: [],
@@ -299,6 +314,27 @@ function main() {
     if (dictionaryGaps.length) {
         console.error(`\nverb_coverage: ${dictionaryGaps.length} seam verb(s) missing from the ACTIONS.json dictionary: ${dictionaryGaps.join(', ')}`);
         process.exit(1);
+    }
+
+    // MCP drift guard (2026-08-25, NR-639 — a deliberate widening of the exit
+    // contract): tools/mcp/server.js's VERBS array is index-is-value against
+    // the seam enum, and it silently fell TEN verbs behind. The wire seam is
+    // an AI-facing boundary (io-standing-rules.md), so divergence fails the
+    // run exactly like a dictionary gap: length AND order must match.
+    {
+        const serverSrc = fs.readFileSync(path.join(ROOT, 'tools', 'mcp', 'server.js'), 'utf8');
+        const m = serverSrc.match(/const VERBS = \[([\s\S]*?)\];/);
+        const mcpVerbs = m ? [...m[1].matchAll(/'([a-z_]+)'/g)].map((x) => x[1]) : [];
+        const mismatch = mcpVerbs.length !== seamVerbs.length
+            || mcpVerbs.some((v, i) => v !== seamVerbs[i]);
+        if (mismatch) {
+            console.error(`\nverb_coverage: tools/mcp/server.js VERBS diverges from the seam ` +
+                `(${mcpVerbs.length} vs ${seamVerbs.length} verbs` +
+                `${mcpVerbs.length === seamVerbs.length ? ', order differs' : ''}) — ` +
+                `append the enum tail in order; index-is-value.`);
+            process.exit(1);
+        }
+        console.log(`\n  MCP server:  VERBS in lockstep with the seam (${mcpVerbs.length} verbs).`);
     }
     process.exit(0);
 }

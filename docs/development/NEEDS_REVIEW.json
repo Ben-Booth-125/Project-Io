@@ -726,12 +726,13 @@
    "title": "spectator_determinism has a red golden row ON MAIN at dc7d0554 - pre-existing, same class as ai_skill_harness (NR-616)",
    "raised": "2026-08-25",
    "kind": "observation",
-   "status": "open",
+   "status": "resolved",
    "source": "Agent E, measured with baseline isolation: harness built from dc7d0554 in a scratch tree shows identical hashes and the same golden-row failure before and after its commits.",
    "what": "played=0AF36395D78F3DAF, spectated=C890E1AF7A9A27E1 - the two match each other (the harness's two real properties hold) but differ from the stored golden 71273F6FEDE03965. World drift from some prior landing moved the constant and nobody re-blessed with dated provenance, as the standing rule expects. Not blessed by the agent (correctly). Wants a deliberate re-bless with a provenance line, or a hunt for which landing moved it.",
    "files": [
     "tools/verify/spectator_determinism.cpp"
-   ]
+   ],
+   "resolution": "Resolved 2026-08-25 by the wave-1/wave-2 re-blesses: the golden now carries a provenance log recording BOTH the pre-existing unprovenance'd drift (0AF36395D78F3DAF at dc7d0554) and the sprint's two legitimate world moves; current constant DEC269E7941134D4, confirmed by R2's two-built-worlds row."
   },
   {
    "id": "NR-635",
@@ -790,13 +791,14 @@
    "title": "tools/mcp/server.js VERBS array is stale by 10 verbs (stops at hold_convoy) - index-is-value, so the whole tail is missing",
    "raised": "2026-08-25",
    "kind": "observation",
-   "status": "open",
+   "status": "resolved",
    "source": "Agent W2E, observed in passing while appending raze_centre (verb 27).",
    "what": "The MCP server's VERBS name array has 17 entries while corp_verb now counts 28 - every verb since BL-448 is unaddressable over the wire, and because index-is-value the fix is appending the full ordered tail, not one name. Compounding: tools/session/verb_coverage.js lists raze_centre unmapped alongside the pre-existing withdraw_from_battle / accept_offer / abandon_contract. An AI-facing seam drifted silently; worth a small owned fix plus a lint that diffs the array length against corp_verb_count.",
    "files": [
     "tools/mcp/server.js",
     "tools/session/verb_coverage.js"
-   ]
+   ],
+   "resolution": "Fixed 2026-08-25 (Ben: 'update the MCP server's verb table'): full 11-verb tail appended in enum order (28 total); schema gains province + extended order/counterparty descriptions; verb_coverage.js gains a FAILING drift guard (length AND order vs the seam) plus subsystem rows for the four unmapped verbs. Honest gap recorded in place: agent_protocol.cpp parses no units key, so a wire accept_offer cannot commit units yet - that is seam work, not schema work."
   },
   {
    "id": "NR-640",
