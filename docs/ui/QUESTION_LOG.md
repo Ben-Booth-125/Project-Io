@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**41 surfaces** — 4 settled, 37 awaiting Ben's wording.
+**45 surfaces** — 4 settled, 41 awaiting Ben's wording.
 
 ---
 
@@ -51,6 +51,14 @@ alphabetical order.
 **Because:** A battle is a province-grain event drawn on a tile-grain canvas, so without a mark it has no position at all — the units are visible but nothing says they are in contact rather than merely adjacent. Drawn on the province anchor tile only, once per battle, because the fight IS the province envelope (BL-467 ruling 1) and scattering a glyph across every participating tile would say the opposite. The glyph is two crossed blades with cross-guards, deliberately not an X: X is already the 'close this' affordance everywhere else in the chrome, and a mark meaning 'a fight is here' must not read as a button meaning 'dismiss this'.
 
 *Demanded by BL-469, BL-467 · `src/ui/body_surface_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/icons.hpp` · id `battle_marker`*
+
+### Stacked-tile ring (Planetary canvas building marker)
+
+**Answers:** This hex holds more than one building - which KINDS are standing here?
+
+**Because:** A tile carries as many buildings as its richness allows (BL-193, building stack capacity), and the canvas drew exactly one silhouette however many stood there. The '+N' count badge told the player a stack existed but never what was in it, and Ben rejected primary-plus-count for exactly that reason: it is always legible and never says WHICH. The ring is the only one of the three shapes considered that scales with the richness-derived cap AND names its contents - a glyph cluster becomes soup past three. It earns space it does not take from anything else: it occupies the empty annulus between the silhouette (0.48 r) and the rim, adds no chrome, no legend and no control, and it composes with the two marks already there rather than replacing them - the ring says which kinds, the centre glyph says which of them leads, the badge says how many in total. It draws nothing on a single-kind tile, so the world's ordinary built tiles are unchanged. Its LOD bound (draw_r > 10 px) is derived from the arc length one segment needs to read as a segment, and below it the tile degrades to the dominant kind's glyph alone - never to an empty hex.
+
+*Demanded by BL-596, BL-193 · `src/ui/icons.cpp`, `src/ui/icons.hpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/presentation.cpp` · id `building_stack_ring`*
 
 ### Comms dock
 
@@ -188,6 +196,14 @@ alphabetical order.
 
 *Demanded by BL-228, BL-230 · `src/ui/hover_card.cpp` · id `hover_card`*
 
+### Lens chrome region (minimap header, top right) — the lens selector and the active lens's key
+
+**Answers:** What do these colours mean, and which good am I asking about?
+
+**Because:** A lens re-skins the whole canvas and the re-skin is meaningless without its key: a nation tint is a colour until the key names the nation, a red-to-green mark is decoration until the key says which end is good. The region earns its space by being the ONLY place any of that lives — selector and key share one home because a lens draws at most one key, so a roster of any size costs exactly this rect and no more. It also earns it by fixing a measured failure rather than tidying a working one: there were TWO legend chromes, and the gradient-bar one was anchored flush-left of the minimap, inside the rect the always-open Selection band occupies. Six of seven keys rendered as ghosts through the band at roughly a tenth of their contrast (NR-601, measured 2026-08-24) — drawn, and unreadable. Only the Continent key escaped, because it alone had been moved to the foreground draw list (BL-376); one of seven was fixed and the collision was never generalised, and nothing had ever captured the other six to notice. So this region is not a tidy: it is how six lenses get a readable key at all.
+
+*Demanded by BL-602 · `src/ui/shell_metrics.cpp`, `src/ui/shell_metrics.hpp`, `src/ui/body_surface_canvas.cpp` · id `lens_chrome_region`*
+
 ### Market Ledger
 
 **Answers:** What is this good worth here, and who is willing to trade it?
@@ -203,6 +219,14 @@ alphabetical order.
 **Because:** Convoys are drawn on three canvases -- a moving beam on the Planetary canvas, lines on the Solar canvas, a lens glyph, an aggregated route graph -- and were LISTED nowhere, so the one number the player needs from them had no home. Travel time became load-bearing on 2026-08-12: a long haul now takes several quarters where it used to take one, and stock committed to a convoy is out of the pool for the whole of it. Without ticks-to-arrival on a surface, a player cannot tell a delivery that is late from one that was always going to be slow, and cannot plan a build against stock already in transit. The tab also gives BL-452's Hold press a per-convoy row to sit on.
 
 *Demanded by BL-452, BL-453 · `src/ui/market_ledger.cpp` · id `market_ledger_convoys`*
+
+### National border band (Planetary canvas, always-on chrome)
+
+**Answers:** Whose ground is this, and where does it stop?
+
+**Because:** A nation used to be a LENS - a territory-wide tint you had to switch to, which meant the political map was invisible unless you asked for it, and the tint occupied the same channel as terrain, texture and every other lens. The band answers the same question as always-on chrome instead, the way roads already do: colour at the boundary falling off inwards, so a nation reads as a bordered region and the middle of a territory stays free for whatever else is being shown. Two neighbours meeting therefore show two parallel rules and never average into a third nation's colour - which the old tint did, because it was composited INSIDE the blended fill. It also carries the route the lens used to own: clicking the band selects the nation, which is the only way to reach one (Ben, 2026-08-24: 'click the border itself'). The corridor is capped at 0.18 of the drawn hex radius so it narrows with the hex rather than swallowing a frontier tile, and hovering it names the nation immediately - well short of the hover card's dwell - so the target is readable before the click commits.
+
+*Demanded by BL-601 · `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp`, `docs/ui/PLANETARY.md` · id `national_border_band`*
 
 ### Nav rail
 
@@ -220,13 +244,13 @@ alphabetical order.
 
 *Demanded by BL-090, BL-091 · `src/ui/profile_panel.cpp` · id `profile_panel`*
 
-### Province card (Selection element, Planetary rung)
+### The province sections of the tile Selection element (Buildings / Deposits / Population)
 
-**Answers:** The canvas just blended four tiles into one shape — what is actually IN it, and what can I do there?
+**Answers:** The canvas just blended several tiles into one shape - what is actually IN this locality, how much room is left in it, and who lives there?
 
-**Because:** BL-511 removed the tile as a click target, so the mixture, the deposits and the buildings of a locality became unreachable by the gesture that used to reach them. The card is where they go: the mixture bar is specifically the BLEND LEGEND (it says what the gradient is made of, which the gradient itself deliberately smooths away), the member-tile list keeps the tile visible as the data grain Ben ruled it remains, and the summed deposits answer the question a player actually asks of a locality rather than of one hex. Without it the render change would have been a net loss of information.
+**Because:** BL-511 removed the tile as a click target, so the mixture, the deposits and the buildings of a locality became unreachable by the gesture that used to reach them, and a CARD OF ITS OWN was the answer. BL-598 (Ben, 2026-08-24) reversed the premise rather than the answer: the tile is a click target again, and the province readings are SECTIONS of the tile element's one accordion. The question is unchanged and still earns its space - a player deciding whether a locality is worth a mine asks about the locality, not one hex - but it no longer earns a second element to ask it in. Two surfaces asking about one piece of ground made the player choose a grain before knowing what they wanted to know; one accordion, ordered from what can be acted on to what the ground merely is, does not. What was dropped in the fold is the province's own Buildings ROLL-UP (the same question the Buildings section's Built column answers, at a grain the player does not build at) and its member-tile list (whose job was to give back a tile that is no longer taken away). What was gained is Population, which had no home on either surface.
 
-*Demanded by BL-511 · `src/ui/selection_panel.cpp`, `src/ui/body_surface_canvas.cpp` · id `province_card`*
+*Demanded by BL-511, BL-598 · `src/ui/selection_panel.cpp`, `src/ui/body_surface_canvas.cpp` · id `province_card`*
 
 ### Selection band - Building card (3-column band)
 
@@ -251,6 +275,14 @@ alphabetical order.
 **Because:** The pinned, polymorphic detail surface for the current selection. It is the answer to the click model's promise: single-click selects, and something must visibly happen when it does. BL-593 (2026-08-24) extended the tile construction ledger's candidate filter with a third lock kind (tech_locked, BL-588), filtered out the same way era_locked and depth_locked already were -- "the door not showing what the gate would refuse", not a new UI affordance.
 
 *Demanded by BL-067, BL-068, BL-071, BL-367, BL-593 · `src/ui/selection_panel.cpp` · id `selection_panel`*
+
+### Selection band - the tile element's section top nav
+
+**Answers:** Everything this ground has to say, in the order I can act on it: what can I still build here, what does the locality hold, what does this hex yield, who works here, what is the terrain?
+
+**Because:** The centre column was a PAGER, and the province was a second element with a pager of its own; both hid the list of questions the surface can answer behind a press. An accordion was built to show that list and was ruled out on sight, on a measurement rather than a taste: five stacked headers spent 169 of the band's 258 px on chrome to leave the open section 89. The nav keeps what the accordion was FOR - a visible sense of how many readings exist - by putting an i/N count beside the title, which costs one row instead of five, and returns the rest of the band to the reading you are actually doing. The chevrons straddle the span so the two presses are as far apart as the element allows; the title centres on the run between them; the full-canvas control is excepted and keeps the rightmost slot, which is where every other surface in the shell puts it. The ORDER is the other half of the argument (Ben, 2026-08-24): Buildings, Deposits, Resources, Population, Terrain runs from what the player can act on to what the ground merely is.
+
+*Demanded by BL-598 · `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp` · id `selection_tile_section_nav`*
 
 ### Selection band - Unit (Soldier) card (3-column band)
 

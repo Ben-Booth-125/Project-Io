@@ -527,12 +527,35 @@ void draw_activity_section(const world& w, entity_id body_id)
 
 } // namespace
 
-// BL-534: the three views the tile Selection accordion pages between. Ben named
-// this set on 2026-08-22 and did NOT pick Province or Ownership, which were both
-// offered — so the array is the ruling, not a starting point to grow.
-namespace { 
-constexpr const char* k_view_names[] = { "Terrain", "Resources", "Available buildings" };
-constexpr int         k_view_count   = 3;
+// BL-598: the FIVE sections of the tile Selection element's one accordion. Ben
+// named this set and this order on 2026-08-24:
+//
+//   "Province selection element must be bundled into the tile selection element.
+//    By this I mean, we just use a longer accordion. We can also swap the order.
+//    Buildings -> Deposits -> Resources -> Population -> Terrain. Keep the tile
+//    available buildings tab, and drop the province buildings tab."
+//
+// THE ORDER IS THE ARGUMENT, not a shuffle: it runs from what the player can ACT
+// on (buildings) through what is there to be taken (deposits, their yield, the
+// workforce that would take it) to what the ground merely IS (terrain). BL-534's
+// pager ran the other way — Terrain first — which put the least actionable
+// reading in the default slot.
+//
+// Three of the five are the tile's own readings; two (Deposits, Population) are
+// PROVINCE readings, which is what "bundled into" means. There is no Tiles
+// section: the province rung is dissolved, so the tile you are looking at is
+// always the tile you clicked, and a member-tile list would be a list of things
+// one canvas click already reaches. The province's old Buildings page is gone
+// too, by the same ruling — the tile's Available-buildings reading answers the
+// same question at the grain the player actually builds at.
+namespace {
+constexpr const char* k_view_names[] = { "Buildings", "Deposits", "Resources",
+                                         "Population", "Terrain" };
+constexpr int         k_view_count   = 5;
+
+// Section indices, named so the draw code below reads as the ruling does.
+enum : int { k_sec_buildings = 0, k_sec_deposits = 1, k_sec_resources = 2,
+             k_sec_population = 3, k_sec_terrain = 4 };
 }
 
 // --- The province building-availability table (BL-534) -----------------------
@@ -2558,6 +2581,193 @@ void draw_contract_selection(const world& w, const contract_template_registry& t
     ImGui::TextDisabled("Total: Cr %.0f", static_cast<double>(c.fee));
 }
 
+// --- The PROVINCE readings the tile element folds in (BL-598) ---------------
+//
+// Ben, 2026-08-24: "Province selection element must be bundled into the tile
+// selection element." Bundled in means the province is a set of SECTIONS of the
+// one element, so these readers take the selected TILE and resolve its province
+// themselves — there is no province selection left to pass in.
+//
+// Nothing here assumes a province SIZE: the member list is walked and summed
+// over, never indexed against a constant, so a repartition changes only how many
+// tiles feed the total. Deposits and population stay where they live (tiles and
+// population centres respectively); these read over them, they do not move them.
+
+struct province_deposit_row
+{
+    resource_type resource;
+    float         amount = 0.0f;
+};
+
+/// Deposits summed across the selected tile's province, richest first.
+///
+/// Summing is the right reduction because a deposit is a STOCK: for a player
+/// deciding whether this locality is worth a mine, several tiles each holding a
+/// little iron IS one province holding that much iron. The per-TILE yield is the
+/// Resources section's question, and it is charted rather than summed — the two
+/// sections ask different things about the same ground, which is why both earn a
+/// place in one accordion.
+std::vector<province_deposit_row> province_deposits(const world& w, entity_id tile_id)
+{
+    std::array<float, resource_count> dep{};
+    dep.fill(0.0f);
+
+    const uint32_t  pid = w.provinces.province_of(tile_id);
+    const province* pr  = (pid != 0) ? w.provinces.find(pid) : nullptr;
+    if (pr != nullptr)
+    {
+        for (const entity_id tid : pr->tiles)
+            if (const auto it = w.tiles.find(tid); it != w.tiles.end())
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    dep[r] += it->second.resource_deposit[r];
+    }
+    else if (const auto it = w.tiles.find(tile_id); it != w.tiles.end())
+    {
+        // Ocean and otherwise unpartitioned ground has no province, and the
+        // section still has to say something TRUE rather than read as "nothing
+        // here": fall back to the tile's own deposits. The draw site says which
+        // grain it is showing, so the number is never ambiguous.
+        for (std::size_t r = 0; r < resource_count; ++r)
+            dep[r] += it->second.resource_deposit[r];
+    }
+
+    std::vector<province_deposit_row> rows;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (dep[r] > 0.0f)
+            rows.push_back({ static_cast<resource_type>(r), dep[r] });
+    std::sort(rows.begin(), rows.end(),
+              [](const province_deposit_row& a, const province_deposit_row& b)
+              { return a.amount > b.amount; });
+    return rows;
+}
+
+/// The five rungs of the population-centre scale ladder, POPULATION.md
+/// § Scale bonus model. Canonical terms, not synonyms (standing rule: GLOSSARY
+/// and the owning doc name the words that reach the screen).
+const char* population_scale_name(int scale)
+{
+    switch (scale)
+    {
+        case 1:  return "Outpost";
+        case 2:  return "Settlement";
+        case 3:  return "Town";
+        case 4:  return "City";
+        default: return (scale >= 5) ? "Metropolis" : "Outpost";
+    }
+}
+
+struct province_pop_row
+{
+    const char* name         = "";
+    int         scale        = 1;
+    int         population   = 0;     ///< Absolute headcount in thousands.
+    float       habitability = 0.0f;
+    bool        here         = false; ///< Stands on the SELECTED tile.
+};
+
+struct province_pop_table
+{
+    bool known = false;               ///< False when the tile has no province.
+    int  total = 0;                   ///< Summed headcount, thousands.
+    std::vector<province_pop_row> rows;
+};
+
+/// The population centres standing in the selected tile's province.
+///
+/// This section is province-grain because the DATA MODEL is: population lives on
+/// population CENTRES, not on arbitrary tiles (POPULATION.md), so there is no
+/// per-tile headcount to show and a per-tile section would have to invent one.
+/// The centre that stands on the selected tile — if one does — is flagged, so the
+/// list reads as "this ground, in its neighbourhood" rather than as a bare roster.
+province_pop_table province_population(const world& w, entity_id tile_id)
+{
+    province_pop_table t;
+    const uint32_t  pid = w.provinces.province_of(tile_id);
+    const province* pr  = (pid != 0) ? w.provinces.find(pid) : nullptr;
+    if (pr == nullptr)
+        return t;
+    t.known = true;
+
+    for (const auto& [cid, pc] : w.population_centres)
+    {
+        const auto tit = w.population_centre_tile.find(cid);
+        if (tit == w.population_centre_tile.end())
+            continue;
+        if (w.provinces.province_of(tit->second) != pid)
+            continue;
+
+        province_pop_row r;
+        if (const auto nit = w.population_centre_name.find(cid);
+            nit != w.population_centre_name.end())
+            r.name = nit->second.c_str();
+        r.scale        = pc.scale;
+        r.population   = pc.population;
+        r.habitability = pc.habitability;
+        r.here         = (tit->second == tile_id);
+        t.total       += pc.population;
+        t.rows.push_back(r);
+    }
+
+    // `population_centres` is unordered, so pin the walk: largest first, which is
+    // also the order the labour pool and the agglomeration bonus care about.
+    std::sort(t.rows.begin(), t.rows.end(),
+              [](const province_pop_row& a, const province_pop_row& b)
+              {
+                  if (a.population != b.population) return a.population > b.population;
+                  return a.scale > b.scale;
+              });
+    return t;
+}
+
+/// The chart body shared by the accordion's Resources and Terrain sections: the
+/// full-canvas disclosure control, then the metric's chart filling whatever the
+/// section body has left.
+///
+/// Factored out because the two sections differ only in WHICH pages they offer
+/// and in whether the chart is a drill target — two copies of the measure /
+/// hover / drill block is exactly how the two would come to disagree, and the
+/// drill stack is shared state.
+void draw_tile_chart_section(ui_state& ui, entity_id sel, const tile_metric& mp,
+                             int page, bool drillable)
+{
+    disclosure_controls(ui, detail_surface::selection_metric, page, /*in_place=*/false);
+
+    ImGui::Spacing();
+    const ImVec2 p  = ImGui::GetCursorScreenPos();
+    const float  cw = ImGui::GetContentRegionAvail().x;
+    const float  gh = std::max(32.0f, ImGui::GetContentRegionAvail().y - 4.0f);
+
+    // Deposited resources are click-drillable into their time series (BL-196).
+    // Habitability and hazard are not: no per-tile history is tracked for them,
+    // so the click target is skipped rather than faked.
+    if (drillable)
+    {
+        if (ImGui::InvisibleButton("##res_chart", {cw, gh}))
+        {
+            const bool dup = !ui.card_stack.empty() &&
+                             ui.card_stack.back().tile == sel &&
+                             ui.card_stack.back().resource == mp.resource_index;
+            if (!dup && ui.card_stack.size() < 20)
+                ui.card_stack.push_back({sel, mp.resource_index});
+            ui.card_track_tile = sel;
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s: this tile yields %.1f vs %.1f for a top-10%% tile.\n"
+                              "Click for its history over time.",
+                              mp.label.c_str(), static_cast<double>(mp.tile_val),
+                              static_cast<double>(mp.ref_val));
+    }
+    else
+    {
+        ImGui::Dummy({cw, gh}); // reserve the same space; no drill-down yet
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s: %.2f vs %.2f %s.\nNo time-series history tracked for this yet.",
+                              mp.label.c_str(), static_cast<double>(mp.tile_val),
+                              static_cast<double>(mp.ref_val), mp.ref_label);
+    }
+    draw_tile_metric_chart(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + gh}, mp);
+}
+
 void draw_tile_selection(world& w, ui_state& ui)
 {
     const entity_id sel = ui.selected_entity;
@@ -2624,26 +2834,43 @@ void draw_tile_selection(world& w, ui_state& ui)
     }
     ImGui::SameLine();
 
-    // ── Centre half: paged metric accordion ──
-    // Pages: every deposited resource (tile production vs. the top-decile tile
-    // for that resource, as before), THEN the tile's own habitability and hazard
-    // (already tracked per-tile — tile_inspector.cpp's table carries the same
-    // two columns — vs. this body's average, so a barren tile still has
-    // something to page through). Atmospheric pollution and per-tile population
-    // are NOT modelled today (population lives on population centres, not
-    // arbitrary tiles), so they have no page here yet — noted, not faked.
+    // ── Centre half: ONE accordion, five sections (BL-598) ────────────────
+    //
+    // Ben, 2026-08-24: "we just use a longer accordion ... Buildings -> Deposits
+    // -> Resources -> Population -> Terrain."
+    //
+    // WHAT THIS REPLACES. Two things at once. The centre pane was a PAGER — a
+    // ‹ Name (i/3) › row with prev/next arrows — and the province was a SECOND
+    // ELEMENT with a pager of its own. Both are gone. A pager shows you one view
+    // and hides the existence of the rest behind an arrow press; an accordion
+    // shows you the whole list of questions this ground can answer and opens the
+    // one you press. With five sections that difference is the readable design,
+    // which is why the merge and the idiom change are one item and not two.
+    //
+    // ONE OPEN AT A TIME. The band is a fixed ~260 px tall; five open bodies
+    // would each get a sliver, so opening a section closes the one before it and
+    // `ui.card_tile_view` carries which is open. -1 means none open, and it is
+    // REACHABLE by design: a header shows its own open state, which makes it a
+    // toggle under the standing Toggle rule, so pressing the open header closes
+    // it rather than doing nothing.
+    //
+    // THE PROVINCE IS IN HERE. Deposits and Population are PROVINCE readings,
+    // resolved from the selected tile rather than from a province selection —
+    // that is what "bundled into" means, and it is why there is no longer a
+    // gesture that selects a province without also selecting a tile.
     {
         const std::vector<tile_metric> pages = tile_metrics(w, sel);
 
         ImGui::BeginChild("##tile_accordion", {center_w, total_h}, true,
-                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+                          ImGuiWindowFlags_NoSavedSettings);
 
-        int& view = ui.card_tile_view;
-        view = std::clamp(view, 0, k_view_count - 1);
+        int& open = ui.card_tile_view;
+        if (open < -1 || open >= k_view_count)
+            open = k_sec_buildings;
 
-        // The resource pages split in two: those backed by a real deposit (the
-        // Resources view) and the tile's own habitability/hazard scalars (the
-        // Terrain view). tile_metrics still builds one list, because the
+        // The metric list splits in two: pages backed by a real deposit (the
+        // Resources section) and the tile's own habitability/hazard scalars (the
+        // Terrain section). tile_metrics still builds ONE list, because the
         // full-canvas fold charts the same pages by index and the two must agree
         // on what page N is — so the split is a filter here, not a second builder.
         std::vector<int> res_pages, terrain_pages;
@@ -2655,64 +2882,115 @@ void draw_tile_selection(world& w, ui_state& ui)
         const int n    = static_cast<int>(pages.size());
         page = std::clamp(page, 0, std::max(0, n - 1));
 
-        // Pager row: [prev]  Metric (i/N)  [next]  [full canvas]
+        // ── The section nav (Ben, 2026-08-24, revising his own accordion ruling
+        //    the same day, on seeing it) ────────────────────────────────────────
         //
-        // The band rests EXPANDED-IN-PLACE (Ben, 2026-08-01): its rect is a fixed
-        // 260 px that cannot shrink, so a folded one-liner here would spend ~220 px
-        // on emptiness — the objection the superseded three-level design raised
-        // against Glance-everywhere. It therefore takes the full-canvas control
-        // alone (BL-265): there is no `⌄` state to reach, because this card is
-        // already expanded. The control opens the same metric on the CANVAS, where
-        // the chart has ten times the height.
+        //   "I meant a topnav left and right chevron, with a full canvas expansion
+        //    button... straddle left and right buttons across the entire span,
+        //    excepting the expand chevron. And our open accordion element title
+        //    should be centred. This is opposed to a vertical accordion."
         //
-        // `right` is the row's true right edge, and the pager's next-page button and
-        // the disclosure control are both hung off it — so the control lands in the
-        // same column it occupies on every other surface.
-        // BL-534 (Ben, 2026-08-22): the accordion pages VIEWS, not resources.
+        // WHY THE REVERSAL IS RIGHT, in the numbers that produced it: five stacked
+        // headers spent 169 of the band's 258 px on chrome to give the open section
+        // 89. This row spends ONE frame height and gives the section everything
+        // below it. The accordion's own argument — show the whole list of questions
+        // rather than hiding it behind a press — is answered instead by the count
+        // beside the title, which says how many readings exist without spending a
+        // row on each.
         //
-        // It used to page one-per-deposited-resource, so reading the seventh
-        // resource cost six presses and there was nowhere to put anything that
-        // was not a resource graph. Three views now — Terrain, Resources,
-        // Available buildings — and the resource choice moves INTO the Resources
-        // view as a dropdown, which is the shape draw_lens_resource_combo already
-        // uses for the lenses. Ben named this set and did not pick Province or
-        // Ownership, which were offered; they are deliberately absent.
-        const float aw    = ImGui::GetContentRegionAvail().x;
-        const float right = ImGui::GetCursorPosX() + aw;
-        ImGui::BeginDisabled(view == 0);
-        if (ImGui::ArrowButton("##view_prev", ImGuiDir_Left)) --view;
-        ImGui::EndDisabled();
-        if (ImGui::IsItemHovered() && view > 0)
-            ImGui::SetTooltip("Previous view");
-
-        char hdr[64];
-        std::snprintf(hdr, sizeof hdr, "%s  (%d/%d)", k_view_names[view], view + 1, k_view_count);
-        const float name_w = ui::fit_width(hdr); // BL-215: measured through the shared module
-        ImGui::SameLine(std::max(frame_h + style.ItemSpacing.x, (aw - name_w) * 0.5f));
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", hdr);
-
-        ImGui::SameLine(right - 2.0f * frame_h - style.ItemSpacing.x);
-        ImGui::BeginDisabled(view == k_view_count - 1);
-        if (ImGui::ArrowButton("##view_next", ImGuiDir_Right)) ++view;
-        ImGui::EndDisabled();
-        if (ImGui::IsItemHovered() && view < k_view_count - 1)
-            ImGui::SetTooltip("Next view");
-
-        // ── View 2: Available buildings (BL-534) ──────────────────────────
-        // Per province throughout, by Ben's ruling. No chart: the question this
-        // view answers ("what can I still put here, and how much room is left")
-        // is a comparison of small integers, and a bar per resource would be
-        // chart furniture around two numbers.
-        if (view == 2)
+        // It also un-forks the shell: the building and unit cards never stopped
+        // using a pager, so the tile card was briefly the only accordion in the
+        // band (NR-605). One idiom again.
+        //
+        // The chevrons STRADDLE the span — hard left and hard right — rather than
+        // clustering around the title, so the two presses are the largest possible
+        // distance apart and the title sits centred between them. The full-canvas
+        // control is excepted from the straddle and keeps the rightmost slot, which
+        // is where every other surface in the shell puts it (BL-265's two-control
+        // idiom; `disclosure_controls` owns the glyph, so it is not re-drawn here).
         {
-            const province_build_table pb = province_builds(w, sel);
-            ImGui::Spacing();
-            if (!pb.known)
+            const float row_h  = ImGui::GetFrameHeight();
+            const float span   = ImGui::GetContentRegionAvail().x;
+            const float x0     = ImGui::GetCursorPosX();
+            const float y0     = ImGui::GetCursorPosY();
+
+            if (open < 0 || open >= k_view_count)
+                open = k_sec_buildings;   // the nav always has a current section
+
+            if (ImGui::ArrowButton("##sec_prev", ImGuiDir_Left))
+                open = (open + k_view_count - 1) % k_view_count;
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", k_view_names[(open + k_view_count - 1) % k_view_count]);
+
+            // The right chevron sits immediately left of the full-canvas control,
+            // NOT one full gutter in. `disclosure_gutter_width` reserves two slots
+            // so the `›` lands in the same column on rows that also offer `⌄` —
+            // this row does not, so reserving both would leave a slot of dead air
+            // between the two presses and break the straddle Ben asked for.
+            const float expand_w = row_h + style.ItemSpacing.x;
+            ImGui::SameLine(x0 + span - expand_w - row_h);
+            if (ImGui::ArrowButton("##sec_next", ImGuiDir_Right))
+                open = (open + 1) % k_view_count;
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", k_view_names[(open + 1) % k_view_count]);
+
+            // Centred between the chevrons, measured rather than guessed so a long
+            // section name stays centred instead of drifting.
+            char title[64];
+            std::snprintf(title, sizeof title, "%s  %d/%d",
+                          k_view_names[open], open + 1, k_view_count);
+            // Centred on the run BETWEEN the two chevrons, which is what "centred"
+            // means once they straddle — not centred on the whole span, which would
+            // sit it visibly left of the gap it is meant to fill.
+            const float tw    = fit_width(title);
+            const float run_l = x0 + row_h;
+            const float run_r = x0 + span - expand_w - row_h;
+            ImGui::SameLine(run_l + (run_r - run_l - tw) * 0.5f);
+            ImGui::SetCursorPosY(y0 + (row_h - ImGui::GetTextLineHeight()) * 0.5f);
+            fit_text(text_box::selection, "selection.tile.section", title,
+                     std::max(24.0f, run_r - run_l));
+
+            // The full-canvas expansion, in the rightmost slot. `in_place = false`:
+            // a section is already the whole body, so there is nothing to expand
+            // in place — the only larger state is the canvas.
+            ImGui::SameLine();
+            ImGui::SetCursorPosY(y0);
+            disclosure_controls(ui, detail_surface::selection_metric,
+                                1000 + open, /*in_place=*/false);
+
+            ImGui::SetCursorPosX(x0);
+            ImGui::SetCursorPosY(y0 + row_h + style.ItemSpacing.y);
+            ImGui::Separator();
+        }
+
+        // ONE section draws, and it gets the whole body. No height arithmetic:
+        // the accordion had to reserve a header's worth of room for every section
+        // still below it, and there is nothing below this one.
+        {
+            const int s = open;
+            ImGui::BeginChild(k_view_names[s], {0.0f, 0.0f}, false,
+                              ImGuiWindowFlags_NoSavedSettings);
+
+            switch (s)
             {
-                ImGui::TextDisabled("This tile belongs to no province.");
-            }
-            else
+            // ── Buildings — what you can still put here ───────────────────
+            // The tile's available-buildings reading, KEPT by Ben's ruling, and
+            // per province throughout (his 2026-08-22 call on the grain, which
+            // BL-598 does not disturb). The province's own Buildings page — a
+            // roll-up of what already stands — is the one DROPPED: it asked the
+            // same question at a grain the player does not build at, and the
+            // Built column here already carries the standing count.
+            //
+            // No chart: the question is a comparison of small integers, and a bar
+            // per resource would be chart furniture around two numbers.
+            case k_sec_buildings:
             {
+                const province_build_table pb = province_builds(w, sel);
+                if (!pb.known)
+                {
+                    ImGui::TextDisabled("This tile belongs to no province.");
+                    break;
+                }
                 // The province total first: it bounds every row beneath it, so
                 // reading a row without it is misleading. -1 is UNKNOWN by the
                 // BL-513 contract and is said, not silently rendered as room.
@@ -2766,92 +3044,173 @@ void draw_tile_selection(world& w, ui_state& ui)
                     }
                     ImGui::EndTable();
                 }
+                break;
             }
-            ImGui::EndChild();
-        }
-        else
-        {
-        // ── Views 0/1: Terrain and Resources ──────────────────────────────
-        // Both are the metric chart; they differ in WHICH pages they offer and
-        // in how you choose between them. Resources gets the dropdown (Ben:
-        // "bundle the resource view into a dropdown"); Terrain has two pages at
-        // most, so it keeps the plain pager it already had.
-        const std::vector<int>& shown = (view == 1) ? res_pages : terrain_pages;
-        if (shown.empty())
-        {
-            ImGui::Spacing();
-            ImGui::TextDisabled(view == 1 ? "No deposits on this tile."
-                                          : "No terrain metrics for this tile.");
-            ImGui::EndChild();
-        }
-        else
-        {
-        // Keep `page` inside the shown set: switching view must not leave the
-        // chart on a page this view does not offer.
-        if (std::find(shown.begin(), shown.end(), page) == shown.end())
-            page = shown.front();
 
-        if (view == 1)
-        {
-            // The dropdown that replaces the carousel. Reading the seventh
-            // deposit used to cost six presses of the pager.
-            ImGui::Spacing();
-            ImGui::SetNextItemWidth(-FLT_MIN);
-            const tile_metric& cur = pages[static_cast<std::size_t>(page)];
-            if (ImGui::BeginCombo("##res_pick", cur.label.c_str()))
+            // ── Deposits — what this locality holds, summed ───────────────
+            // The province card's Deposits page, carried across intact. It is a
+            // STOCK question ("is this locality worth a mine?"), which is why it
+            // sums where the Resources section charts.
+            case k_sec_deposits:
             {
-                for (const int pi : shown)
+                const std::vector<province_deposit_row> rows = province_deposits(w, sel);
+                const bool in_province = w.provinces.province_of(sel) != 0;
+                ImGui::TextDisabled("%s", in_province
+                                              ? "Summed across this province."
+                                              : "This tile only - it has no province.");
+                ImGui::Separator();
+                if (rows.empty())
                 {
-                    const tile_metric& q = pages[static_cast<std::size_t>(pi)];
-                    if (ImGui::Selectable(q.label.c_str(), pi == page))
-                        page = pi;
+                    ImGui::TextDisabled("none");
+                    break;
                 }
-                ImGui::EndCombo();
+                ImDrawList* pdl = ImGui::GetWindowDrawList();
+                for (const province_deposit_row& r : rows)
+                {
+                    const ImVec2 pc = ImGui::GetCursorScreenPos();
+                    const float  pr = ImGui::GetTextLineHeight() * 0.30f;
+                    pdl->AddCircleFilled({pc.x + pr, pc.y + ImGui::GetTextLineHeight() * 0.5f},
+                                         pr, ui::presentation_of(r.resource).colour);
+                    ImGui::Dummy({pr * 2.0f + style.ItemSpacing.x, ImGui::GetTextLineHeight()});
+                    ImGui::SameLine();
+                    ImGui::Text("%s  %.1f", ui::resource_name(r.resource),
+                                static_cast<double>(r.amount));
+                }
+                break;
             }
-        }
 
-        const tile_metric& mp = pages[static_cast<std::size_t>(page)];
-        disclosure_controls(ui, detail_surface::selection_metric, page, /*in_place=*/false);
-
-        // The current page's graph, filling the rest of the container. Deposited
-        // resources are click-drillable into their time series (BL-196);
-        // habitability/hazard are not — no per-tile history is tracked for them
-        // yet, so the click target is skipped rather than faked.
-        ImGui::Spacing();
-        const ImVec2 p  = ImGui::GetCursorScreenPos();
-        const float  cw = ImGui::GetContentRegionAvail().x;
-        const float  gh = std::max(48.0f, ImGui::GetContentRegionAvail().y - 4.0f);
-        const bool   drillable = mp.resource_index >= 0;
-        if (drillable)
-        {
-            if (ImGui::InvisibleButton("##res_chart", {cw, gh}))
+            // ── Resources — what THIS tile yields, against the field ──────
+            // The dropdown rather than a carousel (Ben, 2026-08-22: reading the
+            // seventh deposit must not cost six presses). Deposited resources are
+            // click-drillable into their time series (BL-196); habitability and
+            // hazard are not, and live in Terrain.
+            case k_sec_resources:
             {
-                const bool dup = !ui.card_stack.empty() &&
-                                 ui.card_stack.back().tile == sel &&
-                                 ui.card_stack.back().resource == mp.resource_index;
-                if (!dup && ui.card_stack.size() < 20)
-                    ui.card_stack.push_back({sel, mp.resource_index});
-                ui.card_track_tile = sel;
+                if (res_pages.empty())
+                {
+                    ImGui::TextDisabled("No deposits on this tile.");
+                    break;
+                }
+                // Keep `page` inside the section's own set: the Terrain section
+                // shares the index, so opening one must not leave the chart on a
+                // page the other offers.
+                if (std::find(res_pages.begin(), res_pages.end(), page) == res_pages.end())
+                    page = res_pages.front();
+
+                ImGui::SetNextItemWidth(-FLT_MIN);
+                if (ImGui::BeginCombo("##res_pick", pages[static_cast<std::size_t>(page)].label.c_str()))
+                {
+                    for (const int pi : res_pages)
+                        if (ImGui::Selectable(pages[static_cast<std::size_t>(pi)].label.c_str(),
+                                              pi == page))
+                            page = pi;
+                    ImGui::EndCombo();
+                }
+                draw_tile_chart_section(ui, sel, pages[static_cast<std::size_t>(page)],
+                                        page, /*drillable=*/true);
+                break;
             }
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s: this tile yields %.1f vs %.1f for a top-10%% tile.\n"
-                                  "Click for its history over time.",
-                                  mp.label.c_str(), static_cast<double>(mp.tile_val),
-                                  static_cast<double>(mp.ref_val));
+
+            // ── Population — the labour this ground can draw on ───────────
+            // Province-grain because the DATA MODEL is: population lives on
+            // population centres, not on arbitrary tiles (POPULATION.md), so
+            // there is no per-tile headcount and a per-tile section would have to
+            // invent one. It is in the accordion because "who works here" is the
+            // question between "what can I build" and "what is the ground like".
+            case k_sec_population:
+            {
+                const province_pop_table pt = province_population(w, sel);
+                if (!pt.known)
+                {
+                    ImGui::TextDisabled("This tile belongs to no province.");
+                    break;
+                }
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                                   "Province population");
+                ImGui::SameLine();
+                ImGui::Text("%d thousand", pt.total);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Summed over every population centre in this province.\n"
+                                      "Scale drives the agglomeration bonus and the labour pool.");
+                ImGui::Separator();
+                if (pt.rows.empty())
+                {
+                    ImGui::TextDisabled("Uninhabited.");
+                    break;
+                }
+                // TWO LINES PER CENTRE, name over stats. One line does not fit:
+                // a name plus "Metropolis - 5000 k - hab 0.15" overran the
+                // section's ~280 px and clipped its last glyph, and the fix is
+                // not to drop a field the player came here for. The stats line is
+                // indented and muted, so the list still scans by NAME.
+                for (std::size_t i = 0; i < pt.rows.size(); ++i)
+                {
+                    const province_pop_row& r = pt.rows[i];
+                    if (r.here)
+                    {
+                        // A bullet marks the centre standing on the SELECTED tile,
+                        // so the list reads as "this ground, in its neighbourhood"
+                        // rather than as a bare roster of the province.
+                        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                                           "%s", "\xe2\x80\xa2");
+                        ImGui::SameLine();
+                    }
+                    else
+                    {
+                        ImGui::Dummy({ImGui::GetTextLineHeight() * 0.5f, 1.0f});
+                        ImGui::SameLine();
+                    }
+                    ImGui::Text("%s", (r.name[0] != '\0') ? r.name : "Unnamed");
+
+                    ImGui::Dummy({ImGui::GetTextLineHeight(), 1.0f});
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("%s \xc2\xb7 %d k \xc2\xb7 hab %.2f",
+                                        population_scale_name(r.scale), r.population,
+                                        static_cast<double>(r.habitability));
+                }
+                break;
+            }
+
+            // ── Terrain — what the ground merely IS ───────────────────────
+            // Last by Ben's order, and the order is the argument: this is the
+            // reading you can do nothing about. Habitability and hazard against
+            // the body average, so a barren tile still has something to read.
+            default:
+            {
+                if (terrain_pages.empty())
+                {
+                    ImGui::TextDisabled("No terrain metrics for this tile.");
+                    break;
+                }
+                if (std::find(terrain_pages.begin(), terrain_pages.end(), page) == terrain_pages.end())
+                    page = terrain_pages.front();
+                // The same dropdown Resources uses rather than a second idiom for
+                // two pages: the pager the accordion replaced is gone from this
+                // element entirely, so a lone pair of arrows here would be the
+                // only survivor of a shape nothing else uses.
+                if (terrain_pages.size() > 1)
+                {
+                    ImGui::SetNextItemWidth(-FLT_MIN);
+                    if (ImGui::BeginCombo("##terrain_pick",
+                                          pages[static_cast<std::size_t>(page)].label.c_str()))
+                    {
+                        for (const int pi : terrain_pages)
+                            if (ImGui::Selectable(pages[static_cast<std::size_t>(pi)].label.c_str(),
+                                                  pi == page))
+                                page = pi;
+                        ImGui::EndCombo();
+                    }
+                }
+                draw_tile_chart_section(ui, sel, pages[static_cast<std::size_t>(page)],
+                                        page, /*drillable=*/false);
+                break;
+            }
+            }
+
+            ImGui::EndChild();
         }
-        else
-        {
-            ImGui::Dummy({cw, gh}); // reserve the same space; no drill-down yet
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s: %.2f vs %.2f %s.\nNo time-series history tracked for this yet.",
-                                  mp.label.c_str(), static_cast<double>(mp.tile_val),
-                                  static_cast<double>(mp.ref_val), mp.ref_label);
-        }
-        draw_tile_metric_chart(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + gh}, mp);
 
         ImGui::EndChild();
-        }
-        }
     }
     ImGui::SameLine();
 
@@ -2957,276 +3316,6 @@ void draw_tile_selection(world& w, ui_state& ui)
 }
 
 
-// ---------------------------------------------------------------------------
-// The province body (BL-511; refolded 2026-08-21)
-// ---------------------------------------------------------------------------
-// Ben, 2026-08-21: "We don't need another selection element, we can just use the
-// same one as we used for tiles." So a province is NOT a card of its own — it is
-// one more thing the single polymorphic Selection element can be showing. This
-// function is a BODY, not a card: it is called from draw_selection_content after
-// the shared header (icon / title / 'go to' / separator), exactly as the building
-// and unit bodies are, and it takes the same three-column band those two use —
-// a left-quarter render of the thing, a centre-half paged accordion, a
-// right-quarter 2x3 action grid.
-//
-// What stays province-SPECIFIC is only the content, which is the part that earns
-// the surface. The canvas blends the member tiles into one soft shape; this body
-// un-blends them: the mixture bar is the blend's legend, and the three accordion
-// pages give the tile back — member tiles as presses, deposits summed, buildings
-// rolled up. Deposits, terrain and buildings all remain TILE-keyed (Ben's ruling:
-// tiles "are just going to be rendered differently, but still instrumental unit
-// values"); this reads over them, it does not move them.
-//
-// Nothing here assumes a province SIZE: `pv.tiles` is walked and divided by, never
-// indexed against a constant, so a repartition that changes the member count
-// changes only how many bands the mixture bar has.
-void draw_province_selection_body(world& w, ui_state& ui, const province& pv)
-{
-    const ImGuiStyle& style    = ImGui::GetStyle();
-    ImDrawList*       dl       = ImGui::GetWindowDrawList();
-    const float       avail    = ImGui::GetContentRegionAvail().x;
-    const float       total_h  = ImGui::GetContentRegionAvail().y;
-    const float       frame_h  = ImGui::GetFrameHeight();
-    const float       spacing  = style.ItemSpacing.x;
-    const float       left_w   = avail * 0.25f;
-    const float       right_w  = avail * 0.25f;
-    const float       center_w = std::max(80.0f, avail - left_w - right_w - 2.0f * spacing);
-
-    // -- Left quarter: the province in situ, over its mixture bar --
-    // The same slot the tile card gives the zoomed hex neighbourhood and the unit
-    // card its portrait glyph - "what does this thing look like". The
-    // neighbourhood centres on the anchor tile, so the province is shown where it
-    // sits; the mixture bar runs along the bottom of the same panel, always
-    // visible rather than buried on an accordion page (it is the legend for the
-    // gradient the player is looking at, so it has to be readable beside it).
-    {
-        const ImVec2 p     = ImGui::GetCursorScreenPos();
-        const ImVec2 mx    = {p.x + left_w, p.y + total_h};
-        const float  bar_h = frame_h * 0.8f;
-        const float  pad   = 3.0f;
-        dl->AddRectFilled(p, mx, IM_COL32(16, 18, 24, 255), 3.0f);
-        draw_tile_neighbourhood(dl, w, pv.tiles.front(), p,
-                                {left_w, std::max(24.0f, total_h - bar_h - pad * 2.0f)},
-                                /*radius=*/2);
-
-        // One segment per member tile, in the province's own ascending-tile-id
-        // order, each drawn in exactly the colour the canvas gives that tile
-        // (composition hue composited with the landform relief). The canvas
-        // averages these together; the bar un-averages them, so "what did that
-        // gradient just blend?" is one glance away rather than a zoom and a count.
-        const float  strip_w = left_w - pad * 2.0f;
-        const float  seg_w   = strip_w / static_cast<float>(pv.tiles.size());
-        const ImVec2 b0      = {p.x + pad, mx.y - bar_h - pad};
-        for (std::size_t i = 0; i < pv.tiles.size(); ++i)
-        {
-            const auto tit = w.tiles.find(pv.tiles[i]);
-            if (tit == w.tiles.end())
-                continue;
-            const ImU32 c = ui::landform_relief(ui::terrain_colour(tit->second.substrate,
-                                                                   tit->second.cover,
-                                                                   tit->second.cover_density),
-                                                tit->second.landform);
-            dl->AddRectFilled({b0.x + seg_w * static_cast<float>(i), b0.y},
-                              {b0.x + seg_w * static_cast<float>(i + 1), b0.y + bar_h}, c);
-        }
-        dl->AddRect(b0, {b0.x + strip_w, b0.y + bar_h}, IM_COL32(0, 0, 0, 120));
-
-        // Hover target over the bar only - the panel around it stays inert.
-        ImGui::SetCursorScreenPos(b0);
-        ImGui::Dummy({strip_w, bar_h});
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Mixture: one band per tile in this province, in the\n"
-                              "colour the map gives that tile. The map blends them.");
-
-        dl->AddRect(p, mx, IM_COL32(90, 90, 100, 255), 3.0f);
-        ImGui::SetCursorScreenPos(p);
-        ImGui::Dummy({left_w, total_h});
-    }
-    ImGui::SameLine();
-
-    // -- Centre half: paged accordion - Tiles / Deposits / Buildings --
-    // Same pager chrome as the tile, building and unit accordions (prev arrow,
-    // centred "Label (i/N)", next arrow), so the three province readings are
-    // paged exactly the way every other selection's readings are.
-    {
-        static const char* const k_pages[] = {"Tiles", "Deposits", "Buildings"};
-        const int                n         = 3;
-
-        ImGui::BeginChild("##prov_accordion", {center_w, total_h}, true,
-                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
-
-        int& page = ui.selection_province_page;
-        page      = std::clamp(page, 0, n - 1);
-
-        const float aw    = ImGui::GetContentRegionAvail().x;
-        const float right = ImGui::GetCursorPosX() + aw;
-        ImGui::BeginDisabled(page == 0);
-        if (ImGui::ArrowButton("##prov_prev", ImGuiDir_Left)) --page;
-        ImGui::EndDisabled();
-        if (ImGui::IsItemHovered() && page > 0)
-            ImGui::SetTooltip("Previous");
-
-        char hdr[64];
-        std::snprintf(hdr, sizeof hdr, "%s  (%d/%d)", k_pages[page], page + 1, n);
-        const float name_w = ui::fit_width(hdr);
-        ImGui::SameLine(std::max(frame_h + style.ItemSpacing.x, (aw - name_w) * 0.5f));
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", hdr);
-
-        ImGui::SameLine(right - 2.0f * frame_h - style.ItemSpacing.x);
-        ImGui::BeginDisabled(page == n - 1);
-        if (ImGui::ArrowButton("##prov_next", ImGuiDir_Right)) ++page;
-        ImGui::EndDisabled();
-        if (ImGui::IsItemHovered() && page < n - 1)
-            ImGui::SetTooltip("Next");
-
-        ImGui::Spacing();
-        ImGui::BeginChild("##prov_page_body", {0.0f, 0.0f}, false,
-                          ImGuiWindowFlags_NoSavedSettings);
-
-        if (page == 0)
-        {
-            // Member tiles: the tile is not retired, it is one press away. Each row
-            // selects the TILE, which clears the province and hands the player the
-            // full tile card - deposits, the neighbourhood hex view, the Construct
-            // door. Building placement did NOT move to province grain, so this list
-            // is also the route to building anywhere.
-            for (std::size_t i = 0; i < pv.tiles.size(); ++i)
-            {
-                const entity_id tid = pv.tiles[i];
-                const auto      tit = w.tiles.find(tid);
-                if (tit == w.tiles.end())
-                    continue;
-                const tile_component& tc = tit->second;
-
-                const bool plain = (tc.landform == terrain_landform::plains);
-                char label[160];
-                std::snprintf(label, sizeof label, "[%d, %d]  %s%s%s##prov_tile_%d",
-                              tc.grid_x, tc.grid_y,
-                              ui::terrain_name(tc).c_str(),
-                              plain ? "" : " \xc2\xb7 ",
-                              plain ? "" : ui::landform_name(tc.landform),
-                              static_cast<int>(i));
-                if (ImGui::Selectable(label))
-                {
-                    ui.selected_entity   = tid;
-                    ui.selected_province = 0; // entity and province selection are exclusive
-                }
-            }
-        }
-        else if (page == 1)
-        {
-            // Deposits, summed across the province. Deposits stay TILE-keyed (Ben's
-            // ruling); this is a read over them, not a move of them. Summing is the
-            // right reduction because a deposit is a stock: several tiles each
-            // holding a little iron is, for a player deciding whether this locality
-            // is worth a mine, one province holding that much iron.
-            std::array<float, resource_count> dep{};
-            for (entity_id tid : pv.tiles)
-                if (const auto tit = w.tiles.find(tid); tit != w.tiles.end())
-                    for (std::size_t r = 0; r < resource_count; ++r)
-                        dep[r] += tit->second.resource_deposit[r];
-
-            std::vector<std::pair<float, std::size_t>> ranked;
-            for (std::size_t r = 0; r < resource_count; ++r)
-                if (dep[r] > 0.0f)
-                    ranked.push_back({dep[r], r});
-            std::sort(ranked.begin(), ranked.end(),
-                      [](const std::pair<float, std::size_t>& a,
-                         const std::pair<float, std::size_t>& b) { return a.first > b.first; });
-
-            if (ranked.empty())
-                ImGui::TextDisabled("none");
-            ImDrawList* pdl = ImGui::GetWindowDrawList();
-            for (std::size_t i = 0; i < ranked.size(); ++i)
-            {
-                const resource_type rt = static_cast<resource_type>(ranked[i].second);
-                const ImVec2 pc = ImGui::GetCursorScreenPos();
-                const float  pr = ImGui::GetTextLineHeight() * 0.30f;
-                pdl->AddCircleFilled({pc.x + pr, pc.y + ImGui::GetTextLineHeight() * 0.5f},
-                                     pr, ui::presentation_of(rt).colour);
-                ImGui::Dummy({pr * 2.0f + style.ItemSpacing.x, ImGui::GetTextLineHeight()});
-                ImGui::SameLine();
-                ImGui::Text("%s  %.1f", ui::resource_name(rt),
-                            static_cast<double>(ranked[i].first));
-            }
-        }
-        else
-        {
-            // Buildings standing in the province. Placement did NOT move to province
-            // grain, so a building still belongs to a tile. What the province adds is
-            // the roll-up: "what is already here?" is a locality question, and
-            // answering it used to mean clicking every hex in turn.
-            std::vector<entity_id> here;
-            for (const auto& kv : w.buildings)
-                if (w.provinces.province_of(kv.second.tile) == pv.id)
-                    here.push_back(kv.first);
-            std::sort(here.begin(), here.end()); // w.buildings is unordered - pin the order
-
-            // A building carries no owner field; ownership is the corporation's
-            // `assets` list (the canvas resolves it the same way). Built once per
-            // draw over the province's handful of buildings, not per row.
-            std::unordered_map<entity_id, entity_id> bld_owner;
-            if (!here.empty())
-                for (const auto& ckv : w.corporations)
-                    for (entity_id aid : ckv.second.assets)
-                        bld_owner[aid] = ckv.first;
-
-            if (here.empty())
-                ImGui::TextDisabled("none");
-            for (std::size_t i = 0; i < here.size(); ++i)
-            {
-                const auto bit = w.buildings.find(here[i]);
-                if (bit == w.buildings.end())
-                    continue;
-                const char* owner = "";
-                if (const auto oit = bld_owner.find(here[i]); oit != bld_owner.end())
-                    if (const auto cit = w.corporations.find(oit->second);
-                        cit != w.corporations.end())
-                        owner = cit->second.name.c_str();
-                char label[200];
-                std::snprintf(label, sizeof label, "%s  %s##prov_bld_%d",
-                              building_type_name(bit->second.type), owner,
-                              static_cast<int>(i));
-                if (ImGui::Selectable(label))
-                {
-                    ui.selected_entity   = here[i];
-                    ui.selected_province = 0;
-                }
-            }
-        }
-
-        ImGui::EndChild();
-        ImGui::EndChild();
-    }
-    ImGui::SameLine();
-
-    // -- Right quarter: 2x3 action grid - only "Go to" is real today, exactly as
-    // on the unit card. Construction is deliberately NOT here: placement is
-    // tile-grain, so the Construct door stays on the tile card and the Tiles page
-    // is the route to it. --
-    {
-        ImGui::BeginChild("##prov_actions", {right_w, total_h}, false,
-                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
-        const float  bw  = (right_w - spacing) / 2.0f;
-        const float  bh  = (total_h - 2.0f * spacing) / 3.0f;
-        const ImVec2 bsz = {bw, bh};
-
-        if (tile_icon_button("##prov_goto", bsz, /*enabled=*/true, "Go to", glyph_goto))
-            focus_on_entity(w, ui, pv.tiles.front());
-        ImGui::SameLine();
-        tile_icon_button("##prov_reserved1", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
-
-        tile_icon_button("##prov_reserved2", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
-        ImGui::SameLine();
-        tile_icon_button("##prov_reserved3", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
-
-        tile_icon_button("##prov_reserved4", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
-        ImGui::SameLine();
-        tile_icon_button("##prov_reserved5", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
-
-        ImGui::EndChild();
-    }
-}
 
 
 } // namespace
@@ -3235,15 +3324,15 @@ void draw_selection_content(world& w, const recipe_registry& reg,
                             const economy_report& report,
                             const contract_template_registry& templates, ui_state& ui)
 {
-    // BL-511, refolded 2026-08-21 (Ben: "We don't need another selection element,
-    // we can just use the same one as we used for tiles"). A province is resolved
-    // BEFORE selection_kind_of - it has to be: a province is not an entity, so the
-    // kind resolution cannot see it, and the band substitutes the player
-    // corporation whenever the entity selection is empty (BL-266), which is exactly
-    // the state a province selection leaves behind. But resolving it early only
-    // chooses WHAT the one element is showing; the header, the separator and the
-    // three-column band below are the same code every other kind runs. The canvas
-    // guarantees the two selections are mutually exclusive (province_sync_entity).
+    // BL-598 removed the PROVINCE branch that stood here. BL-511 gave a province
+    // its own resolution ahead of `selection_kind_of` — it is not an entity, so
+    // the kind resolution cannot see it — and BL-534 gave it its own body. Ben
+    // dissolved that on 2026-08-24: the province is now a set of SECTIONS in the
+    // tile element's accordion, resolved from the selected tile at the draw site,
+    // so this dispatcher has one fewer thing to be. `ui_state::selected_province`
+    // survives as a derived mirror the canvas outline reads; nothing here reads
+    // it, which is the point — a card can no longer be routed by a stale id.
+    //
     // BL-469: a BATTLE resolves before everything else, for the same structural
     // reason a province resolves before selection_kind_of — it is not an entity,
     // so the kind resolution cannot see it — and for one reason of its own: a
@@ -3262,8 +3351,8 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     }
 
     // BL-577: a contract resolves next, for the same structural reason the
-    // battle and the province do — a `mercenary_contract` is not an entity,
-    // so `selection_kind_of` cannot see it. It owns its whole card (SELECTION.md
+    // battle does — a `mercenary_contract` is not an entity, so
+    // `selection_kind_of` cannot see it. It owns its whole card (SELECTION.md
     // § The contract element), so it returns rather than falling through to
     // the shared header, exactly like the battle above.
     if (ui.has_contract_selection() && selected_contract(w, ui) != nullptr)
@@ -3272,38 +3361,24 @@ void draw_selection_content(world& w, const recipe_registry& reg,
         return;
     }
 
-    const province* pv = (ui.selected_province != 0)
-                             ? w.provinces.find(ui.selected_province)
-                             : nullptr;
-    if (pv && pv->tiles.empty())
-        pv = nullptr;
-    if (ui.selected_province != 0 && pv == nullptr)
-        ui.selected_province = 0; // stale id (regenerated world) - fall back cleanly
+    const selection_kind kind = selection_kind_of(w, ui.selected_entity);
 
-    // A province borrows the TILE kind for its header icon: it is a cluster of
-    // tiles, not a new kind of thing, so the tile primitive is the honest glyph.
-    // Its title and trailing label are supplied below rather than by
-    // selection_title / selection_kind_name, which key off an entity id.
-    const selection_kind kind = (pv != nullptr) ? selection_kind::tile
-                                                : selection_kind_of(w, ui.selected_entity);
+    // Nothing valid selected - draw nothing. (The band frame never lets this
+    // happen: with no valid selection it substitutes the player corporation
+    // before calling here, BL-266. This guard covers other callers only.)
+    if (kind == selection_kind::none)
+        return;
 
-    if (pv == nullptr)
+    // A selected tile owns its WHOLE card layout, header included (Ben's
+    // 2026-07-23 three-region design: header / zoomed hex neighbourhood +
+    // accordion / action grid), so it is dispatched before the generic header
+    // the other kinds share. Since BL-598 it is also where the PROVINCE is read:
+    // the Deposits, Buildings and Population sections of its accordion resolve
+    // the province from this tile.
+    if (kind == selection_kind::tile)
     {
-        // Nothing valid selected - draw nothing. (The band frame never lets this
-        // happen: with no valid selection it substitutes the player corporation
-        // before calling here, BL-266. This guard covers other callers only.)
-        if (kind == selection_kind::none)
-            return;
-
-        // A selected tile owns its WHOLE card layout, header included (Ben's
-        // 2026-07-23 three-region design: header / zoomed hex neighbourhood +
-        // action strip / graphs), so it is dispatched before the generic header
-        // the other kinds share.
-        if (kind == selection_kind::tile)
-        {
-            draw_tile_selection(w, ui);
-            return;
-        }
+        draw_tile_selection(w, ui);
+        return;
     }
 
     // Frame-agnostic: this draws into whatever window the caller opened (the sticky
@@ -3315,26 +3390,10 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     const ImGuiStyle& style   = ImGui::GetStyle();
     ImDrawList*       dl      = ImGui::GetWindowDrawList();
 
-    // The entity the header's icon and 'go to' act on. A province is not an entity,
-    // so it borrows its ANCHOR tile - the lowest-id member - for both. Province ids
-    // are derived and opaque (body rank | block raster | component), so the raw id
-    // is not a name a player can hold; the anchor tile's grid position is.
-    const entity_id head_id = (pv != nullptr) ? pv->tiles.front() : ui.selected_entity;
-
-    char prov_title[64] = {};
-    char prov_sub[32]   = {};
-    if (pv != nullptr)
-    {
-        int anchor_x = 0, anchor_y = 0;
-        if (const auto ait = w.tiles.find(head_id); ait != w.tiles.end())
-        {
-            anchor_x = ait->second.grid_x;
-            anchor_y = ait->second.grid_y;
-        }
-        std::snprintf(prov_title, sizeof prov_title, "Province [%d, %d]", anchor_x, anchor_y);
-        std::snprintf(prov_sub, sizeof prov_sub, "%d tiles",
-                      static_cast<int>(pv->tiles.size()));
-    }
+    // The entity the header's icon and 'go to' act on. BL-598 removed the
+    // province's anchor-tile borrow here: a province is no longer a thing this
+    // element can BE, so the header always acts on the selected entity.
+    const entity_id head_id = ui.selected_entity;
 
     // ── Header: [icon] Name · type ............................. [>] [x] ──
     {
@@ -3344,15 +3403,12 @@ void draw_selection_content(world& w, const recipe_registry& reg,
                             {hc.x + ir, hc.y + frame_h * 0.5f}, ir);
         ImGui::SetCursorScreenPos({hc.x + ir * 2.0f + style.ItemSpacing.x, hc.y});
 
-        const char* title = (pv != nullptr) ? prov_title
-                                            : selection_title(w, kind, ui.selected_entity);
-        // The muted trailing label: the KIND for an entity, the member-tile count
-        // for a province (whose "type" is already the coordinate in its title).
-        const char* sub = (pv != nullptr) ? prov_sub : selection_kind_name(kind);
+        const char* title = selection_title(w, kind, ui.selected_entity);
+        const char* sub   = selection_kind_name(kind); // the muted trailing KIND
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", title);
         // Suppress the redundant type label when the title is already the kind name
         // (e.g. a tile titles as "Tile"), avoiding "Tile · Tile".
-        if (pv != nullptr || std::strcmp(title, sub) != 0)
+        if (std::strcmp(title, sub) != 0)
         {
             ImGui::SameLine();
             ImGui::TextDisabled("%s", sub);
@@ -3371,15 +3427,6 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     }
 
     ImGui::Separator();
-
-    // A province takes the same three-column band the building and unit bodies do,
-    // under the shared header above - it is a body of this element, not a card of
-    // its own (BL-511 refold).
-    if (pv != nullptr)
-    {
-        draw_province_selection_body(w, ui, *pv);
-        return;
-    }
 
     // A selected player building used to BYPASS this layout and render the full
     // management view as its card (2026-07-22). Reversed 2026-08-08 (Ben: "selection

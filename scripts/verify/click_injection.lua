@@ -30,58 +30,86 @@ verify.clear_selection()
 
 -- C1 — a synthesised click SELECTS. click_tile centres the tile (asking the
 -- canvas where it is, rather than re-deriving the transform here) and presses
--- there. A plain-ground click lands on the tile's PROVINCE, per BL-511.
+-- there.
+--
+-- BL-598 (2026-08-24) CHANGED WHAT A PLAIN-GROUND CLICK LANDS ON. It used to
+-- land on the tile's PROVINCE, leaving `selected_entity` null (BL-511); the
+-- province has since folded into the tile Selection element as a set of
+-- accordion sections, so the click lands on the TILE and `selected_province`
+-- carries the province as a derived mirror. Both are set now — which is the
+-- assertion below, and the one that would have failed silently under the old
+-- wording (`selected_province ~= 0` alone was true before AND after).
 local landed = verify.click_tile(COL, ROW)
 verify.expect(landed, "C1a click_tile resolved a screen point and pressed")
 
 local t = verify.pointer_target()
 print(string.format("C1 after click: province=%d has_entity=%s at (%.0f,%.0f)",
                     t.selected_province, tostring(t.has_selection), t.x, t.y))
-verify.expect(t.selected_province ~= 0,
-              "C1b the injected click selected a province through the real handler")
-verify.capture("click_injection_01_clicked_province")
+verify.expect(t.selected_province ~= 0 and t.has_selection,
+              "C1b the injected click selected the TILE and mirrored its province")
+verify.capture("click_injection_01_clicked_tile")
 
 local pid_click = t.selected_province
 
--- ORDER MATTERS (NR-504, 2026-08-22): C3/C4 run IMMEDIATELY after C1, before
--- C2's clear_selection()/select_province() teardown. Repeat-click detection keys
--- on the previous CLICK, so a programmatic re-select in between made C3's press
--- read as a FIRST click and re-select the province. Do not reorder these back.
--- C3 — a SECOND press on the same tile cycles the rung (BL-511's UNIT >
--- PROVINCE > BUILDING > TILE walk). This is the real evidence that press number
--- two is a distinct press and not a repaint: a fresh click would re-select the
--- province, a repeat click steps past it to the bare tile.
-local p = verify.tile_screen(COL, ROW)
-verify.expect(p.ok, "C3a tile_screen resolved the tile's screen centre")
-verify.click(p.x, p.y)
+-- C2 — the click AGREES with the shortcut it stands in for. verify.select_province
+-- writes the state a click is supposed to produce; if the two disagree, one of
+-- them is lying about the gesture, and nothing else could tell which. The hook
+-- FOLLOWS the gesture since BL-598: it selects the tile and returns the province
+-- id, rather than writing a province-only tuple no player can reach.
+verify.clear_selection()
+local pid_direct = verify.select_province(COL, ROW)
+local d = verify.pointer_target()
+verify.expect(pid_click == pid_direct,
+              string.format("C2a injected click and select_province agree (%d vs %d)",
+                            pid_click, pid_direct))
+verify.expect(d.selected_province == pid_direct and d.has_selection,
+              "C2b select_province leaves the same tuple the click does")
+
+-- C3 — a SECOND press on the same tile cycles the rung. This is the real
+-- evidence that press number two is a distinct press and not a repaint.
+--
+-- IT HAS TO BE A BUILT TILE. The cycle is BATTLE > UNIT > BUILDING > TILE since
+-- BL-598 dissolved the province rung, so on bare ground exactly ONE rung is live
+-- and a repeat click honestly re-selects the same tile — no observable advance,
+-- and nothing for this check to read. A tile carrying a building has two live
+-- rungs, and the two are told apart by `selected_province`: the BUILDING rung
+-- clears the mirror (a building card has no province section), the TILE rung
+-- carries it. Zero vs non-zero is the whole assertion.
+local built = nil
+for _, b in ipairs(verify.buildings()) do built = b; break end
+verify.expect(built ~= nil, "C3a a building exists on the home body to cycle on")
+
+verify.click_tile(built.x, built.y)          -- first press: the building marker
+t = verify.pointer_target()
+print(string.format("C3 first press on a built tile: province=%d has_entity=%s",
+                    t.selected_province, tostring(t.has_selection)))
+verify.expect(t.selected_province == 0 and t.has_selection,
+              "C3b the first press resolved the BUILDING marker (no province mirror)")
+
+local bp = verify.tile_screen(built.x, built.y)
+verify.expect(bp.ok, "C3c tile_screen resolved the built tile's screen centre")
+verify.click(bp.x, bp.y)                     -- second press: advance to the tile
 t = verify.pointer_target()
 print(string.format("C3 after repeat click: province=%d has_entity=%s",
                     t.selected_province, tostring(t.has_selection)))
-verify.expect(t.selected_province == 0 and t.has_selection,
-              "C3b the repeat click advanced the selection cycle off the province")
+verify.expect(t.selected_province ~= 0 and t.has_selection,
+              "C3d the repeat click advanced the cycle from building to tile")
 verify.capture("click_injection_02_cycle_advanced")
 
--- C4 — double_click delivers TWO presses, not one. Only province and tile are
--- live rungs on plain ground, so two advances return to the rung we are already
--- on: after this the selection must still be the bare tile. One press would have
--- landed on the province, so this distinguishes the two.
-verify.double_click(p.x, p.y)
+-- C4 — double_click delivers TWO presses, not one. From the tile rung two
+-- advances wrap past the dead battle and unit rungs to the BUILDING and then on
+-- to the TILE again, so the mirror must be non-zero after it. One press would
+-- have left it on the building with the mirror cleared, so this distinguishes
+-- the two.
+verify.double_click(bp.x, bp.y)
 t = verify.pointer_target()
 print(string.format("C4 after double click: province=%d has_entity=%s",
                     t.selected_province, tostring(t.has_selection)))
-verify.expect(t.selected_province == 0 and t.has_selection,
+verify.expect(t.selected_province ~= 0 and t.has_selection,
               "C4 double_click pressed twice (two rung advances, not one)")
 verify.capture("click_injection_03_double_click")
 
--- C2 — the click AGREES with the shortcut it replaces. verify.select_province
--- writes the state a click is supposed to produce; if the two disagree, one of
--- them is lying about the gesture, and until now nothing could tell which.
-verify.clear_selection()
-local pid_direct = verify.select_province(COL, ROW)
-verify.expect(pid_click == pid_direct,
-              string.format("C2 injected click and select_province agree (%d vs %d)",
-                            pid_click, pid_direct))
-
+local p = bp
 
 -- C5 — HOVER through the same seam. The pointer is placed and then DWELLS by
 -- frame count: the glance card appears at 30 frames and sticks at 150 (the fixed

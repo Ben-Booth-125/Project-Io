@@ -23,8 +23,8 @@ Every `scripts/verify/*.lua` (except `lib.lua`) is a runnable check — the list
 **auto-discovered** from the directory, so a newly committed script is available
 without editing this file. The lens / canvas / panel checks form the bulk
 (`corporation_lens`, `country_lens`, `market_lens`, `population_lens`,
-`resource_lens`, `scarcity_lens`, `supply_lens`, `opportunity_lens`,
-`production_lens`; `building_management`, `construction_panel`, `selection_go_to`,
+`resource_lens`, `scarcity_lens`, `supply_lens`;
+`building_management`, `construction_panel`, `selection_go_to`,
 the ledger checks, …). v0.0.8 (Discovery & Intelligence) additions, named here per
 the "authorising a new check = naming it" convention:
 
@@ -251,3 +251,41 @@ runs capture-only.
 
   **Not yet run** — authored 2026-08-21 in a container with no SDL3, so it awaits a
   Windows/Linux-with-SDL run plus the live click the standing rule requires.
+
+## The shell pass (2026-08-24)
+
+**`shell_pass.lua`** — the ubiquitous-chrome review: profile tile, header strip, time panel, nav
+rail and its tooltip, comms dock, Selection band in three kinds, minimap at each rung of the
+ladder, the lens region, the hover card, the launch screen, the in-session system menu, and each
+of the thirteen rail ledgers. 30 captures from one world. (The band's fourth kind was the
+**province**; BL-598 folded it into the tile element as accordion sections, so the two captures
+would have been the same picture. `selection_accordion.lua` is where that element is checked.) It is a **design review, not a gate** —
+no goldens, and its only assertion is the clipping ledger's.
+
+Two things about it are worth copying, and one is worth not copying.
+
+- **It stages its own world** via `stage_ui_fixture()` in `lib.lua` — twelve econ ticks so every
+  trend has a shape, plus mercenary contracts staged into all three Contracts views so no tab is
+  empty by accident. A capture of an empty surface records what the surface looks like empty,
+  which is the one state a layout review must not be conducted in.
+- **It refuses to fall back.** If it cannot reach the state it needs, it stops rather than
+  capturing a world it did not intend.
+- **Do not copy the load.** `ui_shell_fixture.lua` writes a snapshot and captures both sides of
+  the round trip, and that pair is the evidence that opening one is *not* equivalent to staging
+  one: the canvas comes back dimmed (the day-tick mirror is re-seeded from a sim loop
+  `verify.econ_step` never advanced, so the activity fog ages everything as stale — NR-608) and
+  the comms dock comes back empty (the chat log is not in the save envelope — NR-609). Until those
+  are ruled on, stage rather than load.
+
+**What it found the first time it ran**, as the argument for pointing a capture pass at surfaces
+nobody has scripted: nav slot 8 had no `show_panel` name, so no script could ever open it — and it
+draws its corporation-name column about ten pixels wide, one letter per row. The in-session system
+menu had no hook either. Both hooks exist now. The rule the battle-card check states — *a surface
+with no reachable path from a script is a surface nobody has looked at* — held again.
+
+**A caveat on this check's own verdict.** `expect_no_clipping` came back `0 record(s)` over all 31
+frames, and the Corporation dashboard in those very frames truncates a roll-up row mid-word. The
+overflow ledger only sees text routed through `ui::text_fit`, which is draw-list text; the ~524
+`ImGui::Text*` sites in `src/ui` are clipped by ImGui and are invisible to it. Read a green
+clipping verdict as "no measured draw-list container overflowed", never as "the shell does not
+clip" (NR-614).

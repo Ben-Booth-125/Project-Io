@@ -96,6 +96,7 @@ Verdict provenance — the 2026-08-24 design form: shape A over B/C/D (B’s pri
 | P1 | The province becomes a thing you can see, and then a thing worth seeing | Closed 2026-08-21 — done_when met, then overshot by five items; owed: nothing was rendered |
 | N1 | The two spines, landed inert | Closed 2026-08-23 — all three landed inert; two of the three were UNSOUND and were fixed in the closing pass (NR-546, NR-547) |
 | N2 | The spines move | Closed — three lanes merged; one lane’s interpretation withdrawn after adversarial verification (NR-554) |
+| 17b | The shell stops fighting the map | Closed 2026-08-24 — goal met. All nine items; 93 scripts / 4 failures, all four pre-existing (NR-606). Four doc fictions found, one fixed |
 | 26 | Re-baseline (the gate; nothing else may open first) | Subsumed — split at execution into 26a/26b, themselves deleted in the 2026-08-24 purge |
 | 18 | Logistic Points land with their consumers | Open 2026-08-24 — ALL EIGHT landed (BL-596..BL-603); two live clicks owed. Cuts v0.1.18 |
 
@@ -103,4 +104,4 @@ Verdict provenance — the 2026-08-24 design form: shape A over B/C/D (B’s pri
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*29 sprints archived cold; 1 open/gated in the hot store.*
+*30 sprints archived cold; 1 open/gated in the hot store.*

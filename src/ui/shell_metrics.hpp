@@ -41,27 +41,31 @@ inline constexpr float shell_margin = 8.0f;
 /// the time panel was sized to match it so the right edge stays aligned.
 float right_chrome_width(ImVec2 disp);
 
-/// Left edge (px) of the right chrome column — `disp.x - shell_margin -
-/// right_chrome_width(disp)`. This is the **clearance** edge: everything to its left
-/// (header, Selection band, system gear) stops here.
+/// Left edge (px) of the right chrome column — `disp.x - right_chrome_width(disp)`.
+/// This is the **clearance** edge: everything to its left (header, Selection band,
+/// system gear) stops here.
 ///
-/// The **minimap alone** is flush to the screen edge inside this column (BL-312,
-/// Ben 2026-08-06: "wrap the minimap to the full edges of the canvas"), so it is
-/// `shell_margin` wider than the column's other occupants and starts
-/// `shell_margin` to the RIGHT of this edge. Ask `minimap_rect` for it rather than
-/// assuming the two agree — that mismatch is the drift this module was written for.
+/// The column is **flush to the right screen edge** (BL-599/BL-600, Ben 2026-08-24:
+/// "Minimap needs to touch the edges of the screen, rather than popping out a bit…
+/// Time controls need to touch the edges of the screen too"). It previously
+/// subtracted a `shell_margin` that the minimap alone did not, so the column and its
+/// own foot disagreed by one margin and live canvas showed through the seam. Every
+/// occupant now shares this edge — ask for a rect rather than assuming, which is
+/// still the rule this module exists for.
 float right_chrome_left(ImVec2 disp);
 
-/// The minimap box, bottom-right. Flush to the right screen edge (BL-312); the
-/// BOTTOM keeps its margin deliberately, because `selection_band_height` is
-/// `minimap_height + chrome_margin` precisely so the bottom strip's top edge lands
-/// on this rect's top edge. Flushing the bottom too would drop the minimap below the
-/// strip and break the "one band across the full width" alignment.
+/// The minimap box, bottom-right. Flush right (BL-312) and flush **bottom**
+/// (BL-599). Its height is `selection_band_height`, not `minimap_height`: the old
+/// bottom margin is absorbed into the box rather than left under it, so the box
+/// reaches the screen foot while its TOP edge stays exactly where the bottom strip's
+/// top edge lands. That alignment is what makes the screen's foot read as one band,
+/// and it is the reason the margin is absorbed rather than simply dropped.
 shell_rect minimap_rect(ImVec2 disp);
 
-/// The time panel, top-right — the head of the right chrome column. Height is
-/// content-derived (container 5, LAYOUT.md), so the caller measures it and passes it
-/// in; only the x/width/margin algebra belongs here.
+/// The time panel, top-right — the head of the right chrome column. Flush to the top
+/// and right screen edges (BL-600), which is the edge the profile tile and header
+/// already sat on. Height is content-derived (container 5, LAYOUT.md), so the caller
+/// measures it and passes it in; only the x/width/margin algebra belongs here.
 shell_rect time_panel_rect(ImVec2 disp, float time_h);
 
 /// Total horizontal budget (px) of the screen's **bottom strip** — the run the comms
@@ -78,6 +82,40 @@ float bottom_band_budget(ImVec2 disp);
 /// no internal gutter, and introducing the shell's only gap here would read as a
 /// mistake. Height and top edge are `selection_band_height`'s, shared with the dock.
 shell_rect selection_band_rect(ImVec2 disp);
+
+/// **The lens chrome region** (BL-602) — the ONE home for everything a lens puts
+/// on screen beside the canvas: the shared resource/good combo and whichever key the
+/// active lens draws. Ben, 2026-08-24: *"This selection element for lenses should
+/// always fit in the header for the minimap, at the top right corner."*
+///
+/// There were two homes before, and one of them was invisible. Count-driven keys sat
+/// in the right chrome column pinned under the time panel; fixed-height gradient keys
+/// sat flush-LEFT of the minimap, vertically centred — inside the rect the always-open
+/// Selection band occupies, so six of the seven rendered as ghosts through the band at
+/// roughly a tenth of their contrast (NR-601). Only the Continent key escaped, by
+/// drawing on the foreground list (BL-376): one of seven fixed, the collision never
+/// generalised. Moving every key here fixes the *placement*, which is what the z-order
+/// patch was standing in for.
+///
+/// The rect is anchored to the minimap's **top-right corner**: same x and width as
+/// `minimap_rect` (so it is flush to the right screen edge and reads as one stack of
+/// chrome with the minimap), **bottom edge on the minimap's top edge**, growing
+/// **upward** into the column's otherwise-unused space and ceilinged one margin below
+/// the time panel's foot.
+///
+/// Bottom-anchored, not top-anchored, and that is load-bearing. A box that grows
+/// upward from a fixed top takes its own header — and therefore its toggle — with it:
+/// opening the list moved the control ~320 px up the screen and a second press at the
+/// same point landed on the canvas instead of closing it, so the toggle worked exactly
+/// once. Anchoring the bottom keeps the header on the minimap's edge whether the
+/// region is open or shut, so open/close is one repeatable press in one place.
+///
+/// @param time_h  Measured time-panel height (`ui_state::time_panel_h`). 0 on the
+///                first frame before that panel has drawn; the ceiling then falls back
+///                to one margin from the screen top rather than to zero.
+/// @param want_h  Height the active lens's content asks for. The result is capped to
+///                the space between the ceiling and the minimap, never beyond it.
+shell_rect lens_chrome_rect(ImVec2 disp, float time_h, float want_h);
 
 /// The **freed centre-right slot** (BL-216) — the exact rect the comms log vacated
 /// when BL-227 moved it to the bottom strip, now the home of the pinned-items watch

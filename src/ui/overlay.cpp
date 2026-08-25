@@ -20,12 +20,9 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
     {
         case overlay_mode::supply:      icons::supply     (dl, centre, r, colour); break;
         case overlay_mode::market:      icons::market     (dl, centre, r, colour); break;
-        case overlay_mode::country:     icons::country    (dl, centre, r, colour); break;
         case overlay_mode::corporation: icons::corporation(dl, centre, r, colour); break;
         case overlay_mode::resource:    icons::resource   (dl, centre, r, colour); break;
         case overlay_mode::population:  icons::population (dl, centre, r, colour); break;
-        case overlay_mode::opportunity: icons::opportunity(dl, centre, r, colour); break;
-        case overlay_mode::production:  icons::production (dl, centre, r, colour); break;
         case overlay_mode::scarcity:    icons::scarcity   (dl, centre, r, colour); break;
         case overlay_mode::industry:    icons::industry   (dl, centre, r, colour); break;
         case overlay_mode::continent:   icons::continent  (dl, centre, r, colour); break;
@@ -50,12 +47,9 @@ const char* overlay_mode_name(overlay_mode m)
     {
         case overlay_mode::supply:      return "Supply routes";
         case overlay_mode::market:      return "Market catchment boundaries";
-        case overlay_mode::country:     return "Countries";
         case overlay_mode::corporation: return "Corporation ownership";
         case overlay_mode::resource:    return "Resource deposits";
         case overlay_mode::population:  return "Workforce efficiency";
-        case overlay_mode::opportunity: return "Opportunity";
-        case overlay_mode::production:  return "Production intensity";
         case overlay_mode::scarcity:    return "Market scarcity";
         case overlay_mode::industry:    return "Industry density";
         case overlay_mode::continent:   return "Continents (tectonic plates)";
@@ -72,12 +66,9 @@ const char* overlay_mode_short_name(overlay_mode m)
     {
         case overlay_mode::supply:      return "Supply";
         case overlay_mode::market:      return "Market";
-        case overlay_mode::country:     return "Country";
         case overlay_mode::corporation: return "Corp";
         case overlay_mode::resource:    return "Resource";
         case overlay_mode::population:  return "Population";
-        case overlay_mode::opportunity: return "Opportunity";
-        case overlay_mode::production:  return "Production";
         case overlay_mode::scarcity:    return "Scarcity";
         case overlay_mode::industry:    return "Industry";
         case overlay_mode::continent:   return "Continent";
@@ -95,20 +86,27 @@ void toggle_overlay(ui_state& ui, overlay_mode m)
 
 void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
 {
-    // The seven on-screen lenses, in settled order (BL-013, trimmed BL-093):
-    // Corp → Country → Resource → Market → Population → Opportunity → Production.
+    // The on-screen lenses, in settled order (BL-013, trimmed BL-093, then twice
+    // more in one sprint — BL-604 retired Opportunity and Production, BL-601
+    // retired Country):
+    // Corp → Resource → Market → Population → Continent.
     // Scarcity and Industry are keyboard-cycle only (like Supply); Reach and
     // Supply-routes (BL-011/BL-014) join them off-strip too — they do not fit
     // the 240 px minimap bar this row now lives on. Single-select with a null state:
     // clicking the active lens clears to overlay_mode::none (toggle_overlay).
-    // BL-226 adds Continent as the eighth. It earns a strip slot rather than the
-    // keyboard-only shelf because it answers a question the player asks at first
-    // sight of a body ("why is the land shaped like that?"), which is exactly the
-    // moment they are looking at the strip.
-    constexpr overlay_mode modes[8] = {
-        overlay_mode::corporation, overlay_mode::country, overlay_mode::resource,
-        overlay_mode::market, overlay_mode::population, overlay_mode::opportunity,
-        overlay_mode::production, overlay_mode::continent };
+    // Continent earns a strip slot rather than the keyboard-only shelf because it
+    // answers a question the player asks at first sight of a body ("why is the land
+    // shaped like that?"), which is exactly the moment they are looking at the strip.
+    //
+    // Three retirements in one sprint, and the array extent is DEDUCED rather than
+    // written — which is what keeps a trim from leaving a stale literal behind.
+    // BL-604 dropped Opportunity and Production (per-tile value surfaces Ben cut);
+    // BL-601 dropped Country, whose content is always-on border chrome now, so the
+    // lens had nothing left to toggle. The strip re-numbers itself; no slot is held
+    // open for a retired lens.
+    constexpr overlay_mode modes[] = {
+        overlay_mode::corporation, overlay_mode::resource,
+        overlay_mode::market, overlay_mode::population, overlay_mode::continent };
 
     const float bar_h = ImGui::GetFrameHeight() + 6.0f;
     ImGui::SetNextWindowPos({x, top_y}, ImGuiCond_Always);

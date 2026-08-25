@@ -2,6 +2,7 @@
   "_schema": "backlog/io-v2",
   "_note": [
     "PURGED 2026-08-24 (Sprint 16 closed, v0.1.15 tagged): the ten Sprint 16 items are snapshotted verbatim in archive/backlog-purged-2026-08-24.json and are NOT open work. The hot file now holds only BL-595 (designed, no sprint yet) -- author the next sprint's items fresh against the authority docs when one is picked. File nothing here that the open sprint does not need. Ids never reuse.",
+    "SECOND ARCHIVE PASS, 2026-08-24: Sprint 16 (BL-569..BL-578) and Sprint 17b (BL-596..BL-604) both closed on this date, and their nineteen completed items moved to archive/backlog-complete-2026-08-24.json. The hot file is EMPTY, which is the resting state this convention intends between sprints — the next sprint's items are authored fresh against the authority docs rather than inherited. (Sprint 17's own eleven items are RETAINED here by the merge of 2026-08-24: that sprint closed under the other reading of this note, with prose archived and metadata kept, and this merge does not re-archive another session's bookkeeping.)",
     "Canonical backlog for Project Io — the authoritative METADATA index of every backlog item.",
     "One item = one object in `items`.",
     "",
