@@ -230,6 +230,18 @@ in `tools/verify/README.md`.
   `corp_ai.cpp`/`corp_command.cpp`/`construction.cpp`/`survey_system.cpp`/
   `supply_system.cpp`/`building_profit.cpp`. CMake target `ai_skill_harness`
   (picked up by the generic glob below — no CMakeLists entry needed).
+- **`stratum_gate_harness`** — Stratum placement gates (BL-615, POPULATION.md § Strata gate
+  buildings): the `placement_gate` axis through `can_place_in_world`, driven by authored data on
+  the building definition (per-type in `building_economics`, per-recipe radius for the heavy
+  processor class), never a building-name switch. Rows: a university (min_centre_scale 4) refused
+  on open land (`needs_centre`) and on a Town (`centre_too_small` — the two refusals distinct); a
+  schooling building refused outside any centre and placed on the smallest; a heavy processor
+  refused beyond its `centre_proximity_radius` (`far_from_centre`), placed within/at it, and the
+  radius wrapping the east-west cylinder; the default (empty) gate gating nothing, so every
+  pre-BL-615 call site is unchanged; `recipe_registry::placement_gate_for` resolving the
+  per-named-building gate (recipe radius overrides the type's); `construct_building` enforcing
+  the gate itself (the authoritative seam — no caller passes it by hand); and replay determinism.
+  Links the world superset — `node tools/verify/build_harness.js stratum_gate_harness --run`.
 - **`continents_harness`** — Continents/Drift (BL-210 first slice): the plate-drift
   sibling pass. Determinism (R1 — same seed identical, different seed different);
   mobile-lid plate count lands in [4,10] (R2); the stagnant-lid special case is one

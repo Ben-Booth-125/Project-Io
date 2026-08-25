@@ -46,6 +46,9 @@ enum class placement_reason : uint8_t
     out_of_logistics_range, ///< BL-323 S2: too far from any city / port / logistics hub to be supplied.
     tech_locked,       ///< BL-344: the corporation has not earned the tech that unlocks this type.
     province_full,     ///< BL-513: the province is at the total-buildings ceiling its land sustains.
+    needs_centre,      ///< BL-615: this building must stand ON a population-centre tile.
+    centre_too_small,  ///< BL-615: the hosting centre is below the building's required stratum.
+    far_from_centre,   ///< BL-615: no population centre within the building's proximity radius.
 };
 
 /// Human-readable one-line explanation for a placement reason, for surfacing on
@@ -227,10 +230,21 @@ bool is_coastal(const world& w, entity_id tile_id);
 ///                   describes a TILE has no corp to ask about, while a check
 ///                   that gates an ACTION does. When set, a type gated behind an
 ///                   unearned tech is refused with `tech_locked`.
+/// @param gate       BL-615 stratum placement gate (POPULATION.md § Strata gate
+///                   buildings) for the SPECIFIC named building being placed —
+///                   resolve it with `recipe_registry::placement_gate_for`. The
+///                   default gates nothing, so every pre-existing call site
+///                   keeps its old meaning; only callers with registry access
+///                   (construct_building, the authoritative seam) enforce it.
+///                   Refusals: `needs_centre` (no population centre on the
+///                   tile), `centre_too_small` (a centre, but below
+///                   `min_centre_scale`), `far_from_centre` (no centre within
+///                   `centre_proximity_radius` grid steps on this body).
 placement_result can_place_in_world(const world& w, entity_id tile_id,
                                     building_type type, resource_type target,
                                     float max_reach = -1.0f,
-                                    entity_id corp = null_entity);
+                                    entity_id corp = null_entity,
+                                    placement_gate gate = {});
 
 // ---------------------------------------------------------------------------
 // Building stacks (Ben's 2026-07-22 call: "buildings can be stacked, so you can

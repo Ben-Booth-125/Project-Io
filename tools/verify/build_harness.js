@@ -34,8 +34,13 @@ const os = require('os');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORLD = path.join(ROOT, 'src', 'world');
 
-// The four sol2/Lua TUs io_world_obj excludes. Mirrored from CMakeLists.
-const LUA_TUS = new Set(['recipe_registry', 'works_registry', 'tech_tree', 'world_gen_config']);
+// The sol2/Lua TUs io_world_obj excludes. Mirrored from CMakeLists (its
+// list(FILTER ... EXCLUDE REGEX ...) line is the authority — keep in step).
+// contract_template joined the exclusion with BL-570; this mirror had not
+// followed, so every worktree-agent build failed on sol/sol.hpp (fixed with
+// BL-615's slice, 2026-08-25).
+const LUA_TUS = new Set(['recipe_registry', 'works_registry', 'tech_tree', 'world_gen_config',
+                         'contract_template']);
 
 // Harnesses that genuinely need a live Lua state, and so cannot be built here.
 // CMakeLists declares each of these explicitly with lua54 linked; see its comments.

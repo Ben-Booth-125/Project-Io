@@ -97,6 +97,15 @@ processors (the steel-mill class) must sit **near** a population centre rather t
 country. The gate is a placement rule (`placement_rules::can_place` is the seam), not a recipe
 property — it is about where the workforce lives, not what the building does.
 
+The gate is **authored data on the building definition**, never a building-name switch: a
+`placement_gate` of three fields — `requires_centre` (must stand on a centre's tile),
+`min_centre_scale` (the hosting centre's minimum stratum, 1–5), `centre_proximity_radius` (must
+stand within this grid distance of some centre; the heavy-processor field, carried per recipe
+since a recipe is the named-building identity for processing). Each axis refuses with its own
+reason code (`needs_centre` / `centre_too_small` / `far_from_centre`), so the build door can
+teach which condition is unmet rather than greying the row. The proximity radius is a balance
+target, not a commitment; the ladder positions (university at City+) are the design decision.
+
 ### Growth, decline and razing
 
 A centre **promotes up the ladder when preconditions are met** (Ben, 2026-08-25; BL-616, centre

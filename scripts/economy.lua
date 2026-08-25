@@ -245,6 +245,40 @@ economy = {
             build_duration_ticks = 4.0,
             resource_costs = { steel = 35.0 },
         },
+        -- BL-615: Schooling — the education building any settlement can host.
+        -- Same passive shape as research_institute (base_rate 0, staffs at
+        -- zero); its qualification-raising effect is a separate seam
+        -- (POPULATION.md § Qualification), not authored here. Priced at the
+        -- port's grade — a civic building, not a garrison installation — and
+        -- costed in timber/stone so the SAME basket is obtainable in both era
+        -- bands (a steel line here would be BL-590's ancient-arc anachronism
+        -- over again). PLACEMENT is what defines it: requires_centre, any
+        -- stratum (POPULATION.md § Strata gate buildings).
+        schooling = {
+            base_rate   = 0.0,
+            maintenance = 8.0,
+            base_wage   = 6.0,
+            build_cost  = 150.0,
+            build_duration_ticks = 3.0,
+            resource_costs = { timber = 12.0, stone = 8.0 },
+            requires_centre = true,
+        },
+        -- BL-615: University — the schooling building's City-tier sibling:
+        -- "you can't build a university in a town" (Ben, 2026-08-25).
+        -- min_centre_scale 4 = City on the Outpost(1)..Metropolis(5) ladder.
+        -- Dearer than a research_institute (a campus, not one institute),
+        -- cheaper than a launchpad; stone-heavy for the same both-bands
+        -- reason as the schooling basket.
+        university = {
+            base_rate   = 0.0,
+            maintenance = 18.0,
+            base_wage   = 12.0,
+            build_cost  = 400.0,
+            build_duration_ticks = 5.0,
+            resource_costs = { stone = 30.0, timber = 12.0 },
+            requires_centre  = true,
+            min_centre_scale = 4,
+        },
     },
 
     -- BL-332: research accumulation rate. Flat per-tick credit to the owning

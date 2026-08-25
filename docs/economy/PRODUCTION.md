@@ -370,7 +370,18 @@ Infrastructure buildings affect logistical or economic capacity rather than extr
 | Inland Logistics Hub | Land-mode logistics node (`building_type::inland_logistics_hub`, BL-149): its tile joins the population-centre set that discounts the A\* haul cost of any intra-body convoy routed through it (LOGISTICS.md). The player-placeable counterpart to a city's free-hub discount — extends the cheap land network out to remote sites. Produces nothing (0 workforce); cost in `economy.buildings.inland_logistics_hub`. | 0 |
 | Military Base | Unit muster building (`building_type::military_base`, BL-325). Produces nothing, staffs at zero, and is deliberately **not** a supply anchor — military reach IS the economic reach field. `docs/military/MILITARY.md`. | any |
 | Research Institute | The "how does tech get done" building (`building_type::research_institute`, BL-332). Passive: a flat per-tick credit to its owner's `corporation_component::science`, a market-invisible accumulator, not a resource. | any |
+| Schooling | Education building any settlement can host (`building_type::schooling`, BL-615 — stratum placement gates). Passive like the Research Institute; its qualification-raising effect belongs to POPULATION.md § Qualification. Placement is what defines it: it must stand **in** a population centre, of any stratum (POPULATION.md § Strata gate buildings). | any |
+| University | The Schooling building's City-tier sibling (`building_type::university`, BL-615). Passive; must stand in a centre of stratum **City (4) or above** — "you can't build a university in a town" (Ben, 2026-08-25). | any |
 | Orbital Port | Receives off-world convoys; required on any non-terrestrial body to accept supply | 1 |
+
+**Stratum placement gates are authored data, not code** (BL-615, stratum placement gates;
+POPULATION.md § Strata gate buildings owns the design). A building definition carries a
+`placement_gate` — `requires_centre`, `min_centre_scale`, `centre_proximity_radius` — authored
+per type in `economy.lua` and, for processing, per recipe in `recipes.lua`: the heavy
+processor class (the steel-mill recipes) carries a small proximity radius, so a mill must sit
+near a settlement's workforce while a miller need not. `placement_rules::can_place_in_world`
+reads the gate generically and refuses with a distinct reason per axis (`needs_centre`,
+`centre_too_small`, `far_from_centre`).
 
 The Orbital Port is design vocabulary with no enum value. Storage capacity and per-node
 throughput are **Logistic Points** — `docs/economy/LOGISTICS.md` § Logistic Points (BL-464):

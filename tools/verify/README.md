@@ -279,6 +279,16 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\supply_advance.cpp ^
 :: Easiest via the one-line builder (needs the world-superset TU set):
 ::   node tools/verify/build_harness.js sea_port_gate --run
 
+:: Stratum placement gates (BL-615, POPULATION.md § Strata gate buildings):
+:: can_place_in_world's placement_gate axis — university refused below a City
+:: centre (needs_centre / centre_too_small distinct), schooling refused outside
+:: any centre, a heavy processor recipe refused beyond its authored
+:: centre_proximity_radius (far_from_centre, cylinder-wrapped), the empty gate
+:: gating nothing, recipe_registry::placement_gate_for's per-named-building
+:: resolution, and construct_building enforcing the gate itself.
+:: Needs the world-superset TU set — use the one-line builder:
+::   node tools/verify/build_harness.js stratum_gate_harness --run
+
 :: Population MVP + workforce-pool step 2 — population centres on Kepler (R3),
 :: agricultural demand from pop (R4), agglomeration workforce contention (R5 / BL-042 R1).
 :: Also covers population-dynamic R2 (hab scalar) and R3 (growth level-up).

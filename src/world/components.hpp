@@ -415,6 +415,15 @@ enum class building_type : uint8_t
                              ///< its output is a flat per-tick credit to its owning corp's
                              ///< `corporation_component::science`, a market-invisible accumulator,
                              ///< not a resource_type. See economy_system.cpp's capability-points pass.
+    schooling           = 8, ///< BL-615: passive education building (same shape as research_institute:
+                             ///< produces nothing tradeable, staffs at zero). PASSIVE for now — its
+                             ///< qualification-raising effect is a separate seam (POPULATION.md
+                             ///< § Qualification). Placement-gated: must stand IN a population
+                             ///< centre of any stratum (placement_gate, POPULATION.md § Strata
+                             ///< gate buildings).
+    university          = 9, ///< BL-615: the schooling building's City-tier sibling. Same passive
+                             ///< shape; placement-gated to a centre of stratum City (4) or above —
+                             ///< "you can't build a university in a town" (Ben, 2026-08-25).
 };
 
 /// One past the last building type — the wire parser's range gate (BL-396:
@@ -424,7 +433,29 @@ enum class building_type : uint8_t
 /// enum's tail, the same way resource_count derives from resource_type::count:
 /// appending a type means moving this with it.
 static constexpr uint8_t building_type_count =
-    static_cast<uint8_t>(building_type::research_institute) + 1;
+    static_cast<uint8_t>(building_type::university) + 1;
+
+/// BL-615 stratum placement gates (docs/economy/POPULATION.md § Strata gate
+/// buildings): which relationship to the population-centre scale ladder a
+/// building's SITE must hold. Authored DATA on the building definition —
+/// per-type in `building_economics` (scripts/economy.lua), with a per-recipe
+/// radius override for processing facilities (scripts/recipes.lua) — and read
+/// generically by `placement_rules::can_place_in_world`; never a
+/// building-name switch in logic. A default-constructed gate gates nothing,
+/// so every pre-BL-615 call site and hand-built harness registry is unchanged.
+struct placement_gate
+{
+    /// The building must stand ON a tile hosting a population centre.
+    bool requires_centre = false;
+    /// The hosting centre must be at least this stratum (1–5, the
+    /// Outpost→Metropolis scale ladder). 0 = no minimum. A non-zero minimum
+    /// implies the centre requirement (a tile with no centre has no stratum).
+    int min_centre_scale = 0;
+    /// The building must stand within this grid distance of SOME population
+    /// centre on the same body (wrapped squared-grid-distance metric, the
+    /// codebase's standard proximity measure). 0 = ungated.
+    int centre_proximity_radius = 0;
+};
 
 /// Sentinel `building_component.recipe` value meaning "no processing recipe is
 /// assigned" — used by extraction sites and unconfigured processors. The recipe

@@ -47,6 +47,13 @@ recipes = {
         group   = "Metal Foundry", -- BL-434
         inputs  = { iron_ore = 2.0, coal = 1.0 },
         outputs = { steel = 1.0 },
+        -- BL-615: the heavy processor class — a steel mill must sit NEAR a
+        -- population centre ("you can't build a steel mill far from a
+        -- population centre", Ben, 2026-08-25). 6 grid steps: a quarter of
+        -- the 24-cost logistics reach budget over plains, so the mill rule
+        -- binds visibly tighter than reach without demanding co-location —
+        -- POPULATION.md § Strata gate buildings.
+        centre_proximity_radius = 6,
     },
 
     -- id 1 — Refinery: petroleum -> refined fuel.
@@ -89,6 +96,7 @@ recipes = {
         group   = "Metal Foundry", -- BL-434
         inputs  = { iron_nickel_ore = 2.0 },
         outputs = { steel = 1.0 },
+        centre_proximity_radius = 6, -- BL-615: heavy processor class — see the steel recipe's note.
     },
 
     -- id 5 — Chemical Plant, ATMOSPHERE route (BL-308, Era 0). PRODUCTION.md
@@ -528,6 +536,7 @@ recipes = {
         group        = "Metal Foundry", -- BL-434, with the Smelter and its siblings
         inputs       = { iron_ore = 1.5, coal = 0.5, machinery = 0.15 },
         outputs      = { steel = 1.0 },
+        centre_proximity_radius = 6, -- BL-615: heavy processor class — see the steel recipe's note.
     },
 
     -- =====================================================================

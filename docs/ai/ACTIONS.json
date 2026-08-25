@@ -57,7 +57,7 @@
         {
           "name": "type",
           "type": "building_type",
-          "meaning": "Which building — extraction_site, processing_facility, port, launchpad, inland_logistics_hub, military_base. Set by which row is pressed."
+          "meaning": "Which building — extraction_site, processing_facility, port, launchpad, inland_logistics_hub, military_base, research_institute, schooling, university. Set by which row is pressed. Schooling and university (BL-615) are passive education buildings with no ledger row yet; the seam accepts them and the stratum gate below decides where they may stand."
         },
         {
           "name": "target",
@@ -75,6 +75,7 @@
         "The tile entity exists (rejected_invalid otherwise).",
         "A stated recipe (anything but no_recipe) requires type = processing_facility AND an id the recipe registry resolves (rejected_invalid otherwise, checked before placement — BL-388).",
         "placement_rules::can_place_in_world accepts (type, target) on this tile — ocean, missing deposit, a port off the coast, or a full per-body slot cap (Launchpad: max 1 per body) all refuse (rejected_placement).",
+        "The BL-615 stratum gate accepts the SPECIFIC named building's authored placement_gate (POPULATION.md § Strata gate buildings): schooling must stand ON a population-centre tile (needs_centre otherwise), a university on a centre of stratum City (4)+ (centre_too_small below it), and a heavy processor recipe (the steel-mill class: steel, steel_from_iron_nickel, steel_bessemer) within 6 grid steps of some centre (far_from_centre beyond). All three surface as rejected_placement through the seam; the reason codes are distinct at the placement layer.",
         "The building type is UNLOCKED for the acting corporation (BL-344), AND, if a recipe is stated, that RECIPE is separately unlocked (BL-588). Two independent tech locks, shown two different ways. One building type is gated: military_base requires E0-ML-01 \"Standing Garrison Doctrine\" (2 extraction sites + Cr 2,000 balance) -- a locked STRUCTURE still appears as a row, showing \"Locked - the technology that permits this has not been researched\" in place of the Build button. Recipe-level gates (BL-588/BL-589) work differently: refined_copper requires E0-EC-03 (1 processing facility + Cr 400), the Toolmaker requires E0-EC-01 (1 processing facility + Cr 500), the Bessemer Converter requires E1-EC-01 (holding machinery in stockpile) -- a tech-locked RECIPE is filtered OUT of the ledger entirely (BL-593, 2026-08-24, Ben's ruling: \"the door not showing what the gate would refuse\", the same treatment era_locked and depth_locked already had), so it never appears as a row at all, locked or otherwise. Either way construct_building refuses with tech_locked, which the corp-command seam reports as rejected_tech_locked -- an agent driving construct_building/corp_command directly (rather than reading rows off the ledger) sees the SAME refusal code for both, since the door's filtering is a UI convenience, not a second gate.",
         "The corporation's balance covers the full capex: registry build_cost plus the material costs priced at the tile's local market (rejected_funds). The UI shows this one credit total and disables Build with 'Can't afford' when short."
       ],

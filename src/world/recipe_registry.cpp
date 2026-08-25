@@ -183,6 +183,15 @@ void recipe_registry::load_from_lua(lua_state& lua)
         // an empty string is not the fallback.
         r.group = entry->get_or<std::string>("group", "General");
 
+        // BL-615: per-recipe stratum-gate radius (the heavy processor class).
+        // Absent = 0 = ungated. A negative value is authored nonsense and is
+        // rejected at load rather than clamped — the same refuse-don't-coerce
+        // contract every other malformed-data path here holds.
+        r.centre_proximity_radius = entry->get_or("centre_proximity_radius", 0);
+        if (r.centre_proximity_radius < 0)
+            throw std::runtime_error("recipe_registry: recipe '" + r.name
+                                     + "' has a negative centre_proximity_radius");
+
         m_recipes.push_back(std::move(r));
     }
 
@@ -298,6 +307,8 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "inland_logistics_hub", building_type::inland_logistics_hub }, // BL-149
             { "military_base",        building_type::military_base },        // BL-325 S1
             { "research_institute",   building_type::research_institute },   // BL-332
+            { "schooling",            building_type::schooling },            // BL-615
+            { "university",           building_type::university },           // BL-615
         };
         for (const named_type& nt : types)
         {
@@ -321,6 +332,22 @@ void recipe_registry::load_from_lua(lua_state& lua)
                 read_resource_map(*rcosts, e.resource_build_cost,
                                   std::string("buildings.") + nt.key + ".resource_costs");
             e.era = read_era(*b, std::string("buildings.") + nt.key); // BL-433
+
+            // BL-615 stratum placement gate (POPULATION.md § Strata gate
+            // buildings). All three fields optional; the defaults gate nothing.
+            // Out-of-range values are REJECTED at load, never clamped — the
+            // scale ladder is 1..5, so a min_centre_scale outside [0,5] names
+            // a stratum that does not exist.
+            e.gate.requires_centre = b->get_or("requires_centre", false);
+            e.gate.min_centre_scale = b->get_or("min_centre_scale", 0);
+            if (e.gate.min_centre_scale < 0 || e.gate.min_centre_scale > 5)
+                throw std::runtime_error(std::string("recipe_registry: buildings.") + nt.key
+                                         + ".min_centre_scale is outside the 0-5 stratum ladder");
+            e.gate.centre_proximity_radius = b->get_or("centre_proximity_radius", 0);
+            if (e.gate.centre_proximity_radius < 0)
+                throw std::runtime_error(std::string("recipe_registry: buildings.") + nt.key
+                                         + ".centre_proximity_radius is negative");
+
             m_building_econ[static_cast<std::size_t>(nt.type)] = e;
 
             // BL-590: per-named-building material overrides, authored beside the

@@ -30,7 +30,13 @@ constexpr auto max_substrate  = terrain_substrate::coast;
 constexpr auto max_cover      = terrain_cover::urban;
 constexpr auto max_landform   = terrain_landform::rift;
 constexpr auto max_body_type  = body_type::star;
-constexpr auto max_building   = building_type::research_institute;
+constexpr auto max_building   = building_type::university; // BL-615: appended schooling/university.
+                                                           // A WIDENED range gate, not a format
+                                                           // change: no serialised array is sized
+                                                           // by building_type (unlike resource_
+                                                           // count), so every older stream still
+                                                           // reads — its values 0..7 sit inside
+                                                           // the new ceiling. No version bump.
 constexpr auto max_survey     = survey_phase::surveyed;
 constexpr auto max_convoy     = convoy_mode::space;
 constexpr auto max_focus      = industrial_focus::trade;
