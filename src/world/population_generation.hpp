@@ -18,6 +18,14 @@ struct settlement_state; // settlement.hpp — the Era -1 record the campaign pa
 /// site in population_generation.cpp for how the figure was arrived at).
 inline constexpr int k_land_tiles_per_centre = 410;
 
+/// Headcount in thousands for each scale level 1-5 — the scale->headcount
+/// mapping (docs/economy/POPULATION.md § Generation). Exported here (was
+/// file-local in population_generation.cpp) because BL-616 (centre promotion
+/// and decline) reads the same rungs in economy_system.cpp: a centre promotes
+/// when its population has held above the NEXT tier's rung, and demotes when
+/// it falls below its CURRENT tier's — one table, both consumers.
+inline constexpr int k_population_for_scale[5] = { 10, 50, 200, 1000, 5000 };
+
 /// URBAN heads per population centre on the CAMPAIGN path (BL-610, centres
 /// from demography). A living region's urban headcount (its simulated
 /// population times the urban share, population_generation.cpp

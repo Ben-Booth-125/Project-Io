@@ -114,6 +114,18 @@ int main()
     if (bid_building != null_entity)
         w.buildings.at(bid_building).wage_bid = 0.4375f;
 
+    // BL-616: decline rides `growth_accumulator` as a NEGATIVE consecutive-
+    // failure streak (no new persistent field, no version bump) — so make one
+    // centre's accumulator negative before the round trip: a reader that
+    // rejected or zero-clamped a negative streak would break byte-equality
+    // here. Lowest centre id, same discipline as the two fixtures above.
+    entity_id neg_centre = null_entity;
+    for (const auto& [cid, pcc] : w.population_centres)
+        if (neg_centre == null_entity || cid < neg_centre)
+            neg_centre = cid;
+    if (neg_centre != null_entity)
+        w.population_centres.at(neg_centre).growth_accumulator = -37;
+
     // -----------------------------------------------------------------------
     // P1 (R1) -- a round trip preserves every serialised field
     // -----------------------------------------------------------------------

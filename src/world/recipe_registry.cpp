@@ -233,6 +233,30 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_growth = gp;
     }
 
+    // BL-617 population-migration rates (economy.migration). Validated, never
+    // clamped (the authored-rate rule the sentiment decay reader set): a
+    // permille outside [0, 1000], a non-finite/negative wage weight, or a
+    // selectivity below 1 (which would make emigration RAISE the origin
+    // nation's qualification — the design inverted) is refused outright.
+    sol::optional<sol::table> migr = (*econ)["migration"];
+    if (migr)
+    {
+        migration_params mp;
+        mp.rate_permille         = migr->get_or("rate_permille",         mp.rate_permille);
+        mp.neutral_gate_permille = migr->get_or("neutral_gate_permille", mp.neutral_gate_permille);
+        mp.wage_weight           = migr->get_or("wage_weight",           mp.wage_weight);
+        mp.qualified_selectivity = migr->get_or("qualified_selectivity", mp.qualified_selectivity);
+        if (mp.rate_permille < 0 || mp.rate_permille > 1000)
+            throw std::runtime_error("economy.migration.rate_permille must be in [0, 1000]");
+        if (mp.neutral_gate_permille < 0 || mp.neutral_gate_permille > 1000)
+            throw std::runtime_error("economy.migration.neutral_gate_permille must be in [0, 1000]");
+        if (!std::isfinite(mp.wage_weight) || mp.wage_weight < 0.0f)
+            throw std::runtime_error("economy.migration.wage_weight must be finite and >= 0");
+        if (!std::isfinite(mp.qualified_selectivity) || mp.qualified_selectivity < 1.0f)
+            throw std::runtime_error("economy.migration.qualified_selectivity must be finite and >= 1");
+        m_migration = mp;
+    }
+
     // BL-368 population-demand model (economy.population_demand). Scalars fall
     // back to the struct defaults so a partial table still loads.
     sol::optional<sol::table> pop_demand = (*econ)["population_demand"];

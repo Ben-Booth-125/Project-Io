@@ -7,7 +7,8 @@
 #include "logistics.hpp"       // invalidate_logistics_caches, tile_traversal_cost, intra_body_path (BL-470)
 #include "market_clearing.hpp" // market_for_tile (BL-095 construction gate)
 #include "placement_rules.hpp" // stack_output_scalar (BL-193 building stacks)
-#include "stance.hpp"          // is_hostile (BL-470's NR-344: war flips the march queue)
+#include "population_generation.hpp" // k_population_for_scale (BL-616 promotion/decline rungs)
+#include "stance.hpp"          // is_hostile (BL-470's NR-344 march queue; BL-617 migration gate)
 #include "tech_gate.hpp"       // recipe_unlocked (BL-588)
 #include "unit_roster.hpp"     // resolve_unit_upkeep (BL-454 unit pass), unit_roster_table (BL-470)
 #include "workforce.hpp"
@@ -1063,12 +1064,18 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     {
         entity_id body;
         entity_id id;
+        entity_id nation; ///< BL-617: tile_to_nation of the building's tile (null = stateless).
         float     demand;
         float     offered;
     };
     std::vector<std::pair<entity_id, float>> demand_by_body;
     std::vector<labour_claim>                claims;
     std::vector<const labour_claim*>         pool_claims;
+    // BL-617: the CLEARING-WAGE signal the migration pass reads — per
+    // (nation, body), Σ(granted labour × offered wage) and Σ(granted labour),
+    // accumulated as each pool clears below. Sorted-corp walk, keyed map slots:
+    // the float accumulation order is fixed.
+    std::map<std::pair<entity_id, entity_id>, std::pair<float, float>> wage_signal_acc;
     for (const entity_id corp : corp_ids)
     {
         const corporation_component& cc = w.corporations.at(corp);
@@ -1095,7 +1102,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             if (body == null_entity)
                 continue;
             const float add = b.workforce_assigned * hab_cap_for(body);
-            claims.push_back({ body, building_id, add,
+            const auto  tn  = w.tile_to_nation.find(b.tile);
+            const entity_id claim_nation =
+                (tn != w.tile_to_nation.end()) ? tn->second : null_entity;
+            claims.push_back({ body, building_id, claim_nation, add,
                                reg.economics(b.type).base_wage * (1.0f + b.wage_bid) });
             const auto  it  = std::find_if(demand_by_body.begin(), demand_by_body.end(),
                                            [body](const std::pair<entity_id, float>& e) {
@@ -1132,7 +1142,12 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             {
                 for (const labour_claim& c : claims)
                     if (c.body == body)
+                    {
                         report.building_labour[c.id] = 1.0f;
+                        auto& acc = wage_signal_acc[{ c.nation, body }];
+                        acc.first  += c.demand * c.offered; // fully granted
+                        acc.second += c.demand;
+                    }
                 continue;
             }
             // Contended: offered wage descending, building id ascending — the
@@ -1157,6 +1172,9 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 report.building_labour[c->id] =
                     (c->demand > 0.0f) ? alloc / c->demand : 1.0f;
                 remaining -= alloc;
+                auto& acc = wage_signal_acc[{ c->nation, body }];
+                acc.first  += alloc * c->offered; // paid at the offered rate (BL-614)
+                acc.second += alloc;
             }
         }
     }
@@ -1561,15 +1579,39 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         }
     }
 
-    // BL-048B / BL-078: Population growth step — accumulate growth per centre each
-    // tick; level up when the accumulator crosses the tier threshold. Growth ticks
-    // only when body habitability >= 0.5 AND the population's whole consumption
-    // basket is met at >= growth_met_threshold (BL-078 keys growth off met-supply,
-    // not food alone — minimal bounded growth, no habitability feedback loop). The
-    // met-supply is read from last tick's cleared market (this step precedes
+    // BL-048B / BL-078 / BL-616: Population growth, promotion and decline
+    // (docs/economy/POPULATION.md § Growth, decline and razing). Each tick a
+    // centre's conditions either hold — body habitability >= 0.5 AND the
+    // consumption basket met at >= growth_met_threshold (BL-078 keys growth off
+    // met-supply, not food alone) — or fail. `growth_accumulator` counts the
+    // CONSECUTIVE streak, positive while conditions hold, negative while they
+    // fail; flipping direction resets it, and it rides the existing serialised
+    // field (negative values round-trip — save_roundtrip R10), so BL-616 adds
+    // no persistent state.
+    //
+    //  - GROWTH: every k_growth_step_ticks of sustained met conditions the
+    //    population takes a step of max(1, pop / k_growth_step_divisor) — real
+    //    heads, integer thousands, superseding the old set-to-scalex10 proxy.
+    //  - PROMOTION: population held above the NEXT tier's rung
+    //    (k_population_for_scale, population_generation.hpp) with conditions
+    //    met for at least k_promotion_window_ticks promotes ONE scale tier;
+    //    the streak restarts. Since centres anchor provinces (BL-611),
+    //    promotion moves the political map's value during play.
+    //  - DECLINE: every k_decline_step_ticks of sustained failure sheds the
+    //    same-shaped step, and a population below its CURRENT tier's rung
+    //    demotes one tier. Asymmetric by design: passive failure only shrinks
+    //    — scale floors at 1, population floors at 1, the centre is NEVER
+    //    destroyed, and its urban ground (BL-612) is never unstamped. Outright
+    //    destruction is the deliberate raze_centre corp_verb (corp_command.cpp).
+    //
+    // The met-supply is read from last tick's cleared market (this step precedes
     // clear_markets in the tick), so it is deterministic and price-consistent.
-    // Tier thresholds (ticks to grow): scale 1→2: 200, 2→3: 500, 3→4: 1500, 4→5: 5000.
-    static constexpr int growth_threshold[6] = { 0, 200, 500, 1500, 5000, 0 };
+    // Step sizes/windows are first-cut tuning constants, not commitments.
+    constexpr int k_growth_step_ticks      = 10; ///< qualifying ticks per growth step.
+    constexpr int k_growth_step_divisor    = 25; ///< step = max(1, pop/25) — ~4% per step.
+    constexpr int k_promotion_window_ticks = 50; ///< sustained ticks above the rung to promote.
+    constexpr int k_decline_step_ticks     = 10; ///< failing ticks per shed step.
+    constexpr int k_decline_step_divisor   = 25; ///< shed = max(1, pop/25).
     const growth_params& growth_sp = reg.growth();
 
     // Per-body market basket, summed over ALL the body's markets (BL-357). A body
@@ -1597,10 +1639,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         }
     }
 
-    for (auto& [cid, pcc] : w.population_centres)
+    // centre_ids (sorted above): per-centre integer arithmetic, but walk in
+    // ascending id anyway so any future cross-centre coupling stays ordered.
+    for (const entity_id cid : centre_ids)
     {
-        if (pcc.scale >= 5)
-            continue; // already at max
+        population_centre_component& pcc = w.population_centres.at(cid);
 
         const auto tile_it = w.population_centre_tile.find(cid);
         if (tile_it == w.population_centre_tile.end())
@@ -1612,13 +1655,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
 
         const auto hit = report.body_habitability.find(body);
         const float hab = (hit != report.body_habitability.end()) ? hit->second : 1.0f;
-        if (hab < 0.5f)
-            continue;
 
         // Met-supply ratio across the whole demand basket (BL-078): a basket-weighted
         // mean of supply/demand over the body's aggregated markets (BL-357), so a
         // centre grows only when its population's consumption is broadly met and
-        // plateaus when it is not.
+        // declines when it is not.
         float met_ratio = 1.0f;
         if (const auto dit = basket_demand.find(body); dit != basket_demand.end())
         {
@@ -1635,18 +1676,52 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             if (met_weight > 0.0f)
                 met_ratio = met_acc / met_weight;
         }
-        if (met_ratio < growth_sp.growth_met_threshold)
-            continue;
 
-        ++pcc.growth_accumulator;
-        const int threshold = growth_threshold[std::clamp(pcc.scale, 1, 5)];
-        if (threshold > 0 && pcc.growth_accumulator >= threshold)
+        const bool conditions_met = (hab >= 0.5f)
+                                 && (met_ratio >= growth_sp.growth_met_threshold);
+        if (conditions_met)
         {
-            ++pcc.scale;
-            pcc.growth_accumulator = 0;
-            // Population headcount: scale × base (10k per scale level as a rough proxy).
-            pcc.population = pcc.scale * 10;
+            // Extend (or restart) the positive streak.
+            pcc.growth_accumulator = std::max(pcc.growth_accumulator, 0) + 1;
+            if (pcc.growth_accumulator % k_growth_step_ticks == 0)
+                pcc.population += std::max(1, pcc.population / k_growth_step_divisor);
+            // PROMOTION: population held above the next rung for the window.
+            if (pcc.scale >= 1 && pcc.scale < 5
+                && pcc.population >= k_population_for_scale[pcc.scale] // index scale == next tier's rung
+                && pcc.growth_accumulator >= k_promotion_window_ticks)
+            {
+                ++pcc.scale;
+                pcc.growth_accumulator = 0; // the window restarts at the new tier
+            }
         }
+        else
+        {
+            // Extend (or restart) the negative streak.
+            pcc.growth_accumulator = std::min(pcc.growth_accumulator, 0) - 1;
+            if ((-pcc.growth_accumulator) % k_decline_step_ticks == 0)
+                pcc.population = std::max(1, pcc.population
+                                              - std::max(1, pcc.population / k_decline_step_divisor));
+            // DEMOTION: population below the CURRENT tier's rung. Floors at
+            // scale 1 / population 1 — passive failure never destroys a centre
+            // (BL-616's asymmetry), and its urban ground stays stamped.
+            if (pcc.scale > 1
+                && pcc.population < k_population_for_scale[pcc.scale - 1])
+            {
+                --pcc.scale;
+            }
+        }
+    }
+
+    // BL-617: the migration pass (docs/economy/POPULATION.md § Migration) —
+    // after growth/decline so a tick's flows act on this tick's populations,
+    // before agency so a scorer reads post-migration state. The clearing-wage
+    // signal is derived from what the BL-614 wage pass granted above.
+    {
+        std::map<std::pair<entity_id, entity_id>, float> clearing_wage;
+        for (const auto& [key, acc] : wage_signal_acc)
+            if (acc.second > 0.0f)
+                clearing_wage[key] = acc.first / acc.second;
+        run_population_migration(w, reg, clearing_wage);
     }
 
     // BL-079: scoped background-corp agency (SCOPED RULE EXCEPTION — narrow, local,
@@ -1830,6 +1905,206 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
 // ---------------------------------------------------------------------------
 // BL-454 — the unit pass
 // ---------------------------------------------------------------------------
+
+migration_tick run_population_migration(world& w, const recipe_registry& reg,
+    const std::map<std::pair<entity_id, entity_id>, float>& clearing_wage)
+{
+    // BL-617 (docs/economy/POPULATION.md § Migration). See the header's doc
+    // comment for the model; every walk below is sorted and every head is an
+    // integer, so the pass is replay-identical by construction.
+    migration_tick t;
+    const migration_params& mp = reg.migration();
+    if (mp.rate_permille <= 0 || w.population_centres.size() < 2)
+        return t;
+
+    struct centre_row
+    {
+        entity_id id;
+        entity_id nation; ///< null_entity = stateless (no tile_to_nation record).
+        int       pop;
+        double    attract;
+    };
+
+    // Snapshot: per body, centres in ascending id. All flows are computed from
+    // this pre-pass state and applied at the end, so no flow sees another's
+    // effect within the tick.
+    std::map<entity_id, std::vector<centre_row>> by_body;
+    {
+        std::vector<entity_id> ids;
+        ids.reserve(w.population_centres.size());
+        for (const auto& kv : w.population_centres)
+            ids.push_back(kv.first);
+        std::sort(ids.begin(), ids.end());
+        for (const entity_id cid : ids)
+        {
+            const population_centre_component& pcc = w.population_centres.at(cid);
+            const auto tit = w.population_centre_tile.find(cid);
+            if (tit == w.population_centre_tile.end())
+                continue;
+            const auto tc_it = w.tiles.find(tit->second);
+            if (tc_it == w.tiles.end())
+                continue;
+            const entity_id body = tc_it->second.body;
+            const auto tn = w.tile_to_nation.find(tit->second);
+            const entity_id nation =
+                (tn != w.tile_to_nation.end()) ? tn->second : null_entity;
+            const auto wit = clearing_wage.find({ nation, body });
+            const float wage = (wit != clearing_wage.end()) ? wit->second : 0.0f;
+            by_body[body].push_back({ cid, nation,
+                                      pcc.population,
+                                      static_cast<double>(pcc.habitability)
+                                          + static_cast<double>(mp.wage_weight) * wage });
+        }
+    }
+
+    // The nation ledger this pass conserves against: heads per nation, summed
+    // from the same snapshot (a nation's tracked heads are its centres').
+    std::map<entity_id, long long> nation_pop;
+    for (const auto& [body, rows] : by_body)
+        for (const centre_row& r : rows)
+            if (r.nation != null_entity)
+                nation_pop[r.nation] += r.pop;
+
+    std::map<entity_id, int>       pop_delta; // per centre
+    std::map<entity_id, long long> dP;        // per nation: heads
+    std::map<entity_id, double>    dQ;        // per nation: qualified heads
+
+    for (const auto& [body, rows] : by_body)
+    {
+        if (rows.size() < 2)
+            continue;
+        double mean = 0.0;
+        for (const centre_row& r : rows)
+            mean += r.attract;
+        mean /= static_cast<double>(rows.size());
+
+        // Receivers: strictly above the mean, weighted by their excess.
+        std::vector<const centre_row*> recv;
+        double wsum = 0.0;
+        for (const centre_row& r : rows)
+            if (r.attract > mean)
+            {
+                recv.push_back(&r);
+                wsum += r.attract - mean;
+            }
+        if (recv.empty() || wsum <= 0.0)
+            continue;
+
+        for (const centre_row& donor : rows)
+        {
+            if (donor.attract >= mean)
+                continue;
+            // Integer emigrant pool; a centre never empties (cap at pop − 1).
+            int em = donor.pop * mp.rate_permille / 1000;
+            em = std::min(em, donor.pop - 1);
+            if (em <= 0)
+                continue; // small centres shed nobody — the integer floor is deliberate
+
+            for (const centre_row* r : recv)
+            {
+                const int share = static_cast<int>(
+                    static_cast<double>(em) * ((r->attract - mean) / wsum));
+                if (share <= 0)
+                    continue; // floor division; the remainder stays home
+
+                // STANCE GATE (nation grain, riding the existing stance store —
+                // stance.hpp read with nation entity ids; no new relational
+                // state). Hostile either direction closes; friendship opens
+                // fully; otherwise the neutral throttle. Same-nation ungated;
+                // a stateless side gates neutral (no treaty with nobody).
+                int gate = 1000;
+                if (donor.nation != r->nation)
+                {
+                    if (donor.nation != null_entity && r->nation != null_entity)
+                    {
+                        if (is_hostile(w, donor.nation, r->nation)
+                            || is_hostile(w, r->nation, donor.nation))
+                            gate = 0;
+                        else if (are_friends(w, donor.nation, r->nation))
+                            gate = 1000;
+                        else
+                            gate = mp.neutral_gate_permille;
+                    }
+                    else
+                    {
+                        gate = mp.neutral_gate_permille;
+                    }
+                }
+                const int moved = share * gate / 1000;
+                if (moved <= 0)
+                {
+                    if (gate == 0)
+                        ++t.gated_closed;
+                    continue;
+                }
+
+                pop_delta[donor.id] -= moved;
+                pop_delta[r->id]    += moved;
+                ++t.flows;
+                t.moved += moved;
+
+                // BRAIN DRAIN (BL-613's fraction moves with the people). Only a
+                // CROSS-BORDER flow touches a ledger; a same-nation move
+                // redistributes heads the nation already holds.
+                if (donor.nation == r->nation)
+                    continue;
+                double q_origin = 0.0;
+                if (donor.nation != null_entity)
+                    if (const auto nit = w.nations.find(donor.nation); nit != w.nations.end())
+                        q_origin = static_cast<double>(nit->second.qualification);
+                double qmoved = static_cast<double>(moved)
+                              * std::min(1.0, q_origin
+                                                  * static_cast<double>(mp.qualified_selectivity));
+                if (donor.nation != null_entity)
+                {
+                    // Clamp to what the origin ledger actually holds, so the
+                    // debit can never manufacture negative qualified heads.
+                    const double avail =
+                        q_origin * static_cast<double>(nation_pop[donor.nation])
+                        + dQ[donor.nation];
+                    qmoved = std::min(qmoved, std::max(0.0, avail));
+                    dQ[donor.nation] -= qmoved;
+                    dP[donor.nation] -= moved;
+                }
+                if (r->nation != null_entity)
+                {
+                    // A stateless ORIGIN credits zero qualification (q_origin
+                    // stays 0 above): unknown people arrive unqualified.
+                    dQ[r->nation] += qmoved;
+                    dP[r->nation] += moved;
+                }
+                t.qualified_moved += static_cast<float>(qmoved);
+            }
+        }
+    }
+
+    // Apply the centre deltas (ascending id — the map walk).
+    for (const auto& [cid, d] : pop_delta)
+    {
+        auto& pcc = w.population_centres.at(cid);
+        pcc.population += d; // >= 1 by the em cap above
+    }
+
+    // Re-derive each touched nation's fraction from its post-flow ledger.
+    // Ascending nation id; the arithmetic keeps the value in [0, 1] (movers
+    // carry at most 1 qualification each and the debit is availability-
+    // clamped), so the clamp below is belt-and-braces, not a rescue.
+    for (const auto& [nid, dp] : dP)
+    {
+        const auto nit = w.nations.find(nid);
+        if (nit == w.nations.end())
+            continue;
+        const long long p0 = nation_pop[nid];
+        const double    q0 = static_cast<double>(nit->second.qualification)
+                           * static_cast<double>(p0);
+        const long long p1 = p0 + dp;
+        const double    q1 = q0 + dQ[nid];
+        nit->second.qualification =
+            (p1 > 0) ? static_cast<float>(std::clamp(q1 / static_cast<double>(p1), 0.0, 1.0))
+                     : 0.0f;
+    }
+    return t;
+}
 
 unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg)
 {

@@ -598,6 +598,20 @@ economy = {
         growth_met_threshold = 0.50, -- basket met-supply ratio a centre needs to grow
     },
 
+    -- BL-617 (population migration; docs/economy/POPULATION.md § Migration).
+    -- A deterministic per-tick flow moves heads from low- toward high-
+    -- attractiveness centres on each body, stance-gated between nations,
+    -- carrying qualification (brain drain). First-cut-then-tune (NR-600):
+    -- the shape is the design, every number here is a dial. The loader
+    -- REJECTS out-of-range values (permille outside [0,1000], wage_weight
+    -- non-finite/negative, selectivity below 1) rather than clamping.
+    migration = {
+        rate_permille         = 10,   -- share of a below-mean centre's heads seeking to move per tick
+        neutral_gate_permille = 250,  -- throttle between NEUTRAL nations (friendly 1000, hostile 0)
+        wage_weight           = 0.02, -- credits -> attractiveness on the clearing-wage signal
+        qualified_selectivity = 1.5,  -- movers skew qualified: migrants carry min(1, origin_q x this)
+    },
+
     -- BL-340/BL-365: background-industrial demand for the mid-chain processing
     -- goods real background firms alone would under-consume during the
     -- pre-game warm start / early game, before enough of them exist. A

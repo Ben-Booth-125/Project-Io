@@ -562,6 +562,10 @@
    "The Contracts ledger's Active view, Abandon press (BL-576). Select an active contract, press Abandon to see its reputation cost, confirm in the popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger."
   ],
   [
+   "gameplay.raze_centre",
+   "Seam-only for now (BL-616, centre promotion and decline): a corp_verb issued against the corp-command seam (ProjectIo --serve, COMMAND opcode). No UI press exists yet — the occupation surface that would host one belongs to the conquest consequence item (BL-518)."
+  ],
+  [
    "chrome.quick_save_key",
    "Keyboard."
   ],

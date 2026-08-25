@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*146 entries — 27 gameplay · 25 canvas · 14 lens · 47 ledger · 33 chrome.*
+*147 entries — 28 gameplay · 25 canvas · 14 lens · 47 ledger · 33 chrome.*
 
 ---
 
@@ -538,6 +538,22 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** The contract's state becomes abandoned. Same money outcome as a failure — the deposit already paid at accept_offer is not clawed back, and the reserved remainder is simply never disbursed — but a DISTINCT, LESSER sentiment magnitude (contract_cancelled, not contract_failed) records that the contractor chose this rather than losing a fight (CONTRACTS.md Q2: 'an honest early exit costs less than a rout, but it still costs').
 
 **Reason to select.** An early, priced way out of a contract that reading the field has shown cannot be won — cheaper than letting it run to a failed deadline, never free. The ledger shows the exact reputation number before the press commits, not after.
+
+### `gameplay.raze_centre` — Seam-only for now (BL-616, centre promotion and decline): a corp_verb issued against the corp-command seam (ProjectIo --serve, COMMAND opcode). No UI press exists yet — the occupation surface that would host one belongs to the conquest consequence item (BL-518).
+
+**Press.** Over the seam: COMMAND corp=<id> verb=27 subject=<centre id>. No other field is read.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The population centre to raze. Irreversible — the centre and its name are erased; the urban ground it stamped (BL-612) stays stamped. |
+
+**Valid when:**
+- `subject` names a real population centre with a tile record (rejected_invalid otherwise).
+- OCCUPATION: the acting corp owns at least one unit positioned on the centre's body (rejected_state otherwise) — the deliberate-destruction act is only reachable with military presence, per POPULATION.md § Growth, decline and razing.
+
+**Expected output.** The centre is erased from the world (component, tile record, name). Its urban land-use stamp remains — razed ground reads as historied, and the extraction it blocked stays blocked. Razing an ANCHOR centre (BL-611) does not rewrite the live province holder; a future holder re-derivation falls back to territory plurality, and the conquest consequence belongs to BL-518.
+
+**Reason to select.** The one way a centre is ever destroyed: passive decline only shrinks (scale floors at 1). An occupier razes to deny the province's anchor value rather than hold it — rare by design, because occupying is almost always worth more than ash.
 
 ---
 

@@ -392,8 +392,9 @@ static void test_habitability_scalar()
 }
 
 // ---------------------------------------------------------------------------
-// population-dynamic R3: 200+ ticks with habitability >= 0.5 AND food ratio
-// >= 0.5 causes a scale-1 centre to level up to scale-2.
+// population-dynamic R3: sustained ticks with habitability >= 0.5 AND met
+// ratio >= 0.5 cause a scale-1 centre at the scale-2 headcount rung to promote
+// (BL-616: promotion is population-driven — rung + sustained window).
 // Sets food supply equal to demand each tick to satisfy the growth condition.
 // ---------------------------------------------------------------------------
 static void test_population_growth()
@@ -428,12 +429,17 @@ static void test_population_growth()
         w.markets[mkt] = mc;
     }
 
-    // Pop centre scale 1, good habitability.
+    // Pop centre scale 1, good habitability. BL-616 (centre promotion and
+    // decline) made promotion POPULATION-driven: a centre promotes when its
+    // headcount has held above the NEXT tier's rung (k_population_for_scale)
+    // for a sustained window, so this fixture seeds the headcount AT the
+    // scale-2 rung (50) and the window (50 qualifying ticks) is what the run
+    // proves — the old fixed 200-tick accumulator threshold is gone.
     const entity_id pop = w.create_entity();
     {
         population_centre_component pcc{};
         pcc.scale        = 1;
-        pcc.population   = 10;
+        pcc.population   = 50;
         pcc.habitability = 0.9f;
         w.population_centres[pop]     = pcc;
         w.population_centre_tile[pop] = tile;
@@ -446,7 +452,8 @@ static void test_population_growth()
     // all-zero, so the gate is trivially met regardless — the supply dance is
     // belt-and-braces against a future non-empty basket.) The population demand
     // itself is injected by clear_markets (BL-190 ordering fix), not the econ
-    // step. Growth threshold for scale 1->2 is 200 ticks.
+    // step. BL-616: promotion fires once the rung-level headcount has held
+    // through the 50-tick sustained window, so 210 ticks is ample.
     for (int t = 0; t < 210; ++t)
     {
         // Set food supply to match last tick's demand (or enough to be >= 50%).
@@ -461,7 +468,7 @@ static void test_population_growth()
     const population_centre_component& pcc_after = w.population_centres.at(pop);
     std::printf("  scale after 210 ticks: %d (growth_accumulator=%d)\n",
                 pcc_after.scale, pcc_after.growth_accumulator);
-    check(pcc_after.scale >= 2, "pop centre levels up from scale-1 to scale-2 after 200 qualifying ticks");
+    check(pcc_after.scale >= 2, "pop centre at the scale-2 rung promotes after the sustained window (BL-616)");
 }
 
 // ---------------------------------------------------------------------------
@@ -514,7 +521,7 @@ static void test_multi_market_growth_aggregate()
     {
         population_centre_component pcc{};
         pcc.scale        = 1;
-        pcc.population   = 10;
+        pcc.population   = 50; // at the scale-2 rung — BL-616 promotion is population-driven (see R3 above)
         pcc.habitability = 0.9f;
         w.population_centres[pop]     = pcc;
         w.population_centre_tile[pop] = tile;

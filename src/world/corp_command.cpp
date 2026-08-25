@@ -1268,6 +1268,60 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                            sentiment_factor_kind::contract_cancelled);
             return corp_command_result::applied;
         }
+
+        case corp_verb::raze_centre:
+        {
+            // BL-616 (docs/economy/POPULATION.md § Growth, decline and razing):
+            // the deliberate destruction act. Passive decline only ever shrinks
+            // a centre; erasing one is an agent's choice, in occupation, and it
+            // should be rare because the occupier almost always prefers to
+            // occupy.
+            const auto cit = w.population_centres.find(cmd.subject);
+            if (cit == w.population_centres.end())
+                return corp_command_result::rejected_invalid;
+            const auto tit = w.population_centre_tile.find(cmd.subject);
+            if (tit == w.population_centre_tile.end())
+                return corp_command_result::rejected_invalid; // no tile record — corrupt centre
+            const auto tc_it = w.tiles.find(tit->second);
+            if (tc_it == w.tiles.end())
+                return corp_command_result::rejected_invalid;
+            const entity_id body = tc_it->second.body;
+
+            // OCCUPATION PRECONDITION (first cut, stated in BL-616's report):
+            // the acting corp owns at least one unit whose position tile lies
+            // on the centre's body. A unit is the only mobile military presence
+            // and is complete from the moment hire_unit raises it (which itself
+            // required a COMPLETED military_base), so "completed military
+            // presence" reduces to unit-on-body. Pure existence predicate over
+            // w.units — order-independent, so the unordered walk is safe.
+            bool present = false;
+            for (const auto& [uid, uc] : w.units)
+            {
+                if (uc.owner != cmd.corp)
+                    continue;
+                const auto ut = w.tiles.find(uc.position);
+                if (ut != w.tiles.end() && ut->second.body == body)
+                {
+                    present = true;
+                    break;
+                }
+            }
+            if (!present)
+                return corp_command_result::rejected_state; // no occupation, no razing
+
+            // Erase the centre from its three stores. The urban land-use stamp
+            // (BL-612) deliberately STAYS — razed ground reads as historied,
+            // and the extraction it blocked stays blocked. `w.province_holder`
+            // is NOT touched here: the holder is live state seeded from the
+            // anchor's nation (BL-611), and razing an ANCHOR leaves any future
+            // holder re-derivation to fall back to territory plurality — the
+            // conquest consequence of taking/razing an anchor belongs to
+            // BL-518, not this verb.
+            w.population_centres.erase(cit);
+            w.population_centre_tile.erase(tit);
+            w.population_centre_name.erase(cmd.subject);
+            return corp_command_result::applied;
+        }
     }
     return corp_command_result::rejected_invalid;
 }

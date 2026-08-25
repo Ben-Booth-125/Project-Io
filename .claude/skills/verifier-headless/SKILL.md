@@ -242,6 +242,20 @@ in `tools/verify/README.md`.
   per-named-building gate (recipe radius overrides the type's); `construct_building` enforcing
   the gate itself (the authoritative seam — no caller passes it by hand); and replay determinism.
   Links the world superset — `node tools/verify/build_harness.js stratum_gate_harness --run`.
+- **`population_dynamics`** — Centre promotion/decline + migration (BL-616 / BL-617,
+  POPULATION.md § Growth, decline and razing / § Migration). P1: a centre held above the next
+  tier's rung (`k_population_for_scale`) with met supply and habitability promotes at exactly the
+  sustained window, replay-identical across fresh runs. P2: failing conditions shed population
+  and demote — scale floors at 1, population at 1, the centre is never destroyed passively, and
+  the failing streak rides `growth_accumulator` negative. P3: the `raze_centre` corp_verb through
+  `apply_corp_command` — rejected without the acting corp's unit on the centre's body
+  (occupation precondition), applied with one, erasing all three centre stores; rejections
+  mutate nothing. M1: heads flow from low- toward high-attractiveness centres deterministically.
+  M2/M3: the nation-grain stance gate (friendly 1000 / neutral throttle / hostile closed, riding
+  the existing stance tables keyed by nation ids) and qualified-head conservation — cross-border
+  migrants carry `min(1, origin_q × selectivity)` qualification, debiting the origin nation's
+  fraction and crediting the destination's, total conserved. Links the world superset —
+  `node tools/verify/build_harness.js population_dynamics --run`.
 - **`continents_harness`** — Continents/Drift (BL-210 first slice): the plate-drift
   sibling pass. Determinism (R1 — same seed identical, different seed different);
   mobile-lid plate count lands in [4,10] (R2); the stagnant-lid special case is one
