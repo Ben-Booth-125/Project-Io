@@ -2346,6 +2346,9 @@ void app::render()
                 m_ui.construction.last_message = "No viable route to that market."; break;
             case corp_command_result::rejected_funds:
                 m_ui.construction.last_message = "Can't afford the haul."; break;
+            case corp_command_result::rejected_no_lp:
+                m_ui.construction.last_message =
+                    "No Logistic Points left at the source anchor this tick."; break;
             default:
                 m_ui.construction.last_message = "Dispatch failed."; break;
         }
