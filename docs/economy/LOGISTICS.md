@@ -117,6 +117,11 @@ A\* path taking the **max** `road_level` on overlap.
 least one endpoint is Town+, **Track** (1) otherwise. Then one Track border link between the nearest
 centre pair of each territorially-adjacent nation pair, so the lattice connects across the continent.
 
+**The network scales with the nation's qualification** (Ben, 2026-08-25; BL-618, roads scale with
+qualification): a nation's qualification fraction (`docs/economy/POPULATION.md` § Qualification)
+modulates its redundancy-edge count and tier promotion, so a low-qualification nation generates a
+sparser, lower-tier lattice. A national development level the map already shows, not a new dial.
+
 **Roads are a land feature.** Water tiles are skipped, and an edge whose route crosses *open* ocean
 is not stamped at all — that is a sea route, and stamping it would scatter fragments on distant
 shores. A short crossing made of shore (a strait, TILES.md § Water kinds) does get a road.

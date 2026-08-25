@@ -105,6 +105,12 @@ The text-drivable face of the game — the substrate an AI player uses, and v0.1
 **History ladder**
 The institutional-history generation stage (`src/world/history_ladder.cpp`). The **pre-national ladder** (BL-221) runs after tiles and *before* nations, and drives them: it counts the agrarian cradles the land supported, prices conquest against exit, and sets the nation seed budget (`nation_params_from_ladder`) — the ladder is upstream of the map, not a narration of it. Its events carry historical-epoch timestamps (BL-220, dated epochs) and merge into the body's biography. The industrial stages are BL-222 (industrial ladder) and the averted rupture BL-223. See `docs/lore/HISTORY.md`.
 
+**Qualification**
+A nation-grain fraction: the share of its workforce that is **qualified** (Ben, 2026-08-25; BL-613, qualification fraction). Raised by schooling buildings and universities, consumed by buildings running complicated production methods, seeded from Era −1 industrialisation timing, carried by migrants (brain drain), and read by road generation. See `docs/economy/POPULATION.md` § Qualification.
+
+**Stratum (population centre)**
+The centre scale ladder — Outpost / Settlement / Town / City / Metropolis (scale 1–5) — read as a building-placement gate: some buildings are placeable only in a centre, some only at a minimum stratum (a university needs City+). Not a new axis; the same `population_centre_component.scale`. See `docs/economy/POPULATION.md` § Strata gate buildings.
+
 **Building**
 A surface installation placed on a tile. Buildings are either **extraction** (harvesting raw materials from tile deposits) or **processing** (consuming inputs and producing outputs via a recipe) or **infrastructure** (affecting logistical or economic capacity). Each building holds a `building_component` and a `stockpile_component`.
 

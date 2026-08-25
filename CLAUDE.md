@@ -77,6 +77,7 @@ follow. Where a store has a query tool, use the tool, never load the file.
 | `docs/economy/TILES.md` | Two-axis terrain, deposit profiles, amenity tiles. |
 | `docs/economy/POPULATION.md` | Population centres, agglomeration, habitability. |
 | `docs/economy/ERAS.md` | The era ladder and the gate into space. |
+| `docs/economy/RESEARCH.md` | Research points and technology unlocks (stub). |
 | `docs/economy/SPACE_ASSETS.md` | Off-body assets (stub). |
 
 ### Military, politics, relations

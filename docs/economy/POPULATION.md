@@ -26,12 +26,19 @@ settled rather than the other way round.
   rules' habitability gate; among candidates, a tile adjacent to an existing centre carries 3×
   weight, multiplied by a 1–5 richness bucket, so centres cluster progressively and a rich tile
   can outweigh a merely adjacent one.
-- **Centre count derives from land area, not grid area** (BL-463, centre count from land): one
-  centre per `k_land_tiles_per_centre` land tiles (a measured divisor, ~410), bounded below by
-  one and above by the tiles able to host one, so a seed with more land is more settled.
-- **Scale (1–5, Outpost → Metropolis) is drawn from a weighted distribution** — 40 / 30 / 20 /
-  8 / 2 % — with `k_population_for_scale` = 10 / 50 / 200 / 1,000 / 5,000 thousand heads.
-  Deterministic from the campaign seed.
+- **Count and scale derive from Era −1 region demography** (Ben, 2026-08-25; BL-610, centres
+  from demography). Density is history's consequence: the simulated regions' populations
+  (§ Region demography) decide how many centres a body carries and how large each is, replacing
+  the land-area divisor and the authored weighted scale draw. `k_population_for_scale` =
+  10 / 50 / 200 / 1,000 / 5,000 thousand heads remains the scale→headcount mapping.
+- **Every province is anchored by a centre** (Ben, 2026-08-25; BL-611, province centre anchor).
+  A centre of *any* scale — most are small; towns stand where history earned them. The anchor
+  is the province's political decider: the centre's nation is the province's nation, and taking
+  the centre takes the province (`docs/generation/PROVINCES.md` § The partition; BL-567,
+  province is the conquest unit). This retires the centre-less hinterland province.
+- **Urban ground is stamped at generation** (Ben, 2026-08-25; BL-612, urban ground stamped).
+  A centre arrives with an urban land-use footprint scaled by its tier, so city ground is
+  scarce and contested from turn one rather than notionally open (§ Land use).
 
 A centre's tile keeps its full deposit: population and extraction compete for a tile through
 § Land use, not through generation.
@@ -81,6 +88,27 @@ The scale bonus and land-use constraint are the primary mechanism preventing a p
 
 Exact values are balance targets, not commitments. The tiers and the direction (scale confers advantage) are the design decisions. Scale also sets a centre's labour contribution (§ The labour pool) and its logistics-node discount (SUPPLY.md § Logistical cost).
 
+### Strata gate buildings
+
+The scale ladder doubles as the **stratum ladder** (Ben, 2026-08-25; BL-615, stratum placement
+gates): certain buildings are only placeable **in** a centre, and some only in a centre of a
+minimum stratum. A **university** requires City (4)+; a schooling building any centre; heavy
+processors (the steel-mill class) must sit **near** a population centre rather than in open
+country. The gate is a placement rule (`placement_rules::can_place` is the seam), not a recipe
+property — it is about where the workforce lives, not what the building does.
+
+### Growth, decline and razing
+
+A centre **promotes up the ladder when preconditions are met** (Ben, 2026-08-25; BL-616, centre
+promotion and decline) — sustained met supply, habitability, and population above the next
+tier's threshold. Since centres anchor provinces, promotion changes the political map's value
+during play.
+
+Decline is asymmetric by design: **passive failure only shrinks a centre — it never destroys
+one.** Outright destruction is a deliberate agent action (razing, in occupation), and it should
+be rare because the occupier almost always prefers to occupy. A shrunk centre keeps its urban
+ground — a fading town reads as historied, not deleted.
+
 ---
 
 ## Population demand
@@ -97,6 +125,13 @@ Each Tick, a population centre consumes a basket of goods drawn from the local m
 Demand is supplied from the body's market. If demand exceeds local supply, the deficit is met by imports (via convoys, Layer 5). Persistent unmet demand reduces habitability, which reduces workforce efficiency, which propagates as a production penalty — the first indirect feedback loop in the economy.
 
 Two demand signals carry this. A centre's **own** market demand is one unit of `agricultural_produce` per scale level per tick — the subsistence half of the basket, the only half with a `resource_type` value (RESOURCES.md § Prototype scope: clean water, consumer goods and habitability goods are a resource *category*, not enumerators). The broader consumption signal is the **nation-substrate basket** (`scripts/economy.lua` § `substrate`), which is nation-level rather than per-centre.
+
+**Demand ladders with scale** (Ben, 2026-08-25). The basket's *composition*, not only its size,
+follows the stratum: higher strata consume up the value chain — a city pulls consumer goods, a
+metropolis electronics — so big centres are demand **endpoints** that give goods value from day
+one, and the markets worth reaching. What is deliberately **unquantified**: the cost of living —
+how much it costs a head to live, and which goods each stratum consumes in what proportion
+(§ Open items).
 
 ---
 
@@ -142,6 +177,44 @@ Habitability is reduced by:
 
 ---
 
+## Qualification
+
+**Workforce has a skill axis** (Ben, 2026-08-25; BL-613, qualification fraction). Each
+**nation** carries a `qualification` fraction — the share of its workforce that is qualified.
+Nation-grain deliberately: it reads as a national development level, feeds road generation, and
+avoids per-centre bookkeeping the prototype does not need.
+
+- **Raised by schooling buildings and universities.** A schooling building lifts the host
+  nation's fraction; a **university** (City+ only, § Strata gate buildings) lifts it further
+  *and* produces research points (RP — `docs/economy/RESEARCH.md`).
+- **Consumed by complicated methods.** A building running a complicated production method
+  requires that many **qualified** workers from the pool alongside ordinary labour; the
+  qualified pool is the scarcer one, and is what gates organically scaling building levels —
+  a deeper facility costs qualified heads, not only credits.
+- **Seeded from history.** A region's Era −1 industrialisation timing — the same scalar that
+  sets corp focus (`docs/generation/CORPORATION_GENERATION.md` § Pass 2) — aggregates into the
+  nation's opening fraction: early industrialisers open qualified, late ones raw.
+- **Scales generated infrastructure.** A low-qualification nation generates fewer, lower-tier
+  roads (`docs/economy/LOGISTICS.md` § Roads; BL-618, roads scale with qualification).
+- **Moves with people.** Migration carries qualification — brain drain is real (§ Migration).
+
+## Migration
+
+**Population moves between centres, and between friendly nations** (Ben, 2026-08-25; BL-617,
+population migration). Growth is no longer purely local: each tick a deterministic, seeded flow
+moves heads from low- toward high-attractiveness centres, attractiveness read from habitability
+and the clearing wage. Between nations the flow is **stance-gated** (`docs/politics/RELATIONS.md`):
+friendly nations encourage it, hostile ones close it.
+
+Migrants **carry qualification with them** — an emigrating qualified worker debits the origin
+nation's fraction and credits the destination's. Brain drain is therefore a real strategic
+weapon: high habitability and high wages drain a rival nation's qualified labour. Deterministic
+and replayable like every flow — no RNG in the gate path.
+
+The strategic consequence, stated once: money stops being the only scarce input to growth.
+Qualified labour, habitability, and province-anchoring centres are each a **non-purchasable
+constraint**, and migration is the only lever that moves one of them.
+
 ## Workforce model
 
 The per-`(corp, body)` pool with contention and the population-derived supply feeding it are specified in PRODUCTION.md § Workforce model. `building_component.workforce_assigned` is an authored constant in `[0, 1]` — the *request* the contention scalar throttles.
@@ -168,13 +241,14 @@ centres.
 ### Contention
 
 When **demand ≤ supply**, every building is fully staffed and runs at its requested level.
-When **demand > supply**, the pool is **rationed proportionally**: each building receives
-`supply / demand` of its request (a single contention scalar applied uniformly), so a
-corporation that over-builds relative to its labour force sees *every* building throttled
-rather than some starved to zero. This proportional rule is the workforce counterpart of
-the two-threshold input model in PRODUCTION.md, and is deliberately simple — priority
-weighting between buildings is standing allocation **policy** (SYSTEMS.md § Policy), a
-separate layer over the pool.
+When **demand > supply**, labour clears by **wage competition** (Ben, 2026-08-25; BL-614, wage
+competition): scarce labour goes to the buildings offering the higher wage, in deterministic
+order (wage, then building id), rather than being rationed proportionally. A corporation that
+over-builds relative to its labour force must outbid itself and its neighbours, so labour
+scarcity is priced instead of silently averaged. The proportional `supply / demand` scalar it
+supersedes remains the right mental model for the *fully-uncontended* case — everyone staffed at
+request — and building counts lean on available land (§ Land use, the province ceiling), not on
+the pool alone.
 
 The contention scalar multiplies the existing linear `workforce_assigned` term, so the
 production arithmetic gains a factor rather than changing shape:
@@ -222,5 +296,20 @@ capped by fiat). Every rate is a `_q` thousandths quantity — no floats in a ga
 Verified by `tools/verify/demography_harness.cpp`.
 
 Region demography is self-contained at the region level. On graduation to the campaign era it
-is the source the population-centre scale distribution draws from, replacing the weighted
-random draw in § Generation with a consequence of the simulated history.
+is the source both the centre **count** and the **scale distribution** draw from (§ Generation;
+BL-610, centres from demography) — density is a consequence of the simulated history, not a
+divisor or a weighted draw. It also aggregates into each nation's opening qualification
+fraction (§ Qualification).
+
+---
+
+## Open items
+
+- **Cost of living is unquantified** (Ben, 2026-08-25). Neither how much it costs a head to
+  live, nor which goods each stratum consumes in what proportion, has numbers. § Population
+  demand states the direction (demand ladders with scale); the quantification — basket
+  contents per stratum, and the wage a head needs to afford it — is open, and couples to
+  BL-544 (unit wage reference).
+- **Wage-clearing detail.** BL-614 (wage competition) owns whether corps set a wage dial per
+  body, per building, or accept a derived clearing wage — and how the qualified and ordinary
+  pools clear against one another.

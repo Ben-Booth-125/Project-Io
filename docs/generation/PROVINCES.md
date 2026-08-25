@@ -70,9 +70,14 @@ independent of how the shapes are drawn.
    (1–5): *a metropolis draws a larger province than a village does.*
 2. **Boundaries are rivers, elevation difference, and sometimes roads — but a road BINDS.** Tiles a
    road links tend to share a province. **A road is never a divider.**
-3. **Country no centre reaches becomes hinterland**, under the same boundary rules, seeded from the
-   **least-accessible tile** — so a hinterland is shaped by its terrain rather than being whatever
-   was left over.
+3. **Every province is anchored by a population centre** (Ben, 2026-08-25; BL-611, province
+   centre anchor — superseding the hinterland ruling below). Centre density now derives from
+   Era −1 demography (`docs/economy/POPULATION.md` § Generation; BL-610, centres from
+   demography), dense enough that every province seeds from a centre of *some* scale; the
+   centre is the province's **political decider** — its nation is the province's nation, and
+   under BL-567 (province is the conquest unit) taking the centre takes the province, making
+   every anchor a strategic objective. *Superseded original ruling, kept for the record:*
+   country no centre reaches became hinterland, seeded from the least-accessible tile.
 4. **Size is a growth budget, not a clamp.** *"Don't reject tiny provinces"* — nothing is merged
    away to satisfy a floor, and **boundaries win ties.**
 5. **A national border is a hard edge.** Seeds are placed per nation and the terrain cost function
@@ -124,7 +129,7 @@ larger, but not larger than say 80 tiles."*
 | Domain (`province_kind`) | Band | Notes |
 |---|---|---|
 | **`land`** | 7–12 soft, 20 hard | The only domain anything can stand in |
-| **`coastal_water`** | the land band exactly — 7–12 soft, 20 hard | The shoreline ring and the lakes. **No population centre seeds one** — hinterland only. Reuses the land constants; none of its own |
+| **`coastal_water`** | the land band exactly — 7–12 soft, 20 hard | The shoreline ring and the lakes. **No population centre seeds one** — the least-accessible-tile seeding survives here (water holds no centres; the BL-611 anchor rule is a land-domain rule). Reuses the land constants; none of its own |
 | **`open_ocean`** | `k_sea_province_soft_target` 42, `k_sea_province_max_tiles` 80 | The sea out of sight of land; seeds spaced `k_sea_province_seed_spacing` = 7 |
 
 Ben gave the sea **one** number, 80, and everything else is derived from it by the same lattice
@@ -233,10 +238,12 @@ one visual language across the whole map.
 
 ## Open questions
 
-1. **Do provinces feed back into where national borders fall?** Ruling 5 makes the national
-   assignment an input to the partition — borders shape provinces. True mutual co-generation,
-   where the partition also moves the border, is a larger question that the ruling does not need
-   and that nothing has asked for; flagged in BL-563 (province respects nation), not assumed.
+1. **Do provinces feed back into where national borders fall? — ANSWERED** (Ben, 2026-08-25):
+   through the anchor centre. At generation, ruling 5 stands — the national assignment is an
+   input, and anchor and territory agree by construction. After generation, the **centre decides**:
+   a province's nation is its anchor centre's nation, so conquest moves borders by taking centres
+   (BL-567, province is the conquest unit; BL-611, province centre anchor). BL-518 (war redraws
+   borders) inherits this as its mechanism.
 2. **What conquest moves.** With the province the unit of conquest (BL-567), BL-518 (war redraws
    borders) moves whole provinces between nations rather than tiles — how a border redraw
    interacts with ruling 5's per-nation seeding after generation is that item's to settle.

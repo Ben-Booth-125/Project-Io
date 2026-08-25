@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*36 entries — 36 open, 0 resolved.*
+*39 entries — 39 open, 0 resolved.*
 
 ---
 
@@ -395,6 +395,27 @@ Ben granted an exception to the curated-world-independent golden policy for this
 **Why it matters.** The grant is cheap to spend once. Spending it on a state we are about to overwrite wastes it and leaves 31 stale goldens behind.
 
 *Files: `.claude/skills/verifier-visual/SKILL.md`, `docs/development/DEVELOPMENT_PRACTICES.md`*
+
+### NR-628 — RESEARCH.md placed under docs/economy/ with a router row - location was a delegated call
+*decision taken on your behalf · raised 2026-08-25 · from The 2026-08-25 population design form: Ben chose 'new RESEARCH.md' and asked for the stub now, without naming a path.*
+
+Placed at docs/economy/RESEARCH.md (RP is produced by a building and spent in the economy/era gate) and a row added to CLAUDE.md's Economy table. Alternatives were docs/tech/ (rejected: that folder is engineering foundations, not game systems) and docs/research/ (rejected: explicitly non-authority scaffolding). Overturn by moving the file and the router row.
+
+*Files: `docs/economy/RESEARCH.md`, `CLAUDE.md`*
+
+### NR-629 — Wage competition written as the SETTLED labour-clearing model, superseding proportional contention
+*decision taken on your behalf · raised 2026-08-25 · from Ben, 2026-08-25 form: 'wage competition is preferred'.*
+
+'Preferred' was written into POPULATION.md section Contention as the settled design (docs are state-independent; the proportional scalar remains what the code does until BL-614 lands). If 'preferred' meant 'leaning, not settled', overturn by restoring the proportional paragraph and marking BL-614 (wage competition) as a direction to evaluate instead.
+
+*Files: `docs/economy/POPULATION.md`*
+
+### NR-630 — The centre-density recalibration is ~40x, and its downstream tunables are not re-derived
+*observation · raised 2026-08-25 · from Measured while filing BL-610/BL-611: centres today 1 per ~410 land tiles, land provinces 1 per ~10.*
+
+'A centre in every land province' implies roughly 40x today's centre count, mostly small strata. Self-adjusting downstream: Pass 6 background-firm calibration (a 0.90 production/demand target, not a count). NOT self-adjusting and needing re-derivation when BL-610 builds: population_demand's demand_scale, workforce supply per centre (labour units 1/3/10/30/100), the market carve's population anchoring, logistics node discounts (most tiles now near a centre), and road generation's edge count (~40x more MST nodes). Each is a measured retune, not a redesign.
+
+*Files: `src/world/population_generation.cpp`, `scripts/economy.lua`*
 
 ---
 
