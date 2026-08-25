@@ -167,7 +167,15 @@ inline constexpr uint32_t world_save_magic =
 /// value — the writer cannot have produced one.
 /// (BL-613/BL-614 were authored as v11/v12 on their own branch and renumbered
 /// to v13/v14 at the wave-1 integration, where BL-612/BL-611 held 11/12.)
-inline constexpr uint32_t world_save_version = 14;
+///
+/// Bumped to 15 by BL-624 (razed settlement tier): the population-centre
+/// record (`w_popcentre` / `r_popcentre`) gains
+/// `population_centre_component::razed` — one int after `province_anchor`, in
+/// declaration order. A v14 stream's centre records are one field short, a
+/// MID-RECORD gap, so it is refused whole on the same strict-equality
+/// contract as every prior bump. The reader additionally refuses a value
+/// other than 0/1 — the writer cannot have produced one.
+inline constexpr uint32_t world_save_version = 15;
 
 /// Write @p w as a complete world snapshot.
 ///

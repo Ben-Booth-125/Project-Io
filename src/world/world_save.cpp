@@ -218,17 +218,24 @@ void w_popcentre(std::ostream& o, const population_centre_component& p)
     // BL-611 (format v12): the anchor-founding marker — a rebuild of the
     // partition must not seed from a centre the partition itself caused.
     w_int(o, p.province_anchor ? 1 : 0);
+    // BL-624 (format v15): the razed tier — a demoted centre must reload as
+    // the ruin it is, not as a live village.
+    w_int(o, p.razed ? 1 : 0);
 }
 
 bool r_popcentre(std::istream& i, population_centre_component& p)
 {
     int anchor = 0;
+    int razed  = 0;
     if (!(r_int(i, p.scale) && r_int(i, p.population) && r_f32(i, p.habitability)
-          && r_int(i, p.growth_accumulator) && r_int(i, anchor)))
+          && r_int(i, p.growth_accumulator) && r_int(i, anchor) && r_int(i, razed)))
         return false;
     if (anchor != 0 && anchor != 1)
         return false; // not a value the writer above can produce — corrupt stream
+    if (razed != 0 && razed != 1)
+        return false; // same contract for the BL-624 flag
     p.province_anchor = (anchor == 1);
+    p.razed           = (razed == 1);
     return true;
 }
 

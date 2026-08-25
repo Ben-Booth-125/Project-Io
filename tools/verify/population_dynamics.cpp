@@ -12,8 +12,13 @@
 //   P3: raze works through apply_corp_command — rejected without a real
 //       centre (rejected_invalid) and without the acting corp's military
 //       presence on the centre's body (rejected_state); applied with a unit
-//       on the body, erasing the centre from all three stores. A rejection
-//       mutates nothing.
+//       on the body, DEMOTING the centre to the razed tier (BL-624):
+//       population 0, razed set, entity/name/tile all kept. A rejection
+//       mutates nothing; razing a ruin is rejected_state.
+//   P4: the razed -> regrown round trip is deterministic — a razed centre
+//       contributes no labour/demand/habitability weight, re-settles at the
+//       reduced gate (half the promotion window) back to scale 1 with the
+//       village-rung seed population, and two fresh runs agree tick-exactly.
 //   M1: migration flows are deterministic and directional — heads flow from
 //       the low- toward the high-attractiveness centre on a body, and two
 //       runs from identical worlds produce identical populations.
@@ -234,19 +239,91 @@ static void test_raze()
     check(apply_corp_command(f.w, reg, cmd) == corp_command_result::rejected_state,
           "a unit on a different body is not presence — still rejected_state");
 
-    // A unit on the centre's body: applied; all three stores emptied.
+    // A unit on the centre's body: applied — DEMOTED, not erased (BL-624).
     const entity_id near_unit = f.w.create_entity();
     f.w.units[near_unit] = unit_component{ .position = f.tile_ids[1], .owner = corp, .count = 100 };
     check(apply_corp_command(f.w, reg, cmd) == corp_command_result::applied,
           "raze with a unit on the centre's body is applied");
-    check(f.w.population_centres.count(c) == 0
-              && f.w.population_centre_tile.count(c) == 0
-              && f.w.population_centre_name.count(c) == 0,
-          "the razed centre is erased from all three stores");
+    check(f.w.population_centres.count(c) == 1
+              && f.w.population_centre_tile.count(c) == 1
+              && f.w.population_centre_name.count(c) == 1,
+          "the razed centre PERSISTS in all three stores (demotion, not erasure)");
+    {
+        const auto& pcc = f.w.population_centres.at(c);
+        check(pcc.razed && pcc.population == 0 && pcc.scale == 1,
+              "razing sets the razed tier: population 0, scale 1, razed flag on");
+    }
 
-    // A second raze of the same (now absent) centre: rejected_invalid.
-    check(apply_corp_command(f.w, reg, cmd) == corp_command_result::rejected_invalid,
+    // A second raze of the same (now razed) centre: rejected_state, mutating
+    // nothing — a ruin cannot be razed again.
+    check(apply_corp_command(f.w, reg, cmd) == corp_command_result::rejected_state,
+          "razing an already-razed centre is rejected_state");
+    check(f.w.population_centres.at(c).razed,
+          "the second raze's rejection mutated nothing (still razed)");
+
+    // A raze of a centre that never existed: rejected_invalid.
+    corp_command ghost = cmd;
+    ghost.subject      = 0xDEADD00Du;
+    check(apply_corp_command(f.w, reg, ghost) == corp_command_result::rejected_invalid,
           "razing an absent centre is rejected_invalid");
+}
+
+// ---------------------------------------------------------------------------
+// P4 — the razed -> regrown round trip is deterministic (BL-624)
+// ---------------------------------------------------------------------------
+static void test_resettle()
+{
+    std::printf("--- P4: razed -> regrown round trip, deterministically ---\n");
+    // Two centres so the body keeps a live centre while one lies razed: the
+    // live one holds body habitability above the 0.5 growth gate (a razed
+    // centre carries no habitability weight — asserted below via the razed
+    // centre's own hab being LOW and the gate still passing).
+    auto build = [](fixture& f, entity_id& live, entity_id& ruin) {
+        live = f.add_centre(0, 3, 200, 0.9f);
+        ruin = f.add_centre(1, 2, 100, 0.1f); // low hab: would DRAG the body mean
+        f.w.population_centres.at(ruin).razed      = true;
+        f.w.population_centres.at(ruin).population = 0;
+        f.w.population_centres.at(ruin).scale      = 1;
+    };
+    fixture a(2), b(2);
+    entity_id a_live, a_ruin, b_live, b_ruin;
+    build(a, a_live, a_ruin);
+    build(b, b_live, b_ruin);
+    recipe_registry reg;
+
+    // While razed: no labour and no habitability weight. The body mean reads
+    // off the LIVE centre alone (0.9); with the razed one counted it would be
+    // (0.9x3 + 0.1x1)/4 = 0.7 — both above the gate, so the sharper probe is
+    // the re-settle tick itself: with weight excluded the gate holds every
+    // tick and the ruin re-settles at EXACTLY the reduced window (25 ticks,
+    // half the 50-tick promotion window).
+    int resettle_tick = -1;
+    for (int t = 1; t <= 60; ++t)
+    {
+        run_economy_step(a.w, reg);
+        if (resettle_tick < 0 && !a.w.population_centres.at(a_ruin).razed)
+            resettle_tick = t;
+    }
+    check(resettle_tick == 25,
+          "the ruin re-settles at exactly HALF the promotion window (tick 25)",
+          resettle_tick, 25);
+    {
+        const auto& pcc = a.w.population_centres.at(a_ruin);
+        check(!pcc.razed && pcc.scale == 1 && pcc.population >= 10,
+              "re-settlement returns scale 1 with the village-rung seed population",
+              pcc.population, 10);
+    }
+
+    // Determinism: the same 60 ticks on a fresh identical world agree exactly.
+    for (int t = 1; t <= 60; ++t)
+        run_economy_step(b.w, reg);
+    const auto& pa = a.w.population_centres.at(a_ruin);
+    const auto& pb = b.w.population_centres.at(b_ruin);
+    check(pa.razed == pb.razed && pa.scale == pb.scale
+              && pa.population == pb.population
+              && pa.growth_accumulator == pb.growth_accumulator,
+          "two fresh razed->regrown runs replay identically",
+          pa.population, pb.population);
 }
 
 // ---------------------------------------------------------------------------
@@ -396,6 +473,7 @@ int main()
     test_promotion();
     test_decline();
     test_raze();
+    test_resettle();
     test_migration_direction();
     test_stance_gate_and_conservation();
 

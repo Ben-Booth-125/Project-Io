@@ -1271,14 +1271,17 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
         case corp_verb::raze_centre:
         {
-            // BL-616 (docs/economy/POPULATION.md § Growth, decline and razing):
-            // the deliberate destruction act. Passive decline only ever shrinks
-            // a centre; erasing one is an agent's choice, in occupation, and it
-            // should be rare because the occupier almost always prefers to
-            // occupy.
+            // BL-616/BL-624 (docs/economy/POPULATION.md § Growth, decline and
+            // razing): the deliberate destruction act. Passive decline only
+            // ever shrinks a centre; razing one is an agent's choice, in
+            // occupation, and it should be rare because the occupier almost
+            // always prefers to occupy. Since BL-624 (razed settlement tier)
+            // it DEMOTES rather than erases — see below.
             const auto cit = w.population_centres.find(cmd.subject);
             if (cit == w.population_centres.end())
                 return corp_command_result::rejected_invalid;
+            if (cit->second.razed)
+                return corp_command_result::rejected_state; // already ash — nothing to raze
             const auto tit = w.population_centre_tile.find(cmd.subject);
             if (tit == w.population_centre_tile.end())
                 return corp_command_result::rejected_invalid; // no tile record — corrupt centre
@@ -1309,17 +1312,24 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (!present)
                 return corp_command_result::rejected_state; // no occupation, no razing
 
-            // Erase the centre from its three stores. The urban land-use stamp
-            // (BL-612) deliberately STAYS — razed ground reads as historied,
-            // and the extraction it blocked stays blocked. `w.province_holder`
-            // is NOT touched here: the holder is live state seeded from the
-            // anchor's nation (BL-611), and razing an ANCHOR leaves any future
-            // holder re-derivation to fall back to territory plurality — the
-            // conquest consequence of taking/razing an anchor belongs to
-            // BL-518, not this verb.
-            w.population_centres.erase(cit);
-            w.population_centre_tile.erase(tit);
-            w.population_centre_name.erase(cmd.subject);
+            // DEMOTE, never erase (BL-624, razed settlement tier; Ben,
+            // 2026-08-25: "keep razed settlement as a settlement tier, so
+            // it's cheap to rebuild there"). Population zeroed and the razed
+            // flag set; the entity, its name, its tile record and its urban
+            // land-use stamp (BL-612) all STAY — razed ground reads as
+            // historied, the extraction it blocked stays blocked, and the
+            // centre still anchors its province (scale set to 1 so the
+            // strictly-positive anchor-scale scan still finds it; a ruin can
+            // be captured, so razing never deletes a conquest handle).
+            // `w.province_holder` is NOT touched here: the holder is live
+            // state seeded from the anchor's nation (BL-611), and the
+            // conquest consequence of taking an anchor belongs to BL-518,
+            // not this verb. The growth pass re-settles a razed centre at a
+            // reduced gate (economy_system.cpp § k_resettle_window_ticks).
+            cit->second.razed              = true;
+            cit->second.population         = 0;
+            cit->second.scale              = 1;
+            cit->second.growth_accumulator = 0;
             return corp_command_result::applied;
         }
     }

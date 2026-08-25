@@ -126,6 +126,25 @@ int main()
     if (neg_centre != null_entity)
         w.population_centres.at(neg_centre).growth_accumulator = -37;
 
+    // BL-624: the razed tier is a NEW persistent field (format v15), default
+    // false everywhere at generation — so demote one centre to the razed
+    // state before the round trip, in the shape raze_centre leaves it
+    // (population 0, scale 1, razed set). Highest centre id, so it never
+    // collides with the negative-streak fixture above.
+    entity_id razed_centre = null_entity;
+    for (const auto& [cid, pcc] : w.population_centres)
+        if (razed_centre == null_entity || cid > razed_centre)
+            razed_centre = cid;
+    if (razed_centre != null_entity && razed_centre != neg_centre)
+    {
+        auto& pcc      = w.population_centres.at(razed_centre);
+        pcc.razed      = true;
+        pcc.population = 0;
+        pcc.scale      = 1;
+    }
+    else
+        razed_centre = null_entity; // a one-centre world: skip the fixture
+
     // -----------------------------------------------------------------------
     // P1 (R1) -- a round trip preserves every serialised field
     // -----------------------------------------------------------------------
@@ -157,6 +176,20 @@ int main()
         check(read_ok && bit != loaded.buildings.end()
                   && bit->second.wage_bid == 0.4375f,
               "P1 building wage_bid (BL-614) round-trips at its written value");
+    }
+
+    // BL-624: the razed centre reloads as the ruin it is — flag, zeroed
+    // population and floored scale all by VALUE, and the entity/name/tile
+    // records all still present (demotion, not erasure).
+    if (razed_centre != null_entity)
+    {
+        const auto cit = loaded.population_centres.find(razed_centre);
+        check(read_ok && cit != loaded.population_centres.end()
+                  && cit->second.razed && cit->second.population == 0
+                  && cit->second.scale == 1
+                  && loaded.population_centre_tile.count(razed_centre) == 1
+                  && loaded.population_centre_name.count(razed_centre) == 1,
+              "P1 a razed centre (BL-624) round-trips as razed, with entity/name/tile kept");
     }
 
     // -----------------------------------------------------------------------
@@ -212,13 +245,13 @@ int main()
             // same record would shift with it. The whole stream is refused
             // instead -- a v4 save is not migrated, it is rejected, and the
             // destination is not touched.
-            static_assert(world_save_version == 14,
-                          "P9..P18 name v4..v13 as refused "
+            static_assert(world_save_version == 15,
+                          "P9..P19 name v4..v14 as refused "
                           "predecessors; re-read these rows on a bump");
             std::string bad = bytes_once;
             const uint32_t v4 = 4;
             std::memcpy(&bad[4], &v4, sizeof v4);
-            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v14)");
+            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v15)");
         }
         {
             // Sprint 16, BL-571: the IMMEDIATE previous format (BL-570's v5,
@@ -232,7 +265,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v5 = 5;
             std::memcpy(&bad[4], &v5, sizeof v5);
-            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused (format is v14)");
+            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused (format is v15)");
         }
         {
             // Sprint 16, BL-572: the IMMEDIATE previous format (BL-571's v6,
@@ -245,7 +278,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v6 = 6;
             std::memcpy(&bad[4], &v6, sizeof v6);
-            check(!from_bytes(bad, victim), "P11 a v6-versioned stream is refused (format is v14)");
+            check(!from_bytes(bad, victim), "P11 a v6-versioned stream is refused (format is v15)");
         }
         {
             // Sprint 16, BL-573: the IMMEDIATE previous format (BL-572's v7,
@@ -257,7 +290,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v7 = 7;
             std::memcpy(&bad[4], &v7, sizeof v7);
-            check(!from_bytes(bad, victim), "P12 a v7-versioned stream is refused (format is v14)");
+            check(!from_bytes(bad, victim), "P12 a v7-versioned stream is refused (format is v15)");
         }
         {
             // BL-585: the IMMEDIATE previous format (Sprint 16's v8, the
@@ -270,7 +303,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v8 = 8;
             std::memcpy(&bad[4], &v8, sizeof v8);
-            check(!from_bytes(bad, victim), "P13 a v8-versioned stream is refused (format is v14)");
+            check(!from_bytes(bad, victim), "P13 a v8-versioned stream is refused (format is v15)");
         }
         {
             // BL-586 slice 2: the IMMEDIATE previous format (BL-585's v9, the
@@ -282,7 +315,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v9 = 9;
             std::memcpy(&bad[4], &v9, sizeof v9);
-            check(!from_bytes(bad, victim), "P14 a v9-versioned stream is refused (format is v14)");
+            check(!from_bytes(bad, victim), "P14 a v9-versioned stream is refused (format is v15)");
         }
         {
             // v10 (BL-586 slice 2) is refused twice over after this wave: it has
@@ -294,7 +327,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v10 = 10;
             std::memcpy(&bad[4], &v10, sizeof v10);
-            check(!from_bytes(bad, victim), "P15 a v10-versioned stream is refused (format is v14)");
+            check(!from_bytes(bad, victim), "P15 a v10-versioned stream is refused (format is v15)");
         }
         {
             // v11 (BL-612's intermediate shape, this wave) still lacks the
@@ -305,7 +338,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v11 = 11;
             std::memcpy(&bad[4], &v11, sizeof v11);
-            check(!from_bytes(bad, victim), "P16 a v11-versioned stream is refused (format is v14)");
+            check(!from_bytes(bad, victim), "P16 a v11-versioned stream is refused (format is v15)");
         }
         {
             // v12 (BL-611's intermediate shape, this wave) predates BL-613's
@@ -315,7 +348,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v12 = 12;
             std::memcpy(&bad[4], &v12, sizeof v12);
-            check(!from_bytes(bad, victim), "P17 a v12-versioned stream is refused (format is v14)");
+            check(!from_bytes(bad, victim), "P17 a v12-versioned stream is refused (format is v15)");
         }
         {
             // v13 (BL-613's renumbered intermediate) still lacks wage_bid in
@@ -324,7 +357,16 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v13 = 13;
             std::memcpy(&bad[4], &v13, sizeof v13);
-            check(!from_bytes(bad, victim), "P18 a v13-versioned stream is refused (format is v14)");
+            check(!from_bytes(bad, victim), "P18 a v13-versioned stream is refused (format is v15)");
+        }
+        {
+            // v14 (the pre-BL-624 release format) still lacks the razed flag
+            // in the population-centre record -- one w_int short, mid-record.
+            // Refused whole, same contract as every prior bump.
+            std::string bad = bytes_once;
+            const uint32_t v14 = 14;
+            std::memcpy(&bad[4], &v14, sizeof v14);
+            check(!from_bytes(bad, victim), "P19 a v14-versioned stream is refused (format is v15)");
         }
         {
             // Truncated mid-way through the tile store -- far enough in that a

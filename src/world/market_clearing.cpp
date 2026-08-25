@@ -247,6 +247,9 @@ void inject_population_demand(world& w, const recipe_registry& reg)
 
     for (const auto& [centre_id, pcc] : w.population_centres)
     {
+        if (pcc.razed)
+            continue; // BL-624 (razed settlement tier): a razed centre has no
+                      // heads to feed — it injects no demand until re-settled.
         const auto tile_it = w.population_centre_tile.find(centre_id);
         if (tile_it == w.population_centre_tile.end())
             continue;

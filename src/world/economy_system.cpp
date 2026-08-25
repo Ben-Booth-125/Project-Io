@@ -985,6 +985,9 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     for (const entity_id cid : centre_ids)
     {
         const population_centre_component& pcc = w.population_centres.at(cid);
+        if (pcc.razed)
+            continue; // BL-624: a razed centre supplies no labour and carries
+                      // no habitability weight — ash has no workforce.
         const auto tile_it = w.population_centre_tile.find(cid);
         if (tile_it == w.population_centre_tile.end())
             continue;
@@ -1540,6 +1543,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         for (const entity_id cid : centre_ids)
         {
             const population_centre_component& pcc = w.population_centres.at(cid);
+            if (pcc.razed)
+                continue; // BL-624: no habitability weight from a razed centre.
             const auto tile_it = w.population_centre_tile.find(cid);
             if (tile_it == w.population_centre_tile.end())
                 continue;
@@ -1612,6 +1617,13 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     constexpr int k_promotion_window_ticks = 50; ///< sustained ticks above the rung to promote.
     constexpr int k_decline_step_ticks     = 10; ///< failing ticks per shed step.
     constexpr int k_decline_step_divisor   = 25; ///< shed = max(1, pop/25).
+    /// BL-624 (razed settlement tier): sustained-met ticks to RE-SETTLE a
+    /// razed centre back to scale 1 with a village-rung seed population.
+    /// HALF the promotion window, by design ("rebuilding there is cheap" —
+    /// the urban ground and the entity already exist, so re-settling costs
+    /// less patience than climbing a tier). First-cut constant, derived from
+    /// the window rather than chosen fresh.
+    constexpr int k_resettle_window_ticks  = k_promotion_window_ticks / 2;
     const growth_params& growth_sp = reg.growth();
 
     // Per-body market basket, summed over ALL the body's markets (BL-357). A body
@@ -1679,6 +1691,34 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
 
         const bool conditions_met = (hab >= 0.5f)
                                  && (met_ratio >= growth_sp.growth_met_threshold);
+
+        // BL-624: a RAZED centre sits outside the ordinary ladder — nothing
+        // to grow, shed or demote (the decline arm's max(1, ...) floor would
+        // otherwise conjure a head from ash). The same conditions gate the
+        // same streak accumulator; held met for k_resettle_window_ticks —
+        // half the promotion window — the centre RE-SETTLES: razed cleared,
+        // scale 1, the village-rung seed population (the same figure an
+        // anchor founding starts at).
+        if (pcc.razed)
+        {
+            if (conditions_met)
+            {
+                pcc.growth_accumulator = std::max(pcc.growth_accumulator, 0) + 1;
+                if (pcc.growth_accumulator >= k_resettle_window_ticks)
+                {
+                    pcc.razed              = false;
+                    pcc.scale              = 1;
+                    pcc.population         = k_population_for_scale[0];
+                    pcc.growth_accumulator = 0; // the ladder restarts settled
+                }
+            }
+            else
+            {
+                pcc.growth_accumulator = std::min(pcc.growth_accumulator, 0) - 1;
+            }
+            continue;
+        }
+
         if (conditions_met)
         {
             // Extend (or restart) the positive streak.
@@ -1938,6 +1978,11 @@ migration_tick run_population_migration(world& w, const recipe_registry& reg,
         for (const entity_id cid : ids)
         {
             const population_centre_component& pcc = w.population_centres.at(cid);
+            if (pcc.razed)
+                continue; // BL-624: migration ignores a razed centre entirely —
+                          // it sheds nobody (population 0) and RECEIVES nobody;
+                          // re-settlement is the growth pass's reduced gate, not
+                          // a migrant stream into ash.
             const auto tit = w.population_centre_tile.find(cid);
             if (tit == w.population_centre_tile.end())
                 continue;

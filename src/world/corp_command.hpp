@@ -98,7 +98,7 @@ enum class corp_verb : uint8_t
     // DELIBERATELY NOT in corp_ai.cpp's candidate list: no standing-rules
     // grant covers a rival razing, so the verb exists on the seam (player /
     // agent reach) and the scorer never emits it.
-    raze_centre,       ///< `corp` razes population centre `subject`. Occupation-context: requires the corp's own military presence (a unit) on the centre's body. Irreversible; the urban ground stays stamped.
+    raze_centre,       ///< `corp` razes population centre `subject`. Occupation-context: requires the corp's own military presence (a unit) on the centre's body. Demotes to the razed tier (BL-624) — population zeroed, entity/name/tile/urban ground kept, the province anchor survives; the growth pass re-settles at a reduced gate.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve

@@ -916,6 +916,23 @@ struct population_centre_component
     /// the holder derivation, demand, naming, the urban stamp — treats an
     /// anchor as the ordinary centre it is.
     bool province_anchor = false;
+
+    /// BL-624 (razed settlement tier; Ben, 2026-08-25: "keep razed settlement
+    /// as a settlement tier, so it's cheap to rebuild there"). True after
+    /// `raze_centre` DEMOTES this centre: population zeroed, but the entity,
+    /// its name, its tile and its urban ground all persist, and the centre
+    /// still anchors its province (scale is set to 1 at the raze so the
+    /// anchor derivation — a strictly-positive scale scan — still finds it).
+    /// While razed the centre contributes NO labour, NO demand, NO
+    /// agglomeration and NO habitability weight, and migration ignores it;
+    /// the ordinary growth pass re-settles it at a reduced gate
+    /// (economy_system.cpp § k_resettle_window_ticks), clearing this flag.
+    ///
+    /// A bool beside `province_anchor`, not a tier enum: razed is ORTHOGONAL
+    /// to scale (the rung a rebuild climbs back through) and to anchor-hood
+    /// (which must survive the raze), so folding it into either would
+    /// conflate independent axes.
+    bool razed = false;
 };
 
 /// Deployable unit stub. Faction AI and transport are deferred; the combat

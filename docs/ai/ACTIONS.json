@@ -2412,15 +2412,16 @@
         {
           "name": "subject",
           "type": "entity_id",
-          "meaning": "The population centre to raze. Irreversible — the centre and its name are erased; the urban ground it stamped (BL-612) stays stamped."
+          "meaning": "The population centre to raze. Demotes to the razed tier (BL-624, razed settlement tier) — population zeroed and the razed state set, but the entity, its name, its tile and the urban ground it stamped (BL-612) all persist."
         }
       ],
       "preconditions": [
         "`subject` names a real population centre with a tile record (rejected_invalid otherwise).",
+        "`subject` is not already razed (rejected_state — a ruin cannot be razed again).",
         "OCCUPATION: the acting corp owns at least one unit positioned on the centre's body (rejected_state otherwise) — the deliberate-destruction act is only reachable with military presence, per POPULATION.md § Growth, decline and razing."
       ],
-      "expected_output": "The centre is erased from the world (component, tile record, name). Its urban land-use stamp remains — razed ground reads as historied, and the extraction it blocked stays blocked. Razing an ANCHOR centre (BL-611) does not rewrite the live province holder; a future holder re-derivation falls back to territory plurality, and the conquest consequence belongs to BL-518.",
-      "reason_to_select": "The one way a centre is ever destroyed: passive decline only shrinks (scale floors at 1). An occupier razes to deny the province's anchor value rather than hold it — rare by design, because occupying is almost always worth more than ash."
+      "expected_output": "The centre is DEMOTED, never erased (BL-624): population 0, scale 1, razed set; entity, name, tile record and urban land-use stamp all kept — razed ground reads as historied, and the extraction it blocked stays blocked. The centre still anchors its province (a ruin can be captured, so razing never deletes a conquest handle); the live province holder is not rewritten — the conquest consequence belongs to BL-518. While razed it contributes no labour, demand, agglomeration or habitability weight; the ordinary growth pass re-settles it at a reduced gate (half the promotion window) back to scale 1 with a small seed population.",
+      "reason_to_select": "The strongest act against a settlement: passive decline only shrinks (scale floors at 1), and razing knocks it to the razed tier. An occupier razes to null the centre's economy without deleting the province's capture anchor — rare by design, because occupying is almost always worth more than ash, and the ruin re-settles cheaply if conditions return."
     },
     {
       "id": "chrome.quick_save_key",
