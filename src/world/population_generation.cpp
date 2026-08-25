@@ -21,8 +21,9 @@
 
 namespace {
 
-/// Headcount in thousands for each scale level 1–5.
-constexpr int k_population_for_scale[5] = { 10, 50, 200, 1000, 5000 };
+// k_population_for_scale moved to population_generation.hpp (BL-616): the
+// promotion/decline pass in economy_system.cpp reads the same rungs, and two
+// copies of the scale->headcount table is how they drift apart.
 
 /// Weighted scale distribution: indices 0–4 correspond to scale 1–5.
 /// Weights: 40%, 30%, 20%, 8%, 2%.

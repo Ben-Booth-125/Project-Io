@@ -91,6 +91,14 @@ enum class corp_verb : uint8_t
     // live one early.
     accept_offer,      ///< Convert live offer `order` (a mercenary_offer id) into a mercenary_contract, committing `units` (the corp's own). `counterparty` names the offer's client NATION for this verb, not a corp — the seam's counterparty check forks on verb; see corp_command.cpp.
     abandon_contract,  ///< `corp` (the contractor) walks away from live contract `order` early. Same money outcome as a failure (deposit only); a distinct, lesser sentiment magnitude (CONTRACTS.md § Q2).
+    // --- BL-616: razing joins the seam (2026-08-25) ---
+    // Appended AFTER abandon_contract, same append-only rule. The deliberate
+    // destruction act POPULATION.md § Growth, decline and razing reserves for
+    // an agent in occupation — passive decline only ever shrinks a centre.
+    // DELIBERATELY NOT in corp_ai.cpp's candidate list: no standing-rules
+    // grant covers a rival razing, so the verb exists on the seam (player /
+    // agent reach) and the scorer never emits it.
+    raze_centre,       ///< `corp` razes population centre `subject`. Occupation-context: requires the corp's own military presence (a unit) on the centre's body. Irreversible; the urban ground stays stamped.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -100,7 +108,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::abandon_contract) + 1;
+    static_cast<uint8_t>(corp_verb::raze_centre) + 1;
 
 /// Ceiling on one corporation's outstanding sell orders. The book is now
 /// reachable by command, so it is reachable by a scorer with a bug in it — this

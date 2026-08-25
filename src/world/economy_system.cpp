@@ -7,6 +7,7 @@
 #include "logistics.hpp"       // invalidate_logistics_caches, tile_traversal_cost, intra_body_path (BL-470)
 #include "market_clearing.hpp" // market_for_tile (BL-095 construction gate)
 #include "placement_rules.hpp" // stack_output_scalar (BL-193 building stacks)
+#include "population_generation.hpp" // k_population_for_scale (BL-616 promotion/decline rungs)
 #include "stance.hpp"          // is_hostile (BL-470's NR-344: war flips the march queue)
 #include "tech_gate.hpp"       // recipe_unlocked (BL-588)
 #include "unit_roster.hpp"     // resolve_unit_upkeep (BL-454 unit pass), unit_roster_table (BL-470)
@@ -1561,15 +1562,39 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         }
     }
 
-    // BL-048B / BL-078: Population growth step — accumulate growth per centre each
-    // tick; level up when the accumulator crosses the tier threshold. Growth ticks
-    // only when body habitability >= 0.5 AND the population's whole consumption
-    // basket is met at >= growth_met_threshold (BL-078 keys growth off met-supply,
-    // not food alone — minimal bounded growth, no habitability feedback loop). The
-    // met-supply is read from last tick's cleared market (this step precedes
+    // BL-048B / BL-078 / BL-616: Population growth, promotion and decline
+    // (docs/economy/POPULATION.md § Growth, decline and razing). Each tick a
+    // centre's conditions either hold — body habitability >= 0.5 AND the
+    // consumption basket met at >= growth_met_threshold (BL-078 keys growth off
+    // met-supply, not food alone) — or fail. `growth_accumulator` counts the
+    // CONSECUTIVE streak, positive while conditions hold, negative while they
+    // fail; flipping direction resets it, and it rides the existing serialised
+    // field (negative values round-trip — save_roundtrip R10), so BL-616 adds
+    // no persistent state.
+    //
+    //  - GROWTH: every k_growth_step_ticks of sustained met conditions the
+    //    population takes a step of max(1, pop / k_growth_step_divisor) — real
+    //    heads, integer thousands, superseding the old set-to-scalex10 proxy.
+    //  - PROMOTION: population held above the NEXT tier's rung
+    //    (k_population_for_scale, population_generation.hpp) with conditions
+    //    met for at least k_promotion_window_ticks promotes ONE scale tier;
+    //    the streak restarts. Since centres anchor provinces (BL-611),
+    //    promotion moves the political map's value during play.
+    //  - DECLINE: every k_decline_step_ticks of sustained failure sheds the
+    //    same-shaped step, and a population below its CURRENT tier's rung
+    //    demotes one tier. Asymmetric by design: passive failure only shrinks
+    //    — scale floors at 1, population floors at 1, the centre is NEVER
+    //    destroyed, and its urban ground (BL-612) is never unstamped. Outright
+    //    destruction is the deliberate raze_centre corp_verb (corp_command.cpp).
+    //
+    // The met-supply is read from last tick's cleared market (this step precedes
     // clear_markets in the tick), so it is deterministic and price-consistent.
-    // Tier thresholds (ticks to grow): scale 1→2: 200, 2→3: 500, 3→4: 1500, 4→5: 5000.
-    static constexpr int growth_threshold[6] = { 0, 200, 500, 1500, 5000, 0 };
+    // Step sizes/windows are first-cut tuning constants, not commitments.
+    constexpr int k_growth_step_ticks      = 10; ///< qualifying ticks per growth step.
+    constexpr int k_growth_step_divisor    = 25; ///< step = max(1, pop/25) — ~4% per step.
+    constexpr int k_promotion_window_ticks = 50; ///< sustained ticks above the rung to promote.
+    constexpr int k_decline_step_ticks     = 10; ///< failing ticks per shed step.
+    constexpr int k_decline_step_divisor   = 25; ///< shed = max(1, pop/25).
     const growth_params& growth_sp = reg.growth();
 
     // Per-body market basket, summed over ALL the body's markets (BL-357). A body
@@ -1597,10 +1622,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         }
     }
 
-    for (auto& [cid, pcc] : w.population_centres)
+    // centre_ids (sorted above): per-centre integer arithmetic, but walk in
+    // ascending id anyway so any future cross-centre coupling stays ordered.
+    for (const entity_id cid : centre_ids)
     {
-        if (pcc.scale >= 5)
-            continue; // already at max
+        population_centre_component& pcc = w.population_centres.at(cid);
 
         const auto tile_it = w.population_centre_tile.find(cid);
         if (tile_it == w.population_centre_tile.end())
@@ -1612,13 +1638,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
 
         const auto hit = report.body_habitability.find(body);
         const float hab = (hit != report.body_habitability.end()) ? hit->second : 1.0f;
-        if (hab < 0.5f)
-            continue;
 
         // Met-supply ratio across the whole demand basket (BL-078): a basket-weighted
         // mean of supply/demand over the body's aggregated markets (BL-357), so a
         // centre grows only when its population's consumption is broadly met and
-        // plateaus when it is not.
+        // declines when it is not.
         float met_ratio = 1.0f;
         if (const auto dit = basket_demand.find(body); dit != basket_demand.end())
         {
@@ -1635,17 +1659,39 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             if (met_weight > 0.0f)
                 met_ratio = met_acc / met_weight;
         }
-        if (met_ratio < growth_sp.growth_met_threshold)
-            continue;
 
-        ++pcc.growth_accumulator;
-        const int threshold = growth_threshold[std::clamp(pcc.scale, 1, 5)];
-        if (threshold > 0 && pcc.growth_accumulator >= threshold)
+        const bool conditions_met = (hab >= 0.5f)
+                                 && (met_ratio >= growth_sp.growth_met_threshold);
+        if (conditions_met)
         {
-            ++pcc.scale;
-            pcc.growth_accumulator = 0;
-            // Population headcount: scale × base (10k per scale level as a rough proxy).
-            pcc.population = pcc.scale * 10;
+            // Extend (or restart) the positive streak.
+            pcc.growth_accumulator = std::max(pcc.growth_accumulator, 0) + 1;
+            if (pcc.growth_accumulator % k_growth_step_ticks == 0)
+                pcc.population += std::max(1, pcc.population / k_growth_step_divisor);
+            // PROMOTION: population held above the next rung for the window.
+            if (pcc.scale >= 1 && pcc.scale < 5
+                && pcc.population >= k_population_for_scale[pcc.scale] // index scale == next tier's rung
+                && pcc.growth_accumulator >= k_promotion_window_ticks)
+            {
+                ++pcc.scale;
+                pcc.growth_accumulator = 0; // the window restarts at the new tier
+            }
+        }
+        else
+        {
+            // Extend (or restart) the negative streak.
+            pcc.growth_accumulator = std::min(pcc.growth_accumulator, 0) - 1;
+            if ((-pcc.growth_accumulator) % k_decline_step_ticks == 0)
+                pcc.population = std::max(1, pcc.population
+                                              - std::max(1, pcc.population / k_decline_step_divisor));
+            // DEMOTION: population below the CURRENT tier's rung. Floors at
+            // scale 1 / population 1 — passive failure never destroys a centre
+            // (BL-616's asymmetry), and its urban ground stays stamped.
+            if (pcc.scale > 1
+                && pcc.population < k_population_for_scale[pcc.scale - 1])
+            {
+                --pcc.scale;
+            }
         }
     }
 
