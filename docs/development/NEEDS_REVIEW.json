@@ -757,6 +757,19 @@
     "src/world/province.cpp",
     "src/world/population_generation.cpp"
    ]
+  },
+  {
+   "id": "NR-637",
+   "title": "At the new density the Planetary canvas reads settlement-saturated at far zoom - does the marker vocabulary need a tier gate?",
+   "raised": "2026-08-25",
+   "kind": "question",
+   "status": "open",
+   "source": "lens_strip_population.png captured on the integrated wave-1 world (build/screenshots/).",
+   "what": "With ~1,450 centres the always-on civic chrome draws a skyline glyph for nearly every land tile cluster - the lived-in goal is unmistakably met, but at far zoom the surface reads as a uniform settlement grid rather than a hierarchy of cities over towns over villages. Candidate directions, Ben's call: (a) zoom-gate village markers (scale 1 renders only past a zoom threshold, the conurbation anchor carries the far read); (b) raise the conurbation clustering distance so villages fold into their town's glyph; (c) leave it - density IS the message. POPULATION.md § Centre rendering owns the vocabulary.",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "docs/economy/POPULATION.md"
+   ]
   }
  ]
 }

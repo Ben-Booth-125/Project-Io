@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*45 entries — 45 open, 0 resolved.*
+*46 entries — 46 open, 0 resolved.*
 
 ---
 
@@ -458,6 +458,13 @@ The carve model is: count = each living region's urban headcount (10% share) / 1
 (1) The whole land fill is nation-locked (growth, leftovers, singleton absorption), making land provinces single-nation by construction - this is the core of purged BL-563 (province respects nation), designed but never built; the brief's anchor==tile-owner assertion is unreachable without it. (2) Centre-less pockets get a scale-1 anchor FOUNDING post-partition (relaxed habitability gate on pure-ice, counted), flagged province_anchor and excluded from partition seeding so the partition stays a pure function of the pre-anchor world - hence the second save bump. Also: hinterland seeding retained on UNSETTLED bodies' land (Selene/Cinder/Pallas have no centres); P9b retired as superseded (absorption legitimately merges centres at this density); P5d redefined to the nation lock.
 
 *Files: `src/world/province.cpp`, `src/world/population_generation.cpp`*
+
+### NR-637 — At the new density the Planetary canvas reads settlement-saturated at far zoom - does the marker vocabulary need a tier gate?
+*question · raised 2026-08-25 · from lens_strip_population.png captured on the integrated wave-1 world (build/screenshots/).*
+
+With ~1,450 centres the always-on civic chrome draws a skyline glyph for nearly every land tile cluster - the lived-in goal is unmistakably met, but at far zoom the surface reads as a uniform settlement grid rather than a hierarchy of cities over towns over villages. Candidate directions, Ben's call: (a) zoom-gate village markers (scale 1 renders only past a zoom threshold, the conurbation anchor carries the far read); (b) raise the conurbation clustering distance so villages fold into their town's glyph; (c) leave it - density IS the message. POPULATION.md § Centre rendering owns the vocabulary.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `docs/economy/POPULATION.md`*
 
 ---
 
