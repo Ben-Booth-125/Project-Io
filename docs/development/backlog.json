@@ -423,7 +423,8 @@
         "docs/economy/LOGISTICS.md"
       ],
       "authority_doc": "docs/economy/LOGISTICS.md",
-      "design": "Ruled 2026-08-24 (Sprint 18 design form: shape A, active first): the LP substrate and its FIRST consumer land together, per settled rule 3 — read docs/economy/LOGISTICS.md § Logistic Points whole before implementing; all seven cut constraints bind. Cities generate the bifold per-tick rate (a RATE, not a stock: computed, spent or wasted, never banked, never serialised, no state_hash entry). Active LP prices run_unit_march in credits — march points still spend against traversal cost; active LP is what makes that march cost money (the 2026-08-22 ruling). A refused march is announced, never silently queued. Allocation is a deterministic priority over sorted city ids. First-cut rates authored here, argued against BL-543 (value anchor) and flagged for tuning (NR-600). Fresh authoring: BL-464 and the purged Sprint 32 item prose are reference only. Harness: generation determinism across two runs of one seed, march debit exactness, a refusal mutates nothing. COMPLETE 2026-08-24 (Sprint 18 wave 2, built in place on main): active_lp_anchor_pools (logistics.cpp/hpp), run_unit_march gated on nearest-anchor active LP with credit debit, refused draws mutate nothing (unit_march_tick::refused_no_lp). First-cut rates in scripts/economy.lua (NR-600). Verified independently: logistic_points_harness 27/27 fresh rebuild; unit_march_harness 89/90, the one failure (corp_verb_count staleness) confirmed pre-existing since Sprint 16's BL-573, unrelated; full ProjectIo rebuild clean. NR-619 filed for the nearest-anchor interpretation and refusal-surfacing gap (owed to BL-598). Commit 3cd0204c."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "status": "complete",
@@ -451,7 +452,8 @@
         "docs/economy/LOGISTICS.md"
       ],
       "authority_doc": "docs/economy/LOGISTICS.md",
-      "design": "The second consumer, same sprint (active landed first by ruling). Passive LP caps the automatic trade flow: each dispatch leg draws passive throughput at its route’s city loci; an over-cap leg is REFUSED outright and announced (a refusal nobody sees is silent interdiction again), never queued or clamped. LP is a cap, not a price — credits stay the price (settled rule 1). With both halves live, the built mobilised-first visit order (economy_system.cpp § run order) finally contends for a real pool: goods-vs-force priority becomes an explicit design instead of a tick-phase accident. Harness: admit/refuse boundary exactness, order-independence under contention (two iteration orders, one allocation), the queue flip observable under mobilisation. PAUSED 2026-08-25 (Sprint 18 wave 3), NOT merged. Built and harness-green (34/34, including a real demonstration of war-flips-the-queue), but haulage_measure measured a 73% collapse in real convoy traffic (1055 -> 284 dispatched; 802 -> 246 intra-body). Cause is the draw formula: commit_convoy draws leg.dist, and LOGISTICS.md constraint 3 forbids a distance-proportional LP cost outright (\"LP *is* haulage cost again\"), as does rule 1 (double-charging distance). Work preserved on branch wip/bl-597-lp-passive-convoys (3ab3b452); main untouched. Awaiting Ben's ruling on the formula — NR-620. COMPLETE 2026-08-25, after Ben's ruling on NR-620: the passive draw is CARGO QUANTITY, not route distance. Rebuilt on that formula, leg.dist removed rather than left write-only, and the harness row that pins it (P1) now asserts the pool falls by the cargo quantity specifically, so a return to a distance draw fails it. Measured on the real generated world: 1041 convoys / 789 intra-body against the 1055/802 no-gate baseline (98.7% restored) with ~14 legs still refused, so the cap binds without strangling; the 20.0 rate was right all along. logistic_points_convoy_harness 33/33 including the re-tuned war-flips-the-queue contention row, full suite green except the pre-existing corp_verb_count staleness."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "status": "complete",
@@ -476,7 +478,8 @@
         "docs/ai/AI_OPPONENT.md"
       ],
       "authority_doc": "docs/ai/AI_OPPONENT.md",
-      "design": "Granted 2026-08-24 (standing rules § the dated network grant; raised on the design form rather than assumed, per the NR-517 precedent). place_road joins the scorer’s candidate verbs; port and inland-hub build candidates are scored like any building. This satisfies LP constraint 5 — a rival must be able to build the generator — and honours Ben’s 2026-08-22 “before LP lands” ordering: this item is wave 1 of the sprint, ahead of BL-596 (LP active march). Deterministic scored-utility only; the purged BL-447 prose is reference. Harness: a rival extends the lattice identically across two runs of one seed. COMPLETE 2026-08-24 (Sprint 18 wave 1): corp_ai.cpp gains place_road and Port/Inland-Logistics-Hub candidates. Verified: corp_ai_harness 47/47 fresh on the merged tree; ai_skill_harness confirmed byte-identical with/without the change (both new paths inert there by the harness's own hand-built registry). Commit 327c7a3d."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "status": "complete",
@@ -501,7 +504,8 @@
         "docs/ai/AI_OPPONENT.md"
       ],
       "authority_doc": "docs/ai/AI_OPPONENT.md",
-      "design": "Granted 2026-08-24 (standing rules, same dated grant). corp_verb dispatch_convoy joins the scorer’s candidate list, through price_convoy_leg + commit_convoy — the same seam auto-dispatch and the player use; deliberately no fourth code path (SUPPLY.md § Dispatch trigger). The spend obeys the solvency gate like every other spend. Harness: a rival’s directed convoy equals a player’s of the same shape (extend convoy_command.cpp’s existing agreement rows). COMPLETE 2026-08-24 (Sprint 18 wave 1): corp_ai.cpp gains a directed dispatch_convoy candidate through the shared price_convoy_leg seam; resolve_command_body fixed to tag it correctly. Verified alongside BL-599, same byte-identical isolation test. Commit ff506a48."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "status": "complete",
@@ -525,7 +529,8 @@
         "docs/military/MILITARY.md"
       ],
       "authority_doc": "docs/military/MILITARY.md",
-      "design": "MILITARY.md § Upkeep designs one decay rule with two triggers; every rate in scripts/economy.lua § upkeep is zero today, so the wired code path is inert by data. Author non-zero decay/recovery/out_of_supply_reach and the ordnance draw, argued against BL-543 (value anchor); first-cut-then-tune, flagged for Ben’s calibration (NR-600). Harness: the reach trigger fires beyond out_of_supply_reach and recovery restores inside it; existing goldens that legitimately move are attributed. COMPLETE 2026-08-24 (Sprint 18 wave 1): rates landed in scripts/economy.lua (credits_per_head=6.0, credits_per_head_per_power=0.004, ordnance=0.14, food_rations=1.0, supply_decay_permille=50, supply_recovery_permille=100, out_of_supply_reach=24.0), verified against value_anchor (22/22) and the new upkeep_harness (19/19). tier_margin R2 failure confirmed pre-existing, independent of this change. Commit 4fff7972."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "status": "complete",
@@ -548,7 +553,8 @@
         "docs/ui/LENSES.md"
       ],
       "authority_doc": "docs/ui/LENSES.md",
-      "design": "Observed live 2026-08-25 (Ben): no logistics glyph below the minimap. Not a bug — draw_overlay_controls (src/ui/overlay.cpp) hardcodes an eight-lens strip and Throughput was deliberately left off it, joining the keyboard-cycle-only shelf with Scarcity, Industry, Supply, Reach and Supply-routes, on the stated ground that the 240px minimap bar has no room. Ben expected a glyph, so the shelf decision is worth revisiting for this lens at least. Note the interaction with BL-604: the strip currently LIVES on the minimap bar, and BL-604 gives the minimap rect to the legend — so where the strip goes is part of that layout question and these two should be settled together. icons::convoy already exists (icons.hpp) and overlay.cpp already maps it to overlay_mode::throughput for the cycle label; only a strip slot is missing. COMPLETE 2026-08-25: Throughput takes strip slot 6, with its own glyph — a TRUCK in profile (icons::throughput), Ben's call. Two abstract cuts were built and rejected against captures first: a funnel narrowing to a node read as a bowtie (an X, already the closed affordance in this vocabulary), and a ringed node with flow stubs read as a lone ring. Proportions matched to industry's vertical extent so it does not sit small against its neighbours. LENSES.md, ICONS.md and ACTIONS.json all updated; captured via lens_strip.lua."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "status": "complete",
@@ -575,7 +581,8 @@
         "docs/economy/LOGISTICS.md"
       ],
       "authority_doc": "docs/ui/LENSES.md",
-      "design": "LOGISTICS.md § Refusal: “Throughput is a lens, extending Reach” — the reach field with LP magnitude at each city locus on the Planetary canvas. Respect the three-state tile_reach_cost read (−1 not computed / finite / infinity unreachable) LOGISTICS.md §3 names as the UI trap, and both fogs. No per-tile data exposed to Lua (standing rules). Visual requirement: a live click in the built app, not just a capture. RENUMBERED BL-598 -> BL-606 on 2026-08-25. Sprint 17b and Sprint 18 ran concurrently on 2026-08-24 and both drew BL-598 from the same fresh id range for different work; 17b's landed in a FROZEN cold archive and holds the majority of live citations, so Sprint 18's id moved instead. Commit messages written before this pass still cite the old id — they are immutable and the mapping is recorded here."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "status": "complete",
@@ -599,7 +606,8 @@
         "docs/economy/SUPPLY.md"
       ],
       "authority_doc": "docs/economy/SUPPLY.md",
-      "design": "SUPPLY.md § Dispatch trigger designs it: a resource + quantity + destination-market form on the market Selection card — a form, not a press. Today no UI site issues corp_verb dispatch_convoy (the verb is wire-only; the decision feed merely renders it). Build the form, wire the verb, surface refusals inline (including BL-597’s passive-cap refusal once it lands). Live click required; question_log.json entry per the every-surface rule. COMPLETE 2026-08-24 (Sprint 18 wave 1): the market Selection card's Cargo/Quantity/Destination dispatch form, routed through apply_corp_command's dispatch_convoy verb. Verified: clean full ProjectIo build, smoke-launched (window opens, Lua loads, no crash). A live click is NOT yet observed -- no interactive access in this container; owed to whoever next has one. Commit 439fb0b6. RENUMBERED BL-601 -> BL-607 on 2026-08-25. Sprint 17b and Sprint 18 ran concurrently on 2026-08-24 and both drew BL-601 from the same fresh id range for different work; 17b's landed in a FROZEN cold archive and holds the majority of live citations, so Sprint 18's id moved instead. Commit messages written before this pass still cite the old id — they are immutable and the mapping is recorded here."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "status": "complete",
@@ -625,7 +633,8 @@
         "docs/economy/LOGISTICS.md"
       ],
       "authority_doc": "docs/economy/SUPPLY.md",
-      "design": "Park lifted 2026-08-24 (design form; the coastal-ports design was parked 2026-08-21). SUPPLY.md § Infrastructure gates: sea requires a Port at both endpoints; today the path picks sea mode ungated. Scope is the GATE: author the Port building (already named in reach’s anchor vocabulary, LOGISTICS.md §3), enforce the two-endpoint check at dispatch, surface the refusal. The wider archived BL-188 coastal-trade model stays reference, not scope. Golden churn from newly-refused sea legs is expected and must be attributed, never blessed away. COMPLETE 2026-08-24 (Sprint 18 wave 1): tile_has_active_port added to supply_system.cpp, gating price_convoy_leg on an active Port at both endpoints; ungated water-crossing legs are refused (rejected_placement, mutates nothing) rather than falling back to land pricing. Verified 23/23 in tools/verify/sea_port_gate.cpp. Golden churn: none in the standing suite; ai_skill_harness pre-existing red bands unrelated (NR-616). Commit b15d663e. RENUMBERED BL-602 -> BL-608 on 2026-08-25. Sprint 17b and Sprint 18 ran concurrently on 2026-08-24 and both drew BL-602 from the same fresh id range for different work; 17b's landed in a FROZEN cold archive and holds the majority of live citations, so Sprint 18's id moved instead. Commit messages written before this pass still cite the old id — they are immutable and the mapping is recorded here."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "status": "cancelled",

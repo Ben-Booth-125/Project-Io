@@ -43,26 +43,7 @@ and/or a version goal (v0.1.1 etc.).
 
 ## Open now
 
-### Sprint 18 — Logistic Points land with their consumers
-*Open · opened 2026-08-24*
-
-**Goal.** The network gets its ceiling: the bifold city-generated throughput rate LOGISTICS.md argues end-to-end, landing with both consumers — the priced march first (Ben, 2026-08-24), convoy admissibility second — plus the two rival network grants and the three riders the design form settled. Cuts v0.1.18 (amended: Logistic Points pulled forward from v0.1.20).
-
-**Planned.**
-- BL-599 (rival roads and hubs) — wave 1: the scorer builds the generator, per Ben’s “before LP lands” (grant 2026-08-24)
-- BL-596 (LP active march) — the bifold city rate + the priced march, one landing (settled rule 3)
-- BL-597 (LP passive convoys) — convoy admissibility; war flips the queue observably
-- BL-606 (throughput lens) — Reach with a magnitude; live click
-- BL-600 (rival directed dispatch) — the scorer directs convoys through the shared seam (grant 2026-08-24)
-- BL-607 (dispatch form) — the Selection-card form SUPPLY.md designs; live click
-- BL-608 (sea port gate) — the Port gates the sea leg (park lifted 2026-08-24)
-- BL-603 (upkeep zeros) — the reach field starts to bite (data edit; Ben calibrates)
-
-**Done when.** A march costs credits through active LP in a live game; an over-cap dispatch leg is refused and the refusal announced; the queue flip is observable under mobilisation in the harness; a rival places a road deterministically across two runs of one seed; the Throughput lens and the dispatch form each pass a live click.
-
-**Risk.** LP’s seven constraints each killed an earlier cut — constraint 3 (cost formula before allocation sort key) is the live one. The substrate deliberately keeps its measured mispricings (route-wide crosses_ocean, unpriced intra-catchment distance): Ben chose depth over correction on the design form, so LP’s first-cut rates are argued against numbers known to be imperfect and must be re-argued if a later sprint fixes them. Golden churn from upkeep zeros and the sea gate is real and is attributed, never blessed away.
-
-Verdict provenance — the 2026-08-24 design form: shape A over B/C/D (B’s pricing-honesty roster stays purged-designed reference); purged records enter FRESH, archive as reference only; Sprint 25b deleted under the purge policy (its interception-narration work is unowned — NR-599); rival grants place_road/hub + directed dispatch (standing rules, dated); riders all three (dispatch form, sea-gate park lift, upkeep zeros); LP consumer order ACTIVE FIRST; rates first-cut-then-tune (NR-600). Number reuse, deliberate (Ben, 2026-08-24): the superseded military-engagement Sprint 18 (opened 2026-08-15) is archived cold alongside the ‘18 retro’ and ‘18b’ entries; this sprint is a fresh authoring against the current docs, not a resurrection. PROGRESS 2026-08-25: seven of eight items landed and independently re-verified on the merged tree (never trusted from a sub-agent report) — BL-599/BL-600 (scorer network verbs), BL-607 (dispatch form, live click OWED — no interactive access in this container), BL-608 (sea Port gate), BL-603 (upkeep zeros, self-corrected against value_anchor), BL-596 (active LP prices the march), BL-606 (Throughput lens, live click OWED). BL-597 is PAUSED, not merged: harness-green 34/34 but haulage_measure measured real convoy traffic collapsing 1055 -> 284 (802 -> 246 intra-body), because its draw is distance-proportional — the exact formula LOGISTICS.md constraint 3 and rule 1 both forbid. Preserved on wip/bl-597-lp-passive-convoys (3ab3b452); awaiting Ben on NR-620. METHOD FINDINGS worth carrying: (1) no standing harness could see the trade collapse — ai_skill_harness never dispatches a convoy, data_creep_harness seeds them directly past the gate, and the item own fixtures ran a generous rate, so every golden stayed digit-for-digit identical while trade died; haulage_measure, which runs the real tick loop, was the only instrument that could. (2) Worktree isolation forked from a stale base on every wave-1 agent (a leftover detached-HEAD worktree, elated-mclean-7dd61c/jolly-tesla-49df05, still on disk and now also misdirecting computer-use tooling — NR-618, NR-622); waves 2-3 were run in-place on the shared checkout instead, and every wave-1 item was cherry-picked commit-by-commit rather than merged wholesale. (3) Sub-agents repeatedly stalled by backgrounding their own builds and ending the turn to await a notification that never comes. BL-597 LANDED 2026-08-25 after Ben ruled NR-620: rebuilt on a cargo-QUANTITY draw instead of route distance, restoring 1041/789 convoys against the 1055/802 baseline (98.7%) with the cap still binding on ~14 legs a run. The 20.0 rate was right all along; only the formula was wrong. All eight items are now in. ID RENUMBER 2026-08-25: Sprint 17b (merged the same day) had independently minted BL-598/601/602/604 for different work on 2026-08-24; 17b's records are frozen in the cold archive and hold most live citations, so Sprint 18's four moved — BL-598 -> BL-606 (throughput lens), BL-601 -> BL-607 (dispatch form), BL-602 -> BL-608 (sea port gate), BL-604 -> BL-609 (legend, cancelled). Commit messages predating the pass still cite the old ids and are immutable.
+*Nothing open.*
 
 ## Where things stand
 
@@ -97,11 +78,11 @@ Verdict provenance — the 2026-08-24 design form: shape A over B/C/D (B’s pri
 | N1 | The two spines, landed inert | Closed 2026-08-23 — all three landed inert; two of the three were UNSOUND and were fixed in the closing pass (NR-546, NR-547) |
 | N2 | The spines move | Closed — three lanes merged; one lane’s interpretation withdrawn after adversarial verification (NR-554) |
 | 17b | The shell stops fighting the map | Closed 2026-08-24 — goal met. All nine items; 93 scripts / 4 failures, all four pre-existing (NR-606). Four doc fictions found, one fixed |
+| 18 | Logistic Points land with their consumers | Closed 2026-08-25 — all eight landed (BL-596..BL-603, BL-606..BL-608); Sprint 17b merged alongside; v0.1.18 uncut pending Ben |
 | 26 | Re-baseline (the gate; nothing else may open first) | Subsumed — split at execution into 26a/26b, themselves deleted in the 2026-08-24 purge |
-| 18 | Logistic Points land with their consumers | Open 2026-08-24 — ALL EIGHT landed (BL-596..BL-603); two live clicks owed. Cuts v0.1.18 |
 
-**Next up.** As of 2026-08-24, **Sprint 18 (Logistic Points land with their consumers)** is the only open sprint — eight items, BL-596..BL-603, cutting v0.1.18 (Logistic Points pulled forward from v0.1.20 by the design-form verdict). Two cap slots free; any candidate numbers 18 or below. **BL-518** (the Era −1 sim redrawing borders as its wars resolve) and **BL-514** (blend all tiles, HELD) stay parked in `backlog.json`.
+**Next up.** As of 2026-08-25 **nothing is open** — Sprint 18 closed with all eight items landed, and Sprint 17b merged alongside it. All three cap slots are free; any candidate numbers 18 or below and is authored fresh against the current docs. **Owed before or with the next sprint:** two live clicks (the dispatch form and the Throughput lens, both compile-clean and never pressed), and the **v0.1.18 tag**, left uncut because a release is Ben's to call. **BL-518** (the Era −1 sim redrawing borders as its wars resolve) and **BL-514** (blend all tiles, HELD) stay parked in `backlog.json`.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*30 sprints archived cold; 1 open/gated in the hot store.*
+*31 sprints archived cold; 0 open/gated in the hot store.*
