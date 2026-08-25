@@ -82,7 +82,7 @@ and/or a version goal (v0.1.1 etc.).
 | 17b | The shell stops fighting the map | Closed 2026-08-24 — goal met. All nine items; 93 scripts / 4 failures, all four pre-existing (NR-606). Four doc fictions found, one fixed |
 | 18 | Logistic Points land with their consumers | Closed 2026-08-25 — all eight landed (BL-596..BL-603, BL-606..BL-608); Sprint 17b merged alongside; v0.1.18 uncut pending Ben |
 | 26 | Re-baseline (the gate; nothing else may open first) | Subsumed — split at execution into 26a/26b, themselves deleted in the 2026-08-24 purge |
-| 19 | The world reads lived-in - population foundations | Closed 2026-08-25 - eleven of twelve items landed (BL-610..BL-618, BL-620, BL-621); v0.1.19 cut with v0.1.18 stamped retroactively |
+| 19 | The world reads lived-in - population foundations | Closed 2026-08-25 - thirteen of fourteen items landed (BL-610..BL-618, BL-620, BL-621, BL-623, BL-624); v0.1.19 recut after the NR-640 verdict wave |
 
 **Next up.** Sprint 19 (opened 2026-08-25) is the active sprint - population foundations, BL-610..BL-619. Owed with it: two live clicks (dispatch form, Throughput lens) and the v0.1.18 tag, left uncut because a release is Ben's to call.
 

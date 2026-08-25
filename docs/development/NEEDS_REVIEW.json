@@ -836,6 +836,32 @@
     "docs/economy/LOGISTICS.md"
    ],
    "resolution": "Ben, 2026-08-25: era-relative thresholds - implemented same session as BL-621 (era-relative road gates); LOGISTICS.md updated, harness re-specified."
+  },
+  {
+   "id": "NR-642",
+   "title": "BL-623/BL-624 delegated calls: two-call partition, C2's roaded class deleted, scale-1 ruins, migration skips razed, demand skip in market_clearing",
+   "raised": "2026-08-25",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Agent W3's report, commits ef20f9fe / d8f7ed3a.",
+   "what": "Five calls, each overturnable: (1) the homeworld partition runs early (before roads) AND the canonical whole-world rebuild still runs at end of generation - byte-identical for early bodies since the fill reads no roads and anchors are seed-skipped; P6 guards the identity (Selene/Pallas are authored after the homeworld political pipeline, forcing the two-call shape). (2) The partition harness's roaded-edge instrument class (C2c) was DELETED rather than kept as a report row - against a pre-road partition it measures settlement clustering, not a rule. (3) A razed centre keeps SCALE 1 (not 0) so the strictly-positive anchor scan still finds the ruin; re-razing a ruin is rejected_state. (4) Migration ignores razed centres in both directions - re-settlement is the growth pass's job alone. (5) BL-624's demand skip landed in market_clearing.cpp, one file beyond the item's list (inject_population_demand lives there).",
+   "files": [
+    "src/world/hard_coded_world.cpp",
+    "src/world/province.cpp",
+    "src/world/market_clearing.cpp"
+   ]
+  },
+  {
+   "id": "NR-643",
+   "title": "Population-centre fields (razed, growth_accumulator, province_anchor) are outside world::state_hash - pre-existing scope, observed again",
+   "raised": "2026-08-25",
+   "kind": "observation",
+   "status": "open",
+   "source": "Agent W3, in passing (BL-624).",
+   "what": "state_hash folds the fields a tick may mutate, but the population-centre record's newer fields (BL-616's accumulator, BL-624's razed) are not in it - divergence in them would not move the hash. Today the harness determinism rows compare the fields directly, so drift is still caught; if state_hash is ever leaned on as the sole replay check for centre state, fold them in (a hash-baseline move, so do it deliberately with a re-bless).",
+   "files": [
+    "src/world/world.cpp"
+   ]
   }
  ]
 }

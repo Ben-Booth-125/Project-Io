@@ -992,7 +992,7 @@
    "id": "BL-623",
    "short_name": "PROVINCES_BEFORE_ROADS",
    "title": "The partition runs before roads; every province's settlement exists when the lattice is laid",
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "A",
    "difficulty": 3,
@@ -1012,13 +1012,13 @@
     "docs/generation/GENERATION_STRATEGY.md"
    ],
    "authority_doc": "docs/generation/PROVINCES.md",
-   "design": "Ruled 2026-08-25 (Ben, resolving NR-640 as option c): reorder the homeworld pipeline to ... institutional history -> provinces (+ ensure_province_anchor_centres) -> roads -> corporations -> markets -> laws. The partition drops roads from its inputs (partition ruling 2's binding half OVERTURNED, recorded in PROVINCES.md), so the road-bind divisor retires from the cost model, the partition's recompute contract (P6) trivially excludes roads, and the anchor foundings exist BEFORE generate_roads - they take local streets and spurs like any village, ending the off-lattice class entirely. Corporations stay after roads so placement reach reads the real network. Harness consequences owned here: province_partition_harness drops its road-bind rows and keeps P6/P7 against the new input set; road_generation_harness strengthens R3 back to every-centre-on-lattice and retires R3b. Design settled in PROVINCES.md (rulings 2/3) and GENERATION_STRATEGY.md (the run order) - read before implementing."
+   "design": "Ruled 2026-08-25 (Ben, resolving NR-640 as option c): reorder the homeworld pipeline to ... institutional history -> provinces (+ ensure_province_anchor_centres) -> roads -> corporations -> markets -> laws. The partition drops roads from its inputs (partition ruling 2's binding half OVERTURNED, recorded in PROVINCES.md), so the road-bind divisor retires from the cost model, the partition's recompute contract (P6) trivially excludes roads, and the anchor foundings exist BEFORE generate_roads - they take local streets and spurs like any village, ending the off-lattice class entirely. Corporations stay after roads so placement reach reads the real network. Harness consequences owned here: province_partition_harness drops its road-bind rows and keeps P6/P7 against the new input set; road_generation_harness strengthens R3 back to every-centre-on-lattice and retires R3b. Design settled in PROVINCES.md (rulings 2/3) and GENERATION_STRATEGY.md (the run order) - read before implementing. COMPLETION: Landed 2026-08-25 (Agent W3, ef20f9fe; merged main). Two-call partition shape (early homeworld + canonical end-of-gen rebuild, P6-guarded); road-bind divisor deleted; all 1,344 centres on the lattice (27 street-only survivors, counted); roaded tiles 1,511 -> 3,082; world_audit/partition/road/determinism all green."
   },
   {
    "id": "BL-624",
    "short_name": "RAZED_SETTLEMENT_TIER",
    "title": "Razing demotes a settlement to a razed tier; the province keeps its capture anchor and rebuilding is cheap",
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "A",
    "difficulty": 3,
@@ -1040,7 +1040,7 @@
     "docs/economy/POPULATION.md"
    ],
    "authority_doc": "docs/economy/POPULATION.md",
-   "design": "Ruled 2026-08-25 (Ben: 'keep razed settlement as a settlement tier, so it's cheap to rebuild there'). raze_centre stops erasing: it sets a persistent razed state - population zeroed, no labour/demand/agglomeration contribution, entity + name + tile + urban ground all kept, the centre still anchors its province (a ruin can be captured; the province-settlement invariant survives play). Rebuild: the ordinary growth pass re-settles a razed centre at a REDUCED gate (first-cut: half the promotion window; a data constant) back to scale 1, clearing the razed state. Serialisation: the razed field rides the centre record, save v14 -> v15, strict refusal. population_dynamics P3 rows re-specified from erasure to demotion; a new row proves razed -> regrown round-trip. ACTIONS.json raze_centre entry updated. Design settled in POPULATION.md section Growth, decline and razing - read before implementing."
+   "design": "Ruled 2026-08-25 (Ben: 'keep razed settlement as a settlement tier, so it's cheap to rebuild there'). raze_centre stops erasing: it sets a persistent razed state - population zeroed, no labour/demand/agglomeration contribution, entity + name + tile + urban ground all kept, the centre still anchors its province (a ruin can be captured; the province-settlement invariant survives play). Rebuild: the ordinary growth pass re-settles a razed centre at a REDUCED gate (first-cut: half the promotion window; a data constant) back to scale 1, clearing the razed state. Serialisation: the razed field rides the centre record, save v14 -> v15, strict refusal. population_dynamics P3 rows re-specified from erasure to demotion; a new row proves razed -> regrown round-trip. ACTIONS.json raze_centre entry updated. Design settled in POPULATION.md section Growth, decline and razing - read before implementing. COMPLETION: Landed 2026-08-25 (Agent W3, d8f7ed3a; merged main). razed bool beside province_anchor; raze demotes to a scale-1 ruin that still anchors; excluded from labour/demand/habitability/migration; re-settles at half the promotion window; save v14->v15; population_dynamics 31 assertions incl. the razed->regrown round-trip."
   }
  ]
 }

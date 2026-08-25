@@ -3856,14 +3856,14 @@
   {
    "brief": "provinces-before-roads",
    "title": "BL-623 - partition before roads, settlements before the lattice",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-25",
    "promoted_from": "backlog.json BL-623 (PROVINCES_BEFORE_ROADS) - Sprint 19, the world reads lived-in",
    "batch": "sprint-19-wave-3",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: province_partition_harness re-specified rows"
      ],
@@ -3872,7 +3872,7 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: road_generation_harness R3 strengthened"
      ],
@@ -3881,7 +3881,7 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_audit"
      ],
@@ -3893,14 +3893,14 @@
   {
    "brief": "razed-settlement-tier",
    "title": "BL-624 - razing demotes to a razed tier that anchors and regrows",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-25",
    "promoted_from": "backlog.json BL-624 (RAZED_SETTLEMENT_TIER) - Sprint 19, the world reads lived-in",
    "batch": "sprint-19-wave-3",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: population_dynamics P3 re-specified"
      ],
@@ -3909,7 +3909,7 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: population_dynamics new row"
      ],
@@ -3918,7 +3918,7 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: save_roundtrip rows"
      ],

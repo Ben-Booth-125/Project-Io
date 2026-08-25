@@ -43,6 +43,13 @@ minor cut was skipped by ruling (Ben, 2026-08-25); the next minor owes a diff ag
   to Track.
 - **RESEARCH.md** stub authority doc: universities produce RP; RP purchases unlocks (BL-619
   owns the full design).
+- **Provinces before roads** (BL-623, at the recut): the partition drops roads from its
+  inputs (the 2026-08-21 roads-bind ruling overturned), every province's settlement exists
+  when the lattice is laid, and all ~1,344 centres — anchor foundings included — join the
+  road network (+1,571 roaded tiles).
+- **The razed settlement tier** (BL-624, at the recut): razing demotes to a ruin that keeps
+  the province's capture anchor and re-settles at half the promotion window; the province
+  never loses its conquest handle. `world_save_version` 14 → 15.
 
 ### Fixed
 - The MCP server's verb table restored to lockstep (28 verbs) with a failing drift guard

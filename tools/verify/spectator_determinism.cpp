@@ -249,7 +249,13 @@ constexpr int      k_ticks = 300;
 // the antiquity world that was all-Track for a few hours. Confirmed
 // reproducible by R2's own two-independently-built-worlds row
 // (EE1AC6587E0D7800 twice). This is the v0.1.19 cut's constant.
-constexpr uint64_t k_unspectated_golden = 0xEE1AC6587E0D7800ull;
+// Re-blessed a fourth and final time for the v0.1.19 recut, 2026-08-25:
+// BL-623 (provinces before roads — the partition drops roads from its inputs
+// and anchors join the lattice, +1,571 roaded tiles) and BL-624 (razed
+// settlement tier, save v15). Confirmed reproducible by R2's own
+// two-independently-built-worlds row (81ADF917369317C7 twice) on the merged
+// wave-3 tree. This is the constant v0.1.19 ships with.
+constexpr uint64_t k_unspectated_golden = 0x81ADF917369317C7ull;
 
 /// Hand-built registry mirroring scripts/economy.lua + scripts/recipes.lua for
 /// the building types the generator places. Copied from ai_skill_harness so the
