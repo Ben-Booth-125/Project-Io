@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*48 entries — 48 open, 0 resolved.*
+*50 entries — 50 open, 0 resolved.*
 
 ---
 
@@ -479,6 +479,20 @@ Four calls, each overturnable: (1) raze_centre's occupation precondition = the a
 The MCP server's VERBS name array has 17 entries while corp_verb now counts 28 - every verb since BL-448 is unaddressable over the wire, and because index-is-value the fix is appending the full ordered tail, not one name. Compounding: tools/session/verb_coverage.js lists raze_centre unmapped alongside the pre-existing withdraw_from_battle / accept_offer / abandon_contract. An AI-facing seam drifted silently; worth a small owned fix plus a lint that diffs the array length against corp_verb_count.
 
 *Files: `tools/mcp/server.js`, `tools/session/verb_coverage.js`*
+
+### NR-640 — Anchor villages are OFF the road lattice - connecting them post-partition breaks partition-recompute reproducibility; ordering question for Ben
+*question · raised 2026-08-25 · from Agent W2G's report (BL-620): road_generation_harness R3 was already red at HEAD - BL-611's ensure_province_anchor_centres founds ~1,086 villages AFTER generate_roads.*
+
+Roads -> partition -> anchors is a hard ordering: roads bind provinces, so the partition must see final roads, and anchors exist only after the partition. W2G built and then REVERTED a connect-the-anchors pass because any post-partition road_level write changes the partition's input and broke P6 (partition-recompute reproducibility, a save/load contract) plus two more rows. Current contract, asserted by new R3/R3b: anchor foundings are the ONLY off-lattice centres. The open call: (a) leave anchors off-lattice as administrative foundings (current state - a pure-ice village with no road is arguably honest); (b) a partition fixpoint (roads -> partition -> anchors -> anchor spurs -> REPARTITION, iterate) - deterministic but a real algorithm change; (c) fold anchor founding INTO the pre-road centre pass somehow (loses the 'only provinces the fill left empty' definition).
+
+*Files: `src/world/hard_coded_world.cpp`, `src/world/road_generation.cpp`, `src/world/province.cpp`*
+
+### NR-641 — The default campaign world is now an ALL-TRACK lattice - every nation sits at the qualification floor at epoch 0
+*question · raised 2026-08-25 · from Agent W2G's report (BL-618): qualification spreads 0.05-0.60 only at epoch >= 1700; epoch_year 0 (the campaign default, an antiquity start) leaves every nation at the never-industrialised floor 0.05.*
+
+The first-cut tier mapping (Road needs qualification >= 0.10, Highway >= 0.30, redundancy loops rationed by qualification/0.40) is era-coherent - highways are industrial - but its visible consequence is that the DEFAULT generated world promotes nothing past Track: a global logistics-cost change (Track x0.67 vs Road x0.50 vs Highway x0.40) and a different-looking map. Options: (a) accept - an antiquity world with only tracks is honest, and roads arrive as qualification rises in play (BL-616's education loop now matters); (b) rebase the thresholds on the era-relative qualification distribution rather than absolute values, so antiquity keeps its Roman-road-analogue backbone; (c) keep absolute thresholds but lower them. Differential harness rows Q1-Q4 prove the lever works either way.
+
+*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
 
 ---
 

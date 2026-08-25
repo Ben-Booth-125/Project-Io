@@ -797,6 +797,33 @@
     "tools/mcp/server.js",
     "tools/session/verb_coverage.js"
    ]
+  },
+  {
+   "id": "NR-640",
+   "title": "Anchor villages are OFF the road lattice - connecting them post-partition breaks partition-recompute reproducibility; ordering question for Ben",
+   "raised": "2026-08-25",
+   "kind": "question",
+   "status": "open",
+   "source": "Agent W2G's report (BL-620): road_generation_harness R3 was already red at HEAD - BL-611's ensure_province_anchor_centres founds ~1,086 villages AFTER generate_roads.",
+   "what": "Roads -> partition -> anchors is a hard ordering: roads bind provinces, so the partition must see final roads, and anchors exist only after the partition. W2G built and then REVERTED a connect-the-anchors pass because any post-partition road_level write changes the partition's input and broke P6 (partition-recompute reproducibility, a save/load contract) plus two more rows. Current contract, asserted by new R3/R3b: anchor foundings are the ONLY off-lattice centres. The open call: (a) leave anchors off-lattice as administrative foundings (current state - a pure-ice village with no road is arguably honest); (b) a partition fixpoint (roads -> partition -> anchors -> anchor spurs -> REPARTITION, iterate) - deterministic but a real algorithm change; (c) fold anchor founding INTO the pre-road centre pass somehow (loses the 'only provinces the fill left empty' definition).",
+   "files": [
+    "src/world/hard_coded_world.cpp",
+    "src/world/road_generation.cpp",
+    "src/world/province.cpp"
+   ]
+  },
+  {
+   "id": "NR-641",
+   "title": "The default campaign world is now an ALL-TRACK lattice - every nation sits at the qualification floor at epoch 0",
+   "raised": "2026-08-25",
+   "kind": "question",
+   "status": "open",
+   "source": "Agent W2G's report (BL-618): qualification spreads 0.05-0.60 only at epoch >= 1700; epoch_year 0 (the campaign default, an antiquity start) leaves every nation at the never-industrialised floor 0.05.",
+   "what": "The first-cut tier mapping (Road needs qualification >= 0.10, Highway >= 0.30, redundancy loops rationed by qualification/0.40) is era-coherent - highways are industrial - but its visible consequence is that the DEFAULT generated world promotes nothing past Track: a global logistics-cost change (Track x0.67 vs Road x0.50 vs Highway x0.40) and a different-looking map. Options: (a) accept - an antiquity world with only tracks is honest, and roads arrive as qualification rises in play (BL-616's education loop now matters); (b) rebase the thresholds on the era-relative qualification distribution rather than absolute values, so antiquity keeps its Roman-road-analogue backbone; (c) keep absolute thresholds but lower them. Differential harness rows Q1-Q4 prove the lever works either way.",
+   "files": [
+    "src/world/road_generation.cpp",
+    "docs/economy/LOGISTICS.md"
+   ]
   }
  ]
 }
