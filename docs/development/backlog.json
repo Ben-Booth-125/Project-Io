@@ -1041,6 +1041,31 @@
    ],
    "authority_doc": "docs/economy/POPULATION.md",
    "design": "Ruled 2026-08-25 (Ben: 'keep razed settlement as a settlement tier, so it's cheap to rebuild there'). raze_centre stops erasing: it sets a persistent razed state - population zeroed, no labour/demand/agglomeration contribution, entity + name + tile + urban ground all kept, the centre still anchors its province (a ruin can be captured; the province-settlement invariant survives play). Rebuild: the ordinary growth pass re-settles a razed centre at a REDUCED gate (first-cut: half the promotion window; a data constant) back to scale 1, clearing the razed state. Serialisation: the razed field rides the centre record, save v14 -> v15, strict refusal. population_dynamics P3 rows re-specified from erasure to demotion; a new row proves razed -> regrown round-trip. ACTIONS.json raze_centre entry updated. Design settled in POPULATION.md section Growth, decline and razing - read before implementing. COMPLETION: Landed 2026-08-25 (Agent W3, d8f7ed3a; merged main). razed bool beside province_anchor; raze demotes to a scale-1 ruin that still anchors; excluded from labour/demand/habitability/migration; re-settles at half the promotion window; save v14->v15; population_dynamics 31 assertions incl. the razed->regrown round-trip."
+  },
+  {
+   "id": "BL-625",
+   "short_name": "SETTLEMENT_TIER_GLYPHS",
+   "title": "A glyph per settlement tier: the canvas reads as a world of many population centres",
+   "status": "open",
+   "glyph": "○",
+   "priority": "B",
+   "difficulty": 2,
+   "version_goal": "post-v0.1.19",
+   "sprint": null,
+   "category": "UI",
+   "written": "2026-08-25",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "files": [
+    "src/ui/icons.hpp",
+    "src/ui/icons.cpp",
+    "src/ui/body_surface_canvas.cpp",
+    "docs/ui/ICONS.md"
+   ],
+   "authority_doc": "docs/ui/ICONS.md",
+   "design": "Raised by Ben 2026-08-25, straight after the flood-field warm-start fix: now that the world genuinely carries a settlement per province (BL-623, provinces before roads) plus the razed tier (BL-624), the canvas should SHOW that density - today the population-centre mark does not distinguish scale, so a metropolis and a village read identically and the world looks emptier than it is. Work: one glyph per tier of population_centre_component.scale (1-5, village -> metropolis), plus a distinct mark for a razed centre (BL-624's orthogonal bool - a ruin should read as a ruin, not vanish). Glyphs live in src/ui/icons.{hpp,cpp} under the (dl, centre, r, colour) contract and are catalogued in docs/ui/ICONS.md in the same change; identity colours stay in presentation.hpp. Zoom behaviour follows the existing detail_level rules so low zoom does not smear five glyph shapes into noise. ACTIONS.json untouched unless a control changes; question_log entry owed if the surface's question materially changes."
   }
  ]
 }
