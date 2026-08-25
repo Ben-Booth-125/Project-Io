@@ -1,6 +1,7 @@
 #include "population_generation.hpp"
 
 #include "world/city_names.hpp"     // world::generate_city_name
+#include "world/hex_neighbors.hpp"  // the canonical odd-r sides (BL-612 footprints)
 #include "world/placement_rules.hpp"
 #include "world/settlement.hpp"     // settlement_state — the Era -1 record (BL-610)
 
@@ -388,6 +389,103 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
 // ---------------------------------------------------------------------------
 // Coverage pass (BL-463) — every nation holds at least one population centre
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Urban footprints (BL-612) — generation stamps the ground cities stand on
+// ---------------------------------------------------------------------------
+
+int stamp_urban_land_use(world& w, entity_id body_id)
+{
+    const auto body_it = w.bodies.find(body_id);
+    if (body_it == w.bodies.end())
+        return 0;
+    const int gw = body_it->second.grid_width;
+    const int gh = body_it->second.grid_height;
+    if (gw <= 0 || gh <= 0)
+        return 0;
+
+    // Raster lookup, as in generate_population_centres above.
+    std::vector<entity_id> grid(static_cast<std::size_t>(gw) * gh, null_entity);
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (tc.body != body_id)
+            continue;
+        const int idx = tc.grid_y * gw + tc.grid_x;
+        if (idx >= 0 && idx < gw * gh)
+            grid[static_cast<std::size_t>(idx)] = tid;
+    }
+
+    // Centres on this body, in sorted centre-id order — the walk is
+    // deterministic and, because stamping is idempotent, the RESULT is
+    // order-independent besides.
+    std::vector<std::pair<entity_id, entity_id>> centres; // (centre, tile)
+    for (const auto& [cid, tid] : w.population_centre_tile)
+    {
+        const auto tit = w.tiles.find(tid);
+        if (tit != w.tiles.end() && tit->second.body == body_id)
+            centres.emplace_back(cid, tid);
+    }
+    std::sort(centres.begin(), centres.end());
+
+    int stamped = 0;
+    const auto stamp = [&](entity_id tid) {
+        auto& lu = w.land_use[tid]; // absent entry default-constructs undeveloped
+        if (lu.use != land_use_component::type::urban)
+        {
+            lu.use = land_use_component::type::urban;
+            ++stamped;
+        }
+    };
+
+    for (const auto& [cid, tid] : centres)
+    {
+        const auto pit = w.population_centres.find(cid);
+        if (pit == w.population_centres.end())
+            continue;
+        const int scale = std::clamp(pit->second.scale, 1, 5);
+        const int want  = k_urban_footprint_tiles[scale - 1];
+
+        stamp(tid); // a settlement always paves its own tile
+
+        if (want <= 1)
+            continue;
+
+        // Rank the six hex neighbours (habitability desc, tile id asc) and
+        // pave the best `want - 1` land tiles among them. The coast can cut a
+        // footprint short, and that is kept rather than compensated.
+        const auto tit = w.tiles.find(tid);
+        if (tit == w.tiles.end())
+            continue;
+        struct cand { float hab; entity_id tile; };
+        std::vector<cand> ring;
+        ring.reserve(6);
+        for (int s = 0; s < 6; ++s)
+        {
+            const auto [nx_raw, ny] =
+                hex_neighbors::neighbour(tit->second.grid_x, tit->second.grid_y, s);
+            if (ny < 0 || ny >= gh)
+                continue; // rows clamp; columns wrap (the east-west cylinder)
+            const int nx = ((nx_raw % gw) + gw) % gw;
+            const entity_id n = grid[static_cast<std::size_t>(ny) * gw + nx];
+            if (n == null_entity)
+                continue;
+            const auto nit = w.tiles.find(n);
+            if (nit == w.tiles.end() || is_water(nit->second.substrate))
+                continue; // urban ground is a land feature
+            ring.push_back({ nit->second.habitability, n });
+        }
+        std::sort(ring.begin(), ring.end(), [](const cand& a, const cand& b) {
+            if (a.hab != b.hab)
+                return a.hab > b.hab; // the city grows onto its most livable side
+            return a.tile < b.tile;
+        });
+        const int extra = std::min<int>(want - 1, static_cast<int>(ring.size()));
+        for (int i = 0; i < extra; ++i)
+            stamp(ring[static_cast<std::size_t>(i)].tile);
+    }
+
+    return stamped;
+}
 
 int ensure_national_population_centres(world& w, entity_id body_id, unsigned seed)
 {

@@ -369,6 +369,13 @@ struct world
     /// perturb world generation). A market's city name resolves via its centre_tile.
     std::unordered_map<entity_id, std::string>                 population_centre_name;
 
+    /// Land-use state per TILE entity, held sparsely: an absent entry is
+    /// `undeveloped` (docs/economy/POPULATION.md § Land use). Seeded by
+    /// stamp_urban_land_use (BL-612, urban ground stamped) with the urban
+    /// footprints under population centres; joins the flat-binary save as its
+    /// own store (world_save format v11).
+    std::unordered_map<entity_id, land_use_component>          land_use;
+
     /// Nation entities keyed by their entity ID. Populated by generate_nations()
     /// after tile generation; empty until that call is made for a body.
     std::unordered_map<entity_id, nation_component>    nations;

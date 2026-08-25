@@ -78,3 +78,29 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
 ///
 /// @returns the number of centres founded.
 int ensure_national_population_centres(world& w, entity_id body_id, unsigned seed);
+
+/// Urban footprint size per centre scale 1-5, in tiles including the centre's
+/// own (BL-612, urban ground stamped). A village or town paves its own tile; a
+/// city spills onto its best neighbour; a metropolis and a megacity take a
+/// widening share of the ring (a full radius-1 disc at scale 5). Tiles here
+/// are tens of kilometres across, so even 5M heads never out-paves one ring.
+inline constexpr int k_urban_footprint_tiles[5] = { 1, 1, 2, 4, 7 };
+
+/// Stamps `land_use_component::type::urban` under every population centre on
+/// @p body_id (BL-612, urban ground stamped): the centre's own tile plus its
+/// best neighbours up to `k_urban_footprint_tiles[scale-1]`, so city ground is
+/// scarce and contested from turn one (docs/economy/POPULATION.md § Land use).
+///
+/// Runs AFTER both placement passes so coverage foundings are paved too, and
+/// before corporations place assets. Extraction standing on ground that goes
+/// urban is grandfathered (TILES.md § Urban transform) — the stamp never
+/// removes anything, it only marks the ground.
+///
+/// Deterministic and RNG-free: centres walk in sorted-id order, neighbours are
+/// ranked (habitability desc, tile id asc) over the fixed hex sides, water is
+/// skipped, and stamping is idempotent — a tile two cities share is stamped
+/// once. A footprint the coast cuts short stays short: an island city paves
+/// what it has.
+///
+/// @returns the number of tiles stamped urban.
+int stamp_urban_land_use(world& w, entity_id body_id);

@@ -743,6 +743,11 @@ void write_world_snapshot(const world& w, std::ostream& out)
     w_id_store(out, w.population_centre_tile);
     w_store(out, w.population_centre_name,
             [](std::ostream& s, const std::string& v) { w_str(s, v); });
+    // BL-612 (format v11): sparse per-tile land use — the urban footprints
+    // generation stamps under population centres, plus whatever play mutates.
+    w_store(out, w.land_use, [](std::ostream& s, const land_use_component& v) {
+        w_int(s, static_cast<int>(v.use));
+    });
     w_store(out, w.nations, w_nation);
     // Sprint N3 T2 (format v3): the persistent weight map, directly after the
     // nations it keys on. A `std::map`, so `w_map` writes it ascending as held.
@@ -889,6 +894,18 @@ bool read_world_snapshot(world& w, std::istream& in)
         return false;
     if (!r_store(in, s.population_centre_name,
                  [](std::istream& st, std::string& v) { return r_str(st, v); }))
+        return false;
+    // BL-612 (format v11). A value outside the five authored states cannot
+    // have been written by the writer above, so the stream is corrupt rather
+    // than odd and is refused whole (the standing rejection contract).
+    if (!r_store(in, s.land_use, [](std::istream& st, land_use_component& v) {
+            int raw = 0;
+            if (!r_int(st, raw) || raw < 0
+                || raw > static_cast<int>(land_use_component::type::infrastructure))
+                return false;
+            v.use = static_cast<land_use_component::type>(raw);
+            return true;
+        }))
         return false;
     if (!r_store(in, s.nations, r_nation))
         return false;

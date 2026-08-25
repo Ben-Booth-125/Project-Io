@@ -46,7 +46,11 @@ settled rather than the other way round.
   province is the conquest unit). This retires the centre-less hinterland province.
 - **Urban ground is stamped at generation** (Ben, 2026-08-25; BL-612, urban ground stamped).
   A centre arrives with an urban land-use footprint scaled by its tier, so city ground is
-  scarce and contested from turn one rather than notionally open (§ Land use).
+  scarce and contested from turn one rather than notionally open (§ Land use). The footprint
+  is the centre's own tile plus its most-livable land neighbours — 1/1/2/4/7 tiles by scale
+  (`k_urban_footprint_tiles`); a footprint the coast cuts short stays short, and a tile two
+  cities share is stamped once. Extraction already standing is grandfathered
+  (`docs/economy/TILES.md` § Urban transform).
 
 A centre's tile keeps its full deposit: population and extraction compete for a tile through
 § Land use, not through generation.

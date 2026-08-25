@@ -133,7 +133,15 @@ inline constexpr uint32_t world_save_magic =
 /// array in the stream widens, not a trailing section. A v9 stream's arrays
 /// are the wrong length for a v10 reader, so it is refused whole on the same
 /// strict-equality contract as every prior bump.
-inline constexpr uint32_t world_save_version = 10;
+///
+/// Bumped to 11 by BL-612 (urban ground stamped): `world::land_use` (sparse
+/// per-tile `land_use_component`, seeded at generation with the urban
+/// footprints under population centres) is written as a new section directly
+/// after `population_centre_name`. A v10 stream has no such section, so the
+/// bytes where it would sit would be read as the nation store's count and
+/// everything after it misaligned; a v10 stream is therefore refused whole,
+/// destination untouched — the existing rejection contract.
+inline constexpr uint32_t world_save_version = 11;
 
 /// Write @p w as a complete world snapshot.
 ///

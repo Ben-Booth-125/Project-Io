@@ -689,6 +689,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
     name_population_centres(w, kepler, home_grid_width, kepler_settlement, kepler_creeds,
                             /*seed=*/params.seed ^ 0xC17910E6u);
 
+    // Urban ground (BL-612, urban ground stamped): every centre — coverage
+    // foundings included, which is why this follows ensure_national — paves a
+    // footprint sized by its scale, so city ground is scarce and contested
+    // from turn one. RNG-free; perturbs no stream. Runs before
+    // generate_corporations so starting assets land on a world whose ground
+    // already says where the cities are.
+    stamp_urban_land_use(w, kepler);
+
     // Everything from here to globalisation is the 0-1960 story. An antiquity
     // start (BL-271: epoch_year < 1700) generates the world BEFORE it happens —
     // no rupture is pre-resolved, no charter is enacted, no common tongue forms.
