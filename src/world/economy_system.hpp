@@ -211,6 +211,20 @@ struct economy_report
     /// the budget step (wages on effective workforce) and the economy panel.
     std::map<std::pair<entity_id, entity_id>, float> workforce_contention;
 
+    /// BL-613 (qualification fraction): per (NATION, body), the qualified-labour
+    /// contention scalar applied this tick — `min(1, qualified supply / qualified
+    /// demand)`, where qualified supply is `nation_component::qualification` × the
+    /// labour the nation's population centres contribute on that body, and
+    /// qualified demand sums `workforce_assigned × recipe.qualified_workforce`
+    /// over the buildings running qualified methods on the nation's tiles there.
+    /// A building running such a method is throttled by this factor BESIDE the
+    /// ordinary (corp, body) scalar above — a second factor, same shape
+    /// (docs/economy/POPULATION.md § Qualification). Keyed by nation, not corp:
+    /// the qualified pool is national, so every corp drawing deep labour inside
+    /// one nation contends for the same heads. Empty when no authored recipe
+    /// carries a `qualified_workforce` requirement (every hand-built harness).
+    std::map<std::pair<entity_id, entity_id>, float> qualified_contention;
+
     /// Per-body mean habitability aggregate (BL-048): weighted average of all
     /// population-centre tiles on the body. 0.0 = uninhabitable, 1.0 = full.
     std::map<entity_id, float> body_habitability;

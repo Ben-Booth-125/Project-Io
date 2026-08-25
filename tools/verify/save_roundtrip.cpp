@@ -93,6 +93,17 @@ int main()
                 (unsigned long long)w.corporations.size(),
                 (unsigned long long)w.history_log.size());
 
+    // BL-613: make the nation record's newest field non-trivial before the round
+    // trip, so P1's byte-equality cannot pass over it on an all-zero default (a
+    // `no_prehistory()` world may seed every nation's qualification at the
+    // floor). Lowest nation id, so the choice cannot ride the unordered layout.
+    entity_id qual_nation = null_entity;
+    for (const auto& [nid, nc] : w.nations)
+        if (qual_nation == null_entity || nid < qual_nation)
+            qual_nation = nid;
+    if (qual_nation != null_entity)
+        w.nations.at(qual_nation).qualification = 0.375f;
+
     // -----------------------------------------------------------------------
     // P1 (R1) -- a round trip preserves every serialised field
     // -----------------------------------------------------------------------
@@ -106,6 +117,16 @@ int main()
     const std::string bytes_twice = read_ok ? to_bytes(loaded) : std::string();
     check(read_ok && bytes_once == bytes_twice,
           "P1 re-serialising the loaded world reproduces the snapshot byte for byte");
+
+    // BL-613: the qualification fraction survives by VALUE, not just by byte
+    // agreement of the two writes.
+    if (qual_nation != null_entity)
+    {
+        const auto nit = loaded.nations.find(qual_nation);
+        check(read_ok && nit != loaded.nations.end()
+                  && nit->second.qualification == 0.375f,
+              "P1 nation qualification (BL-613) round-trips at its written value");
+    }
 
     // -----------------------------------------------------------------------
     // P2 (R1) -- state_hash agrees, at the same tick
@@ -160,13 +181,13 @@ int main()
             // same record would shift with it. The whole stream is refused
             // instead -- a v4 save is not migrated, it is rejected, and the
             // destination is not touched.
-            static_assert(world_save_version == 10,
-                          "P9/P10/P11/P12/P13/P14 name v4/v5/v6/v7/v8/v9 as refused predecessors; "
-                          "re-read these rows on a bump");
+            static_assert(world_save_version == 11,
+                          "P9/P10/P11/P12/P13/P14/P15 name v4/v5/v6/v7/v8/v9/v10 as refused "
+                          "predecessors; re-read these rows on a bump");
             std::string bad = bytes_once;
             const uint32_t v4 = 4;
             std::memcpy(&bad[4], &v4, sizeof v4);
-            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v10)");
+            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v11)");
         }
         {
             // Sprint 16, BL-571: the IMMEDIATE previous format (BL-570's v5,
@@ -180,7 +201,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v5 = 5;
             std::memcpy(&bad[4], &v5, sizeof v5);
-            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused (format is v10)");
+            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused (format is v11)");
         }
         {
             // Sprint 16, BL-572: the IMMEDIATE previous format (BL-571's v6,
@@ -193,7 +214,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v6 = 6;
             std::memcpy(&bad[4], &v6, sizeof v6);
-            check(!from_bytes(bad, victim), "P11 a v6-versioned stream is refused (format is v10)");
+            check(!from_bytes(bad, victim), "P11 a v6-versioned stream is refused (format is v11)");
         }
         {
             // Sprint 16, BL-573: the IMMEDIATE previous format (BL-572's v7,
@@ -205,7 +226,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v7 = 7;
             std::memcpy(&bad[4], &v7, sizeof v7);
-            check(!from_bytes(bad, victim), "P12 a v7-versioned stream is refused (format is v10)");
+            check(!from_bytes(bad, victim), "P12 a v7-versioned stream is refused (format is v11)");
         }
         {
             // BL-585: the IMMEDIATE previous format (Sprint 16's v8, the
@@ -218,7 +239,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v8 = 8;
             std::memcpy(&bad[4], &v8, sizeof v8);
-            check(!from_bytes(bad, victim), "P13 a v8-versioned stream is refused (format is v10)");
+            check(!from_bytes(bad, victim), "P13 a v8-versioned stream is refused (format is v11)");
         }
         {
             // BL-586 slice 2: the IMMEDIATE previous format (BL-585's v9, the
@@ -230,7 +251,20 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v9 = 9;
             std::memcpy(&bad[4], &v9, sizeof v9);
-            check(!from_bytes(bad, victim), "P14 a v9-versioned stream is refused (format is v10)");
+            check(!from_bytes(bad, victim), "P14 a v9-versioned stream is refused (format is v11)");
+        }
+        {
+            // BL-613: the IMMEDIATE previous format (BL-586 slice 2's v10, the
+            // version this batch released before BL-613 bumped again). A v10
+            // stream's nation record is one w_f32 short (no `qualification`) --
+            // a MID-RECORD gap like P10's, so a reader that accepted it would
+            // misread every field of every nation after the first and
+            // everything serialised after `nations` besides. Refused whole,
+            // same contract as every prior bump.
+            std::string bad = bytes_once;
+            const uint32_t v10 = 10;
+            std::memcpy(&bad[4], &v10, sizeof v10);
+            check(!from_bytes(bad, victim), "P15 a v10-versioned stream is refused (format is v11)");
         }
         {
             // Truncated mid-way through the tile store -- far enough in that a

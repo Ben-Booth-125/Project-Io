@@ -133,7 +133,15 @@ inline constexpr uint32_t world_save_magic =
 /// array in the stream widens, not a trailing section. A v9 stream's arrays
 /// are the wrong length for a v10 reader, so it is refused whole on the same
 /// strict-equality contract as every prior bump.
-inline constexpr uint32_t world_save_version = 10;
+///
+/// Bumped to 11 by BL-613 (qualification fraction): the nation record
+/// (`w_nation` / `r_nation`) gains `nation_component::qualification` — one
+/// float after `capital_tile`, in declaration order. A v10 stream simply
+/// predates the field and has nowhere to source it from, so it is refused
+/// whole on the same strict-equality contract as every prior bump. The reader
+/// additionally refuses a non-finite or out-of-[0, 1] value: the writer
+/// cannot have produced one, so the stream is corrupt rather than odd.
+inline constexpr uint32_t world_save_version = 11;
 
 /// Write @p w as a complete world snapshot.
 ///

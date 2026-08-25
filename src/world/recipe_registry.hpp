@@ -80,6 +80,20 @@ struct recipe
     /// has SOME group to compare against in the cross-group-switch cost check
     /// (economy_system.cpp's try_switch_recipe) without a special empty-string case.
     std::string group = "General";
+
+    /// BL-613 (qualification fraction; docs/economy/POPULATION.md
+    /// § Qualification): the fraction of this recipe's labour that must be
+    /// QUALIFIED, in [0, 1]. 0 (the default, and the value for every
+    /// hand-built harness recipe) means the recipe runs on ordinary labour
+    /// alone and the qualified pool never gates it. Above 0, a building
+    /// running this recipe throttles against its host nation's qualified pool
+    /// (nation_component::qualification × the nation's share of the body's
+    /// labour supply) exactly like the ordinary contention scalar — a factor,
+    /// not a new shape (economy_system.cpp's workforce pass). Authored as
+    /// `qualified_workforce = ...` in recipes.lua on the deepest / latest
+    /// methods only; validated at load as a finite rate in [0, 1] and
+    /// REJECTED otherwise, never clamped.
+    float qualified_workforce = 0.0f;
 };
 
 /// The primary output resource of a recipe — the argmax of its outputs. Used

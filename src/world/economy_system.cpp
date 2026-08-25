@@ -830,6 +830,60 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         }
     }
 
+    // BL-613 education: the qualification-raising pass.
+    //
+    // ── INTEGRATION POINT (BL-613 ↔ the schooling/university roster) ─────────
+    // `is_education_building` below is the SEAM: it returns false until the
+    // schooling and university roster entries land (a separate slice authors
+    // them; the MAIN SESSION wires this predicate to those entries at merge —
+    // do not invent the buildings here). While it returns false the pass is
+    // wired but inert, so landing the roster entries plus the predicate is the
+    // whole remaining work.
+    //
+    // Shape once live: each COMPLETED education building lifts its host
+    // nation's qualification toward 1 by a flat per-tick rate — the counterpart
+    // of the research pass above, landing on the nation rather than the corp.
+    // Counted per nation in integers (commutes, so the unordered corporations
+    // walk is safe), then applied in ascending nation id so the float writes
+    // are ordered. First-cut flat rate, tune-not-restructure (NR-600).
+    {
+        constexpr float k_qualification_per_education_building_tick = 0.0005f;
+
+        const auto is_education_building = [](const building_component& /*b*/) -> bool {
+            // INTEGRATION POINT — see the block comment above. Returns false
+            // until the schooling/university entries exist to test against.
+            return false;
+        };
+
+        std::map<entity_id, int> education_by_nation;
+        for (const auto& [corp, cc] : w.corporations)
+        {
+            for (const entity_id bid : cc.assets)
+            {
+                const auto bit = w.buildings.find(bid);
+                if (bit == w.buildings.end())
+                    continue;
+                const building_component& b = bit->second;
+                if (b.ticks_remaining > 0 || b.decommissioned)
+                    continue;
+                if (!is_education_building(b))
+                    continue;
+                if (const auto tn = w.tile_to_nation.find(b.tile);
+                    tn != w.tile_to_nation.end())
+                    ++education_by_nation[tn->second];
+            }
+        }
+        for (const auto& [nid, count] : education_by_nation)
+        {
+            const auto nit = w.nations.find(nid);
+            if (nit == w.nations.end())
+                continue;
+            float& q = nit->second.qualification;
+            q = std::min(1.0f, q + k_qualification_per_education_building_tick
+                                       * static_cast<float>(count));
+        }
+    }
+
     // BL-350 procurement contracts: paced like a BL-095 build — the deposit
     // was already debited at accept_quote, so each tick draws an even slice of
     // the remainder from the BUYER's balance (a simplification of BL-095's own
@@ -910,6 +964,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // Scale → labour-force table (units available to industry on this body).
     static constexpr float labour_by_scale[6] = { 0.0f, 1.0f, 3.0f, 10.0f, 30.0f, 100.0f };
     std::map<entity_id, float> pop_supply_by_body;
+    // BL-613: the same labour, attributed to the NATION whose tile the centre
+    // stands on — the base the qualified pool below is a fraction of. A centre
+    // on an unclaimed tile contributes to no nation's qualified pool (it still
+    // contributes to the body total above).
+    std::map<std::pair<entity_id, entity_id>, float> pop_supply_by_body_nation; // (body, nation)
     // BL-041: Habitability cap — weighted mean habitability of population centres per body.
     // weight = centre scale; cap = min(1, mean_hab / 0.6); default 1.0 (uncapped) when no centres.
     std::map<entity_id, float> hab_weighted_sum;
@@ -932,6 +991,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             continue;
         const int sc = std::clamp(pcc.scale, 1, 5);
         pop_supply_by_body[tc_it->second.body] += labour_by_scale[sc];
+        if (const auto tn = w.tile_to_nation.find(tile_it->second); tn != w.tile_to_nation.end())
+            pop_supply_by_body_nation[{tc_it->second.body, tn->second}] += labour_by_scale[sc];
         const entity_id body = tc_it->second.body;
         const float weight = static_cast<float>(sc);
         hab_weighted_sum[body]  += pcc.habitability * weight;
@@ -1047,6 +1108,81 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         return (it != report.workforce_contention.end()) ? it->second : 1.0f;
     };
 
+    // ── Pass 1b (BL-613): the QUALIFIED pool, per (nation, body).
+    //
+    // A recipe carrying a `qualified_workforce` requirement draws that fraction
+    // of its labour from the host NATION's qualified pool —
+    // `nation_component::qualification` × the labour the nation's centres
+    // contribute on the body — and is throttled by min(1, supply/demand) over it,
+    // a second factor beside the (corp, body) scalar above, same shape
+    // (POPULATION.md § Qualification). Keyed by nation because the pool is
+    // national: every corp running deep methods inside one nation contends for
+    // the same qualified heads. Demand sums in ascending (nation, body) via the
+    // std::map; the walk below is the same sorted corp/stored-asset order the
+    // ordinary pass uses, so the accumulation order is fixed.
+    //
+    // A building outside every nation (unclaimed tile, off-nation body) is
+    // ungated — the same jurisdiction reading the levy pass uses: no nation, no
+    // national pool to draw from or be throttled by. A nation whose centres
+    // contribute no labour on the body has an EMPTY qualified pool there, and
+    // its deep methods idle — no people, no qualified people.
+    {
+        std::map<std::pair<entity_id, entity_id>, float> qual_demand; // (nation, body)
+        for (const entity_id corp : corp_ids)
+        {
+            const corporation_component& cc = w.corporations.at(corp);
+            for (const entity_id building_id : cc.assets)
+            {
+                const auto bit = w.buildings.find(building_id);
+                if (bit == w.buildings.end())
+                    continue;
+                const building_component& b = bit->second;
+                if (b.decommissioned || b.ticks_remaining > 0)
+                    continue;
+                if (b.type != building_type::processing_facility)
+                    continue; // extraction has no recipe, hence no qualified draw
+                const recipe* rcp = reg.get_recipe(b.recipe);
+                if (rcp == nullptr || rcp->qualified_workforce <= 0.0f)
+                    continue;
+                const entity_id body = building_body(w, b);
+                if (body == null_entity)
+                    continue;
+                const auto tn = w.tile_to_nation.find(b.tile);
+                if (tn == w.tile_to_nation.end())
+                    continue; // outside every jurisdiction: ungated
+                // Mirror the ordinary pool's demand shape: the assigned request,
+                // capped by habitability, scaled by the qualified fraction.
+                qual_demand[{tn->second, body}] +=
+                    b.workforce_assigned * rcp->qualified_workforce * hab_cap_for(body);
+            }
+        }
+        for (const auto& [key, demand] : qual_demand)
+        {
+            const auto nit = w.nations.find(key.first);
+            const float qual = (nit != w.nations.end()) ? nit->second.qualification : 0.0f;
+            const auto  pit  = pop_supply_by_body_nation.find({key.second, key.first});
+            const float pool = (pit != pop_supply_by_body_nation.end()) ? pit->second : 0.0f;
+            const float supply = qual * pool;
+            const float scalar = (demand > supply && demand > 0.0f) ? supply / demand : 1.0f;
+            report.qualified_contention[key] = scalar;
+        }
+    }
+
+    /// The qualified throttle for one building: 1.0 unless it runs a qualified
+    /// method inside a nation, in which case the (nation, body) scalar above.
+    auto qualified_factor_for = [&](const building_component& b, entity_id body) -> float {
+        if (b.type != building_type::processing_facility)
+            return 1.0f;
+        const recipe* rcp = reg.get_recipe(b.recipe);
+        if (rcp == nullptr || rcp->qualified_workforce <= 0.0f)
+            return 1.0f;
+        const auto tn = w.tile_to_nation.find(b.tile);
+        if (tn == w.tile_to_nation.end())
+            return 1.0f;
+        const auto it = report.qualified_contention.find({tn->second, body});
+        return (it != report.qualified_contention.end()) ? it->second : 1.0f;
+    };
+
     // ── Pass 2: BL-193 stack grouping — who shares a deposit, and at what rank.
     //
     // Split out ahead of the auto-solve (BL-346): a site's RANK is its place in its
@@ -1144,8 +1280,14 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             if (b.type != building_type::extraction_site &&
                 b.type != building_type::processing_facility)
                 continue;
+            // BL-613: the solver optimises against the labour the building can
+            // actually reach, qualified throttle included — same product the
+            // production pass applies below.
+            const entity_id solve_body = building_body(w, b);
             b.workforce_target = solve_workforce_target(
-                w, reg, b, contention_for(w.player_entity, building_body(w, b)),
+                w, reg, b,
+                contention_for(w.player_entity, solve_body)
+                    * qualified_factor_for(b, solve_body),
                 rank_of(building_id));
         }
     }
@@ -1257,9 +1399,13 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     // market on the body" — a multi-market body, BL-096/BL-263,
                     // must draw its own centre's stock, not a sibling market's).
                     const entity_id market_id = market_for_tile(w, b.tile);
+                    // BL-613: the qualified throttle rides beside the ordinary
+                    // contention scalar — a second factor, same shape.
                     report.buildings.push_back(
                         run_processing(w, reg, corp, building_id, b, market_id,
-                                       contention_for(corp, body), report));
+                                       contention_for(corp, body)
+                                           * qualified_factor_for(b, body),
+                                       report));
                     break;
                 }
                 default:

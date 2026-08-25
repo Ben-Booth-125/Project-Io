@@ -683,7 +683,7 @@ void derive_national_character(settlement_state& ss,
     const int64_t early_cut = ranked.empty() ? 0 : ranked[ranked.size() / 3];
     const int64_t late_cut  = ranked.empty() ? 0 : ranked[(ranked.size() * 2) / 3];
 
-    // --- Write the three axes ---------------------------------------------------
+    // --- Write the four axes ----------------------------------------------------
     for (int ni = 0; ni < nations; ++ni)
     {
         const auto it = w.nations.find(nation_ids[static_cast<std::size_t>(ni)]);
@@ -698,11 +698,14 @@ void derive_national_character(settlement_state& ss,
 
         // economic_focus <- the dominant resource class of the regions
         // settled DURING industrialisation, not of everything it holds.
+        // `ind_regions` rides the same walk for the qualification axis below.
         std::array<int, 3> tally = { 0, 0, 0 };
+        int ind_regions = 0;
         for (const region& p : ss.regions)
         {
             if (p.nation != ni) continue;
             if (!p.industrialised) continue;
+            ++ind_regions;
             ++tally[static_cast<std::size_t>(focus_of_class(p.dominant))];
         }
         if (tally[0] + tally[1] + tally[2] == 0)
@@ -728,6 +731,31 @@ void derive_national_character(settlement_state& ss,
         else if (ff <= early_cut)       nc.politics = ideology::mercantile;
         else if (ff <= late_cut)        nc.politics = ideology::technocratic;
         else                            nc.politics = ideology::authoritarian;
+
+        // qualification <- the same timing record, as a FRACTION rather than a
+        // rank (BL-613, qualification fraction; POPULATION.md § Qualification:
+        // "early industrialisers open qualified, late ones raw"). Two terms,
+        // both already computed above: WHEN the first furnace lit (the tercile
+        // base — a first mover has had generations of schooling on top of its
+        // industry) and HOW MUCH of the nation industrialised (the breadth
+        // bonus — one furnace region does not school a whole realm). A nation
+        // that never industrialised opens at a floor, not zero: some literate
+        // administration exists anywhere a nation does. First-cut constants,
+        // tune-not-restructure (the NR-600 idiom).
+        {
+            const float ind_share =
+                region_count[static_cast<std::size_t>(ni)] > 0
+                    ? static_cast<float>(ind_regions)
+                      / static_cast<float>(region_count[static_cast<std::size_t>(ni)])
+                    : 0.0f;
+            float base = 0.05f;                    // never industrialised
+            if (ff != never)
+                base = ff <= early_cut ? 0.35f
+                     : ff <= late_cut  ? 0.22f
+                                       : 0.12f;
+            const float q = base + 0.25f * ind_share;
+            nc.qualification = q < 0.0f ? 0.0f : (q > 1.0f ? 1.0f : q);
+        }
     }
 
     // --- Stage 4's lines, now that they can name a nation ----------------------

@@ -218,15 +218,23 @@ void w_nation(std::ostream& o, const nation_component& n)
     w_enum(o, n.posture);
     w_enum(o, n.focus);
     w_f32(o, n.treasury);
-    w_id(o, n.capital_tile); // BL-571: world_save_version 5
+    w_id(o, n.capital_tile);     // BL-571: world_save_version 5
+    w_f32(o, n.qualification);   // BL-613: world_save_version 11
 }
 
 bool r_nation(std::istream& i, nation_component& n)
 {
-    return r_str(i, n.name) && r_ids(i, n.tiles) && r_f32_array(i, n.resource_abundance)
+    if (!(r_str(i, n.name) && r_ids(i, n.tiles) && r_f32_array(i, n.resource_abundance)
         && r_enum(i, n.politics, max_ideology) && r_enum(i, n.posture, max_posture)
         && r_enum(i, n.focus, max_econ_focus) && r_f32(i, n.treasury)
-        && r_id(i, n.capital_tile);
+        && r_id(i, n.capital_tile) && r_f32(i, n.qualification)))
+        return false;
+    // BL-613: `qualification` is a fraction by contract. The writer cannot have
+    // produced a NaN or a value outside [0, 1], so a stream carrying one is
+    // corrupt rather than odd — refuse whole, never clamp (the same grounds as
+    // r_nation_budget's own rejection).
+    return std::isfinite(n.qualification)
+        && n.qualification >= 0.0f && n.qualification <= 1.0f;
 }
 
 /// Sprint N3 T2: one nation's budget -- the nine line weights in authored enum
