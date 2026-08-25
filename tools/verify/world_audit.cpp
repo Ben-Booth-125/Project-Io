@@ -16,6 +16,7 @@
 #include "harness_params.hpp"
 #include "world/nation_generation.hpp"
 #include "world/placement_rules.hpp"
+#include "world/population_generation.hpp"
 #include "world/terrain_combat.hpp"
 #include "world/world.hpp"
 
@@ -1149,7 +1150,64 @@ int main()
                 "(>= 6 across the 6-seed sweep, saw %d): %s\n",
                 frag_total.exclaves_emergent, frag_ok ? "PASS" : "FAIL");
 
-    return (fw_frac >= 3.0f && bad == 0 && seed_bad == 0 && seam_bad == 0
+    // --- BL-612 (urban ground stamped): every centre carries an urban
+    // footprint; urban ground exists only where centres are. The stamp is the
+    // centre's own tile plus hex neighbours, so wrapped-Chebyshev distance <= 1
+    // is the (slightly wider, safe) envelope; the count is bracketed by the
+    // distinct centre tiles below and the sum of k_urban_footprint_tiles above
+    // (coast cuts short, shared tiles stamp once). ---
+    bool urban_ok = true;
+    {
+        int centre_tiles = 0, urban_tiles = 0, footprint_budget = 0;
+        int centres_not_urban = 0, urban_orphans = 0;
+        std::set<entity_id> centre_tile_set;
+        for (const auto& [cid, pcc] : w.population_centres)
+        {
+            const auto tit = w.population_centre_tile.find(cid);
+            if (tit == w.population_centre_tile.end())
+                continue;
+            const entity_id ctile = tit->second;
+            centre_tile_set.insert(ctile);
+            ++centre_tiles;
+            const int s = std::clamp(pcc.scale, 1, 5);
+            footprint_budget += k_urban_footprint_tiles[s - 1];
+            const auto lu = w.land_use.find(ctile);
+            if (lu == w.land_use.end() || lu->second.use != land_use_component::type::urban)
+                ++centres_not_urban;
+        }
+        for (const auto& [tid, luc] : w.land_use)
+        {
+            if (luc.use != land_use_component::type::urban)
+                continue;
+            ++urban_tiles;
+            const auto tit = w.tiles.find(tid);
+            if (tit == w.tiles.end()) { ++urban_orphans; continue; }
+            const tile_component& tc = tit->second;
+            const int width = w.bodies.at(tc.body).grid_width;
+            bool near_centre = false;
+            for (const entity_id ctile : centre_tile_set)
+            {
+                const auto cit = w.tiles.find(ctile);
+                if (cit == w.tiles.end() || cit->second.body != tc.body)
+                    continue;
+                const int rdx = std::abs(cit->second.grid_x - tc.grid_x);
+                const int dx = std::min(rdx, width - rdx);
+                const int dy = std::abs(cit->second.grid_y - tc.grid_y);
+                if (std::max(dx, dy) <= 1) { near_centre = true; break; }
+            }
+            if (!near_centre)
+                ++urban_orphans;
+        }
+        const bool bracketed = urban_tiles >= static_cast<int>(centre_tile_set.size()) && urban_tiles <= footprint_budget;
+        urban_ok = centres_not_urban == 0 && urban_orphans == 0 && bracketed && centre_tiles > 0;
+        std::printf("\nBL-612 urban stamp: centres=%d urban=%d budget=%d "
+                    "(unstamped centres %d, orphan urban %d, bracketed %s) : %s\n",
+                    centre_tiles, urban_tiles, footprint_budget,
+                    centres_not_urban, urban_orphans, bracketed ? "yes" : "no",
+                    urban_ok ? "PASS" : "FAIL");
+    }
+
+    return (urban_ok && fw_frac >= 3.0f && bad == 0 && seed_bad == 0 && seam_bad == 0
             && unclaimed_land == 0 && holdings_bad == 0 && stockpile_ok
             && absent == 0 && ordering_ok
             && floor_ok && variance_ok && count_ok

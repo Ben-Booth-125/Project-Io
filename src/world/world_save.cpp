@@ -139,7 +139,7 @@ void w_building(std::ostream& o, const building_component& b)
     w_f32(o, b.construction_progress);
     w_int(o, b.loss_streak);
     w_int(o, b.ai_cooldown);
-    w_f32(o, b.wage_bid); // BL-614: world_save_version 12
+    w_f32(o, b.wage_bid); // BL-614: world_save_version 14 (v12 pre-renumber)
     w_int(o, b.recipe_switch_cooldown);
 }
 
@@ -242,7 +242,7 @@ void w_nation(std::ostream& o, const nation_component& n)
     w_enum(o, n.focus);
     w_f32(o, n.treasury);
     w_id(o, n.capital_tile);     // BL-571: world_save_version 5
-    w_f32(o, n.qualification);   // BL-613: world_save_version 11
+    w_f32(o, n.qualification);   // BL-613: world_save_version 13 (v11 pre-renumber)
 }
 
 bool r_nation(std::istream& i, nation_component& n)

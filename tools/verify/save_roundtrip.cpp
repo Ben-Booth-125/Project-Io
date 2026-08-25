@@ -200,8 +200,8 @@ int main()
             // same record would shift with it. The whole stream is refused
             // instead -- a v4 save is not migrated, it is rejected, and the
             // destination is not touched.
-            static_assert(world_save_version == 12,
-                          "P9/P10/P11/P12/P13/P14/P15/P16 name v4..v11 as refused "
+            static_assert(world_save_version == 14,
+                          "P9..P18 name v4..v13 as refused "
                           "predecessors; re-read these rows on a bump");
             std::string bad = bytes_once;
             const uint32_t v4 = 4;

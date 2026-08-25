@@ -703,7 +703,7 @@ struct building_component
     /// vs per-body dial vs derived clearing wage question stays open on the
     /// item. Non-negative by contract (a bid raises, never undercuts, in this
     /// cut). SERIALISED (world_save.cpp's building record) —
-    /// `world_save_version` 11 → 12 moved with it; a non-finite or negative
+    /// `world_save_version` 13 → 14 moved with it (11 → 12 pre-renumber); a non-finite or negative
     /// value refuses the whole stream.
     float wage_bid = 0.0f;
 
@@ -1352,7 +1352,7 @@ struct nation_component
     /// the `is_education_building` seam (returns false until the schooling /
     /// university roster entries land — see economy_system.cpp's qualification
     /// pass). SERIALISED (world_save.cpp's nation record) — `world_save_version`
-    /// 10 → 11 moved with it; a non-finite or out-of-[0,1] value refuses the
+    /// 12 → 13 moved with it (10 → 11 pre-renumber); a non-finite or out-of-[0,1] value refuses the
     /// whole stream.
     float qualification = 0.0f;
 };

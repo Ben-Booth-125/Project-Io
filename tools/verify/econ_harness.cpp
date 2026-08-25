@@ -535,6 +535,64 @@ int main()
               wm.markets[mkt_b].supply[ri(resource_type::steel)], 10.0f);
     }
 
+    // --- Qualified pool (BL-613): a deep method throttles against the host
+    // nation's qualification, and unthrottles when the nation has the heads.
+    // One Town (scale 3 -> 10 labour units) carries the body's whole pool; the
+    // recipe wants half its labour qualified. qualification 0 -> the qualified
+    // pool is empty and the method IDLES; qualification 1 -> ample, full run.
+    // (POPULATION.md § Qualification; the R2 row of the BL-613 group.)
+    {
+        recipe deep;
+        deep.name = "deep_steel";
+        deep.inputs[ri(resource_type::iron_ore)] = 2.0f;
+        deep.outputs[ri(resource_type::steel)]   = 1.0f;
+        deep.qualified_workforce = 0.5f;
+        const uint16_t deep_id = reg.add_recipe(deep);
+
+        auto run_with_qualification = [&](float qual) -> std::pair<float, float> {
+            world qw;
+            const entity_id qb = qw.create_entity();
+            qw.bodies[qb] = body_component{};
+            const entity_id nid = qw.create_entity();
+            nation_component nc; nc.name = "Qualland"; nc.qualification = qual;
+            qw.nations[nid] = nc;
+            const entity_id t_centre = qw.create_entity();
+            { tile_component tc{}; tc.body = qb; qw.tiles[t_centre] = tc; }
+            const entity_id centre = qw.create_entity();
+            population_centre_component pcc; pcc.scale = 3; pcc.population = 200;
+            qw.population_centres[centre] = pcc;
+            qw.population_centre_tile[centre] = t_centre;
+            const entity_id t_bld = qw.create_entity();
+            { tile_component tc{}; tc.body = qb; qw.tiles[t_bld] = tc; }
+            qw.tile_to_nation[t_centre] = nid;
+            qw.tile_to_nation[t_bld]    = nid;
+            const entity_id eb = qw.create_entity();
+            building_component b{}; b.tile = t_bld;
+            b.type = building_type::processing_facility;
+            b.workforce_assigned = 0.5f; b.recipe = deep_id;
+            qw.buildings[eb] = b;
+            const entity_id ec = qw.create_entity();
+            corporation_component cc; cc.balance = 1000.0f; cc.is_player = true;
+            cc.assets.push_back(eb);
+            qw.corporations[ec] = cc;
+            qw.pool_for(ec, qb).quantities[ri(resource_type::iron_ore)] = 100.0f;
+            economy_report r = run_economy_step(qw, reg);
+            float out = -1.0f;
+            for (const auto& br : r.buildings)
+                if (br.building == eb) out = br.output_quantity;
+            const auto qc = r.qualified_contention.find({nid, qb});
+            const float scalar = (qc != r.qualified_contention.end()) ? qc->second : 1.0f;
+            return { out, scalar };
+        };
+
+        const auto [out0, sc0] = run_with_qualification(0.0f);
+        check(near(out0, 0.0f), "QF.R1 (BL-613) a deep method IDLES in a zero-qualification nation", out0, 0.0f);
+        check(near(sc0, 0.0f),  "QF.R2 (BL-613) the qualified pool reports zero grant (contention 0)", sc0, 0.0f);
+        const auto [out1, sc1] = run_with_qualification(1.0f);
+        check(out1 > 0.0f, "QF.R3 (BL-613) the same method RUNS when the nation is qualified", out1, 0.0f);
+        check(near(sc1, 1.0f), "QF.R4 (BL-613) ample qualified pool grants in full (contention 1)", sc1, 1.0f);
+    }
+
     std::printf("\n%s  (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES", g_failures, g_failures == 1 ? "" : "s");
     return g_failures == 0 ? 0 : 1;
 }
