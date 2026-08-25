@@ -571,8 +571,9 @@
       ],
       "recommendation": "Merge it deliberately, as its own piece of work. It is ~3800 insertions across the exact three files Sprint 18 also rewrote (body_surface_canvas.cpp, selection_panel.cpp, ui_state.hpp), so expect substantive conflicts that need judgement about which of two live designs wins in each hunk — not something to resolve mechanically. Worth doing BEFORE BL-604 (legend takes the minimap): 17b already touches shell_metrics, the minimap/legend geometry that item rewrites, so merging first avoids doing that layout twice.",
       "files": [],
-      "status": "open",
-      "resolution": null
+      "status": "resolved",
+      "resolution": "RESOLVED 2026-08-25 — merged into main as 98fa2e57 on Ben's instruction. All 42 UI files landed; full ProjectIo builds clean and 8 of 9 harnesses are green (the one failure, unit_march_harness's corp_verb_count row, is pre-existing since Sprint 16). Four calls needed judgement and are recorded in the merge commit: BL-598's Throughput key was adapted to 17b's one-chrome-home idiom and its foreground-list workaround dropped; 17b's ROADMAP trim was taken wholesale with Sprint 18's cut re-placed into it; 17b's completed sprint went to the cold archive rather than the io-v2 hot store; and 17b's NR-598/599/600 were renumbered to NR-625/626/627, main's being already published and cited — the same rule 17b applied to its own ids.",
+      "resolved_on": "2026-08-25"
     },
     {
       "id": "NR-619",
