@@ -1066,9 +1066,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Which standing lanes carry my economy, and how heavily? The aggregate counterpart to Supply's in-flight convoys: the carved trade lanes and their traffic weight, for judging which routes are load-bearing and which are vestigial.
 
-### `lens.throughput` — Off the lens bar; reuses the convoy glyph, on the same terms as lens.reach (the lens it extends)
+### `lens.throughput` — Lens strip slot 6, on the minimap (draw_overlay_controls, src/ui/overlay.cpp). Its glyph is a TRUCK in profile (icons::throughput) — its own mark since BL-605, no longer the borrowed convoy chevron, because an on-screen lens carries one distinct glyph.
 
-**Press.** No bar press — reachable only via the keyboard lens-cycle (controls family owns the hotkeys).
+**Press.** Click the truck glyph on the lens strip, or cycle with L / Shift+L (Throughput is the LAST lens in the family, so one Shift+L from no lens lands on it). Re-clicking the active glyph clears to overlay_mode::none, per the strip toggle rule. Planetary rung only.
 
 **Valid when:**
 - Only reachable by keyboard cycle.

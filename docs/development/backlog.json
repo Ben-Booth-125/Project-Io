@@ -605,8 +605,8 @@
       "design": "MILITARY.md § Upkeep designs one decay rule with two triggers; every rate in scripts/economy.lua § upkeep is zero today, so the wired code path is inert by data. Author non-zero decay/recovery/out_of_supply_reach and the ordnance draw, argued against BL-543 (value anchor); first-cut-then-tune, flagged for Ben’s calibration (NR-600). Harness: the reach trigger fires beyond out_of_supply_reach and recovery restores inside it; existing goldens that legitimately move are attributed. COMPLETE 2026-08-24 (Sprint 18 wave 1): rates landed in scripts/economy.lua (credits_per_head=6.0, credits_per_head_per_power=0.004, ordnance=0.14, food_rations=1.0, supply_decay_permille=50, supply_recovery_permille=100, out_of_supply_reach=24.0), verified against value_anchor (22/22) and the new upkeep_harness (19/19). tier_margin R2 failure confirmed pre-existing, independent of this change. Commit 4fff7972."
     },
     {
-      "status": "designed",
-      "glyph": "✓",
+      "status": "cancelled",
+      "glyph": "x",
       "version_goal": "v0.1.18",
       "sprint": "18",
       "written": "2026-08-25",
@@ -629,10 +629,10 @@
         "docs/ui/MINIMAP.md"
       ],
       "authority_doc": "docs/ui/LENSES.md",
-      "design": "Ruled 2026-08-25 (Ben, looking at the live Throughput lens): \"when a lens needs a legend, it takes the minimap space\" — the flush-left-of-the-minimap anchor is retired, because it put the key over the always-open Selection band and read as sloppy. Design settled in docs/ui/LENSES.md § legend chromes; read it before implementing. Scope: move the gradient-bar chrome (begin_lens_key) into the minimap rect and let the minimap yield; the count-driven keys already sit in the right chrome column above the minimap and should be reconciled to the same rule rather than left as a second idiom. Two consequences fall out and are deliberately part of this item: the BL-376 foreground-list + opaque-fill workaround becomes unnecessary once the legend owns its rect (it was the right fix for the wrong layout), which also dissolves the standing defect that six of the seven gradient keys were unreadable under the band; and the item must answer what the minimap does while displaced — hidden outright, or restored the moment the lens clears. A live click is required, per the UI rule."
+      "design": "Ruled 2026-08-25 (Ben, looking at the live Throughput lens): \"when a lens needs a legend, it takes the minimap space\" — the flush-left-of-the-minimap anchor is retired, because it put the key over the always-open Selection band and read as sloppy. Design settled in docs/ui/LENSES.md § legend chromes; read it before implementing. Scope: move the gradient-bar chrome (begin_lens_key) into the minimap rect and let the minimap yield; the count-driven keys already sit in the right chrome column above the minimap and should be reconciled to the same rule rather than left as a second idiom. Two consequences fall out and are deliberately part of this item: the BL-376 foreground-list + opaque-fill workaround becomes unnecessary once the legend owns its rect (it was the right fix for the wrong layout), which also dissolves the standing defect that six of the seven gradient keys were unreadable under the band; and the item must answer what the minimap does while displaced — hidden outright, or restored the moment the lens clears. A live click is required, per the UI rule. CANCELLED 2026-08-25, by Ben on seeing the merged build: \"Looks fantastic, probably better than my direct instruction to fill minimap space.\" Sprint 17b had already moved every legend into one chrome home — the minimap HEADER, growing upward into the column — which answers the complaint that prompted the ruling (a key popped out over the Selection band) without taking the minimap's own rect. The 2026-08-25 ruling is therefore superseded by its own author in favour of what shipped. The z-order half of this item is also moot: 17b's region overlaps no window, so the foreground-list workaround was dropped at the merge rather than generalised."
     },
     {
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "version_goal": "v0.1.18",
       "sprint": "18",
@@ -652,7 +652,7 @@
         "docs/ui/LENSES.md"
       ],
       "authority_doc": "docs/ui/LENSES.md",
-      "design": "Observed live 2026-08-25 (Ben): no logistics glyph below the minimap. Not a bug — draw_overlay_controls (src/ui/overlay.cpp) hardcodes an eight-lens strip and Throughput was deliberately left off it, joining the keyboard-cycle-only shelf with Scarcity, Industry, Supply, Reach and Supply-routes, on the stated ground that the 240px minimap bar has no room. Ben expected a glyph, so the shelf decision is worth revisiting for this lens at least. Note the interaction with BL-604: the strip currently LIVES on the minimap bar, and BL-604 gives the minimap rect to the legend — so where the strip goes is part of that layout question and these two should be settled together. icons::convoy already exists (icons.hpp) and overlay.cpp already maps it to overlay_mode::throughput for the cycle label; only a strip slot is missing."
+      "design": "Observed live 2026-08-25 (Ben): no logistics glyph below the minimap. Not a bug — draw_overlay_controls (src/ui/overlay.cpp) hardcodes an eight-lens strip and Throughput was deliberately left off it, joining the keyboard-cycle-only shelf with Scarcity, Industry, Supply, Reach and Supply-routes, on the stated ground that the 240px minimap bar has no room. Ben expected a glyph, so the shelf decision is worth revisiting for this lens at least. Note the interaction with BL-604: the strip currently LIVES on the minimap bar, and BL-604 gives the minimap rect to the legend — so where the strip goes is part of that layout question and these two should be settled together. icons::convoy already exists (icons.hpp) and overlay.cpp already maps it to overlay_mode::throughput for the cycle label; only a strip slot is missing. COMPLETE 2026-08-25: Throughput takes strip slot 6, with its own glyph — a TRUCK in profile (icons::throughput), Ben's call. Two abstract cuts were built and rejected against captures first: a funnel narrowing to a node read as a bowtie (an X, already the closed affordance in this vocabulary), and a ringed node with flow stubs read as a lone ring. Proportions matched to industry's vertical extent so it does not sit small against its neighbours. LENSES.md, ICONS.md and ACTIONS.json all updated; captured via lens_strip.lua."
     }
   ]
 }

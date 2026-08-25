@@ -34,7 +34,7 @@ by the cycle without a literal being kept in step by hand.
 | `supply` | off the bar | Solar per-convoy lines · Circumplanetary convoy-count badge · Planetary per-tile convoy glyph |
 | `reach` | off the bar | Planetary key listing the active body's trade-route endpoints by recency |
 | `supply_routes` | off the bar | Planetary key of aggregated lanes, log-scaled thickness |
-| `throughput` | off the bar | Planetary reach-cost field (far → at an anchor) + an active-LP ring on every supply anchor + gradient key |
+| `throughput` | 6 | Planetary reach-cost field (far → at an anchor) + an active-LP ring on every supply anchor + gradient key |
 
 Identity colours live in `presentation.hpp`; the corporation-identity helper is
 `palette::corp_colour`.
@@ -45,19 +45,23 @@ Identity colours live in `presentation.hpp`; the corporation-identity helper is
 
 The lens bar — on the **minimap** (see [MINIMAP.md](MINIMAP.md)) — presents a
 **curated subset** in this order: **Corporation → Resource → Market →
-Population → Continent**. **Scarcity** and **Industry** are off the bar, reached
-by **keyboard lens-cycle only** — joining **Supply**, **Reach**,
-**Supply-routes** and **Throughput**, which do not fit the strip. The Continent
+Population → Continent → Throughput**. **Scarcity** and **Industry** are off the
+bar, reached by **keyboard lens-cycle only** — joining **Supply**, **Reach** and
+**Supply-routes**, which do not fit the strip. The Continent
 lens earns its bar
 slot over the keyboard-only shelf because it answers a question the player asks at
 *first sight* of a body — "why is the land shaped like that?" — which is exactly
 the moment they are looking at the strip.
 
-> **Throughput's absence from the strip is questioned, not settled** (Ben,
-> 2026-08-25, looking at the live lens): *"I can't see a logistics glyph below the
-> minimap."* BL-605 owns it, and it is entangled with the legend region below —
-> the strip currently lives on the minimap bar, which is the rect a legend now
-> claims.
+**Throughput earns the sixth slot** (Ben, 2026-08-25: *"the only thing now is to add
+the glyph for our throughput lens"*). It sat on the keyboard-only shelf because the
+eight-lens strip had no room; the three retirements above freed three slots, so the
+reason expired before the lens did. Logistics is one of the two things the whole
+design is rate-limited by, which is a poor thing to leave undiscoverable. It carries
+its **own** glyph rather than the borrowed convoy chevron — a strip lens gets a
+distinct mark (BL-605). The glyph is a **truck** (Ben: *"just use a truck as the
+glyph"*); two abstract cuts were tried and both failed at strip size, and a
+vehicle needs no decoding.
 
 The campaign opens on **no lens** (`overlay_mode::none`, the plain canvas) — a
 click only updates the Selection element and never re-skins the canvas, so the
@@ -81,7 +85,7 @@ representation intended.
 | **Continent** | — | — | plate tint + boundary lift + key |
 | **Reach** *(keyboard-cycle only)* | connected-body glow | — | connection-list key |
 | **Supply-routes** *(keyboard-cycle only)* | aggregated graph edges | — | lane-list key, log-scaled thickness |
-| **Throughput** *(keyboard-cycle only)* | — | — | reach-cost field + per-anchor active-LP ring + key |
+| **Throughput** | — | — | reach-cost field + per-anchor active-LP ring + key |
 
 **Per-lens rung notes.** Corporation, Resource, Population, Industry and Continent
 are **Planetary-only** — their unit of meaning (a tile, a building, a deposit, a
@@ -167,17 +171,12 @@ list and the foreground special case is gone. An **input blocker** over the whol
 region is what remains necessary: a draw list paints pixels and registers no
 window, so without it a press on the legend would also select the tile underneath.
 
-> **STILL OPEN — Ben, 2026-08-25: "when a lens needs a legend, it takes the minimap
-> space."** Ruled while looking at the live build, which did NOT yet carry the
-> region described above — the key was still on the old flush-left anchor, and the
-> complaint was that it "looks sloppy popped out over the selection element". The
-> region above already answers that complaint, so this ruling may already be
-> satisfied; what it asks for and what shipped are not obviously the same rect.
-> The header sits ABOVE the minimap and grows upward into the column; the ruling
-> says the legend takes the minimap's OWN space and the minimap yields.
->
-> **Do not resolve this by reading — look at it.** BL-604 owns the question, and
-> is to be settled against the merged build rather than either description.
+> **SETTLED 2026-08-25 — the header region stands.** Ben ruled that day that a legend
+> "takes the minimap space", then saw the region above in the merged build and preferred
+> it: *"Looks fantastic, probably better than my direct instruction to fill minimap
+> space."* The ruling is superseded by its own author; the minimap keeps its rect and the
+> legend keeps the header. BL-604 is cancelled, and the z-order workaround it would have
+> removed was already dropped at the Sprint 17b merge.
 
 The resource/good selector shared by the Resource, Market and Scarcity lenses is
 one combo bound to `ui_state.lens_resource` (`draw_lens_resource_combo`), sitting

@@ -219,7 +219,7 @@
   ],
   [
    "lens.throughput",
-   "Off the lens bar; reuses the convoy glyph, on the same terms as lens.reach (the lens it extends)"
+   "Lens strip slot 6, on the minimap (draw_overlay_controls, src/ui/overlay.cpp). Its glyph is a TRUCK in profile (icons::throughput) — its own mark since BL-605, no longer the borrowed convoy chevron, because an on-screen lens carries one distinct glyph."
   ],
   [
    "ledger.budget_tax_tier",
