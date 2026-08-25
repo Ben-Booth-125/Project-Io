@@ -51,6 +51,22 @@ struct logistics_path
     std::vector<entity_id> tiles;
 };
 
+/// One COMPLETED Dijkstra flood over a body's raster grid, anchored at a single
+/// tile: distance, parent index and touched-ocean flag for every cell. The
+/// many-to-one layer beneath the per-pair path cache (2026-08-25 warm-start
+/// stall): dispatch prices hundreds of origins against the same few destination
+/// centres, so one flood per centre answers every pair that touches it at
+/// path-reconstruction cost instead of a fresh grid search. Byte-identical to
+/// the per-pair search's answers — same relaxation order, same tie-breaks, and
+/// a settled node's parent is final whether or not the search stopped early.
+struct logistics_flood_field
+{
+    int                anchor_idx = -1;   ///< Raster index of the anchor tile.
+    std::vector<float> dist;              ///< Weighted cost anchor -> cell; 1e30f unreached.
+    std::vector<int>   came_from;         ///< Parent raster index on the best path, -1 at anchor/unreached.
+    std::vector<char>  crossed;           ///< Best path anchor -> cell touches ocean?
+};
+
 // ---------------------------------------------------------------------------
 // World history log (BL-208) — the append-only, serialised world log
 // ---------------------------------------------------------------------------
@@ -560,6 +576,15 @@ struct world
     /// when road_level changes (road placement, BL-147). Keeps per-Tick per-lane A* off the
     /// dispatch hot path.
     std::map<std::tuple<entity_id, entity_id, entity_id>, logistics_path> astar_cost_cache;
+
+    /// Completed flood fields for intra-body pathfinding, keyed (body, anchor tile) —
+    /// see logistics_flood_field. A derived cache with the SAME invalidation contract
+    /// as astar_cost_cache (cleared together by invalidate_logistics_caches and on
+    /// load); rebuilt lazily by intra_body_path on a pair-cache miss. ~410 KB per
+    /// anchor on the 312x145 grid, bounded by the distinct destination centres queried
+    /// between invalidations — deliberately spending memory to keep rival road
+    /// placement (BL-599) from turning every tick into hundreds of grid searches.
+    std::map<std::pair<entity_id, entity_id>, logistics_flood_field> logistics_flood_fields;
 
     /// Per-body LOGISTICS REACH FIELD (BL-323 S2): raster-indexed weighted cost from each
     /// tile to its nearest supply anchor — a city, a port, or an inland logistics hub.

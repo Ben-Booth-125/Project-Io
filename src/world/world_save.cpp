@@ -732,6 +732,7 @@ void clear_derived_state(world& w)
     // stream stays free of anything two sides could disagree about.
     w.body_tile_index.clear();
     w.astar_cost_cache.clear();
+    w.logistics_flood_fields.clear();
     w.body_reach_cost.clear();
 
     // The market index carries its own staleness stamps; zeroing them is what

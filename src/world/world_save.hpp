@@ -26,7 +26,7 @@
 //      well-known entities, the belt, and every id counter INCLUDING the
 //      allocator cursor (world::next_entity_id).
 //   2. REBUILT, never read -- `body_tile_index`, `astar_cost_cache`,
-//      `body_reach_cost`, `body_market_index` and its two stamps, plus
+//      `logistics_flood_fields`, `body_reach_cost`, `body_market_index` and its two stamps, plus
 //      `ai_decisions` and `current_day_tick`. Pure functions of what bucket 1
 //      holds; writing them would only create a second thing to keep in
 //      agreement. `clear_derived_state` is what a load calls.
@@ -216,7 +216,7 @@ bool read_world_snapshot(world& w, std::istream& in);
 /// harness asserts the rebuild produces identical contents, which means it
 /// needs to clear a freshly-generated world the same way a load does.
 ///
-/// Clears: `body_tile_index`, `astar_cost_cache`, `body_reach_cost`,
+/// Clears: `body_tile_index`, `astar_cost_cache`, `logistics_flood_fields`, `body_reach_cost`,
 /// `body_market_index` (and its count/max-id stamps), `ai_decisions`, and
 /// `current_day_tick`. Does NOT touch `corp_modifiers` -- see above.
 ///

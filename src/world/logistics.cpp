@@ -129,6 +129,111 @@ const std::vector<entity_id>& body_tile_grid(world& w, entity_id body)
     return ins.first->second;
 }
 
+namespace {
+
+/// Fetch or build the COMPLETED flood field anchored at @p anchor_tile — the
+/// full Dijkstra the pair search used to run per endpoint pair, run once and
+/// kept on `world.logistics_flood_fields` (2026-08-25 warm-start stall).
+/// dispatch_convoys prices hundreds of origins against the same few
+/// destination centres, and rival place_road (BL-599) clears the pair cache at
+/// tick rate, so the per-pair searches re-flooded the grid hundreds of times
+/// every econ tick — the 2026-08-12 AppHangB1 disease with a new carrier.
+///
+/// Relaxation order, edge costs and tie-breaks are IDENTICAL to the retired
+/// per-pair search (it was already Dijkstra — the "A*" name carried no
+/// heuristic); the only difference is no early exit, and a settled node's
+/// parent is final, so a pair reconstructed from this field matches what the
+/// early-exit search anchored at the same tile returned.
+const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id anchor_tile,
+                                             int gw, int gh,
+                                             const std::vector<entity_id>& grid,
+                                             const tile_component& anchor_tc)
+{
+    const auto key = std::make_pair(body, anchor_tile);
+    const auto fit = w.logistics_flood_fields.find(key);
+    if (fit != w.logistics_flood_fields.end())
+        return fit->second;
+
+    logistics_flood_field f;
+    const int total = gw * gh;
+    f.dist.assign(static_cast<std::size_t>(total), 1e30f);
+    f.came_from.assign(static_cast<std::size_t>(total), -1);
+    f.crossed.assign(static_cast<std::size_t>(total), 0);
+    std::vector<char> settled(static_cast<std::size_t>(total), 0);
+
+    const auto tile_at = [&](int idx) -> const tile_component* {
+        const entity_id tid = grid[static_cast<std::size_t>(idx)];
+        if (tid == null_entity)
+            return nullptr;
+        const auto tit = w.tiles.find(tid);
+        return (tit != w.tiles.end()) ? &tit->second : nullptr;
+    };
+
+    const int ac = anchor_tc.grid_x, ar = anchor_tc.grid_y;
+    f.anchor_idx = raster_idx(ac, ar, gw);
+    f.dist[static_cast<std::size_t>(f.anchor_idx)]    = 0.0f;
+    f.crossed[static_cast<std::size_t>(f.anchor_idx)] =
+        is_water(anchor_tc.substrate) ? 1 : 0; // BL-516
+
+    std::priority_queue<pq_entry, std::vector<pq_entry>, std::greater<pq_entry>> pq;
+    pq.push({ 0.0f, ac, ar });
+
+    // 4-cardinal offsets, matching nation_generation::cardinal_neighbours (N, S, W, E).
+    const int off_dc[4] = {  0,  0, -1, 1 };
+    const int off_dr[4] = { -1,  1,  0, 0 };
+
+    while (!pq.empty())
+    {
+        const pq_entry cur = pq.top();
+        pq.pop();
+        const int idx = raster_idx(cur.col, cur.row, gw);
+        if (settled[static_cast<std::size_t>(idx)])
+            continue;
+        settled[static_cast<std::size_t>(idx)] = 1;
+
+        const tile_component* cur_tc = tile_at(idx);
+        if (!cur_tc)
+            continue;
+        const float cur_cost = tile_traversal_cost(*cur_tc);
+
+        for (int i = 0; i < 4; ++i)
+        {
+            const int nr = cur.row + off_dr[i];
+            if (nr < 0 || nr >= gh)
+                continue;
+            const int nc = ((cur.col + off_dc[i]) % gw + gw) % gw;
+            const int nidx = raster_idx(nc, nr, gw);
+            if (settled[static_cast<std::size_t>(nidx)])
+                continue;
+            const tile_component* n_tc = tile_at(nidx);
+            if (!n_tc)
+                continue; // absent grid cell — impassable
+
+            // River discount (BL-170): see the pair search this loop was lifted
+            // from — a river-adjacent edge is cheaper, stacking multiplicatively
+            // with the road-tier discount inside tile_traversal_cost.
+            const int hex_side = hex_side_for_offset(off_dc[i], off_dr[i], (cur.row & 1) != 0);
+            const float river_mult = (hex_side >= 0) ? river_edge_discount(*cur_tc, hex_side) : 1.0f;
+
+            const float edge = 0.5f * (cur_cost + tile_traversal_cost(*n_tc)) * river_mult;
+            const float nd   = f.dist[static_cast<std::size_t>(idx)] + edge;
+            if (nd < f.dist[static_cast<std::size_t>(nidx)])
+            {
+                f.dist[static_cast<std::size_t>(nidx)] = nd;
+                f.crossed[static_cast<std::size_t>(nidx)] =
+                    (f.crossed[static_cast<std::size_t>(idx)]
+                     || is_water(n_tc->substrate)) ? 1 : 0; // BL-516
+                f.came_from[static_cast<std::size_t>(nidx)] = idx;
+                pq.push({ nd, nc, nr });
+            }
+        }
+    }
+
+    return w.logistics_flood_fields.emplace(key, std::move(f)).first->second;
+}
+
+} // namespace
+
 const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_tile,
                                       entity_id dst_tile)
 {
@@ -167,106 +272,53 @@ const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_ti
         return w.astar_cost_cache.emplace(key, std::move(res)).first->second;
     }
 
-    const int total = gw * gh;
-    const int sc = sit->second.grid_x, sr = sit->second.grid_y;
-    const int dc = dit->second.grid_x, dr = dit->second.grid_y;
-
-    std::vector<float> dist(static_cast<std::size_t>(total), 1e30f);
-    std::vector<char>  settled(static_cast<std::size_t>(total), 0);
-    std::vector<char>  crossed(static_cast<std::size_t>(total), 0); // best path touches ocean?
-    std::vector<int>   came_from(static_cast<std::size_t>(total), -1); // parent idx for path reconstruction (BL-152)
-
-    const auto tile_at = [&](int idx) -> const tile_component* {
-        const entity_id tid = grid[static_cast<std::size_t>(idx)];
-        if (tid == null_entity)
-            return nullptr;
-        const auto tit = w.tiles.find(tid);
-        return (tit != w.tiles.end()) ? &tit->second : nullptr;
-    };
-
-    const int start   = raster_idx(sc, sr, gw);
-    const int destIdx = raster_idx(dc, dr, gw);
-    dist[static_cast<std::size_t>(start)] = 0.0f;
-    crossed[static_cast<std::size_t>(start)] =
-        is_water(sit->second.substrate) ? 1 : 0; // BL-516
-
-    std::priority_queue<pq_entry, std::vector<pq_entry>, std::greater<pq_entry>> pq;
-    pq.push({ 0.0f, sc, sr });
-
-    // 4-cardinal offsets, matching nation_generation::cardinal_neighbours (N, S, W, E).
-    const int off_dc[4] = {  0,  0, -1, 1 };
-    const int off_dr[4] = { -1,  1,  0, 0 };
-
-    while (!pq.empty())
+    // Answer from a completed flood field rather than a per-pair search
+    // (2026-08-25 — see flood_field_for above). Prefer a field either endpoint
+    // already anchors; on a double miss, flood from the DESTINATION, because
+    // the hot callers (dispatch's shortfall scan, nearest_lp_anchor, the march
+    // pass) ask many origins about the same few destination tiles.
+    const logistics_flood_field* field = nullptr;
     {
-        const pq_entry cur = pq.top();
-        pq.pop();
-        const int idx = raster_idx(cur.col, cur.row, gw);
-        if (settled[static_cast<std::size_t>(idx)])
-            continue;
-        settled[static_cast<std::size_t>(idx)] = 1;
-        if (idx == destIdx)
-            break;
-
-        const tile_component* cur_tc = tile_at(idx);
-        if (!cur_tc)
-            continue;
-        const float cur_cost = tile_traversal_cost(*cur_tc);
-
-        for (int i = 0; i < 4; ++i)
+        const auto dfit = w.logistics_flood_fields.find(std::make_pair(body, dst_tile));
+        if (dfit != w.logistics_flood_fields.end())
+            field = &dfit->second;
+        else
         {
-            const int nr = cur.row + off_dr[i];
-            if (nr < 0 || nr >= gh)
-                continue;
-            const int nc = ((cur.col + off_dc[i]) % gw + gw) % gw;
-            const int nidx = raster_idx(nc, nr, gw);
-            if (settled[static_cast<std::size_t>(nidx)])
-                continue;
-            const tile_component* n_tc = tile_at(nidx);
-            if (!n_tc)
-                continue; // absent grid cell — impassable
-
-            // River discount (BL-170): a river-adjacent edge is cheaper, stacking
-            // MULTIPLICATIVELY with the road-tier discount already folded into
-            // tile_traversal_cost above. The A* neighbour walk is 4-cardinal on the
-            // raster grid; hex_side_for_offset maps that cardinal move to the hex
-            // side (0-5) river tracing recorded on `cur`'s tile.
-            const int hex_side = hex_side_for_offset(off_dc[i], off_dr[i], (cur.row & 1) != 0);
-            const float river_mult = (hex_side >= 0) ? river_edge_discount(*cur_tc, hex_side) : 1.0f;
-
-            const float edge = 0.5f * (cur_cost + tile_traversal_cost(*n_tc)) * river_mult;
-            const float nd   = dist[static_cast<std::size_t>(idx)] + edge;
-            if (nd < dist[static_cast<std::size_t>(nidx)])
-            {
-                dist[static_cast<std::size_t>(nidx)] = nd;
-                crossed[static_cast<std::size_t>(nidx)] =
-                    (crossed[static_cast<std::size_t>(idx)]
-                     || is_water(n_tc->substrate)) ? 1 : 0; // BL-516
-                came_from[static_cast<std::size_t>(nidx)] = idx;
-                pq.push({ nd, nc, nr });
-            }
+            const auto sfit = w.logistics_flood_fields.find(std::make_pair(body, src_tile));
+            if (sfit != w.logistics_flood_fields.end())
+                field = &sfit->second;
         }
     }
+    if (!field)
+        field = &flood_field_for(w, body, dst_tile, gw, gh, grid, dit->second);
 
-    if (dist[static_cast<std::size_t>(destIdx)] < 1e30f)
+    // The endpoint the field is NOT anchored at — the walk start. The weighted
+    // path is symmetric (the cache key is the unordered pair for exactly that
+    // reason), so either endpoint's field prices the pair.
+    const bool anchored_at_dst =
+        field->anchor_idx == raster_idx(dit->second.grid_x, dit->second.grid_y, gw);
+    const tile_component& other_tc  = anchored_at_dst ? sit->second : dit->second;
+    const entity_id       other_tile = anchored_at_dst ? src_tile : dst_tile;
+    const int otherIdx = raster_idx(other_tc.grid_x, other_tc.grid_y, gw);
+
+    if (field->dist[static_cast<std::size_t>(otherIdx)] < 1e30f)
     {
         res.reachable     = true;
-        res.cost          = dist[static_cast<std::size_t>(destIdx)];
-        res.crosses_ocean = crossed[static_cast<std::size_t>(destIdx)] != 0;
+        res.cost          = field->dist[static_cast<std::size_t>(otherIdx)];
+        res.crosses_ocean = field->crossed[static_cast<std::size_t>(otherIdx)] != 0;
 
-        // Reconstruct the tile sequence (BL-152). Walk parents dest→start, mapping
-        // each raster index to its tile id, then reverse to src→dst. Canonicalise to
-        // lo→hi (the cache is keyed on the unordered pair) so every reader sees one
-        // stable order regardless of which direction first populated the entry.
+        // Reconstruct the tile sequence (BL-152): walk parents other→anchor,
+        // then canonicalise to lo→hi (the cache is keyed on the unordered pair)
+        // so every reader sees one stable order regardless of which endpoint
+        // anchored the field.
         std::vector<entity_id> seq;
-        for (int i = destIdx; i != -1; i = came_from[static_cast<std::size_t>(i)])
+        for (int i = otherIdx; i != -1; i = field->came_from[static_cast<std::size_t>(i)])
         {
             const entity_id tid = grid[static_cast<std::size_t>(i)];
             if (tid != null_entity) seq.push_back(tid);
-            if (i == start) break;
+            if (i == field->anchor_idx) break;
         }
-        std::reverse(seq.begin(), seq.end()); // now src→dst
-        if (src_tile != lo)                   // canonicalise to lo→hi
+        if (other_tile != lo) // seq runs other→anchor; flip unless other IS lo
             std::reverse(seq.begin(), seq.end());
         res.tiles = std::move(seq);
     }

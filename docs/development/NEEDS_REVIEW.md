@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*53 entries — 40 open, 13 resolved.*
+*54 entries — 41 open, 13 resolved.*
 
 ---
 
@@ -423,6 +423,13 @@ Five calls, each overturnable: (1) the homeworld partition runs early (before ro
 state_hash folds the fields a tick may mutate, but the population-centre record's newer fields (BL-616's accumulator, BL-624's razed) are not in it - divergence in them would not move the hash. Today the harness determinism rows compare the fields directly, so drift is still caught; if state_hash is ever leaned on as the sole replay check for centre state, fold them in (a hash-baseline move, so do it deliberately with a re-bless).
 
 *Files: `src/world/world.cpp`*
+
+### NR-645 — logistics_harness T7 dispatch block (6 assertions) fails at pristine HEAD - pre-existing drift, not the flood-field change
+*observation · raised 2026-08-25 · from Warm-start stall fix session (flood-field pathfinding): harness sweep before commit.*
+
+The six T7/T8 intra-body dispatch assertions (shortfall dispatches one convoy, cost debit, cost arithmetic 0.4, the two 0.352 discounts, decommissioned-hub no-discount) fail identically when the harness is built against unmodified HEAD (5778a932) - verified in a throwaway worktree. So the drift predates the 2026-08-25 flood-field change; the likely suspect is a dispatch-gate landed since the harness's synthetic worlds were authored (e.g. BL-597's passive-LP draw refusing anchorless bodies), but that is unconfirmed. Needs a session to rebase the harness's synthetic worlds onto the current dispatch contract - not a weakening of the assertions.
+
+*Files: `tools/verify/logistics_harness.cpp`*
 
 ---
 

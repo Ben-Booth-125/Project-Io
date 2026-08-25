@@ -877,6 +877,18 @@
     "scripts/verify/golden/tech_tree_antiquity.png"
    ],
    "resolution": "Ben, 2026-08-25: delete the three stale goldens - done same session; re-admitting the surface stays a deliberate copy-in per the NR-237 curated-set policy."
+  },
+  {
+   "id": "NR-645",
+   "title": "logistics_harness T7 dispatch block (6 assertions) fails at pristine HEAD - pre-existing drift, not the flood-field change",
+   "raised": "2026-08-25",
+   "kind": "observation",
+   "status": "open",
+   "source": "Warm-start stall fix session (flood-field pathfinding): harness sweep before commit.",
+   "what": "The six T7/T8 intra-body dispatch assertions (shortfall dispatches one convoy, cost debit, cost arithmetic 0.4, the two 0.352 discounts, decommissioned-hub no-discount) fail identically when the harness is built against unmodified HEAD (5778a932) - verified in a throwaway worktree. So the drift predates the 2026-08-25 flood-field change; the likely suspect is a dispatch-gate landed since the harness's synthetic worlds were authored (e.g. BL-597's passive-LP draw refusing anchorless bodies), but that is unconfirmed. Needs a session to rebase the harness's synthetic worlds onto the current dispatch contract - not a weakening of the assertions.",
+   "files": [
+    "tools/verify/logistics_harness.cpp"
+   ]
   }
  ]
 }

@@ -123,6 +123,7 @@ float tile_reach_cost(const world& w, entity_id tile);
 inline void invalidate_logistics_caches(world& w)
 {
     w.astar_cost_cache.clear();
+    w.logistics_flood_fields.clear(); // same contract: any traversal/anchor change stales it
     w.body_reach_cost.clear();
 }
 
