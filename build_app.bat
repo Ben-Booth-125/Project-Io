@@ -15,10 +15,11 @@ REM    <variant> with a wall of bogus "std::std::" / C2098 / C2059 errors that
 REM    look like a corrupt STL rather than a config problem. So pin BuildTools
 REM    explicitly and do NOT fall back to any other install.
 REM
-REM 2. THE BUILD DIRECTORY. The real build dir is build\. build_live\ is a COPY
-REM    (its CMakeCache still points at build\) kept so a running ProjectIo.exe
-REM    is not locked while rebuilding. Never build in build_live - nmake there
-REM    writes into build\ anyway and the result is confusing.
+REM 2. THE BUILD DIRECTORY. This script builds build\ (Debug; NMake) - the
+REM    debugging tree. The PLAY build is build_rel\ (Release; Ninja), rebuilt
+REM    with: cmake --build build_rel --target ProjectIo -j  (after vcvars).
+REM    These two are the only build trees (2026-08-25 trim; build_live's
+REM    running-copy convention retired with it).
 REM
 REM Output: build\ProjectIo.exe (single-config Debug; NMake Makefiles).
 REM Verify runs read scripts from build\scripts\, which the build refreshes.
