@@ -902,6 +902,31 @@
    ],
    "authority_doc": "docs/economy/RESEARCH.md",
    "design": "Filed 2026-08-25 with the stub authority doc (Ben: 'write a stub authority doc for RESEARCH.md now... it helps to have the concept in writing'). Settled: universities (City+) produce RP; RP purchases unlocks; three live consumption touchpoints exist (era-gate Rocketry per BL-087, the unlock_recipe tech arm per BL-588, province-ceiling relief per BL-513). Open and owned here: the RP economy (rates; per-corp vs per-nation; tradeability), whether scripts/tech_tree.lua's ~150 inert nodes become the graph, and nation-budget funding. A design session of its own before any build."
+  },
+  {
+   "id": "BL-620",
+   "short_name": "ROAD_GEN_SCALES_TO_DENSITY",
+   "title": "Road generation scales to village density - the O(n^2) all-centre-pairs pass is the generation cost wall",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": "v0.1.19",
+   "sprint": "19",
+   "category": "Generation",
+   "written": "2026-08-25",
+   "author": "Ben",
+   "requires": [
+    "BL-610"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "files": [
+    "src/world/road_generation.cpp",
+    "docs/economy/LOGISTICS.md"
+   ],
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "design": "Filed 2026-08-25 from Agent G's measurement (BL-610 landing): generate_roads computes pairwise A* between ALL centres per nation (O(n^2) A* + O(n^3) relative-neighbour scan). At the new demography density (~1,450-2,000 centres vs ~130) it went from ~1-2s to ~56s of a ~58s world - every world-building harness now takes minutes and the loading screen gains ~a minute. Fix direction, which also fits the design: a BACKBONE over towns-and-up (scale >= 2 or 3) built as today, with villages joining LOCALLY (each village a Track to its nearest backbone centre or road tile via a distance-prefiltered candidate set) - low-stratum settlements get spur tracks, not lattice membership, which is also the historically honest shape. Rides with BL-618 (roads scale with qualification) in wave 2: same file, one agent, sequential - perf shape first, qualification modulation over it. Constraint: deterministic, and the lattice must stay connected per road_generation_harness."
   }
  ]
 }

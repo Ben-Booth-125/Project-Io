@@ -25,7 +25,7 @@ three worktree agents; wave 2 promotes after the wave-1 merge. Batch: `sprint-19
 
 ## Wave 1 — Agent E (economy-dev, worktree), sequential within the agent
 
-- [ ] **T4 (BL-613, qualification fraction)** — `src/world/components.hpp` +
+- [x] **T4 (BL-613, qualification fraction)** — *code-complete on the agent branch (20b86c67), save v10→11; NR-633* — `src/world/components.hpp` +
   `src/world/economy_system.cpp` + nation serialisation seam: `nation_component::qualification`,
   seeded at generation from region industrialisation timing aggregated per nation; recipes gain
   a `qualified_workforce` requirement (data, default 0; first-cut values on deep methods);
@@ -35,7 +35,7 @@ three worktree agents; wave 2 promotes after the wave-1 merge. Batch: `sprint-19
   - provides: `nation_component::qualification` (+ serialisation), `qualified_workforce`
     recipe field, qualified-pool throttle, `is_education_building` seam
   - consumes: settlement industrialisation-timing scalar (landed)
-- [ ] **T5 (BL-614, wage competition)** — `src/world/economy_system.cpp`: contended allocation
+- [x] **T5 (BL-614, wage competition)** — *code-complete on the agent branch (dd283070), save v11→12; live-Lua parse and SDL callers unverified in-worktree — integrating build covers both* — `src/world/economy_system.cpp`: contended allocation
   by offered wage. First cut (NR-600 idiom, flagged for overturn): per-building
   `wage_bid` dial (default 0, data-only, no UI), offered wage = `base_wage × (1 + wage_bid)`,
   allocation sorted (offered wage desc, building id asc), wages paid at offered rate on
@@ -45,7 +45,7 @@ three worktree agents; wave 2 promotes after the wave-1 merge. Batch: `sprint-19
 
 ## Wave 1 — Agent P (economy-dev, worktree)
 
-- [ ] **T6 (BL-615, stratum placement gates)** — `src/world/placement_rules.cpp` + building
+- [x] **T6 (BL-615, stratum placement gates)** — *code-complete on the agent branch (9ea61218), 16/16 harness rows; merge + owed UI wiring pending (NR-631/NR-632)* — `src/world/placement_rules.cpp` + building
   data: per-building placement fields (`requires_centre`, `min_centre_scale`,
   `centre_proximity_radius`), reason-coded refusals; **schooling** and **university** roster
   entries (university `min_centre_scale = 4`); heavy processors get proximity values.
