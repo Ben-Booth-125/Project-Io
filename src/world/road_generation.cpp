@@ -4,7 +4,9 @@
 #include "logistics.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
+#include <cstdlib>
 #include <functional>
 #include <limits>
 #include <map>
@@ -42,6 +44,30 @@ constexpr int          kMidScale   = 2;
 // shallow shelf read as a crossing.
 constexpr int          kMaxCrossingTiles = 3;
 
+// BL-620 (road generation scales to density). At demography-derived density (BL-610) the home
+// body carries ~1,500-2,000 centres, almost all villages; the old pass ran pairwise A* between
+// ALL centres per nation (O(n^2) A*, ~50k searches) plus cross-nation ALL-PAIRS A* for every
+// border link (~100k more), and became ~56s of a ~58s world build. The restructure: the
+// backbone lattice is built over TOWNS-AND-UP only (scale >= kMidScale, exactly the old MST +
+// relative-neighbour shape), and each village joins LOCALLY — one Track spur to its nearest
+// already-roaded same-nation tile, chosen from a grid-distance-prefiltered candidate set,
+// never all-pairs. Low-stratum settlements get spur tracks, not lattice membership, which is
+// also the historically honest shape.
+//
+// A village tries the kSpurCandidates nearest targets (a candidate can be unreachable, or its
+// route can cross open sea and be refused by the strait rule) and gives up past
+// kMaxSpurGridDist tiles — an isolated village keeps only its local street.
+constexpr int kSpurCandidates  = 3;
+constexpr int kMaxSpurGridDist = 40;
+
+// Border links keep their contract — one Track between the nearest reachable centre pair of
+// each territorially-adjacent nation pair — but the nearest pair is found by running A* over
+// only the kBorderProbePairs closest pairs by wrapped grid distance, not over all n_a * n_b
+// pairs. Terrain weight varies far less than a factor of kBorderProbePairs, so the true
+// cheapest pair is in the probe set in practice; the probe order is deterministic
+// (distance^2, then tile ids).
+constexpr int kBorderProbePairs = 24;
+
 // Tier for an edge between two centres of the given scales (BL-172).
 std::uint8_t edge_tier(int scale_a, int scale_b)
 {
@@ -54,13 +80,17 @@ std::uint8_t edge_tier(int scale_a, int scale_b)
 
 constexpr float kUnreachable = std::numeric_limits<float>::max();
 
-/// A road node: one population centre on the body, tagged with its nation and scale.
+/// A road node: one population centre on the body, tagged with its nation, scale and
+/// grid position (BL-620: the spur / border prefilters need coordinates without a
+/// tiles-map lookup per comparison).
 struct road_node
 {
     entity_id centre;
     entity_id tile;
     entity_id nation;
     int       scale;
+    int       gx;
+    int       gy;
 };
 
 entity_id nation_of(const world& w, entity_id tile)
@@ -95,28 +125,49 @@ bool crossings_are_straits(const world& w, const logistics_path& p)
 }
 
 /// Stamp a road of @p level along the A* path between two tiles, taking the max on
-/// overlap and skipping WATER OF EVERY KIND (roads are a land feature). No-op if unreachable, or if
-/// the route crosses open sea rather than a strait (see kMaxCrossingTiles).
-void stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8_t level)
+/// overlap and skipping WATER OF EVERY KIND (roads are a land feature). No-op if unreachable, or
+/// if the route crosses open sea rather than a strait (see kMaxCrossingTiles). Returns whether
+/// the edge was laid; when @p stamped is given, appends every land tile of the route (BL-620:
+/// the village-spur pass feeds these back as future spur targets).
+bool stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8_t level,
+                std::vector<entity_id>* stamped = nullptr)
 {
     const logistics_path& p = intra_body_path(w, body, ta, tb);
     if (!p.reachable)
-        return;
+        return false;
     if (p.crosses_ocean && !crossings_are_straits(w, p))
-        return;
+        return false;
     for (const entity_id t : p.tiles)
     {
         const auto it = w.tiles.find(t);
         if (it == w.tiles.end() || is_water(it->second.substrate)) // BL-516
             continue;
         it->second.road_level = std::max(it->second.road_level, level);
+        if (stamped)
+            stamped->push_back(t);
     }
+    return true;
 }
 
 } // namespace
 
 void generate_roads(world& w, entity_id body)
 {
+    // Grid geometry (BL-620: the spur and border prefilters measure wrapped grid
+    // distance, so they need the body's dimensions up front).
+    const auto bit = w.bodies.find(body);
+    const int  gw  = (bit != w.bodies.end()) ? std::max(1, bit->second.grid_width) : 0;
+    const int  gh  = (bit != w.bodies.end()) ? std::max(1, bit->second.grid_height) : 0;
+
+    // Squared grid distance with the east-west column wrap (cylinder topology).
+    auto wrapped_d2 = [&](int ax, int ay, int bx, int by) -> long long {
+        int dx = std::abs(ax - bx);
+        if (gw > 0)
+            dx = std::min(dx, gw - dx);
+        const int dy = ay - by;
+        return static_cast<long long>(dx) * dx + static_cast<long long>(dy) * dy;
+    };
+
     // 1. Collect this body's centres, ordered by tile id so the whole pass is
     //    independent of the unordered_map iteration order (determinism).
     std::vector<road_node> nodes;
@@ -128,7 +179,8 @@ void generate_roads(world& w, entity_id body)
         int scale = 1;
         if (const auto pit = w.population_centres.find(centre); pit != w.population_centres.end())
             scale = pit->second.scale;
-        nodes.push_back({ centre, tile, nation_of(w, tile), scale });
+        nodes.push_back({ centre, tile, nation_of(w, tile), scale,
+                          tit->second.grid_x, tit->second.grid_y });
     }
     std::sort(nodes.begin(), nodes.end(),
               [](const road_node& a, const road_node& b) { return a.tile < b.tile; });
@@ -136,7 +188,7 @@ void generate_roads(world& w, entity_id body)
         return;
 
     // 1b. Every centre's own tile carries at least a Track (Sprint B2 cut 1). Previously a
-    //     nation with a single centre on this body fell straight through the `n < 2` guard
+    //     nation with a single centre on this body fell straight through the backbone pass
     //     below and ended generation with no roaded tile anywhere in its territory — the
     //     census measured that as the ONLY cause of a road-less nation. A settlement has
     //     streets whether or not it has a neighbour to drive to, and this puts the nation on
@@ -151,102 +203,176 @@ void generate_roads(world& w, entity_id body)
             it->second.road_level = std::max(it->second.road_level, kTrack);
     }
 
-    // Group node indices by nation (std::map → nation ids ascending, deterministic).
+    // Group node indices by nation (std::map → nation ids ascending, deterministic;
+    // members inherit the tile-id sort above, so each list is tile-ordered).
     std::map<entity_id, std::vector<int>> by_nation;
     for (int i = 0; i < static_cast<int>(nodes.size()); ++i)
         by_nation[nodes[i].nation].push_back(i);
 
-    // 2. Per-nation backbone: MST + relative-neighbour redundancy over the centres.
+    // 2+3. Per nation: a BACKBONE over towns-and-up (MST + relative-neighbour redundancy,
+    //      the pre-BL-620 shape, now over the town set only), then each village joins the
+    //      lattice locally with a Track spur.
     for (const auto& [nation, members] : by_nation)
     {
-        (void)nation;
-        const int n = static_cast<int>(members.size());
-        if (n < 2)
-            continue;
+        // Spur target set: this nation's already-roaded tiles — every member centre's own
+        // street (stamped in 1b) plus, below, the backbone raster and earlier spurs. The
+        // std::set only dedupes; candidate order never depends on it (the nearest-target
+        // scan is over the vector with a strict (distance^2, tile-id) comparison).
+        struct spur_target { entity_id tile; int gx; int gy; };
+        std::vector<spur_target> targets;
+        std::set<entity_id>      target_seen;
+        auto add_target = [&](entity_id t) {
+            if (!target_seen.insert(t).second)
+                return;
+            const auto it = w.tiles.find(t);
+            if (it == w.tiles.end())
+                return;
+            targets.push_back({ t, it->second.grid_x, it->second.grid_y });
+        };
+        for (const int m : members)
+            add_target(nodes[m].tile);
 
-        // Pairwise terrain-weighted A* costs (symmetric matrix); collect the
-        // reachable pairs as candidate edges (a,b index into `members`).
-        struct edge { float cost; int a; int b; };
-        std::vector<edge> edges;
-        std::vector<std::vector<float>> d(n, std::vector<float>(n, kUnreachable));
-        for (int a = 0; a < n; ++a)
-            for (int b = a + 1; b < n; ++b)
+        // --- Backbone: towns-and-up only (BL-620) ---------------------------------
+        std::vector<int> towns;
+        for (const int m : members)
+            if (nodes[m].scale >= kMidScale)
+                towns.push_back(m);
+        const int n = static_cast<int>(towns.size());
+        if (n >= 2)
+        {
+            // Pairwise terrain-weighted A* costs (symmetric matrix); collect the
+            // reachable pairs as candidate edges (a,b index into `towns`).
+            struct edge { float cost; int a; int b; };
+            std::vector<edge> edges;
+            std::vector<std::vector<float>> d(n, std::vector<float>(n, kUnreachable));
+            for (int a = 0; a < n; ++a)
+                for (int b = a + 1; b < n; ++b)
+                {
+                    const logistics_path& p =
+                        intra_body_path(w, body, nodes[towns[a]].tile, nodes[towns[b]].tile);
+                    const float c = p.reachable ? p.cost : kUnreachable;
+                    d[a][b] = d[b][a] = c;
+                    if (p.reachable)
+                        edges.push_back({ c, a, b });
+                }
+
+            // Deterministic edge order: cost, then lo-tile-id, then hi-tile-id.
+            auto lo_tile = [&](const edge& e) { return std::min(nodes[towns[e.a]].tile, nodes[towns[e.b]].tile); };
+            auto hi_tile = [&](const edge& e) { return std::max(nodes[towns[e.a]].tile, nodes[towns[e.b]].tile); };
+            std::sort(edges.begin(), edges.end(), [&](const edge& e, const edge& f) {
+                if (e.cost != f.cost) return e.cost < f.cost;
+                if (lo_tile(e) != lo_tile(f)) return lo_tile(e) < lo_tile(f);
+                return hi_tile(e) < hi_tile(f);
+            });
+
+            // Kruskal MST with union-find.
+            std::vector<int> parent(n);
+            for (int i = 0; i < n; ++i) parent[i] = i;
+            std::function<int(int)> find = [&](int x) {
+                while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+                return x;
+            };
+            std::vector<std::pair<int, int>> chosen;
+            std::vector<std::vector<bool>> in_mst(n, std::vector<bool>(n, false));
+            for (const edge& e : edges)
             {
-                const logistics_path& p =
-                    intra_body_path(w, body, nodes[members[a]].tile, nodes[members[b]].tile);
-                const float c = p.reachable ? p.cost : kUnreachable;
-                d[a][b] = d[b][a] = c;
-                if (p.reachable)
-                    edges.push_back({ c, a, b });
+                const int ra = find(e.a), rb = find(e.b);
+                if (ra != rb)
+                {
+                    parent[ra] = rb;
+                    chosen.emplace_back(e.a, e.b);
+                    in_mst[e.a][e.b] = in_mst[e.b][e.a] = true;
+                }
             }
 
-        // Deterministic edge order: cost, then lo-tile-id, then hi-tile-id.
-        auto lo_tile = [&](const edge& e) { return std::min(nodes[members[e.a]].tile, nodes[members[e.b]].tile); };
-        auto hi_tile = [&](const edge& e) { return std::max(nodes[members[e.a]].tile, nodes[members[e.b]].tile); };
-        std::sort(edges.begin(), edges.end(), [&](const edge& e, const edge& f) {
-            if (e.cost != f.cost) return e.cost < f.cost;
-            if (lo_tile(e) != lo_tile(f)) return lo_tile(e) < lo_tile(f);
-            return hi_tile(e) < hi_tile(f);
-        });
-
-        // Kruskal MST with union-find.
-        std::vector<int> parent(n);
-        for (int i = 0; i < n; ++i) parent[i] = i;
-        std::function<int(int)> find = [&](int x) {
-            while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x]; }
-            return x;
-        };
-        std::vector<std::pair<int, int>> chosen;
-        std::vector<std::vector<bool>> in_mst(n, std::vector<bool>(n, false));
-        for (const edge& e : edges)
-        {
-            const int ra = find(e.a), rb = find(e.b);
-            if (ra != rb)
+            // Relative-neighbour redundancy: keep a non-MST edge (a,b) only if no third
+            // town c is closer to BOTH endpoints than they are to each other — i.e.
+            // max(d[a][c], d[b][c]) < d[a][b] for some c disqualifies it. Adds the short
+            // loops a bare MST misses without cluttering the lattice.
+            for (const edge& e : edges)
             {
-                parent[ra] = rb;
-                chosen.emplace_back(e.a, e.b);
-                in_mst[e.a][e.b] = in_mst[e.b][e.a] = true;
+                if (in_mst[e.a][e.b])
+                    continue;
+                bool keep = true;
+                for (int c = 0; c < n; ++c)
+                {
+                    if (c == e.a || c == e.b)
+                        continue;
+                    if (std::max(d[e.a][c], d[e.b][c]) < d[e.a][e.b])
+                    {
+                        keep = false;
+                        break;
+                    }
+                }
+                if (keep)
+                    chosen.emplace_back(e.a, e.b);
+            }
+
+            // Rasterise: tier by the two towns' scales (Highway / Road / Track), and feed
+            // this nation's stamped tiles into the spur target set.
+            std::vector<entity_id> stamped;
+            for (const auto& [a, b] : chosen)
+            {
+                const std::uint8_t tier = edge_tier(nodes[towns[a]].scale, nodes[towns[b]].scale);
+                stamped.clear();
+                stamp_edge(w, body, nodes[towns[a]].tile, nodes[towns[b]].tile, tier, &stamped);
+                for (const entity_id t : stamped)
+                    if (nation_of(w, t) == nation)
+                        add_target(t);
             }
         }
 
-        // Relative-neighbour redundancy: keep a non-MST edge (a,b) only if no third
-        // centre c is closer to BOTH endpoints than they are to each other — i.e.
-        // max(d[a][c], d[b][c]) < d[a][b] for some c disqualifies it. Adds the short
-        // loops a bare MST misses without cluttering the lattice.
-        for (const edge& e : edges)
+        // --- Village spurs (BL-620) -----------------------------------------------
+        // Villages in tile-id order (members are already sorted), each laying one Track
+        // to its nearest same-nation roaded tile. A stamped spur's tiles join the target
+        // set, so later villages branch off earlier feeders rather than each running its
+        // own long track — the incremental order is deterministic because the walk is.
+        if (gw > 0)
         {
-            if (in_mst[e.a][e.b])
-                continue;
-            bool keep = true;
-            for (int c = 0; c < n; ++c)
+            constexpr long long kMaxSpurD2 =
+                static_cast<long long>(kMaxSpurGridDist) * kMaxSpurGridDist;
+            std::vector<entity_id> stamped;
+            for (const int m : members)
             {
-                if (c == e.a || c == e.b)
-                    continue;
-                if (std::max(d[e.a][c], d[e.b][c]) < d[e.a][e.b])
+                if (nodes[m].scale >= kMidScale)
+                    continue; // towns are backbone members, not spur clients
+                // The kSpurCandidates nearest targets by (distance^2, tile id), capped.
+                struct cand { long long d2; entity_id tile; };
+                std::array<cand, kSpurCandidates> best;
+                best.fill({ kMaxSpurD2 + 1, null_entity });
+                for (const spur_target& t : targets)
                 {
-                    keep = false;
+                    if (t.tile == nodes[m].tile)
+                        continue;
+                    const long long d2 = wrapped_d2(nodes[m].gx, nodes[m].gy, t.gx, t.gy);
+                    if (d2 > kMaxSpurD2)
+                        continue;
+                    cand c{ d2, t.tile };
+                    for (int s = 0; s < kSpurCandidates; ++s)
+                        if (best[s].tile == null_entity || c.d2 < best[s].d2
+                            || (c.d2 == best[s].d2 && c.tile < best[s].tile))
+                            std::swap(c, best[s]);
+                }
+                for (int s = 0; s < kSpurCandidates; ++s)
+                {
+                    if (best[s].tile == null_entity)
+                        break;
+                    stamped.clear();
+                    if (!stamp_edge(w, body, nodes[m].tile, best[s].tile, kTrack, &stamped))
+                        continue; // unreachable or open-sea route: try the next-nearest
+                    for (const entity_id t : stamped)
+                        if (nation_of(w, t) == nation)
+                            add_target(t);
                     break;
                 }
             }
-            if (keep)
-                chosen.emplace_back(e.a, e.b);
-        }
-
-        // 3+4. Rasterise: tier by the two centres' scales (Highway / Road / Track).
-        for (const auto& [a, b] : chosen)
-        {
-            const std::uint8_t tier = edge_tier(nodes[members[a]].scale, nodes[members[b]].scale);
-            stamp_edge(w, body, nodes[members[a]].tile, nodes[members[b]].tile, tier);
         }
     }
 
     // 5. Border links: one local road between the nearest centre pair of each
     //    territorially-adjacent nation pair, connecting the per-nation lattices.
-    const auto bit = w.bodies.find(body);
     if (bit == w.bodies.end())
         return;
-    const int gw = std::max(1, bit->second.grid_width);
-    const int gh = std::max(1, bit->second.grid_height);
     const std::vector<entity_id>& grid = body_tile_grid(w, body); // grid_y*gw + grid_x
 
     // Territorial adjacency (sorted nation pair → adjacent), from a 4-cardinal
@@ -301,22 +427,38 @@ void generate_roads(world& w, entity_id body)
         if (ia == by_nation.end() || ib == by_nation.end())
             continue;
 
-        // Nearest reachable centre pair across the boundary; tie-break by tile ids
-        // (members are already tile-id ordered, so the first minimum is canonical).
-        float best = kUnreachable;
-        entity_id best_a = null_entity, best_b = null_entity;
+        // BL-620 prefilter: rank all cross pairs by wrapped grid distance (cheap integer
+        // work), then A* only the kBorderProbePairs closest. The pair chosen is the
+        // cheapest-by-A* among the probe set — deterministic: the probe order is
+        // (distance^2, lo tile, hi tile) and the cost comparison is strict, so the first
+        // minimum is canonical.
+        struct border_pair { long long d2; entity_id ta; entity_id tb; };
+        std::vector<border_pair> probe;
+        probe.reserve(ia->second.size() * ib->second.size());
         for (const int a : ia->second)
             for (const int b : ib->second)
+                probe.push_back({ wrapped_d2(nodes[a].gx, nodes[a].gy, nodes[b].gx, nodes[b].gy),
+                                  nodes[a].tile, nodes[b].tile });
+        std::sort(probe.begin(), probe.end(), [](const border_pair& x, const border_pair& y) {
+            if (x.d2 != y.d2) return x.d2 < y.d2;
+            if (x.ta != y.ta) return x.ta < y.ta;
+            return x.tb < y.tb;
+        });
+        if (static_cast<int>(probe.size()) > kBorderProbePairs)
+            probe.resize(kBorderProbePairs);
+
+        float best = kUnreachable;
+        entity_id best_a = null_entity, best_b = null_entity;
+        for (const border_pair& bp : probe)
+        {
+            const logistics_path& p = intra_body_path(w, body, bp.ta, bp.tb);
+            if (p.reachable && p.cost < best)
             {
-                const logistics_path& p =
-                    intra_body_path(w, body, nodes[a].tile, nodes[b].tile);
-                if (p.reachable && p.cost < best)
-                {
-                    best = p.cost;
-                    best_a = nodes[a].tile;
-                    best_b = nodes[b].tile;
-                }
+                best = p.cost;
+                best_a = bp.ta;
+                best_b = bp.tb;
             }
+        }
         if (best_a != null_entity)
             stamp_edge(w, body, best_a, best_b, kTrack);
     }
@@ -331,3 +473,4 @@ void generate_roads(world& w, entity_id body)
     // Roads change traversal cost, so they change reach too (BL-323 S2).
     w.body_reach_cost.clear();
 }
+

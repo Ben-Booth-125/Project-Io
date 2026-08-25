@@ -4,9 +4,11 @@
 //                   tiles (the lattice exists), and never on ocean tiles.
 //   R2 three-tier — all three tiers appear — Track (1), Road (2), Highway (3) —
 //                   and no tile carries a tier beyond Highway (generation ceiling).
-//   R3 connectivity — every population centre with >=1 same-nation peer sits on,
-//                   or orthogonally adjacent to, a roaded tile (its lattice reached
-//                   it). Uses the same 4-cardinal + column-wrap topology as gen.
+//   R3 connectivity — every non-anchor population centre with >=1 same-nation peer
+//                   sits on, or orthogonally adjacent to, a roaded tile (its lattice
+//                   reached it); province-anchor foundings (BL-611) are exempt, and
+//                   R3b asserts they are the ONLY centres off the lattice. Uses the
+//                   same 4-cardinal + column-wrap topology as gen.
 //   R4 determinism — a second generation yields an identical road_level field.
 // Exit non-zero on any failure.
 
@@ -65,10 +67,11 @@ int main()
     check(track_tiles > 0, "R2 track roads present (road_level 1)");
     check(road_tiles > 0, "R2 road-tier roads present (road_level 2)");
 
-    // The highway tier needs two City+ centres to land ADJACENT in the road graph
-    // (edge_tier requires both endpoints at scale >= 3). Population scale is drawn
-    // from a fixed weighted distribution — ~30% are City+ — so whether any such
-    // PAIR ends up adjacent is spatial luck, not a property of the generator.
+    // The highway tier needs two City+ centres to land ADJACENT in the backbone
+    // graph (edge_tier requires both endpoints at scale >= 3; since BL-620 the
+    // backbone spans towns-and-up only). Centre scales are carved from the Era -1
+    // demography (BL-610) and City+ centres are rare, so whether any such PAIR
+    // ends up adjacent is spatial luck, not a property of the generator.
     //
     // Asserting it on one world therefore makes this check seed-fragile: it broke
     // when BL-167 began rolling the homeworld's ocean fraction, which reshuffled
@@ -98,6 +101,15 @@ int main()
 
     // R3 connectivity — a centre with a same-nation peer must touch a road tile
     // (itself or a 4-cardinal neighbour, column-wrapped).
+    //
+    // PROVINCE ANCHORS ARE EXEMPT (contract change with BL-610/BL-611, asserted since
+    // BL-620): anchor foundings land AFTER generate_roads by structural necessity —
+    // they need the province partition, and the partition reads the finished road
+    // raster (roads bind provinces; a post-partition road stamp would break the
+    // partition-recompute contract, province_partition_harness P6). So an anchor
+    // carries no street and owes no lattice contact; R3b instead asserts anchors are
+    // the ONLY centres off the lattice. Whether anchors should eventually join it
+    // (via a partition rebuild) is an open design call.
     auto nation_of = [&](entity_id t) -> entity_id {
         const auto it = w.tile_to_nation.find(t);
         return (it != w.tile_to_nation.end()) ? it->second : null_entity;
@@ -109,6 +121,10 @@ int main()
         const auto it = w.tiles.find(t);
         return it != w.tiles.end() && it->second.road_level > 0;
     };
+    auto is_anchor = [&](entity_id cid) -> bool {
+        const auto it = w.population_centres.find(cid);
+        return it != w.population_centres.end() && it->second.province_anchor;
+    };
     // Count same-nation peers per nation among centres.
     std::map<entity_id, int> centres_per_nation;
     for (const auto& [cid, tile] : w.population_centre_tile)
@@ -117,21 +133,26 @@ int main()
         if (tit == w.tiles.end() || tit->second.body != kepler) continue;
         centres_per_nation[nation_of(tile)]++;
     }
-    int checked = 0, connected = 0;
+    int checked = 0, connected = 0, anchors = 0, off_lattice_non_anchor = 0;
     for (const auto& [cid, tile] : w.population_centre_tile)
     {
         const auto tit = w.tiles.find(tile);
         if (tit == w.tiles.end() || tit->second.body != kepler) continue;
-        if (centres_per_nation[nation_of(tile)] < 2) continue; // isolated centre: no edge owed
-        ++checked;
         const int r = tit->second.grid_y, c = tit->second.grid_x;
         const bool touches = road_at(r, c) || road_at(r, (c + 1) % gw) ||
                              road_at(r, (c + gw - 1) % gw) || road_at(r - 1, c) || road_at(r + 1, c);
+        if (is_anchor(cid)) { ++anchors; continue; }
+        if (!touches) ++off_lattice_non_anchor;
+        if (centres_per_nation[nation_of(tile)] < 2) continue; // isolated centre: no edge owed
+        ++checked;
         if (touches) ++connected;
     }
-    std::printf("      (connectivity: %d/%d non-isolated centres touch a road)\n", connected, checked);
+    std::printf("      (connectivity: %d/%d non-isolated non-anchor centres touch a road; %d anchors exempt)\n",
+                connected, checked, anchors);
     check(checked > 0 && connected == checked,
-          "R3 every non-isolated population centre touches its road lattice");
+          "R3 every non-isolated, non-anchor population centre touches its road lattice");
+    check(off_lattice_non_anchor == 0,
+          "R3b province anchors are the only centres off the lattice");
 
     // R4 determinism — regenerate and compare the whole road_level field by tile.
     world w2 = make_hard_coded_world(no_prehistory());

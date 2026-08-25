@@ -1256,6 +1256,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
     name_population_centres(w, kepler, home_grid_width, kepler_settlement, kepler_creeds,
                             /*seed=*/params.seed ^ 0xC17910E6u);
     stamp_urban_land_use(w, kepler);
+    // NOTE (BL-620): these anchor foundings land AFTER generate_roads by structural
+    // necessity — they need the partition, and the partition reads the finished road
+    // raster — so they carry NO street or spur. Stamping roads for them here would
+    // change road_level after build_province_partition read it, breaking the
+    // partition-recompute contract (province_partition_harness P6) and the road-binds
+    // instrument (C2c). Whether anchors should join the lattice via a partition
+    // rebuild is an open design call; road_generation_harness R3 exempts
+    // province_anchor centres for exactly this reason.
 
     // BL-569: seed the province holder — since BL-611 from each land
     // province's ANCHOR centre's nation (plurality is the no-centre

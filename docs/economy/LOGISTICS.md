@@ -108,10 +108,19 @@ Dijkstra itself.
 ### 4. Roads — generated, then extended by hand
 
 Generated per nation after population, deterministically from the campaign seed (BL-146 /
-BL-172, road generation). Five passes: local streets (every centre's own tile gets at least a
-Track), a weighted graph over centre pairs, a **Kruskal MST backbone** plus relative-neighbour
-redundancy edges for realistic loops, a three-tier assignment, and rasterisation along each edge's
-A\* path taking the **max** `road_level` on overlap.
+BL-172, road generation). Local streets first: every centre's own tile gets at least a Track.
+Then the **backbone**, over towns-and-up only (scale ≥ 2): a weighted graph over the town
+pairs, a **Kruskal MST** plus relative-neighbour redundancy edges for realistic loops, a
+three-tier assignment, and rasterisation along each edge's A\* path taking the **max**
+`road_level` on overlap.
+
+**Villages join locally, not as lattice members** (BL-620, road generation scales to density):
+each village lays one Track spur to its nearest already-roaded same-nation tile — backbone
+raster, another centre's streets, or an earlier spur — chosen from a distance-prefiltered
+candidate set, never all-pairs. A village whose nearest target is beyond the spur cap, or
+whose every route would cross open sea, keeps only its local street. Low-stratum settlements
+feed the network; they do not define it — which is both the honest historical shape and what
+keeps generation cost linear in village count at demography-derived density (BL-610).
 
 **Three tiers** (Ben, 2026-07-11): **Highway** (3) between two major centres, **Road** (2) when at
 least one endpoint is Town+, **Track** (1) otherwise. Then one Track border link between the nearest
