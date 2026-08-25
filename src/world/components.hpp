@@ -857,6 +857,17 @@ struct population_centre_component
     int   population         = 0;    ///< Absolute headcount in thousands.
     float habitability       = 1.0f; ///< 0–1 scalar inherited from the tile.
     int   growth_accumulator = 0;    ///< Ticks of qualifying growth; resets on level-up.
+
+    /// BL-611 (province centre anchor): true for a centre founded by
+    /// `ensure_province_anchor_centres` AFTER the partition shipped, to anchor
+    /// a province the centre-seeded fill left without one. The partition's
+    /// seed gathering SKIPS these — the partition is a pure function of the
+    /// pre-anchor centre set and the seed, so a rebuild from the stored seed
+    /// reproduces it exactly (province_partition_harness P6/P7) instead of
+    /// re-seeding from centres the partition itself caused. Everything else —
+    /// the holder derivation, demand, naming, the urban stamp — treats an
+    /// anchor as the ordinary centre it is.
+    bool province_anchor = false;
 };
 
 /// Deployable unit stub. Faction AI and transport are deferred; the combat

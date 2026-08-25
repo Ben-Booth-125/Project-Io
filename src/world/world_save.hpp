@@ -141,7 +141,15 @@ inline constexpr uint32_t world_save_magic =
 /// bytes where it would sit would be read as the nation store's count and
 /// everything after it misaligned; a v10 stream is therefore refused whole,
 /// destination untouched — the existing rejection contract.
-inline constexpr uint32_t world_save_version = 11;
+///
+/// Bumped to 12 by BL-611 (province centre anchor), landing the same wave as
+/// BL-612 above (v11 exists only as the BL-612-alone shape, the BL-570/BL-571
+/// precedent): `population_centre_component::province_anchor` is a new field
+/// IN THE MIDDLE of the per-centre record (`w_popcentre`/`r_popcentre`), so
+/// every centre record written before it is one field short and a v11 stream
+/// reads misaligned from the first centre onward. Refused whole, same
+/// strict-equality contract as every prior bump.
+inline constexpr uint32_t world_save_version = 12;
 
 /// Write @p w as a complete world snapshot.
 ///

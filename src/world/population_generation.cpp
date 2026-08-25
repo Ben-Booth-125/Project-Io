@@ -391,6 +391,82 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
+// Province anchors (BL-611) — every land province holds a centre
+// ---------------------------------------------------------------------------
+
+int ensure_province_anchor_centres(world& w, entity_id body_id, int* gate_relaxed)
+{
+    if (gate_relaxed != nullptr)
+        *gate_relaxed = 0;
+
+    // Which tiles already host a centre. Content is order-independent (a set).
+    std::unordered_set<entity_id> host_tiles;
+    for (const auto& [cid, tid] : w.population_centre_tile)
+        host_tiles.insert(tid);
+
+    int founded = 0;
+    for (const province& pr : w.provinces.provinces) // ascending id — the contract
+    {
+        if (pr.body != body_id)
+            continue;
+        if (province_kind_of(w, pr) != province_kind::land)
+            continue;
+
+        bool      anchored    = false;
+        entity_id best_gated  = null_entity; // best tile PASSING the placement gate
+        double    gated_score = -1.0;
+        entity_id best_any    = null_entity; // least-bad tile, gate or no gate
+        double    any_score   = -1.0;
+
+        for (const entity_id tid : pr.tiles) // ascending — strictly-greater argmax
+        {
+            if (host_tiles.count(tid)) { anchored = true; break; }
+            const auto tit = w.tiles.find(tid);
+            if (tit == w.tiles.end())
+                continue;
+            const tile_component& tc = tit->second;
+
+            double richness = 0.0;
+            for (const resource_type er : placement_rules::k_extractable)
+                richness += static_cast<double>(
+                    tc.resource_deposit[static_cast<std::size_t>(er)]);
+            const double score = static_cast<double>(tc.habitability) * (1.0 + richness);
+
+            if (score > any_score) { any_score = score; best_any = tid; }
+            if (placement_rules::can_place_population_centre(tc) && score > gated_score)
+            {
+                gated_score = score;
+                best_gated  = tid;
+            }
+        }
+        if (anchored)
+            continue;
+
+        const entity_id site = (best_gated != null_entity) ? best_gated : best_any;
+        if (site == null_entity)
+            continue; // no readable tile at all — cannot happen for a real province
+        if (best_gated == null_entity && gate_relaxed != nullptr)
+            ++*gate_relaxed; // pure ice / bare rock: the anchor stands anyway
+
+        const auto tit = w.tiles.find(site);
+        const float hab = (tit != w.tiles.end()) ? tit->second.habitability : 0.0f;
+
+        population_centre_component pcc;
+        pcc.scale           = 1; // an anchor founding is a village, always
+        pcc.population      = k_population_for_scale[0];
+        pcc.habitability    = hab;
+        pcc.province_anchor = true; // never a partition seed on a rebuild
+        const entity_id centre_id = w.create_entity();
+        w.population_centres[centre_id] = pcc;
+        w.population_centre_tile[centre_id] = site;
+
+        host_tiles.insert(site);
+        ++founded;
+    }
+    return founded;
+}
+
+// ---------------------------------------------------------------------------
 // Urban footprints (BL-612) — generation stamps the ground cities stand on
 // ---------------------------------------------------------------------------
 

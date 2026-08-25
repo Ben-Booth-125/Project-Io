@@ -1245,10 +1245,23 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // stream at all, so adding it perturbs nothing above it. See province.hpp.
     build_province_partition(w, params.seed ^ 0x50524F56u);
 
-    // BL-569: seed the province holder from tile_to_nation's plurality, now
-    // that both the partition and every tile's nation assignment exist.
-    // `run_battles` moves entries thereafter; the seed here is the only
-    // generation-time write.
+    // BL-611 (province centre anchor): every land province on the settled
+    // body holds a centre — the leftover pockets the centre-seeded fill could
+    // not reach get a scale-1 anchor founded on their best ground, BEFORE the
+    // holder is derived from the anchors below. RNG-free. The re-name is the
+    // byte-stable re-run name_population_centres documents (new ids sort
+    // last, the existing prefix of draws reproduces exactly); the re-stamp is
+    // idempotent and paves only the new anchors' footprints.
+    ensure_province_anchor_centres(w, kepler);
+    name_population_centres(w, kepler, home_grid_width, kepler_settlement, kepler_creeds,
+                            /*seed=*/params.seed ^ 0xC17910E6u);
+    stamp_urban_land_use(w, kepler);
+
+    // BL-569: seed the province holder — since BL-611 from each land
+    // province's ANCHOR centre's nation (plurality is the no-centre
+    // fallback), now that the partition, every tile's nation assignment, and
+    // the anchors all exist. `run_battles` moves entries thereafter; the seed
+    // here is the only generation-time write.
     seed_province_holders(w);
 
     // BL-571: nation garrisons — capital plus grudge-border provinces, sized

@@ -104,3 +104,29 @@ inline constexpr int k_urban_footprint_tiles[5] = { 1, 1, 2, 4, 7 };
 ///
 /// @returns the number of tiles stamped urban.
 int stamp_urban_land_use(world& w, entity_id body_id);
+
+/// Founds one scale-1 population centre in every LAND province on @p body_id
+/// that holds none (BL-611, province centre anchor) — the structural half of
+/// "every land province is anchored by a centre, and the centre decides its
+/// nation" (docs/generation/PROVINCES.md § The partition, ruling 3).
+///
+/// Runs AFTER `build_province_partition` and BEFORE `seed_province_holders`,
+/// so every land province the fill produced — the leftover pockets included —
+/// has an anchor by the time the holder is derived from it. The same shape as
+/// `ensure_national_population_centres`: a guarantee pass, not a tuned top-up.
+///
+/// The founding site is a pure argmax over the province's own tiles
+/// (ascending, the partition's contract) on habitability weighted by
+/// extractable richness — the primary pass's own two quantities — preferring
+/// tiles that pass the placement gate. A province whose every tile fails the
+/// gate (pure ice, bare rock) still gets its anchor on its least-bad tile:
+/// the province exists, so someone holds it — the relaxation is counted in
+/// @p gate_relaxed for the harness to report rather than hidden.
+///
+/// Deterministic and RNG-free: ascending province order, ascending tile walk,
+/// strictly-greater argmax, scale always 1 (an anchor founding is a village —
+/// rank-size already gave the big towns to the demography carve).
+///
+/// @returns the number of centres founded.
+int ensure_province_anchor_centres(world& w, entity_id body_id,
+                                   int* gate_relaxed = nullptr);

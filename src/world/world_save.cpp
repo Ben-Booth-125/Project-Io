@@ -201,12 +201,21 @@ void w_popcentre(std::ostream& o, const population_centre_component& p)
     w_int(o, p.population);
     w_f32(o, p.habitability);
     w_int(o, p.growth_accumulator);
+    // BL-611 (format v12): the anchor-founding marker — a rebuild of the
+    // partition must not seed from a centre the partition itself caused.
+    w_int(o, p.province_anchor ? 1 : 0);
 }
 
 bool r_popcentre(std::istream& i, population_centre_component& p)
 {
-    return r_int(i, p.scale) && r_int(i, p.population) && r_f32(i, p.habitability)
-        && r_int(i, p.growth_accumulator);
+    int anchor = 0;
+    if (!(r_int(i, p.scale) && r_int(i, p.population) && r_f32(i, p.habitability)
+          && r_int(i, p.growth_accumulator) && r_int(i, anchor)))
+        return false;
+    if (anchor != 0 && anchor != 1)
+        return false; // not a value the writer above can produce — corrupt stream
+    p.province_anchor = (anchor == 1);
+    return true;
 }
 
 void w_nation(std::ostream& o, const nation_component& n)

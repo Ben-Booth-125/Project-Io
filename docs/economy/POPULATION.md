@@ -43,7 +43,11 @@ settled rather than the other way round.
   A centre of *any* scale — most are small; towns stand where history earned them. The anchor
   is the province's political decider: the centre's nation is the province's nation, and taking
   the centre takes the province (`docs/generation/PROVINCES.md` § The partition; BL-567,
-  province is the conquest unit). This retires the centre-less hinterland province.
+  province is the conquest unit). This retires the centre-less hinterland province. The
+  guarantee is structural: after the partition ships, any land province the centre-seeded fill
+  left without one receives a **scale-1 anchor founding** on its best ground
+  (`ensure_province_anchor_centres` — argmax of habitability × richness, the placement gate
+  preferred and relaxed only where no tile passes it, counted rather than hidden).
 - **Urban ground is stamped at generation** (Ben, 2026-08-25; BL-612, urban ground stamped).
   A centre arrives with an urban land-use footprint scaled by its tier, so city ground is
   scarce and contested from turn one rather than notionally open (§ Land use). The footprint
