@@ -225,7 +225,18 @@ constexpr int      k_ticks = 300;
 // patched around — see this item's delivery report for the fuller note; the
 // assertion itself is UNCHANGED here, per the standing rule against
 // weakening a failing test to pass.
-constexpr uint64_t k_unspectated_golden = 0x71273F6FEDE03965ull;
+// Re-blessed 2026-08-25 (Sprint 19 wave 1). TWO layers of drift, both
+// recorded: (1) the golden was ALREADY red on main at dc7d0554, before this
+// sprint's merge — Agent E measured 0AF36395D78F3DAF there with baseline
+// isolation (NR-634): some prior landing moved the world and nobody
+// re-blessed with provenance, which this note now repairs by recording that
+// the gap existed. (2) Sprint 19 wave 1 then legitimately re-rolled the
+// generated world wholesale — demography-derived centre density (BL-610),
+// urban ground (BL-612), anchored provinces (BL-611), nation qualification
+// (BL-613) and wage clearing (BL-614). New value confirmed reproducible by
+// R2's own two-independently-built-worlds row (95A7DAAC3E0693D2 twice) on
+// the integrated tree at the wave-1 merge.
+constexpr uint64_t k_unspectated_golden = 0x95A7DAAC3E0693D2ull;
 
 /// Hand-built registry mirroring scripts/economy.lua + scripts/recipes.lua for
 /// the building types the generator places. Copied from ai_skill_harness so the
