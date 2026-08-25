@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*146 entries — 27 gameplay · 24 canvas · 15 lens · 47 ledger · 33 chrome.*
+*147 entries — 27 gameplay · 24 canvas · 16 lens · 47 ledger · 33 chrome.*
 
 ---
 
@@ -1074,6 +1074,21 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** No tile re-skin. A lane-list key: one row per standing trade lane touching the active body (one entry per body pair), with a log-scaled thickness bar from that lane's cumulative convoy count (a single completion reads as a thin sliver; heavy repeat traffic saturates rather than growing linearly) and the same recency-tier colouring as Reach. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.
 
 **Reason to select.** Which standing lanes carry my economy, and how heavily? The aggregate counterpart to Supply's in-flight convoys: the carved trade lanes and their traffic weight, for judging which routes are load-bearing and which are vestigial.
+
+### `lens.throughput` — Off the lens bar; reuses the convoy glyph, on the same terms as lens.reach (the lens it extends)
+
+**Press.** No bar press — reachable only via the keyboard lens-cycle (controls family owns the hotkeys).
+
+**Valid when:**
+- Only reachable by keyboard cycle.
+- Planetary only. Needs the body's logistics reach field, which the app warms for the active body every frame before the draw.
+- Needs at least one supply anchor on the body (a city, or a BUILT and ACTIVE port or inland logistics hub) for the anchor rings and the LP totals; with none, the key says so rather than drawing a scale over nothing.
+- Reads the authored economy.military.active_lp_per_anchor_tick; an authored rate of zero yields no anchor rings.
+- Cleared by cycling off it or the clear hotkey, not by a bar re-click.
+
+**Expected output.** Two layers over the Planetary surface. FIELD: every tile is composited 0.72 toward a deep-navy-to-cyan ramp over its weighted reach cost to the nearest supply anchor — cyan at an anchor, navy on the ground furthest from one, the cold end for anything unreachable. The cost ratio is square-root compressed before the ramp because the distribution is heavily left-skewed (measured on the home body: median 20.8 against a maximum 101.8 over 57 anchors), so a linear ramp would read as one flat wash. ANCHORS: every supply anchor tile carries a RING (not a filled mark — the tile already carries a settlement or building marker drawn over it), its thickness carrying that anchor's active Logistic Points as a share of the body's largest pool, in a hotter near-white cyan over a dark backing. KEY: a fixed-height gradient key flush-left of the minimap, drawn on ImGui's FOREGROUND list with an opaque fill so it is readable over the Selection band — the field ramp labelled far / at anchor, the anchor ring beside its per-anchor LP rate, and the body's anchor count and total LP per tick. Pure rendering: it computes no game state, mutates nothing, and cannot trigger the reach-field Dijkstra (it reads the const tile_reach_cost, whose -1 'not computed' case draws nothing). The LP pools are rebuilt every frame and never persisted — LP is a per-tick rate, never a stock. Pointer clicks fall through to the tile/province; there is no dedicated ledger route. Terrain texture (BL-520) survives this lens at 0.45 strength.
+
+**Reason to select.** Select to answer 'how much can move through here, and how far is this ground from the capacity that would move it?' — before ordering a march that active LP could refuse, before siting a building whose supply has to come from somewhere, or when deciding where a new port or inland hub would actually widen the network. It is the surface half of the Logistic Points cap (LOGISTICS.md): a refused march is legible only if the player can see where throughput is thin, and a cap nobody can see is silent interdiction. It extends the Reach lens rather than replacing it — Reach spends the same field as a yes/no placement predicate, this spends the quantity that predicate throws away. It does NOT mean LP is priced by distance (it is not): the shading says how far this ground is from a generator, never that the points thin out on the way.
 
 ---
 

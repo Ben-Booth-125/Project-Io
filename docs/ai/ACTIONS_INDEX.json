@@ -226,6 +226,10 @@
    "Off the lens bar; reuses the supply glyph"
   ],
   [
+   "lens.throughput",
+   "Off the lens bar; reuses the convoy glyph, on the same terms as lens.reach (the lens it extends)"
+  ],
+  [
    "ledger.budget_tax_tier",
    "Balance Ledger (Budget), 'Taxes' tier control"
   ],

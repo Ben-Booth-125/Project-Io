@@ -18,9 +18,9 @@ Glyph shapes live in [ICONS.md](ICONS.md); identity colours live in
 
 The whole `overlay_mode` family at a glance. Bar slots 1–8 are the minimap strip
 order; "off the bar" lenses are reached by the keyboard lens-cycle (`L` /
-`Shift+L`, `0` clears). `canvas_command.cpp` anchors `overlay_mode_count` to the
-last enumerator (`supply_routes` + 1 = 14) with a `static_assert` naming the
-re-anchor rule, so the cycle reaches every lens.
+`Shift+L`, `0` clears). `canvas_command.cpp` derives `overlay_mode_count` from the
+enum's own `count` sentinel, so a lens added at the end of the family is reachable
+by the cycle without a literal being kept in step by hand.
 
 | `overlay_mode` | Bar | Surface (one line) |
 |---|---|---|
@@ -37,6 +37,7 @@ re-anchor rule, so the cycle reaches every lens.
 | `supply` | off the bar | Solar per-convoy lines · Circumplanetary convoy-count badge · Planetary per-tile convoy glyph |
 | `reach` | off the bar | Planetary key listing the active body's trade-route endpoints by recency |
 | `supply_routes` | off the bar | Planetary key of aggregated lanes, log-scaled thickness |
+| `throughput` | off the bar | Planetary reach-cost field (far → at an anchor) + an active-LP ring on every supply anchor + gradient key |
 
 Identity colours live in `presentation.hpp`; the corporation-identity helper is
 `palette::corp_colour`.
@@ -49,7 +50,8 @@ The lens bar — on the **minimap** (see [MINIMAP.md](MINIMAP.md)) — presents 
 **curated subset** in this order: **Corporation → Country → Resource → Market →
 Population → Opportunity → Production → Continent**. **Scarcity** and
 **Industry** are off the bar, reached by **keyboard lens-cycle only** — joining
-**Supply**, **Reach** and **Supply-routes**, which do not fit the strip. The
+**Supply**, **Reach**, **Supply-routes** and **Throughput**, which do not fit the
+strip. The
 Continent lens earns its bar slot over the keyboard-only shelf because it answers
 a question the player asks at *first sight* of a body — "why is the land shaped
 like that?" — which is exactly the moment they are looking at the strip.
@@ -79,6 +81,7 @@ representation intended.
 | **Continent** | — | — | plate tint + boundary lift + key |
 | **Reach** *(keyboard-cycle only)* | connected-body glow | — | connection-list key |
 | **Supply-routes** *(keyboard-cycle only)* | aggregated graph edges | — | lane-list key, log-scaled thickness |
+| **Throughput** *(keyboard-cycle only)* | — | — | reach-cost field + per-anchor active-LP ring + key |
 
 **Per-lens rung notes.** Corporation, Country, Resource, Population,
 Opportunity, Industry, and Continent are **Planetary-only** — their unit of meaning
@@ -120,13 +123,16 @@ captures too. Two chromes:
   and use text wrapping"). The Market lens's good-selector combo sits above the
   header.
 - **Fixed-height gradient-bar keys** — Resource, Production, Scarcity,
-  Population, Industry, Opportunity, Continent — use the simpler `begin_lens_key`
-  chrome: a box anchored **flush-left of the minimap**, its right edge at the
-  minimap's left edge and vertically centred on it (a `lens_key_anchor` passed
-  from `app.cpp`), reading as a drawer folding out from the minimap's left side.
-  The Continent key alone draws on ImGui's **foreground** draw list with an
-  opaque fill, so it floats over the always-open Selection band rather than
-  being buried by it (BL-376, continent key z-order).
+  Population, Industry, Opportunity, Continent, Throughput — use the simpler
+  `begin_lens_key` chrome: a box anchored **flush-left of the minimap**, its right
+  edge at the minimap's left edge and vertically centred on it (a `lens_key_anchor`
+  passed from `app.cpp`), reading as a drawer folding out from the minimap's left
+  side. The Continent and Throughput keys draw on ImGui's **foreground** draw list
+  with an opaque fill, so they float over the always-open Selection band rather
+  than being buried by it (BL-376, continent key z-order). **That is the correct
+  treatment for this chrome, and the other six not having it is a defect, not a
+  distinction** — a key drawn on the background list at this anchor is drawn under
+  the band and cannot be read.
 
 The resource/good selector shared by the Resource, Market and Scarcity lenses is
 one combo bound to `ui_state.lens_resource` (`draw_lens_resource_combo`), hosted
@@ -670,6 +676,84 @@ Reach. The Solar-canvas graph is the lens's inter-body representation (rung tabl
 
 **Glyph / access.** Reuses `icons::supply`; off the strip, reached by the
 keyboard lens-cycle.
+
+## Throughput lens
+
+**Intent.** Read the map as a *capacity surface*: how much can move through here,
+and how far is this ground from the capacity that would move it? Owned by BL-598
+(throughput lens), the surface half of
+[LOGISTICS.md](../economy/LOGISTICS.md) § Logistic Points, whose ruling is that
+**throughput is Reach with a magnitude** — an extension of an existing surface
+rather than a new one. Its companion duty is the same section's *"surfacing is
+non-optional"*: a cap nobody can see is silent interdiction again.
+
+**Data definition.** Two reads, both of things that already exist.
+
+- The **field** is `body_reach_field`, read per tile through the const
+  `tile_reach_cost` — the weighted cost from that tile to its nearest supply
+  anchor. The Reach rule spends this field as a *binary placement predicate*
+  (reachable / not); the lens spends the quantity the predicate throws away.
+- The **magnitude** is `active_lp_anchor_pools` — this tick's active Logistic
+  Points at every supply anchor (a city, or a built and active port or inland
+  hub), at the authored `active_lp_per_anchor_tick`.
+
+**Why the field is the reach cost and not "the LP serving this tile".** Because
+the second is a constant, measured rather than assumed: on the home body every
+anchor generates the same authored rate and *every* tile has a finite reach cost
+(ocean is crossable at a sea-leg cost), so both "is it reached" and "how much LP
+reaches it" are flat over the whole grid. A per-tile *nearest-anchor attribution*
+would be needed to make the second vary, and deriving one is the second
+distance model [LOGISTICS.md](../economy/LOGISTICS.md) rule 2 refuses. The lens
+therefore draws the quantity that does vary and is the player's actual question:
+how far this ground is from capacity. **It does not assert that LP attenuates with
+distance** — LP is not distance-priced, and a lens implying it were would be
+asserting the model constraint 3 forbids.
+
+**Rung.** Planetary only — anchors and the reach field are per-tile. Guarded
+behind `overlay_mode::throughput` in
+[`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
+
+**Colour.** Two deliberately different sequential ramps, because the lens shows
+two things and one ramp cannot separate them.
+
+- **Field:** deep navy (furthest) → the logistics cyan (at an anchor), composited
+  at `0.72`. The cost ratio is **square-root compressed** before the ramp: the
+  distribution is heavily left-skewed (measured on the home body: median `20.8`
+  against a maximum of `101.8`, over 57 anchors), so a linear ramp puts four
+  fifths of the grid in its top fifth and the map reads as one flat wash.
+  Unreachable ground takes the cold end.
+- **Anchor:** a **ring** on the anchor tile, its thickness carrying that anchor's
+  share of the body's largest pool, in a hotter near-white cyan over a dark
+  backing. A ring rather than a disc because every anchor tile already carries a
+  settlement or building marker drawn after this pass — a filled mark is simply
+  hidden by it, which is what the first cut did at all 57 anchors.
+
+**Fogs.** The field is part of the tile fill, so the survey mask and the
+intra-body vision wash govern it exactly as they govern every other lens fill. The
+anchor ring follows the **marker** convention rather than the road-span one: the
+survey mask owns it, the vision fog does not dim it — an anchor is a city or a
+completed port, as public as the building glyph beside it.
+
+**Glyph / access.** Off the strip, keyboard lens-cycle only; reuses
+`icons::convoy` on the same terms Reach does, the lens it extends.
+
+**Legend.** A fixed-height gradient key (§ Legend placement) on the **foreground**
+draw list with an opaque fill, so it is readable over the Selection band. It
+carries the field ramp (`far` → `at anchor`), the anchor ring drawn exactly as the
+map draws it beside the per-anchor rate, and the body's anchor count and total
+LP/tick. A body with no anchor, or an authored rate of zero, says so rather than
+drawing a scale over nothing.
+
+**Determinism.** The pools are rebuilt **every frame** by `update_body_throughput`
+(`body_surface_canvas.hpp`) — non-const, for the same reason `update_body_vision`
+is: the draw holds a `const world&` and must not be what populates a cache.
+Nothing is persisted: LP is a per-tick rate, so the lens holds a photograph of
+this tick's rate, never a stock carried across one. The anchor list is **sorted by
+tile id before it is reduced**, so neither the legend's total nor the per-tile
+lookup depends on hash-map iteration order.
+
+**Interaction notes.** Planetary-only, single-select, no selector. Verified by
+`scripts/verify/throughput_lens.lua`.
 
 ## Placement-suitability surface *(not a strip lens)*
 

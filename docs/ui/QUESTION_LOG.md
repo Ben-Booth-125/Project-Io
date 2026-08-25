@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**40 surfaces** — 4 settled, 36 awaiting Ben's wording.
+**41 surfaces** — 4 settled, 37 awaiting Ben's wording.
 
 ---
 
@@ -283,6 +283,14 @@ alphabetical order.
 **Because:** A constellation of gates is only a decision if the player can see which are reachable. BL-344 made that second half real: each node now reports EARNED, LOCKED with its unmet conditions itemised, or -- honestly -- "no gate authored", instead of showing an unevaluable string condition that could never resolve.
 
 *Demanded by BL-087, BL-126, BL-344 · `src/ui/tech_tree_panel.cpp` · id `tech_tree_panel`*
+
+### Throughput lens (Planetary canvas)
+
+**Answers:** How much can move through here, and how far is this ground from the capacity that would move it?
+
+**Because:** Active Logistic Points are a CAP: a march over the cap is refused outright, and LOGISTICS.md makes surfacing that non-optional -- 'a refusal nobody sees is silent interdiction again'. Without a surface the player meets the cap only as a move that mysteriously did not happen. It earns its space by costing none: it extends the Reach field the placement rule already computes rather than adding a surface, which is exactly the shape Ben's ruling asked for -- 'throughput is that field with a magnitude, so it is a small step from an existing surface rather than a new one'. It is off the lens bar, so it takes no strip slot from the eight lenses that answer first-sight questions.
+
+*Demanded by BL-598 · `src/ui/body_surface_canvas.cpp` · id `throughput_lens`*
 
 ### Tile inspector
 

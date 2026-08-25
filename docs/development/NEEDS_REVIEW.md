@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*19 entries — 17 open, 2 resolved.*
+*23 entries — 21 open, 2 resolved.*
 
 ---
 
@@ -224,6 +224,46 @@ MEASURED on the real generated world: baseline 1055 convoys dispatched (802 intr
 > **Recommendation:** Rule on the formula, then the fix is small. Quantity-proportional is the reading that satisfies both the constraint and the rule, and it is what "how much can move through HERE" actually says. Whatever is chosen, re-run haulage_measure against the 1055/802 baseline as the acceptance check rather than trusting the item own harness, and keep the sea_port_gate.cpp fixture fix on the branch (BL-602 harness regressed 23/23 -> 6 failures because its default registry leaves the LP rate at zero; its Port already IS an anchor, it only lacked a rate).
 
 *Files: `src/world/supply_system.cpp`, `docs/economy/LOGISTICS.md`, `scripts/economy.lua`, `tools/verify/haulage_measure.cpp`*
+
+### NR-621 — BL-598's Throughput lens shades by REACH COST, not by 'the LP serving this tile' - because the second is measurably a constant
+*decision taken on your behalf · raised 2026-08-25 · from BL-598 (throughput lens), landing the surface half of LOGISTICS.md section Logistic Points.*
+
+LOGISTICS.md says 'throughput is that field with a magnitude'. Built literally - per tile, the active LP of the anchor serving it - that field is a CONSTANT, and this was measured rather than assumed. On the home body: 57 anchors, every one generating the same authored active_lp_per_anchor_tick (20.0), and EVERY tile carrying a finite reach cost (ocean is crossable at a sea-leg cost, so nothing is unreachable). So both 'is it reached' (the Reach binary) and 'how much LP reaches it' are flat over all 31,581 tiles - a wash carrying no information. Making the second vary would need a per-tile NEAREST-ANCHOR attribution the engine does not have, and deriving one is the second distance/anchor model BL-325 ruling 3 forbids. So the lens draws the quantity that does vary: the reach FIELD's own magnitude - how far this ground is from a generator - with the LP quantity drawn as a ring on each anchor, where LOGISTICS.md constraint 2 insists its spatial locus stays. Field ramp measured and square-root compressed: cost median 20.8 against max 101.8, so a linear ramp put four fifths of the grid in its top fifth and the map read as one flat wash.
+
+- Accept as built - reach-cost field plus a per-anchor LP ring
+- Per-tile nearest-anchor attribution instead, accepting a new multi-source Dijkstra that returns the SOURCE as well as the cost (it starts to say something only once per-anchor rates stop being uniform - rate scaled by city scale is the obvious trigger)
+- Anchor rings only, no field - the strictest reading of 'LP has a spatial locus'
+
+> **Recommendation:** Accept as built for now, and revisit if per-anchor rates ever become non-uniform. The lens is written so that day needs no change: the anchor ring already ramps on each anchor's share of the body maximum, it is simply 1.0 everywhere today.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `docs/ui/LENSES.md`, `docs/economy/LOGISTICS.md`*
+
+### NR-622 — BL-598 shipped with NO live click - the container cannot approve the OS-level computer-use dialog
+*observation · raised 2026-08-25 · from BL-598 (throughput lens). Third occurrence this sprint after BL-601 and its integration.*
+
+The project rule is that a UI requirement needs a live press, not only a headless capture. It was attempted: request_access for ProjectIo returned user_denied, because nothing in this container can approve the Windows consent dialog. So the Throughput lens is verified by three headless captures (scripts/verify/throughput_lens.lua - full grid, framed anchor, and the key over an open Selection band) and a clean build, and NOT by a human press. Two specific things a capture cannot prove here: that the keyboard lens-cycle (L / Shift+L) actually reaches the new mode in a real session (the capture path sets ui.overlay directly through verify.set_overlay), and that the key does not fight the pointer over the Selection band it now floats above. Worth noting separately: the access request resolved ProjectIo to c:/users/benbo/project-io/.claude/worktrees/elated-mclean-7dd61c/build/projectio.exe - a LEFTOVER WORKTREE, not the shared checkout. That stale worktree is the same one this sprint's briefs blame for forking agents off a stale base, and it is still on disk.
+
+> **Recommendation:** Ben presses L through to the Throughput lens once in a live session and looks at the key over the Selection band. Separately, delete the .claude/worktrees/elated-mclean-7dd61c worktree - it is now actively misdirecting tooling, not only git.
+
+*Files: `scripts/verify/throughput_lens.lua`, `src/ui/body_surface_canvas.cpp`*
+
+### NR-623 — lens_strip's three goldens are stale by world drift, blessed 2026-06-17 at 44b0228 - not touched by BL-598
+*observation · raised 2026-08-25 · from Ran as an adjacent-regression check while landing BL-598 (throughput lens).*
+
+lens_strip_none, lens_strip_corporation and lens_strip_production all fail at about 24 percent differing. The diff is the WORLD, not the strip: 38 nations in the golden against 43 now, balance Cr 3.2k against Cr 2.2k, a different terrain field and a different Selection card. BL-598 cannot be the cause - under overlay_mode none/corporation/production not one line of it executes and update_body_throughput early-returns. golden_log.json dates all three to 2026-06-17 at commit 44b0228, which is months of world change ago. NOT re-blessed: the golden policy is a curated world-independent set, and these three are world-dependent, so re-blessing buys one clean run and the same failure the next time the world moves.
+
+> **Recommendation:** Retire the three lens_strip goldens to capture-only, or re-point the script at something world-independent - the strip itself is the subject, the map behind it is not. Either way it is a golden-policy call, not a fix.
+
+*Files: `scripts/verify/lens_strip.lua`, `scripts/verify/golden_log.json`*
+
+### NR-624 — The LP REFUSAL still has no surface - run_unit_march counts it and the count is dropped on the floor
+*observation · raised 2026-08-25 · from Noticed while landing BL-598 (throughput lens), reading run_unit_march for the lens's data source.*
+
+LOGISTICS.md section 'Refusal, surface and determinism' carries TWO duties. BL-598 discharges the second ('throughput is a lens'). The first - 'a leg over the cap fails, refused outright, AND THE PLAYER IS TOLD WHY... surfacing is non-optional, a refusal nobody sees is silent interdiction again' - is still owed. run_unit_march returns unit_march_tick::refused_no_lp, but that struct never reaches economy_report, so no UI can read it: a march refused for want of LP is, to the player, a unit that simply did not move. The Throughput lens shows where throughput is THIN, which is the standing read; it does not and cannot say 'this order was refused this tick', which is the event read.
+
+> **Recommendation:** A small item: carry unit_march_tick into economy_report and surface the count where the player already looks at movement - the decision feed is the natural home, a refusal being exactly the class of thing it exists for. Deliberately not folded into BL-598, which owns the lens.
+
+*Files: `src/world/economy_system.cpp`, `src/world/economy_system.hpp`, `docs/economy/LOGISTICS.md`*
 
 ---
 

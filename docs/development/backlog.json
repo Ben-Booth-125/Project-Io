@@ -453,7 +453,7 @@
       "design": "The second consumer, same sprint (active landed first by ruling). Passive LP caps the automatic trade flow: each dispatch leg draws passive throughput at its route’s city loci; an over-cap leg is REFUSED outright and announced (a refusal nobody sees is silent interdiction again), never queued or clamped. LP is a cap, not a price — credits stay the price (settled rule 1). With both halves live, the built mobilised-first visit order (economy_system.cpp § run order) finally contends for a real pool: goods-vs-force priority becomes an explicit design instead of a tick-phase accident. Harness: admit/refuse boundary exactness, order-independence under contention (two iteration orders, one allocation), the queue flip observable under mobilisation. PAUSED 2026-08-25 (Sprint 18 wave 3), NOT merged. Built and harness-green (34/34, including a real demonstration of war-flips-the-queue), but haulage_measure measured a 73% collapse in real convoy traffic (1055 -> 284 dispatched; 802 -> 246 intra-body). Cause is the draw formula: commit_convoy draws leg.dist, and LOGISTICS.md constraint 3 forbids a distance-proportional LP cost outright (\"LP *is* haulage cost again\"), as does rule 1 (double-charging distance). Work preserved on branch wip/bl-597-lp-passive-convoys (3ab3b452); main untouched. Awaiting Ben's ruling on the formula — NR-620."
     },
     {
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "version_goal": "v0.1.18",
       "sprint": "18",

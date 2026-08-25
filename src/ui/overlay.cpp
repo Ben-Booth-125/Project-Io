@@ -35,6 +35,9 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
         // scope) for whenever these lenses join the on-screen strip.
         case overlay_mode::reach:         icons::convoy(dl, centre, r, colour); break;
         case overlay_mode::supply_routes: icons::supply(dl, centre, r, colour); break;
+        // Throughput (BL-598) extends Reach, so it borrows Reach's convoy glyph
+        // on the same terms — both are off-strip, and the cycle names them apart.
+        case overlay_mode::throughput:    icons::convoy(dl, centre, r, colour); break;
         default: break;
     }
 }
@@ -58,6 +61,7 @@ const char* overlay_mode_name(overlay_mode m)
         case overlay_mode::continent:   return "Continents (tectonic plates)";
         case overlay_mode::reach:         return "Reach (commercial connectivity)";
         case overlay_mode::supply_routes: return "Supply-routes graph";
+        case overlay_mode::throughput:    return "Throughput (active Logistic Points)";
         default:                        return "None";
     }
 }
@@ -79,6 +83,7 @@ const char* overlay_mode_short_name(overlay_mode m)
         case overlay_mode::continent:   return "Continent";
         case overlay_mode::reach:         return "Reach";
         case overlay_mode::supply_routes: return "Supply routes";
+        case overlay_mode::throughput:    return "Throughput";
         default:                        return "None";
     }
 }

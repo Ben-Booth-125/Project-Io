@@ -1940,6 +1940,14 @@ void app::render()
                 // so this is a map lookup on every frame but the first after an
                 // invalidation (a road laid, a building placed or demolished).
                 body_reach_field(m_world, m_ui.active_body);
+                // BL-598: this tick's active-LP anchor pools for the Throughput
+                // lens, in the same place and for the same reason — the pool
+                // enumeration wants a mutable world, the draw is const. A no-op
+                // unless that lens is active, and never cached: LP is a per-tick
+                // rate, so the map is rebuilt every frame rather than banked.
+                // Ordered AFTER body_reach_field because the lens draws the reach
+                // envelope under the anchors and both must describe one frame.
+                ui::update_body_throughput(m_world, m_ui, m_registry);
                 ui::draw_body_surface_canvas(m_world, m_ui, m_registry, m_last_econ_report,
                                              m_generation_report, {0.0f, 0.0f}, disp, primary_input,
                                              {mm_origin.x, mm_origin.y + mm_h * 0.5f});

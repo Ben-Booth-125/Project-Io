@@ -58,4 +58,25 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 /// @param now_days Current continuous sim time in elapsed days (stored as the beam clock).
 void update_body_vision(world& w, ui_state& state, double now_days);
 
+/// Refresh the Throughput lens's active-LP anchor pools for state.active_body
+/// (BL-598; LOGISTICS.md § Logistic Points). A no-op unless that lens is active.
+///
+/// Here, and non-const, for exactly the reason update_body_vision is: the draw
+/// holds a `const world&` and must not be the thing that populates a cache.
+/// `active_lp_anchor_pools` is pure and uncached — it takes a mutable world only
+/// because it may build the body's raster index — so this runs no Dijkstra and
+/// no A*, and the reach field the lens's tile pass reads through the const
+/// `tile_reach_cost` is warmed by the caller (app.cpp) a line earlier.
+///
+/// LP IS A PER-TICK RATE, NEVER A STOCK. What lands in `ui_state` is derived VIEW
+/// state on the same footing as permanent_vision: rebuilt from scratch on every
+/// call, never serialised, never in state_hash, never read back by the sim. It is
+/// a photograph of this tick's rate, retaken each frame — it does not carry one
+/// tick's points into the next.
+///
+/// @param w      World (non-const: the anchor enumeration may build the raster index).
+/// @param state  Shared UI state; lp_anchors and its two reductions are rebuilt.
+/// @param reg    Recipe registry — the authored `military().active_lp_per_anchor_tick`.
+void update_body_throughput(world& w, ui_state& state, const recipe_registry& reg);
+
 } // namespace ui

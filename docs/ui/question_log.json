@@ -588,6 +588,18 @@
     "src/ui/contracts_ledger.cpp"
    ],
    "status": "drafted"
+  },
+  "throughput_lens": {
+   "surface": "Throughput lens (Planetary canvas)",
+   "answers": "How much can move through here, and how far is this ground from the capacity that would move it?",
+   "because": "Active Logistic Points are a CAP: a march over the cap is refused outright, and LOGISTICS.md makes surfacing that non-optional -- 'a refusal nobody sees is silent interdiction again'. Without a surface the player meets the cap only as a move that mysteriously did not happen. It earns its space by costing none: it extends the Reach field the placement rule already computes rather than adding a surface, which is exactly the shape Ben's ruling asked for -- 'throughput is that field with a magnitude, so it is a small step from an existing surface rather than a new one'. It is off the lens bar, so it takes no strip slot from the eight lenses that answer first-sight questions.",
+   "backlog_item": [
+    "BL-598"
+   ],
+   "files": [
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "status": "drafted"
   }
  }
 }
