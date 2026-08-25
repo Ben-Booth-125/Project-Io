@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*52 entries — 40 open, 12 resolved.*
+*53 entries — 40 open, 13 resolved.*
 
 ---
 
@@ -538,4 +538,13 @@ The first-cut tier mapping (Road needs qualification >= 0.10, Highway >= 0.30, r
 > **RESOLVED.** Ben, 2026-08-25: era-relative thresholds - implemented same session as BL-621 (era-relative road gates); LOGISTICS.md updated, harness re-specified.
 
 *Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
+
+### NR-644 — Stale tech-tree goldens (1720x1080, blessed 2026-08-15) fail every verify run on size alone - delete or deliberately re-admit
+*question · raised 2026-08-25 · from Tech tree restyle session (wide8 verdicts, GLOBAL_STYLE_SHEET.md) - first verify run after the restyle.*
+
+scripts/verify/golden/tech_tree_{tabs,era1,antiquity}.png are 1720x1080 against the harness's fixed 1280x720, so every tech_tree_panel.lua run reports 3 golden FAILs regardless of content. They were blessed the same day the golden demotion ruling landed (NR-237: curated world-independent set only, currently the icon_silhouettes pair) and these frames carry shell/world content, so they sit outside the policy anyway. Recommend deleting the three; re-admitting the surface would be a deliberate copy-in after the restyle is eyeballed.
+
+> **RESOLVED.** Ben, 2026-08-25: delete the three stale goldens - done same session; re-admitting the surface stays a deliberate copy-in per the NR-237 curated-set policy.
+
+*Files: `scripts/verify/golden/tech_tree_tabs.png`, `scripts/verify/golden/tech_tree_era1.png`, `scripts/verify/golden/tech_tree_antiquity.png`*
 
