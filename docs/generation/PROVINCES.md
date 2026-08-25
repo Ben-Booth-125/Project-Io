@@ -92,6 +92,19 @@ a road-binding divisor (`k_province_road_bind_divisor`) and a small seeded jitte
 (`k_province_edge_jitter`). Hinterland seeds are spaced `k_province_seed_spacing` apart, measured
 geodesically over land — and it is the spacing, not the budget, that sets hinterland size.
 
+**How rulings 3 and 5 are one mechanism** (BL-611, province centre anchor). The LAND fill is
+**nation-locked**: a region — centre-seeded or leftover — claims only tiles of its seed's
+nation, and singleton absorption honours the same lock, so a land province is single-nation by
+construction and its anchor's nation *is* its tile-derived nation. On a settled body the spaced
+hinterland seeding is retired; ground no centre's budget reaches (ice caps, deep desert, the far
+side of a border no centre stands behind) is mopped up by the leftover pass, and every leftover
+province then receives a **scale-1 anchor founding** on its best ground
+(`ensure_province_anchor_centres`, `population_generation.cpp`) before the holder is derived —
+a pure-ice province gets its anchor on its least-bad tile, counted rather than hidden. The
+**anchor** is derived, never stored: the highest summed centre scale in the province, ties to
+the lowest tile id. The spaced hinterland survives for the water domains and for the land of an
+unsettled body (no centres anywhere), where there is nothing else to seed from.
+
 ### The size band, and why it has three numbers
 
 | Constant | Value | Meaning |

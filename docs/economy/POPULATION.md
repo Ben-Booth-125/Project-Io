@@ -31,14 +31,30 @@ settled rather than the other way round.
   (§ Region demography) decide how many centres a body carries and how large each is, replacing
   the land-area divisor and the authored weighted scale draw. `k_population_for_scale` =
   10 / 50 / 200 / 1,000 / 5,000 thousand heads remains the scale→headcount mapping.
+  The carve is a pure integer function of the region populations, no RNG: an urban share
+  (a tenth, `k_demography_urban_share_q`) of each living region's headcount towns; the
+  **count** is each region's urban headcount over one village's-worth
+  (`k_demography_heads_per_centre` = `k_population_for_scale[0]`), floored at one — a razed
+  region contributes nothing; the **scales** are a rank-size share-out of the body's whole
+  urban headcount, banded to the nearest `k_population_for_scale` rung in log space — a few
+  cities over many towns over a train of villages, real settlement concentration as mechanism,
+  never a name. A body with no settlement record keeps a land-area fallback.
 - **Every province is anchored by a centre** (Ben, 2026-08-25; BL-611, province centre anchor).
   A centre of *any* scale — most are small; towns stand where history earned them. The anchor
   is the province's political decider: the centre's nation is the province's nation, and taking
   the centre takes the province (`docs/generation/PROVINCES.md` § The partition; BL-567,
-  province is the conquest unit). This retires the centre-less hinterland province.
+  province is the conquest unit). This retires the centre-less hinterland province. The
+  guarantee is structural: after the partition ships, any land province the centre-seeded fill
+  left without one receives a **scale-1 anchor founding** on its best ground
+  (`ensure_province_anchor_centres` — argmax of habitability × richness, the placement gate
+  preferred and relaxed only where no tile passes it, counted rather than hidden).
 - **Urban ground is stamped at generation** (Ben, 2026-08-25; BL-612, urban ground stamped).
   A centre arrives with an urban land-use footprint scaled by its tier, so city ground is
-  scarce and contested from turn one rather than notionally open (§ Land use).
+  scarce and contested from turn one rather than notionally open (§ Land use). The footprint
+  is the centre's own tile plus its most-livable land neighbours — 1/1/2/4/7 tiles by scale
+  (`k_urban_footprint_tiles`); a footprint the coast cuts short stays short, and a tile two
+  cities share is stamped once. Extraction already standing is grandfathered
+  (`docs/economy/TILES.md` § Urban transform).
 
 A centre's tile keeps its full deposit: population and extraction compete for a tile through
 § Land use, not through generation.

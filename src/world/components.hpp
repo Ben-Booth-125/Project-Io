@@ -826,13 +826,24 @@ struct procurement_contract
 static_assert(sizeof(procurement_quote)    == 40, "procurement_quote is a save-format record — see procurement.hpp");
 static_assert(sizeof(procurement_contract) == 48, "procurement_contract is a save-format record — see procurement.hpp");
 
-/// Land-use classification of a tile or zone. Drives the trade-off between
-/// residential, industrial, agricultural, and undeveloped land.
-/// See docs/economy/POPULATION.md § Land-use trade-offs.
+/// Land-use classification of a tile (docs/economy/POPULATION.md § Land use):
+/// undeveloped, extraction, urban, amenity, or infrastructure. Held sparsely in
+/// `world::land_use` keyed by tile entity — an absent entry IS undeveloped, so
+/// the store carries only the ground something has happened to.
+///
+/// BL-612 (urban ground stamped): generation stamps `urban` footprints under
+/// population centres, sized by centre scale, so city ground is scarce and
+/// contested from turn one. The urban COVER transform (TILES.md § Urban
+/// transform) is the tile-axis rule this composes with; extraction already
+/// standing when ground goes urban is grandfathered, per the same section.
+///
+/// (The enum read `residential/industrial/agricultural/wilderness` until
+/// 2026-08-25 — a dormant shape no code ever stored, superseded by the doc's
+/// five states; BL-612 is its first real user.)
 struct land_use_component
 {
-    enum class type { residential, industrial, agricultural, wilderness, infrastructure };
-    type use = type::wilderness;
+    enum class type : uint8_t { undeveloped = 0, extraction, urban, amenity, infrastructure };
+    type use = type::undeveloped;
 };
 
 /// A population centre occupying a tile. Scale governs agglomeration bonuses
@@ -846,6 +857,17 @@ struct population_centre_component
     int   population         = 0;    ///< Absolute headcount in thousands.
     float habitability       = 1.0f; ///< 0–1 scalar inherited from the tile.
     int   growth_accumulator = 0;    ///< Ticks of qualifying growth; resets on level-up.
+
+    /// BL-611 (province centre anchor): true for a centre founded by
+    /// `ensure_province_anchor_centres` AFTER the partition shipped, to anchor
+    /// a province the centre-seeded fill left without one. The partition's
+    /// seed gathering SKIPS these — the partition is a pure function of the
+    /// pre-anchor centre set and the seed, so a rebuild from the stored seed
+    /// reproduces it exactly (province_partition_harness P6/P7) instead of
+    /// re-seeding from centres the partition itself caused. Everything else —
+    /// the holder derivation, demand, naming, the urban stamp — treats an
+    /// anchor as the ordinary centre it is.
+    bool province_anchor = false;
 };
 
 /// Deployable unit stub. Faction AI and transport are deferred; the combat

@@ -34,8 +34,13 @@ const os = require('os');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORLD = path.join(ROOT, 'src', 'world');
 
-// The four sol2/Lua TUs io_world_obj excludes. Mirrored from CMakeLists.
-const LUA_TUS = new Set(['recipe_registry', 'works_registry', 'tech_tree', 'world_gen_config']);
+// The five sol2/Lua TUs io_world_obj excludes. Mirrored from CMakeLists
+// (line ~474: the IO_WORLD_SOURCES list(FILTER ... EXCLUDE) regex — keep the
+// two in lockstep). contract_template joined the exclusion with BL-570 and
+// this mirror missed it until 2026-08-25, which is exactly the rot the header
+// comment warns about.
+const LUA_TUS = new Set(['recipe_registry', 'works_registry', 'tech_tree', 'world_gen_config',
+                         'contract_template']);
 
 // Harnesses that genuinely need a live Lua state, and so cannot be built here.
 // CMakeLists declares each of these explicitly with lua54 linked; see its comments.

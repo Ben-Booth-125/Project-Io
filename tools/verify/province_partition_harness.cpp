@@ -47,6 +47,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <set>
 #include <unordered_map>
 #include <vector>
 
@@ -462,9 +463,12 @@ int main()
         // P5d — THE ABSORPTION RULING, asserted on the shipped partition rather
         // than on the pass's own bookkeeping. Ben, 2026-08-21: "We can add a
         // pass to capture all the 1 tile provinces." So a surviving one-tile
-        // province must have had NOWHERE TO GO — no land neighbour at all. That
-        // is a TRUE ISLAND, and reaching across water to place it is exactly the
-        // rule the ruling does not ask for.
+        // province must have had NOWHERE TO GO — no neighbour it MAY join:
+        // none in its own domain (a TRUE ISLAND — reaching across water to
+        // place it is exactly the rule the ruling does not ask for), and since
+        // BL-611 none on land of its own NATION either (the nation lock:
+        // ruling 5's hard edge would dissolve at exactly the border tiles it
+        // exists to draw if a border singleton were absorbed across it).
         {
             std::size_t singles = 0, not_islands = 0;
             for (const province& p : part.provinces)
@@ -478,6 +482,10 @@ int main()
                 const auto  tit  = w.tiles.find(p.tiles.front());
                 if (tit == w.tiles.end())
                     continue;
+                const bool is_land = province_kind_of(w, p) == province_kind::land;
+                const auto own_nat = w.tile_to_nation.find(p.tiles.front());
+                const entity_id own_nation =
+                    (own_nat == w.tile_to_nation.end()) ? null_entity : own_nat->second;
                 for (int s = 0; s < 6; ++s)
                 {
                     const auto c =
@@ -498,15 +506,25 @@ int main()
                     if (nit == w.tiles.end()
                         || !domain_matches(nit->second.substrate, province_kind_of(w, p)))
                         continue;
+                    // BL-611: on land, "somewhere to go" also means the same
+                    // nation — a foreign neighbour was never available.
+                    if (is_land)
+                    {
+                        const auto nn = w.tile_to_nation.find(n);
+                        const entity_id n_nation =
+                            (nn == w.tile_to_nation.end()) ? null_entity : nn->second;
+                        if (n_nation != own_nation)
+                            continue;
+                    }
                     ++not_islands;
                     break;
                 }
             }
-            std::printf("        %zu one-tile provinces survive, all true islands: %s\n", singles,
-                        not_islands == 0 ? "yes" : "NO");
+            std::printf("        %zu one-tile provinces survive, all with nowhere to go: %s\n",
+                        singles, not_islands == 0 ? "yes" : "NO");
             check(not_islands == 0,
-                  "P5d every surviving one-tile province is a TRUE ISLAND (no same-domain"
-                  " neighbour)");
+                  "P5d every surviving one-tile province had NOWHERE TO GO (no same-domain,"
+                  " and on land same-nation, neighbour)");
         }
     }
 
@@ -591,9 +609,15 @@ int main()
         check(nonzero, "P8d no id is 0 — null_entity is not a tile, so province_of's 0 is safe");
     }
 
-    // P9 — THE SEEDS. Provinces GROW FROM POPULATION CENTRES (Ben, 2026-08-21),
-    // so every centre must sit in a province and no two centres may share one:
-    // the settlement pass gives each its own region.
+    // P9 — THE SEEDS AND THE ANCHORS. Provinces GROW FROM POPULATION CENTRES
+    // (Ben, 2026-08-21), so every centre must sit in a province — and since
+    // BL-611 (province centre anchor, superseding "one seed each": at
+    // demography-derived density two centres legitimately share a province
+    // through singleton absorption, and the anchor-founding pass adds one to
+    // every pocket the fill left) EVERY land province on a settled body holds
+    // at least one centre, and the ANCHOR — the highest summed scale, ties to
+    // the lowest tile id — decides the province's nation, agreeing with the
+    // tile-derived plurality by construction (the nation-locked fill).
     {
         std::map<entity_id, int> centre_tile_scale;
         for (const auto& [cid, tid] : w.population_centre_tile)
@@ -604,7 +628,18 @@ int main()
             centre_tile_scale[tid] += pit->second.scale;
         }
 
-        bool                        all_placed = true, all_distinct = true;
+        // Which bodies are SETTLED (hold any centre) — the anchor rule is a
+        // settled-land rule; an unsettled body's land keeps the hinterland.
+        std::set<entity_id> settled_bodies;
+        for (const auto& [tid, scale] : centre_tile_scale)
+        {
+            (void)scale;
+            const auto tit = w.tiles.find(tid);
+            if (tit != w.tiles.end())
+                settled_bodies.insert(tit->second.body);
+        }
+
+        bool                        all_placed = true;
         std::map<uint32_t, int>     province_centres;
         std::map<int, std::pair<int, std::size_t>> by_scale; // scale -> (count, total tiles)
         for (const auto& [tid, scale] : centre_tile_scale)
@@ -615,8 +650,7 @@ int main()
                 all_placed = false;
                 continue;
             }
-            if (++province_centres[pid] > 1)
-                all_distinct = false;
+            ++province_centres[pid];
             const province* p = part.find(pid);
             if (p != nullptr)
             {
@@ -626,7 +660,87 @@ int main()
             }
         }
         check(all_placed, "P9a every population-centre tile belongs to a province");
-        check(all_distinct, "P9b no two population centres share a province (one seed each)");
+
+        // A1 — every land province on a settled body holds >= 1 centre.
+        // A2 — the anchor's nation IS the tile-derived plurality nation, and
+        //      IS the stored province_holder (BL-611: the centre decides).
+        // A3 — no water province holds a centre (water is never settled).
+        {
+            std::size_t land_on_settled = 0, unanchored = 0, shared = 0;
+            std::size_t anchor_mismatch = 0, holder_mismatch = 0, water_with_centre = 0;
+            for (std::size_t i = 0; i < part.provinces.size(); ++i)
+            {
+                const province& p = part.provinces[i];
+                const province_kind k = province_kind_of(w, p);
+
+                // Does any centre stand here, and which tile anchors it?
+                entity_id anchor       = null_entity;
+                int       anchor_scale = 0;
+                int       centres_here = 0;
+                for (const entity_id tid : p.tiles) // ascending — the contract
+                {
+                    const auto cit = centre_tile_scale.find(tid);
+                    if (cit == centre_tile_scale.end())
+                        continue;
+                    ++centres_here;
+                    if (cit->second > anchor_scale)
+                    {
+                        anchor_scale = cit->second;
+                        anchor       = tid;
+                    }
+                }
+
+                if (k != province_kind::land)
+                {
+                    if (centres_here > 0)
+                        ++water_with_centre;
+                    continue;
+                }
+                if (!settled_bodies.count(p.body))
+                    continue;
+
+                ++land_on_settled;
+                if (centres_here == 0) { ++unanchored; continue; }
+                if (centres_here > 1) ++shared;
+
+                // The anchor's nation.
+                const auto an = w.tile_to_nation.find(anchor);
+                const entity_id anchor_nation =
+                    (an == w.tile_to_nation.end()) ? null_entity : an->second;
+
+                // The tile-derived plurality (ordered tally, ascending walk).
+                std::map<entity_id, int> tally;
+                for (const entity_id tid : p.tiles)
+                {
+                    const auto it = w.tile_to_nation.find(tid);
+                    if (it != w.tile_to_nation.end())
+                        ++tally[it->second];
+                }
+                entity_id plurality = null_entity;
+                int       best      = 0;
+                for (const auto& [nid, n] : tally)
+                    if (n > best) { best = n; plurality = nid; }
+
+                if (anchor_nation != plurality)
+                    ++anchor_mismatch;
+                if (i < w.province_holder.size()
+                    && w.province_holder[i] != anchor_nation)
+                    ++holder_mismatch;
+            }
+            std::printf("        %zu land provinces on settled bodies; %zu multi-centre,"
+                        " %zu unanchored\n",
+                        land_on_settled, shared, unanchored);
+            check(unanchored == 0,
+                  "A1  every land province on a settled body holds >= 1 population centre"
+                  " (BL-611)");
+            check(anchor_mismatch == 0,
+                  "A2a the anchor centre's nation IS the tile-derived plurality nation"
+                  " (nation-locked fill)");
+            check(holder_mismatch == 0,
+                  "A2b the stored province_holder IS the anchor centre's nation");
+            check(water_with_centre == 0,
+                  "A3  no water province holds a population centre (water domains unchanged)");
+        }
 
         std::printf("        centre-seeded province size by centre scale:");
         for (const auto& [scale, row] : by_scale)

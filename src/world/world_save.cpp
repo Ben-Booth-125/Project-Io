@@ -201,12 +201,21 @@ void w_popcentre(std::ostream& o, const population_centre_component& p)
     w_int(o, p.population);
     w_f32(o, p.habitability);
     w_int(o, p.growth_accumulator);
+    // BL-611 (format v12): the anchor-founding marker — a rebuild of the
+    // partition must not seed from a centre the partition itself caused.
+    w_int(o, p.province_anchor ? 1 : 0);
 }
 
 bool r_popcentre(std::istream& i, population_centre_component& p)
 {
-    return r_int(i, p.scale) && r_int(i, p.population) && r_f32(i, p.habitability)
-        && r_int(i, p.growth_accumulator);
+    int anchor = 0;
+    if (!(r_int(i, p.scale) && r_int(i, p.population) && r_f32(i, p.habitability)
+          && r_int(i, p.growth_accumulator) && r_int(i, anchor)))
+        return false;
+    if (anchor != 0 && anchor != 1)
+        return false; // not a value the writer above can produce — corrupt stream
+    p.province_anchor = (anchor == 1);
+    return true;
 }
 
 void w_nation(std::ostream& o, const nation_component& n)
@@ -743,6 +752,11 @@ void write_world_snapshot(const world& w, std::ostream& out)
     w_id_store(out, w.population_centre_tile);
     w_store(out, w.population_centre_name,
             [](std::ostream& s, const std::string& v) { w_str(s, v); });
+    // BL-612 (format v11): sparse per-tile land use — the urban footprints
+    // generation stamps under population centres, plus whatever play mutates.
+    w_store(out, w.land_use, [](std::ostream& s, const land_use_component& v) {
+        w_int(s, static_cast<int>(v.use));
+    });
     w_store(out, w.nations, w_nation);
     // Sprint N3 T2 (format v3): the persistent weight map, directly after the
     // nations it keys on. A `std::map`, so `w_map` writes it ascending as held.
@@ -889,6 +903,18 @@ bool read_world_snapshot(world& w, std::istream& in)
         return false;
     if (!r_store(in, s.population_centre_name,
                  [](std::istream& st, std::string& v) { return r_str(st, v); }))
+        return false;
+    // BL-612 (format v11). A value outside the five authored states cannot
+    // have been written by the writer above, so the stream is corrupt rather
+    // than odd and is refused whole (the standing rejection contract).
+    if (!r_store(in, s.land_use, [](std::istream& st, land_use_component& v) {
+            int raw = 0;
+            if (!r_int(st, raw) || raw < 0
+                || raw > static_cast<int>(land_use_component::type::infrastructure))
+                return false;
+            v.use = static_cast<land_use_component::type>(raw);
+            return true;
+        }))
         return false;
     if (!r_store(in, s.nations, r_nation))
         return false;

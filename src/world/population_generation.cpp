@@ -1,11 +1,14 @@
 #include "population_generation.hpp"
 
 #include "world/city_names.hpp"     // world::generate_city_name
+#include "world/hex_neighbors.hpp"  // the canonical odd-r sides (BL-612 footprints)
 #include "world/placement_rules.hpp"
+#include "world/settlement.hpp"     // settlement_state — the Era -1 record (BL-610)
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <random>
 #include <string>
 #include <unordered_map>
@@ -23,6 +26,11 @@ constexpr int k_population_for_scale[5] = { 10, 50, 200, 1000, 5000 };
 
 /// Weighted scale distribution: indices 0–4 correspond to scale 1–5.
 /// Weights: 40%, 30%, 20%, 8%, 2%.
+///
+/// RETIRED ON THE CAMPAIGN PATH (BL-610, centres from demography): a body with
+/// an Era -1 settlement record carves its scales from the simulated region
+/// populations instead (`carve_region_scales` below). The draw survives for
+/// the no-settlement fallback and for the coverage pass's small-seat draw.
 constexpr int k_scale_weight[5] = { 40, 30, 20, 8, 2 };
 constexpr int k_scale_weight_total = 100;
 
@@ -39,6 +47,88 @@ int draw_scale(std::mt19937& rng)
             return i + 1; // scale is 1-based
     }
     return 1; // fallback (shouldn't be reached)
+}
+
+// ---------------------------------------------------------------------------
+// BL-610 (centres from demography) — the campaign path's count and scales.
+// ---------------------------------------------------------------------------
+
+/// The urban share of a region's simulated population, in thousandths. A
+/// pre-industrial settlement system towns roughly a tenth of its people; the
+/// rest are the countryside the region itself represents. Mechanism from real
+/// history, never a name (the standing rule). The centre COUNT and the scale
+/// carve both read the urban headcount, so this is the one knob between the
+/// demography and the density.
+constexpr int64_t k_demography_urban_share_q = 100; // 10%
+
+/// Scale banding thresholds in RAW HEADS: the geometric midpoints between the
+/// `k_population_for_scale` rungs (10k/50k/200k/1M/5M heads), so a carved share
+/// lands on the NEAREST rung in log space rather than always rounding down.
+/// sqrt(10k*50k)=22,360; sqrt(50k*200k)=100,000; sqrt(200k*1M)=447,213;
+/// sqrt(1M*5M)=2,236,067. Constants, so no float sqrt runs in a gate path.
+constexpr int64_t k_scale_band_heads[4] = { 22360, 100000, 447213, 2236067 };
+
+int scale_for_share(int64_t share_heads)
+{
+    int s = 1;
+    for (int i = 0; i < 4; ++i)
+        if (share_heads >= k_scale_band_heads[i])
+            s = i + 2;
+    return s;
+}
+
+/// Carve a body's Era -1 demography into centre scales (BL-610).
+///
+/// COUNT is per region: a living region's urban headcount over
+/// `k_demography_heads_per_centre`, floored at one — a region history kept
+/// alive has at least a village; a razed region (population 0) contributes
+/// nothing. Summing per region rather than carving the body total is what
+/// makes the count the DISTRIBUTION's consequence: a world of many thin
+/// regions towns differently from one of few fat ones.
+///
+/// SCALES are rank-size over the whole body's urban headcount: rank i of n
+/// receives U/(i*H_n), H_n the harmonic number — one hierarchy of a few
+/// cities over many towns over a train of villages, the concentration real
+/// settlement systems show (a MECHANISM, never a name — the standing rule).
+/// Carved body-wide rather than per region because placement is body-wide
+/// too: the region record decides HOW MANY and HOW LARGE, the placement pass
+/// decides where.
+///
+/// All integer (harmonic sum in millionths), no RNG: a pure function of the
+/// region populations, so count and scale are the demography's consequence
+/// and nothing else's.
+std::vector<int> carve_demography_scales(const settlement_state& settlement,
+                                         int heads_per_centre)
+{
+    std::vector<int> out;
+    if (heads_per_centre <= 0)
+        return out;
+
+    int64_t urban_total = 0;
+    int64_t count       = 0;
+    for (const region& p : settlement.regions)
+    {
+        if (p.population <= 0)
+            continue;
+        const int64_t urban = p.population * k_demography_urban_share_q / 1000;
+        urban_total += urban;
+        count       += std::max<int64_t>(1, urban / heads_per_centre);
+    }
+    if (count <= 0)
+        return out;
+
+    const int n = static_cast<int>(std::min<int64_t>(count, 65536));
+
+    int64_t harmonic_millionths = 0;
+    for (int i = 1; i <= n; ++i)
+        harmonic_millionths += 1000000 / i;
+
+    // Rank-size share-out of the urban total; already descending by rank.
+    const int64_t c = urban_total * 1000000 / harmonic_millionths;
+    out.reserve(static_cast<std::size_t>(n));
+    for (int i = 1; i <= n; ++i)
+        out.push_back(scale_for_share(c / i));
+    return out;
 }
 
 /// Grid neighbours (cardinal + diagonal = 8 neighbours) with horizontal column
@@ -68,6 +158,7 @@ void eight_neighbours(const std::vector<entity_id>& tile_ids,
 // ---------------------------------------------------------------------------
 
 void generate_population_centres(world& w, entity_id body_id, unsigned seed,
+                                 const settlement_state* settlement,
                                  int land_tiles_per_centre)
 {
     // Locate the body to get grid dimensions.
@@ -144,28 +235,33 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
             : 1;
     };
 
-    // Target centre count — derived from LAND AREA, not grid area (BL-463).
+    // Target centre count and scales — BL-610 (centres from demography): on a
+    // body with an Era -1 settlement record, BOTH derive from the regions'
+    // simulated populations. Density is history's consequence — a world whose
+    // history fed more people carries more and larger towns — replacing the
+    // land-area divisor and the authored 40/30/20/8/2 weighted draw at once.
     //
-    // This read `clamp(gw * gh / 1000, 20, 40)` until 2026-08-20. Grid area is a
-    // compile-time constant (261×121 = 31,581), so the expression evaluated to
-    // exactly 31 on every world ever generated, while the land under it ranged
-    // 8,952–16,074 tiles across an eight-seed sweep. No world could be more or
-    // less settled than any other.
+    // The carve comes back descending by rank, so the largest cities are
+    // placed first and the adjacency weighting below clusters the train of
+    // villages around them.
+    std::vector<int> demography_scales;
+    if (settlement != nullptr)
+        demography_scales = carve_demography_scales(*settlement,
+                                                    k_demography_heads_per_centre);
+    const bool from_demography = !demography_scales.empty();
+
+    // The FALLBACK: land area over a divisor (BL-463: land area, not grid
+    // area). Taken only when there is no settlement record to read — a body
+    // without an Era -1 sim, or a harness probing placement alone.
     //
     // The divisor is MEASURED, not chosen (BL-463 § Direction, not a chosen
     // number; BL-224's report-then-tune discipline). Over the eight-seed
-    // baseline sweep run by tools/verify/substrate_census.cpp the shipped
+    // baseline sweep run by tools/verify/substrate_census.cpp the pre-BL-610
     // generator placed 248 centres over 101,629 land tiles — 409.8 land tiles
-    // per centre. `k_land_tiles_per_centre` is that figure rounded, so the
-    // CENTRAL density is unchanged and the only thing this line changes is that
-    // the count now VARIES with the land the seed actually produced.
+    // per centre, rounded into `k_land_tiles_per_centre`.
     //
     // The bounds are structural, not tuning: at least one centre, and never more
     // centres than there are tiles able to host one.
-    // The divisor now lives in the header as `k_land_tiles_per_centre` and
-    // arrives as a defaulted parameter, so a harness can measure an alternative
-    // without a recompile. Every production caller passes nothing and gets the
-    // shipped constant, so the generated world is unchanged.
     const int divisor = (land_tiles_per_centre > 0) ? land_tiles_per_centre
                                                     : k_land_tiles_per_centre;
     int land_tiles = 0;
@@ -173,8 +269,11 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
         if (tc.body == body_id && !is_water(tc.substrate)) // BL-516
             ++land_tiles;
 
-    const int centre_count = std::clamp(land_tiles / divisor,
-                                        1, static_cast<int>(candidates.size()));
+    const int centre_count = from_demography
+        ? std::min(static_cast<int>(demography_scales.size()),
+                   static_cast<int>(candidates.size()))
+        : std::clamp(land_tiles / divisor,
+                     1, static_cast<int>(candidates.size()));
 
     // Seeded RNG — deterministic, never draws from random_device.
     std::mt19937 rng(seed);
@@ -223,8 +322,13 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
         const auto tc_it = w.tiles.find(chosen_tile);
         const float hab = (tc_it != w.tiles.end()) ? tc_it->second.habitability : 1.0f;
 
-        // Draw scale and derive population.
-        const int scale = draw_scale(rng);
+        // The scale: carved from the demography on the campaign path (BL-610,
+        // largest first — the sort above), drawn from the weighted table on the
+        // fallback. Either way `k_population_for_scale` stays the one
+        // scale -> headcount mapping.
+        const int scale = from_demography
+            ? demography_scales[static_cast<std::size_t>(placed)]
+            : draw_scale(rng);
         const int pop   = k_population_for_scale[scale - 1];
 
         // Create the population centre entity.
@@ -285,6 +389,179 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed,
 // ---------------------------------------------------------------------------
 // Coverage pass (BL-463) — every nation holds at least one population centre
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Province anchors (BL-611) — every land province holds a centre
+// ---------------------------------------------------------------------------
+
+int ensure_province_anchor_centres(world& w, entity_id body_id, int* gate_relaxed)
+{
+    if (gate_relaxed != nullptr)
+        *gate_relaxed = 0;
+
+    // Which tiles already host a centre. Content is order-independent (a set).
+    std::unordered_set<entity_id> host_tiles;
+    for (const auto& [cid, tid] : w.population_centre_tile)
+        host_tiles.insert(tid);
+
+    int founded = 0;
+    for (const province& pr : w.provinces.provinces) // ascending id — the contract
+    {
+        if (pr.body != body_id)
+            continue;
+        if (province_kind_of(w, pr) != province_kind::land)
+            continue;
+
+        bool      anchored    = false;
+        entity_id best_gated  = null_entity; // best tile PASSING the placement gate
+        double    gated_score = -1.0;
+        entity_id best_any    = null_entity; // least-bad tile, gate or no gate
+        double    any_score   = -1.0;
+
+        for (const entity_id tid : pr.tiles) // ascending — strictly-greater argmax
+        {
+            if (host_tiles.count(tid)) { anchored = true; break; }
+            const auto tit = w.tiles.find(tid);
+            if (tit == w.tiles.end())
+                continue;
+            const tile_component& tc = tit->second;
+
+            double richness = 0.0;
+            for (const resource_type er : placement_rules::k_extractable)
+                richness += static_cast<double>(
+                    tc.resource_deposit[static_cast<std::size_t>(er)]);
+            const double score = static_cast<double>(tc.habitability) * (1.0 + richness);
+
+            if (score > any_score) { any_score = score; best_any = tid; }
+            if (placement_rules::can_place_population_centre(tc) && score > gated_score)
+            {
+                gated_score = score;
+                best_gated  = tid;
+            }
+        }
+        if (anchored)
+            continue;
+
+        const entity_id site = (best_gated != null_entity) ? best_gated : best_any;
+        if (site == null_entity)
+            continue; // no readable tile at all — cannot happen for a real province
+        if (best_gated == null_entity && gate_relaxed != nullptr)
+            ++*gate_relaxed; // pure ice / bare rock: the anchor stands anyway
+
+        const auto tit = w.tiles.find(site);
+        const float hab = (tit != w.tiles.end()) ? tit->second.habitability : 0.0f;
+
+        population_centre_component pcc;
+        pcc.scale           = 1; // an anchor founding is a village, always
+        pcc.population      = k_population_for_scale[0];
+        pcc.habitability    = hab;
+        pcc.province_anchor = true; // never a partition seed on a rebuild
+        const entity_id centre_id = w.create_entity();
+        w.population_centres[centre_id] = pcc;
+        w.population_centre_tile[centre_id] = site;
+
+        host_tiles.insert(site);
+        ++founded;
+    }
+    return founded;
+}
+
+// ---------------------------------------------------------------------------
+// Urban footprints (BL-612) — generation stamps the ground cities stand on
+// ---------------------------------------------------------------------------
+
+int stamp_urban_land_use(world& w, entity_id body_id)
+{
+    const auto body_it = w.bodies.find(body_id);
+    if (body_it == w.bodies.end())
+        return 0;
+    const int gw = body_it->second.grid_width;
+    const int gh = body_it->second.grid_height;
+    if (gw <= 0 || gh <= 0)
+        return 0;
+
+    // Raster lookup, as in generate_population_centres above.
+    std::vector<entity_id> grid(static_cast<std::size_t>(gw) * gh, null_entity);
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (tc.body != body_id)
+            continue;
+        const int idx = tc.grid_y * gw + tc.grid_x;
+        if (idx >= 0 && idx < gw * gh)
+            grid[static_cast<std::size_t>(idx)] = tid;
+    }
+
+    // Centres on this body, in sorted centre-id order — the walk is
+    // deterministic and, because stamping is idempotent, the RESULT is
+    // order-independent besides.
+    std::vector<std::pair<entity_id, entity_id>> centres; // (centre, tile)
+    for (const auto& [cid, tid] : w.population_centre_tile)
+    {
+        const auto tit = w.tiles.find(tid);
+        if (tit != w.tiles.end() && tit->second.body == body_id)
+            centres.emplace_back(cid, tid);
+    }
+    std::sort(centres.begin(), centres.end());
+
+    int stamped = 0;
+    const auto stamp = [&](entity_id tid) {
+        auto& lu = w.land_use[tid]; // absent entry default-constructs undeveloped
+        if (lu.use != land_use_component::type::urban)
+        {
+            lu.use = land_use_component::type::urban;
+            ++stamped;
+        }
+    };
+
+    for (const auto& [cid, tid] : centres)
+    {
+        const auto pit = w.population_centres.find(cid);
+        if (pit == w.population_centres.end())
+            continue;
+        const int scale = std::clamp(pit->second.scale, 1, 5);
+        const int want  = k_urban_footprint_tiles[scale - 1];
+
+        stamp(tid); // a settlement always paves its own tile
+
+        if (want <= 1)
+            continue;
+
+        // Rank the six hex neighbours (habitability desc, tile id asc) and
+        // pave the best `want - 1` land tiles among them. The coast can cut a
+        // footprint short, and that is kept rather than compensated.
+        const auto tit = w.tiles.find(tid);
+        if (tit == w.tiles.end())
+            continue;
+        struct cand { float hab; entity_id tile; };
+        std::vector<cand> ring;
+        ring.reserve(6);
+        for (int s = 0; s < 6; ++s)
+        {
+            const auto [nx_raw, ny] =
+                hex_neighbors::neighbour(tit->second.grid_x, tit->second.grid_y, s);
+            if (ny < 0 || ny >= gh)
+                continue; // rows clamp; columns wrap (the east-west cylinder)
+            const int nx = ((nx_raw % gw) + gw) % gw;
+            const entity_id n = grid[static_cast<std::size_t>(ny) * gw + nx];
+            if (n == null_entity)
+                continue;
+            const auto nit = w.tiles.find(n);
+            if (nit == w.tiles.end() || is_water(nit->second.substrate))
+                continue; // urban ground is a land feature
+            ring.push_back({ nit->second.habitability, n });
+        }
+        std::sort(ring.begin(), ring.end(), [](const cand& a, const cand& b) {
+            if (a.hab != b.hab)
+                return a.hab > b.hab; // the city grows onto its most livable side
+            return a.tile < b.tile;
+        });
+        const int extra = std::min<int>(want - 1, static_cast<int>(ring.size()));
+        for (int i = 0; i < extra; ++i)
+            stamp(ring[static_cast<std::size_t>(i)].tile);
+    }
+
+    return stamped;
+}
 
 int ensure_national_population_centres(world& w, entity_id body_id, unsigned seed)
 {

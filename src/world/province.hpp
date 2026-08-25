@@ -677,11 +677,12 @@ int province_buildings_standing(const world& w, uint32_t province_id);
 // ---------------------------------------------------------------------------
 // `world::province_holder` tracks who currently holds a province ACROSS
 // battles, which `battle_dispatch::field_held_by` (erased with the battle it
-// concluded) cannot: seeded at generation from `tile_to_nation`'s plurality,
-// moved by a decisive battle's `field_held_by` (`run_battles`,
-// battle_system.cpp), left untouched by a stalemate. `no_entity` means "no
-// recorded holder" — a sea province, or a land province no nation's tiles
-// reached a plurality in.
+// concluded) cannot: seeded at generation from the province's ANCHOR centre's
+// nation (BL-611, province centre anchor — `tile_to_nation`'s plurality is
+// the fallback for ground no centre stands on), moved by a decisive battle's
+// `field_held_by` (`run_battles`, battle_system.cpp), left untouched by a
+// stalemate. `no_entity` means "no recorded holder" — a sea province, or a
+// land province with neither an anchor nor a plurality.
 //
 // Deliberately NARROW: `tile_to_nation` (the territorial map) does NOT follow
 // the holder here — the political map changing hands is unowned work. A held
@@ -692,21 +693,31 @@ int province_buildings_standing(const world& w, uint32_t province_id);
 // MILITARY.md, etc.) — never on container order.
 // ---------------------------------------------------------------------------
 
-/// Seed `w.province_holder` from `w.tile_to_nation`'s plurality over each land
-/// province's tiles, called from `build_province_partition`'s CALLER once the
-/// partition and every tile's nation assignment both exist.
+/// Seed `w.province_holder` for each land province, called from
+/// `build_province_partition`'s CALLER once the partition, every tile's
+/// nation assignment, and the anchor centres all exist (after
+/// `ensure_province_anchor_centres` — an anchor founded later than this pass
+/// would fall to the plurality fallback and desynchronise the two).
+///
+/// BL-611 (province centre anchor): the holder is the ANCHOR centre's nation
+/// — the anchor being the highest summed centre scale standing in the
+/// province, ties to the lowest tile id, derived on the spot and never
+/// stored. A province with no centre at all (an unsettled body's land) falls
+/// back to `tile_to_nation`'s plurality over its tiles. At generation the
+/// two agree by construction: the land fill is nation-locked (ruling 5), so
+/// every tile of an anchored province shares the anchor's nation —
+/// `province_partition_harness` A2 asserts exactly that.
 ///
 /// One entity_id per province, POSITIONALLY ALIGNED with
 /// `w.provinces.provinces` (ascending `province::id` order) — NOT indexed by
 /// the raw id, which is a derived tile id and not compact. `no_entity` for a
-/// non-land province (coastal water, open ocean) and for a land province none
-/// of whose tiles carry a `tile_to_nation` entry.
+/// non-land province (coastal water, open ocean) and for a land province with
+/// neither an anchor nor any `tile_to_nation` entry.
 ///
 /// DETERMINISTIC: `province::tiles` is already ascending entity id (the
-/// partition's own contract), and the tally is walked in that order into an
-/// ordered `std::map` keyed on nation id, so the plurality winner — and its
-/// ascending-id tie-break — does not depend on any unordered container's
-/// layout.
+/// partition's own contract); the anchor scan and the fallback tally both
+/// walk it in that order through ordered `std::map`s, so no unordered
+/// container's layout reaches either pick.
 ///
 /// @param w World whose `provinces` partition is already built and whose
 ///          `tile_to_nation` is already populated; `province_holder` is

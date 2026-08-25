@@ -160,13 +160,13 @@ int main()
             // same record would shift with it. The whole stream is refused
             // instead -- a v4 save is not migrated, it is rejected, and the
             // destination is not touched.
-            static_assert(world_save_version == 10,
-                          "P9/P10/P11/P12/P13/P14 name v4/v5/v6/v7/v8/v9 as refused predecessors; "
-                          "re-read these rows on a bump");
+            static_assert(world_save_version == 12,
+                          "P9/P10/P11/P12/P13/P14/P15/P16 name v4..v11 as refused "
+                          "predecessors; re-read these rows on a bump");
             std::string bad = bytes_once;
             const uint32_t v4 = 4;
             std::memcpy(&bad[4], &v4, sizeof v4);
-            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v10)");
+            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v12)");
         }
         {
             // Sprint 16, BL-571: the IMMEDIATE previous format (BL-570's v5,
@@ -180,7 +180,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v5 = 5;
             std::memcpy(&bad[4], &v5, sizeof v5);
-            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused (format is v10)");
+            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused (format is v12)");
         }
         {
             // Sprint 16, BL-572: the IMMEDIATE previous format (BL-571's v6,
@@ -193,7 +193,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v6 = 6;
             std::memcpy(&bad[4], &v6, sizeof v6);
-            check(!from_bytes(bad, victim), "P11 a v6-versioned stream is refused (format is v10)");
+            check(!from_bytes(bad, victim), "P11 a v6-versioned stream is refused (format is v12)");
         }
         {
             // Sprint 16, BL-573: the IMMEDIATE previous format (BL-572's v7,
@@ -205,7 +205,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v7 = 7;
             std::memcpy(&bad[4], &v7, sizeof v7);
-            check(!from_bytes(bad, victim), "P12 a v7-versioned stream is refused (format is v10)");
+            check(!from_bytes(bad, victim), "P12 a v7-versioned stream is refused (format is v12)");
         }
         {
             // BL-585: the IMMEDIATE previous format (Sprint 16's v8, the
@@ -218,7 +218,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v8 = 8;
             std::memcpy(&bad[4], &v8, sizeof v8);
-            check(!from_bytes(bad, victim), "P13 a v8-versioned stream is refused (format is v10)");
+            check(!from_bytes(bad, victim), "P13 a v8-versioned stream is refused (format is v12)");
         }
         {
             // BL-586 slice 2: the IMMEDIATE previous format (BL-585's v9, the
@@ -230,7 +230,32 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v9 = 9;
             std::memcpy(&bad[4], &v9, sizeof v9);
-            check(!from_bytes(bad, victim), "P14 a v9-versioned stream is refused (format is v10)");
+            check(!from_bytes(bad, victim), "P14 a v9-versioned stream is refused (format is v12)");
+        }
+        {
+            // BL-612 (urban ground stamped): the IMMEDIATE previous format
+            // (BL-586 slice 2's v10). A v10 stream has no `land_use` section,
+            // so the bytes where v11 expects it would be read as the nation
+            // store's count and everything after it misaligned -- the same
+            // mid-stream-section shape as Sprint N3's nation_budgets bump.
+            // Refused whole, same contract as every prior bump.
+            std::string bad = bytes_once;
+            const uint32_t v10 = 10;
+            std::memcpy(&bad[4], &v10, sizeof v10);
+            check(!from_bytes(bad, victim), "P15 a v10-versioned stream is refused (format is v12)");
+        }
+        {
+            // BL-611 (province centre anchor): the IMMEDIATE previous format
+            // (BL-612's v11, which exists only as the same-wave intermediate
+            // shape -- the BL-570/BL-571 precedent). A v11 stream's centre
+            // records are one field short (no province_anchor), a MID-RECORD
+            // gap like P10's: a reader that accepted it would misread every
+            // centre after the first and everything serialised after them.
+            // Refused whole, same contract as every prior bump.
+            std::string bad = bytes_once;
+            const uint32_t v11 = 11;
+            std::memcpy(&bad[4], &v11, sizeof v11);
+            check(!from_bytes(bad, victim), "P16 a v11-versioned stream is refused (format is v12)");
         }
         {
             // Truncated mid-way through the tile store -- far enough in that a
@@ -439,6 +464,7 @@ int main()
             { "population_centres", w.population_centres.size(), loaded.population_centres.size() },
             { "population_centre_tile", w.population_centre_tile.size(), loaded.population_centre_tile.size() },
             { "population_centre_name", w.population_centre_name.size(), loaded.population_centre_name.size() },
+            { "land_use", w.land_use.size(), loaded.land_use.size() },
             { "nations", w.nations.size(), loaded.nations.size() },
             { "nation_budgets", w.nation_budgets.size(), loaded.nation_budgets.size() },
             { "tile_to_nation", w.tile_to_nation.size(), loaded.tile_to_nation.size() },

@@ -454,9 +454,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // Kepler is the only body with a political layer in the prototype; its nation
     // count is derived, not authored. Selene/Cinder/Pallas stay unclaimed.
     // See docs/generation/NATION_GENERATION.md.
-    // Population centres must be placed before generate_nations so that Pass 6
-    // (substrate density) can reference them during nation territory assignment.
-    generate_population_centres(w, kepler, /*seed=*/params.seed ^ 0x70701001u);
+    //
+    // POPULATION CENTRES MOVED (BL-610, centres from demography): the centre
+    // pass lived here, before the ladder, until 2026-08-25. It now runs INSIDE
+    // the settlement block below — after the Era -1 sim, whose region
+    // populations decide the centre count and scales — and still before
+    // generate_nations, so Pass 6 (substrate density) reads the centres during
+    // nation territory assignment exactly as it always has.
 
     // The nation count is a CONSEQUENCE of Kepler's geography, not a target: seeds
     // scale with its habitable land area and every nation below the minimum viable
@@ -623,6 +627,16 @@ world make_hard_coded_world(world_params params, generation_report* report,
             }
         }
 
+        // Population centres (BL-610, centres from demography): placed HERE,
+        // after the Era -1 sim has grown, warred and plagued the regions'
+        // populations, so the centre count and scale distribution are the
+        // history's consequence rather than a land-area divisor and an
+        // authored weighted draw. Same seed derivation as the pre-BL-610 call
+        // site; only the position in the chain and the settlement argument
+        // changed.
+        generate_population_centres(w, kepler, /*seed=*/params.seed ^ 0x70701001u,
+                                    &kepler_settlement);
+
         kepler_np.seed_tiles = settlement_seed_tiles(kepler_settlement);
 
         // Each anchor carries its region's tongue across into Pass 5, so a
@@ -674,6 +688,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // draws is reproduced exactly and only the new centres consume fresh ones.
     name_population_centres(w, kepler, home_grid_width, kepler_settlement, kepler_creeds,
                             /*seed=*/params.seed ^ 0xC17910E6u);
+
+    // Urban ground (BL-612, urban ground stamped): every centre — coverage
+    // foundings included, which is why this follows ensure_national — paves a
+    // footprint sized by its scale, so city ground is scarce and contested
+    // from turn one. RNG-free; perturbs no stream. Runs before
+    // generate_corporations so starting assets land on a world whose ground
+    // already says where the cities are.
+    stamp_urban_land_use(w, kepler);
 
     // Everything from here to globalisation is the 0-1960 story. An antiquity
     // start (BL-271: epoch_year < 1700) generates the world BEFORE it happens —
@@ -1223,10 +1245,23 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // stream at all, so adding it perturbs nothing above it. See province.hpp.
     build_province_partition(w, params.seed ^ 0x50524F56u);
 
-    // BL-569: seed the province holder from tile_to_nation's plurality, now
-    // that both the partition and every tile's nation assignment exist.
-    // `run_battles` moves entries thereafter; the seed here is the only
-    // generation-time write.
+    // BL-611 (province centre anchor): every land province on the settled
+    // body holds a centre — the leftover pockets the centre-seeded fill could
+    // not reach get a scale-1 anchor founded on their best ground, BEFORE the
+    // holder is derived from the anchors below. RNG-free. The re-name is the
+    // byte-stable re-run name_population_centres documents (new ids sort
+    // last, the existing prefix of draws reproduces exactly); the re-stamp is
+    // idempotent and paves only the new anchors' footprints.
+    ensure_province_anchor_centres(w, kepler);
+    name_population_centres(w, kepler, home_grid_width, kepler_settlement, kepler_creeds,
+                            /*seed=*/params.seed ^ 0xC17910E6u);
+    stamp_urban_land_use(w, kepler);
+
+    // BL-569: seed the province holder — since BL-611 from each land
+    // province's ANCHOR centre's nation (plurality is the no-centre
+    // fallback), now that the partition, every tile's nation assignment, and
+    // the anchors all exist. `run_battles` moves entries thereafter; the seed
+    // here is the only generation-time write.
     seed_province_holders(w);
 
     // BL-571: nation garrisons — capital plus grudge-border provinces, sized
