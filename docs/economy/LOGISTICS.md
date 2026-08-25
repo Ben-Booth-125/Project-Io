@@ -108,10 +108,19 @@ Dijkstra itself.
 ### 4. Roads — generated, then extended by hand
 
 Generated per nation after population, deterministically from the campaign seed (BL-146 /
-BL-172, road generation). Five passes: local streets (every centre's own tile gets at least a
-Track), a weighted graph over centre pairs, a **Kruskal MST backbone** plus relative-neighbour
-redundancy edges for realistic loops, a three-tier assignment, and rasterisation along each edge's
-A\* path taking the **max** `road_level` on overlap.
+BL-172, road generation). Local streets first: every centre's own tile gets at least a Track.
+Then the **backbone**, over towns-and-up only (scale ≥ 2): a weighted graph over the town
+pairs, a **Kruskal MST** plus relative-neighbour redundancy edges for realistic loops, a
+three-tier assignment, and rasterisation along each edge's A\* path taking the **max**
+`road_level` on overlap.
+
+**Villages join locally, not as lattice members** (BL-620, road generation scales to density):
+each village lays one Track spur to its nearest already-roaded same-nation tile — backbone
+raster, another centre's streets, or an earlier spur — chosen from a distance-prefiltered
+candidate set, never all-pairs. A village whose nearest target is beyond the spur cap, or
+whose every route would cross open sea, keeps only its local street. Low-stratum settlements
+feed the network; they do not define it — which is both the honest historical shape and what
+keeps generation cost linear in village count at demography-derived density (BL-610).
 
 **Three tiers** (Ben, 2026-07-11): **Highway** (3) between two major centres, **Road** (2) when at
 least one endpoint is Town+, **Track** (1) otherwise. Then one Track border link between the nearest
@@ -121,6 +130,13 @@ centre pair of each territorially-adjacent nation pair, so the lattice connects 
 qualification): a nation's qualification fraction (`docs/economy/POPULATION.md` § Qualification)
 modulates its redundancy-edge count and tier promotion, so a low-qualification nation generates a
 sparser, lower-tier lattice. A national development level the map already shows, not a new dial.
+
+Tier promotion is **gated**: a Highway needs its two major endpoints *and* qualification ≥ 0.30;
+a Road needs its Town+ endpoint *and* qualification ≥ 0.10; a gated-out edge demotes one rung,
+never disappears. Redundancy loops are **rationed** cheapest-first — the kept fraction is
+qualification / 0.40, so the MST always survives whole and the loops are the qualified-labour
+luxury. The never-industrialised floor (0.05) sits below both gates: a pre-industrial nation
+lays an all-Track lattice, because engineering above the track is a qualified-labour product.
 
 **Roads are a land feature.** Water tiles are skipped, and an edge whose route crosses *open* ocean
 is not stamped at all — that is a sea route, and stamping it would scatter fragments on distant

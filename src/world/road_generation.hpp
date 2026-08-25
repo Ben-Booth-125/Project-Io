@@ -17,11 +17,12 @@
 //      at all; a settlement has streets regardless, and this is what puts such a nation on
 //      the lattice for the border links and for the player's place_road to extend.
 //   1. Weighted graph  — terrain-weighted A* cost (intra_body_path) between each
-//      centre pair, one-off at generation.
+//      TOWN-AND-UP pair (scale >= 2; BL-620 — at demography density all-centre
+//      pairs were the generation cost wall), one-off at generation.
 //   2. Backbone        — Kruskal MST over that graph, tie-broken by
 //      (cost, lo-tile-id, hi-tile-id), plus relative-neighbour redundancy edges
 //      for realistic loops.
-//   3. Three-tier      — tier per edge from the two centres' scales (BL-172):
+//   3. Three-tier      — tier per edge from the two towns' scales (BL-172):
 //      HIGHWAY (road_level 3) between two major centres (scale >= 3, City /
 //      Metropolis); ROAD (2) when at least one endpoint is Town+ (scale >= 2);
 //      TRACK (1) otherwise.
@@ -30,6 +31,9 @@
 //      the path already respects the east-west cylinder wrap. An edge whose route crosses
 //      OPEN ocean (a water run longer than a strait) is not stamped at all — that is a sea
 //      route, and stamping it would scatter road fragments on distant shores.
+//   5. Village spurs   — each village (scale 1) lays one TRACK to its nearest
+//      already-roaded same-nation tile, chosen from a grid-distance-prefiltered
+//      candidate set (BL-620): spur tracks, not lattice membership.
 // Then, across nations: one TRACK border link between the nearest centre pair of
 // each territorially-adjacent nation pair, so the continent-wide lattice connects.
 // Territorial adjacency tolerates a short unowned gap (a strait or an unclaimed margin),
