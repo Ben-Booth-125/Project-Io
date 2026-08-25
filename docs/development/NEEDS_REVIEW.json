@@ -813,14 +813,15 @@
    "title": "Anchor villages are OFF the road lattice - connecting them post-partition breaks partition-recompute reproducibility; ordering question for Ben",
    "raised": "2026-08-25",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "Agent W2G's report (BL-620): road_generation_harness R3 was already red at HEAD - BL-611's ensure_province_anchor_centres founds ~1,086 villages AFTER generate_roads.",
    "what": "Roads -> partition -> anchors is a hard ordering: roads bind provinces, so the partition must see final roads, and anchors exist only after the partition. W2G built and then REVERTED a connect-the-anchors pass because any post-partition road_level write changes the partition's input and broke P6 (partition-recompute reproducibility, a save/load contract) plus two more rows. Current contract, asserted by new R3/R3b: anchor foundings are the ONLY off-lattice centres. The open call: (a) leave anchors off-lattice as administrative foundings (current state - a pure-ice village with no road is arguably honest); (b) a partition fixpoint (roads -> partition -> anchors -> anchor spurs -> REPARTITION, iterate) - deterministic but a real algorithm change; (c) fold anchor founding INTO the pre-road centre pass somehow (loses the 'only provinces the fill left empty' definition).",
    "files": [
     "src/world/hard_coded_world.cpp",
     "src/world/road_generation.cpp",
     "src/world/province.cpp"
-   ]
+   ],
+   "resolution": "Ben, 2026-08-25: option (c) with the overturn - the partition runs before roads (ruling 2's binding half superseded), every province is given its settlement before the lattice is laid, and the settlement is the capture anchor. Work: BL-623 (provinces before roads) + BL-624 (razed settlement tier, closing the razed-anchor hole). v0.1.19 recuts after."
   },
   {
    "id": "NR-641",

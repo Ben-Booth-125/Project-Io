@@ -68,8 +68,11 @@ independent of how the shapes are drawn.
 
 1. **Provinces grow from population centres**, and seed strength scales with the centre's scale
    (1–5): *a metropolis draws a larger province than a village does.*
-2. **Boundaries are rivers, elevation difference, and sometimes roads — but a road BINDS.** Tiles a
-   road links tend to share a province. **A road is never a divider.**
+2. **Boundaries are rivers and elevation difference.** *Superseded half (Ben, 2026-08-25;
+   BL-623, provinces before roads): roads were a binding input — tiles a road links tended to
+   share a province, never divide one. Overturned with the ordering: the partition now runs
+   BEFORE roads, so every province's settlement exists when the lattice is laid and anchor
+   foundings join it like any village. Roads still never divide — they simply are not read.*
 3. **Every province is anchored by a population centre** (Ben, 2026-08-25; BL-611, province
    centre anchor — superseding the hinterland ruling below). Centre density now derives from
    Era −1 demography (`docs/economy/POPULATION.md` § Generation; BL-610, centres from
@@ -87,9 +90,9 @@ independent of how the shapes are drawn.
 
 The cost model that makes an edge a border lives in `province.hpp`: a base edge cost
 (`k_province_edge_base_cost`), a river crossing cost (`k_province_river_edge_cost`), a height
-difference cost (`k_province_height_cost`, pinned so a p90 height step costs the same as a river),
-a road-binding divisor (`k_province_road_bind_divisor`) and a small seeded jitter
-(`k_province_edge_jitter`). Hinterland seeds are spaced `k_province_seed_spacing` apart, measured
+difference cost (`k_province_height_cost`, pinned so a p90 height step costs the same as a river)
+and a small seeded jitter (`k_province_edge_jitter`). The road-binding divisor retired with
+ruling 2's supersession (BL-623) — roads are laid after the partition and are not an input. Hinterland seeds are spaced `k_province_seed_spacing` apart, measured
 geodesically over land — and it is the spacing, not the budget, that sets hinterland size.
 
 **How rulings 3 and 5 are one mechanism** (BL-611, province centre anchor). The LAND fill is

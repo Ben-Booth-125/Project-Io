@@ -3852,6 +3852,80 @@
    "promoted_from": "backlog.json BL-620 (ROAD_GEN_SCALES_TO_DENSITY) + BL-618 (ROADS_SCALE_WITH_QUALIFICATION) - Sprint 19, the world reads lived-in",
    "batch": "sprint-19-wave-2",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "provinces-before-roads",
+   "title": "BL-623 - partition before roads, settlements before the lattice",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-623 (PROVINCES_BEFORE_ROADS) - Sprint 19, the world reads lived-in",
+   "batch": "sprint-19-wave-3",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: province_partition_harness re-specified rows"
+     ],
+     "requirement": "The homeworld pipeline runs provinces (+ anchor foundings) before roads; the partition reads no road data; P6/P7 recompute reproducibility holds against the new input set; every land province holds >= 1 settlement.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: road_generation_harness R3 strengthened"
+     ],
+     "requirement": "Every centre - anchor foundings included - joins the road lattice (local street + spur or backbone); the off-lattice exemption (R3b) is retired.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: world_audit"
+     ],
+     "requirement": "world_audit's corp-holdings and reach checks pass with corporations placed after the reordered roads.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "razed-settlement-tier",
+   "title": "BL-624 - razing demotes to a razed tier that anchors and regrows",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-624 (RAZED_SETTLEMENT_TIER) - Sprint 19, the world reads lived-in",
+   "batch": "sprint-19-wave-3",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: population_dynamics P3 re-specified"
+     ],
+     "requirement": "raze_centre demotes (population 0, razed set, entity/name/tile/urban kept) instead of erasing; the razed centre still anchors its province; rejections still mutate nothing.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: population_dynamics new row"
+     ],
+     "requirement": "A razed centre regrows through the ordinary growth pass at the reduced gate, clearing razed and returning to scale 1; deterministic and replay-identical.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: save_roundtrip rows"
+     ],
+     "requirement": "The razed field round-trips the save at v15; a v14 stream is refused whole.",
+     "notes": ""
+    }
+   ]
   }
  ]
 }

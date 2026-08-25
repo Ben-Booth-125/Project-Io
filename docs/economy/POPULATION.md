@@ -131,11 +131,18 @@ during play.
 
 Decline is asymmetric by design: **passive failure only shrinks a centre — it never destroys
 one.** Outright destruction is a deliberate agent action (razing, in occupation), and it should
-be rare because the occupier almost always prefers to occupy. A shrunk centre keeps its urban
-ground — a fading town reads as historied, not deleted — and **so does a razed one**: the
-stamp outlives the people, so razed ground stays built-over and extraction-blocked, a ruin
-rather than a reset (Ben-delegated call, NR-638). Razing is a `corp_verb` under the ordinary
-command seam; no rival-AI grant covers it, so only a human presses it today.
+be rare because the occupier almost always prefers to occupy.
+
+**A razed settlement is a TIER, not an erasure** (Ben, 2026-08-25; BL-624, razed settlement
+tier). Razing demotes the centre to the **razed** state: population zeroed, no labour, no
+demand, no agglomeration — but the entity, its name, its tile, and its urban ground all
+persist. Two consequences are the point: the province **keeps its capture anchor** (a ruin can
+still be taken, so razing never deletes a conquest handle — the province-settlement invariant
+survives play), and **rebuilding there is cheap** — the urban ground and the entity already
+exist, so the ordinary growth pass re-settles a razed centre at a reduced gate rather than
+anyone founding from nothing. A shrunk or razed centre reads as historied, not deleted. Razing
+is a `corp_verb` under the ordinary command seam; no rival-AI grant covers it, so only a human
+presses it today.
 
 ---
 

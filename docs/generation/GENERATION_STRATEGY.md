@@ -30,8 +30,8 @@ Generation runs, in `make_hard_coded_world`:
 ```
 planetology → continents → tiles                       (per body)
   → population centres → history ladder → nations
-  → institutional history → roads → corporations → markets → laws   (homeworld only)
-  → provinces                                            (every body, last)
+  → institutional history → provinces → roads → corporations → markets → laws   (homeworld only)
+  → provinces                                            (every other body, last)
 ```
 
 A body's atmosphere/history precedes its plates; plates precede its terrain; deposits exist
@@ -39,10 +39,15 @@ before territory is drawn over them. On the homeworld, population centres are pl
 nations (so the substrate-density pass can read them), the history ladder runs **before**
 `generate_nations` because it *drives* the seed budget, and Stages 1–2 of the institutional
 history are recorded **after** — they name and count nations that did not exist a moment
-earlier. Roads are stamped once nations + centres exist; corporations are placed before markets,
-so the market carve can read who competes where. The province partition runs **last**, so it
-reads the finished tile map (rivers, roads, urban transforms all applied), under its own seed
-offset so it perturbs nothing above it. All passes are **deterministic** from the campaign seed.
+earlier. On the homeworld the **province partition runs before roads** (Ben, 2026-08-25;
+BL-623, provinces before roads — overturning the 2026-08-21 roads-bind-provinces input): the
+partition reads rivers and urban transforms but **not** roads, every settlement-less province
+is then given its settlement, and only then are roads stamped — over the *complete* settlement
+set, so every anchor founding joins the lattice like any village. Corporations are placed after
+roads and before markets, so placement reach reads the real network and the market carve can
+read who competes where. On every other body the partition still runs last. Each pass sits
+under its own seed offset so it perturbs nothing above it. All passes are **deterministic**
+from the campaign seed.
 Within the tile-generation layer, the six-pass core stays fixed and every extension lands as a
 **sibling pass** reading the shared `generation_record` rather than growing the core pipeline
 (settled 2026-07-21, BL-051, generation-record sibling passes).
