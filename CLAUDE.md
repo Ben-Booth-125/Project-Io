@@ -139,7 +139,7 @@ follow. Where a store has a query tool, use the tool, never load the file.
 | `docs/development/req/requirements.json` | Requirements and their verification record. | `requirements_query.js`, `archive_requirements.js` |
 | `docs/development/NEEDS_REVIEW.json` → `.md` | Ben's review queue: questions, decisions taken on his behalf, observations, novelty flags. Write **as things arise**, not at close. Resolved entries go cold in `archive/needs-review-<quarter>.json`. | `render_needs_review.js`, `archive_reviews.js` |
 | `docs/development/review.json` | Blocked on a visual artifact only Ben can produce. | — |
-| `docs/development/sprints.json` → `SPRINTS.md` | Weekly goal + retro. Pacing feedback, not authority. | grep directly |
+| `docs/development/sprints.json` → `SPRINTS.md` | Sprint goal + retro per themed span; hot file holds open/gated only, completed sprints cold in `archive/sprints-*.json`. Pacing feedback, not authority. | `render_sprints.js`, `archive_sprints.js` |
 | `docs/development/user_stories.json` → `USER_STORIES.md` | Player-intent coverage — the second route from docs to code. | `story_check.js` |
 | `docs/development/DEVLOG_INDEX.md` → `DEVLOG.md` / `archive/DEVLOG-*.md` | What was built each session and why. **Start at the index.** | `devlog_index.js` (`--rollover`) |
 | `docs/development/PHANTOMS.md` | Scan of designed-but-undocumented features; pointers to design sessions. | — |

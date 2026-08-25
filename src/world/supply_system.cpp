@@ -362,6 +362,28 @@ entity_id corp_representative_tile(const world& w, const corporation_component& 
     return best_tile;
 }
 
+/// True when an active (built AND non-decommissioned) Port sits on `tile` —
+/// the sea-mode endpoint gate (BL-608, SUPPLY.md § Infrastructure gates:
+/// "Port building at both endpoints"). Ownership-agnostic like
+/// `is_supply_anchor` (logistics.cpp): a Port is body infrastructure, not a
+/// corp asset check — unlike `corp_has_launchpad_on` above, which is
+/// deliberately per-corp because a launchpad IS the corp's own pad. Same
+/// built+active test `is_supply_anchor` and `collect_logistics_nodes` already
+/// use for port/hub anchors, narrowed to Port only (a hub does not gate sea).
+bool tile_has_active_port(const world& w, entity_id tile)
+{
+    if (tile == null_entity)
+        return false;
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        (void)bid;
+        if (bc.tile == tile && bc.type == building_type::port
+            && bc.ticks_remaining <= 0 && !bc.decommissioned)
+            return true;
+    }
+    return false;
+}
+
 /// Find the market entity for a given body — the lowest-id one, so the pick is
 /// stable when a body hosts several markets (w.markets is an unordered_map; the
 /// first hit would inherit hash layout). Returns null_entity if none exists.
@@ -462,7 +484,25 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
         const logistics_path& path = intra_body_path(w, src_body, origin, dest_centre);
         if (!path.reachable)
             return leg;
-        mode      = path.crosses_ocean ? convoy_mode::sea : convoy_mode::land;
+        if (path.crosses_ocean)
+        {
+            // BL-608: sea mode is gated on an active Port at BOTH endpoints
+            // (SUPPLY.md § Infrastructure gates). The cheapest A* path already
+            // crosses water — there is no cheaper land-only route BL-522's
+            // per-leg pricing would recover — so an ungated pair is refused
+            // outright rather than silently re-priced at the land rate: a
+            // cart cannot be billed for a lane it cannot physically cross.
+            // `leg` is still default-constructed (viable == false) here, so
+            // this mutates nothing; the caller's existing `!leg.viable` path
+            // (corp_command.cpp: dispatch_convoy -> rejected_placement) surfaces it.
+            if (!tile_has_active_port(w, origin) || !tile_has_active_port(w, dest_centre))
+                return leg;
+            mode = convoy_mode::sea;
+        }
+        else
+        {
+            mode = convoy_mode::land;
+        }
         dist      = path.cost;
         unit_cost = reg.logistics_cost(mode);
         // Distance now costs TIME as well as money (Ben, 2026-08-12). Computed
@@ -508,9 +548,10 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
     return leg;
 }
 
-bool commit_convoy(world& w, entity_id corp_id, entity_id src_body,
+bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, entity_id src_body,
                    entity_id src_market, entity_id dest_market_id,
-                   std::size_t ri, float qty, const convoy_leg& leg)
+                   std::size_t ri, float qty, const convoy_leg& leg,
+                   lp_pool_map* shared_lp_pools, bool* out_refused_no_lp)
 {
     if (!leg.viable || ri >= resource_count)
         return false;
@@ -520,6 +561,67 @@ bool commit_convoy(world& w, entity_id corp_id, entity_id src_body,
     corporation_component& corp = cit->second;
     if (corp.balance < leg.cost)
         return false; // the solvency gate, in ONE place for both callers
+
+    // BL-597: the passive-LP admissibility gate, before any mutation —
+    // same "refused outright, mutates nothing" contract as BL-596's active
+    // gate (run_unit_march). Space legs have no intra-body path at all and
+    // are out of scope (LOGISTICS.md's Logistic Points design is
+    // tile-grounded — "cities are the locus"), matching BL-596's own march
+    // gate, which likewise only fires for a unit walking a tile path.
+    //
+    // THE DRAW IS CARGO QUANTITY, NOT DISTANCE (Ben, 2026-08-25, ruling on
+    // NR-620). The first cut drew `leg.dist` and LOGISTICS.md forbids that
+    // twice over: constraint 3, "if cost is proportional to distance, LP
+    // *is* haulage cost again", and rule 1, "the convoy already charges
+    // distance in credits... would double-charge distance". Measured, the
+    // distance draw collapsed real convoy traffic from 1055 dispatches to
+    // 284 (haulage_measure on the generated world) — most hauls need many
+    // times an anchor's whole tick and were refused on an idle tick, for
+    // ever. Quantity is what "how much can move through HERE" actually
+    // says: the anchor passes so many units of goods per tick, and credits
+    // remain the sole price of distance.
+    if (leg.mode != convoy_mode::space)
+    {
+        lp_pool_map local_pools;
+        lp_pool_map& pools_by_body = shared_lp_pools ? *shared_lp_pools : local_pools;
+        const military_capability_params& mil = reg.military();
+        std::unordered_map<entity_id, float>& pools =
+            lp_pool_for_body(pools_by_body, w, src_body, mil.active_lp_per_anchor_tick);
+
+        // Same locus as price_convoy_leg's own origin — the corp's
+        // representative (lowest-id building) tile on the source body, the
+        // convoy's actual dispatch point.
+        const entity_id origin = corp_representative_tile(w, corp, src_body);
+        const entity_id nearest_anchor =
+            (origin != null_entity) ? nearest_lp_anchor(w, src_body, origin, pools) : null_entity;
+
+        if (nearest_anchor == null_entity)
+        {
+            // No reachable anchor on this body at all — no passive LP exists
+            // to draw against.
+            if (out_refused_no_lp)
+                *out_refused_no_lp = true;
+            return false;
+        }
+
+        float& pool = pools.at(nearest_anchor);
+        if (pool + 1e-6f < qty)
+        {
+            // The nearest anchor's pool is already exhausted (by a
+            // higher-priority draw earlier this tick — possibly THIS SAME
+            // TICK'S active march pass, if `shared_lp_pools` ties the two
+            // together — or simply too small).
+            if (out_refused_no_lp)
+                *out_refused_no_lp = true;
+            return false;
+        }
+
+        // Granted: consume the anchor's pool. LP is the CAP, not a second
+        // PRICE (LOGISTICS.md rule 1) — `leg.cost` (already debited below)
+        // is the only credit charge a passive draw pays; unlike BL-596's
+        // active draw, there is no separate LP-specific credit line here.
+        pool -= qty;
+    }
 
     // Debit cost and source pool; create the convoy.
     corp.balance -= leg.cost;
@@ -558,9 +660,18 @@ bool commit_convoy(world& w, entity_id corp_id, entity_id src_body,
     return true;
 }
 
-void dispatch_convoys(world& w, const recipe_registry& reg,
-                      float logistics_cost_land, float logistics_cost_space)
+convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
+                      float logistics_cost_land, float logistics_cost_space,
+                      lp_pool_map* shared_lp_pools)
 {
+    convoy_dispatch_tick out;
+
+    // BL-597: this pass's passive-LP pools. Local (and so shared across
+    // every convoy THIS call commits) when the caller did not hand us a
+    // shared instance — see this function's own doc comment.
+    lp_pool_map local_pools;
+    lp_pool_map& pools_by_body = shared_lp_pools ? *shared_lp_pools : local_pools;
+
     // One dispatch pass per (corp, dest_body, resource) shortfall.
     // Shortfall = market demand exceeded supply in the last clearing pass.
     // We fix quantities at a single batch = shortfall amount, capped by source surplus.
@@ -641,15 +752,21 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                 if (best_src_body == null_entity)
                     continue;
 
-                // Commit through the shared path: the solvency gate, the pool
-                // debit, the propellant burn and the convoy itself all live
-                // there, so a rival's convoy and the player's are the same
-                // object built by the same code.
-                commit_convoy(w, corp_id, best_src_body, market_for_body(w, best_src_body),
-                              dest_market_id, ri, best_qty, best_leg);
+                // Commit through the shared path: the solvency gate, the
+                // passive-LP gate (BL-597), the pool debit, the propellant
+                // burn and the convoy itself all live there, so a rival's
+                // convoy and the player's are the same object built by the
+                // same code.
+                bool refused_no_lp = false;
+                if (commit_convoy(w, reg, corp_id, best_src_body, market_for_body(w, best_src_body),
+                              dest_market_id, ri, best_qty, best_leg, &pools_by_body, &refused_no_lp))
+                    ++out.dispatched;
+                else if (refused_no_lp)
+                    ++out.refused_no_lp;
             }
         }
     }
     (void)logistics_cost_land; // intra-body reads reg.logistics_cost(land/sea) directly; this
                                // param is retained for caller/signature stability.
+    return out;
 }

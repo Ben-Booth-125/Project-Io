@@ -32,6 +32,12 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
         // scope) for whenever these lenses join the on-screen strip.
         case overlay_mode::reach:         icons::convoy(dl, centre, r, colour); break;
         case overlay_mode::supply_routes: icons::supply(dl, centre, r, colour); break;
+        // Throughput has its OWN glyph (BL-605). It borrowed Reach's convoy
+        // chevron while it was keyboard-only, on the grounds that the cycle names
+        // off-strip lenses apart; joining the strip ends that, because an
+        // on-screen lens carries one distinct glyph (LENSES.md) and two strip
+        // neighbours sharing a mark is exactly what that rule forbids.
+        case overlay_mode::throughput:    icons::throughput(dl, centre, r, colour); break;
         default: break;
     }
 }
@@ -52,6 +58,7 @@ const char* overlay_mode_name(overlay_mode m)
         case overlay_mode::continent:   return "Continents (tectonic plates)";
         case overlay_mode::reach:         return "Reach (commercial connectivity)";
         case overlay_mode::supply_routes: return "Supply-routes graph";
+        case overlay_mode::throughput:    return "Throughput (active Logistic Points)";
         default:                        return "None";
     }
 }
@@ -70,6 +77,7 @@ const char* overlay_mode_short_name(overlay_mode m)
         case overlay_mode::continent:   return "Continent";
         case overlay_mode::reach:         return "Reach";
         case overlay_mode::supply_routes: return "Supply routes";
+        case overlay_mode::throughput:    return "Throughput";
         default:                        return "None";
     }
 }
@@ -99,9 +107,16 @@ void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
     // BL-601 dropped Country, whose content is always-on border chrome now, so the
     // lens had nothing left to toggle. The strip re-numbers itself; no slot is held
     // open for a retired lens.
+    // Throughput takes the sixth slot (BL-605, Ben 2026-08-25: "the only thing now
+    // is to add the glyph for our throughput lens"). It had been on the
+    // keyboard-only shelf because the eight-lens strip had no room — and then the
+    // three retirements above freed three slots, so the reason expired before the
+    // lens did. Logistics is one of the two things the whole design is rate-limited
+    // by (LOGISTICS.md), which is a poor thing to leave undiscoverable.
     constexpr overlay_mode modes[] = {
         overlay_mode::corporation, overlay_mode::resource,
-        overlay_mode::market, overlay_mode::population, overlay_mode::continent };
+        overlay_mode::market, overlay_mode::population, overlay_mode::continent,
+        overlay_mode::throughput };
 
     const float bar_h = ImGui::GetFrameHeight() + 6.0f;
     ImGui::SetNextWindowPos({x, top_y}, ImGuiCond_Always);

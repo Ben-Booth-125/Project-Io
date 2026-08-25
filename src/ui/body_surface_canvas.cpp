@@ -854,6 +854,105 @@ void draw_industry_key(ImDrawList* dl, const ui_state& state)
     dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high"); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
+/// The logistics hue this canvas already speaks: the Supply lens's convoy glyph
+/// colour, reused so throughput and the convoys it admits read as one vocabulary
+/// rather than two unrelated blues.
+constexpr ImU32 k_throughput_hue = IM_COL32(80, 200, 255, 255);
+
+/// The Throughput lens's FIELD ramp (BL-606): deep navy where throughput is
+/// furthest away, the logistics cyan at an anchor. Sequential, not diverging —
+/// capacity has a single good direction. @p t is 1 at an anchor and 0 at the
+/// body's furthest reachable ground (or anywhere unreachable).
+ImU32 throughput_field_colour(float t)
+{
+    t = std::clamp(t, 0.0f, 1.0f);
+    return lerp_colour(IM_COL32(16, 24, 42, 255), k_throughput_hue, t);
+}
+
+/// The Throughput lens's ANCHOR ramp: a distinctly HOTTER, near-white cyan over
+/// an anchor's share of the body's largest pool. Deliberately a different ramp
+/// from the field's — an anchor mark drawn in the field's own colours vanishes
+/// into it, which is exactly how the first cut's marks disappeared.
+ImU32 throughput_anchor_colour(float t)
+{
+    t = std::clamp(t, 0.0f, 1.0f);
+    return lerp_colour(IM_COL32(70, 150, 190, 255), IM_COL32(240, 252, 255, 255), t);
+}
+
+/// On-canvas legend for the Throughput lens (BL-606, LOGISTICS.md § Logistic
+/// Points). A fixed-height GRADIENT-BAR key, so it takes the begin_lens_key
+/// chrome flush-left of the minimap — but on ImGui's FOREGROUND draw list with
+/// an OPAQUE fill, the way draw_continent_key does (BL-376). The six other
+/// gradient keys still paint on the background list and are buried by the
+/// always-open Selection band; reproducing that here would ship a key nobody
+/// can read, so this one follows the fixed precedent rather than the majority.
+///
+/// It reports the two facts the ramp alone cannot: how many anchors generate on
+/// this body, and how much they generate in total this tick. Degrades honestly —
+/// a body with no anchor, or an authored rate of zero, says so instead of
+/// drawing a scale over nothing.
+void draw_throughput_key(ImDrawList* dl, const ui_state& state)
+{
+    const float pad    = 8.0f;
+    const float line_h = ImGui::GetTextLineHeight();
+    const float bar_h  = 10.0f;
+
+    const float mark_d = 11.0f; // anchor swatch diameter
+    const bool  have   = !state.lp_anchors.empty() && state.lp_anchor_max > 0.0f;
+    const float body_h = have
+        ? pad + line_h + 4.0f + bar_h + 2.0f + line_h + 6.0f
+              + std::max(line_h, mark_d) + 4.0f + line_h + pad
+        : pad + line_h + 6.0f + line_h + 4.0f + line_h + pad;
+
+    float x, y, bar_w;
+    begin_lens_key(dl, state, body_h, pad, x, y, bar_w);
+
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Throughput (active LP)"); // fit-exempt: legend box sized to its measured entries (container 2)
+    y += line_h + (have ? 4.0f : 6.0f);
+
+    if (!have)
+    {
+        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), "No anchor generates"); // fit-exempt: legend box sized to its measured entries (container 2)
+        y += line_h + 4.0f;
+        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "active LP on this body."); // fit-exempt: legend box sized to its measured entries (container 2)
+        return;
+    }
+
+    // Bar 1 — the FIELD ramp: how far this ground is from the nearest generator.
+    constexpr int segs = 24;
+    for (int i = 0; i < segs; ++i)
+    {
+        const float t0 = static_cast<float>(i) / segs;
+        dl->AddRectFilled({ x + bar_w * t0, y },
+                          { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h },
+                          throughput_field_colour(t0));
+    }
+    y += bar_h + 2.0f;
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "far"); // fit-exempt: legend box sized to its measured entries (container 2)
+    const ImVec2 nts = ImGui::CalcTextSize("at anchor");
+    dl->AddText({x + bar_w - nts.x, y}, IM_COL32(170, 175, 185, 255), "at anchor"); // fit-exempt: legend box sized to its measured entries (container 2)
+    y += line_h + 6.0f;
+
+    // Row 2 — the anchor MARK, carrying the LP quantity itself. Two ramps in one
+    // key because the lens genuinely shows two things: where capacity is, and how
+    // far the ground is from it. The mark is drawn here exactly as the map draws
+    // it (ring, dark backing included) so the legend shows the treatment, not a
+    // description of it.
+    const float mr = mark_d * 0.5f;
+    dl->AddCircle({x + mr + 1.0f, y + mr}, mr, IM_COL32(10, 18, 30, 220), 18, 4.0f);
+    dl->AddCircle({x + mr + 1.0f, y + mr}, mr, throughput_anchor_colour(1.0f), 18, 2.0f);
+    char per[48];
+    std::snprintf(per, sizeof(per), "anchor: %.0f LP/tick", state.lp_anchor_max);
+    dl->AddText({x + mark_d + 8.0f, y + (mark_d - line_h) * 0.5f}, // fit-exempt: legend box sized to its measured entries (container 2)
+                IM_COL32(235, 235, 235, 255), per);
+    y += std::max(line_h, mark_d) + 4.0f;
+
+    char totals[64];
+    std::snprintf(totals, sizeof(totals), "%d anchors - %.0f LP/tick total",
+                  static_cast<int>(state.lp_anchors.size()), state.lp_anchor_total);
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), totals); // fit-exempt: legend box sized to its measured entries (container 2)
+}
+
 /// Legend for the Scarcity lens: an abundant→scarce gradient bar (no tint
 /// → hot) plus the selected resource's name and swatch. Same placement as the others.
 void draw_scarcity_key(ImDrawList* dl, ui_state& state)
@@ -1139,6 +1238,58 @@ entity_id resolve_structure_hit(const std::vector<structure_hit_zone>& zones,
 }
 
 } // namespace
+
+void update_body_throughput(world& w, ui_state& state, const recipe_registry& reg)
+{
+    state.lp_anchors.clear();
+    state.lp_anchor_total = 0.0f;
+    state.lp_anchor_max   = 0.0f;
+    state.lp_reach_max    = 0.0f;
+
+    // Off by default in every sense: no lens, no work. The lens is the only reader,
+    // and the pools must not be built when nobody is looking at them — LP is a rate,
+    // and a rate nobody consumes is exactly the write-only accumulator LOGISTICS.md
+    // rule 3 deleted military_points for.
+    if (state.overlay != overlay_mode::throughput || state.active_body == null_entity)
+        return;
+
+    // Fresh every call, never cached and never stored on `world` — the contract
+    // active_lp_anchor_pools states in its own doc comment. `world&` is needed
+    // only because it may populate the RASTER INDEX cache (body_tile_grid); it
+    // runs no Dijkstra and no A*, so the cost of a miss here is one grid build,
+    // not a reach-field rebuild. The reach field the tile pass reads is warmed
+    // separately by app.cpp, one call before the draw.
+    const std::unordered_map<entity_id, float> pools =
+        active_lp_anchor_pools(w, state.active_body, reg.military().active_lp_per_anchor_tick);
+
+    state.lp_anchors.reserve(pools.size());
+    for (const auto& [tile, lp] : pools)
+        state.lp_anchors.push_back({ tile, lp });
+
+    // SORT BEFORE REDUCING. `pools` is an unordered_map, so both the legend's
+    // total and the draw's lower_bound would otherwise depend on hash layout —
+    // float addition is not associative, and a legend whose number moves with
+    // the allocator is not a legend.
+    std::sort(state.lp_anchors.begin(), state.lp_anchors.end(),
+              [](const ui_state::lp_anchor& a, const ui_state::lp_anchor& b) {
+                  return a.tile < b.tile;
+              });
+    for (const ui_state::lp_anchor& a : state.lp_anchors)
+    {
+        state.lp_anchor_total += a.lp;
+        state.lp_anchor_max = std::max(state.lp_anchor_max, a.lp);
+    }
+
+    // The field ramp's denominator. `body_reach_field` is a CACHE HIT here — the
+    // caller warms it for this same body one line earlier — so this is a vector
+    // read, not a Dijkstra, and the const draw below still triggers nothing.
+    // Max over a vector is order-independent, so it is deterministic where a
+    // float sum over a hash map would not be.
+    const std::vector<float>& reach = body_reach_field(w, state.active_body);
+    for (const float c : reach)
+        if (c >= 0.0f && !std::isinf(c))
+            state.lp_reach_max = std::max(state.lp_reach_max, c);
+}
 
 void update_body_vision(world& w, ui_state& state, double now_days)
 {
@@ -2072,6 +2223,56 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const float t = std::clamp(it->second / industry_max, 0.0f, 1.0f);
                 constexpr ImU32 ind = IM_COL32(210, 150, 70, 255); // industrial amber
                 fill = lerp_colour(fill, ind, 0.15f + 0.6f * t);
+            }
+        }
+        // Throughput lens (BL-606, LOGISTICS.md § Logistic Points). "Throughput is
+        // a lens, extending Reach. The Reach lens shows a binary field; throughput
+        // is that field with a magnitude." The BINARY half is drawn here — served
+        // ground where it is near against ground where it is far — and the LP
+        // QUANTITY is drawn on the anchors themselves, below, because that is
+        // where LP is generated and where LOGISTICS.md constraint 2 insists its
+        // spatial locus stays.
+        //
+        // WHY THE FIELD IS THE REACH COST AND NOT "the LP serving this tile".
+        // Measured, not assumed: on the home body every anchor generates the same
+        // authored rate (57 anchors x 20 LP) and every tile has a FINITE reach
+        // cost, because ocean is crossable at a sea-leg cost. So both the binary
+        // "is it reached" and the per-tile "how much LP reaches it" are CONSTANTS
+        // over the whole grid — a flat wash carrying no information. What varies,
+        // and what the player actually needs, is how far the ground is from the
+        // capacity: the reach field's own magnitude, which is precisely the
+        // quantity the Reach lens throws away when it uses this field as a
+        // yes/no placement predicate.
+        //
+        // This does NOT assert that LP attenuates with distance — it does not,
+        // and pricing it by distance is the thing LOGISTICS.md constraint 3
+        // forbids. It asserts only what the field says: this ground is this far
+        // from the nearest generator.
+        //
+        // The read is `tile_reach_cost` — the CONST half of the reach-field pair,
+        // and the only one a canvas holding a `const world&` may call. Its
+        // three-way contract is honoured exactly: -1 is "not computed", which
+        // draws NOTHING rather than inventing an answer (the field is warmed for
+        // the active body one call before this draw, in app.cpp, so -1 means the
+        // body genuinely has no field, not that this pass arrived early);
+        // infinity is "computed and unreachable", which takes the cold end of the
+        // ramp; anything finite normalises against the body's own worst case.
+        // Nothing here can trigger the Dijkstra.
+        else if (state.overlay == overlay_mode::throughput && state.lp_reach_max > 0.0f)
+        {
+            const float rc = tile_reach_cost(w, id);
+            if (rc >= 0.0f)
+            {
+                // SQUARE-ROOT COMPRESSION, measured rather than guessed. With 57
+                // anchors on the home body the cost distribution is heavily
+                // left-skewed — median 20.8 against a maximum of 101.8 — so a
+                // linear ramp puts four fifths of the grid in its top fifth and
+                // the map reads as one flat cyan wash. Compressing the ratio
+                // spreads the NEAR field, which is the half the player sites in.
+                const float t = std::isinf(rc)
+                    ? 0.0f
+                    : 1.0f - std::sqrt(std::clamp(rc / state.lp_reach_max, 0.0f, 1.0f));
+                fill = lerp_colour(fill, throughput_field_colour(t), 0.72f);
             }
         }
         // Continent lens (BL-226): tint each tile by the tectonic plate that owns
@@ -3141,6 +3342,51 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 icons::value_mark(dl, {cx, cy}, mr, ryg_colour(t));
             }
 
+            // Throughput lens (BL-606): the MAGNITUDE half. LP is generated at
+            // anchors — cities, built-and-active ports and inland hubs — and
+            // nowhere else, so the quantity is drawn where it exists rather than
+            // smeared over the tiles it might serve. Shading every tile by "the
+            // throughput serving it" would need a per-tile nearest-anchor
+            // attribution the engine does not have; deriving one would be the
+            // second distance model BL-325 ruling 3 forbids outright.
+            //
+            // Radius and hue both carry the anchor's share of the body's largest
+            // pool, so a thin anchor reads small AND dim.
+            //
+            // NOT vision-fogged, which is the value-mark / building-glyph
+            // convention rather than the road-span one: the survey mask already
+            // owns this mark (the `!revealed` continue above is upstream of it),
+            // and an anchor is a city or a completed port — as public as the
+            // building glyph beside it. It was fogged in the first cut and the
+            // mark vanished into the wash, which is how the convention was
+            // settled here rather than guessed.
+            if (state.overlay == overlay_mode::throughput && !state.lp_anchors.empty())
+            {
+                const auto ait = std::lower_bound(
+                    state.lp_anchors.begin(), state.lp_anchors.end(), id,
+                    [](const ui_state::lp_anchor& a, entity_id t) { return a.tile < t; });
+                if (ait != state.lp_anchors.end() && ait->tile == id && state.lp_anchor_max > 0.0f)
+                {
+                    // A uniform authored rate makes every share 1.0, and that is
+                    // the honest reading: every anchor generates the same, full
+                    // amount. The ramp is here for the moment the rate stops being
+                    // uniform, not to manufacture variation that is not there.
+                    const float t = std::clamp(ait->lp / state.lp_anchor_max, 0.0f, 1.0f);
+
+                    // A RING, not a disc. Every anchor is a city, a port or a hub,
+                    // so the anchor tile ALREADY carries a settlement or building
+                    // marker — and those are drawn after this pass, on the same
+                    // draw list. A filled disc is simply hidden by them (measured:
+                    // the first cut drew correctly at every one of the 57 anchors
+                    // and was invisible at all of them). A ring sits outside the
+                    // marker and reads as a capacity halo around the generator.
+                    const float ar = std::max(3.0f, draw_r * 0.66f);
+                    const float th = std::max(1.5f, draw_r * (0.10f + 0.13f * t));
+                    dl->AddCircle({cx, cy}, ar, IM_COL32(10, 18, 30, 220), 18, th + 2.0f);
+                    dl->AddCircle({cx, cy}, ar, throughput_anchor_colour(t), 18, th);
+                }
+            }
+
             // Supply lens: draw a convoy glyph on every tile when the active body
             // has a player convoy passing through it. supply_active is false when
             // no player convoy touches this body.
@@ -3627,6 +3873,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         draw_industry_key(dl, state);
     else if (state.overlay == overlay_mode::continent)
         draw_continent_key(dl, state, plates);
+    // BL-606's key joins the same one chrome home. It was authored against the
+    // old flush-left anchor and needed the FOREGROUND draw list plus an opaque
+    // fill to float over the always-open Selection band; Sprint 17b's minimap-
+    // header region removes the collision the workaround existed for, so the
+    // key draws on the ordinary list like every other legend.
+    else if (state.overlay == overlay_mode::throughput)
+        draw_throughput_key(dl, state);
     else if (state.overlay == overlay_mode::reach)
         draw_reach_key(w, reach_links, state);
     else if (state.overlay == overlay_mode::supply_routes)

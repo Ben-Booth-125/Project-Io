@@ -118,6 +118,19 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   *relational* action against a corp a human owns. Same constraints — deterministic, seeded,
   scored-utility, legal verbs only. Hostility remains a **declared state a corp opts into**
   (Ben, 2026-08-17), so a rival may score and declare it, never acquire it ambiently.
+
+  **Rivals may EXTEND THE NETWORK, and direct convoys on it (Ben, 2026-08-24, the Sprint 18
+  design form).** Two verbs join the scorer's candidate list on the same terms as every grant
+  above — deterministic, seeded, scored-utility, legal verbs only, never a planner. (1)
+  `place_road`, plus port / inland-hub build candidates scored like any building: the
+  generator half of Logistic Points' constraint 5 (`docs/economy/LOGISTICS.md` § Logistic
+  Points — a rival must be able to build the generator), honouring Ben's 2026-08-22 "before
+  LP lands" ordering. (2) `dispatch_convoy` in its directed form, through the same
+  `price_convoy_leg`/`commit_convoy` seam auto-dispatch and the player use — a grant of reach
+  to the player's own verb, no fourth code path, its spend under the solvency gate like every
+  spend. Raised on the form rather than assumed (the NR-517 precedent); fresh authoring — the
+  purged BL-447 prose is reference only. Owners: BL-599 (rival roads and hubs), BL-600
+  (rival directed dispatch).
 - Do **not** introduce a retained-mode UI framework in place of ImGui for the prototype.
 - **An AI-facing seam is an untrusted input boundary (recorded 2026-08-14 with BL-387/BL-396/
   BL-397, after four instances of the pattern in one session; promotion to a standing rule is a

@@ -16,6 +16,7 @@
 #include <cmath>
 #include <limits>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -762,7 +763,8 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
     return recipe_switch_result::applied;
 }
 
-economy_report run_economy_step(world& w, const recipe_registry& reg, bool spectating)
+economy_report run_economy_step(world& w, const recipe_registry& reg, bool spectating,
+                                lp_pool_map* shared_lp_pools)
 {
     economy_report report;
 
@@ -1566,7 +1568,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         report.battle_dispatches = std::move(bt.dispatches);
     }
 
-    run_unit_march(w, reg);
+    run_unit_march(w, reg, shared_lp_pools);
 
     // BL-454: the unit pass — goods draw, the decay rule, orphan cleanup. LAST,
     // deliberately: the strategic tier above demolishes at tick rate, so running
@@ -1741,7 +1743,8 @@ bool corp_is_mobilised(const world& w, entity_id corp)
     return false;
 }
 
-unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
+unit_march_tick run_unit_march(world& w, const recipe_registry& reg,
+                               lp_pool_map* shared_lp_pools)
 {
     unit_march_tick out;
     if (w.units.empty())
@@ -1770,6 +1773,23 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
     const auto& table = unit_roster_table();
     const military_capability_params& mil = reg.military();
 
+    // BL-596: this tick's active-LP pools, one per body, built lazily on
+    // first encounter and decremented as this pass's units draw from it.
+    // NOT cached on `world` — because LP is a per-tick RATE, never a stock
+    // (LOGISTICS.md § Logistic Points, ruling on NR-343). See run_unit_march's
+    // own doc comment for the nearest-anchor interpretation and the refusal
+    // contract.
+    //
+    // BL-597: `local_pools` backs this ONLY when the caller did not hand us
+    // a shared instance — the byte-identical-to-BL-596 path every existing
+    // caller still takes. When `shared_lp_pools` is non-null (the real
+    // per-tick driver, once wired) this pass draws down the SAME map
+    // `commit_convoy`'s passive draws (supply_system.cpp) already touched
+    // this tick, and `lp_pool_for_body` (logistics.hpp, factored out of the
+    // lambda this replaced) is the one fetch-or-build both consumers call.
+    lp_pool_map local_pools;
+    lp_pool_map& lp_pools_by_body = shared_lp_pools ? *shared_lp_pools : local_pools;
+
     for (const entity_id id : ids)
     {
         unit_component& u = w.units.at(id);
@@ -1782,11 +1802,77 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
         // "an unknown index is a data problem, not a reason to make a unit
         // free" tolerance resolve_unit_upkeep already applies (unit_roster.cpp).
         const unit_class cls = (u.type < table.size()) ? table[u.type].cls : unit_class::infantry;
-        float points = mil.march_points_per_class[static_cast<std::size_t>(cls)];
-        if (points <= 0.0f)
+        const float base_points = mil.march_points_per_class[static_cast<std::size_t>(cls)];
+        if (base_points <= 0.0f)
             continue; // this class cannot march under the authored data
 
-        points += u.order.progress;
+        // The full tick's movement budget, banked carry-over included — this
+        // is also exactly the active-LP amount the gate below checks and
+        // draws (BL-596: one active LP admits one march-point's worth of
+        // movement), computed BEFORE anything mutates so a refusal can still
+        // leave u.order.progress untouched.
+        const float would_be_points = base_points + u.order.progress;
+
+        // --- BL-596: the active-LP gate, before any state mutates ---------
+        const auto cur_it0 = w.tiles.find(u.position);
+        if (cur_it0 != w.tiles.end())
+        {
+            const entity_id body = cur_it0->second.body;
+            std::unordered_map<entity_id, float>& pools =
+                lp_pool_for_body(lp_pools_by_body, w, body, mil.active_lp_per_anchor_tick);
+
+            // Nearest anchor by intra_body_path cost from the unit's CURRENT
+            // position — reasoned interpretation (LOGISTICS.md does not name
+            // the mid-route locus rule), reusing the same cost function/cache
+            // every other consumer of this pathing does. Deterministic
+            // regardless of `pools`' hash-map iteration order: this is a pure
+            // min-with-tiebreak reduction over (cost, then lowest tile id).
+            // BL-597 factored this reduction into `nearest_lp_anchor`
+            // (logistics.hpp/cpp) so `commit_convoy`'s passive draw
+            // (supply_system.cpp) reuses this exact rule for a convoy's
+            // dispatch tile rather than a second copy of it.
+            const entity_id nearest_anchor = nearest_lp_anchor(w, body, u.position, pools);
+
+            if (nearest_anchor == null_entity)
+            {
+                // No reachable anchor on this body at all — no active LP
+                // exists to draw against. Refused outright: nothing about
+                // this unit's state changes this tick.
+                ++out.refused_no_lp;
+                continue;
+            }
+
+            float& pool = pools.at(nearest_anchor);
+            if (pool + 1e-6f < would_be_points)
+            {
+                // The nearest anchor's pool is already exhausted (by a
+                // higher-priority draw earlier THIS tick, or simply too
+                // small) — refused outright, same "mutates nothing" contract.
+                ++out.refused_no_lp;
+                continue;
+            }
+
+            // Granted: consume the anchor's pool, then price the draw in
+            // credits — LP is the CAP, credits are the separate PRICE
+            // (LOGISTICS.md rule 1; Ben, 2026-08-22, "it should cost actual
+            // money... moving units"). A nation-owned garrison (BL-571) has
+            // no `w.corporations` entry — it still draws against the LP cap
+            // (the physical constraint applies to everyone) but pays no
+            // credits, matching MILITARY.md's "a garrison does not draw the
+            // credits+goods vector run_unit_upkeep charges corp units".
+            pool -= would_be_points;
+            if (const auto corp_it = w.corporations.find(u.owner); corp_it != w.corporations.end())
+            {
+                const float credit_cost = mil.active_lp_credit_per_unit_distance
+                                         * would_be_points * static_cast<float>(u.count);
+                corp_it->second.balance -= credit_cost;
+            }
+        }
+        // else: the unit's own tile is gone (defensive — see the blocked-step
+        // comment inside the loop below); no LP question to ask about a unit
+        // that isn't anywhere, so it falls through to the existing handling.
+
+        float points = would_be_points;
         u.order.progress = 0.0f;
 
         while (points > 0.0f && u.order.next_index < u.order.path.size())

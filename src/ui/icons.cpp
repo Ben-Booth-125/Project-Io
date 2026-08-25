@@ -740,6 +740,57 @@ void continent(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddPolyline(right, 4, outline, ImDrawFlags_Closed, 1.0f);
 }
 
+void throughput(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A truck, in profile, facing right (Ben, 2026-08-25: "just use a truck as the
+    // glyph"). Filled silhouette with the family's dark outline, same idiom as
+    // `industry`.
+    //
+    // Two abstract cuts were tried first and both failed at ~21px: a funnel
+    // narrowing to a node read as a bowtie (an X, which is already the "closed"
+    // affordance here — see `battle`'s note on the same hazard), and a ringed node
+    // with flow stubs read as a lone ring. A truck needs no decoding, which at
+    // strip size beats any amount of metaphorical fidelity.
+    //
+    // Distinct from `convoy` (a bare chevron) and `supply` (two parallels) by
+    // being a THING rather than a mark — and the lens is about how much can move,
+    // so the vehicle is the honest picture.
+    // Proportions matched to `industry`'s vertical extent (~1.45r) so the truck
+    // does not read as a smaller mark than its strip neighbours, and the cargo box
+    // is given roughly two thirds of the length — a long box with a short cab is
+    // what makes the silhouette a lorry rather than two stacked blocks.
+    const float bw   = r * 0.98f;            // half-width, nose to tail
+    const float bed  = centre.y + r * 0.48f; // underside of body / axle line
+    const float boxt = centre.y - r * 0.70f; // cargo box roof
+    const float cabt = centre.y - r * 0.20f; // cab roof, stepped down from the box
+    const float split = centre.x + r * 0.30f; // where box ends and cab begins
+
+    // Cargo box (tail, left) — the taller volume, so the load reads first.
+    dl->AddRectFilled({ centre.x - bw, boxt }, { split, bed }, colour);
+    dl->AddRect({ centre.x - bw, boxt }, { split, bed }, outline, 0.0f, 0, 1.0f);
+
+    // Cab (nose, right): a stepped-down block with the windscreen raked back, so
+    // the front is unmistakable and the truck has a direction.
+    const ImVec2 cab[5] = {
+        { split,                 cabt },
+        { centre.x + bw * 0.70f, cabt },
+        { centre.x + bw,         centre.y + r * 0.06f },
+        { centre.x + bw,         bed },
+        { split,                 bed },
+    };
+    dl->AddConvexPolyFilled(cab, 5, colour);
+    dl->AddPolyline(cab, 5, outline, ImDrawFlags_Closed, 1.0f);
+
+    // Two wheels on the axle line. Drawn in the OUTLINE colour, not the fill: at
+    // strip size a same-colour wheel merges into the body and the truck loses its
+    // undercarriage, reading as a plain box.
+    const float wr = r * 0.24f;
+    dl->AddCircleFilled({ centre.x - bw * 0.52f, bed }, wr, colour);
+    dl->AddCircleFilled({ centre.x + bw * 0.62f, bed }, wr, colour);
+    dl->AddCircleFilled({ centre.x - bw * 0.52f, bed }, wr * 0.42f, outline);
+    dl->AddCircleFilled({ centre.x + bw * 0.62f, bed }, wr * 0.42f, outline);
+}
+
 void landform(ImDrawList* dl, ImVec2 centre, float r, terrain_landform lf, ImU32 colour)
 {
     // Terrain shape, not an entity — so every glyph here is STROKE-ONLY and none

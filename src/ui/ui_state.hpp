@@ -54,6 +54,7 @@ enum class overlay_mode
     reach,       ///< Body-level commercial reach: bodies connected via the corp's trade_route entries, tiered by recency. BL-011. See LENSES.md § Reach lens.
     continent,   ///< Tectonic plates from the Continents/Drift pass: per-plate tint + boundary emphasis, read from the generation report. BL-226. See LENSES.md § Continent lens.
     supply_routes, ///< Aggregated trade_route graph: one edge per body pair, thickness from log-scaled convoy_count, colour from recency tier. BL-014. See LENSES.md § Supply-routes lens.
+    throughput,    ///< Active Logistic Points: the reach envelope (served / beyond reach) plus a per-anchor LP magnitude disc. BL-598. See LENSES.md § Throughput lens.
     count,         ///< Sentinel — keep last. The lens-cycle wrap (canvas_command.cpp) derives its modulus from this, so a new lens above is reachable without touching a hand-kept count.
 };
 
@@ -169,6 +170,18 @@ struct construction_state
     /// into `unit_roster_table()`.
     entity_id     pending_hire_tile      = null_entity;
     std::uint16_t pending_hire_unit_type = 0;
+
+    /// Pending player convoy-dispatch request (BL-601) — set by the market
+    /// Selection card's dispatch form and executed by `app::render` via
+    /// `apply_corp_command`'s `dispatch_convoy` verb (BL-452's own player seam;
+    /// the form is the front door onto it SUPPLY.md always specified but nothing
+    /// built). Same deferred path as `pending_tile`, for the same reason (UI
+    /// surfaces hold only `const world&`). `pending_dispatch_source` = null_entity
+    /// means nothing pending; the other three fields are meaningless until it is set.
+    entity_id     pending_dispatch_source = null_entity; ///< Source market (the card's own selection).
+    entity_id     pending_dispatch_dest   = null_entity; ///< Destination market.
+    resource_type pending_dispatch_good   = resource_type::iron_ore;
+    float         pending_dispatch_qty    = 0.0f;
 
     /// Pending demolition request — set by the building Selection element's Demolish
     /// control and executed by `app::render` via `demolish_building`. Takes the same
@@ -754,6 +767,30 @@ struct ui_state
     /// and dims one econ tick's travel behind the head.
     struct convoy_beam { std::vector<entity_id> path; float progress = 0.0f; float speed = 0.0f; };
     std::vector<convoy_beam> convoy_beams;
+
+    // --- Throughput lens: this frame's active-LP anchor pools (BL-598) ---
+    // LOGISTICS.md § Logistic Points: LP is a per-tick RATE, never a stock. These
+    // three fields are DERIVED VIEW STATE with exactly the same standing as
+    // permanent_vision above — recomputed from scratch every frame by
+    // ui::update_body_throughput (which needs a non-const world, so the const draw
+    // cannot do it), never serialised, never entering state_hash, never read back
+    // by the simulation. Nothing here crosses a tick boundary as game state: it is
+    // a photograph of this tick's rate, retaken each frame.
+    //
+    /// The active body's supply anchors and their active LP for this tick, SORTED
+    /// ASCENDING BY TILE ID. Sorted rather than hashed for two reasons: the draw
+    /// does a lower_bound per visible tile, and the reductions below are float
+    /// sums, which are order-dependent — an unordered_map's iteration order would
+    /// make the number in the legend depend on the hash layout.
+    struct lp_anchor { entity_id tile = null_entity; float lp = 0.0f; };
+    std::vector<lp_anchor> lp_anchors;
+    float lp_anchor_total = 0.0f; ///< Σ lp over lp_anchors, summed in tile-id order.
+    float lp_anchor_max   = 0.0f; ///< Largest single anchor's lp; the anchor-mark ramp's ceiling.
+
+    /// Largest FINITE reach cost on the active body — the denominator the lens's
+    /// field ramp normalises against, so the shading is body-relative rather than
+    /// calibrated to an absolute cost nobody can read. 0 when no field exists.
+    float lp_reach_max = 0.0f;
 
     double sim_now_days = 0.0; ///< Latest continuous sim time (elapsed days); the beam-motion clock.
 

@@ -403,6 +403,25 @@ struct military_capability_params
     /// A composite unit (BL-472, not built here) reads its SLOWEST member's
     /// class entry — the hook, not the composite logic.
     std::array<float, unit_class_count> march_points_per_class = {};
+
+    /// BL-596 (LP_ACTIVE_MARCH, LOGISTICS.md § Logistic Points): active LP
+    /// generated per supply anchor per tick, in the SAME units as a march
+    /// point (`march_points_per_class` above) — one active LP admits exactly
+    /// one march-point's worth of a unit's movement this tick, so the cap and
+    /// the thing it caps share a scale rather than needing a conversion
+    /// factor. Zero (the default) means no active LP exists anywhere, which
+    /// refuses every march — economy.lua sets the real first-cut rate.
+    /// Authored under `economy.military.active_lp_per_anchor_tick`.
+    float active_lp_per_anchor_tick = 0.0f;
+
+    /// BL-596: credits charged per (active-LP-unit x head) an active march
+    /// draws — "it should cost actual money to resolve LP usage... moving
+    /// units" (Ben, 2026-08-22). LP stays the CAP (rule 1: "LP is a cap, not
+    /// a price"); this is the separate price. First-cut derivation against
+    /// `logistics.base_cost_per_unit_distance.land` in scripts/economy.lua —
+    /// see that file's comment. Authored under
+    /// `economy.military.active_lp_credit_per_unit_distance`.
+    float active_lp_credit_per_unit_distance = 0.0f;
 };
 
 /// BL-350 procurement/contract tunables, authored in scripts/economy.lua under the top-level

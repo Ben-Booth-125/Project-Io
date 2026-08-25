@@ -8,6 +8,7 @@
 #include "nation_budget.hpp"   // budget_claim (Sprint N3 T5: the cash-gated survey asks its nation)
 #include "placement_rules.hpp"
 #include "recipe_registry.hpp"
+#include "supply_system.hpp"   // price_convoy_leg / commit_convoy (BL-600, the shared dispatch seam)
 #include "survey_system.hpp"
 #include "tech_gate.hpp"       // recipe_unlocked (BL-588)
 #include "unit_roster.hpp"
@@ -62,6 +63,15 @@ entity_id resolve_command_body(const world& w, const corp_command& cmd)
         case corp_verb::survey:
         case corp_verb::place_sell_order:
             return cmd.subject; // subject IS the body for these verbs
+        case corp_verb::dispatch_convoy:
+        {
+            // subject is the SOURCE MARKET (corp_command.hpp), not a body or a
+            // building — the default branch below would wrongly probe
+            // w.buildings with it. Tagged by the source body, matching every
+            // other verb's "where did the corp act FROM" reading.
+            const auto mit = w.markets.find(cmd.subject);
+            return (mit != w.markets.end()) ? mit->second.body : null_entity;
+        }
         case corp_verb::remove_sell_order:
         {
             // The order names no body directly; resolve it from the book while
@@ -919,6 +929,139 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
         }
 
+        // ---- Road & anchor candidates: extend the network toward ground -----
+        // the corp cannot yet reach (BL-599, LOGISTICS.md § Roads / § Reach;
+        // dated grant in io-standing-rules.md § Determinism & data model —
+        // "Rivals may EXTEND THE NETWORK... place_road, plus port/inland-hub
+        // build candidates scored like any building", Ben, 2026-08-24).
+        //
+        // The extraction build-candidate loop above deliberately proposes a
+        // site WITHOUT checking the logistics-reach budget (the BL-162 /
+        // BL-379 note a few screens up: checking it there would reshuffle
+        // which sites every rival attempts, hence world evolution, hence
+        // every blessed golden, for no player-visible gain). That means an
+        // out-of-reach site is proposed, scored, and then silently refused by
+        // the REAL seam (construction.cpp's `max_logistics_reach`) every
+        // single evaluation until something extends the network. This block
+        // is that something: it re-derives the same reach refusal
+        // construct_building would hit at apply time, so it only ever
+        // targets ground actually blocked by distance, never an arbitrary
+        // tile.
+        {
+            const float reach_budget = reg.construction().max_logistics_reach;
+            if (reach_budget >= 0.0f)
+            {
+                const building_economics& ex = reg.economics(building_type::extraction_site);
+                entity_id    best_tile = null_entity;
+                entity_id    best_body = null_entity;
+                float        best_net  = 0.0f;
+                std::uint8_t best_tier = 1;
+                for (const extraction_site& s : ranked_sites)
+                {
+                    // Tile-level placement must still hold (terrain, tech,
+                    // stack) — only the REACH half is this block's concern,
+                    // so it asks the question both ways: viable without the
+                    // budget, refused with it.
+                    if (!placement_rules::can_place_in_world(w, s.tile, building_type::extraction_site,
+                                                              s.target))
+                        continue;
+                    if (placement_rules::can_place_in_world(w, s.tile, building_type::extraction_site,
+                                                             s.target, reach_budget, corp))
+                        continue; // already reachable — nothing here for a road to fix
+
+                    const entity_id body = tile_body(w, s.tile);
+                    if (body == null_entity)
+                        continue;
+                    body_reach_field(w, body); // warm before tile_reach_cost, as the muster-base block does
+                    if (tile_reach_cost(w, s.tile) < 0.0f)
+                        continue; // reach field not computed for this body — skip, do not guess
+
+                    const tile_component& tc  = w.tiles.at(s.tile);
+                    const std::size_t     ri  = static_cast<std::size_t>(s.target);
+                    const float wf      = 0.5f; // construct_building staffs at 0.5, as the build candidate above
+                    const float rich    = richness_rate_scalar(ex, tc.resource_deposit[ri]);
+                    const float price   = local_price(w, s.tile, ri);
+                    const float revenue = ex.base_rate * rich * wf * (1.0f - tc.hazard_level) * price;
+                    const float net     = revenue - ex.maintenance - ex.base_wage * wf;
+                    if (net <= best_net)
+                        continue; // never extend toward a loss, and keep only the single best
+
+                    best_net  = net;
+                    best_tile = s.tile;
+                    best_body = body;
+                    // Raise one tier past whatever is there, capped at
+                    // Highway — a repeat eval against the same still-
+                    // unreached tile upgrades it rather than re-requesting a
+                    // tier it already holds (which `place_road` refuses as
+                    // `invalid_tile`, benign per APPLY THEN COUNT below).
+                    best_tier = std::min<std::uint8_t>(3, static_cast<std::uint8_t>(tc.road_level + 1));
+                }
+
+                if (best_tile != null_entity)
+                {
+                    // ROAD candidate: raising this tile's own road_level
+                    // discounts its traversal cost (road_traversal_multiplier),
+                    // which feeds directly into body_reach_field's Dijkstra
+                    // edge costs — the same mechanism the Reach lens reads.
+                    {
+                        const road_economics& rex = reg.road_econ(best_tier);
+                        candidate c;
+                        c.cmd.tick      = tick; c.cmd.corp = corp;
+                        c.cmd.verb      = corp_verb::place_road;
+                        c.cmd.tile      = best_tile;
+                        c.cmd.road_tier = best_tier;
+                        // Modest relative to the site it targets: a road does
+                        // not itself earn revenue, it unlocks a FUTURE
+                        // build's, so it is priced under the BL-417
+                        // net^2/capex curve rather than matching it.
+                        c.score  = 0.3f * best_net * best_net / std::max(1.0f, rex.build_cost) * jitter;
+                        c.spend  = std::max(1.0f, rex.build_cost);
+                        c.reason = corp_decision_reason::best_build;
+                        c.bucket = bucket_for_reason(c.reason);
+                        cands.push_back(c);
+                    }
+
+                    // ANCHOR candidate: only where the road above can never be
+                    // enough — a body with NO supply anchor at all fails
+                    // every tile's reach check, because there is no anchor
+                    // for the Dijkstra to run from; a road only discounts a
+                    // PATH between two anchors, and none exists yet to path
+                    // from. Placing the first port/hub is the one placement
+                    // `can_place_in_world` exempts from the reach rule while
+                    // a body holds zero of them (the bootstrap rule,
+                    // LOGISTICS.md § Reach), so it is the only way out of
+                    // that state. This is LP constraint 5 answered directly —
+                    // "a rival must be able to build the generator".
+                    if (!body_has_supply_anchor(w, best_body))
+                    {
+                        const building_type atype = placement_rules::is_coastal(w, best_tile)
+                                                   ? building_type::port
+                                                   : building_type::inland_logistics_hub;
+                        if (placement_rules::can_place_in_world(w, best_tile, atype,
+                                                                 resource_type::iron_ore, reach_budget, corp))
+                        {
+                            const building_economics& aex = reg.economics(atype);
+                            candidate c;
+                            c.cmd.tick = tick; c.cmd.corp = corp;
+                            c.cmd.verb = corp_verb::build;
+                            c.cmd.tile = best_tile;
+                            c.cmd.type = atype;
+                            // Flat, modest score — same shape and reasoning as
+                            // the muster-base candidate below: neither
+                            // building produces a tradeable good, so there is
+                            // no net/capex curve to price it against, and it
+                            // must never out-bid a genuine economic build.
+                            c.score  = 0.4f * jitter;
+                            c.spend  = std::max(1.0f, aex.build_cost);
+                            c.reason = corp_decision_reason::best_build;
+                            c.bucket = bucket_for_reason(c.reason);
+                            cands.push_back(c);
+                        }
+                    }
+                }
+            }
+        }
+
         // ---- Dial candidates: per owned, operating, off-cooldown building --
         for (const entity_id bid : cc.assets)
         {
@@ -1428,12 +1571,150 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
         }
 
+        // ---- Directed-dispatch candidate: haul into a public shortfall -------
+        // (BL-600, LOGISTICS.md § Logistic Points / SUPPLY.md § Dispatch
+        // trigger; the same dated grant BL-599 lands under). `dispatch_convoy`
+        // reaches the corp-command seam exactly as `place_sell_order` does
+        // (§ 2C) — through `apply_corp_command`, which already prices and
+        // commits it via `price_convoy_leg` + `commit_convoy`
+        // (corp_command.cpp): the SAME two functions the auto-dispatcher's
+        // shortfall scan calls (SUPPLY.md's "no fourth code path" rule). This
+        // block supplies exactly that scan's opinion as one scored candidate
+        // rather than reimplementing pricing here — it prices with the shared
+        // function to RANK opportunities, and the seam re-prices and commits
+        // for real at apply time.
+        //
+        // Bounded to the corp's own surplus pools (own asset bodies) against
+        // markets carrying a PUBLIC shortfall (demand > supply — the same
+        // aggregates `export_corp_blackboard` shows a rival, visibility-honest
+        // per BL-068/DISCOVERY.md, and the same reading
+        // `forecast_glut_multiplier` gives the build candidates above), and
+        // keeps only the single best-scoring opportunity — the same
+        // one-candidate-per-eval shape `max_trades` already gives the
+        // order-book verb, so a directed haul competes for exactly one slot
+        // rather than flooding the candidate list with every (body, resource)
+        // pair.
+        {
+            // Lowest-id market on a body — the same stable pick
+            // `supply_system.cpp`'s own (internal-linkage) `market_for_body`
+            // makes, duplicated rather than shared for the same reason that
+            // one's own comment gives.
+            auto market_on_body = [&w](entity_id body) -> entity_id {
+                entity_id best = null_entity;
+                for (const auto& [mid, mc] : w.markets)
+                    if (mc.body == body && (best == null_entity || mid < best))
+                        best = mid;
+                return best;
+            };
+
+            const logistics_nodes nodes = collect_logistics_nodes(w);
+
+            entity_id   best_market   = null_entity;
+            entity_id   best_src_body = null_entity;
+            std::size_t best_ri       = 0;
+            float       best_qty      = 0.0f;
+            float       best_score    = 0.0f;
+            convoy_leg  best_leg;
+
+            for (const auto& [key, pool] : w.corp_body_pools)
+            {
+                if (key.first != corp)
+                    continue;
+                const entity_id src_body = key.second;
+
+                for (std::size_t r = 0; r < resource_count; ++r)
+                {
+                    // Same hold rule as the trade candidate above (BL-293):
+                    // never divert stock below the threshold the corp's own
+                    // chain might still want.
+                    const float surplus = pool.quantities[r] - p.trade_hold_threshold;
+                    if (surplus <= 0.0f)
+                        continue;
+
+                    for (const auto& [mid, mc] : w.markets)
+                    {
+                        // Same-body IS a real haul (BL-096 multi-market bodies):
+                        // `price_convoy_leg` routes it over `intra_body_path`
+                        // exactly like the auto-dispatcher's own scan does, so
+                        // this candidate does not special-case it away.
+                        if (mc.base_price[r] <= 0.0f)
+                            continue; // this market does not price the good
+
+                        const float shortfall = mc.demand[r] - mc.supply[r];
+                        if (shortfall <= 0.0f)
+                            continue; // no PUBLIC shortfall here
+
+                        const float qty = std::min(surplus, shortfall);
+                        if (qty <= 0.0f)
+                            continue;
+
+                        // Priced through the SHARED function, purely to RANK
+                        // candidates — nothing here mutates the world beyond
+                        // the A* path cache `price_convoy_leg` itself warms
+                        // (the same non-const-`w` shape `body_reach_field`
+                        // uses above). The seam re-prices and commits for
+                        // real at apply time.
+                        const convoy_leg leg = price_convoy_leg(
+                            w, reg, nodes, corp, src_body, mid, r, qty,
+                            reg.logistics_cost(convoy_mode::space));
+                        if (!leg.viable)
+                            continue; // unroutable / unpadded / unfuelled lane
+
+                        // Valued at the CLEARED price, not the floor: unlike
+                        // the trade candidate (a standing order the book
+                        // might not fill at all), a dispatched convoy WILL
+                        // credit the destination pool on arrival — the
+                        // conservative choice there does not apply here.
+                        const float price   = (mc.price[r] > 0.0f) ? mc.price[r] : mc.base_price[r];
+                        const float revenue = qty * price;
+                        const float score   = revenue - leg.cost;
+                        if (score <= 0.0f)
+                            continue; // never haul at a loss
+
+                        if (score > best_score)
+                        {
+                            best_score    = score;
+                            best_market   = mid;
+                            best_src_body = src_body;
+                            best_ri       = r;
+                            best_qty      = qty;
+                            best_leg      = leg;
+                        }
+                    }
+                }
+            }
+
+            if (best_market != null_entity)
+            {
+                const entity_id src_market = market_on_body(best_src_body);
+                if (src_market != null_entity)
+                {
+                    candidate c;
+                    c.cmd.tick        = tick;
+                    c.cmd.corp        = corp;
+                    c.cmd.verb        = corp_verb::dispatch_convoy;
+                    c.cmd.subject     = src_market;                              // source market
+                    c.cmd.counterparty = best_market;                            // destination market
+                    c.cmd.target      = static_cast<resource_type>(best_ri);     // cargo
+                    c.cmd.quantity    = best_qty;                                // units
+                    // Same currency every other candidate scores in — expected
+                    // cash, so a haul competes honestly against a dial or a
+                    // build with no hand-tuned weight of its own.
+                    c.score  = best_score * jitter;
+                    c.spend  = best_leg.cost;
+                    c.reason = corp_decision_reason::best_build;
+                    c.bucket = bucket_for_reason(c.reason);
+                    cands.push_back(c);
+                }
+            }
+        }
+
         if (cands.empty())
             continue;
         std::sort(cands.begin(), cands.end(), candidate_before);
 
         // ---- Greedy selection under the action budget + solvency gate -------
-        int   builds = 0, dials = 0, surveys = 0, hires = 0, trades = 0;
+        int   builds = 0, dials = 0, surveys = 0, hires = 0, trades = 0, dispatches = 0;
         float committed = 0.0f;
         std::vector<entity_id> touched_this_eval;
 
@@ -1499,7 +1780,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // subject is a tile), and capped at one per evaluation besides.
             const bool is_trade  = (c.cmd.verb == corp_verb::place_sell_order ||
                                     c.cmd.verb == corp_verb::remove_sell_order);
-            const bool is_dial   = !is_build && !is_survey && !is_hire && !is_trade;
+            // Directed dispatch (BL-600) is excluded from the dial budget for
+            // the identical reason trade is: its subject is a MARKET, not a
+            // building, so neither the dial cap nor the one-touch-per-building
+            // rule below means anything for it. Its own cap, same shape as
+            // hire's.
+            const bool is_dispatch = (c.cmd.verb == corp_verb::dispatch_convoy);
+            const bool is_dial   = !is_build && !is_survey && !is_hire && !is_trade && !is_dispatch;
             // Every `continue` below is a FOREGONE candidate, and each one calls
             // forgo() so it can compete to be the decision log's runner-up.
             // A budget-capped candidate is the purest case of the thing the
@@ -1511,6 +1798,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // hiring every tick would out-hire the player by pure frequency.
             if (is_hire   && hires   >= 1)            { forgo(c); continue; }
             if (is_trade  && trades  >= p.max_trades) { forgo(c); continue; }
+            // One directed dispatch per evaluation, same cadence as trade —
+            // a rival redirecting cargo every tick would out-haul the player
+            // by pure frequency, and the enumeration above already keeps only
+            // its single best-scoring opportunity.
+            if (is_dispatch && dispatches >= p.max_dispatches) { forgo(c); continue; }
             // One touch per building per evaluation: a second dial on a
             // building already commanded this eval is contradictory.
             if (is_dial && std::find(touched_this_eval.begin(), touched_this_eval.end(),
@@ -1594,11 +1886,15 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             if (is_survey) ++surveys;
             if (is_hire)   ++hires;
             if (is_trade)  ++trades;
+            if (is_dispatch) ++dispatches;
 
             // Cooldown on the touched building (anti-thrash). A trade command's
             // subject is a body, so it records no touch — the anti-duplicate rule
-            // in the trade block above is what stops it thrashing.
-            if (!is_trade)
+            // in the trade block above is what stops it thrashing. A dispatch's
+            // subject is a market, for the identical reason — nothing here to
+            // cool down, and the enumeration's own single-best-candidate cap is
+            // what stops it thrashing.
+            if (!is_trade && !is_dispatch)
             {
                 const entity_id touched = is_build ? built : c.cmd.subject;
                 if (const auto tb = w.buildings.find(touched); tb != w.buildings.end())

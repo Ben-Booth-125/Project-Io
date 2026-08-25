@@ -1,6 +1,7 @@
 #pragma once
 
 #include "recipe_registry.hpp"
+#include "logistics.hpp" // lp_pool_map, nearest_lp_anchor, lp_pool_for_body (BL-597)
 #include "world.hpp"
 
 #include <cstddef>
@@ -133,8 +134,31 @@ void credit_arrived_convoys(world& w, int tick = 0,
 /// @param reg       Registry (for building type lookups).
 /// @param logistics_cost_land   base_cost_per_unit_distance for land mode.
 /// @param logistics_cost_space  base_cost_per_unit_distance for space mode.
-void dispatch_convoys(world& w, const recipe_registry& reg,
-                      float logistics_cost_land, float logistics_cost_space);
+/// @param shared_lp_pools BL-597: forwarded to every `commit_convoy` call this
+///        pass makes. Null (the default) builds one private `lp_pool_map`
+///        local to this call, shared across every convoy THIS pass commits
+///        (so two shortfalls converging on one anchor within one
+///        `dispatch_convoys` call already contend, mirroring how
+///        `run_unit_march` shares one pool across all its units) but
+///        discarded before the caller gets it back — the real per-tick driver
+///        passes its own instance to see that same pool drawn down further by
+///        this tick's `run_unit_march` call, which is what makes "war flips
+///        the queue" observable.
+/// @return This pass's counters — dispatched legs and passive-LP refusals,
+///        same shape/intent as `unit_march_tick` (BL-596). The auto-dispatch
+///        path had NO surfacing at all before this (not even for the
+///        pre-existing insolvency refusal `commit_convoy` already gated on);
+///        this is the first cut, matching BL-596's own counter-on-the-tick-
+///        summary convention rather than inventing a narration pathway.
+struct convoy_dispatch_tick
+{
+    int dispatched    = 0; ///< Convoys committed this pass.
+    int refused_no_lp = 0; ///< BL-597: shortfalls refused for want of passive LP.
+};
+
+convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
+                      float logistics_cost_land, float logistics_cost_space,
+                      lp_pool_map* shared_lp_pools = nullptr);
 
 // ---------------------------------------------------------------------------
 // The shared dispatch (BL-452)
@@ -179,6 +203,7 @@ struct convoy_leg
     convoy_mode mode         = convoy_mode::land;
     float       cost         = 0.0f; ///< Total credits the haul costs (already node-discounted).
     int         travel_ticks = 1;    ///< Econ ticks the leg takes; convoy speed is 1/this.
+
 };
 
 /// Price one leg. A pure read of the world apart from the A* path cache, which
@@ -212,6 +237,46 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
 ///                   be `null_entity` on a body carrying none), while the player's verb
 ///                   passes the market they actually dispatched from. The cargo and the
 ///                   cost are a function of `src_body` either way.
-bool commit_convoy(world& w, entity_id corp_id, entity_id src_body,
+///
+/// BL-597 (LOGISTICS.md § Logistic Points): before any mutation, an
+/// intra-body leg (`leg.mode != convoy_mode::space`) must also clear the
+/// PASSIVE-LP admissibility gate — LOGISTICS.md rule 1, "LP is a CAP, not a
+/// PRICE": no second credit charge, `leg.cost` (haulage) stays the only
+/// price, LP only decides whether the leg is admissible at all. The corp's
+/// dispatch tile (`corp_representative_tile(w, corp, src_body)`, the same
+/// origin `price_convoy_leg` routes from) draws against its NEAREST anchor's
+/// pool (`nearest_lp_anchor`, logistics.hpp — the same reduction BL-596's
+/// active march gate uses), by the leg's CARGO QUANTITY (Ben, 2026-08-25,
+/// ruling on NR-620): one passive LP admits one unit of goods through the
+/// anchor, as one active LP admits one march-point's worth of movement.
+/// Deliberately NOT distance — LOGISTICS.md constraint 3 ("if cost is
+/// proportional to distance, LP *is* haulage cost again") and rule 1
+/// (distance is already priced, in credits) both forbid that, and measured
+/// it collapsed real convoy traffic by 73%.
+/// A space leg (inter-body) skips this entirely: LOGISTICS.md's Logistic
+/// Points design is tile-grounded infrastructure ("cities are the locus"),
+/// out of scope for a lane with no intra-body path at all — matching
+/// BL-596's own march gate, which likewise only fires for a unit walking a
+/// tile path.
+///
+/// @param reg              For `reg.military().active_lp_per_anchor_tick` — the
+///                         ONE per-anchor LP rate LOGISTICS.md's bifold table
+///                         splits by use, not two authored numbers; see that
+///                         field's own doc comment (recipe_registry.hpp).
+/// @param shared_lp_pools  BL-597: forwarded to (and lazily built through)
+///                         `lp_pool_for_body`, same contract as
+///                         `run_unit_march`'s parameter of the same name —
+///                         null (the default) gets a private, per-call-fresh
+///                         pool; a non-null instance shared with the same
+///                         tick's `run_unit_march` call makes active and
+///                         passive draws genuinely contend.
+/// @param out_refused_no_lp Optional; set true (never false) when this call
+///                         refused SPECIFICALLY for want of passive LP,
+///                         distinct from `false` returned for any other
+///                         reason (not viable, insolvent). Mirrors
+///                         `unit_march_tick::refused_no_lp`'s naming.
+bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, entity_id src_body,
                    entity_id src_market, entity_id dest_market_id,
-                   std::size_t ri, float qty, const convoy_leg& leg);
+                   std::size_t ri, float qty, const convoy_leg& leg,
+                   lp_pool_map* shared_lp_pools = nullptr,
+                   bool* out_refused_no_lp = nullptr);

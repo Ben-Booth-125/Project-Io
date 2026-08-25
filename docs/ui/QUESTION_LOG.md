@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**43 surfaces** — 4 settled, 39 awaiting Ben's wording.
+**45 surfaces** — 4 settled, 41 awaiting Ben's wording.
 
 ---
 
@@ -260,6 +260,14 @@ alphabetical order.
 
 *Demanded by BL-431, BL-430, BL-428, BL-074 · `src/ui/selection_panel.cpp`, `src/ui/selection_panel.hpp`, `src/ui/selection_card.cpp`, `src/ui/detail_level.hpp`, `src/ui/ui_state.hpp` · id `selection_building_card`*
 
+### Selection band - Market card, Dispatch convoy form
+
+**Answers:** How much of what do I send from the market I'm looking at, to where?
+
+**Because:** SUPPLY.md always specified this front door -- 'a dispatch starts from a source you are looking at, and it is a resource + quantity + destination-market form, not a press' -- but BL-452 only ever wired dispatch_convoy onto the wire/agent dictionary; no UI site issued it, so the player's own corp had no way to direct a convoy at all (only the automatic shortfall scan moved goods). The form reuses the Sell Orders tab's own tradeable-resource test and the Convoys tab's market_city_name identity, so it cannot show a resource or destination the player couldn't already see traded or in flight, and a rejection (no route, insufficient funds) is surfaced inline rather than silently dropped.
+
+*Demanded by BL-607, BL-452 · `src/ui/selection_panel.cpp` · id `selection_market_dispatch`*
+
 ### Selection element
 
 **Answers:** What have I selected, and what can I do with it?
@@ -307,6 +315,14 @@ alphabetical order.
 **Because:** A constellation of gates is only a decision if the player can see which are reachable. BL-344 made that second half real: each node now reports EARNED, LOCKED with its unmet conditions itemised, or -- honestly -- "no gate authored", instead of showing an unevaluable string condition that could never resolve.
 
 *Demanded by BL-087, BL-126, BL-344 · `src/ui/tech_tree_panel.cpp` · id `tech_tree_panel`*
+
+### Throughput lens (Planetary canvas)
+
+**Answers:** How much can move through here, and how far is this ground from the capacity that would move it?
+
+**Because:** Active Logistic Points are a CAP: a march over the cap is refused outright, and LOGISTICS.md makes surfacing that non-optional -- 'a refusal nobody sees is silent interdiction again'. Without a surface the player meets the cap only as a move that mysteriously did not happen. It earns its space by costing none: it extends the Reach field the placement rule already computes rather than adding a surface, which is exactly the shape Ben's ruling asked for -- 'throughput is that field with a magnitude, so it is a small step from an existing surface rather than a new one'. It is off the lens bar, so it takes no strip slot from the eight lenses that answer first-sight questions.
+
+*Demanded by BL-606 · `src/ui/body_surface_canvas.cpp` · id `throughput_lens`*
 
 ### Tile inspector
 

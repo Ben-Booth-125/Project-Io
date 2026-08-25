@@ -52,6 +52,7 @@ struct corp_ai_params
     int   max_builds      = 1;     ///< Constructions per corp per evaluation.
     int   max_dials       = 3;     ///< Dial changes (recipe/workforce/idle/resume) per evaluation.
     int   max_trades      = 1;     ///< Order-book commands per corp per evaluation (BL-293).
+    int   max_dispatches  = 1;     ///< Directed convoy dispatches per corp per evaluation (BL-600).
 
     /// BL-409 — spectator mode: the session has no human seat.
     ///

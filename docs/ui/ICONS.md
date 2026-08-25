@@ -239,6 +239,12 @@ on the rail. Reserved slots stay `BeginDisabled`.
 | **Industry** | `industry(…, colour)` | Factory silhouette — a filled body block with a two-tooth sawtooth roof and a left chimney rising above the roofline; distinct from the production up-triangle and the market bars (BL-084, industry lens) | Caller fill | `overlay_mode::industry` |
 | **Continent** | `continent(…, colour)` | Two filled, deliberately asymmetric quads split by a diagonal **gap** — the seam is the shape that carries the meaning, and it is a gap rather than a drawn hairline so it survives at strip size. Reads "the crust is in pieces, and this is where they meet"; distinct from the Country shield (a bordered *territory*) and from any solid landmass blob, because the lens shows the *boundary*, not the area (BL-226, continent lens) | Caller fill | `overlay_mode::continent` |
 | **Reach** | *(borrows `convoy`)* | The rightward chevron | Caller stroke | `overlay_mode::reach` |
+| **Throughput** | `throughput(…, colour)` | A **truck** in profile facing right — long cargo box, stepped-down cab with a raked windscreen, two wheels on the axle line; filled with the family's dark outline, hubs picked out in the outline colour so the undercarriage survives at strip size. Ben, 2026-08-25: *"just use a truck as the glyph."* Two abstract cuts were tried first and both failed at ~21px — a funnel narrowing to a node read as a bowtie (an X, already the *closed* affordance here) and a ringed node with flow stubs read as a lone ring; a truck needs no decoding, which beats metaphorical fidelity on a strip. Distinct from `convoy` (a bare chevron) and `supply` (two parallels) by being a *thing* rather than a mark, which matters because it borrowed the convoy chevron while it was keyboard-only (BL-605) | Caller fill | `overlay_mode::throughput` |
+
+> **Three rows above are stale** and are left rather than quietly deleted: **Country**,
+> **Opportunity** and **Production** name lenses Sprint 17b retired. The glyph functions
+> still exist in `icons.cpp`; what no longer exists is the lens each one claims. Whether
+> the functions go with them is a separate call from whether the lenses did.
 
 In the strip ([`overlay.cpp`](../../src/ui/overlay.cpp), `draw_overlay_controls`)
 each lens is an invisible button with its glyph drawn over the rect; the active
@@ -246,8 +252,8 @@ lens gets a highlighted backing and the `palette::selection` glyph colour, inact
 lenses use `palette::neutral`. The lens **name** is supplied as a hover tooltip via
 `overlay_mode_name`.
 
-The curated on-screen strip order is corporation / country / resource / market /
-population / opportunity / production / continent; scarcity, industry, supply, reach
+The curated on-screen strip order is corporation / resource / market /
+population / continent / throughput; scarcity, industry, supply, reach
 and supply-routes are keyboard-cycle only (a width call, MINIMAP.md § Overlay
 controls). Reach and Supply-routes **borrow** the `convoy` / `supply` glyphs rather
 than carrying their own — adequate off-strip, where the glyph is never seen beside

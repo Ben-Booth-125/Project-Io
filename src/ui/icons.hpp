@@ -243,6 +243,28 @@ void industry(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour of both plates.
 void continent(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the **Throughput** lens glyph (BL-605) — a **truck** in profile, facing
+/// right: a long cargo box, a stepped-down cab with a raked windscreen, and two
+/// wheels on the axle line. Filled silhouette with the family's dark outline, the
+/// same idiom as `industry` (Ben, 2026-08-25: *"just use a truck as the glyph"*).
+///
+/// Two abstract cuts were tried first and both failed at strip size (~21px): a
+/// funnel narrowing to a node read as a bowtie — an X, which is already the
+/// "closed" affordance in this vocabulary — and a ringed node with flow stubs read
+/// as a lone ring. A truck needs no decoding, which beats metaphorical fidelity
+/// here.
+///
+/// Distinct from `convoy` (a bare chevron) and `supply` (two parallels) by being a
+/// THING rather than a mark. The Throughput lens borrowed the convoy chevron while
+/// it was keyboard-only; that stopped being tenable on the strip, where every
+/// on-screen lens carries one distinct glyph (LENSES.md).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Fill colour of the body and wheels; hubs take the dark outline.
+void throughput(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw a **landform** marker for @p lf — the terrain-shape glyph family (BL-231).
 /// Stroke-only, in @p colour, so it reads as *engraved terrain* rather than as one
 /// more entity marker sitting on the tile; the caller picks a colour that contrasts

@@ -1250,15 +1250,21 @@ void app::step_economy()
     // --verify, which is the schedule every harness already certifies.
     m_world.current_econ_tick = static_cast<int>(m_econ_steps++);
 
+    // BL-597: one shared passive/active Logistic Point pool for this tick —
+    // handed to both dispatch_convoys (passive) and run_economy_step's march
+    // pass (active) so the two genuinely contend for one anchor's capacity,
+    // per LOGISTICS.md's bifold table. Local to this tick; never persisted
+    // (LP is a per-tick RATE, ruling on NR-343).
+    lp_pool_map tick_lp_pools;
     dispatch_convoys(m_world, m_registry,
                      m_registry.logistics_cost(convoy_mode::land),
-                     m_registry.logistics_cost(convoy_mode::space));
+                     m_registry.logistics_cost(convoy_mode::space), &tick_lp_pools);
     advance_convoys(m_world);
     lap(0); // convoys
     // BL-409: under spectate the session has no human seat, so the strategic
     // tier evaluates every corp — the player's included. Default false, so an
     // ordinary played session runs exactly as before.
-    m_last_econ_report = run_economy_step(m_world, m_registry, m_ui.spectating);
+    m_last_econ_report = run_economy_step(m_world, m_registry, m_ui.spectating, &tick_lp_pools);
     lap(1); // economy step (production + corp AI)
     auto flows = clear_markets(m_world, m_registry, m_last_econ_report);
     lap(2); // market clearing
@@ -1952,10 +1958,19 @@ void app::render()
                 // so this is a map lookup on every frame but the first after an
                 // invalidation (a road laid, a building placed or demolished).
                 body_reach_field(m_world, m_ui.active_body);
-                // No lens-key anchor argument (BL-602): every legend now asks
-                // ui::lens_chrome_rect for the one region — the minimap's header, top
-                // right — rather than being handed a point derived here. That derivation
-                // was the last hand-rolled shell rect in this block.
+                // BL-606: this tick's active-LP anchor pools for the Throughput
+                // lens, in the same place and for the same reason — the pool
+                // enumeration wants a mutable world, the draw is const. A no-op
+                // unless that lens is active, and never cached: LP is a per-tick
+                // rate, so the map is rebuilt every frame rather than banked.
+                // Ordered AFTER body_reach_field because the lens draws the reach
+                // envelope under the anchors and both must describe one frame.
+                ui::update_body_throughput(m_world, m_ui, m_registry);
+                // No lens-key anchor argument (Sprint 17b, one chrome home):
+                // every legend now asks ui::lens_chrome_rect for the one region —
+                // the minimap's header, top right — rather than being handed a
+                // point derived here. That derivation was the last hand-rolled
+                // shell rect in this block.
                 ui::draw_body_surface_canvas(m_world, m_ui, m_registry, m_last_econ_report,
                                              m_generation_report, {0.0f, 0.0f}, disp,
                                              primary_input);
@@ -2298,6 +2313,42 @@ void app::render()
                 m_ui.construction.last_message = "Hiring failed."; break;
         }
         m_ui.construction.pending_hire_tile = null_entity; // consume the request
+    }
+
+    // Execute a convoy-dispatch request queued this frame by the market
+    // Selection card's dispatch form (BL-607). Routes through the same
+    // `dispatch_convoy` corp_verb the AI's own directed dispatch and the wire
+    // seam use (SUPPLY.md § Dispatch trigger: "the auto-dispatch body above
+    // with the shortfall scan removed") — the player's convoy costs, travels
+    // and picks a mode exactly like a rival's. Unlike the order-book presses
+    // above, the result IS surfaced: a dispatch can fail for reasons the form
+    // cannot fully pre-check (no viable route, insufficient funds at commit
+    // time), and a rejection mutates nothing, so the player needs to be told why.
+    if (m_ui.construction.pending_dispatch_source != null_entity)
+    {
+        corp_command cmd;
+        cmd.tick         = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp         = m_world.player_entity;
+        cmd.verb         = corp_verb::dispatch_convoy;
+        cmd.subject      = m_ui.construction.pending_dispatch_source;
+        cmd.counterparty = m_ui.construction.pending_dispatch_dest;
+        cmd.target       = m_ui.construction.pending_dispatch_good;
+        cmd.quantity     = m_ui.construction.pending_dispatch_qty;
+        const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
+        switch (r)
+        {
+            case corp_command_result::applied:
+                m_ui.construction.last_message = "Convoy dispatched."; break;
+            case corp_command_result::rejected_state:
+                m_ui.construction.last_message = "Not enough stock on hand to dispatch that much."; break;
+            case corp_command_result::rejected_placement:
+                m_ui.construction.last_message = "No viable route to that market."; break;
+            case corp_command_result::rejected_funds:
+                m_ui.construction.last_message = "Can't afford the haul."; break;
+            default:
+                m_ui.construction.last_message = "Dispatch failed."; break;
+        }
+        m_ui.construction.pending_dispatch_source = null_entity; // consume the request
     }
 
     // Execute a demolition queued this frame by the building Selection element. The

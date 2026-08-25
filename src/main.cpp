@@ -154,10 +154,16 @@ int run_serve(int ticks, long long as_corp, bool as_any)
     const auto step_one_tick = [&](int t) {
         w.current_day_tick  = t;
         w.current_econ_tick = t;
+        // BL-597: one shared passive/active Logistic Point pool for this
+        // tick, handed to both the convoy dispatch (passive) and the march
+        // pass inside run_economy_step (active) — so the two genuinely
+        // contend, per LOGISTICS.md's bifold table and the "war flips the
+        // queue" finding. Local to this tick; never persisted.
+        lp_pool_map tick_lp_pools;
         dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space));
+                         reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
         advance_convoys(w);
-        economy_report report = run_economy_step(w, reg);
+        economy_report report = run_economy_step(w, reg, /*spectating=*/false, &tick_lp_pools);
         auto flows = clear_markets(w, reg, report);
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings); // BL-343: law enforcement seam
@@ -242,10 +248,13 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
     {
         w.current_day_tick  = t;
         w.current_econ_tick = t;
+        // BL-597: see step_one_tick's own comment above — one shared LP pool
+        // per tick for both the passive (convoy) and active (march) draws.
+        lp_pool_map tick_lp_pools;
         dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space));
+                         reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
         advance_convoys(w);
-        economy_report report = run_economy_step(w, reg);
+        economy_report report = run_economy_step(w, reg, /*spectating=*/false, &tick_lp_pools);
         auto flows = clear_markets(w, reg, report);
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings); // BL-343: law enforcement seam

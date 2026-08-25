@@ -7,6 +7,7 @@
 #include <limits>
 #include <queue>
 #include <tuple>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -15,6 +16,30 @@ namespace {
 /// Sea-leg traversal cost for an ocean tile — costlier than any land landform, so A*
 /// prefers a land route and only crosses water when it must. A calibration constant.
 constexpr float sea_leg_cost = 2.5f;
+
+/// The anchor TILE set — every city, plus every built-and-active port / inland
+/// logistics hub — exactly `is_supply_anchor`'s predicate, collected once
+/// rather than probed per tile. Shared by `body_reach_field` (placement's
+/// distance rule) and `active_lp_anchor_pools` (BL-596: active Logistic
+/// Points, LOGISTICS.md § Logistic Points) — one anchor set, two consumers,
+/// per BL-325 ruling 3 ("no second distance/anchor model").
+std::unordered_set<entity_id> collect_anchor_tile_set(const world& w)
+{
+    std::unordered_set<entity_id> anchor_tiles;
+    for (const auto& [centre, ctile] : w.population_centre_tile)
+    {
+        (void)centre;
+        anchor_tiles.insert(ctile);
+    }
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        (void)bid;
+        if ((bc.type == building_type::port || bc.type == building_type::inland_logistics_hub)
+            && bc.ticks_remaining <= 0 && !bc.decommissioned)
+            anchor_tiles.insert(bc.tile);
+    }
+    return anchor_tiles;
+}
 
 /// Raster index for (col, row) with the column wrapped into [0, gw). Mirrors
 /// nation_generation.cpp's raster_idx so the two share one grid convention.
@@ -341,19 +366,7 @@ const std::vector<float>& body_reach_field(world& w, entity_id body)
     // centres was ~50M map probes per rebuild, and the rebuild fired every warm-
     // start tick (2026-08-12, the AppHangB1 stall). Same predicate, same
     // conditions, one linear pass — the seeded set is identical.
-    std::unordered_set<entity_id> anchor_tiles;
-    for (const auto& [centre, ctile] : w.population_centre_tile)
-    {
-        (void)centre;
-        anchor_tiles.insert(ctile);
-    }
-    for (const auto& [bid, bc] : w.buildings)
-    {
-        (void)bid;
-        if ((bc.type == building_type::port || bc.type == building_type::inland_logistics_hub)
-            && bc.ticks_remaining <= 0 && !bc.decommissioned)
-            anchor_tiles.insert(bc.tile);
-    }
+    const std::unordered_set<entity_id> anchor_tiles = collect_anchor_tile_set(w);
 
     // Seed every anchor at zero. RASTER ORDER, never tiles-map order — this runs
     // inside a deterministic simulation and the seed order must not depend on
@@ -437,6 +450,90 @@ float tile_reach_cost(const world& w, entity_id tile)
     if (idx >= fit->second.size())
         return -1.0f;
     return fit->second[idx];
+}
+
+// ---------------------------------------------------------------------------
+// Active Logistic Points (BL-596 — LOGISTICS.md § Logistic Points)
+// ---------------------------------------------------------------------------
+// LP is a per-tick RATE, never a stock (Ben, ruling on NR-343, 2026-08-20):
+// regenerated, spent or wasted each tick, never banked, and carrying it on
+// `world` (a field, a cache, anything that outlives one call) would be the
+// `military_points` write-only-accumulator defect renamed. So this function
+// is PURE and UNCACHED — it recomputes the anchor set and hands back a fresh
+// map every call, and the caller owns decrementing it for exactly one tick's
+// worth of draws before discarding it.
+//
+// Constraint 2 (LOGISTICS.md): cities, and built-and-active ports/inland
+// hubs, are the locus — the same anchor set `body_reach_field` seeds from
+// (`collect_anchor_tile_set`, above), never a per-corp pool (the
+// abstraction `military_points` was deleted for).
+//
+// EXTENSION POINT for BL-597 (passive convoy LP draw, a later item): that
+// item draws against the SAME per-anchor pool this function computes, just
+// at its own rate and from its own call site — call this again rather than
+// re-deriving the anchor set a second time.
+
+std::unordered_map<entity_id, float> active_lp_anchor_pools(world& w, entity_id body,
+                                                             float lp_per_anchor_tick)
+{
+    std::unordered_map<entity_id, float> pools;
+    if (lp_per_anchor_tick <= 0.0f)
+        return pools;
+
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    if (grid.empty())
+        return pools;
+
+    const std::unordered_set<entity_id> anchor_tiles = collect_anchor_tile_set(w);
+
+    // Walk the RASTER grid, not the anchor_tiles set — the grid's order is a
+    // pure function of the body (raster index), so this stays independent of
+    // population_centre_tile's / w.buildings' hash-map iteration order even
+    // though the RESULT is an unordered_map (its content, not its iteration
+    // order, is what every caller depends on).
+    for (const entity_id tid : grid)
+    {
+        if (tid == null_entity)
+            continue;
+        if (anchor_tiles.find(tid) == anchor_tiles.end())
+            continue;
+        pools.emplace(tid, lp_per_anchor_tick);
+    }
+    return pools;
+}
+
+// ---------------------------------------------------------------------------
+// Passive Logistic Points scaffolding (BL-597 — LOGISTICS.md § Logistic Points)
+// ---------------------------------------------------------------------------
+
+std::unordered_map<entity_id, float>& lp_pool_for_body(lp_pool_map& pools_by_body, world& w,
+                                                        entity_id body, float lp_per_anchor_tick)
+{
+    auto it = pools_by_body.find(body);
+    if (it == pools_by_body.end())
+        it = pools_by_body.emplace(body, active_lp_anchor_pools(w, body, lp_per_anchor_tick)).first;
+    return it->second;
+}
+
+entity_id nearest_lp_anchor(world& w, entity_id body, entity_id from_tile,
+                            const std::unordered_map<entity_id, float>& pool)
+{
+    entity_id nearest_anchor = null_entity;
+    float best_cost = std::numeric_limits<float>::infinity();
+    for (const auto& kv : pool)
+    {
+        const entity_id anchor_tile = kv.first;
+        const logistics_path& p = intra_body_path(w, body, from_tile, anchor_tile);
+        if (!p.reachable)
+            continue;
+        if (nearest_anchor == null_entity || p.cost < best_cost
+            || (p.cost == best_cost && anchor_tile < nearest_anchor))
+        {
+            best_cost      = p.cost;
+            nearest_anchor = anchor_tile;
+        }
+    }
+    return nearest_anchor;
 }
 
 // ---------------------------------------------------------------------------

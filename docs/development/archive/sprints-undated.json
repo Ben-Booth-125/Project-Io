@@ -1,0 +1,75 @@
+{
+  "_schema": "sprints-archive/io-v1",
+  "_note": [
+    "Cold store for sprints.json entries completed in undated.",
+    "Written by tools/session/archive_sprints.js. Records are FROZEN: the sprint entry",
+    "verbatim, retro and notes included. The live store is docs/development/sprints.json,",
+    "which holds open/proposed/gated sprints only. Sprint NUMBERS may be reused after a",
+    "purge (Ben, 2026-08-24) — a key here can collide with a later sprint of the same id,",
+    "so colliding keys carry their date; the id field inside the record is authoritative."
+  ],
+  "bucket": "undated",
+  "records": {
+    "12": {
+      "id": "12",
+      "theme": "v0.1.11 reconciled",
+      "state": "superseded",
+      "status_line": "Superseded 2026-08-12 by the 0 CE refocus (NR-177), never opened",
+      "opened_date": null,
+      "closed_date": null,
+      "goal": "The fattest open minor, built against the actor Sprint 8 defined rather than the one it was written for. Cuts v0.1.11.",
+      "planned": [
+        "The laws and tech surfaces (BL-155, BL-156, BL-186) as reframed — under a militia these are constraints the player operates inside, a different surface from an enactment ledger",
+        "BL-211 (history ledger), BL-212 (nation-voiced comms), BL-309 (deed lines), BL-264 (wizard layout after fold), BL-341 (parked Windows cold-configure check)",
+        "BL-280 (negotiated tax rate, design-owed, difficulty 5) is the one to watch — Sprint 8 will likely have merged its bargaining model into the procurement seam, in which case it shrinks or dissolves"
+      ],
+      "notes": "Part of the \"Sprints 8-14 the plan\" written 2026-08-10, re-sequenced the same day (Sprint 10 — the living world — inserted ahead of procurement on Ben's steer that the world should be filled with real industry). Sprints 12-14 superseded 2026-08-12 by the 0 CE refocus (NR-177); never opened; their minors parked with the space arc."
+    },
+    "13": {
+      "id": "13",
+      "theme": "Generation visibility, and the owed timelapse",
+      "state": "superseded",
+      "status_line": "Superseded 2026-08-12 by the 0 CE refocus (NR-177), never opened",
+      "opened_date": null,
+      "closed_date": null,
+      "goal": "Close the generation arc Ben declared himself happy with, including the one piece he named as still owed. Cuts v0.1.7.",
+      "planned": [
+        "BL-303 (Generation Ledger), BL-304 (field-overlay lenses), BL-305 (political-step visibility)",
+        "BL-098 (the UX review walking the whole band against user_stories.json) — the right last act, since by then five sprints of surfaces will have accumulated",
+        "BL-317 (the New World wizard's prehistory timelapse), pulled back from v0.3.0 — the history time-lapse Ben named at Sprint 5's close, a generation-visibility item by nature"
+      ],
+      "notes": "One sequencing option worth taking: BL-317 pairs naturally with BL-264 (wizard layout after per-stage folding) — both are New World wizard stages; if Sprint 12 is building BL-264 anyway, riding BL-317 alongside it gets the timelapse three sprints earlier for very little extra. Superseded 2026-08-12 by NR-177 (the 0 CE refocus); never opened."
+    },
+    "14": {
+      "id": "14",
+      "theme": "v0.2.0 (the AI opponent)",
+      "state": "superseded",
+      "status_line": "Superseded 2026-08-12 by the 0 CE refocus (NR-177), never opened",
+      "opened_date": null,
+      "closed_date": null,
+      "goal": "The obvious next sprint after 8-13 — the thing that makes Io a game rather than a simulation.",
+      "planned": [],
+      "notes": "Named only as \"the obvious Sprint 14\" in the Sprints 8-14 plan, deliberately not carried by that plan (v0.2.0, 12 items — the opponent should be built against a settled player identity, not re-fitted to one). Deferred twice — first for the militia refocus, then again for the living world when Sprint 10 was inserted. Superseded 2026-08-12 by NR-177 along with 12-13; never opened, its items parked with the space arc."
+    },
+    "26": {
+      "id": "26",
+      "theme": "Re-baseline (the gate; nothing else may open first)",
+      "state": "subsumed",
+      "status_line": "Subsumed — split at execution into 26a/26b, themselves deleted in the 2026-08-24 purge",
+      "opened_date": null,
+      "closed_date": null,
+      "goal": "Make the board readable before eight sprints are planned onto it. This is method debt, and it is cheap. (Part of the Sprints 26-33 'The Fall' proposal; split at execution time into 26a and 26b, which are the sprints that actually opened.)",
+      "planned": [
+        "Close-out — flip the ~15 landed-but-open items terminal (BL-417, BL-429, BL-437, BL-439, BL-440, BL-441, BL-442, BL-443, BL-452, BL-453, BL-454, BL-455, BL-456, BL-457, BL-459). A plan built from --status designed schedules work that already shipped.",
+        "Split v0.1.16 — 37 open items in an admitted holding pen, no internal order. Name the minors this arc needs; add v0.1.18 to ROADMAP.md.",
+        "NEW-1 — prehistory-on determinism case. world_determinism.cpp sets prehistory_years=0 on every case, excluding the exact pass this whole arc changes.",
+        "Doc truth pass — MILITARY.md stale in three places, TECH_FOUNDATIONS.md still says combat is out of scope, HISTORY.md and ERAS.md describe a 4000-year six-band ladder generation does not run. Per ruling 8 the code is right and the docs are wrong: correct both to the shipped 400 years in one 4-year band.",
+        "NEW-12 — the nation-behaviour grant, written into the standing rules. Ruling 4 widens BL-054 in the BL-202/BL-203 shape. Must land before Lane D builds against it.",
+        "Un-park v0.1.11 — ruling 5. BL-155, BL-156, BL-186, BL-280 move to the ancient arc."
+      ],
+      "done_when": "backlog_query.js --status designed returns only genuinely unbuilt work, world_determinism has a green prehistory-on case, and the nation-behaviour exception is in the standing rules with its date and scope.",
+      "risk": "None material. The risk is skipping it and planning against a false board.",
+      "notes": "This is the arc's Sprint 26 as originally proposed; the adversarial pass finding 8 ('Sprint 26 is two sprints wearing one label') split it into Sprint 26a (three authority edits + determinism case) and Sprint 26b (close-out + doc pass), which are the entries actually opened 2026-08-18. AMENDED 2026-08-19: the dropped half of the split (N2 in the session's contradiction audit) was executed this date — v0.1.16 split into The watch (v0.1.16), Ancient conflict & seams (v0.1.19), Stance & force (v0.1.20), The credible rival (v0.1.21), Harness truth (v0.1.22), with BL-296/BL-443 to v0.1.11; v0.1.18 defined in ROADMAP.md as economy truth (Ben chose define over dissolve). The ~15-item close-out claim is also corrected by the same audit: 8 of the 15 are complete, 7 remain open pending per-item verification (N1)."
+    }
+  }
+}

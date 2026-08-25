@@ -70,7 +70,7 @@ authority doc for its subject, and the work in whichever sprint opens it.
 | **Economy breadth** | The growth spine is **chain depth**: how far down the production graph a corp reaches gates its next building. Past 20 building types, with alternate production methods that trade off rather than upgrade. |
 | **The economy tells the truth** | The measured pathologies, fixed — processing underearns extraction, the economy mines one resource, co-extraction is invisible, intra-catchment distance is free. |
 | **Ancient conflict & seams** | The Era −1 machinery graduates from generator to gameplay: era-keyed rosters, the strategic layer, the diplomacy seam and its battery, myth and theology. |
-| **Stance & force** | Who may fight whom, and the verbs to do it — the unit verb family, company answerability, the stance surface, Logistic Points, formations. |
+| **Stance & force** | Who may fight whom, and the verbs to do it — the unit verb family, company answerability, the stance surface, formations. *(Logistic Points left this theme: pulled forward and shipped by Sprint 18 — see Cut so far.)* |
 | **The credible rival** | The scorer behaves like a competitor and every verb is reachable: build scoring, procurement, demolition and roading, the processor and mine-siting blind spots. |
 | **Harness truth** | The instruments measure the sim that ships — lazy-sim cost, the stale-exe gate, the world-snapshot cache, seed-invariant settlement counts. |
 | **Policy, tech meta, the nation as actor** | The player is *subject to* a law and someone else enacts it. The tech effect union and shared modifier vocabulary; a law author over a real nation treasury, so a levy is a conserved transfer. |
@@ -86,6 +86,16 @@ authority doc for its subject, and the work in whichever sprint opens it.
 ---
 
 ## Cut so far
+
+**The network gets its ceiling (Sprint 18, 2026-08-24/25).** Logistic Points landed with both
+consumers, pulled forward from the Stance & force theme: cities generate a per-tick throughput rate,
+a march draws it in march points and pays credits, a convoy draws it in cargo units and is refused
+outright over the cap. Guns and butter compete for one anchor rate, which is what makes goods-versus-
+force priority an explicit design rather than an accident of tick order. With it: the Throughput
+lens, the scorer's road/hub and directed-convoy verbs, the market Selection card's dispatch form, a
+Port gate on the sea leg, and unit upkeep turned off zero. The draw formula is the thing to remember —
+it must measure *what moves*, never *how far*; a distance draw cut real convoy traffic by 73% while
+every golden held steady (NR-620), and only `haulage_measure` could see it.
 
 Tags `v0.0.4` → `v0.1.15`. The done-definition written at each of those cuts, and the findings each
 one recorded, are in [`archive/ROADMAP-2026-08-24.md`](archive/ROADMAP-2026-08-24.md); the per-item

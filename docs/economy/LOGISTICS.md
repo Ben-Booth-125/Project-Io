@@ -219,7 +219,8 @@ prototype, by design (`TECH_FOUNDATIONS.md` § Prototype scope).
 
 ## Logistic Points
 
-BL-464 (logistic points) owns the design. Ben, 2026-08-18: *"Let's begin codifying Logistic Points
+BL-596 (LP active march) and BL-597 (LP passive convoys) own the build, BL-606 (throughput lens)
+the surface — all 2026-08-24, replacing the purged BL-464 umbrella. Ben, 2026-08-18: *"Let's begin codifying Logistic Points
 in this sprint. It's an important layer for military and goods transport."* The reasoning below has
 survived two rulings and two rejected first cuts, and is recorded so the next cut starts from it.
 
@@ -274,7 +275,9 @@ does not live between ticks.
 
 **1. LP is a CAP, not a price.** The convoy already charges distance in credits. Adding LP as a
 second price would double-charge distance and move every economy golden. **Credits stay the price;
-LP decides whether the leg is admissible at all.**
+LP decides whether the leg is admissible at all.** A draw measured in *distance* breaks this rule
+however it is dressed up — see constraint 3 for the settled formula, and NR-620 for what it cost
+to learn: a distance draw cut real convoy traffic by 73% while every golden held steady.
 
 **2. Adopt the node half; refuse the link half.** The reference system runs two currencies —
 throughput from nodes, and distance from links. **Io already owns the link half, twice over:**
@@ -300,11 +303,16 @@ Each rejected an earlier cut. Two are structural.
    `military_points` was deleted for.** Cities are the locus.
 3. **Specify the LP cost formula before the allocation sort key**, which is a function of it. If
    cost is proportional to distance, LP *is* haulage cost again; if flat, the sort degenerates.
+   **Settled (Ben, 2026-08-25): the draw is what MOVES, not how far.** A passive convoy draw is
+   its **cargo quantity**; an active march draw is its **march points**. One rate serves both, so
+   a unit of goods and a march-point's worth of movement burden an anchor equally — the implicit
+   exchange rate, and a first cut. Distance stays priced in credits and only in credits.
 4. **The base allowance must not be the whole mechanic.** No corp is seeded a hub, so "your own
    nodes decide how much you may move" is fictional; city generation is what makes the rate real.
-5. **A rival must be able to build the generator.** `corp_ai.cpp` carries a port / inland-hub build
-   candidate (Ben, 2026-08-22: yes, and before LP lands; BL-447 (scorer never demolishes or roads)
-   is the scorer's missing-verb item), so the rate is not an asymmetric tax on rivals.
+5. **A rival must be able to build the generator.** `corp_ai.cpp`'s scorer carries `place_road`
+   and a port / inland-hub build candidate (Ben, 2026-08-22: yes, and before LP lands; BL-599
+   (rival roads and hubs) is the scorer's road/anchor item), so the rate is not an asymmetric tax
+   on rivals.
 6. **No reserved military share.** Two budgets means guns and butter stop competing, which is the
    whole point of one rate.
 7. **No one-way ratchet.** A `supply_decay_permille` with zero recovery is a stock, not a rate.
@@ -326,7 +334,11 @@ LP is what makes that priority explicit, and it is the strongest argument for it
   that field with a magnitude, so it is a small step from an existing surface rather than a new one.
 - **Allocation under contention is order-independent** — a deterministic priority rule over a
   sorted set, never first-come by iteration order.
-- Still to be argued before code: the rates for both halves, and which consumer lands first.
+- **Active lands first (Ben, 2026-08-24, the Sprint 18 design form)** — the priced march is the
+  first consumer; passive convoy admissibility follows in the same sprint, each half landing with
+  its consumer (settled rule 3, applied per half). Rates for both halves are first-cut in the
+  landing items, argued against BL-543's (value anchor) unit-cost anchor and flagged for tuning
+  rather than ruled ahead (NR-600).
 
 ---
 
@@ -347,7 +359,9 @@ LP is what makes that priority explicit, and it is the strongest argument for it
 (stance and friendship, which are interdiction's two predicates), [`PRODUCTION.md`](PRODUCTION.md)
 (§ Logistics and transport capacity, which this document supersedes).
 
-**Owning items.** BL-464 (logistic points) — throughput. BL-458 (interdiction) — the cut network.
-BL-188 (coastal ports) — sea trade. BL-452 (convoy verbs) and BL-453 (convoys ledger) — the
+**Owning items.** BL-596 / BL-597 (LP active march / passive convoys) — throughput; BL-606
+(throughput lens) — its lens. BL-458 (interdiction) — the cut network.
+BL-608 (sea port gate) — the sea endpoint gate (BL-188's archived coastal-trade prose is
+reference). BL-452 (convoy verbs) and BL-453 (convoys ledger) — the
 player-facing halves. BL-323 (buildings rework) — reach. BL-146 / BL-172 (road generation) — roads.
 BL-077 (intra-body pathfinding) — the core. BL-550 (national insolvency) — what the network costs.

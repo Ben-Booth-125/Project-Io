@@ -797,6 +797,25 @@ target_link_libraries(price_band_harness PRIVATE io_world_obj lua54)
 target_compile_features(price_band_harness PRIVATE cxx_std_20)
 target_compile_options(price_band_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# upkeep_harness (BL-603, UPKEEP_ZEROS) is live-Lua for the same reason
+# price_band_harness is, immediately above: U1 asks what the SHIPPED
+# scripts/economy.lua's unit_upkeep table actually authors (non-zero, and
+# honouring the BL-543 value anchor), which a hand-built fixture cannot
+# answer without becoming the thing under test. U2-U7 load a probe script
+# over the same registry for clean, round mechanical numbers.
+add_executable(upkeep_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/upkeep_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(upkeep_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(upkeep_harness PRIVATE io_world_obj lua54)
+target_compile_features(upkeep_harness PRIVATE cxx_std_20)
+target_compile_options(upkeep_harness PRIVATE ${IO_WARNING_FLAGS})
+
 # agent_seam_harness (BL-412) — the live agent control seam. Hand-declared
 # because it links two src/core TUs the world superset deliberately excludes:
 # agent_protocol.cpp (the --serve line protocol, shared with run_serve) and
@@ -1091,6 +1110,11 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     # contracts.lua by relative path through two registries; same reasoning
     # as condition_set_harness above.
     mercenary_contract_harness
+    # ADDED 2026-08-24 (BL-603). U1 loads scripts/recipes.lua + economy.lua by
+    # relative path and asks what the SHIPPED file authors; without this it
+    # would run from build/ under ctest and measure a stale or absent copy,
+    # same trap price_band_harness's own entry above already documents.
+    upkeep_harness
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})

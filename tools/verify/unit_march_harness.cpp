@@ -81,6 +81,7 @@ entity_id make_row_body(world& w, int gw, terrain_landform lf = terrain_landform
     bc.grid_width  = gw;
     bc.grid_height = 1;
     w.bodies[body] = bc;
+    entity_id first_tile = null_entity;
     for (int c = 0; c < gw; ++c)
     {
         const entity_id t = w.create_entity();
@@ -91,7 +92,18 @@ entity_id make_row_body(world& w, int gw, terrain_landform lf = terrain_landform
         tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
         tc.landform    = lf;
         w.tiles[t]     = tc;
+        if (c == 0)
+            first_tile = t;
     }
+    // BL-596: every fixture body needs a supply anchor now that run_unit_march
+    // gates on active Logistic Points — an anchorless body refuses EVERY
+    // march outright (LOGISTICS.md § Logistic Points constraint 2: cities are
+    // the locus). A city at tile 0 anchors the whole row (body_reach_field's
+    // own Dijkstra is what M2/M4/M5/M6 already exercise the cost of), and
+    // registry_with_march below pairs it with a generous active-LP rate so
+    // the cap does not bind unless a test deliberately starves it — see
+    // tools/verify/logistic_points_harness.cpp for the tests that DO.
+    w.population_centre_tile[w.create_entity()] = first_tile;
     return body;
 }
 
@@ -124,11 +136,20 @@ entity_id add_unit(world& w, entity_id corp, entity_id tile, uint16_t type = ROW
 
 /// A registry with `march_points_per_class[infantry]` authored to @p pts;
 /// every other class stays at the struct default (0.0 — cannot march).
+///
+/// BL-596: also authors a deliberately generous active_lp_per_anchor_tick so
+/// none of THIS file's pre-existing march tests are gated by the cap — they
+/// test march resolution, not LP contention. Set once, high enough that no
+/// fixture here (a handful of units, one anchor) can plausibly exhaust it;
+/// tools/verify/logistic_points_harness.cpp is where the cap itself, and its
+/// refusal path, are actually exercised.
 recipe_registry registry_with_march(float pts)
 {
     recipe_registry reg;
     military_capability_params mp = reg.military();
     mp.march_points_per_class[static_cast<std::size_t>(unit_class::infantry)] = pts;
+    mp.active_lp_per_anchor_tick = 1.0e6f;
+    mp.active_lp_credit_per_unit_distance = 0.0f; // isolate march mechanics from credit pricing here
     reg.set_military(mp);
     return reg;
 }
@@ -161,6 +182,7 @@ entity_id make_grid_body(world& w, int gw, int gh,
     bc.grid_width  = gw;
     bc.grid_height = gh;
     w.bodies[body] = bc;
+    entity_id first_tile = null_entity;
     for (int r = 0; r < gh; ++r)
         for (int c = 0; c < gw; ++c)
         {
@@ -172,7 +194,11 @@ entity_id make_grid_body(world& w, int gw, int gh,
             tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
             tc.landform    = lf;
             w.tiles[t]     = tc;
+            if (r == 0 && c == 0)
+                first_tile = t;
         }
+    // BL-596: same anchor requirement as make_row_body, above.
+    w.population_centre_tile[w.create_entity()] = first_tile;
     return body;
 }
 
