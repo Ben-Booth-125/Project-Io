@@ -10,7 +10,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
-| 2026-08-24 | [The shell gets looked at: a UI pass, then Sprint 17b delivers it (BL-596–BL-604; NR-598–NR-615)](DEVLOG.md) | BL-070 BL-086 BL-376 BL-514 BL-596 BL-597 BL-598 BL-601 BL-603 BL-604 | DEVLOG.md |
+| 2026-08-25 | [Population design settles, Sprint 19 opens and lands both build waves (BL-610–BL-618, BL-620; NR-628–NR-641)](DEVLOG.md) | BL-070 BL-086 BL-376 BL-514 BL-596 BL-597 BL-598 BL-601 BL-603 BL-604 BL-610 BL-611 BL-612 BL-613 BL-614 BL-615 BL-616 BL-617 BL-618 BL-619 BL-620 | DEVLOG.md |
 | 2026-08-24 | [Sprint 17 designed, delivered end to end, and cut as v0.1.17 (BL-585–BL-594)](DEVLOG.md) | BL-409 BL-429 BL-585 BL-586 BL-587 BL-588 BL-589 BL-590 BL-591 BL-592 BL-593 BL-594 | DEVLOG.md |
 | 2026-08-23 | [Sprint 16 Batch Delivery opens: BL-571/BL-572 ratified, the batch planned, Wave 1 lands (BL-569, BL-575)](DEVLOG.md) | BL-348 BL-349 BL-436 BL-569 BL-570 BL-571 BL-572 BL-573 BL-574 BL-575 BL-576 BL-577 BL-578 BL-579 BL-594 BL-595 | DEVLOG.md |
 | 2026-08-23 | [The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575)](DEVLOG.md) | BL-569 BL-570 BL-571 BL-572 BL-573 BL-574 BL-575 BL-576 BL-577 BL-578 | DEVLOG.md |

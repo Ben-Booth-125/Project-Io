@@ -10,7 +10,41 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — The shell gets looked at: a UI pass, then Sprint 17b delivers it (BL-596–BL-604; NR-598–NR-615) (2026-08-24, latest)
+## Session — Population design settles, Sprint 19 opens and lands both build waves (BL-610–BL-618, BL-620; NR-628–NR-641) (2026-08-25, latest)
+
+**Runtime:** ~5 h wall-clock (estimated). Modes in sequence: Design (the population session —
+doc summaries, Ben's four ideas, the elicitation form, the settled design written into
+POPULATION.md / PROVINCES.md / GLOSSARY.md / LOGISTICS.md plus the new RESEARCH.md stub) →
+Full, Batch Delivery ×2 (Sprint 19 waves 1 and 2, five worktree agents total) → integration,
+review barrier, harness sweeps, close-out.
+
+**Design.** Ben's four ideas (town-per-province, qualification, roads-by-qualification,
+migration) plus six advisor questions resolved on one form. Settled: centres from Era −1
+demography; every land province anchored by a centre that decides its nation; urban ground
+stamped; per-nation qualification raised by schooling/universities and consumed by complicated
+methods; wage-competition labour clearing; stratum placement gates (university at City+);
+promotion/decline with raze-only destruction; stance-gated migration with real brain drain;
+RESEARCH.md stub (universities produce RP). Cost of living deliberately left unquantified
+(POPULATION.md § Open items).
+
+**Wave 1** (agents G/E/P): BL-610 centres from demography (density ~40× — 6.04 land tiles per
+centre, s1-heavy histogram), BL-611 province anchors (nation-locked land fill; 6,266/6,266
+anchored), BL-612 urban stamping, BL-613 qualification (+ save v13), BL-614 wage clearing
+(+ v14), BL-615 stratum gates. The save-version collision between two agents was resolved by
+stacking to v14 at merge. verifier-review returned FIX FIRST — a stale static_assert, two
+unasserted requirements (both got real harness rows), and a ghost-preview gate mismatch — all
+fixed before the compile.
+
+**Wave 2** (agents W2E/W2G): BL-616 promotion/decline + the raze_centre verb, BL-617 migration
+(stance gate latent — nothing declares nation stance yet), BL-620 road generation restructured
+(backbone over towns, village spurs; world build 2.90 s → 0.70 s under g++ — the 56 s road wall
+is gone), BL-618 qualification-gated tiers (the antiquity default world is now all-Track —
+NR-641, Ben's call).
+
+**Open at close:** BL-619 (research design session, gated); BL-615's live click (access);
+NR-637/640/641 presentation-and-ordering calls; the NR-630/635 density retunes. Observed in
+passing: story_check has 50 dead-trace fails from the 2026-08-23 backlog purge (pre-existing);
+the MCP verb table is 10 verbs stale (NR-639, task chip offered).
 
 **Runtime:** ~8 h wall-clock (estimated — the four worktree agents alone ran 79–99 min each,
 concurrently). Modes in sequence: Light (the ROADMAP trim) → Review (the shell pass) → Design (the

@@ -69,11 +69,232 @@
       ],
       "resolution": "Delivered one of BL-089's two documented deferrals: the Solar-canvas body hover tooltip now carries a short commercial-activity line keyed on body_activity_visibility (mirroring the Selection panel's draw_activity_section wording), excluding the star. Pure read, no new state. The OTHER deferral — the deterministic proximity 'glimpse' — remains deferred (it needs either a serialised last_glimpse_tick on body_component or orbital back-computation from mutated orbital_angle_rad; disproportionate determinism/save-seam risk for a polish minor). Code-verified (tooltip is hover-gated, not headlessly capturable)."
     },
+    "ancient-goods-append-and-slice-1": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: chain_depth (R1, R1b)"
+          ],
+          "requirement": "ITEM-SPANNING (BL-585): four resource_type values appended at the end of the enum (ceramics, dressed_stone, planks, tools), each produced by an authored recipe and either consumed by another recipe or named in chain_depth’s R1/R1b actor-consumed tables as a terminal market-sold good. world_save_version bumped with the read path’s strict-equality rejection extended (no migration).",
+          "notes": "chain_depth: \"42 resources: 0 unobtainable, 0 unwanted, 14 actor-consumed exemptions\" / R1b \"0 stranded, 5 known-and-tracked gaps\". save_roundtrip gained P13 (v8-versioned stream refused). world_save_version 8 -> 9.",
+          "result_metric": "4 new resource_type values, resource_count 38 -> 42, 0 orphans"
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: chain_depth (D6, R2)"
+          ],
+          "requirement": "BL-586 slice 1: four named ancient buildings on existing raws (Potter’s Kiln, Stonemason, Sawmill, Toolmaker), each following the generic-building-plus-recipe pattern (no new building_type enum value), each declaring a BL-434 sub-facility group. No dominated method introduced; ancient depth ceiling unchanged.",
+          "notes": "Construction Materials is a new group (Kiln/Stonemason/Sawmill); Toolmaker joined Metal Foundry as its deepest member (required depth 2, depth(tools)=3, tied with the existing ceiling). D6: \"max depth: industrial 4, ancient 3\" — unchanged from before this item.",
+          "result_metric": "4 named buildings, 1 new sub-facility group, ancient max depth unchanged at 3"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: recipe_switch_harness",
+            "headless: price_band_harness",
+            "headless: save_roundtrip",
+            "headless: determinism_harness",
+            "headless: spectator_determinism",
+            "build: full tree (cmake --build build, every target)"
+          ],
+          "requirement": "The widened enum and the save-format bump do not regress any other harness or the GUI build. Two guarded exhaustiveness checks (src/core/verify_api.cpp k_resource_slugs, src/world/resource_names.cpp) found and fixed beyond the item’s own declared file list. spectator_determinism’s golden re-blessed on the structural move, confirmed reproducible across two independently built worlds before blessing, per this file’s own standing policy.",
+          "notes": "save_roundtrip: ALL PASS including new P13. determinism_harness: ALL PASS. spectator_determinism: re-blessed 2FB3C201D7C4B1FA, ALL PASS after. recipe_switch_harness / price_band_harness: unchanged, ALL PASS. Full tree build (cmake --build build): zero errors, zero warnings introduced.",
+          "result_metric": "6 harnesses + full GUI build, 0 failures after the re-bless"
+        }
+      ]
+    },
+    "ancient-roster-slice-2": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: chain_depth (R1, R1b)"
+          ],
+          "requirement": "Tannery (hides -> leather), Weaver (fibre -> cloth) and Shipwright (planks + cloth -> rigging) complete the design table’s remaining three chains; no orphan resource in either direction, band-reachable.",
+          "notes": "47 resources total (up from 42), 0 unobtainable, 0 unwanted; R1b shows 0 stranded beyond the pre-existing 5 tracked space-era gaps. 23 named buildings now carry a material override (up from 18).",
+          "result_metric": "47 resources, 0 orphans, 23 named buildings"
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: chain_depth (D6/G1 depth report)"
+          ],
+          "requirement": "Depth is the point, not a side effect (the item’s own instruction): the deepest new chain should clear depth 2, confirmed by the harness’s own report, not hand-computed.",
+          "notes": "leather and cloth land at depth 1 (one step above their depth-0 raw); Shipwright/rigging lands at depth 2 (max(depth(planks)=1, depth(cloth)=1) + 1), the roster’s first chain past the earlier Toolmaker-only depth-2+ example within this item’s own new content.",
+          "result_metric": "rigging at depth 2"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "code",
+            "design ruling (elicitation form, 2026-08-24)"
+          ],
+          "requirement": "hides’ deposit-generation mechanism and fibre’s were unsettled design calls (cover-based vs endemic; new resource vs reuse) — put to Ben rather than assumed, before any code.",
+          "notes": "Ruled: hides ENDEMIC (like furs — lat/sector-restricted, richness-scored, terrain_cover::grass); fibre ORDINARY cover-based/biotic (grass/marsh, alongside agricultural_produce, no rarity gate); Shipwright’s output a new named good (“rigging”) rather than reusing trade_goods_misc; whole slice built in one pass rather than split further.",
+          "result_metric": "4 design calls ruled before implementation"
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "headless: save_roundtrip, spectator_determinism"
+          ],
+          "requirement": "world_save_version bumps for the structural resource_count widening (9 -> 10), a refused-predecessor row proves the old format is rejected, and the spectator-mode golden is re-blessed only after confirmed reproducibility across independent builds.",
+          "notes": "save_roundtrip P14 confirms a v9 stream is refused. spectator_determinism’s k_unspectated_golden re-blessed to 71273F6FEDE03965, confirmed across two independent builds.",
+          "result_metric": "1 new P-row, 1 re-blessed golden"
+        },
+        {
+          "id": "R5",
+          "status": "complete",
+          "verification": [
+            "headless: spectator_determinism",
+            "design ruling"
+          ],
+          "requirement": "A real regression found by the resource_count widening (spectator_determinism’s R1 A/B family-coverage check breaking, unrelated to this item’s new content) is differentially proven, not silently patched, and put to Ben before any fix.",
+          "notes": "Differential test (recipes.lua/economy.lua reverted to pre-slice-2, enum width unchanged) reproduced the identical failure and hash, isolating the cause to the bare width change. Ben ruled the check retired (commented, with full provenance, not deleted or weakened) rather than patched around — filed as NR-596, with a follow-up note owed to io-standing-rules.md’s BL-409 section on what the harness still guarantees.",
+          "result_metric": "1 regression differentially isolated, 1 check retired on ruling"
+        }
+      ]
+    },
     "app-cpp-decomposition": {
       "resolution": "Complete 2026-08-10. app.cpp 3826 -> 1422 lines (-2404) across four VERBATIM extractions, one commit each: verify_api.cpp + app_capture.cpp (~1,180 lines), startup_screens.cpp (~580, matching STARTUP.md ownership), time_panel.{hpp,cpp} (~300), session_history.{hpp,cpp} (~230). Bodies were moved by line-range copy so logic reordering was not possible; the verify API's 60 registered function names were diffed byte-identical (scripts/verify/*.lua call them by name). Two forced changes, both recorded: frame_stats_instance lost its anonymous namespace (render() and the CSV tap now sit in different TUs) and the extracted system menu inlines the pause toggle rather than calling private app::dispatch_action - reviewed as character-equivalent."
     },
+    "battle-state-in-world": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "result_metric": "1000 -> 648 men in one tick",
+          "requirement": "ITEM-SPANNING (headless): A FIGHT ACTUALLY HAPPENS. Two corps' units standing in the same province, with at least one holding a hostile stance toward the other, produce a battle that OPENS, is STEPPED over ticks, and applies losses to unit_component. This is the row that fails today and passes after the item: both resolvers are currently compiled, harnessed, and have NO production caller, so the military layer can compute a fight but cannot have one. The assertion must run the real tick entry point, not call the resolver directly - calling the resolver is what already works.",
+          "notes": "battle_engagement_harness B1 — runs run_economy_step, the real tick entry point, not the resolver. 1000 men -> 648 in one tick. B1c asserts the negative: two NEUTRAL corps sharing a province do not fight.",
+          "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "result_metric": "identical battle sets over 2 builds",
+          "requirement": "DISCOVERY IS ORDER-INDEPENDENT. Battle creation walks provinces in sorted (province id, corp-pair) order, so which battles exist cannot depend on container layout. Assert by building the same world twice and comparing the battle set exactly; the hazard is real because world's corp and unit containers are unordered and the stance tables may be too.",
+          "notes": "B2 — same world built twice, battle set compared exactly. Candidates are gathered then SORTED by (province, attacker, defender) before any battle opens.",
+          "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "result_metric": "1 battle per pair per province",
+          "requirement": "ONE BATTLE PER CORP PAIR PER PROVINCE. A pair cannot be fighting two battles in the same province, and a third corp arriving does not silently join or split an existing pair's battle.",
+          "notes": "B3 — a third corp arriving opens its OWN battles against each existing participant rather than joining or splitting theirs. The std::unique dedup that was a silent no-op with three corps was found by the scout and fixed (NR-463).",
+          "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "result_metric": "4/4 stream distinctness checks",
+          "requirement": "THE SEED FOLDS THE PROVINCE. Battle identity folds the province id where campaign_battle_identity folds tile_index today - same splitmix64 shape, ROLE ORDER PRESERVED so an attacker/defender swap is a different stream. Assert that two battles differing only in province get different streams, and that swapping roles does too.",
+          "notes": "B4 — campaign_battle_identity::tile_index renamed IN PLACE to `province`, same splitmix64 slot and constant, role order preserved. Two battles differing only in province get different streams; swapping roles does too.",
+          "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+        },
+        {
+          "id": "R5",
+          "status": "complete",
+          "result_metric": "sum == round loss, 0 extra draws",
+          "requirement": "PER-UNIT HITS ARE A PURE FUNCTION, NO NEW DRAWS. A side's round loss distributes across its participating units proportional to count, remainder by ascending entity id. Assert the distribution sums to the round loss exactly (no leaked or minted men) and that it consumes no RNG.",
+          "notes": "B5 — distribution sums to the round loss exactly, remainder by ascending entity id, no RNG consumed outside step_campaign_battle's fixed two draws per round.",
+          "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+        },
+        {
+          "id": "R6",
+          "status": "complete",
+          "result_metric": "spectator hashes byte-identical",
+          "requirement": "DETERMINISM, IN-MEMORY REPLAY ONLY - the BL-448 precedent verbatim. No serialiser exists for battle state, so assert on replay and NEVER on a save round-trip. Same seed, same ticks, twice: identical battles, identical rounds_fought, identical unit counts.",
+          "notes": "B6 — in-memory replay only, the BL-448 precedent. world::battles folds into state_hash behind an empty-list guard, so a world that never fights hashes exactly as before; verified byte-identical against the pinned spectator_determinism hashes.",
+          "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+        },
+        {
+          "id": "R7",
+          "status": "complete",
+          "result_metric": "argmax + tie-break asserted",
+          "requirement": "THE TERRAIN PAIR IS THE DEFENDER'S BEST GROUND. One pair for the whole battle, taken from the defender-side tile with the highest terrain_defence in the envelope, ties broken by ascending tile id. Since BL-519 that reads all three axes, so a forested crag must be able to beat bare rock - assert that the chosen tile is the argmax and that the tie-break is by id.",
+          "notes": "B7 / battle_ground() — the defender-side tile with the highest terrain_defence in the envelope, ties by ascending tile id. Exposed as a named function precisely so it stays assertable: a battle is erased the moment it concludes, so a rule only testable when a fight runs long is a rule that quietly stops being tested. Since BL-519 it reads all three terrain axes.",
+          "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+        },
+        {
+          "id": "R8",
+          "status": "complete",
+          "result_metric": "quote == charge; rejection is a no-op",
+          "requirement": "WITHDRAWAL IS PRICED AND REJECTION MUTATES NOTHING. corp_verb::withdraw_from_battle{province} is legal for either participant, applies at the tick boundary before the next round batch, and prices the existing three-term cost. An illegal or duplicate withdraw must leave the world byte-identical - the AI-facing-seam rule, since this verb is reachable from --serve.",
+          "notes": "B8 / B12b — the three-term price is quoted from the resolver's own arithmetic (quote_withdrawal) and B12b asserts quote-against-charge. A rejected request (no such battle, or a non-participant) returns false and mutates nothing. The scout found the parting cost cost NO MEN — strength was captured after the withdrawal rather than before — and it is fixed (NR-463).",
+          "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+        },
+        {
+          "id": "R9",
+          "status": "partial",
+          "result_metric": "aftermath computed; consequence absent",
+          "requirement": "AFTERMATH. The field is held by the side that stayed, defender on ties. Zero-count units are disbanded by the upkeep pass's EXISTING cleanup rather than a second mechanism, and the trace is discarded at battle end so nothing but the record crosses a tick boundary.",
+          "notes": "The field IS held by the side that stayed, defender on ties, and zero-count units ARE reaped (run_unit_upkeep gained the count<=0 test it never had — NR-464). PARTIAL because holding the field HAS NO CONSEQUENCE: no territorial-control concept exists for a battle to affect. Named rather than hidden, NR-465.",
+          "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+        },
+        {
+          "id": "R10",
+          "status": "complete",
+          "result_metric": "verb 24, dictionary entry present",
+          "requirement": "ACTIONS.json TRAVELS WITH THE VERB. The new corp_verb gets its dictionary entry in the same commit (node tools/session/render_actions.js), per the stale-entry rule in src/world/CLAUDE.md - a stale entry misleads the AI player the way a stale golden misleads a visual check.",
+          "notes": "withdraw_from_battle APPENDED at corp_verb 24 with its ACTIONS.json dictionary entry in the same commit. unit_march_harness's corp_verb_count guard fired correctly on the append and was narrowed to assert the new count rather than deleted.",
+          "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+        }
+      ],
+      "resolution": "All ten rows terminal: nine complete, R9 partial. R9 is partial for a stated reason rather than a missing check — the aftermath is computed correctly but nothing consumes it, because no territorial-control concept exists yet.\n\nThe row that could not have been written before this item is R1: it runs the real tick entry point rather than calling a resolver, which is the whole difference between a military layer that can COMPUTE a fight and one that can HAVE one.\n\nFour defects were found by an adversarial scout AFTER the code compiled and passed 26 checks (NR-463/NR-464), and all four are fixed. That is the argument for the scout pass, not against the harness: they were failures of what was asserted, not of whether the assertions ran."
+    },
     "body-market-index": {
       "resolution": "world.hpp gains mutable body_market_index + count/max-id stamp (markets are created, never destroyed — verified); markets_by_body returns the cached ref; market_for_tile/clear_markets allocation-free on the hot path, signature unchanged."
+    },
+    "build-door-wide-roster": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "visual (partial — see notes)",
+            "code"
+          ],
+          "requirement": "ITEM-SPANNING: put the item’s own named design call (filtered-out versus shown-and-locked for a tech-locked recipe) to Ben, with the current code-level facts stated first (Rule 0b) — the candidate filter never checked recipe_unlocked at all, so refined_copper (tech-locked since BL-589) was showing as a normal buildable option with no explanation for why placing it would fail.",
+          "notes": "Ruling: filtered out, matching the existing era_locked/depth_locked precedent. Implemented as a third clause on the SAME removal predicate (selection_panel.cpp) that already carried the other two — recipe_unlocked(w, reg, w.player_entity, c.recipe). Not visually confirmed showing the group actually disappearing: two separate, pre-existing infra gaps blocked it (NR-595) — computer-use cannot reach the custom ProjectIo.exe (same gap as NR-593), and the tile build ledger’s dynamic window title does not match any of scroll_panel’s fixed names, so the column could not be scrolled to bring Metal Foundry into frame in a --verify capture. The code change itself mirrors an already-verified pattern exactly (one more clause on an existing, tested predicate), which is why it is accepted as complete rather than blocked.",
+          "result_metric": "1 clause added to an existing 2-clause filter predicate"
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: construction_gate_harness",
+            "headless: construction_harness",
+            "headless: chain_depth",
+            "headless: tech_gate_harness",
+            "headless: corp_ai_harness",
+            "headless: recipe_switch_harness",
+            "headless: full tree build"
+          ],
+          "requirement": "The filter change integrates cleanly — no regression to construction, the tech gates, the depth ladder, or the AI scorer, none of which this UI-only change should have touched.",
+          "notes": "Full tree build (every target, zero errors) and 6 relevant headless harnesses clean — none of them exercise selection_panel.cpp (a GUI-only file), so this confirms the surrounding machinery (recipe_unlocked, the tech gates, construct_building) is unaffected, not the UI change itself.",
+          "result_metric": "0 regressions"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "code"
+          ],
+          "requirement": "Owed alongside the code, per the item’s own list: question_log.json and ACTIONS.json updated for the changed behavior.",
+          "notes": "question_log.json’s selection_panel entry updated in place. ACTIONS.json’s gameplay.construct precondition corrected — it described only the ORIGINAL structure-level tech lock (military_base/E0-ML-01) and was silent on the two recipe-level gates BL-588/BL-589 shipped and on the fact that a locked structure still shows a row while a locked recipe does not (an AI agent reading the old text would not know the ledger can now hide a candidate entirely). Corrected rather than left stale.",
+          "result_metric": "2 doc entries updated, 1 real staleness in ACTIONS.json fixed"
+        }
+      ]
     },
     "build-warning-flags": {
       "rows": [
@@ -263,6 +484,50 @@
       ],
       "resolution": "Closed in the 2026-07-04 backlog reconciliation (retro-verified). Canvas hit-testing (marker hit-zones + selection resolution) is live in body_surface_canvas.cpp's click handler and selection_panel.cpp's building branch; rows R1-R3 retro-verified. Pure bookkeeping."
     },
+    "centre-promotion-decline": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: economy/population harness rows"
+          ],
+          "requirement": "A centre with sustained met supply, habitability and population above the next tier's threshold promotes one scale tier deterministically; a centre failing its conditions shrinks and never drops below scale 1 passively.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: command harness row"
+          ],
+          "requirement": "A raze verb (occupation context) destroys a centre through the corp_command seam; the ACTIONS.json entry lands in the same change; a razed anchor's province conquest consequence is stated or deferred with an owner.",
+          "notes": ""
+        }
+      ]
+    },
+    "centres-from-demography": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: world_determinism + demography_harness / world_audit extension"
+          ],
+          "requirement": "Centre count and scale are a pure function of the settlement regions' simulated populations - the land-area divisor and the 40/30/20/8/2 weighted draw are gone from the campaign path; two generations of the same seed produce identical centre sets.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: measurement run, numbers in the item's completion notes"
+          ],
+          "requirement": "The resulting density is MEASURED and reported: centres per land tile, scale histogram, and per-province coverage - numbers for the NR-630 retune, not assertions.",
+          "notes": "Measured seeds 0-2: 8.76/8.04/6.18 tiles/centre pre-anchor (6.04 post-anchor), s1=4928 s2=206 s3=45 s4=11 s5=1, coverage 100% post-BL-611. NR-630/NR-635 carry the retune numbers."
+        }
+      ]
+    },
     "chart-question-log": {
       "rows": [
         {
@@ -384,6 +649,21 @@
       ],
       "resolution": "All 6 rows met. planetology_harness 121/121 pass (19 new R13); planetology_sweep unchanged; full CTest 37/37."
     },
+    "condition-province-subject": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless"
+          ],
+          "requirement": "ITEM-SPANNING: condition_subject::province_held measures against world::province_holder (holder / non-holder / sea province all read correctly), scripts/contracts.lua's template table loads through the protected sol2 path with a 'take' (point) and a 'hold' (continuous) row, and condition_set_harness.cpp exercises the measure and the template load/round-trip.",
+          "notes": "condition::province is a new fixed-size field inside every law's/embargo's condition_set — a save-format consequence beyond the item's own file list, correctly caught and handled (world_save_version bump, save_roundtrip P8/P9 extended). fee_mult/deadline_ticks in the two authored template rows are placeholders, not measured — NR-579.",
+          "result_metric": "condition_set_harness: 67 checks, 0 failures"
+        }
+      ],
+      "resolution": "Landed on main (worktree-agent-aae464e367f3fcb1d, merged 0a8f6de2). condition_set_harness 67/67, save_roundtrip clean (world_save_version bumped to 5, then 6 when BL-571 merged on top — see nation-garrisons' resolution)."
+    },
     "construction-panel-deferred-demolish": {
       "resolution": "Dismantle routes through ui_state pending_demolish (the selection-panel seam); bonus real fix: the old call passed selected_entity, which in the tile-fallback path is the TILE id, so tile-selected dismantles silently failed — now resolves found_id. Reopen/Close bool flips stay direct with an exemption comment."
     },
@@ -446,6 +726,83 @@
         }
       ],
       "resolution": "Closed in the 2026-07-04 backlog reconciliation (retro-verified). Construction pricing (per-building resource+budget cost, pool deduction guard) is live in recipe_registry.{hpp,cpp}, scripts/economy.lua, construction.cpp, construction_panel.cpp; rows R1-R4 retro-verified. Follow-up noted: no harness covers the insufficient-materials path."
+    },
+    "contract-harness": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless"
+          ],
+          "requirement": "ITEM-SPANNING: tools/verify/mercenary_contract_harness.cpp observes, from a fixture world and scripted verbs, one instance each of: an offer issued by a threatened nation (M1); accept with a valid force and a bit-exact conserved deposit transfer (M2); a take-template completed on a decisive battle with the remainder paid (M3); a hold-template failed on the first lost tick with the deposit forfeit and reputation lower than a cancel (M4); an abandon (M5); two runs from one seed hash-identical across all cases (M6); and a save/load round-trip mid-contract (M7).",
+          "notes": "M1/M5 already covered by nation_scorer_harness R8 / this harness's own existing R4, referenced not duplicated. M7 already covered by save_roundtrip's P12. The item's original requirement text named 'the escrow returned' on a failed hold contract (M4) -- no such mechanic exists (a mercenary_contract carries no escrow field), matching CONTRACTS.md's own Q2 table ('failed: deposit forfeit, nothing paid'). Wording corrected 2026-08-24 per NR-584 (Ben: loose paraphrase, not a literal spec -- confirmed, no code change).",
+          "result_metric": "mercenary_contract_harness: 66 checks, 0 failures (51 -> 66)"
+        }
+      ],
+      "resolution": "Landed on main (worktree-agent-afa7ac59bf567cd92, merged e1a1a44a). Extended BL-573's existing mercenary_contract_harness from 51 to 66 checks. Independently re-verified."
+    },
+    "contract-messages-and-income": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless",
+            "visual"
+          ],
+          "requirement": "ITEM-SPANNING: each contract terminal/transition event (offer issued/accepted/completed/failed/abandoned) posts a Public-channel message through session_history the same tick it occurs, a contract card opens from the ledger showing client/predicate/force/deadline/fee split, and the Balance ledger renders a 'Contract income' line sourced from budget_result::subsidies.",
+          "notes": "tools/verify/contract_dispatch_harness.cpp (new, 20/20) proves the five dispatch phrasings, the BL-290 tongue-bank determinism, and the abandoned-event one-shot flag; independently re-run on the merged tree, unchanged. subsidies-population bug traced and fixed in passing: a completed contract's remainder credited the corp balance directly but never touched report.budgets[...].subsidies, so the Balance line and header runway would have silently under-read a real payout -- fixed at the same call site. NOT live-click confirmed: the contract card (selection_kind::contract) has NO live trigger path yet -- no UI control anywhere calls corp_command to select a contract entity, and the Contracts ledger (BL-576, sibling wave) does not wire a click-through to it either. Confirmed directly in this session's live pass (2026-08-24): clicking an Active-view contract row in the ledger selects nothing (falls through to the underlying map tile), matching both BL-576's and BL-577's own agent reports. The card's rendering code was not exercised by mouse click; it is unreachable until a future item wires a selection trigger for a contract entity. Balance-line and header-runway rendering also not live-confirmed (no completed contract existed in the live pass to produce a non-zero value) but read correct from the traced fix. Deliberate design call: mercenary_contract::abandoned_event_posted is unserialized -- NR-585.",
+          "result_metric": "contract_dispatch_harness: 20 checks, 0 failures"
+        }
+      ],
+      "resolution": "Landed on main (worktree-agent-a868b5c9d8eb5bcb9, merged 9bc93591). The dispatch/income half is headless-verified (20/20, new contract_dispatch_harness) and independently re-run; the contract card's live-click is UNCONFIRMED -- see R1 notes."
+    },
+    "contract-offers": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless"
+          ],
+          "requirement": "ITEM-SPANNING: derive_contract_offers (run_nation_step, after the budget pass) targets the weakest border province against the nation's highest-grudge neighbour (deterministic argmin, ascending-id tiebreak), a mercenary_offer accumulates the contracted_force line's spendable share into its own offer_escrow until the template minimum clears, several offers can be open and filling concurrently with the tick's share applied oldest-issued-first, an unanswered offer expires after offer_ttl_ticks and returns its escrow, and nation_scorer_harness R5 shows a threatened nation issuing an offer, an unthreatened one not, two offers coexisting, and the sequence replayable. (Landed as R8, not R5 — the file's own R5 was already grudges; renumbered to avoid collision, same requirement content.)",
+          "notes": "line_takes_subject(contracted_force) = true. Fee/deadline are a placeholder contract_offer_params, not a live contract_template_registry lookup — deferred to BL-573 (NR-581).",
+          "result_metric": "nation_scorer_harness R8: 34 checks, 0 failures"
+        }
+      ],
+      "resolution": "Landed on main (worktree-agent-a1a24b0f421a2fbf6, merged). nation_scorer_harness R8 (34 checks, all pass); save_roundtrip clean (world_save_version 6->7)."
+    },
+    "contract-record-and-verbs": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless"
+          ],
+          "requirement": "ITEM-SPANNING: corp_verb::accept_offer and abandon_contract are reachable through corp_command with the seam's untrusted-boundary rule (a rejection mutates nothing), a mercenary_contract evaluates each tick after run_battles into completed/failed/abandoned with the deposit/remainder split CONTRACTS.md specifies, failure folds sentiment_factor_kind::contract_failed and is measurably the hardest reputation move, committed units cannot be disbanded or double-committed, and the record round-trips through world_save.cpp.",
+          "notes": "docs/ai/ACTIONS.json gains the two verbs. Payout is a direct transfer from the offer's already-funded escrow, not a second budget_claim draw (would double-debit — BL-572's escrow already pulled the treasury). contract_failed's -4.0 Trust magnitude is a ratio (2x contract_cancelled), not measured — NR-582.",
+          "result_metric": "mercenary_contract_harness: 51 checks, 0 failures"
+        }
+      ],
+      "resolution": "Landed on main (worktree-agent-a426dc003723cf20f, merged). mercenary_contract_harness (51/51, new); save_roundtrip clean (world_save_version 7->8)."
+    },
+    "contracts-ledger": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "visual",
+            "manual"
+          ],
+          "requirement": "ITEM-SPANNING: the nav-rail Contracts ledger (toggle rule honoured) shows Offers/Active/History views, an Accept press on an offer opens a force picker over uncommitted owned units and dispatches accept_offer on confirm, an Abandon press on an active contract shows its reputation cost before dispatching abandon_contract, an offer is hidden unless its target body is at least Known (DISCOVERY.md), and a live open-and-click pass proves the Accept and Abandon presses are reachable, not only a rendering capture.",
+          "notes": "Live pass (main session, computer-use, 2026-08-24), against a real generated world with real live offers (a nation's budget WAS funded in this seed, contrary to the NR-580 worst case): rail slot 13 renders, tooltips, and toggles correctly (re-click closes, matching the standing toggle rule). Offers view showed four real mercenary_offers with fee/escrow/deadline/garrison. Accept opened the force picker over the owned uncommitted unit; Confirm dispatched accept_offer -- balance visibly credited (Cr -85 debt -> Cr 15), the offer moved from Offers to Active. Active view rendered the contract's predicate, deadline and committed force correctly. Abandon opened the exact confirmation CONTRACTS.md specifies (deposit forfeit, '-2.0 Trust with Zeithketh' shown BEFORE commit); Keep correctly cancelled without dispatching. Fog rule (Known-body visibility) and History view not separately exercised live (no expired/terminal contract existed in the pass) but read correct from code. Nav-rail slot 13 is a real, flagged design call -- NR-586.",
+          "result_metric": ""
+        }
+      ],
+      "resolution": "Landed on main (worktree-agent-a5991264ff4655709, merged 9e9f581d). Live click pass (main session, computer-use, 2026-08-24) confirms every press in the requirement."
     },
     "corp-dashboard-rollups": {
       "rows": [
@@ -953,6 +1310,41 @@
       ],
       "resolution": "apply_budget charges interest = |balance| × k_debt_interest_per_quarter (0.02/qtr) once per tick on a now-negative balance; the constant lives in budget_system.hpp as the single source both the live loop and econ_bankruptcy read. The Interest (debt) line appears in the Balance Ledger breakdown, the header shows an explicit [in debt - interest accruing] badge, and the Treasury 'no consequence' note was corrected to reflect the new charge. Verified via debt_interest.lua (set_balance verify hook). econ_bankruptcy stays PASS (its solvent scenario never triggers interest; a loss-making spiral scenario in the harness is a noted follow-on)."
     },
+    "depth-readout-on-dashboard": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "visual",
+            "code"
+          ],
+          "requirement": "ITEM-SPANNING: the Corporation dashboard’s Production card shows, above the per-building list, the corp’s reached chain depth and the good that set it, the era-allowed recipes exactly one rung deeper, and the not-yet-produced inputs those recipes need — proven by a live open-and-click pass (a scripted capture alone does not prove the press is reachable), not only a scripts/verify capture of the content rendering.",
+          "notes": "PARTIAL, recorded honestly (NR-593, Ben’s call 2026-08-24): no computer-use access this session, so the literal click could not be performed. scripts/verify/corp_dashboard.lua’s corp_rollup_production capture (driven by verify.fold(\"corp_rollup\", 0), the same rollup_body() code path a real click reaches) confirms the three lines render with real content — a fresh corp: \"Reached depth 0, via Iron Ore / Next: Bloomery / Needs: Charcoal\". The fold/expand CONTROL itself is not new to this item (BL-248, already live-verified); BL-591 only added content inside an already-reachable surface. Accepted as sufficient per Ben’s ruling, following BL-575’s own precedent for a named residual verification gap.",
+          "result_metric": "render-confirmed via script capture; literal click owed (NR-593)"
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: full tree build"
+          ],
+          "requirement": "derive_corp_rollups gains a recipe_registry parameter and computes the growth-track fields (reached_depth, reached_good, next_rung, missing_inputs) as pure data — shared by both dashboard hosts (the in-place accordion and the full-canvas takeover) through the one rollup_body() renderer, per BL-265’s established shared-body pattern.",
+          "notes": "Full tree build (cmake --build build, every target, zero errors).",
+          "result_metric": "4 new fields on corp_rollups, 1 new parameter on derive_corp_rollups"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "code"
+          ],
+          "requirement": "A real, pre-existing UI defect found and fixed while authoring this item: ui::resource_name (src/ui/presentation.cpp) had NO entry for charcoal, iron_blooms or trade_goods_misc — explicit nulls left over from a \"still unauthored\" comment that predates BL-429 (2026-08-15) giving all three real producers and consumers, over a week stale. Every one of those three is exactly the kind of good this readout needs to name. Entries authored for all three, plus the four BL-585 goods (ceramics, dressed_stone, planks, tools) which would otherwise have rendered as \"(unnamed resource)\" the moment anything named them.",
+          "notes": "Confirmed via the corp_rollup_production capture itself: \"via Iron Ore\" and \"Needs: Charcoal\" render as real names, not the fallback.",
+          "result_metric": "7 resource_type entries authored (3 backfilled, 4 new)"
+        }
+      ]
+    },
     "determinism-harness": {
       "rows": [
         {
@@ -1120,6 +1512,50 @@
     },
     "enum-switch-warning-sweep": {
       "resolution": "hired handled in severity_of + statement switch; construction_result::tech_locked maps to new corp_command_result::rejected_tech_locked (ACTIONS.json updated, mirror regenerated); corporation_generation explicit neutral cases (NR-126 holds the design question); 4 file-local IMGUI_DEFINE_MATH_OPERATORS dropped; unused/format fixes across src + tools. All touched files pass -Wall -Wextra clean per-slice; integrating build green."
+    },
+    "era-gated-roster": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING (headless): with the registry's era band set to `ancient` (the band a 0 CE epoch_year derives), the browsable roster excludes every entry authored `industrial` — the Launchpad is not a placeable building type, and the petroleum->refined_fuel, propellant and spacecraft-chain recipes are not offered by recipe_count/recipe_at on any building type. With the band set to `industrial` they are all present. With the band left at its default `any`, every authored entry is present.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "ancient 3/17, industrial 17/17",
+          "notes": "Verified 2026-08-15 by tools/verify/era_roster.cpp against the REAL scripts (not a hand-built registry). Ancient band browses 3 of 17 authored recipes; no industrial recipe leaks; Launchpad unavailable. Industrial band browses 17 of 17 with the Launchpad available. Anti-vacuity row asserts the ancient roster is a PROPER subset, so an all-any or all-industrial tagging cannot pass."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "LOAD-BEARING: recipe ids are stable across bands. get_recipe(id) and recipe_id(name) return the same absolute id for the same authored recipe in every band, because the filter masks rather than removes. Concretely: recipe_id(\"steel\") and recipe_id(\"food_rations\") are identical under ancient, industrial and any, and a building whose stored recipe id was authored in one band still resolves to the same recipe object in another.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "",
+          "notes": "Verified. Absolute ids identical under all three bands, and a recipe filtered OUT of the ancient band still resolves by its stored id (refined_fuel) while remaining absent from what the band offers. The mask-not-remove design holds."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "DEFAULT-OFF: a registry that never has its band set behaves exactly as it does today. Every existing headless harness — none of which knows about eras — sees the full roster, and a world built with the default params produces the same state_hash as the pre-change build.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "",
+          "notes": "Verified for the roster half: a freshly loaded registry has band `any`, browses all 17, and still offers the Launchpad. Full state_hash byte-identity was NOT separately re-measured against a pre-change binary — it is covered structurally instead: the default band changes no roster, and determinism_harness/ai_skill_harness passed unchanged in the same ctest run."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "An unknown era string in recipes.lua or economy.lua is a load-time error naming the offending entry, not a silent fallback to `any`. A silent fallback would let a typo quietly re-admit a space-era building to the ancient roster, which is the exact defect this item exists to close.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "",
+          "notes": "Verified: a plausible typo ('industial') on recipes[2].era throws at load, and the message names the offending value and the entry — \"Unknown era 'industial' in recipe 'refined_fuel' (expected any, ancient or industrial)\"."
+        }
+      ]
     },
     "era-minus-1-review-fixes": {
       "rows": [
@@ -1902,6 +2338,41 @@
       ],
       "resolution": "Extended the fresh_start_build.lua pattern (build_first_valid + verify.expect) to three more interactive flows, each mutating via the SAME code path the interactive UI control uses. New verify primitives in app.cpp: recipe/workforce (first_processing_building, set_building_recipe = panel's active_recipe_index+recipe writes, set_building_workforce = panel's clamp+write, building_output), sell order (place_sell_order -> m_ui.sell_orders, home_market_price, home_pool), survey (dispatch_survey_of -> the real dispatch_survey, advance_survey_days -> advance_surveys, survey_cost_of, survey_regions_done; reused the existing set_balance to stage funds). Three acceptance scripts (recipe_workforce.lua, sell_order.lua, survey_dispatch.lua) all PASS on the built game target."
     },
+    "interchangeable-methods-exist": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: chain_depth (R2)"
+          ],
+          "requirement": "ITEM-SPANNING: scripts/recipes.lua carries at least two recipe pairs that chain_depth's R2 row classifies as genuine interchangeable methods (sharing an input with an existing sibling, not a disjoint-raw supply route or a named precondition pair), and R2 reports zero pairs dominated on both cost and chain depth across the whole roster.",
+          "notes": "Landed as recipe ids 29 (charcoal_from_kiln, \"Coking Kiln\") and 30 (steel_bessemer, \"Bessemer Converter\"). chain_depth.exe: \"13 sibling pairs: 10 supply routes, 1 precondition, 2 interchangeable methods\" / \"[PASS] no interchangeable method dominates a sibling on both input cost and chain depth\".",
+          "result_metric": "2 interchangeable methods, 0 dominated (was 0 methods, 0 dominated before this item)"
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: recipe_switch_harness",
+            "headless: price_band_harness"
+          ],
+          "requirement": "The two harnesses that also load scripts/recipes.lua and scripts/economy.lua live (recipe_switch_harness, price_band_harness) build and pass unchanged, confirming the new recipes did not break the shared Lua file for other in-flight work (both harnesses are outside Sprint 16's file set).",
+          "notes": "recipe_switch_harness: ALL PASS (0 failures). price_band_harness: ALL PASS (0 failures).",
+          "result_metric": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "doc"
+          ],
+          "requirement": "docs/economy/PRODUCTION.md § Alternate production methods no longer reports the four NR-243 pairs as an open call — corrected to state they are supply routes/a precondition, per the 2026-08-16 R2 retraction — and records the two new methods in its group tables and the ancient-chain table.",
+          "notes": "Corrects NR-589 (a ruling taken on the stale paragraph this row fixes).",
+          "result_metric": ""
+        }
+      ]
+    },
     "lens-driven-selection": {
       "rows": [
         {
@@ -2139,6 +2610,52 @@
       ],
       "resolution": "Complete, all rows met. Rift-basin + sag-basin mechanism in run_continents, two-bar acceptance gate in hard_coded_world; measured floor 100%, arena 89.6% over 500 seeds."
     },
+    "mercenary-slice-playthrough": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "visual"
+          ],
+          "requirement": "ITEM-SPANNING: scripts/verify/mercenary_slice.lua captures, from a new world, all six of: the ledger showing an offer, the force picker, a unit marching, the battle card, a completed contract, and Balance with contract income — every capture inspected.",
+          "notes": "All six captures produced and inspected. Offer/force-picker/History/Balance captures show the real UI text directly (fee/escrow/deadline, the force-picker popup opened by a REAL verify.click on the Accept button, 'Completed - 600 cr paid', 'Contract income: Cr 450'). Two substitutions, both documented in the script's own header comment and investigated live rather than assumed: capture 3 centres/zooms/clicks the marching unit's own tile (BL-511 rung 0) since a wide shot could not read the marker; capture 4 shows the moment of contact (Field-channel dispatch text plus the garrison's own casualty count) rather than the battle card's live-open modal, because EVERY real fight tried this session -- the contract's own garrison fight, and a from-scratch even corp-vs-corp fight built with battle_card.lua's own proven technique, re-running battle_card.lua itself included -- opened and concluded inside the SAME econ_step call every time, so verify.select_battle never once returned true. Filed as NR-587, not silently worked around.",
+          "result_metric": "6/6 captures produced, 0 script errors, all inspected"
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "manual"
+          ],
+          "requirement": "A live human session reaches one paid contract without going through the agent protocol.",
+          "notes": "Live computer-use session (2026-08-24): generated a fresh world, opened the Contracts ledger from the nav rail, accepted a REAL nation-issued offer (Zeithketh, province #21928, 400cr fee, fully escrowed) through the real force picker, and issued a real march order -- confirmed the committed unit arrived standing beside the target province's garrison. Did NOT reach the literal paid/History state: the offer's deadline (161 econ ticks) measured at ~4 real minutes per tick even at the game's maximum speed, ~10 real hours to reach. Ben ruled (2026-08-24) that this mechanical proof -- offer, accept via the real force picker, and march all confirmed live -- satisfies R2's intent; waiting out the literal payout was not required. Filed as NR-588, distinct from and sharper than NR-579/580's prior 'placeholder' framing.",
+          "result_metric": "offer -> accept -> march confirmed live; payout blocked on real-time pacing, not on any broken control"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless"
+          ],
+          "requirement": "The determinism harness's state_hash is byte-identical to the pre-slice golden for a world with no contract activity (the flag-off byte-identity rule).",
+          "notes": "spectator_determinism (the state_hash-carrying golden this batch has tracked all along) ALL PASS, 0 failures, unmoved. determinism_harness (generation-time determinism) all PASS. save_roundtrip, mercenary_contract_harness (66/66) and contract_dispatch_harness (20/20) all green on the fully merged tree. nation_scorer_harness's pre-existing R1c failure (a `w.nations` iteration-order test, unrelated to any Sprint-16 symbol, first flagged BL-436) confirmed still isolated and out of scope.",
+          "result_metric": "spectator_determinism: ALL PASS, 0 failures; determinism_harness: DETERMINISM OK"
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "doc",
+            "manual"
+          ],
+          "requirement": "v0.1.15 is tagged, ROADMAP.md's done-definition for the minor is met, MANUAL.md gains a Contracts section written from the shipped surfaces, and the Sprint 16 retro is recorded in sprints.json.",
+          "notes": "ROADMAP.md's v0.1.15 entry carries a written done-definition (replacing the 'owed at the cut' placeholder). MANUAL.md's 4.10 Contracts section rewritten off the shipped mechanism (was still describing the retired history_sim scorer); 3.7's ledger table and 4.9's combat trigger both gained a line. CHANGELOG.md's [Unreleased] stamped as [0.1.15], README.md's release summary updated. sprints.json's Sprint 16 entry closed with a retro note. Tagged v0.1.15 locally; not pushed (push is a standing-rule confirm-first action).",
+          "result_metric": ""
+        }
+      ],
+      "resolution": "All nine prerequisite items complete. Scripted six-capture playthrough written and inspected; a real live human session confirmed offer/accept/march/active; determinism harnesses (spectator_determinism, mercenary_contract_harness, contract_dispatch_harness, save_roundtrip) all green; v0.1.15 stamped in CHANGELOG.md/README.md and tagged. One real gap surfaced by the live pass and filed rather than hidden: NR-588, a real offer's deadline takes ~10 real hours to reach at max game speed."
+    },
     "military-base-s1": {
       "rows": [
         {
@@ -2288,6 +2805,21 @@
       ],
       "resolution": "Built on the loading screen rather than on BL-256's generation globe: that globe is parked with the space arc, and the loading screen is the surface the player actually spends ~25 seconds looking at. The carve publishes through the existing generation_progress atomics seam (per-cell relaxed atomics holding nation index + 1, an epoch counter, release/acquire counters for charter marks and ledger rows) and app::draw_building_carve draws it. Nation ids are published as a base so the colours are the ones the Country lens will use."
     },
+    "nation-garrisons": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless"
+          ],
+          "requirement": "ITEM-SPANNING: nation_generation.cpp seeds a treasury-scaled garrison at the capital plus every border province shared with the highest-grudge neighbour (unit_component::owner a nation entity), run_battles' second trigger opens a battle between a corp holding an ACTIVE mercenary contract and the target province's garrison with no declare_hostile row authored, the pair's stance clears at the contract's terminal state, garrison upkeep debits the nation's military_research budget line, and battle_engagement_harness carries a corp-vs-nation case that opens and resolves.",
+          "notes": "The 'stance keyed on contract id, cleared at terminal state' half is deferred — no contract id exists to key on until BL-573 lands; the trigger is stubbed against active_mercenary_contract_for (always none), per the item's own brief. Every generated nation's treasury is 0 at generation (existing settled design), so every garrison currently lands on the sizing floor (20) with no wealth differentiation — NR-580, not a defect in this item, a cross-system gap BL-572 is about to hit too.",
+          "result_metric": "battle_engagement_harness: 64 checks, 0 failures (new case B17)"
+        }
+      ],
+      "resolution": "Landed on main (worktree-agent-a477567f226eaa377, merged b409fc6f). battle_engagement_harness 64/64 (new case B17), save_roundtrip clean. world_save_version collided with BL-570's own bump (both independently went 4->5) — resolved during merge into a single coherent bump to 6 covering both new fields."
+    },
     "one-question-per-view-sweep": {
       "rows": [
         {
@@ -2414,6 +2946,49 @@
         }
       ],
       "resolution": "Complete bar R7's visual leg, blocked by a pre-existing broken include unrelated to this item (NR-091). The order book is world state, serialised on its own flat-binary stream, matched inside the economy tick, and reachable by three new corp_verbs that the player's presses and the rival-corp scorer both route through. order_book_harness 43/43 PASS; econ_harness, corp_ai, corp_agency, history_log, econ_stability and corp_ai_predictive all green. ai_skill_harness's net-worth golden bands fail - but they ALREADY failed 5 assertions at unmodified HEAD, and every determinism assertion passes on both sides. Not re-blessed; see NR-090.\n\nTWO THINGS THE SWEEP TURNED UP, both recorded rather than papered over. The static review found a pre-existing value-minting bug in clear_markets that overlapping sell orders trigger — fixed here, since this item is what made it reachable by a scorer (NR-092). And data_creep_harness R1 now fails where unmodified HEAD passes: rival trading delays the build plateau from tick 500 to tick 1000 (it is still flat from 1000 to 1500). Not re-blessed; NR-093 carries the decision. econ_stability's R6 wall-clock assertion is flaky on this machine under build load — it passed clean on a third consecutive run."
+    },
+    "per-building-materials": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: construction_harness (R9)"
+          ],
+          "requirement": "ITEM-SPANNING: recipe_registry::resource_build_cost_for(type, target, recipe) resolves a per-named-building override — extraction_site keyed by target_resource, processing_facility by recipe id — falling back to the type default when none is authored, and ignoring both override maps for every other building type.",
+          "notes": "construction_harness R9: 5/5 pass — overridden target reads override; unoverridden target falls back to steel default; overridden recipe reads override; unoverridden recipe falls back to default; a non-extraction/processing type (port) ignores both maps regardless of the target/recipe passed to it.",
+          "result_metric": "5/5 R9 assertions"
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: construction_gate_harness",
+            "headless: construction_harness",
+            "headless: chain_depth",
+            "headless: recipe_switch_harness",
+            "headless: price_band_harness",
+            "headless: save_roundtrip",
+            "headless: determinism_harness",
+            "headless: corp_ai_harness",
+            "headless: pregame_balance_harness",
+            "headless: spectator_determinism"
+          ],
+          "requirement": "Every one of the (originally eight, actually thirteen occurrences across four files) call sites that read resource_build_cost directly now goes through resource_build_cost_for instead: construct_building, the three run_construction sites (economy_system.cpp), construction_rate (both the live selection_panel.cpp copy and the unused construction_panel.cpp mirror), and the Build door's capex loop. The two road-specific sites (place_road, the road capex preview) are unchanged — roads have no building_type/recipe identity to key an override on.",
+          "notes": "Full tree build (cmake --build build, every target, zero errors) and 10 harnesses all clean. spectator_determinism's golden held — no re-bless needed (material overrides do not change what state_hash folds).",
+          "result_metric": "13 call sites migrated across 4 files; 0 regressions"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "live-Lua manual probe (not committed — throwaway CMake target, built, run, and removed in-session)"
+          ],
+          "requirement": "The authored economy.lua material_overrides tables actually load and resolve through the live Lua path — not just the hand-built registry the R1/R9 harness exercises.",
+          "notes": "A temporary CMake target loaded the real recipes.lua/economy.lua and called resource_build_cost_for directly: stone extraction returned timber=12/steel=0 (overridden), iron_ore extraction returned steel=20 (unchanged default), the Toolmaker recipe returned stone=12/timber=10/steel=0 (overridden), the industrial steel recipe returned steel=25 (unchanged default). Probe deleted after confirming; CMakeLists.txt reverted to its pre-probe state.",
+          "result_metric": "4/4 live-Lua spot checks matched the authored table exactly"
+        }
+      ]
     },
     "per-building-profitability": {
       "rows": [
@@ -2564,6 +3139,28 @@
       ],
       "resolution": "Complete. The population agricultural_produce demand stub, previously written by run_economy_step and erased by clear_markets' per-tick demand reset the same tick (never priced), now lives in inject_population_demand (market_clearing.cpp), called from clear_markets after the reset alongside the BL-078 substrate injection. Routing upgraded from first-market-on-body to market_for_tile catchment (BL-096 multi-market bodies). population_demand_harness: 4/4 PASS; population_mvp (R4 + growth updated to call clear_markets): 11/11 PASS."
     },
+    "population-migration": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: migration harness rows"
+          ],
+          "requirement": "A deterministic per-tick flow moves heads from low- to high-attractiveness centres (habitability + clearing wage); between nations it is stance-gated (friendly open, hostile closed); replay-identical across two runs.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: conservation row"
+          ],
+          "requirement": "Migrants carry qualification: emigration debits the origin nation's fraction and credits the destination's, conserving the qualified-head total.",
+          "notes": ""
+        }
+      ]
+    },
     "processing-chain-roster": {
       "rows": [
         {
@@ -2701,6 +3298,34 @@
       ],
       "resolution": "Delivered 2026-07-07. The nation substrate was redefined into two tick-time faces: a price-elastic per-capita basket demand and an abstract nation-capacity supply that clears demand only partially, keeping the price form base*sqrt(D/S) and the [0.25x,4x] band. Verified by the upgraded pregame_balance_harness (differentiated demand, elasticity, live margin) + determinism; econ_harness/econ_stability unchanged (substrate-free) confirm the arithmetic path is untouched. Design decision (Ben): the emergent milder opening is accepted (see starting-economy-viability)."
     },
+    "province-centre-anchor": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: province_partition_harness new rows"
+          ],
+          "requirement": "Every land province contains at least one population centre; its nation equals its anchor centre's nation; water domains keep least-accessible seeding unchanged.",
+          "notes": ""
+        }
+      ]
+    },
+    "province-holder": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless"
+          ],
+          "requirement": "ITEM-SPANNING: world::province_holder is seeded at generation from tile_to_nation plurality (one entity_id per province, no_entity for sea), any decisive battle close (every campaign_battle_end value except stalemate) reassigns province_holder[p] to field_held_by and a stalemate leaves it unchanged, the vector round-trips through world_save.cpp and folds into state_hash, and battle_engagement_harness carries one case of each. (Corrected from the original wording's incomplete attacker_broken/defender_withdrew enumeration, which omitted defender_broken and inconsistently excluded attacker_withdrew despite field_held_by being computed identically for all four non-stalemate endings — MILITARY.md's ratified rule is the complete one.)",
+          "notes": "Extends tools/verify/battle_engagement_harness.cpp — B15/B16. Landed 8538a859, merged to main.",
+          "result_metric": "55 checks, 0 failures (battle_engagement_harness, re-run on the merged tree)"
+        }
+      ],
+      "resolution": "Landed on main (worktree-agent-a85dd40a41493c103, merged). battle_engagement_harness B15/B16 pass; full-suite re-verification found and fixed one save_roundtrip tripwire and re-blessed spectator_determinism's golden (see the Wave 1 integration commit)."
+    },
     "proximity-glimpse": {
       "rows": [
         {
@@ -2725,6 +3350,28 @@
         }
       ],
       "resolution": "Delivered BL-089's second documented deferral via sample-and-store, which dissolves the determinism obstacle (body positions are mutated orbital_angle_rad, not pure in tick): record_proximity_glimpses samples live positions at a player convoy's discrete completion tick (credit_arrived_convoys, when orbits have already advanced for the frame) and stamps body_last_glimpse_tick[body] on any non-endpoint body within glimpse_radius_au_default (0.25 AU) of the endpoint->endpoint segment; body_activity_visibility returns known_stale for a glimpsed-but-unrouted body within glimpse_fresh_ticks_default (90), never known/visible. Stored off body_component in a world map to keep the flat-binary layout untouched; all reads (solar badge, hover, Selection) widen with zero renderer change. Verified: commercial_fog_harness 19/19 (10 new assertions) + full CTest 19/19 (incl. determinism); on-canvas by-eye (proximity_glimpse before/after). Golden bless owed on the Linux box."
+    },
+    "qualification-fraction": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: generation determinism + save round-trip rows"
+          ],
+          "requirement": "nation_component::qualification is seeded from Era -1 industrialisation timing (deterministic, replayable) and round-trips the serialisation seam with strict versioning - a bad stream is refused.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: economy harness row + money_conservation"
+          ],
+          "requirement": "A recipe carrying a qualified-workforce requirement is throttled when the nation's qualified pool cannot cover it, and unthrottled when it can; money conservation holds.",
+          "notes": ""
+        }
+      ]
     },
     "reach-rule-hardening": {
       "rows": [
@@ -2826,6 +3473,136 @@
         }
       ],
       "resolution": "All 5 rows met. river_generation_harness + determinism_harness pass; CTest 37/37."
+    },
+    "road-gen-scales": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: road_generation_harness + timed measurement"
+          ],
+          "requirement": "generate_roads at the new density (~1,450-2,000 centres) completes in single-digit seconds: backbone over towns-and-up, villages join locally; the lattice stays connected per road_generation_harness; deterministic.",
+          "notes": "Measured: world build 2.90s -> 0.70s (WSL g++ -O2, seed 0); A* pairs ~150k -> ~3.5k; full-world harnesses 8-14s on the merged tree. MSVC app builds green."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: differential harness row"
+          ],
+          "requirement": "A nation's qualification fraction modulates redundancy-edge count and tier promotion - a low-qualification nation generates a measurably sparser, lower-tier lattice, deterministically.",
+          "notes": "Q1-Q4: floor world 3106 Track / 0 Road / 0 Highway vs qualified 2899/207/0, byte-identical floor regens. NR-641 raises the all-Track default consequence."
+        }
+      ]
+    },
+    "roster-breadth-guard": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: chain_depth (R2)"
+          ],
+          "requirement": "R2 gains a second price vector (fuel-cheap, fuel-dear) so a method that is only better “depending on which market it builds to” is not misread as dominated under one fixed snapshot; a pair is flagged only if dominated under BOTH regimes.",
+          "notes": "13 sibling pairs, 10 supply routes, 1 precondition, 2 interchangeable methods, 0 dominated — unchanged from the single-vector reading, since both existing methods (Coking Kiln, Bessemer Converter) already win on chain depth alone. Confirmed non-vacuous (anti-vacuity check passes) and the dual-vector logic is exercised on every method pair, not a no-op.",
+          "result_metric": "2 price vectors, 0 dominated under both"
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: chain_depth (R3)"
+          ],
+          "requirement": "A materials row: every named building’s BL-590 material override is obtainable in its own band — generic over the whole roster (every extraction target, every processing recipe), not a hand-picked list, so a future override earns the check for free.",
+          "notes": "18 named buildings carry an override (5 extraction targets, 13 processing recipes — matches BL-590’s authored count exactly), 0 offenders. Anti-vacuity confirms the row actually found overrides to check, not an empty set.",
+          "result_metric": "18 buildings checked, 0 offenders"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: chain_depth (G5, R1, R1b)"
+          ],
+          "requirement": "The start-gate row (BL-589’s G5) and the orphan rows (R1/R1b) are named as this item’s own requirement rather than assumed to still pass — both already exist and already pass, built by earlier items in this sprint.",
+          "notes": "No new code: G5 was BL-589’s own row, R1/R1b predate this sprint. Named here per the item’s own instruction (“the rows already exist, but they ARE the sprint’s admission rule and should be named in its requirement rather than assumed”) and reconfirmed green in this item’s own full-suite run.",
+          "result_metric": "3 pre-existing rows reconfirmed, 0 new code"
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "code"
+          ],
+          "requirement": "The new rows are named in .claude/skills/verifier-headless/SKILL.md, part of this item per CLAUDE.md § Tool creation is skill creation — not a follow-up.",
+          "notes": "G5 and R3 entries added. Also corrected two claims that had gone stale since the entry was last touched (R1 reported “ships RED on eight resources”, now green since NR-257; R2 reported “0 interchangeable methods”, now 2 since BL-587) — found while updating the adjacent text, fixed rather than left beside the new content.",
+          "result_metric": "2 new row entries, 2 stale claims corrected"
+        }
+      ]
+    },
+    "roster-playthrough-and-cut": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "visual: live click, computer-use against the built exe"
+          ],
+          "requirement": "A fresh ancient corp is offered the authored opening set and no more (BL-589) — a live click, not a scripted capture.",
+          "notes": "Confirmed across TWO separate generated worlds/corps. The Build door on a fresh corp shows only extraction targets, Infrastructure, and a reason-coded-locked Military Base (“Locked - the technology that permits...”); never a filtered-out recipe standing in as a processing group’s representative.",
+          "result_metric": "2 corps/worlds checked, 0 unruled rows shown"
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "visual: live click"
+          ],
+          "requirement": "Building a fuel route makes the next rung placeable, legible from the dashboard readout (BL-591), not from a wiki.",
+          "notes": "The corporation dashboard’s growth track read live, plain text, on both corps tried: “Reached depth 0, via Agricultural Produce. Next: Bloomery, Shipwright. Needs: Iron Ore, Charcoal, Planks, Cloth.” BL-586 slice 2’s Shipwright named as a live next-rung candidate.",
+          "result_metric": "2/2 corps show a legible growth track"
+        },
+        {
+          "id": "R3",
+          "status": "partial",
+          "verification": [
+            "visual: live click attempted"
+          ],
+          "requirement": "A method choice is made for a stated reason about which market the output is going to (BL-587), and a tech gate resolves and opens a different recipe (BL-588) — both as live clicks.",
+          "notes": "NOT reached live this session — both need more simulated economy time (earning a tech’s stockpile/surplus predicate) than one sitting’s clock-advance covered. The first corp tried (Cr -5.9k starting debt) could not afford to build anything at all, a real but non-defect finding about starting-solvency variance across seeds. Ben’s ruling: accept as substantially confirmed, close now rather than push further.",
+          "result_metric": "0/2 reached live; deferred by ruling, not silently dropped"
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "visual: live click"
+          ],
+          "requirement": "A building is placed whose material basket is not steel (BL-590) — an actual successful construction click, not an assertion.",
+          "notes": "Clay Pit built live (“Construction started”, 103cr against a 257cr balance) on the solvent second corp. Confirms the general build flow and BL-590’s per-building material-cost lookup work end to end in the running app, not only in a harness.",
+          "result_metric": "1 live construction, general flow confirmed"
+        },
+        {
+          "id": "R5",
+          "status": "complete",
+          "verification": [
+            "code"
+          ],
+          "requirement": "The v0.1.17 cut: ROADMAP.md’s done-definition written at the cut (NR-103), MANUAL.md gains the ancient roster and the earned locks, sprints.json’s Sprint 17 entry closed with a retro.",
+          "notes": "ROADMAP.md’s v0.1.17 bullet carries a done-definition naming what shipped and what was explicitly excluded. MANUAL.md §4.4 gained the three-lock model (era/depth/tech) and the growth-track readout. sprints.json closed below.",
+          "result_metric": "3 docs updated at the cut"
+        },
+        {
+          "id": "R6",
+          "status": "complete",
+          "verification": [
+            "visual: live click, reported not fixed"
+          ],
+          "requirement": "Real findings surfaced by the live playthrough are reported, not silently absorbed or silently dropped.",
+          "notes": "NR-597: the corp-selection screen’s per-row “Choose” buttons do not respond to clicks, reproduced 2-for-2 across two sessions; Ben’s ruling: not urgent, logged (KNOWN_BUGS.md is retired) rather than filed as a backlog item. One LOW-CONFIDENCE, unreproduced anomaly also reported: a full-canvas takeover control once returned the app to the main menu in the very first session, not reproduced on two later clean attempts of the same control.",
+          "result_metric": "1 confirmed defect logged, 1 unreproduced anomaly reported honestly"
+        }
+      ]
     },
     "seam-actor-authority": {
       "rows": [
@@ -3051,6 +3828,50 @@
         }
       ],
       "resolution": "Delivered. main() now wraps the run/run_verify dispatch in try/catch(const std::exception&), printing 'ProjectIo: fatal error: <what>' to stderr and returning 1 — a type-shape error in a user-edited economy.lua/recipes.lua (a sol::error, which derives from std::exception) exits cleanly instead of aborting unhandled. The optional per-key .as<>() guard in read_resource_map was judged unnecessary — the single main() catch covers every startup Lua path — and left out to keep the change to one file."
+    },
+    "start-gate-audit": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: chain_depth (G5)"
+          ],
+          "requirement": "ITEM-SPANNING: measure what a fresh ancient corp (reached depth 0, no tech earned) can actually place, get Ben’s ruling on which of it should stay open versus be earned (the item’s own “state the call, do not let it stand as a default” instruction), then assert the ruled opening exactly in chain_depth — not a narrower default this session might have preferred.",
+          "notes": "Measured via a live-Lua probe (temporary CMake target, built/run/deleted): five processing groups open at tick 0 (Metal Foundry via the any-band escape, Fuel Production, Food Processing, Artisan Goods, Construction Materials), wider than the item’s own “extraction, one food, one fuel” first cut. Elicitation form put five concrete calls to Ben; the ruling closed only Metal Foundry’s refined_copper (via a new tech gate, E0-EC-03) and left every other group as measured. chain_depth’s new G5 row: 4/4 pass — the ruled open/closed state matches exactly, refined_copper reads tech_locked at tick 0, and E0-EC-03 genuinely resolves (not a permanent orphan) once its own predicate is met.",
+          "result_metric": "1 recipe newly gated (refined_copper); 4 groups left open as ruled; 4/4 G5 assertions"
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: full tree build",
+            "headless: tech_gate_harness",
+            "headless: tech_effect_union_harness",
+            "headless: construction_gate_harness",
+            "headless: construction_harness",
+            "headless: corp_ai_harness",
+            "headless: recipe_switch_harness",
+            "headless: price_band_harness",
+            "headless: save_roundtrip",
+            "headless: determinism_harness",
+            "headless: spectator_determinism"
+          ],
+          "requirement": "The new gate (E0-EC-03) integrates cleanly with the whole tech-gate/depth-gate machinery BL-588 built — no regression to any existing gate, the recipe-unlock filter, or determinism.",
+          "notes": "Full tree build (every target, zero errors) and 11 harnesses all clean. spectator_determinism’s golden held — no re-bless needed (the new gate’s predicate is not satisfied in that harness’s scenario).",
+          "result_metric": "0 regressions across 11 harnesses"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "observation, filed"
+          ],
+          "requirement": "A real coverage gap found while authoring this item’s gate, recorded rather than silently left or over-scoped into a fix: tech_gate_harness.cpp only exercises E0-ML-01 directly; the three economy gates (E0-EC-01/E1-EC-01 from BL-588, E0-EC-03 from this item) are proven correct only indirectly, scattered across three other harnesses.",
+          "notes": "Filed as NR-594 rather than expanded into this item’s scope — no gap has actually bitten (E1-EC-01’s own defect WAS caught, just incidentally by T3 rather than a dedicated row), but the collision surface grows with each gate.",
+          "result_metric": "1 observation filed (NR-594)"
+        }
+      ]
     },
     "starting-economy-viability": {
       "rows": [
@@ -3556,6 +4377,73 @@
       ],
       "resolution": "Code-complete and headless-verified 2026-08-08. R1/R6's manual-visual leg (a human clicking the Hire button in a live app session) was not run in this headless environment — filed as NR-086, same shape as NR-026's frame-budget gap for BL-249: shipped complete with the human-verification step open as a named follow-up, not silently skipped."
     },
+    "unit-marker-and-march-ui": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "visual",
+            "manual"
+          ],
+          "requirement": "ITEM-SPANNING: a unit marker renders at its province anchor tile on the Planetary canvas with an owner-colour badge and a ring on contract-committed units, the unit card's March press enters a province-picking mode whose next click dispatches corp_verb::march_unit, and Halt/Disband presses are reachable alongside it — proven by a live open-and-click pass (a scripted capture alone does not prove the press is reachable), not only a scripts/verify capture of the marker rendering.",
+          "notes": "Live pass (main session, computer-use, 2026-08-23): unit marker renders and selects correctly; March press shows the correct tooltip, arms province-picking, and a click on a confirmed-different province (verified via the repeat-click cycle showing its own province id) disarms the mode WITHOUT falling through to normal building/tile selection -- the Selection panel stayed on Unit, strong evidence the corp_command actually dispatched rather than the click landing on ordinary marker resolution. Cross-checked against corp_command.cpp's march_unit case (read directly): validation and movement_order construction are correct. unit_march_harness (headless, full suite) independently passed. NOT directly confirmed live: the unit's tile position visibly changing on screen -- map navigation after issuing the order made relocating the specific marker impractical within this pass, and only one quarter boundary had elapsed (this game's economy/march tick is quarterly-cadence, not daily, despite the calendar advancing daily). Halt and Disband were not individually clicked live; both are read confirmed as the identical app.cpp deferred-dispatch pattern as March, same file, same commit. Ben may want a follow-up spot check specifically watching a march resolve, given the residual gap is real even if the wiring reads correct on every other axis.",
+          "result_metric": ""
+        }
+      ],
+      "resolution": "Landed on main (worktree-agent-a0220dee51ed2793d, merged). Live click pass confirms the marker and the March press's two-step dispatch; see R1 notes for the residual (unconfirmed) movement-visual gap."
+    },
+    "unlock-recipe-tech-arm": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: tech_effect_union_harness",
+            "headless: tech_gate_harness"
+          ],
+          "requirement": "ITEM-SPANNING: tech_effect_kind gains unlock_recipe, storing the recipe NAME (never an id); tech_gate gains an unlocks_recipe mirror maintained only through add_effect; recipe_unlocked(w, reg, corp, recipe_id) and gating_tech_for_recipe resolve id -> name and check world::has_tech, with the same null_entity/ungated contract as structure_unlocked.",
+          "notes": "tech_effect_union_harness: 35 passed, 0 failed. tech_gate_harness: 33 passed, 0 failed (after correcting E1-EC-01's predicate — see R3).",
+          "result_metric": "3rd effect-union arm; 2 authored gates (E0-EC-01, E1-EC-01)"
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: construction_gate_harness",
+            "headless: construction_harness",
+            "headless: recipe_switch_harness",
+            "headless: corp_ai_harness"
+          ],
+          "requirement": "The tech-recipe gate is read at BOTH doors — construct_building (placement) and try_switch_recipe (retooling) — closing the same one-click bypass the depth gate's own comment names. Both return the shared tech_locked code (construction_result::tech_locked reused; a new recipe_switch_result::tech_locked mapped to the same corp_command_result::rejected_tech_locked the structure-level lock already uses). corp_ai.cpp's build-candidate loop filters on it, mirroring the existing depth filter, so the scorer never proposes a candidate the seam would refuse.",
+          "notes": "construction_gate_harness / construction_harness / recipe_switch_harness / corp_ai_harness: all rerun clean after the change. Two locks are independent — a recipe can be depth_locked, tech_locked, both, or neither.",
+          "result_metric": "2 doors gated, 1 scorer filter added, 0 regressions"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: tech_gate_harness"
+          ],
+          "requirement": "First-cut authored gates are satisfiable through ordinary play quantities, not a debug poke or a trivially-true predicate — the same bar BL-344's own T3 fixture holds the original garrison gate to.",
+          "notes": "A first draft of E1-EC-01 (surplus >= 1500 only) was caught by tech_gate_harness's own T3 fixture (2 extraction sites, Cr 5,000, zero stockpile): the fixture accidentally satisfied it, proving the predicate was satisfiable by ANY solvent corp regardless of what it had built — a real design flaw, not just a test collision. Corrected to require holding machinery (the Bessemer Converter's own reagent) in stockpile instead, which the fixture genuinely lacks. tech_gate_harness: 33/33 after the fix.",
+          "result_metric": "1 predicate corrected before landing, caught by the existing regression harness"
+        }
+      ]
+    },
+    "urban-ground-stamped": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: world_audit extension"
+          ],
+          "requirement": "Every centre carries an urban land_use footprint sized by its scale tier; standing extraction is grandfathered per TILES.md's urban transform; deterministic.",
+          "notes": ""
+        }
+      ]
+    },
     "verify-batch-mode": {
       "rows": [
         {
@@ -3591,6 +4479,19 @@
         }
       ],
       "resolution": "Complete, all rows met. Batch equivalence needed FIVE per-script isolation layers, each found by measurement: world/ui snapshot (move-assigned), app-side per-tick accumulators, the comms log, a cold ImGui context (frame-1 layout conditions), and the fixed capture size (a wizard script resized mid-batch and poisoned 69 goldens at 1720x1080 — caught by the size-mismatch diff). Hang-ghost hardening rode along: hidden window from before generation, DisableProcessWindowsGhosting, SDL_PumpEvents heartbeats — five Application Hang 1002 events across two days each matched a silently truncated pass."
+    },
+    "wage-competition": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: economy harness rows + money_conservation"
+          ],
+          "requirement": "When pool demand exceeds supply, labour allocates by offered wage in deterministic order (wage, then building id), wages are paid at the offered rate on effective labour only, and money conservation holds.",
+          "notes": ""
+        }
+      ]
     },
     "wire-parser-validation": {
       "rows": [
