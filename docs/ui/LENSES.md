@@ -175,7 +175,7 @@ window, so without it a press on the legend would also select the tile underneat
 > "takes the minimap space", then saw the region above in the merged build and preferred
 > it: *"Looks fantastic, probably better than my direct instruction to fill minimap
 > space."* The ruling is superseded by its own author; the minimap keeps its rect and the
-> legend keeps the header. BL-604 is cancelled, and the z-order workaround it would have
+> legend keeps the header. BL-609 is cancelled, and the z-order workaround it would have
 > removed was already dropped at the Sprint 17b merge.
 
 The resource/good selector shared by the Resource, Market and Scarcity lenses is
@@ -747,7 +747,7 @@ keyboard lens-cycle.
 ## Throughput lens
 
 **Intent.** Read the map as a *capacity surface*: how much can move through here,
-and how far is this ground from the capacity that would move it? Owned by BL-598
+and how far is this ground from the capacity that would move it? Owned by BL-606
 (throughput lens), the surface half of
 [LOGISTICS.md](../economy/LOGISTICS.md) § Logistic Points, whose ruling is that
 **throughput is Reach with a magnitude** — an extension of an existing surface

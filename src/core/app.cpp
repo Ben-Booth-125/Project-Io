@@ -1958,7 +1958,7 @@ void app::render()
                 // so this is a map lookup on every frame but the first after an
                 // invalidation (a road laid, a building placed or demolished).
                 body_reach_field(m_world, m_ui.active_body);
-                // BL-598: this tick's active-LP anchor pools for the Throughput
+                // BL-606: this tick's active-LP anchor pools for the Throughput
                 // lens, in the same place and for the same reason — the pool
                 // enumeration wants a mutable world, the draw is const. A no-op
                 // unless that lens is active, and never cached: LP is a per-tick
@@ -2316,7 +2316,7 @@ void app::render()
     }
 
     // Execute a convoy-dispatch request queued this frame by the market
-    // Selection card's dispatch form (BL-601). Routes through the same
+    // Selection card's dispatch form (BL-607). Routes through the same
     // `dispatch_convoy` corp_verb the AI's own directed dispatch and the wire
     // seam use (SUPPLY.md § Dispatch trigger: "the auto-dispatch body above
     // with the shortfall scan removed") — the player's convoy costs, travels

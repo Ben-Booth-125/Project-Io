@@ -10,7 +10,7 @@
 #include "format.hpp"         // fmt::credits — the god-view corp readout (BL-408)
 #include "hex_render.hpp"      // draw_tile_neighbourhood — the card's zoomed tile view
 #include "icons.hpp"
-#include "market_ledger.hpp"   // market_city_name — the dispatch form's destination identity (BL-601)
+#include "market_ledger.hpp"   // market_city_name — the dispatch form's destination identity (BL-607)
 #include "presentation.hpp"
 #include "selection.hpp"
 #include "text_fit.hpp"
@@ -831,7 +831,7 @@ void draw_selection_icon(const world& w, ImDrawList* dl, selection_kind kind,
     }
 }
 
-// --- BL-601: the convoy dispatch form -----------------------------------
+// --- BL-607: the convoy dispatch form -----------------------------------
 //
 // SUPPLY.md § Dispatch trigger: "The in-app dispatch form lives on the market
 // Selection card — a dispatch starts from a source you are looking at, and it

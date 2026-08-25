@@ -532,29 +532,29 @@
     },
     {
       "id": "NR-616",
-      "title": "ai_skill_harness's five golden bands are already red on main -- unrelated to BL-602 (Port gates the sea leg)",
+      "title": "ai_skill_harness's five golden bands are already red on main -- unrelated to BL-608 (Port gates the sea leg)",
       "kind": "observation",
-      "what": "Building BL-602 (the Port-building sea-mode gate in price_convoy_leg, src/world/supply_system.cpp), I ran ai_skill_harness as a golden-churn check. All five seeds fail net-worth-final, net-worth-min and solvency (net worth reads roughly -3.1M to -4.9M against golden bands blessed 2026-08-16), plus several dial/build thrash-ceiling rows. I re-ran the identical harness against the UNMODIFIED main tree (git stash of my one changed file) and got byte-for-byte the SAME 20 failures -- so this is pre-existing golden drift, not something BL-602 caused. Flagging rather than silently re-blessing, per the golden-churn discipline; I made no attempt to fix or re-bless it, since it is out of BL-602's scope.",
-      "why_it_matters": "The 2026-08-16 bands (BL-436) are stale against whatever landed since -- possibly BL-573/BL-574 (mercenary contracts), the N-series nation grants, or BL-586's roster widening, any of which could move rival net worth. Whoever owns ai_skill_harness next should re-derive the bands from a fresh bless rather than assume BL-602 (or any other recent item) broke them.",
+      "what": "Building BL-608 (the Port-building sea-mode gate in price_convoy_leg, src/world/supply_system.cpp), I ran ai_skill_harness as a golden-churn check. All five seeds fail net-worth-final, net-worth-min and solvency (net worth reads roughly -3.1M to -4.9M against golden bands blessed 2026-08-16), plus several dial/build thrash-ceiling rows. I re-ran the identical harness against the UNMODIFIED main tree (git stash of my one changed file) and got byte-for-byte the SAME 20 failures -- so this is pre-existing golden drift, not something BL-608 caused. Flagging rather than silently re-blessing, per the golden-churn discipline; I made no attempt to fix or re-bless it, since it is out of BL-608's scope.",
+      "why_it_matters": "The 2026-08-16 bands (BL-436) are stale against whatever landed since -- possibly BL-573/BL-574 (mercenary contracts), the N-series nation grants, or BL-586's roster widening, any of which could move rival net worth. Whoever owns ai_skill_harness next should re-derive the bands from a fresh bless rather than assume BL-608 (or any other recent item) broke them.",
       "files": [
         "tools/verify/ai_skill_harness.cpp"
       ],
       "raised": "2026-08-24",
       "status": "open",
-      "source": "BL-602 (SEA_PORT_GATE) golden-churn verification pass."
+      "source": "BL-608 (SEA_PORT_GATE) golden-churn verification pass."
     },
     {
       "id": "NR-617",
       "title": "build_harness.js's LUA_TUS exclusion list is stale -- contract_template.cpp needs sol2/lua54 but is not excluded",
       "kind": "observation",
-      "what": "tools/verify/build_harness.js globs every src/world/*.cpp minus LUA_TUS = {recipe_registry, works_registry, tech_tree, world_gen_config} and documents that set as 'the four sol2/Lua TUs io_world_obj excludes'. contract_template.cpp #includes lua_state.hpp (which pulls sol/sol.hpp) and is NOT in that set, so the one-line builder fails to compile (no sol2 on INCLUDE) and, once sol2's include dir is added by hand, fails to LINK (no lua54.lib named at all -- the script's cl invocation carries no /link section). I routed around it for BL-602's sea_port_gate.cpp by hand-adding sol2_src/include + lua_src to INCLUDE and appending build\\lua54.lib on the link line outside the tool. Did not touch build_harness.js itself -- out of BL-602's scope and I did not want to guess at the intended fix (exclude contract_template.cpp like the others, since nothing here needs to actually LOAD a script; or thread a real lua54.lib link path through for every TU that only compiles against the headers).",
+      "what": "tools/verify/build_harness.js globs every src/world/*.cpp minus LUA_TUS = {recipe_registry, works_registry, tech_tree, world_gen_config} and documents that set as 'the four sol2/Lua TUs io_world_obj excludes'. contract_template.cpp #includes lua_state.hpp (which pulls sol/sol.hpp) and is NOT in that set, so the one-line builder fails to compile (no sol2 on INCLUDE) and, once sol2's include dir is added by hand, fails to LINK (no lua54.lib named at all -- the script's cl invocation carries no /link section). I routed around it for BL-608's sea_port_gate.cpp by hand-adding sol2_src/include + lua_src to INCLUDE and appending build\\lua54.lib on the link line outside the tool. Did not touch build_harness.js itself -- out of BL-608's scope and I did not want to guess at the intended fix (exclude contract_template.cpp like the others, since nothing here needs to actually LOAD a script; or thread a real lua54.lib link path through for every TU that only compiles against the headers).",
       "why_it_matters": "Every session that reaches for this builder against a harness pulling in contract_template.cpp (any world-superset harness, which is most of them) hits the same wall and has to rediscover the same workaround. It is the documented 'one-line builder' (NR-392) silently failing on a large slice of its own advertised surface.",
       "files": [
         "tools/verify/build_harness.js"
       ],
       "raised": "2026-08-24",
       "status": "open",
-      "source": "BL-602 (SEA_PORT_GATE) build pass -- the headless one-line builder failed on the world-superset TU set."
+      "source": "BL-608 (SEA_PORT_GATE) build pass -- the headless one-line builder failed on the world-superset TU set."
     },
     {
       "id": "NR-618",
@@ -562,17 +562,17 @@
       "raised": "2026-08-24",
       "kind": "question",
       "source": "Discovered indirectly: four Sprint 18 worktree agents (BL-599/600/601/602/603) all forked from a base other than main tip, whose history includes bd3f3431 (\"Merge Sprint 17b (the shell stops fighting the map) into main\"), reachable only via the branch merge/17b-onto-main — not from main. Investigated rather than assumed: this is a real, deliberate, well-documented merge by another concurrent session, not stale/lost data.",
-      "what": "merge/17b-onto-main (tip bd3f3431, 2026-08-24 22:41:48) merges a complete UI sweep — icons, lenses, the Selection band accordion, a shell-pass verification script, ~72 files — cleanly resolving nine NR-id collisions against this session's own concurrent NR-589..597 filings by renumbering the 17b side to NR-607..615. It sits sandwiched between two of THIS session's own commits (93b38dc5 at 21:32 and c50a9a7c at 23:17) and was never fast-forwarded or merged into main itself. Every Sprint 18 wave-1 worktree agent (four separate Agent tool calls, each with isolation:\"worktree\") independently forked from this branch's tip rather than main's — meaning worktree isolation picked up whatever HEAD the shared checkout carried at creation time, not necessarily main. No work was lost or corrupted: each agent's OWN commit was cherry-picked onto main individually rather than trusting a wholesale merge, specifically because this contamination was caught. CONFIRMED BY BEN 2026-08-25, looking at the live build: \"the build on main has lost a few UI items from a deleted session. I was of the opinion that was on main.\" Scouted and confirmed — bd3f3431 is NOT an ancestor of main, and against main it carries 42 UI-side files: src/ui/icons.{cpp,hpp} (+51/+26, incl. a stack_ring), body_surface_canvas.cpp (1745 lines), selection_panel.cpp (1029), ui_state.hpp (201), shell_metrics.{cpp,hpp} (+55/+70 — the minimap/legend geometry), overlay.cpp, hex_render.cpp, presentation.{cpp,hpp}, time_panel.cpp, plus new verify scripts (shell_pass, zoom_ladder, stacked_tile_ring, lens_structure_pivot, ui_shell_fixture). Nothing was lost; it was simply never merged. MERGE COST IS REAL AND SHOULD BE PLANNED, NOT ATTEMPTED CASUALLY: Sprint 18 has since landed on the same files — BL-598 rewrote the Throughput lens into body_surface_canvas.cpp and overlay.cpp, BL-601 added the dispatch form to selection_panel.cpp and ui_state.hpp — so the three biggest files in the sweep all carry post-branch work. This wants a deliberate merge session, ideally by whoever authored 17b, not a drive-by.",
+      "what": "merge/17b-onto-main (tip bd3f3431, 2026-08-24 22:41:48) merges a complete UI sweep — icons, lenses, the Selection band accordion, a shell-pass verification script, ~72 files — cleanly resolving nine NR-id collisions against this session's own concurrent NR-589..597 filings by renumbering the 17b side to NR-607..615. It sits sandwiched between two of THIS session's own commits (93b38dc5 at 21:32 and c50a9a7c at 23:17) and was never fast-forwarded or merged into main itself. Every Sprint 18 wave-1 worktree agent (four separate Agent tool calls, each with isolation:\"worktree\") independently forked from this branch's tip rather than main's — meaning worktree isolation picked up whatever HEAD the shared checkout carried at creation time, not necessarily main. No work was lost or corrupted: each agent's OWN commit was cherry-picked onto main individually rather than trusting a wholesale merge, specifically because this contamination was caught. CONFIRMED BY BEN 2026-08-25, looking at the live build: \"the build on main has lost a few UI items from a deleted session. I was of the opinion that was on main.\" Scouted and confirmed — bd3f3431 is NOT an ancestor of main, and against main it carries 42 UI-side files: src/ui/icons.{cpp,hpp} (+51/+26, incl. a stack_ring), body_surface_canvas.cpp (1745 lines), selection_panel.cpp (1029), ui_state.hpp (201), shell_metrics.{cpp,hpp} (+55/+70 — the minimap/legend geometry), overlay.cpp, hex_render.cpp, presentation.{cpp,hpp}, time_panel.cpp, plus new verify scripts (shell_pass, zoom_ladder, stacked_tile_ring, lens_structure_pivot, ui_shell_fixture). Nothing was lost; it was simply never merged. MERGE COST IS REAL AND SHOULD BE PLANNED, NOT ATTEMPTED CASUALLY: Sprint 18 has since landed on the same files — BL-606 rewrote the Throughput lens into body_surface_canvas.cpp and overlay.cpp, BL-607 added the dispatch form to selection_panel.cpp and ui_state.hpp — so the three biggest files in the sweep all carry post-branch work. This wants a deliberate merge session, ideally by whoever authored 17b, not a drive-by.",
       "why_it_matters": "Two things. (1) A full session's worth of real UI work (Sprint 17b) is sitting ready and unintegrated — whoever owns it may still want to merge it, or may be waiting on review. (2) The worktree isolation mechanism forking from a non-main HEAD is a process risk worth knowing about for future sessions: it is exactly the shared-checkout hazard CLAUDE.md already warns about (\"this checkout is shared with other sessions\"), now observed concretely rather than theoretically.",
       "options": [
-        "Merge 17b deliberately, before BL-604 touches the same geometry (recommended)",
+        "Merge 17b deliberately, before BL-609 touches the same geometry (recommended)",
         "Merge it after Sprint 18 is fully closed out",
         "Cherry-pick only the pieces Ben is missing, and retire the rest"
       ],
-      "recommendation": "Merge it deliberately, as its own piece of work. It is ~3800 insertions across the exact three files Sprint 18 also rewrote (body_surface_canvas.cpp, selection_panel.cpp, ui_state.hpp), so expect substantive conflicts that need judgement about which of two live designs wins in each hunk — not something to resolve mechanically. Worth doing BEFORE BL-604 (legend takes the minimap): 17b already touches shell_metrics, the minimap/legend geometry that item rewrites, so merging first avoids doing that layout twice.",
+      "recommendation": "Merge it deliberately, as its own piece of work. It is ~3800 insertions across the exact three files Sprint 18 also rewrote (body_surface_canvas.cpp, selection_panel.cpp, ui_state.hpp), so expect substantive conflicts that need judgement about which of two live designs wins in each hunk — not something to resolve mechanically. Worth doing BEFORE BL-609 (legend takes the minimap): 17b already touches shell_metrics, the minimap/legend geometry that item rewrites, so merging first avoids doing that layout twice.",
       "files": [],
       "status": "resolved",
-      "resolution": "RESOLVED 2026-08-25 — merged into main as 98fa2e57 on Ben's instruction. All 42 UI files landed; full ProjectIo builds clean and 8 of 9 harnesses are green (the one failure, unit_march_harness's corp_verb_count row, is pre-existing since Sprint 16). Four calls needed judgement and are recorded in the merge commit: BL-598's Throughput key was adapted to 17b's one-chrome-home idiom and its foreground-list workaround dropped; 17b's ROADMAP trim was taken wholesale with Sprint 18's cut re-placed into it; 17b's completed sprint went to the cold archive rather than the io-v2 hot store; and 17b's NR-598/599/600 were renumbered to NR-625/626/627, main's being already published and cited — the same rule 17b applied to its own ids.",
+      "resolution": "RESOLVED 2026-08-25 — merged into main as 98fa2e57 on Ben's instruction. All 42 UI files landed; full ProjectIo builds clean and 8 of 9 harnesses are green (the one failure, unit_march_harness's corp_verb_count row, is pre-existing since Sprint 16). Four calls needed judgement and are recorded in the merge commit: BL-606's Throughput key was adapted to 17b's one-chrome-home idiom and its foreground-list workaround dropped; 17b's ROADMAP trim was taken wholesale with Sprint 18's cut re-placed into it; 17b's completed sprint went to the cold archive rather than the io-v2 hot store; and 17b's NR-598/599/600 were renumbered to NR-625/626/627, main's being already published and cited — the same rule 17b applied to its own ids. ID RENUMBER 2026-08-25: the collision this merge exposed extended to BACKLOG ids as well as review ids — both sessions minted BL-598/601/602/604 on 2026-08-24. Sprint 18's four moved (BL-598->606 throughput lens, BL-601->607 dispatch form, BL-602->608 sea port gate, BL-604->609 legend/cancelled) because 17b's are frozen in the cold archive and hold most live citations. Citations in this entry are stated in the NEW numbering.",
       "resolved_on": "2026-08-25"
     },
     {
@@ -582,12 +582,12 @@
       "kind": "decision-taken",
       "source": "BL-596 (LP_ACTIVE_MARCH) landing — LOGISTICS.md does not name the mid-route anchor-attachment rule or a narration pathway for a refused march.",
       "what": "Two calls made so the item could land: (1) a marching unit draws from the anchor with the LOWEST intra_body_path cost from its CURRENT position, recomputed fresh each tick (never cached per-unit) — reusing the exact anchor enumeration body_reach_field seeds its Dijkstra from. (2) a refusal is surfaced only via unit_march_tick::refused_no_lp, a counter, matching the marching/arrived/recomputed style — this codebase has no existing per-unit-movement narration pathway (no agency_event/world_history_entry equivalent fires from run_unit_march today), so no comms/UI surface was invented for this first cut.",
-      "why_it_matters": "LOGISTICS.md (Refusal, surfacing and determinism) requires refusal to be non-optional and legible to the player — a counter on a return struct nobody currently reads UI-side is real but not yet PLAYER-visible. BL-598 (the Throughput lens) is the named surface; until it lands, a refused march is legible only to a harness, not to Ben in play.",
+      "why_it_matters": "LOGISTICS.md (Refusal, surfacing and determinism) requires refusal to be non-optional and legible to the player — a counter on a return struct nobody currently reads UI-side is real but not yet PLAYER-visible. BL-606 (the Throughput lens) is the named surface; until it lands, a refused march is legible only to a harness, not to Ben in play.",
       "options": [
-        "Leave refused_no_lp as the sole signal until BL-598 lands the lens",
-        "Add a lightweight comms-log line now (piggybacking the pattern BL-458 interdiction uses) ahead of BL-598"
+        "Leave refused_no_lp as the sole signal until BL-606 lands the lens",
+        "Add a lightweight comms-log line now (piggybacking the pattern BL-458 interdiction uses) ahead of BL-606"
       ],
-      "recommendation": "Leave it — BL-598 is already scoped to be the throughput surface, and a second ad-hoc narration path now would likely be thrown away when it lands.",
+      "recommendation": "Leave it — BL-606 is already scoped to be the throughput surface, and a second ad-hoc narration path now would likely be thrown away when it lands.",
       "files": [
         "src/world/economy_system.cpp",
         "src/world/economy_system.hpp",
@@ -612,7 +612,7 @@
         "Keep the distance draw and raise the rate far enough that it stops binding — rejected on its face: it leaves LP as a second haulage price, which rule 1 forbids, and only moves where the chokehold sits",
         "Something else — the formula is load-bearing enough that constraint 3 says specify it BEFORE the allocation sort key"
       ],
-      "recommendation": "Rule on the formula, then the fix is small. Quantity-proportional is the reading that satisfies both the constraint and the rule, and it is what \"how much can move through HERE\" actually says. Whatever is chosen, re-run haulage_measure against the 1055/802 baseline as the acceptance check rather than trusting the item own harness, and keep the sea_port_gate.cpp fixture fix on the branch (BL-602 harness regressed 23/23 -> 6 failures because its default registry leaves the LP rate at zero; its Port already IS an anchor, it only lacked a rate).",
+      "recommendation": "Rule on the formula, then the fix is small. Quantity-proportional is the reading that satisfies both the constraint and the rule, and it is what \"how much can move through HERE\" actually says. Whatever is chosen, re-run haulage_measure against the 1055/802 baseline as the acceptance check rather than trusting the item own harness, and keep the sea_port_gate.cpp fixture fix on the branch (BL-608 harness regressed 23/23 -> 6 failures because its default registry leaves the LP rate at zero; its Port already IS an anchor, it only lacked a rate).",
       "files": [
         "src/world/supply_system.cpp",
         "docs/economy/LOGISTICS.md",
@@ -625,10 +625,10 @@
     },
     {
       "id": "NR-621",
-      "title": "BL-598's Throughput lens shades by REACH COST, not by 'the LP serving this tile' - because the second is measurably a constant",
+      "title": "BL-606's Throughput lens shades by REACH COST, not by 'the LP serving this tile' - because the second is measurably a constant",
       "raised": "2026-08-25",
       "kind": "decision-taken",
-      "source": "BL-598 (throughput lens), landing the surface half of LOGISTICS.md section Logistic Points.",
+      "source": "BL-606 (throughput lens), landing the surface half of LOGISTICS.md section Logistic Points.",
       "what": "LOGISTICS.md says 'throughput is that field with a magnitude'. Built literally - per tile, the active LP of the anchor serving it - that field is a CONSTANT, and this was measured rather than assumed. On the home body: 57 anchors, every one generating the same authored active_lp_per_anchor_tick (20.0), and EVERY tile carrying a finite reach cost (ocean is crossable at a sea-leg cost, so nothing is unreachable). So both 'is it reached' (the Reach binary) and 'how much LP reaches it' are flat over all 31,581 tiles - a wash carrying no information. Making the second vary would need a per-tile NEAREST-ANCHOR attribution the engine does not have, and deriving one is the second distance/anchor model BL-325 ruling 3 forbids. So the lens draws the quantity that does vary: the reach FIELD's own magnitude - how far this ground is from a generator - with the LP quantity drawn as a ring on each anchor, where LOGISTICS.md constraint 2 insists its spatial locus stays. Field ramp measured and square-root compressed: cost median 20.8 against max 101.8, so a linear ramp put four fifths of the grid in its top fifth and the map read as one flat wash.",
       "options": [
         "Accept as built - reach-cost field plus a per-anchor LP ring",
@@ -646,10 +646,10 @@
     },
     {
       "id": "NR-622",
-      "title": "BL-598 shipped with NO live click - the container cannot approve the OS-level computer-use dialog",
+      "title": "BL-606 shipped with NO live click - the container cannot approve the OS-level computer-use dialog",
       "raised": "2026-08-25",
       "kind": "observation",
-      "source": "BL-598 (throughput lens). Third occurrence this sprint after BL-601 and its integration.",
+      "source": "BL-606 (throughput lens). Third occurrence this sprint after BL-607 and its integration.",
       "what": "The project rule is that a UI requirement needs a live press, not only a headless capture. It was attempted: request_access for ProjectIo returned user_denied, because nothing in this container can approve the Windows consent dialog. So the Throughput lens is verified by three headless captures (scripts/verify/throughput_lens.lua - full grid, framed anchor, and the key over an open Selection band) and a clean build, and NOT by a human press. Two specific things a capture cannot prove here: that the keyboard lens-cycle (L / Shift+L) actually reaches the new mode in a real session (the capture path sets ui.overlay directly through verify.set_overlay), and that the key does not fight the pointer over the Selection band it now floats above. Worth noting separately: the access request resolved ProjectIo to c:/users/benbo/project-io/.claude/worktrees/elated-mclean-7dd61c/build/projectio.exe - a LEFTOVER WORKTREE, not the shared checkout. That stale worktree is the same one this sprint's briefs blame for forking agents off a stale base, and it is still on disk.",
       "recommendation": "Ben presses L through to the Throughput lens once in a live session and looks at the key over the Selection band. Separately, delete the .claude/worktrees/elated-mclean-7dd61c worktree - it is now actively misdirecting tooling, not only git.",
       "files": [
@@ -661,11 +661,11 @@
     },
     {
       "id": "NR-623",
-      "title": "lens_strip's three goldens are stale by world drift, blessed 2026-06-17 at 44b0228 - not touched by BL-598",
+      "title": "lens_strip's three goldens are stale by world drift, blessed 2026-06-17 at 44b0228 - not touched by BL-606",
       "raised": "2026-08-25",
       "kind": "observation",
-      "source": "Ran as an adjacent-regression check while landing BL-598 (throughput lens).",
-      "what": "lens_strip_none, lens_strip_corporation and lens_strip_production all fail at about 24 percent differing. The diff is the WORLD, not the strip: 38 nations in the golden against 43 now, balance Cr 3.2k against Cr 2.2k, a different terrain field and a different Selection card. BL-598 cannot be the cause - under overlay_mode none/corporation/production not one line of it executes and update_body_throughput early-returns. golden_log.json dates all three to 2026-06-17 at commit 44b0228, which is months of world change ago. NOT re-blessed: the golden policy is a curated world-independent set, and these three are world-dependent, so re-blessing buys one clean run and the same failure the next time the world moves.",
+      "source": "Ran as an adjacent-regression check while landing BL-606 (throughput lens).",
+      "what": "lens_strip_none, lens_strip_corporation and lens_strip_production all fail at about 24 percent differing. The diff is the WORLD, not the strip: 38 nations in the golden against 43 now, balance Cr 3.2k against Cr 2.2k, a different terrain field and a different Selection card. BL-606 cannot be the cause - under overlay_mode none/corporation/production not one line of it executes and update_body_throughput early-returns. golden_log.json dates all three to 2026-06-17 at commit 44b0228, which is months of world change ago. NOT re-blessed: the golden policy is a curated world-independent set, and these three are world-dependent, so re-blessing buys one clean run and the same failure the next time the world moves.",
       "recommendation": "Retire the three lens_strip goldens to capture-only, or re-point the script at something world-independent - the strip itself is the subject, the map behind it is not. Either way it is a golden-policy call, not a fix.",
       "files": [
         "scripts/verify/lens_strip.lua",
@@ -679,9 +679,9 @@
       "title": "The LP REFUSAL still has no surface - run_unit_march counts it and the count is dropped on the floor",
       "raised": "2026-08-25",
       "kind": "observation",
-      "source": "Noticed while landing BL-598 (throughput lens), reading run_unit_march for the lens's data source.",
-      "what": "LOGISTICS.md section 'Refusal, surface and determinism' carries TWO duties. BL-598 discharges the second ('throughput is a lens'). The first - 'a leg over the cap fails, refused outright, AND THE PLAYER IS TOLD WHY... surfacing is non-optional, a refusal nobody sees is silent interdiction again' - is still owed. run_unit_march returns unit_march_tick::refused_no_lp, but that struct never reaches economy_report, so no UI can read it: a march refused for want of LP is, to the player, a unit that simply did not move. The Throughput lens shows where throughput is THIN, which is the standing read; it does not and cannot say 'this order was refused this tick', which is the event read.",
-      "recommendation": "A small item: carry unit_march_tick into economy_report and surface the count where the player already looks at movement - the decision feed is the natural home, a refusal being exactly the class of thing it exists for. Deliberately not folded into BL-598, which owns the lens.",
+      "source": "Noticed while landing BL-606 (throughput lens), reading run_unit_march for the lens's data source.",
+      "what": "LOGISTICS.md section 'Refusal, surface and determinism' carries TWO duties. BL-606 discharges the second ('throughput is a lens'). The first - 'a leg over the cap fails, refused outright, AND THE PLAYER IS TOLD WHY... surfacing is non-optional, a refusal nobody sees is silent interdiction again' - is still owed. run_unit_march returns unit_march_tick::refused_no_lp, but that struct never reaches economy_report, so no UI can read it: a march refused for want of LP is, to the player, a unit that simply did not move. The Throughput lens shows where throughput is THIN, which is the standing read; it does not and cannot say 'this order was refused this tick', which is the event read.",
+      "recommendation": "A small item: carry unit_march_tick into economy_report and surface the count where the player already looks at movement - the decision feed is the natural home, a refusal being exactly the class of thing it exists for. Deliberately not folded into BL-606, which owns the lens.",
       "files": [
         "src/world/economy_system.cpp",
         "src/world/economy_system.hpp",

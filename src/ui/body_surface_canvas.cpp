@@ -859,7 +859,7 @@ void draw_industry_key(ImDrawList* dl, const ui_state& state)
 /// rather than two unrelated blues.
 constexpr ImU32 k_throughput_hue = IM_COL32(80, 200, 255, 255);
 
-/// The Throughput lens's FIELD ramp (BL-598): deep navy where throughput is
+/// The Throughput lens's FIELD ramp (BL-606): deep navy where throughput is
 /// furthest away, the logistics cyan at an anchor. Sequential, not diverging —
 /// capacity has a single good direction. @p t is 1 at an anchor and 0 at the
 /// body's furthest reachable ground (or anywhere unreachable).
@@ -879,7 +879,7 @@ ImU32 throughput_anchor_colour(float t)
     return lerp_colour(IM_COL32(70, 150, 190, 255), IM_COL32(240, 252, 255, 255), t);
 }
 
-/// On-canvas legend for the Throughput lens (BL-598, LOGISTICS.md § Logistic
+/// On-canvas legend for the Throughput lens (BL-606, LOGISTICS.md § Logistic
 /// Points). A fixed-height GRADIENT-BAR key, so it takes the begin_lens_key
 /// chrome flush-left of the minimap — but on ImGui's FOREGROUND draw list with
 /// an OPAQUE fill, the way draw_continent_key does (BL-376). The six other
@@ -2225,7 +2225,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 fill = lerp_colour(fill, ind, 0.15f + 0.6f * t);
             }
         }
-        // Throughput lens (BL-598, LOGISTICS.md § Logistic Points). "Throughput is
+        // Throughput lens (BL-606, LOGISTICS.md § Logistic Points). "Throughput is
         // a lens, extending Reach. The Reach lens shows a binary field; throughput
         // is that field with a magnitude." The BINARY half is drawn here — served
         // ground where it is near against ground where it is far — and the LP
@@ -3342,7 +3342,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 icons::value_mark(dl, {cx, cy}, mr, ryg_colour(t));
             }
 
-            // Throughput lens (BL-598): the MAGNITUDE half. LP is generated at
+            // Throughput lens (BL-606): the MAGNITUDE half. LP is generated at
             // anchors — cities, built-and-active ports and inland hubs — and
             // nowhere else, so the quantity is drawn where it exists rather than
             // smeared over the tiles it might serve. Shading every tile by "the
@@ -3873,7 +3873,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         draw_industry_key(dl, state);
     else if (state.overlay == overlay_mode::continent)
         draw_continent_key(dl, state, plates);
-    // BL-598's key joins the same one chrome home. It was authored against the
+    // BL-606's key joins the same one chrome home. It was authored against the
     // old flush-left anchor and needed the FOREGROUND draw list plus an opaque
     // fill to float over the always-open Selection band; Sprint 17b's minimap-
     // header region removes the collision the workaround existed for, so the

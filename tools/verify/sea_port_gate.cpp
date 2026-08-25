@@ -1,4 +1,4 @@
-// Headless sea-port-gate harness (BL-602; no SDL / Lua / ImGui).
+// Headless sea-port-gate harness (BL-608; no SDL / Lua / ImGui).
 //
 // SUPPLY.md § Infrastructure gates says sea mode requires "Port building at
 // both endpoints", but the mode-selection logic (`path.crosses_ocean` picking
@@ -300,13 +300,13 @@ std::string run_sequence(const recipe_registry& reg)
 
 int main()
 {
-    std::printf("=== sea_port_gate (BL-602: the Port building gates the sea leg) ===\n");
+    std::printf("=== sea_port_gate (BL-608: the Port building gates the sea leg) ===\n");
 
     recipe_registry reg;
     {
         // BL-597: a deliberately generous per-anchor LP rate, same reasoning as
         // convoy_command.cpp and unit_march_harness.cpp — this file's subject is
-        // BL-602's PORT gate, not BL-597's passive-LP admissibility gate, so the
+        // BL-608's PORT gate, not BL-597's passive-LP admissibility gate, so the
         // latter is set up never to bind here. No anchor needs planting: R0's
         // Port on `src_tile` IS a supply anchor (LOGISTICS.md § 3, "a city, or a
         // built and active port or inland logistics hub"), so the only thing the

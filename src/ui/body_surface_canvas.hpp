@@ -58,7 +58,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 void update_body_vision(world& w, ui_state& state, double now_days);
 
 /// Refresh the Throughput lens's active-LP anchor pools for state.active_body
-/// (BL-598; LOGISTICS.md § Logistic Points). A no-op unless that lens is active.
+/// (BL-606; LOGISTICS.md § Logistic Points). A no-op unless that lens is active.
 ///
 /// Here, and non-const, for exactly the reason update_body_vision is: the draw
 /// holds a `const world&` and must not be the thing that populates a cache.

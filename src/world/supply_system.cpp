@@ -363,7 +363,7 @@ entity_id corp_representative_tile(const world& w, const corporation_component& 
 }
 
 /// True when an active (built AND non-decommissioned) Port sits on `tile` —
-/// the sea-mode endpoint gate (BL-602, SUPPLY.md § Infrastructure gates:
+/// the sea-mode endpoint gate (BL-608, SUPPLY.md § Infrastructure gates:
 /// "Port building at both endpoints"). Ownership-agnostic like
 /// `is_supply_anchor` (logistics.cpp): a Port is body infrastructure, not a
 /// corp asset check — unlike `corp_has_launchpad_on` above, which is
@@ -486,7 +486,7 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
             return leg;
         if (path.crosses_ocean)
         {
-            // BL-602: sea mode is gated on an active Port at BOTH endpoints
+            // BL-608: sea mode is gated on an active Port at BOTH endpoints
             // (SUPPLY.md § Infrastructure gates). The cheapest A* path already
             // crosses water — there is no cheaper land-only route BL-522's
             // per-leg pricing would recover — so an ungated pair is refused

@@ -72,31 +72,6 @@
   ],
   "items": [
     {
-      "id": "BL-595",
-      "short_name": "NATION_STARTING_TREASURY",
-      "title": "Generation credits every nation's starting treasury before garrison sizing and contract-offer funding read it",
-      "status": "designed",
-      "glyph": "✓",
-      "priority": "B",
-      "difficulty": 3,
-      "version_goal": "post-v0.1.15",
-      "sprint": null,
-      "category": "Generation",
-      "written": "2026-08-24",
-      "author": "Ben",
-      "requires": [],
-      "blocked_on": null,
-      "parked": false,
-      "files": [
-        "src/world/hard_coded_world.cpp",
-        "src/world/nation_generation.cpp",
-        "docs/generation/NATION_GENERATION.md",
-        "docs/politics/NATIONS.md"
-      ],
-      "authority_doc": "docs/generation/NATION_GENERATION.md",
-      "design": "Ruled 2026-08-24 (NR-580): a generation-time levy/tariff pass credits every nation's `nation_component::treasury` before `seed_nation_garrisons` (BL-571) and before any contract-offer derivation (BL-572) can run — the same conservation-checked transfer `apply_budget`'s levy already uses, fired once at world creation off whatever each nation's own resource/territory profile earns that first quarter. No new authored number; a rich nation starts richer because its profile already says so. Design settled in `docs/generation/NATION_GENERATION.md` § Pass 7 and `docs/politics/NATIONS.md` § 2 — read those before implementing. Not yet built: every garrison and offer in a freshly generated world still lands on its funding floor today."
-    },
-    {
       "status": "complete",
       "glyph": "✓",
       "parked": false,
@@ -399,6 +374,31 @@
       "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
+      "id": "BL-595",
+      "short_name": "NATION_STARTING_TREASURY",
+      "title": "Generation credits every nation's starting treasury before garrison sizing and contract-offer funding read it",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "version_goal": "post-v0.1.15",
+      "sprint": null,
+      "category": "Generation",
+      "written": "2026-08-24",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "files": [
+        "src/world/hard_coded_world.cpp",
+        "src/world/nation_generation.cpp",
+        "docs/generation/NATION_GENERATION.md",
+        "docs/politics/NATIONS.md"
+      ],
+      "authority_doc": "docs/generation/NATION_GENERATION.md",
+      "design": "Ruled 2026-08-24 (NR-580): a generation-time levy/tariff pass credits every nation's `nation_component::treasury` before `seed_nation_garrisons` (BL-571) and before any contract-offer derivation (BL-572) can run — the same conservation-checked transfer `apply_budget`'s levy already uses, fired once at world creation off whatever each nation's own resource/territory profile earns that first quarter. No new authored number; a rich nation starts richer because its profile already says so. Design settled in `docs/generation/NATION_GENERATION.md` § Pass 7 and `docs/politics/NATIONS.md` § 2 — read those before implementing. Not yet built: every garrison and offer in a freshly generated world still lands on its funding floor today."
+    },
+    {
       "status": "complete",
       "glyph": "✓",
       "version_goal": "v0.1.18",
@@ -460,33 +460,6 @@
       "sprint": "18",
       "written": "2026-08-24",
       "author": "Ben",
-      "requires": [
-        "BL-596"
-      ],
-      "blocked_on": null,
-      "parked": false,
-      "id": "BL-598",
-      "short_name": "THROUGHPUT_LENS",
-      "title": "The Throughput lens — Reach with a magnitude",
-      "priority": "B",
-      "difficulty": 3,
-      "category": "UI",
-      "files": [
-        "src/ui/body_surface_canvas.cpp",
-        "src/world/logistics.hpp",
-        "docs/ui/LENSES.md",
-        "docs/economy/LOGISTICS.md"
-      ],
-      "authority_doc": "docs/ui/LENSES.md",
-      "design": "LOGISTICS.md § Refusal: “Throughput is a lens, extending Reach” — the reach field with LP magnitude at each city locus on the Planetary canvas. Respect the three-state tile_reach_cost read (−1 not computed / finite / infinity unreachable) LOGISTICS.md §3 names as the UI trap, and both fogs. No per-tile data exposed to Lua (standing rules). Visual requirement: a live click in the built app, not just a capture."
-    },
-    {
-      "status": "complete",
-      "glyph": "✓",
-      "version_goal": "v0.1.18",
-      "sprint": "18",
-      "written": "2026-08-24",
-      "author": "Ben",
       "requires": [],
       "blocked_on": null,
       "parked": false,
@@ -540,56 +513,6 @@
       "requires": [],
       "blocked_on": null,
       "parked": false,
-      "id": "BL-601",
-      "short_name": "DISPATCH_FORM",
-      "title": "The dispatch form on the market Selection card",
-      "priority": "B",
-      "difficulty": 2,
-      "category": "UI",
-      "files": [
-        "src/ui/selection_card.cpp",
-        "docs/ui/SELECTION.md",
-        "docs/economy/SUPPLY.md"
-      ],
-      "authority_doc": "docs/economy/SUPPLY.md",
-      "design": "SUPPLY.md § Dispatch trigger designs it: a resource + quantity + destination-market form on the market Selection card — a form, not a press. Today no UI site issues corp_verb dispatch_convoy (the verb is wire-only; the decision feed merely renders it). Build the form, wire the verb, surface refusals inline (including BL-597’s passive-cap refusal once it lands). Live click required; question_log.json entry per the every-surface rule. COMPLETE 2026-08-24 (Sprint 18 wave 1): the market Selection card's Cargo/Quantity/Destination dispatch form, routed through apply_corp_command's dispatch_convoy verb. Verified: clean full ProjectIo build, smoke-launched (window opens, Lua loads, no crash). A live click is NOT yet observed -- no interactive access in this container; owed to whoever next has one. Commit 439fb0b6."
-    },
-    {
-      "status": "complete",
-      "glyph": "✓",
-      "version_goal": "v0.1.18",
-      "sprint": "18",
-      "written": "2026-08-24",
-      "author": "Ben",
-      "requires": [],
-      "blocked_on": null,
-      "parked": false,
-      "id": "BL-602",
-      "short_name": "SEA_PORT_GATE",
-      "title": "The Port building gates the sea leg",
-      "priority": "B",
-      "difficulty": 3,
-      "category": "Economy",
-      "files": [
-        "src/world/supply_system.cpp",
-        "src/world/placement_rules.cpp",
-        "scripts/economy.lua",
-        "docs/economy/SUPPLY.md",
-        "docs/economy/LOGISTICS.md"
-      ],
-      "authority_doc": "docs/economy/SUPPLY.md",
-      "design": "Park lifted 2026-08-24 (design form; the coastal-ports design was parked 2026-08-21). SUPPLY.md § Infrastructure gates: sea requires a Port at both endpoints; today the path picks sea mode ungated. Scope is the GATE: author the Port building (already named in reach’s anchor vocabulary, LOGISTICS.md §3), enforce the two-endpoint check at dispatch, surface the refusal. The wider archived BL-188 coastal-trade model stays reference, not scope. Golden churn from newly-refused sea legs is expected and must be attributed, never blessed away. COMPLETE 2026-08-24 (Sprint 18 wave 1): tile_has_active_port added to supply_system.cpp, gating price_convoy_leg on an active Port at both endpoints; ungated water-crossing legs are refused (rejected_placement, mutates nothing) rather than falling back to land pricing. Verified 23/23 in tools/verify/sea_port_gate.cpp. Golden churn: none in the standing suite; ai_skill_harness pre-existing red bands unrelated (NR-616). Commit b15d663e."
-    },
-    {
-      "status": "complete",
-      "glyph": "✓",
-      "version_goal": "v0.1.18",
-      "sprint": "18",
-      "written": "2026-08-24",
-      "author": "Ben",
-      "requires": [],
-      "blocked_on": null,
-      "parked": false,
       "id": "BL-603",
       "short_name": "UPKEEP_ZEROS",
       "title": "Upkeep economics turn on — the reach field starts to bite",
@@ -603,33 +526,6 @@
       ],
       "authority_doc": "docs/military/MILITARY.md",
       "design": "MILITARY.md § Upkeep designs one decay rule with two triggers; every rate in scripts/economy.lua § upkeep is zero today, so the wired code path is inert by data. Author non-zero decay/recovery/out_of_supply_reach and the ordnance draw, argued against BL-543 (value anchor); first-cut-then-tune, flagged for Ben’s calibration (NR-600). Harness: the reach trigger fires beyond out_of_supply_reach and recovery restores inside it; existing goldens that legitimately move are attributed. COMPLETE 2026-08-24 (Sprint 18 wave 1): rates landed in scripts/economy.lua (credits_per_head=6.0, credits_per_head_per_power=0.004, ordnance=0.14, food_rations=1.0, supply_decay_permille=50, supply_recovery_permille=100, out_of_supply_reach=24.0), verified against value_anchor (22/22) and the new upkeep_harness (19/19). tier_margin R2 failure confirmed pre-existing, independent of this change. Commit 4fff7972."
-    },
-    {
-      "status": "cancelled",
-      "glyph": "x",
-      "version_goal": "v0.1.18",
-      "sprint": "18",
-      "written": "2026-08-25",
-      "author": "Ben",
-      "requires": [],
-      "blocked_on": null,
-      "parked": false,
-      "id": "BL-604",
-      "short_name": "LEGEND_TAKES_MINIMAP",
-      "title": "A lens legend takes the minimap's space, for every lens",
-      "priority": "A",
-      "difficulty": 3,
-      "category": "UI",
-      "files": [
-        "src/ui/body_surface_canvas.cpp",
-        "src/ui/shell_metrics.cpp",
-        "src/ui/shell_metrics.hpp",
-        "src/core/app.cpp",
-        "docs/ui/LENSES.md",
-        "docs/ui/MINIMAP.md"
-      ],
-      "authority_doc": "docs/ui/LENSES.md",
-      "design": "Ruled 2026-08-25 (Ben, looking at the live Throughput lens): \"when a lens needs a legend, it takes the minimap space\" — the flush-left-of-the-minimap anchor is retired, because it put the key over the always-open Selection band and read as sloppy. Design settled in docs/ui/LENSES.md § legend chromes; read it before implementing. Scope: move the gradient-bar chrome (begin_lens_key) into the minimap rect and let the minimap yield; the count-driven keys already sit in the right chrome column above the minimap and should be reconciled to the same rule rather than left as a second idiom. Two consequences fall out and are deliberately part of this item: the BL-376 foreground-list + opaque-fill workaround becomes unnecessary once the legend owns its rect (it was the right fix for the wrong layout), which also dissolves the standing defect that six of the seven gradient keys were unreadable under the band; and the item must answer what the minimap does while displaced — hidden outright, or restored the moment the lens clears. A live click is required, per the UI rule. CANCELLED 2026-08-25, by Ben on seeing the merged build: \"Looks fantastic, probably better than my direct instruction to fill minimap space.\" Sprint 17b had already moved every legend into one chrome home — the minimap HEADER, growing upward into the column — which answers the complaint that prompted the ruling (a key popped out over the Selection band) without taking the minimap's own rect. The 2026-08-25 ruling is therefore superseded by its own author in favour of what shipped. The z-order half of this item is also moot: 17b's region overlaps no window, so the foreground-list workaround was dropped at the merge rather than generalised."
     },
     {
       "status": "complete",
@@ -653,6 +549,110 @@
       ],
       "authority_doc": "docs/ui/LENSES.md",
       "design": "Observed live 2026-08-25 (Ben): no logistics glyph below the minimap. Not a bug — draw_overlay_controls (src/ui/overlay.cpp) hardcodes an eight-lens strip and Throughput was deliberately left off it, joining the keyboard-cycle-only shelf with Scarcity, Industry, Supply, Reach and Supply-routes, on the stated ground that the 240px minimap bar has no room. Ben expected a glyph, so the shelf decision is worth revisiting for this lens at least. Note the interaction with BL-604: the strip currently LIVES on the minimap bar, and BL-604 gives the minimap rect to the legend — so where the strip goes is part of that layout question and these two should be settled together. icons::convoy already exists (icons.hpp) and overlay.cpp already maps it to overlay_mode::throughput for the cycle label; only a strip slot is missing. COMPLETE 2026-08-25: Throughput takes strip slot 6, with its own glyph — a TRUCK in profile (icons::throughput), Ben's call. Two abstract cuts were built and rejected against captures first: a funnel narrowing to a node read as a bowtie (an X, already the closed affordance in this vocabulary), and a ringed node with flow stubs read as a lone ring. Proportions matched to industry's vertical extent so it does not sit small against its neighbours. LENSES.md, ICONS.md and ACTIONS.json all updated; captured via lens_strip.lua."
+    },
+    {
+      "status": "complete",
+      "glyph": "✓",
+      "version_goal": "v0.1.18",
+      "sprint": "18",
+      "written": "2026-08-24",
+      "author": "Ben",
+      "requires": [
+        "BL-596"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-606",
+      "short_name": "THROUGHPUT_LENS",
+      "title": "The Throughput lens — Reach with a magnitude",
+      "priority": "B",
+      "difficulty": 3,
+      "category": "UI",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/world/logistics.hpp",
+        "docs/ui/LENSES.md",
+        "docs/economy/LOGISTICS.md"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "design": "LOGISTICS.md § Refusal: “Throughput is a lens, extending Reach” — the reach field with LP magnitude at each city locus on the Planetary canvas. Respect the three-state tile_reach_cost read (−1 not computed / finite / infinity unreachable) LOGISTICS.md §3 names as the UI trap, and both fogs. No per-tile data exposed to Lua (standing rules). Visual requirement: a live click in the built app, not just a capture. RENUMBERED BL-598 -> BL-606 on 2026-08-25. Sprint 17b and Sprint 18 ran concurrently on 2026-08-24 and both drew BL-598 from the same fresh id range for different work; 17b's landed in a FROZEN cold archive and holds the majority of live citations, so Sprint 18's id moved instead. Commit messages written before this pass still cite the old id — they are immutable and the mapping is recorded here."
+    },
+    {
+      "status": "complete",
+      "glyph": "✓",
+      "version_goal": "v0.1.18",
+      "sprint": "18",
+      "written": "2026-08-24",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-607",
+      "short_name": "DISPATCH_FORM",
+      "title": "The dispatch form on the market Selection card",
+      "priority": "B",
+      "difficulty": 2,
+      "category": "UI",
+      "files": [
+        "src/ui/selection_card.cpp",
+        "docs/ui/SELECTION.md",
+        "docs/economy/SUPPLY.md"
+      ],
+      "authority_doc": "docs/economy/SUPPLY.md",
+      "design": "SUPPLY.md § Dispatch trigger designs it: a resource + quantity + destination-market form on the market Selection card — a form, not a press. Today no UI site issues corp_verb dispatch_convoy (the verb is wire-only; the decision feed merely renders it). Build the form, wire the verb, surface refusals inline (including BL-597’s passive-cap refusal once it lands). Live click required; question_log.json entry per the every-surface rule. COMPLETE 2026-08-24 (Sprint 18 wave 1): the market Selection card's Cargo/Quantity/Destination dispatch form, routed through apply_corp_command's dispatch_convoy verb. Verified: clean full ProjectIo build, smoke-launched (window opens, Lua loads, no crash). A live click is NOT yet observed -- no interactive access in this container; owed to whoever next has one. Commit 439fb0b6. RENUMBERED BL-601 -> BL-607 on 2026-08-25. Sprint 17b and Sprint 18 ran concurrently on 2026-08-24 and both drew BL-601 from the same fresh id range for different work; 17b's landed in a FROZEN cold archive and holds the majority of live citations, so Sprint 18's id moved instead. Commit messages written before this pass still cite the old id — they are immutable and the mapping is recorded here."
+    },
+    {
+      "status": "complete",
+      "glyph": "✓",
+      "version_goal": "v0.1.18",
+      "sprint": "18",
+      "written": "2026-08-24",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-608",
+      "short_name": "SEA_PORT_GATE",
+      "title": "The Port building gates the sea leg",
+      "priority": "B",
+      "difficulty": 3,
+      "category": "Economy",
+      "files": [
+        "src/world/supply_system.cpp",
+        "src/world/placement_rules.cpp",
+        "scripts/economy.lua",
+        "docs/economy/SUPPLY.md",
+        "docs/economy/LOGISTICS.md"
+      ],
+      "authority_doc": "docs/economy/SUPPLY.md",
+      "design": "Park lifted 2026-08-24 (design form; the coastal-ports design was parked 2026-08-21). SUPPLY.md § Infrastructure gates: sea requires a Port at both endpoints; today the path picks sea mode ungated. Scope is the GATE: author the Port building (already named in reach’s anchor vocabulary, LOGISTICS.md §3), enforce the two-endpoint check at dispatch, surface the refusal. The wider archived BL-188 coastal-trade model stays reference, not scope. Golden churn from newly-refused sea legs is expected and must be attributed, never blessed away. COMPLETE 2026-08-24 (Sprint 18 wave 1): tile_has_active_port added to supply_system.cpp, gating price_convoy_leg on an active Port at both endpoints; ungated water-crossing legs are refused (rejected_placement, mutates nothing) rather than falling back to land pricing. Verified 23/23 in tools/verify/sea_port_gate.cpp. Golden churn: none in the standing suite; ai_skill_harness pre-existing red bands unrelated (NR-616). Commit b15d663e. RENUMBERED BL-602 -> BL-608 on 2026-08-25. Sprint 17b and Sprint 18 ran concurrently on 2026-08-24 and both drew BL-602 from the same fresh id range for different work; 17b's landed in a FROZEN cold archive and holds the majority of live citations, so Sprint 18's id moved instead. Commit messages written before this pass still cite the old id — they are immutable and the mapping is recorded here."
+    },
+    {
+      "status": "cancelled",
+      "glyph": "x",
+      "version_goal": "v0.1.18",
+      "sprint": "18",
+      "written": "2026-08-25",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-609",
+      "short_name": "LEGEND_TAKES_MINIMAP",
+      "title": "A lens legend takes the minimap's space, for every lens",
+      "priority": "A",
+      "difficulty": 3,
+      "category": "UI",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/shell_metrics.cpp",
+        "src/ui/shell_metrics.hpp",
+        "src/core/app.cpp",
+        "docs/ui/LENSES.md",
+        "docs/ui/MINIMAP.md"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "design": "Ruled 2026-08-25 (Ben, looking at the live Throughput lens): \"when a lens needs a legend, it takes the minimap space\" — the flush-left-of-the-minimap anchor is retired, because it put the key over the always-open Selection band and read as sloppy. Design settled in docs/ui/LENSES.md § legend chromes; read it before implementing. Scope: move the gradient-bar chrome (begin_lens_key) into the minimap rect and let the minimap yield; the count-driven keys already sit in the right chrome column above the minimap and should be reconciled to the same rule rather than left as a second idiom. Two consequences fall out and are deliberately part of this item: the BL-376 foreground-list + opaque-fill workaround becomes unnecessary once the legend owns its rect (it was the right fix for the wrong layout), which also dissolves the standing defect that six of the seven gradient keys were unreadable under the band; and the item must answer what the minimap does while displaced — hidden outright, or restored the moment the lens clears. A live click is required, per the UI rule. CANCELLED 2026-08-25, by Ben on seeing the merged build: \"Looks fantastic, probably better than my direct instruction to fill minimap space.\" Sprint 17b had already moved every legend into one chrome home — the minimap HEADER, growing upward into the column — which answers the complaint that prompted the ruling (a key popped out over the Selection band) without taking the minimap's own rect. The 2026-08-25 ruling is therefore superseded by its own author in favour of what shipped. The z-order half of this item is also moot: 17b's region overlaps no window, so the foreground-list workaround was dropped at the merge rather than generalised. RENUMBERED BL-604 -> BL-609 on 2026-08-25. Sprint 17b and Sprint 18 ran concurrently on 2026-08-24 and both drew BL-604 from the same fresh id range for different work; 17b's landed in a FROZEN cold archive and holds the majority of live citations, so Sprint 18's id moved instead. Commit messages written before this pass still cite the old id — they are immutable and the mapping is recorded here."
     }
   ]
 }
