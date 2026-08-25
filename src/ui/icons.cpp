@@ -444,6 +444,10 @@ void building(ImDrawList* dl, ImVec2 centre, float r, building_type type,
         case building_type::inland_logistics_hub: hub_node(dl, centre, r, fill);  break; // BL-149
         case building_type::military_base:        shield(dl, centre, r, fill);    break; // BL-325
         case building_type::research_institute:   research(dl, centre, r, fill);  break; // BL-332
+        // BL-615: education pair reuses the research glyph family until the
+        // icon vocabulary gives them their own (ICONS.md owns that call).
+        case building_type::schooling:            research(dl, centre, r, fill);  break; // BL-615
+        case building_type::university:           research(dl, centre, r, fill);  break; // BL-615
         default:
             dl->AddCircleFilled(centre, r, fill);
             dl->AddCircle(centre, r, outline, 0, 1.0f);

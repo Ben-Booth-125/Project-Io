@@ -3728,7 +3728,8 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         // button that construct_building would then refuse.
         c.pr = placement_rules::can_place_in_world(w, tile_id, c.type, c.target,
                                                   ui.max_logistics_reach,
-                                                  w.player_entity);
+                                                  w.player_entity,
+                                                  reg.placement_gate_for(c.type, c.recipe));
         c.material_rate = construction_rate(w, reg, c.type, c.target, c.recipe, tile_id); // BL-328 pre-commit warning
 
         // Capex is the figure construction.cpp actually gates on: build cost PLUS the

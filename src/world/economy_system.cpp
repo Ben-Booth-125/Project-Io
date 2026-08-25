@@ -849,10 +849,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     {
         constexpr float k_qualification_per_education_building_tick = 0.0005f;
 
-        const auto is_education_building = [](const building_component& /*b*/) -> bool {
-            // INTEGRATION POINT — see the block comment above. Returns false
-            // until the schooling/university entries exist to test against.
-            return false;
+        const auto is_education_building = [](const building_component& b) -> bool {
+            // Wired at the Sprint 19 wave-1 integration to BL-615's roster
+            // entries (see the block comment above for the seam's history).
+            return b.type == building_type::schooling
+                || b.type == building_type::university;
         };
 
         std::map<entity_id, int> education_by_nation;

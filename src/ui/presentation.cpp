@@ -308,6 +308,8 @@ const char* building_type_name(building_type t)
         case building_type::inland_logistics_hub: return "Inland Logistics Hub"; // BL-149
         case building_type::military_base:        return "Military Base";        // BL-325 S1
         case building_type::research_institute:   return "Research Institute";   // BL-332
+        case building_type::schooling:            return "Schooling";            // BL-615
+        case building_type::university:           return "University";           // BL-615
     }
     return "None";
 }
@@ -384,6 +386,8 @@ ImU32 building_kind_colour(building_type type)
         case building_type::inland_logistics_hub: return IM_COL32(176, 206, 104, 255); // lime
         case building_type::military_base:        return IM_COL32(222,  96,  92, 255); // crimson
         case building_type::research_institute:   return IM_COL32(232, 124, 196, 255); // magenta
+        case building_type::schooling:            return IM_COL32(240, 200, 110, 255); // amber — BL-615
+        case building_type::university:           return IM_COL32(150, 170, 244, 255); // periwinkle — BL-615
         case building_type::none:                 break;
     }
     return neutral;
