@@ -28,6 +28,7 @@
 #include "harness_params.hpp"
 #include "world/world.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <map>
 #include <vector>
@@ -41,12 +42,36 @@ static void check(bool ok, const char* what)
 
 /// Re-run road generation on @p w's body with every nation's qualification forced to
 /// @p qual: reset the body's road_level field, drop the A*/reach caches (they embed the
-/// road discount), and call generate_roads again. The BL-618 differential instrument —
+/// road discount), and call generate_roads again. Under BL-621's era-relative gates a
+/// UNIFORM value grades every nation at percentile 0.5 whatever the value is — the
+/// antiquity shape. The differential instrument is the SPREAD variant below. Formerly —
 /// all else fixed, only the qualification input moves.
 static void regen_roads_at_qualification(world& w, entity_id body, float qual)
 {
     for (auto& [nid, nc] : w.nations)
         nc.qualification = qual;
+    for (auto& [tid, tc] : w.tiles)
+        if (tc.body == body)
+            tc.road_level = 0;
+    w.astar_cost_cache.clear();
+    w.body_reach_cost.clear();
+    generate_roads(w, body);
+}
+
+/// The BL-621 differential instrument: a three-band qualification SPREAD assigned by
+/// ascending nation id — bottom third 0.05 (percentile ~0.17, below the Road gate),
+/// middle 0.30 (~0.5, Roads), top 0.60 (~0.83, Highways where two majors meet). All
+/// else fixed; deterministic by the id sort.
+static void regen_roads_with_spread(world& w, entity_id body)
+{
+    std::vector<entity_id> nids;
+    for (const auto& [nid, nc] : w.nations)
+        nids.push_back(nid);
+    std::sort(nids.begin(), nids.end());
+    const int n = static_cast<int>(nids.size());
+    for (int i = 0; i < n; ++i)
+        w.nations[nids[static_cast<std::size_t>(i)]].qualification =
+            (i < n / 3) ? 0.05f : (i < 2 * n / 3) ? 0.30f : 0.60f;
     for (auto& [tid, tc] : w.tiles)
         if (tc.body == body)
             tc.road_level = 0;
@@ -100,15 +125,16 @@ int main()
     check(roaded_land > 0, "R1 road lattice exists (some Kepler land tile has road_level > 0)");
     check(roaded_ocean == 0, "R1 no road_level stamped on ocean tiles");
 
-    // R2 three-tier ladder (BL-172), gated by qualification (BL-618). The
-    // no_prehistory world's nations never industrialised, so every one sits at the
-    // qualification floor — below both tier gates: the primary world is an
-    // all-Track lattice, and that IS the assertion (the modulation bites).
-    std::printf("      (tiers at the qualification floor: track=%d road=%d highway=%d over=%d)\n",
+    // R2 three-tier ladder (BL-172), gated by qualification PERCENTILE (BL-618 as
+    // amended by BL-621 — Ben's 2026-08-25 ruling on NR-641). The no_prehistory
+    // world's nations all tie at the seeding floor, which under era-relative gates
+    // grades every one at percentile 0.5: the primary world carries a Roads
+    // backbone and no Highways — the antiquity shape, and that IS the assertion.
+    std::printf("      (tiers, all-tied world: track=%d road=%d highway=%d over=%d)\n",
                 track_tiles, road_tiles, highway_tiles, over_highway);
     check(track_tiles > 0, "R2 track roads present (road_level 1)");
-    check(road_tiles == 0 && highway_tiles == 0,
-          "R2 a qualification-floor world promotes no edge past Track (BL-618)");
+    check(road_tiles > 0 && highway_tiles == 0,
+          "R2 an all-tied world keeps Roads and promotes no Highway (BL-621)");
 
     // The full ladder needs qualified nations. The highway tier further needs two
     // City+ centres ADJACENT in the backbone graph (both endpoints scale >= 3;
@@ -125,7 +151,7 @@ int main()
             world_params wp;
             wp.seed = s * 0x9E3779B1u;
             world ws = make_hard_coded_world(no_prehistory(wp));
-            regen_roads_at_qualification(ws, ws.home_body, 0.6f);
+            regen_roads_with_spread(ws, ws.home_body);
             int tc4[4];
             tier_census(ws, ws.home_body, tc4);
             if (tc4[2] > 0) ++seeds_with_road;
@@ -207,26 +233,37 @@ int main()
     }
     check(mismatches == 0, "R4 road_level field identical across two generations");
 
-    // Q — the BL-618 differential: the same world, roads regenerated at the
-    // qualification floor vs high, all else fixed. (Mutates w and w2; keep last.)
+    // Q — the BL-621 era-relative contract (Ben, 2026-08-25, ruling on NR-641): gates
+    // read percentile standing, not absolute qualification. (Mutates w and w2; keep last.)
     {
-        regen_roads_at_qualification(w,  kepler, 0.05f); // the floor
-        regen_roads_at_qualification(w2, kepler, 0.60f); // fully qualified
-        int lo[4], hi[4];
-        tier_census(w,  kepler, lo);
-        tier_census(w2, kepler, hi);
-        std::printf("      (differential: floor total=%d t/r/h=%d/%d/%d | qualified total=%d t/r/h=%d/%d/%d)\n",
-                    lo[0], lo[1], lo[2], lo[3], hi[0], hi[1], hi[2], hi[3]);
-        check(lo[2] + lo[3] == 0, "Q1 floor regen promotes no edge past Track");
-        check(hi[2] > 0, "Q2 qualified regen promotes edges (road tier appears)");
-        check(hi[0] >= lo[0],
-              "Q3 the qualified lattice is at least as large (redundancy loops rationed, never added, at the floor)");
-        // Determinism of the instrument itself: the floor regen equals a second floor regen.
+        regen_roads_at_qualification(w, kepler, 0.05f); // uniform: everyone percentile 0.5
+        int uni[4];
+        tier_census(w, kepler, uni);
+        std::printf("      (uniform floor: total=%d t/r/h=%d/%d/%d)\n",
+                    uni[0], uni[1], uni[2], uni[3]);
+        check(uni[3] == 0, "Q1a an all-tied world promotes no Highway (percentile 0.5 < 0.8)");
+        check(uni[2] > 0,  "Q1b an all-tied world keeps a Roads backbone (0.5 >= 0.4) - the antiquity shape");
+
+        regen_roads_at_qualification(w2, kepler, 0.60f); // uniform at a DIFFERENT absolute level
+        int uni2[4];
+        tier_census(w2, kepler, uni2);
+        check(uni[0] == uni2[0] && uni[1] == uni2[1] && uni[2] == uni2[2] && uni[3] == uni2[3],
+              "Q2 absolute level is irrelevant: uniform 0.05 and uniform 0.60 lattices are identical");
+
+        regen_roads_with_spread(w2, kepler);
+        int spr[4];
+        tier_census(w2, kepler, spr);
+        std::printf("      (spread: total=%d t/r/h=%d/%d/%d)\n",
+                    spr[0], spr[1], spr[2], spr[3]);
+        check(spr[1] != uni[1] || spr[2] != uni[2] || spr[3] != uni[3],
+              "Q3 relative standing is what matters: a spread world's tier census differs from uniform");
+
+        // Determinism of the instrument itself: the uniform regen equals a second uniform regen.
         regen_roads_at_qualification(w2, kepler, 0.05f);
-        int lo2[4];
-        tier_census(w2, kepler, lo2);
-        check(lo[0] == lo2[0] && lo[1] == lo2[1] && lo[2] == lo2[2] && lo[3] == lo2[3],
-              "Q4 the regeneration instrument is deterministic (two floor regens agree)");
+        int uni3[4];
+        tier_census(w2, kepler, uni3);
+        check(uni[0] == uni3[0] && uni[1] == uni3[1] && uni[2] == uni3[2] && uni[3] == uni3[3],
+              "Q4 the regeneration instrument is deterministic (two uniform regens agree)");
     }
 
     std::printf("%s (%d failure(s))\n", g_fail ? "ROAD GEN AUDIT FAILED" : "ROAD GEN AUDIT OK", g_fail);

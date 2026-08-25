@@ -937,6 +937,56 @@
    "authority_doc": "docs/economy/LOGISTICS.md",
    "design": "@docs/development/archive/backlog-design-2026-Q3.json",
    "archived": "docs/development/archive/backlog-design-2026-Q3.json"
+  },
+  {
+   "id": "BL-621",
+   "short_name": "ERA_RELATIVE_ROAD_GATES",
+   "title": "Road tier gates read qualification percentile, not absolute fraction",
+   "status": "complete",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": "v0.1.19",
+   "sprint": "19",
+   "category": "Generation",
+   "written": "2026-08-25",
+   "author": "Ben",
+   "requires": [
+    "BL-618"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "files": [
+    "src/world/road_generation.cpp",
+    "docs/economy/LOGISTICS.md",
+    "tools/verify/road_generation_harness.cpp"
+   ],
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "design": "Ruled 2026-08-25 (Ben, Sprint 19 verdict form, on NR-641): era-relative thresholds - antiquity keeps a Roman-roads-analogue backbone. Gates read the nation's qualification PERCENTILE among the world's nations (mid-rank ties): Highway >= 0.80, Road >= 0.40, loops kept = percentile. An all-tied antiquity world grades everyone at 0.5 - Roads on the Town+ backbone, no Highways; a spread industrial world promotes leaders and demotes laggards. Design in LOGISTICS.md § 4 Roads. COMPLETION: Landed 2026-08-25 same session; road_generation_harness re-specified (R2 antiquity shape; Q1a/Q1b/Q2 absolute-level-irrelevant/Q3 spread-differential/Q4); world_determinism + partition green; spectator golden re-blessed third time (EE1AC6587E0D7800)."
+  },
+  {
+   "id": "BL-622",
+   "short_name": "DENSITY_RETUNES",
+   "title": "Re-derive the density-coupled tunables against the 6.0 tiles/centre world",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": "post-v0.1.19",
+   "sprint": null,
+   "category": "Economy",
+   "written": "2026-08-25",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "files": [
+    "scripts/economy.lua",
+    "src/world/economy_system.cpp",
+    "src/world/market_clearing.cpp"
+   ],
+   "authority_doc": "docs/economy/POPULATION.md",
+   "design": "Ruled 2026-08-25 (Ben, Sprint 19 verdict form): keep 6.0 land tiles per centre; the retunes wait for the next (surfacing) sprint. The measured list from NR-630/NR-635, each a re-derivation against the live world, not a redesign: population_demand's demand_scale; workforce labour units per scale (1/3/10/30/100); the market carve's population anchoring; logistics node discounts (most tiles now near a centre); haulage_measure re-run for the price-band ceiling (its re-derive rule names map/scale changes). Measure first, then move constants - never clamp outcomes."
   }
  ]
 }

@@ -68,33 +68,33 @@ constexpr int kMaxSpurGridDist = 40;
 // (distance^2, then tile ids).
 constexpr int kBorderProbePairs = 24;
 
-// BL-618 (roads scale with qualification; LOGISTICS.md § Roads): the nation's qualification
-// fraction (nation_component::qualification, POPULATION.md § Qualification) modulates the
-// backbone. First-cut mapping, tune-not-restructure:
-//   - Tier promotion is GATED: a Highway needs two major endpoints AND qualification >=
-//     kHighwayQualification; a Road needs one Town+ endpoint AND qualification >=
-//     kRoadQualification; a gated-out edge demotes one rung, never disappears. The floor
-//     (0.05, a nation that never industrialised) sits below both gates, so a pre-industrial
-//     world generates an all-Track lattice — engineering above the track is a qualified-
-//     labour product. 0.10 clears the late-industrialiser base (0.12); 0.30 needs the early
-//     base (0.35), or the mid base (0.22) with broad industrialisation.
-//   - Redundancy loops are RATIONED: the relative-neighbour edges are kept cheapest-first,
-//     floor(count * qualification / kFullRedundancyQualification) of them (clamped to all),
-//     so a low-qualification nation keeps the MST but few loops.
+// BL-618 as amended by BL-621 (era-relative road gates; Ben, 2026-08-25, ruling on
+// NR-641): the gates read the nation's PERCENTILE among the world's nations — mid-rank
+// on ties — never the absolute qualification fraction. Rationale: qualification's
+// seeding is industrialisation timing, which is zero-signal at an antiquity epoch —
+// every nation ties at the floor, and the absolute gates produced an all-Track default
+// world. Relative standing is era-portable: an all-tied antiquity world grades every
+// nation at 0.5 — Roads for every Town+ backbone edge, Highways for none, the
+// Roman-roads-analogue backbone Ben asked to keep — while a spread industrial world
+// promotes its leaders to Highways and demotes its laggards to Track-only lattices.
+//   - Tier promotion is GATED: a Highway needs two major endpoints AND percentile >=
+//     kHighwayPercentile; a Road needs one Town+ endpoint AND percentile >=
+//     kRoadPercentile; a gated-out edge demotes one rung, never disappears.
+//   - Redundancy loops are RATIONED cheapest-first: floor(count * percentile) kept, so
+//     the median nation keeps half its loops and the MST is never rationed.
 // Spurs, local streets and border links are Tracks already and are not modulated.
-constexpr float kRoadQualification           = 0.10f;
-constexpr float kHighwayQualification        = 0.30f;
-constexpr float kFullRedundancyQualification = 0.40f;
+constexpr float kRoadPercentile    = 0.40f;
+constexpr float kHighwayPercentile = 0.80f;
 
 // Tier for a backbone edge between two centres of the given scales (BL-172), gated by the
-// owning nation's qualification (BL-618).
-std::uint8_t edge_tier(int scale_a, int scale_b, float qualification)
+// owning nation's qualification PERCENTILE (BL-618/BL-621).
+std::uint8_t edge_tier(int scale_a, int scale_b, float percentile)
 {
     if (scale_a >= kMajorScale && scale_b >= kMajorScale
-        && qualification >= kHighwayQualification)
+        && percentile >= kHighwayPercentile)
         return kHighway;
     if ((scale_a >= kMidScale || scale_b >= kMidScale)
-        && qualification >= kRoadQualification)
+        && percentile >= kRoadPercentile)
         return kRoad;
     return kTrack;
 }
@@ -230,16 +230,44 @@ void generate_roads(world& w, entity_id body)
     for (int i = 0; i < static_cast<int>(nodes.size()); ++i)
         by_nation[nodes[i].nation].push_back(i);
 
+    // BL-621: each nation's qualification PERCENTILE among the world's nations,
+    // mid-rank on ties — (count below + half the tied group) / N. Computed once,
+    // over ascending nation ids (float-free ranking, but the order is fixed
+    // anyway so a future float term stays deterministic). All-tied -> 0.5 each.
+    std::map<entity_id, float> qual_percentile;
+    {
+        std::vector<std::pair<entity_id, float>> qs;
+        for (const auto& [nid, nc] : w.nations)
+            qs.push_back({ nid, nc.qualification });
+        std::sort(qs.begin(), qs.end(),
+                  [](const auto& a, const auto& b) { return a.first < b.first; });
+        const int nn = static_cast<int>(qs.size());
+        for (const auto& [nid, q] : qs)
+        {
+            int below = 0, tied = 0;
+            for (const auto& [nid2, q2] : qs)
+            {
+                below += q2 < q;
+                tied  += q2 == q;
+            }
+            qual_percentile[nid] =
+                nn > 0 ? (static_cast<float>(below) + 0.5f * static_cast<float>(tied))
+                             / static_cast<float>(nn)
+                       : 0.0f;
+        }
+    }
+
     // 2+3. Per nation: a BACKBONE over towns-and-up (MST + relative-neighbour redundancy,
     //      the pre-BL-620 shape, now over the town set only), then each village joins the
     //      lattice locally with a Track spur.
     for (const auto& [nation, members] : by_nation)
     {
-        // BL-618: the nation's qualification fraction gates tier promotion and rations
-        // the redundancy loops below. Unowned centres (null nation) read 0 — the floor.
+        // BL-618/BL-621: the nation's qualification PERCENTILE gates tier promotion
+        // and rations the redundancy loops below. Unowned centres (null nation)
+        // read 0 — below every gate, Track-only.
         float qualification = 0.0f;
-        if (const auto nit = w.nations.find(nation); nit != w.nations.end())
-            qualification = nit->second.qualification;
+        if (const auto pit = qual_percentile.find(nation); pit != qual_percentile.end())
+            qualification = pit->second;
 
         // Spur target set: this nation's already-roaded tiles — every member centre's own
         // street (stamped in 1b) plus, below, the backbone raster and earlier spurs. The
@@ -335,11 +363,11 @@ void generate_roads(world& w, entity_id body)
                 if (keep)
                     loops.emplace_back(e.a, e.b);
             }
-            // BL-618: ration the loops by qualification, cheapest-first (`loops` inherits
-            // the deterministic (cost, lo, hi) edge order). The MST is never rationed —
-            // a nation's towns connect regardless; loops are the qualified-labour luxury.
-            const float loop_frac =
-                std::clamp(qualification / kFullRedundancyQualification, 0.0f, 1.0f);
+            // BL-618/BL-621: ration the loops by qualification PERCENTILE, cheapest-first
+            // (`loops` inherits the deterministic (cost, lo, hi) edge order). The MST is
+            // never rationed — a nation's towns connect regardless; loops are the
+            // qualified-labour luxury, and the median nation keeps half of them.
+            const float loop_frac = std::clamp(qualification, 0.0f, 1.0f);
             const int loops_kept =
                 static_cast<int>(static_cast<float>(loops.size()) * loop_frac);
             for (int i = 0; i < loops_kept; ++i)

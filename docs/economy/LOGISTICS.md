@@ -131,12 +131,18 @@ qualification): a nation's qualification fraction (`docs/economy/POPULATION.md` 
 modulates its redundancy-edge count and tier promotion, so a low-qualification nation generates a
 sparser, lower-tier lattice. A national development level the map already shows, not a new dial.
 
-Tier promotion is **gated**: a Highway needs its two major endpoints *and* qualification ≥ 0.30;
-a Road needs its Town+ endpoint *and* qualification ≥ 0.10; a gated-out edge demotes one rung,
-never disappears. Redundancy loops are **rationed** cheapest-first — the kept fraction is
-qualification / 0.40, so the MST always survives whole and the loops are the qualified-labour
-luxury. The never-industrialised floor (0.05) sits below both gates: a pre-industrial nation
-lays an all-Track lattice, because engineering above the track is a qualified-labour product.
+The gates are **era-relative** (Ben, 2026-08-25, ruling on NR-641; BL-621, era-relative road
+gates): they read the nation's qualification **percentile among the world's nations** — mid-rank
+on ties — never the absolute fraction. Tier promotion: a Highway needs its two major endpoints
+*and* percentile ≥ 0.80; a Road needs its Town+ endpoint *and* percentile ≥ 0.40; a gated-out
+edge demotes one rung, never disappears. Redundancy loops are **rationed** cheapest-first — the
+kept fraction is the percentile itself, so the median nation keeps half its loops and the MST
+always survives whole. An all-tied world (the antiquity epoch, every nation at the seeding
+floor) grades everyone at 0.5: Roads on every Town+ backbone, Highways nowhere — the
+Roman-roads-analogue backbone — while a spread industrial world promotes its leaders to
+Highways and demotes its laggards to Track. Only a nation *behind its own world* lays an
+all-Track lattice — engineering above the track is a product of relative, not absolute,
+qualified labour.
 
 **Roads are a land feature.** Water tiles are skipped, and an edge whose route crosses *open* ocean
 is not stamped at all — that is a sea route, and stamping it would scatter fragments on distant

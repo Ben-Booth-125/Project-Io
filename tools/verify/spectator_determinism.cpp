@@ -244,7 +244,12 @@ constexpr int      k_ticks = 300;
 // antiquity floor — NR-641). Reproducibility confirmed by R2's own
 // two-independently-built-worlds row (DEC269E7941134D4 twice) on the
 // integrated wave-2 tree.
-constexpr uint64_t k_unspectated_golden = 0xDEC269E7941134D4ull;
+// Re-blessed a third time 2026-08-25, still the same session: BL-621
+// (era-relative road gates, Ben's ruling on NR-641) put a Roads backbone on
+// the antiquity world that was all-Track for a few hours. Confirmed
+// reproducible by R2's own two-independently-built-worlds row
+// (EE1AC6587E0D7800 twice). This is the v0.1.19 cut's constant.
+constexpr uint64_t k_unspectated_golden = 0xEE1AC6587E0D7800ull;
 
 /// Hand-built registry mirroring scripts/economy.lua + scripts/recipes.lua for
 /// the building types the generator places. Copied from ai_skill_harness so the

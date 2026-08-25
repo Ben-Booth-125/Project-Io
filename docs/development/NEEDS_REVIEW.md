@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*50 entries — 48 open, 2 resolved.*
+*50 entries — 39 open, 11 resolved.*
 
 ---
 
@@ -403,68 +403,12 @@ Placed at docs/economy/RESEARCH.md (RP is produced by a building and spent in th
 
 *Files: `docs/economy/RESEARCH.md`, `CLAUDE.md`*
 
-### NR-629 — Wage competition written as the SETTLED labour-clearing model, superseding proportional contention
-*decision taken on your behalf · raised 2026-08-25 · from Ben, 2026-08-25 form: 'wage competition is preferred'.*
-
-'Preferred' was written into POPULATION.md section Contention as the settled design (docs are state-independent; the proportional scalar remains what the code does until BL-614 lands). If 'preferred' meant 'leaning, not settled', overturn by restoring the proportional paragraph and marking BL-614 (wage competition) as a direction to evaluate instead.
-
-*Files: `docs/economy/POPULATION.md`*
-
-### NR-630 — The centre-density recalibration is ~40x, and its downstream tunables are not re-derived
-*observation · raised 2026-08-25 · from Measured while filing BL-610/BL-611: centres today 1 per ~410 land tiles, land provinces 1 per ~10.*
-
-'A centre in every land province' implies roughly 40x today's centre count, mostly small strata. Self-adjusting downstream: Pass 6 background-firm calibration (a 0.90 production/demand target, not a count). NOT self-adjusting and needing re-derivation when BL-610 builds: population_demand's demand_scale, workforce supply per centre (labour units 1/3/10/30/100), the market carve's population anchoring, logistics node discounts (most tiles now near a centre), and road generation's edge count (~40x more MST nodes). Each is a measured retune, not a redesign.
-
-*Files: `src/world/population_generation.cpp`, `scripts/economy.lua`*
-
-### NR-631 — BL-615 landed with five first-cut calls: radius 6, smithy exemption, era band any, no save-version bump, inclusive bound
-*decision taken on your behalf · raised 2026-08-25 · from Agent P's report, BL-615 (stratum placement gates), commit 9ea61218 on its worktree branch.*
-
-Calls taken so the item could land, each overturnable: (1) centre_proximity_radius = 6 for the three industrial steel recipes (a quarter of the 24-unit reach budget; wrapped grid distance, inclusive at the bound); the ancient Smithy (steel_from_blooms) is deliberately ungated - a smithy is not a mill. (2) min_centre_scale > 0 implies requires_centre; proximity counts a centre of ANY stratum. (3) schooling/university take era band 'any' with timber/stone baskets so both bands can build them. (4) max_building widened with NO save-version bump - no serialized array is sized by building_type, reasoning recorded at the constant. (5) Rivals may propose a gated placement and be refused at apply time - deterministic, slightly wasteful.
-
-*Files: `scripts/recipes.lua`, `scripts/economy.lua`, `src/world/placement_rules.cpp`*
-
 ### NR-632 — BL-615 leaves owed UI wiring: build-door locks, preview gates, naming/colour rows for schooling and university
 *observation · raised 2026-08-25 · from Agent P's report - enforcement is at construct_building only; UI preview call sites pass a default (empty) gate.*
 
 Three one-line-each wirings owed to the main session at integration: the door/preview call sites (body_surface_canvas.cpp:3825, selection_panel.cpp:3729) should resolve the real gate so the new reason-coded locks render; presentation.cpp naming and icons.cpp glyph switches need rows for building_type 8/9 (currently 'None'/neutral). Tracked in REFINED.md wave 3; BL-615's R2 visual requirement (live click on the locks) closes only after this.
 
 *Files: `src/ui/body_surface_canvas.cpp`, `src/ui/selection_panel.cpp`, `src/ui/presentation.cpp`, `src/ui/icons.cpp`*
-
-### NR-633 — BL-613/BL-614 landed with six first-cut calls: seeding constants, jurisdiction rule, product composition, non-negative bids, WF.R3 re-spec, education rate
-*decision taken on your behalf · raised 2026-08-25 · from Agent E's report, commits 20b86c67 (BL-613) and dd283070 (BL-614) on its worktree branch.*
-
-Calls taken so the items could land, each overturnable: (1) qualification seeding = first_furnace tercile base (early 0.35 / mid 0.22 / late 0.12 / never 0.05) + 0.25 x industrialised-region share, clamped [0,1] - never-industrialised nations floor at 0.05, not 0. (2) A building outside every nation is UNGATED by the qualified pool (the levy-pass precedent); a nation with no centre labour on a body has an empty pool there and its deep methods idle. (3) Qualified and ordinary grants compose by PRODUCT; qualified clears first but does not deplete the ordinary pool. (4) wage_bid is non-negative - bids raise, never undercut, in this cut; serialisation refuses negatives. (5) econ_harness WF.R3 asserted the superseded proportional model and was RE-SPECIFIED to the ruled wage contract - not weakened: output conservation and the aggregate still asserted, a differential bid row added. (6) Education raising rate 0.0005/building/tick as a local constexpr, inert until the is_education_building seam opens; move to economy.lua with the roster wiring. First-cut qualified_workforce ladder: spacecraft 0.50, heavy-route 0.40, electronics 0.35, medical 0.30, machinery/alloys/ordnance 0.25, steel_bessemer 0.15; ancient roster untouched.
-
-*Files: `src/world/settlement.cpp`, `src/world/economy_system.cpp`, `scripts/recipes.lua`*
-
-### NR-635 — BL-610/BL-612 carve constants are first-cut: 10% urban share, rank-size banding, footprints 1/1/2/4/7; density landed at 6.0 tiles/centre vs the ~10 target
-*decision taken on your behalf · raised 2026-08-25 · from Agent G's report, commits 594d4e18 / 88174045.*
-
-The carve model is: count = each living region's urban headcount (10% share) / 10k heads, floored at 1; scales = integer rank-size share-out banded to the nearest k_population_for_scale rung in log space; footprints 1/1/2/4/7 tiles by scale on most-livable neighbours. Measured seeds 0-2: 8.76/8.04/6.18 land tiles per centre pre-anchor, 6.04 after anchor villages; histogram s1=4928 s2=206 s3=45 s4=11 s5=1. Slightly denser than the ~10 target - k_demography_heads_per_centre is the one data knob if Ben wants it back. P5a3 over-preference share also moved 4.63% -> ~7.2% (report-only row; the 'rare' judgement is Ben's).
-
-*Files: `src/world/population_generation.cpp`*
-
-### NR-636 — BL-611 grew twice, forced by its own assertions: the nation lock implements purged BL-563's core, and anchor foundings carry a flag + the v12 bump
-*decision taken on your behalf · raised 2026-08-25 · from Agent G's report, commit cab05f8f - flagged by the agent as its two novelty points.*
-
-(1) The whole land fill is nation-locked (growth, leftovers, singleton absorption), making land provinces single-nation by construction - this is the core of purged BL-563 (province respects nation), designed but never built; the brief's anchor==tile-owner assertion is unreachable without it. (2) Centre-less pockets get a scale-1 anchor FOUNDING post-partition (relaxed habitability gate on pure-ice, counted), flagged province_anchor and excluded from partition seeding so the partition stays a pure function of the pre-anchor world - hence the second save bump. Also: hinterland seeding retained on UNSETTLED bodies' land (Selene/Cinder/Pallas have no centres); P9b retired as superseded (absorption legitimately merges centres at this density); P5d redefined to the nation lock.
-
-*Files: `src/world/province.cpp`, `src/world/population_generation.cpp`*
-
-### NR-637 — At the new density the Planetary canvas reads settlement-saturated at far zoom - does the marker vocabulary need a tier gate?
-*question · raised 2026-08-25 · from lens_strip_population.png captured on the integrated wave-1 world (build/screenshots/).*
-
-With ~1,450 centres the always-on civic chrome draws a skyline glyph for nearly every land tile cluster - the lived-in goal is unmistakably met, but at far zoom the surface reads as a uniform settlement grid rather than a hierarchy of cities over towns over villages. Candidate directions, Ben's call: (a) zoom-gate village markers (scale 1 renders only past a zoom threshold, the conurbation anchor carries the far read); (b) raise the conurbation clustering distance so villages fold into their town's glyph; (c) leave it - density IS the message. POPULATION.md § Centre rendering owns the vocabulary.
-
-*Files: `src/ui/body_surface_canvas.cpp`, `docs/economy/POPULATION.md`*
-
-### NR-638 — BL-616/BL-617 first-cut calls: raze precondition unit-on-body, stance gate latent (all-neutral), selectivity 1.5 makes brain drain bite, raze keeps urban ground
-*decision taken on your behalf · raised 2026-08-25 · from Agent W2E's report, commits be4c9588 (BL-616) and bc1ea38b (BL-617) on its worktree branch.*
-
-Four calls, each overturnable: (1) raze_centre's occupation precondition = the acting corp owns a unit positioned on the centre's BODY (a stricter on-centre-tile rule is a one-line change); the verb is deliberately NOT in the corp-AI candidate list - no standing-rules grant covers a rival razing. (2) The migration stance gate reads the existing stance tables by nation entity id, but nothing DECLARES nation stance yet, so live inter-nation flows all clear at the neutral throttle (250 permille) - the gate is real but latent until a nation-stance verb exists. (3) qualified_selectivity = 1.5: migrants skew qualified, so emigration lowers the origin's FRACTION, not just its headcount - at exactly 1.0 the fraction would be invariant, contradicting the doc's 'debits the fraction' reading. (4) Razing leaves the urban land-use stamp (historied ground; extraction stays blocked) - now written into POPULATION.md. Growth/decline constants: step 10 ticks, shed/gain pop/25, promotion window 50 ticks; migration rate 10 permille, wage_weight 0.02 - all data or constexpr, first-cut-then-tune.
-
-*Files: `src/world/economy_system.cpp`, `src/world/corp_command.hpp`, `scripts/economy.lua`*
 
 ### NR-640 — Anchor villages are OFF the road lattice - connecting them post-partition breaks partition-recompute reproducibility; ordering question for Ben
 *question · raised 2026-08-25 · from Agent W2G's report (BL-620): road_generation_harness R3 was already red at HEAD - BL-611's ensure_province_anchor_centres founds ~1,086 villages AFTER generate_roads.*
@@ -473,19 +417,48 @@ Roads -> partition -> anchors is a hard ordering: roads bind provinces, so the p
 
 *Files: `src/world/hard_coded_world.cpp`, `src/world/road_generation.cpp`, `src/world/province.cpp`*
 
-### NR-641 — The default campaign world is now an ALL-TRACK lattice - every nation sits at the qualification floor at epoch 0
-*question · raised 2026-08-25 · from Agent W2G's report (BL-618): qualification spreads 0.05-0.60 only at epoch >= 1700; epoch_year 0 (the campaign default, an antiquity start) leaves every nation at the never-industrialised floor 0.05.*
-
-The first-cut tier mapping (Road needs qualification >= 0.10, Highway >= 0.30, redundancy loops rationed by qualification/0.40) is era-coherent - highways are industrial - but its visible consequence is that the DEFAULT generated world promotes nothing past Track: a global logistics-cost change (Track x0.67 vs Road x0.50 vs Highway x0.40) and a different-looking map. Options: (a) accept - an antiquity world with only tracks is honest, and roads arrive as qualification rises in play (BL-616's education loop now matters); (b) rebase the thresholds on the era-relative qualification distribution rather than absolute values, so antiquity keeps its Roman-road-analogue backbone; (c) keep absolute thresholds but lower them. Differential harness rows Q1-Q4 prove the lever works either way.
-
-*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
-
 ---
 
 ## Resolved
 
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
+
+### NR-629 — Wage competition written as the SETTLED labour-clearing model, superseding proportional contention
+*decision taken on your behalf · raised 2026-08-25 · from Ben, 2026-08-25 form: 'wage competition is preferred'.*
+
+'Preferred' was written into POPULATION.md section Contention as the settled design (docs are state-independent; the proportional scalar remains what the code does until BL-614 lands). If 'preferred' meant 'leaning, not settled', overturn by restoring the proportional paragraph and marking BL-614 (wage competition) as a direction to evaluate instead.
+
+> **RESOLVED.** Ben, 2026-08-25 verdict form: SETTLED - the doc stands as written.
+
+*Files: `docs/economy/POPULATION.md`*
+
+### NR-630 — The centre-density recalibration is ~40x, and its downstream tunables are not re-derived
+*observation · raised 2026-08-25 · from Measured while filing BL-610/BL-611: centres today 1 per ~410 land tiles, land provinces 1 per ~10.*
+
+'A centre in every land province' implies roughly 40x today's centre count, mostly small strata. Self-adjusting downstream: Pass 6 background-firm calibration (a 0.90 production/demand target, not a count). NOT self-adjusting and needing re-derivation when BL-610 builds: population_demand's demand_scale, workforce supply per centre (labour units 1/3/10/30/100), the market carve's population anchoring, logistics node discounts (most tiles now near a centre), and road generation's edge count (~40x more MST nodes). Each is a measured retune, not a redesign.
+
+> **RESOLVED.** Ben, 2026-08-25: keep 6.0 tiles/centre, retunes next sprint - now BL-622 (density retunes).
+
+*Files: `src/world/population_generation.cpp`, `scripts/economy.lua`*
+
+### NR-631 — BL-615 landed with five first-cut calls: radius 6, smithy exemption, era band any, no save-version bump, inclusive bound
+*decision taken on your behalf · raised 2026-08-25 · from Agent P's report, BL-615 (stratum placement gates), commit 9ea61218 on its worktree branch.*
+
+Calls taken so the item could land, each overturnable: (1) centre_proximity_radius = 6 for the three industrial steel recipes (a quarter of the 24-unit reach budget; wrapped grid distance, inclusive at the bound); the ancient Smithy (steel_from_blooms) is deliberately ungated - a smithy is not a mill. (2) min_centre_scale > 0 implies requires_centre; proximity counts a centre of ANY stratum. (3) schooling/university take era band 'any' with timber/stone baskets so both bands can build them. (4) max_building widened with NO save-version bump - no serialized array is sized by building_type, reasoning recorded at the constant. (5) Rivals may propose a gated placement and be refused at apply time - deterministic, slightly wasteful.
+
+> **RESOLVED.** Ben, 2026-08-25 verdict form: confirmed.
+
+*Files: `scripts/recipes.lua`, `scripts/economy.lua`, `src/world/placement_rules.cpp`*
+
+### NR-633 — BL-613/BL-614 landed with six first-cut calls: seeding constants, jurisdiction rule, product composition, non-negative bids, WF.R3 re-spec, education rate
+*decision taken on your behalf · raised 2026-08-25 · from Agent E's report, commits 20b86c67 (BL-613) and dd283070 (BL-614) on its worktree branch.*
+
+Calls taken so the items could land, each overturnable: (1) qualification seeding = first_furnace tercile base (early 0.35 / mid 0.22 / late 0.12 / never 0.05) + 0.25 x industrialised-region share, clamped [0,1] - never-industrialised nations floor at 0.05, not 0. (2) A building outside every nation is UNGATED by the qualified pool (the levy-pass precedent); a nation with no centre labour on a body has an empty pool there and its deep methods idle. (3) Qualified and ordinary grants compose by PRODUCT; qualified clears first but does not deplete the ordinary pool. (4) wage_bid is non-negative - bids raise, never undercut, in this cut; serialisation refuses negatives. (5) econ_harness WF.R3 asserted the superseded proportional model and was RE-SPECIFIED to the ruled wage contract - not weakened: output conservation and the aggregate still asserted, a differential bid row added. (6) Education raising rate 0.0005/building/tick as a local constexpr, inert until the is_education_building seam opens; move to economy.lua with the roster wiring. First-cut qualified_workforce ladder: spacecraft 0.50, heavy-route 0.40, electronics 0.35, medical 0.30, machinery/alloys/ordnance 0.25, steel_bessemer 0.15; ancient roster untouched.
+
+> **RESOLVED.** Ben, 2026-08-25 verdict form: confirmed.
+
+*Files: `src/world/settlement.cpp`, `src/world/economy_system.cpp`, `scripts/recipes.lua`*
 
 ### NR-634 — spectator_determinism has a red golden row ON MAIN at dc7d0554 - pre-existing, same class as ai_skill_harness (NR-616)
 *observation · raised 2026-08-25 · from Agent E, measured with baseline isolation: harness built from dc7d0554 in a scratch tree shows identical hashes and the same golden-row failure before and after its commits.*
@@ -496,6 +469,42 @@ played=0AF36395D78F3DAF, spectated=C890E1AF7A9A27E1 - the two match each other (
 
 *Files: `tools/verify/spectator_determinism.cpp`*
 
+### NR-635 — BL-610/BL-612 carve constants are first-cut: 10% urban share, rank-size banding, footprints 1/1/2/4/7; density landed at 6.0 tiles/centre vs the ~10 target
+*decision taken on your behalf · raised 2026-08-25 · from Agent G's report, commits 594d4e18 / 88174045.*
+
+The carve model is: count = each living region's urban headcount (10% share) / 10k heads, floored at 1; scales = integer rank-size share-out banded to the nearest k_population_for_scale rung in log space; footprints 1/1/2/4/7 tiles by scale on most-livable neighbours. Measured seeds 0-2: 8.76/8.04/6.18 land tiles per centre pre-anchor, 6.04 after anchor villages; histogram s1=4928 s2=206 s3=45 s4=11 s5=1. Slightly denser than the ~10 target - k_demography_heads_per_centre is the one data knob if Ben wants it back. P5a3 over-preference share also moved 4.63% -> ~7.2% (report-only row; the 'rare' judgement is Ben's).
+
+> **RESOLVED.** Ben, 2026-08-25: density stands at 6.0; the knob stays; retunes are BL-622 (density retunes).
+
+*Files: `src/world/population_generation.cpp`*
+
+### NR-636 — BL-611 grew twice, forced by its own assertions: the nation lock implements purged BL-563's core, and anchor foundings carry a flag + the v12 bump
+*decision taken on your behalf · raised 2026-08-25 · from Agent G's report, commit cab05f8f - flagged by the agent as its two novelty points.*
+
+(1) The whole land fill is nation-locked (growth, leftovers, singleton absorption), making land provinces single-nation by construction - this is the core of purged BL-563 (province respects nation), designed but never built; the brief's anchor==tile-owner assertion is unreachable without it. (2) Centre-less pockets get a scale-1 anchor FOUNDING post-partition (relaxed habitability gate on pure-ice, counted), flagged province_anchor and excluded from partition seeding so the partition stays a pure function of the pre-anchor world - hence the second save bump. Also: hinterland seeding retained on UNSETTLED bodies' land (Selene/Cinder/Pallas have no centres); P9b retired as superseded (absorption legitimately merges centres at this density); P5d redefined to the nation lock.
+
+> **RESOLVED.** Ben, 2026-08-25 verdict form: confirmed.
+
+*Files: `src/world/province.cpp`, `src/world/population_generation.cpp`*
+
+### NR-637 — At the new density the Planetary canvas reads settlement-saturated at far zoom - does the marker vocabulary need a tier gate?
+*question · raised 2026-08-25 · from lens_strip_population.png captured on the integrated wave-1 world (build/screenshots/).*
+
+With ~1,450 centres the always-on civic chrome draws a skyline glyph for nearly every land tile cluster - the lived-in goal is unmistakably met, but at far zoom the surface reads as a uniform settlement grid rather than a hierarchy of cities over towns over villages. Candidate directions, Ben's call: (a) zoom-gate village markers (scale 1 renders only past a zoom threshold, the conurbation anchor carries the far read); (b) raise the conurbation clustering distance so villages fold into their town's glyph; (c) leave it - density IS the message. POPULATION.md § Centre rendering owns the vocabulary.
+
+> **RESOLVED.** Ben, 2026-08-25 verdict form: leave it - density is the message. No marker change.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `docs/economy/POPULATION.md`*
+
+### NR-638 — BL-616/BL-617 first-cut calls: raze precondition unit-on-body, stance gate latent (all-neutral), selectivity 1.5 makes brain drain bite, raze keeps urban ground
+*decision taken on your behalf · raised 2026-08-25 · from Agent W2E's report, commits be4c9588 (BL-616) and bc1ea38b (BL-617) on its worktree branch.*
+
+Four calls, each overturnable: (1) raze_centre's occupation precondition = the acting corp owns a unit positioned on the centre's BODY (a stricter on-centre-tile rule is a one-line change); the verb is deliberately NOT in the corp-AI candidate list - no standing-rules grant covers a rival razing. (2) The migration stance gate reads the existing stance tables by nation entity id, but nothing DECLARES nation stance yet, so live inter-nation flows all clear at the neutral throttle (250 permille) - the gate is real but latent until a nation-stance verb exists. (3) qualified_selectivity = 1.5: migrants skew qualified, so emigration lowers the origin's FRACTION, not just its headcount - at exactly 1.0 the fraction would be invariant, contradicting the doc's 'debits the fraction' reading. (4) Razing leaves the urban land-use stamp (historied ground; extraction stays blocked) - now written into POPULATION.md. Growth/decline constants: step 10 ticks, shed/gain pop/25, promotion window 50 ticks; migration rate 10 permille, wage_weight 0.02 - all data or constexpr, first-cut-then-tune.
+
+> **RESOLVED.** Ben, 2026-08-25 verdict form: confirmed (all four calls).
+
+*Files: `src/world/economy_system.cpp`, `src/world/corp_command.hpp`, `scripts/economy.lua`*
+
 ### NR-639 — tools/mcp/server.js VERBS array is stale by 10 verbs (stops at hold_convoy) - index-is-value, so the whole tail is missing
 *observation · raised 2026-08-25 · from Agent W2E, observed in passing while appending raze_centre (verb 27).*
 
@@ -504,4 +513,13 @@ The MCP server's VERBS name array has 17 entries while corp_verb now counts 28 -
 > **RESOLVED.** Fixed 2026-08-25 (Ben: 'update the MCP server's verb table'): full 11-verb tail appended in enum order (28 total); schema gains province + extended order/counterparty descriptions; verb_coverage.js gains a FAILING drift guard (length AND order vs the seam) plus subsystem rows for the four unmapped verbs. Honest gap recorded in place: agent_protocol.cpp parses no units key, so a wire accept_offer cannot commit units yet - that is seam work, not schema work.
 
 *Files: `tools/mcp/server.js`, `tools/session/verb_coverage.js`*
+
+### NR-641 — The default campaign world is now an ALL-TRACK lattice - every nation sits at the qualification floor at epoch 0
+*question · raised 2026-08-25 · from Agent W2G's report (BL-618): qualification spreads 0.05-0.60 only at epoch >= 1700; epoch_year 0 (the campaign default, an antiquity start) leaves every nation at the never-industrialised floor 0.05.*
+
+The first-cut tier mapping (Road needs qualification >= 0.10, Highway >= 0.30, redundancy loops rationed by qualification/0.40) is era-coherent - highways are industrial - but its visible consequence is that the DEFAULT generated world promotes nothing past Track: a global logistics-cost change (Track x0.67 vs Road x0.50 vs Highway x0.40) and a different-looking map. Options: (a) accept - an antiquity world with only tracks is honest, and roads arrive as qualification rises in play (BL-616's education loop now matters); (b) rebase the thresholds on the era-relative qualification distribution rather than absolute values, so antiquity keeps its Roman-road-analogue backbone; (c) keep absolute thresholds but lower them. Differential harness rows Q1-Q4 prove the lever works either way.
+
+> **RESOLVED.** Ben, 2026-08-25: era-relative thresholds - implemented same session as BL-621 (era-relative road gates); LOGISTICS.md updated, harness re-specified.
+
+*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
 
