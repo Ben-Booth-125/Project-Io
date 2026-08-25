@@ -30,9 +30,14 @@ struct building_opex
 };
 
 /// Compute a building's maintenance + wages for one tick. `contention_scalar` is the
-/// (corp, body) labour throttle (1.0 uncontended); `mean_hab` is the body's mean
-/// population habitability (clamped to [0.1, 2.0] internally, exactly as the budget
-/// loop does). Decommissioned buildings pay only fixed material maintenance, no wages.
+/// building's labour throttle (1.0 uncontended — since BL-614 the per-building
+/// allocation grant where the caller has one, the (corp, body) aggregate
+/// otherwise); `mean_hab` is the body's mean population habitability (clamped to
+/// [0.1, 2.0] internally, exactly as the budget loop does). Wages are paid AT THE
+/// OFFERED RATE (BL-614): `base_wage × (1 + b.wage_bid)` — a building that outbid
+/// its siblings for scarce labour pays the premium it offered, on the labour it
+/// actually got. Decommissioned buildings pay only fixed material maintenance,
+/// no wages.
 building_opex compute_building_opex(const building_component& b,
                                     const building_economics& e,
                                     float contention_scalar,
@@ -63,6 +68,14 @@ float body_mean_habitability(const world& w, entity_id body);
 /// @param flows      Per-corporation market cash flow from clear_markets().
 /// @param contention Per-(corp, body) workforce contention from run_economy_step
 ///                   (`economy_report.workforce_contention`); absent keys read as 1.0.
+/// @param building_labour Optional (BL-614): the per-building allocation grants
+///                   (`economy_report.building_labour`). When non-null, a
+///                   building with an entry pays wages on ITS OWN grant — the
+///                   wage-competition allocation, qualified constraint folded —
+///                   rather than the pool aggregate; a building without one
+///                   falls back to `contention`. Null (every harness that
+///                   predates the map) reproduces the pool-scalar wages
+///                   bit-identically.
 /// @param breakdown  Optional sink (BL-072): when non-null, receives the per-corp
 ///                   four-flow split (income / expenditure / maintenance / wages,
 ///                   plus the BL-073 interest line) whose net() equals the delta
@@ -82,4 +95,5 @@ void apply_budget(world& w,
                   const std::unordered_map<entity_id, corp_cash_flow>& flows,
                   const std::map<std::pair<entity_id, entity_id>, float>& contention,
                   std::map<entity_id, corp_budget>* breakdown = nullptr,
-                  const std::vector<building_report>* production = nullptr);
+                  const std::vector<building_report>* production = nullptr,
+                  const std::map<entity_id, float>* building_labour = nullptr);

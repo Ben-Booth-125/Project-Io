@@ -690,6 +690,23 @@ struct building_component
     /// owning corp. Never set on player buildings.
     int  ai_cooldown = 0;
 
+    /// BL-614 (wage competition; docs/economy/POPULATION.md § Contention): this
+    /// building's wage premium over its type's authored `base_wage`, as a
+    /// fraction — offered wage = base_wage × (1 + wage_bid). When a (corp,
+    /// body) labour pool is contended, scarce labour allocates to the buildings
+    /// offering the higher wage (offered wage descending, then building id
+    /// ascending), superseding the uniform proportional scalar; wages are then
+    /// paid AT THE OFFERED RATE on the labour actually allocated
+    /// (compute_building_opex). FIRST CUT, flagged for overturn (NR-629):
+    /// data-only, no UI and no verb sets it, so every offered wage is currently
+    /// base_wage and contention resolves by building id — the per-building dial
+    /// vs per-body dial vs derived clearing wage question stays open on the
+    /// item. Non-negative by contract (a bid raises, never undercuts, in this
+    /// cut). SERIALISED (world_save.cpp's building record) —
+    /// `world_save_version` 11 → 12 moved with it; a non-finite or negative
+    /// value refuses the whole stream.
+    float wage_bid = 0.0f;
+
     /// BL-430: economy ticks remaining before this building's recipe may be
     /// switched again through the PLAYER-grade seam (corp_command's set_recipe
     /// verb, and the construction_panel UI, which shares its gate). Set from
@@ -1315,4 +1332,27 @@ struct nation_component
     /// why `world_save_version` moves with it — a v4 stream simply predates
     /// the field and has nowhere to source it from.
     entity_id capital_tile = null_entity;
+
+    /// BL-613 (qualification fraction; docs/economy/POPULATION.md § Qualification):
+    /// the share of this nation's workforce that is QUALIFIED, in [0, 1].
+    /// Nation-grain deliberately — it reads as a national development level.
+    ///
+    /// Seeded at generation by `derive_national_character` (settlement.cpp) from
+    /// the Era −1 industrialisation-timing record the settlement pass produces —
+    /// the same `first_furnace` terciles that set ideology, plus the breadth of
+    /// industrialisation across the nation's regions. Early industrialisers open
+    /// qualified, late ones raw, never-industrialised nations open at a floor.
+    /// A harness fixture that skips the settlement pass keeps the honest default:
+    /// no history, no qualified pool.
+    ///
+    /// Consumed by the workforce pool (economy_system.cpp): a recipe carrying a
+    /// `qualified_workforce` requirement throttles against qualification × the
+    /// nation's share of the body's labour supply — a factor beside the ordinary
+    /// contention scalar, not a new shape. Raised by education buildings through
+    /// the `is_education_building` seam (returns false until the schooling /
+    /// university roster entries land — see economy_system.cpp's qualification
+    /// pass). SERIALISED (world_save.cpp's nation record) — `world_save_version`
+    /// 10 → 11 moved with it; a non-finite or out-of-[0,1] value refuses the
+    /// whole stream.
+    float qualification = 0.0f;
 };

@@ -166,6 +166,15 @@ recipes = {
         outputs = { ree_alloy = 1.0 },
     },
 
+    -- BL-613 (qualification fraction, POPULATION.md § Qualification):
+    -- `qualified_workforce` is the fraction of a recipe's labour that must be
+    -- QUALIFIED, drawn from the host nation's qualified pool. Authored on the
+    -- DEEPEST / LATEST methods only, as a ladder that follows chain depth —
+    -- deeper method, larger qualified share — so the non-purchasable
+    -- constraint gates exactly the buildings the growth spine says are
+    -- hardest to reach. First-cut values, tune-not-restructure (NR-600).
+    -- Every recipe without the field runs on ordinary labour alone.
+
     -- id 10 — Fabricator: steel + refined copper -> machinery. The
     -- Fabricator's alternative path to alloys (id 11) — a real choice
     -- between the two rather than a forced chain.
@@ -175,6 +184,7 @@ recipes = {
         group   = "Advanced Fabrication", -- BL-434
         inputs  = { steel = 1.0, refined_copper = 1.0 },
         outputs = { machinery = 1.0 },
+        qualified_workforce = 0.25, -- BL-613: depth-3 fabrication
     },
 
     -- id 11 — Fabricator: steel + REE alloy -> alloys.
@@ -184,6 +194,7 @@ recipes = {
         group   = "Advanced Fabrication", -- BL-434
         inputs  = { steel = 1.0, ree_alloy = 1.0 },
         outputs = { alloys = 1.0 },
+        qualified_workforce = 0.25, -- BL-613: depth-3 fabrication
     },
 
     -- id 12 — Electronics Lab: silicon + refined copper + REE alloy -> electronics.
@@ -193,6 +204,7 @@ recipes = {
         group   = "Electronics", -- BL-434
         inputs  = { silicon = 1.0, refined_copper = 1.0, ree_alloy = 0.5 },
         outputs = { electronics = 1.0 },
+        qualified_workforce = 0.35, -- BL-613: precision work above plain fabrication
     },
 
     -- id 13 — Assembly Plant: alloys + electronics -> spacecraft components.
@@ -204,6 +216,7 @@ recipes = {
         group   = "Advanced Fabrication", -- BL-434
         inputs  = { alloys = 2.0, electronics = 1.0 },
         outputs = { spacecraft_components = 1.0 },
+        qualified_workforce = 0.50, -- BL-613: the roster's deepest chain terminal
     },
 
     -- BL-368 (2026-08-11) — the habitability tranche (RESOURCES.md § Habitability
@@ -244,6 +257,7 @@ recipes = {
         group   = "Welfare Goods", -- BL-434
         inputs  = { water = 1.0, agricultural_produce = 1.0 },
         outputs = { medical_supplies = 1.0 },
+        qualified_workforce = 0.30, -- BL-613: pharma is skilled work
     },
 
     -- =====================================================================
@@ -386,6 +400,7 @@ recipes = {
         group        = "Advanced Fabrication", -- same group as id 13
         inputs       = { machinery = 2.0, steel = 2.0 },
         outputs      = { spacecraft_components = 1.0 },
+        qualified_workforce = 0.40, -- BL-613: below id 13's 0.50 — the crude route needs fewer specialists, a real trade
     },
 
     -- id 25 — Electronics Lab, CONTACT-GRADE route: platinum group metals ->
@@ -406,6 +421,7 @@ recipes = {
         group        = "Electronics", -- same group as id 12
         inputs       = { platinum_group_metals = 0.5 },
         outputs      = { electronics = 1.0 },
+        qualified_workforce = 0.35, -- BL-613: same precision tier as id 12
     },
 
     -- id 26 — Smelter, IN-SITU route: regolith -> steel. Regolith reduction on
@@ -459,6 +475,7 @@ recipes = {
         group   = "Advanced Fabrication", -- BL-434, with machinery and alloys
         inputs  = { steel = 1.0, machinery = 1.0 },
         outputs = { ordnance = 1.0 },
+        qualified_workforce = 0.25, -- BL-613: same depth tier as machinery/alloys
     },
 
     -- id 28 — Smithy, ANCIENT ordnance route (BL-460): iron_blooms + charcoal
@@ -537,6 +554,7 @@ recipes = {
         inputs       = { iron_ore = 1.5, coal = 0.5, machinery = 0.15 },
         outputs      = { steel = 1.0 },
         centre_proximity_radius = 6, -- BL-615: heavy processor class — see the steel recipe's note.
+        qualified_workforce = 0.15, -- BL-613: the latest steel method wants some specialists; the plain Smelter wants none
     },
 
     -- =====================================================================

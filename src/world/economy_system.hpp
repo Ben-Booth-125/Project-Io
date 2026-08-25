@@ -204,12 +204,43 @@ struct economy_report
     /// nondeterminism, so the accumulation order must stay SORTED.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> wants;
 
-    /// Per (corporation, body): the workforce contention scalar applied this tick —
-    /// `min(1, supply/demand)`. 1.0 when the corp's labour demand on that body fits
-    /// its pool supply; below 1.0 every building on that (corp, body) is throttled
-    /// proportionally (docs/economy/POPULATION.md § Workforce model, step 1). Read by
-    /// the budget step (wages on effective workforce) and the economy panel.
+    /// Per (corporation, body): the pool-level workforce scarcity figure this
+    /// tick — `min(1, supply/demand)`, rescaled by habitability efficiency after
+    /// production. Since BL-614 (wage competition) this is a REPORTING aggregate
+    /// (the economy panel's number, and the wage fallback for a building
+    /// `building_labour` below never saw); the scalar actually applied to each
+    /// building is per-building, in `building_labour`. Below 1.0 means the pool
+    /// is contended and allocation ran by offered wage
+    /// (docs/economy/POPULATION.md § Contention).
     std::map<std::pair<entity_id, entity_id>, float> workforce_contention;
+
+    /// BL-614 (wage competition): per BUILDING, the labour-allocation factor
+    /// applied this tick — the fraction of `workforce_assigned` the pool
+    /// granted, ordinary and qualified (BL-613) constraints folded together,
+    /// rescaled by habitability efficiency after production (the same rescale
+    /// `workforce_contention` gets). One entry per completed producing building
+    /// (extraction / processing); 1.0 when its pools are uncontended. When a
+    /// pool is contended, scarce labour goes to the buildings offering the
+    /// higher wage — offered wage = base_wage × (1 + wage_bid), descending,
+    /// then building id ascending — so entries differ ACROSS one (corp, body)
+    /// pool, which is what the uniform proportional scalar could never do. Read
+    /// by the budget step (wages at the offered rate on this allocation) and by
+    /// estimate_building_profit; absent keys read as the (corp, body) aggregate.
+    std::map<entity_id, float> building_labour;
+
+    /// BL-613 (qualification fraction): per (NATION, body), the qualified-labour
+    /// contention scalar applied this tick — `min(1, qualified supply / qualified
+    /// demand)`, where qualified supply is `nation_component::qualification` × the
+    /// labour the nation's population centres contribute on that body, and
+    /// qualified demand sums `workforce_assigned × recipe.qualified_workforce`
+    /// over the buildings running qualified methods on the nation's tiles there.
+    /// A building running such a method is throttled by this factor BESIDE the
+    /// ordinary (corp, body) scalar above — a second factor, same shape
+    /// (docs/economy/POPULATION.md § Qualification). Keyed by nation, not corp:
+    /// the qualified pool is national, so every corp drawing deep labour inside
+    /// one nation contends for the same heads. Empty when no authored recipe
+    /// carries a `qualified_workforce` requirement (every hand-built harness).
+    std::map<std::pair<entity_id, entity_id>, float> qualified_contention;
 
     /// Per-body mean habitability aggregate (BL-048): weighted average of all
     /// population-centre tiles on the body. 0.0 = uninhabitable, 1.0 = full.

@@ -166,7 +166,8 @@ int run_serve(int ticks, long long as_corp, bool as_any)
         economy_report report = run_economy_step(w, reg, /*spectating=*/false, &tick_lp_pools);
         auto flows = clear_markets(w, reg, report);
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
-                     &report.buildings); // BL-343: law enforcement seam
+                     &report.buildings,        // BL-343: law enforcement seam
+                     &report.building_labour); // BL-614: wages on the per-building grant
         run_nation_step(w, reg, report, t, contract_templates); // Sprint N3: nations score, spend, dispatch
         advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
         credit_arrived_convoys(w, t);
@@ -257,7 +258,8 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
         economy_report report = run_economy_step(w, reg, /*spectating=*/false, &tick_lp_pools);
         auto flows = clear_markets(w, reg, report);
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
-                     &report.buildings); // BL-343: law enforcement seam
+                     &report.buildings,        // BL-343: law enforcement seam
+                     &report.building_labour); // BL-614: wages on the per-building grant
         run_nation_step(w, reg, report, t, contract_templates); // Sprint N3: nations score, spend, dispatch
         advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
         credit_arrived_convoys(w, t);

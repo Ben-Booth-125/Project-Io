@@ -139,18 +139,26 @@ void w_building(std::ostream& o, const building_component& b)
     w_f32(o, b.construction_progress);
     w_int(o, b.loss_streak);
     w_int(o, b.ai_cooldown);
+    w_f32(o, b.wage_bid); // BL-614: world_save_version 12
     w_int(o, b.recipe_switch_cooldown);
 }
 
 bool r_building(std::istream& i, building_component& b)
 {
-    return r_id(i, b.tile) && r_enum(i, b.type, max_building)
+    if (!(r_id(i, b.tile) && r_enum(i, b.type, max_building)
         && r_f32(i, b.workforce_assigned) && r_enum(i, b.target_resource, max_resource)
         && r_u16(i, b.recipe) && r_int(i, b.workforce_target)
         && r_bool(i, b.workforce_auto) && r_bool(i, b.decommissioned)
         && r_int(i, b.active_recipe_index) && r_int(i, b.ticks_remaining)
         && r_f32(i, b.construction_progress) && r_int(i, b.loss_streak)
-        && r_int(i, b.ai_cooldown) && r_int(i, b.recipe_switch_cooldown);
+        && r_int(i, b.ai_cooldown) && r_f32(i, b.wage_bid)
+        && r_int(i, b.recipe_switch_cooldown)))
+        return false;
+    // BL-614: `wage_bid` is non-negative by contract (a bid raises, never
+    // undercuts, in this cut). The writer cannot have produced a NaN or a
+    // negative, so a stream carrying one is corrupt — refuse whole, never
+    // clamp (the r_nation qualification precedent one record up).
+    return std::isfinite(b.wage_bid) && b.wage_bid >= 0.0f;
 }
 
 void w_stockpile(std::ostream& o, const stockpile_component& s) { w_f32_array(o, s.quantities); }
@@ -233,15 +241,23 @@ void w_nation(std::ostream& o, const nation_component& n)
     w_enum(o, n.posture);
     w_enum(o, n.focus);
     w_f32(o, n.treasury);
-    w_id(o, n.capital_tile); // BL-571: world_save_version 5
+    w_id(o, n.capital_tile);     // BL-571: world_save_version 5
+    w_f32(o, n.qualification);   // BL-613: world_save_version 11
 }
 
 bool r_nation(std::istream& i, nation_component& n)
 {
-    return r_str(i, n.name) && r_ids(i, n.tiles) && r_f32_array(i, n.resource_abundance)
+    if (!(r_str(i, n.name) && r_ids(i, n.tiles) && r_f32_array(i, n.resource_abundance)
         && r_enum(i, n.politics, max_ideology) && r_enum(i, n.posture, max_posture)
         && r_enum(i, n.focus, max_econ_focus) && r_f32(i, n.treasury)
-        && r_id(i, n.capital_tile);
+        && r_id(i, n.capital_tile) && r_f32(i, n.qualification)))
+        return false;
+    // BL-613: `qualification` is a fraction by contract. The writer cannot have
+    // produced a NaN or a value outside [0, 1], so a stream carrying one is
+    // corrupt rather than odd — refuse whole, never clamp (the same grounds as
+    // r_nation_budget's own rejection).
+    return std::isfinite(n.qualification)
+        && n.qualification >= 0.0f && n.qualification <= 1.0f;
 }
 
 /// Sprint N3 T2: one nation's budget -- the nine line weights in authored enum

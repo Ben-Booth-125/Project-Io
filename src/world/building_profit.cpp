@@ -43,6 +43,11 @@ building_profit estimate_building_profit(const world& w, const recipe_registry& 
     const auto cit = report.workforce_contention.find(std::make_pair(br->corp, body));
     if (cit != report.workforce_contention.end())
         scalar = cit->second;
+    // BL-614: prefer the building's own allocation grant, exactly as
+    // apply_budget does, so the estimate matches the wages actually charged.
+    if (const auto bl = report.building_labour.find(building_id);
+        bl != report.building_labour.end())
+        scalar = bl->second;
 
     const building_opex opex = compute_building_opex(b, reg.economics(b.type), scalar,
                                                      body_mean_habitability(w, body));

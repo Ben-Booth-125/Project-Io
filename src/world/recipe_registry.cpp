@@ -191,6 +191,11 @@ void recipe_registry::load_from_lua(lua_state& lua)
         if (r.centre_proximity_radius < 0)
             throw std::runtime_error("recipe_registry: recipe '" + r.name
                                      + "' has a negative centre_proximity_radius");
+        // BL-613: qualified-labour requirement — a fraction by contract, so it
+        // rides the same validated [0, 1] reader the sentiment decay rates use
+        // (reject, never clamp; absent means 0, ordinary labour only).
+        r.qualified_workforce =
+            read_unit_rate(*entry, "qualified_workforce", 0.0f, "recipe '" + r.name + "'");
 
         m_recipes.push_back(std::move(r));
     }

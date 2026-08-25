@@ -1270,7 +1270,8 @@ void app::step_economy()
     lap(2); // market clearing
     apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention,
                  &m_last_econ_report.budgets,
-                 &m_last_econ_report.buildings); // BL-343: law enforcement seam
+                 &m_last_econ_report.buildings,        // BL-343: law enforcement seam
+                 &m_last_econ_report.building_labour); // BL-614: wages on the per-building grant
     lap(3); // budget
     // Sprint N3: the nation step — score the due nations' weights, spend the
     // treasury against this tick's claims, dispatch the earmarked surveys. After

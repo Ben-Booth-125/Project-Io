@@ -149,7 +149,25 @@ inline constexpr uint32_t world_save_magic =
 /// every centre record written before it is one field short and a v11 stream
 /// reads misaligned from the first centre onward. Refused whole, same
 /// strict-equality contract as every prior bump.
-inline constexpr uint32_t world_save_version = 12;
+///
+/// Bumped to 13 by BL-613 (qualification fraction): the nation record
+/// (`w_nation` / `r_nation`) gains `nation_component::qualification` — one
+/// float after `capital_tile`, in declaration order. A v12 stream simply
+/// predates the field and has nowhere to source it from, so it is refused
+/// whole on the same strict-equality contract as every prior bump. The reader
+/// additionally refuses a non-finite or out-of-[0, 1] value: the writer
+/// cannot have produced one, so the stream is corrupt rather than odd.
+///
+/// Bumped to 14 by BL-614 (wage competition): the building record
+/// (`w_building` / `r_building`) gains `building_component::wage_bid` — one
+/// float in declaration order, between `ai_cooldown` and
+/// `recipe_switch_cooldown`. A v13 stream's building records are one f32 short, a MID-RECORD
+/// gap, so it is refused whole on the same strict-equality contract as every
+/// prior bump. The reader additionally refuses a non-finite or negative
+/// value — the writer cannot have produced one.
+/// (BL-613/BL-614 were authored as v11/v12 on their own branch and renumbered
+/// to v13/v14 at the wave-1 integration, where BL-612/BL-611 held 11/12.)
+inline constexpr uint32_t world_save_version = 14;
 
 /// Write @p w as a complete world snapshot.
 ///

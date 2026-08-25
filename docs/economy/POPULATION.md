@@ -296,10 +296,14 @@ The split, stated once — the player lever is **not** `workforce_assigned`:
 
 Wages are paid from the pool's **effective** (allocated) workforce, not the requested
 target — a throttled building pays for the labour it actually used. The per-building wage
-is `effective_workforce × base_wage` (the budget term, FINANCE.md). `base_wage` is an
-authored constant; wage *level* tracks body habitability and population pressure (higher
-demand for scarce labour raises the clearing wage), and the unit wage reference that
-anchors it is BL-544 (unit wage reference).
+is `effective_workforce × base_wage × (1 + wage_bid)` (the budget term, FINANCE.md) — paid
+**at the offered rate** (BL-614, wage competition): a building that outbid its siblings for
+scarce labour pays the premium it offered. `wage_bid` is the first-cut wage dial — a
+per-building premium fraction (`building_component.wage_bid`, default 0, data-only, no UI;
+NR-629 flags the shape for overturn). `base_wage` is an authored constant; wage *level*
+tracks body habitability and population pressure (higher demand for scarce labour raises
+the clearing wage), and the unit wage reference that anchors it is BL-544 (unit wage
+reference).
 
 The data the pool model reuses, and must not retrofit: the `workforce_assigned` field,
 `market_component.demand`, and `tile_component.habitability`.
@@ -335,6 +339,8 @@ fraction (§ Qualification).
   demand states the direction (demand ladders with scale); the quantification — basket
   contents per stratum, and the wage a head needs to afford it — is open, and couples to
   BL-544 (unit wage reference).
-- **Wage-clearing detail.** BL-614 (wage competition) owns whether corps set a wage dial per
-  body, per building, or accept a derived clearing wage — and how the qualified and ordinary
-  pools clear against one another.
+- **Wage-clearing detail.** BL-614 (wage competition)'s first cut answers both of its own
+  questions provisionally, flagged for overturn (NR-629): the dial is **per building**
+  (`wage_bid`, § Wages), and the qualified pool clears **by the same wage rule, before** the
+  ordinary pool, a building's factor being the product of the two grants. Whether the dial
+  should instead be per body, or a derived clearing wage, stays open on the item.
