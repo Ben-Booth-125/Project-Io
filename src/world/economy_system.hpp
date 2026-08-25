@@ -321,6 +321,57 @@ economy_report run_economy_step(world& w, const recipe_registry& reg,
                                 lp_pool_map* shared_lp_pools = nullptr);
 
 // ---------------------------------------------------------------------------
+// BL-617 — the population migration pass
+// ---------------------------------------------------------------------------
+
+/// What one run of the migration pass did. Pure observability, the
+/// unit_upkeep_tick shape — nothing reads it to make a decision.
+struct migration_tick
+{
+    int   moved           = 0;    ///< Heads (thousands) that changed centre this tick.
+    int   flows           = 0;    ///< Donor→receiver pair flows that moved at least one head.
+    int   gated_closed    = 0;    ///< Pair flows zeroed by a hostile stance gate.
+    float qualified_moved = 0.0f; ///< Qualified heads (thousands) that crossed a nation border.
+};
+
+/// BL-617's per-tick migration resolution (docs/economy/POPULATION.md
+/// § Migration). Runs inside run_economy_step after the growth/decline pass;
+/// exported so a harness can drive it directly with a hand-built wage map.
+///
+/// PER BODY: centres are snapshotted in ascending id, each with an
+/// attractiveness `habitability + wage_weight × clearing_wage(nation, body)`
+/// (the wage term is the allocation-weighted mean OFFERED wage the BL-614 wage
+/// pass actually granted labour at, per (nation, body); 0 where no labour
+/// cleared). Every centre below the body's mean attractiveness emits
+/// `pop × rate_permille / 1000` heads (integer, capped at pop − 1, so a centre
+/// never empties), split across the above-mean centres in proportion to their
+/// excess attractiveness — floor division; the remainder stays home.
+///
+/// BETWEEN NATIONS each pair flow is STANCE-GATED against the existing stance
+/// store (stance.hpp, read with NATION entity ids — nation stance rides the
+/// same tables; nothing declares nation rows yet, so live flows clear at the
+/// neutral throttle): hostile either direction closes the flow (×0), a
+/// friendship row opens it fully (×1000), otherwise the neutral permille
+/// applies. Same-nation moves are ungated. A flow with a stateless side is
+/// neutral-gated (no treaty is possible with nobody).
+///
+/// BRAIN DRAIN: migrants carry `min(1, origin_q × qualified_selectivity)`
+/// qualification each. A cross-border flow debits the origin nation's ledger
+/// (fraction × centre-headcount) and credits the destination's, conserving
+/// qualified heads exactly (the debit is clamped to what the origin actually
+/// holds); each touched nation's `qualification` fraction is re-derived from
+/// its post-flow ledger. Same-nation moves touch no ledger.
+///
+/// Deterministic: sorted bodies, sorted centres, integer head arithmetic, all
+/// float accumulation in fixed order, no RNG anywhere.
+///
+/// @param clearing_wage Per (nation, body): the allocation-weighted mean paid
+///        wage from this tick's wage pass. run_economy_step computes and
+///        passes its own; a harness may hand-build one.
+migration_tick run_population_migration(world& w, const recipe_registry& reg,
+    const std::map<std::pair<entity_id, entity_id>, float>& clearing_wage);
+
+// ---------------------------------------------------------------------------
 // BL-454 — the unit pass
 // ---------------------------------------------------------------------------
 

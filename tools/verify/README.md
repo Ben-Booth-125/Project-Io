@@ -289,6 +289,17 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\supply_advance.cpp ^
 :: Needs the world-superset TU set — use the one-line builder:
 ::   node tools/verify/build_harness.js stratum_gate_harness --run
 
+:: Population dynamics (Sprint 19 wave 2 — BL-616 centre promotion/decline,
+:: BL-617 population migration; POPULATION.md § Growth, decline and razing /
+:: § Migration): promotion fires deterministically at the sustained window (P1),
+:: decline shrinks/demotes and floors at scale 1 — never destroys (P2), the
+:: raze_centre corp_verb through apply_corp_command with its occupation
+:: precondition (P3), migration flows low->high attractiveness and replays
+:: identically (M1), the nation-grain stance gate (friendly/neutral/hostile)
+:: and qualified-head conservation with brain drain (M2/M3).
+:: Needs the world-superset TU set — use the one-line builder:
+::   node tools/verify/build_harness.js population_dynamics --run
+
 :: Population MVP + workforce-pool step 2 — population centres on Kepler (R3),
 :: agricultural demand from pop (R4), agglomeration workforce contention (R5 / BL-042 R1).
 :: Also covers population-dynamic R2 (hab scalar) and R3 (growth level-up).

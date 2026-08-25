@@ -214,6 +214,40 @@ struct growth_params
     float growth_met_threshold = 0.50f; ///< basket met-supply ratio a centre needs to grow.
 };
 
+/// BL-617 (population migration) tunables, authored in scripts/economy.lua
+/// under `economy.migration` (docs/economy/POPULATION.md § Migration). Read
+/// only by run_population_migration (economy_system.cpp). First-cut-then-tune
+/// (the NR-600 idiom): the SHAPE — a per-tick permille flow from low- toward
+/// high-attractiveness centres, stance-gated between nations, carrying
+/// qualification — is the design; every number here is a tuning dial.
+///
+/// The defaults reproduce the shipped Lua values, so a harness that hand-builds
+/// a registry gets live-shaped flows without Lua.
+struct migration_params
+{
+    /// Share (thousandths) of a below-mean centre's heads that seeks to move
+    /// each tick. Integer permille: the flow arithmetic is integer-exact so
+    /// heads are conserved head-for-head. [0, 1000]; loader rejects outside.
+    int rate_permille = 10;
+
+    /// Throttle (thousandths) on a flow between two NEUTRAL nations — neither
+    /// friends nor hostile in the stance store. Friendly pairs pass at 1000,
+    /// hostile pairs at 0, same-nation moves ungated. [0, 1000].
+    int neutral_gate_permille = 250;
+
+    /// Credits→attractiveness conversion on the clearing-wage signal:
+    /// attractiveness = habitability + wage_weight × clearing_wage(nation, body).
+    /// Finite, >= 0; loader rejects otherwise.
+    float wage_weight = 0.02f;
+
+    /// Brain-drain selectivity: migrants carry min(1, origin qualification ×
+    /// this) as their own qualified share — movers skew qualified, so
+    /// emigration debits the origin nation's FRACTION, not just its headcount.
+    /// >= 1 (loader-enforced): below 1 would make emigration RAISE the origin's
+    /// fraction, inverting the design.
+    float qualified_selectivity = 1.5f;
+};
+
 /// BL-442 price-band tunables, authored in scripts/economy.lua under
 /// `economy.price_band`. THE single authority for how far a market price may
 /// travel from its rarity-derived `base_price`: the clamp `resolve_price`
@@ -676,6 +710,9 @@ public:
     /// BL-365 population-growth-gate tunables (economy.population_growth in Lua).
     const growth_params& growth() const { return m_growth; }
 
+    /// BL-617 population-migration tunables (economy.migration in Lua).
+    const migration_params& migration() const { return m_migration; }
+
     /// BL-368 population-demand model tunables (economy.population_demand in Lua).
     const population_demand_params& population_demand() const { return m_population_demand; }
 
@@ -884,6 +921,7 @@ public:
     // --- direct construction for tests (headless harness builds these by hand) ---
     void set_thresholds(float t_full, float t_idle) { m_t_full = t_full; m_t_idle = t_idle; }
     void set_growth(const growth_params& s) { m_growth = s; }
+    void set_migration(const migration_params& m) { m_migration = m; }
     void set_population_demand(const population_demand_params& p) { m_population_demand = p; }
     void set_background_demand(const background_demand_params& b) { m_background_demand = b; }
     void set_price_band(const price_band_params& p) { m_price_band = p; }
@@ -1086,6 +1124,7 @@ private:
     /// BL-078 elastic-substrate model tunables (economy.substrate). Defaults match
     /// economy.lua so a hand-built harness registry behaves sensibly without Lua.
     growth_params m_growth = {};
+    migration_params m_migration = {};
     population_demand_params m_population_demand = {};
     background_demand_params m_background_demand = {};
     price_band_params m_price_band = {};
