@@ -1059,13 +1059,13 @@
    "blocked_on": null,
    "parked": false,
    "files": [
-    "src/ui/icons.hpp",
-    "src/ui/icons.cpp",
+    "docs/ui/ICONS.md",
     "src/ui/body_surface_canvas.cpp",
-    "docs/ui/ICONS.md"
+    "src/ui/icons.cpp",
+    "src/ui/icons.hpp"
    ],
    "authority_doc": "docs/ui/ICONS.md",
-   "design": "Raised by Ben 2026-08-25, straight after the flood-field warm-start fix: now that the world genuinely carries a settlement per province (BL-623, provinces before roads) plus the razed tier (BL-624), the canvas should SHOW that density - today the population-centre mark does not distinguish scale, so a metropolis and a village read identically and the world looks emptier than it is. Work: one glyph per tier of population_centre_component.scale (1-5, village -> metropolis), plus a distinct mark for a razed centre (BL-624's orthogonal bool - a ruin should read as a ruin, not vanish). Glyphs live in src/ui/icons.{hpp,cpp} under the (dl, centre, r, colour) contract and are catalogued in docs/ui/ICONS.md in the same change; identity colours stay in presentation.hpp. Zoom behaviour follows the existing detail_level rules so low zoom does not smear five glyph shapes into noise. ACTIONS.json untouched unless a control changes; question_log entry owed if the surface's question materially changes."
+   "design": "Raised by Ben 2026-08-25, straight after the flood-field warm-start fix: now that the world genuinely carries a settlement per province (BL-623, provinces before roads) plus the razed tier (BL-624), the canvas should SHOW that density - today the population-centre mark does not distinguish scale, so a metropolis and a village read identically and the world looks emptier than it is. Work: one glyph per tier of population_centre_component.scale (1-5, village -> metropolis), plus a distinct mark for a razed centre (BL-624's orthogonal bool - a ruin should read as a ruin, not vanish). Glyphs live in src/ui/icons.{hpp,cpp} under the (dl, centre, r, colour) contract and are catalogued in docs/ui/ICONS.md in the same change; identity colours stay in presentation.hpp. Zoom behaviour follows the existing detail_level rules so low zoom does not smear five glyph shapes into noise. ACTIONS.json untouched unless a control changes; question_log entry owed if the surface's question materially changes. MEASURED 2026-08-25 (Ben reported no settlements visible in play; count_clusters diagnostic over the canonical world): the homeworld carries 1,823 population centres, and body_surface_canvas's conurbation clustering (Chebyshev <= 3, TRANSITIVE chaining - authored for 20-40 centres/body) collapses them to 49 drawn marks; scales run 1,757/52/11/3/0 for 1-5, so the surviving marks are mostly the smallest skyline. The item's scope is therefore the DISPLAY MODEL, not only glyph shapes: the clustering rule must be revisited for the post-BL-623 density (options: per-tier clustering, a smaller radius, or a zoom-laddered LOD where far zoom shows scale>=3 plus a density read and close zoom shows every centre). A skyline glyph already exists (icons::settlement, towers rise with tier); distinct-per-tier shapes and the razed mark build on it."
   }
  ]
 }
