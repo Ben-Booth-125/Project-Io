@@ -236,7 +236,15 @@ constexpr int      k_ticks = 300;
 // (BL-613) and wage clearing (BL-614). New value confirmed reproducible by
 // R2's own two-independently-built-worlds row (95A7DAAC3E0693D2 twice) on
 // the integrated tree at the wave-1 merge.
-constexpr uint64_t k_unspectated_golden = 0x95A7DAAC3E0693D2ull;
+// Re-blessed again 2026-08-25, Sprint 19 wave 2 (same session as the wave-1
+// bless above — the sprint moved the world twice): BL-616 rewrote every
+// centre's growth/decline tick behaviour, BL-617 added the migration pass,
+// BL-620 reshaped the generated road lattice (backbone over towns, village
+// spurs) and BL-618 gates tier promotion on qualification (all-Track at the
+// antiquity floor — NR-641). Reproducibility confirmed by R2's own
+// two-independently-built-worlds row (DEC269E7941134D4 twice) on the
+// integrated wave-2 tree.
+constexpr uint64_t k_unspectated_golden = 0xDEC269E7941134D4ull;
 
 /// Hand-built registry mirroring scripts/economy.lua + scripts/recipes.lua for
 /// the building types the generator places. Copied from ai_skill_harness so the
