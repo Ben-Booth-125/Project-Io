@@ -235,6 +235,21 @@
       ],
       "status": "settled"
     },
+    "corporation_panel_standing": {
+      "surface": "Corporation panel — the standing columns (Reach / Capital / Share)",
+      "answers": "How large is each corporation, how much of the market does it hold, and what is it worth?",
+      "because": "The columns used to read as five bands — negligible / minor / notable / major / dominant — for every row but the player's own, on the premise that a rival's figures were private. Ben retired that premise on 2026-08-26: \"We don't need company information to be invisible.\" Two of the three axes were never hidden by anything except the banding — reach is a count of bodies the player can already see buildings on, and market share is derived from the supply/demand aggregates DISCOVERY.md names as the deliberate public signal — so the band was destroying information the world was already giving away, and buying no privacy for it. They print exactly, for every corporation. Capital is the one axis that is genuinely a FILED figure, so it follows the firm's ownership class instead: exact where the firm files, a dash where it does not (FINANCE.md § Disclosure), with the reason on hover. That is what earns the space — the column now carries a fact about the FIRM that nothing else on screen carries, and the dash reads as 'this firm does not file', never as 'you have not earned this'. What it deliberately does NOT gain is any operational quantity: production rates, stockpile levels, recipes and workforce dials stay private, and the rival hover card still shows type and owner only. An open book tells you what a firm earned, never how it operates.",
+      "backlog_item": [
+        "BL-633",
+        "BL-262",
+        "BL-631"
+      ],
+      "files": [
+        "src/ui/corporation_panel.cpp",
+        "src/world/standing.cpp"
+      ],
+      "status": "drafted"
+    },
     "decision_feed": {
       "surface": "AI decision feed",
       "answers": "What did the rival corporations just decide, and how close was the call?",

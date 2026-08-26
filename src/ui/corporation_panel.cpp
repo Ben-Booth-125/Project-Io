@@ -51,6 +51,21 @@ bool corp_is_discovered(const world& w, entity_id corp)
     return false;
 }
 
+/// The firm's ownership class as one display word. UI-local on purpose: this is a
+/// presentation string for the non-filing tooltip, not a world-layer fact. The enumerators
+/// carry a trailing qualifier because `public`/`private` are C++ keywords; the design's
+/// words for them are *public*, *private* and *closed* (components.hpp).
+const char* ownership_class_label(ownership_class oc)
+{
+    switch (oc)
+    {
+        case ownership_class::publicly_held:  return "public";
+        case ownership_class::privately_held: return "private";
+        case ownership_class::closed:         return "closed";
+    }
+    return "closed";
+}
+
 /// Short label for the player's stance toward `rival`, read via the directed
 /// `is_hostile` and symmetric `are_friends` queries (never collapsed into one
 /// accessor — stance.hpp's own invariant).
@@ -86,11 +101,23 @@ void draw_corporation_panel(const world& w, const std::vector<corp_standing>& st
     // Player/Active, already carried by the row tint + name colour. The reduced table is
     // the single question "how is each corporation doing?" (settles BL-121).
     //
-    // BL-262 first slice: Balance was an exact number for every corp, including rivals —
-    // a privacy violation against BL-068's competitor-visibility rule (rival internals are
-    // private). Replaced with a three-axis standing profile (Reach / Capital / Share); the
-    // player's row still shows exact figures, every rival row shows a band label only, no
-    // numbers. No totals/aggregate row is added — BL-262's hard rule.
+    // BL-262 gave the table a three-axis standing profile (Reach / Capital / Share) in which
+    // the player's row showed exact figures and every rival row showed a band label only.
+    //
+    // BL-633 retires the bands (Ben, 2026-08-26: "We don't need company information to be
+    // invisible"). Every axis now prints an exact figure, and what varies row to row is not how
+    // coarse the number is but whether there is one at all:
+    //   - Reach and Share print for EVERY corporation. Both derive from facts already public —
+    //     buildings are visible on canvas, market aggregates are the deliberate public signal
+    //     (DISCOVERY.md § Competitor visibility) — so the banding was hiding nothing.
+    //   - Capital prints only where the firm FILES (ownership_class == public; FINANCE.md
+    //     § Disclosure). Elsewhere the cell is a dash, and the dash means *this firm does not
+    //     file*, never *you have not earned this*. Hovering the dash says exactly that.
+    //
+    // The operational fog is UNTOUCHED (Ben, same day): this is published FINANCIAL information
+    // only. No production rate, stockpile quantity, recipe or workforce dial is readable here,
+    // and the rival hover card still shows type and owner only. An open book tells you what a
+    // firm earned, never how it operates. No totals/aggregate row is added — BL-262's hard rule.
     constexpr ImGuiTableFlags table_flags =
         ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
 
@@ -128,28 +155,29 @@ void draw_corporation_panel(const world& w, const std::vector<corp_standing>& st
                 s.selected_entity = id;
             }
 
+            // Reach — public for every corporation (buildings are visible on canvas).
             ImGui::TableSetColumnIndex(1);
-            if (cs.is_player)
-                ImGui::Text("%d bodies", cs.reach_bodies);
-            else
-                ImGui::TextUnformatted(standing_band_label(cs.reach_band));
+            ImGui::Text("%d bodies", cs.reach_bodies);
 
+            // Capital — the one gated axis. Exact where the firm files, a dash where it
+            // does not, with the reason on hover so the dash is never read as a fog.
             ImGui::TableSetColumnIndex(2);
-            if (cs.is_player)
+            if (cs.capital_disclosed)
             {
                 const ImU32 col = (cs.capital_balance < 0.0f) ? palette::negative : palette::positive;
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%.1f", cs.capital_balance);
             }
             else
             {
-                ImGui::TextUnformatted(standing_band_label(cs.capital_band));
+                ImGui::TextDisabled("-");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Does not file — %s corporations publish no return.",
+                        ownership_class_label(cc.ownership_class));
             }
 
+            // Share — public for every corporation (market aggregates are the public signal).
             ImGui::TableSetColumnIndex(3);
-            if (cs.is_player)
-                ImGui::Text("%.0f%%", cs.market_share * 100.0f);
-            else
-                ImGui::TextUnformatted(standing_band_label(cs.share_band));
+            ImGui::Text("%.0f%%", cs.market_share * 100.0f);
 
             // BL-449: stance column. Player's own row carries no presses — a corp
             // cannot stance itself (stance.hpp's valid_pair rejects from == to).
