@@ -128,12 +128,38 @@ an era's own institutions is era-agnostic; one derived from industry is silently
 - **Reached the enforceable promise, and kept it → `public`.** Corporate personhood exists here and
   the polity honours it, so a firm can have owners who are not its operators.
 - **Reached it, but the polity holds the firm close → `private`.** The firm exists and trades; its
-  books are its own. A statist or isolationist character lands here.
+  books are its own. A **statist** character lands here.
 - **Never reached it → `closed`.** No charter, no filing, no market in the firm at all.
 
-How widely the charter *diffuses* from its cradle is the part that decides the spread, and it is
-**measured rather than asserted**: the check reports the resulting distribution at more than one
-epoch instead of testing it against a target number.
+**The demote is statist only, and deliberately NOT the never-industrialised character.** That
+character is the industrialisation-timing scale's bottom rung, so demoting on it would put Stage 4
+back into the derivation through the polity term and re-create the degenerate distribution one rung
+down — every corporation in an antiquity world `private` instead of every one `closed`. *Nobody
+built a furnace* is a statement about industry, not about corporate law.
+
+### How the charter reaches ground
+
+The cradle is one place; a world where only one nation's firms could ever be public would be nearly
+as degenerate as the one this replaces. So the charter **diffuses**, by two carriers, and both are
+signals generation already produces:
+
+- **Its people carry it.** The sealed-oath god — the deity that witnesses every bargain — is planted
+  on the charter cradle's culture ([`CREEDS.md`](../lore/CREEDS.md)). Ground whose *current* culture
+  is that one lives the promise at any distance, so conquest carries the institution across a border
+  in either direction, which is Stage 2's whole lesson: a capability re-emerges next door.
+- **Trade copies it outward.** Reach falls with distance from the seat and is extended by harbour
+  quality, because the charter is a merchant's instrument and arrives by ship — which is also why
+  the ladder weights coastal access when it picks the seat at all. The radius scales with the same
+  barrier terrain that prices an army's crossing: ground that is expensive to march is expensive to
+  copy.
+
+Lived → `public`; copied only → `private`; out of reach → `closed`. Reach ignores borders on
+purpose.
+
+**The spread is measured, never targeted.** The check reports the resulting distribution at more
+than one epoch rather than testing it against a number, and the two radii are bounded only in
+shape: the charter must never cover the whole world (or `closed` stops being real) and never fail
+to cover its own hinterland (or `public` does).
 
 A corporation with no home region — the rung-3 case where the settlement pass never reached the
 nation — takes its class from the national character, the same fallback its focus takes.

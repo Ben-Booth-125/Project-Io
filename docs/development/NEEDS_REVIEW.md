@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*73 entries — 56 open, 17 resolved.*
+*76 entries — 59 open, 17 resolved.*
 
 ---
 
@@ -535,6 +535,27 @@ Two findings that are only interesting together. (1) The agent's acceptance scri
 The agent authored scripts/verify/corp_disclosure.lua - an acceptance script that injects a real press through ImGui's own event queue and hit-test via verify.click (BL-521), so a control rendering past the panel's edge FAILS there rather than passing on a screenshot. It correctly did not name it in verifier-visual's SKILL.md, because 'tool creation is skill creation' and registering a check needs Ben's permission. The script works (it selected Faros-YelenKalen International by clicking a row). Ben's call: register it as a named check, or leave it as an ad-hoc script. Recommend registering - an injected press is materially stronger than a capture, and it is the closest thing we have to the live click that keeps slipping.
 
 *Files: `scripts/verify/corp_disclosure.lua`, `.claude/skills/verifier-visual/SKILL.md`*
+
+### NR-665 — The private demote admits STATIST only, not the never-industrialised character - a departure from Pass 2b's literal text
+*decision taken on your behalf · raised 2026-08-26 · from Sprint 20 wave 2, BL-638: the agent departed from the doc, said so, and gave the reason.*
+
+Pass 2b as I wrote it said 'a statist OR ISOLATIONIST character lands here [private]'. The agent admitted `authoritarian` only and excluded `isolationist`, because nation_component::politics IS the industrialisation-timing tercile and `isolationist` is its NEVER rung - so on an antiquity world every nation is isolationist, and demoting on it would have re-created the exact degenerate distribution one rung down: every corporation `private` instead of every corporation `closed`. In its words: 'Nobody built a furnace is a statement about industry, not corporate law; treating it as one smuggles Stage 4 back in through the polity term.' ENDORSED and written into the doc. This is the SAME trap BL-638 exists to fix, reappearing in a different term of the same expression - which is worth noticing on its own: the industrial signal is threaded through more of generation than the obvious call site, so a future rule reading `politics` is reading industrialisation timing whether it means to or not. The fallback path (ownership_from_character) is untouched, where isolationist -> closed still holds.
+
+*Files: `docs/generation/CORPORATION_GENERATION.md`, `src/world/corporation_generation.cpp`*
+
+### NR-666 — The INDUSTRIAL epoch now yields FEWER public firms than antiquity - measured, and it reads backwards
+*question · raised 2026-08-26 · from Sprint 20 wave 2, BL-638's R2 sweep, 8 seeds at each epoch.*
+
+0 CE: public 20 of 64 corps (31.2%), floor met in 8 of 8 worlds. 1960: public 14 of 64 (21.9%), floor met in 5 of 8, three worlds standing floor-unmet. So the ANTIQUITY default now produces MORE publicly-held firms than the industrial arc, which is the opposite of what the history it models would suggest. The mechanism is legible and may be entirely fine: a 1960 world carries more regions (1550 vs 1298), the charter diffuses from a single cradle, so a bigger world dilutes its reach. But it means three modern worlds in eight have nothing to file and nothing to buy - the exact condition BL-638 was written to remove, now relocated to the other end of the timeline. TWO READINGS, and it is Ben's call which: (a) correct as-is - an unmet floor honestly stands, and a world where corporate personhood never spread is a legitimate world; (b) the reach radius should scale with the world's size or era rather than being fixed, so diffusion keeps pace with the ground it has to cover. Related dial: the agent measured that the CULTURAL carrier does most of the work (328 lived regions against 95 copied) because conquest_cost_q keeps the geometric radius near its floor - so if the map's shape should matter more than its peoples, that scaling is where to reach.
+
+*Files: `src/world/settlement.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
+
+### NR-667 — ownership_class values change on every seed - any state_hash golden over the corp store will move
+*observation · raised 2026-08-26 · from Sprint 20 wave 2, BL-638: flagged by the agent, unresolved at its report.*
+
+BL-638 changes the VALUE of a serialised field on every corporation in every seed. charter_reach itself is generation-time only and unserialised, so the format is untouched - but any golden that hashes the corporation store moves. The agent correctly did not re-bless anything and did not run spectator_determinism or a state-hash harness. This must be checked at the merge and folded into the sprint's ONE deliberate re-bless wave with dated provenance - not re-blessed here, and not dribbled. Note NR-661: spectator_determinism's golden was ALREADY stale on main before this sprint, so a mover found there is not necessarily this change.
+
+*Files: `tools/verify/spectator_determinism.cpp`, `src/world/corporation_generation.cpp`*
 
 ---
 
