@@ -4016,6 +4016,124 @@
      "notes": ""
     }
    ]
+  },
+  {
+   "brief": "era-banded-baskets",
+   "batch": "sprint-20-wave-4",
+   "status": "open",
+   "title": "BL-640 - the demand baskets carry an era band, as recipes have since BL-433",
+   "promoted_from": "backlog.json BL-640 (ERA_BANDED_HOUSEHOLD_BASKET)",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census R1",
+      "headless: era_roster"
+     ],
+     "requirement": "population_demand and background_demand are masked by era band through the SAME mechanism recipes use (BL-433's `era` field), not a parallel one. An unknown band string is a load-time error, never a silent fallback.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census R2"
+     ],
+     "requirement": "Ancient rows are authored for the household basket - the terminal artisan goods the ancient roster already produces (ceramics, cloth, leather, dressed_stone). The industrial rows keep their current goods. background_demand, whose six goods are all industrial, is banded rather than deleted.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census, before/after pair kept"
+     ],
+     "requirement": "MEASURED, NOT ASSERTED. The census before/after shows those goods leaving the 'produced in-band, NO market sink' list, and reports the new 0 CE demand distribution. No row asserts a magnitude.",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: chain_depth R1b re-specified"
+     ],
+     "requirement": "chain_depth's R1b list becomes DERIVABLE from BL-648's injector registry instead of hand-narrowed - which is what banding makes possible, and which exposes R1b's own second red list rather than continuing to absorb it.",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "review: the diff removes no assertion"
+     ],
+     "requirement": "No assertion is weakened. A good that legitimately still has no buyer stays red in chain_depth, and the count of red goods is REPORTED so the reduction is visible.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "building-upkeep-goods",
+   "batch": "sprint-20-wave-4",
+   "status": "open",
+   "title": "BL-641 - a building's upkeep is credits AND goods, as a unit's already is",
+   "promoted_from": "backlog.json BL-641 (BUILDING_UPKEEP_IN_GOODS)",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: building_upkeep R1"
+     ],
+     "requirement": "A per-building-type goods vector is drawn against the owner's pool on the BUILDING'S OWN BODY, in a fixed deterministic order - two buildings of one corp on one body draw the same stock and the order decides which goes short.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: building_upkeep R2"
+     ],
+     "requirement": "THE SHORTFALL RULE IS THE SAME RULE. An unmet draw WEAKENS the building by the same subtraction an out-of-supply unit takes; it never destroys, idles or decommissions it. A factory short of its tools runs badly.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: building_upkeep R3"
+     ],
+     "requirement": "Rates are authored per building type in scripts/economy.lua, era-banded, and every rate is authorable at 0.0 - a zero entry skipped exactly as an absent one, so the SHAPE can land before the numbers are settled (the BL-454 precedent).",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: econ_harness, econ_bankruptcy, econ_stability byte-compared"
+     ],
+     "requirement": "AT AUTHORED-ZERO RATES the economy is BIT-IDENTICAL: every pre-existing economy harness produces byte-identical output, and no golden moves. The shape lands inert; turning it on is a data change.",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census, before/after pair kept"
+     ],
+     "requirement": "MEASURED, NOT ASSERTED. With rates on, the census reports the INDUSTRY channel as PRESENT where it was ABSENT, and names which goods gained demand. Report the before/after; assert no magnitude.",
+     "notes": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "headless: building_upkeep R6"
+     ],
+     "requirement": "Determinism holds with rates on: no unordered iteration, no wall-clock, no RNG, and two identical runs produce identical pools.",
+     "notes": ""
+    }
+   ]
   }
  ]
 }

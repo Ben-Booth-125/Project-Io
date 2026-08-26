@@ -1,0 +1,109 @@
+[Lua] recipes.lua loaded  recipe_count=38
+[Lua] economy.lua loaded
+demand_census — BL-649, requirement group `demand-census` R1-R4
+  seed 0 | warm ticks 80 | prehistory OFF (--fast, NOT the spawn) | bands ancient
+  IT REPORTS. No row below fails on a magnitude; see the file header.
+
+=== R1a  THE CHANNEL REGISTER — the eight of MARKETS.md § Demand channels ===
+  An ABSENT row is a finding, not an omission: it is a channel the design names
+  and the code does not have. Every one of the eight is listed.
+
+  CHANNEL          STATE    INJECTOR, OR WHAT IS MISSING
+  Household        PRESENT  inject_population_demand (market_clearing.cpp) <- economy.population_demand basket
+  Industry         ABSENT   no goods vector on building upkeep -- apply_budget charges maintenance+wages in CREDITS only; cf. run_unit_upkeep, which does carry one (owner BL-641)
+  Construction     PRESENT  run_construction -> economy_report::wants (economy_system.cpp) <- economy.buildings.resource_costs / material_overrides. Fires only where something is BUILDING (owner BL-642)
+  Infrastructure   ABSENT   no material draw for roads / ports / hubs anywhere in src/world; the logistics_maintenance budget line spends credits (owner BL-643)
+  State            ABSENT   nation budget lines (incl. strategic_reserve) carry weights and spend credits; no goods purchase exists (owner BL-644)
+  Research         ABSENT   research_institute credits corporation_component::science per tick; nothing draws goods (owner BL-645)
+  Conflict         ABSENT   battle resolution consumes no goods; the only military draw is the per-head standing-force upkeep below, which is not a battle (owner BL-646)
+  Endemic trade    ABSENT   no wealth-scaled or character-flavoured luxury basket; tobacco/spices/coffee/furs are named by no injector (owner BL-647)
+
+  OFF-REGISTER PASSES — real injectors that are NOT one of the eight:
+
+  PASS             STATE    WHAT IT IS
+  Processing inputs PRESENT  run_processing -> economy_report::wants -- the production chain's own input bid. The largest live sink in either band, and not one of the eight (the eight are FINAL demand)
+  Background-industrial STOPGAP  inject_background_demand -- a world-scale basket standing in for Industry. MARKETS.md property 1 says a channel whose size is a constant is a stopgap and should be labelled one
+  Inter-body pull  PRESENT  inject_interbody_demand -- REDISTRIBUTES the home body's unmet demand onto outposts. Injects no new want: with no home demand for a good it moves nothing
+  Standing-force upkeep PRESENT  run_unit_upkeep -- a POOL draw (economy.military.unit_upkeep.goods_per_head). It never reaches market_component::demand, so it consumes goods WITHOUT pricing them
+
+===============================================================================================================
+=== BAND ancient (epoch 0) ===
+  world     : 50901 tiles, 3 markets, 1368 centres (scale sum 1374), 584 buildings (0 building), 104 corps, 326 units / 7690 heads
+  registry  : 17 of 38 authored recipes allowed in band; max chain depth 3
+
+  --- per-resource demand census, census tick, summed over every market ---
+  id  resource               prod d px |  household   backgrnd  interbody  construct    process |   MKT TOTAL |  upkeep/pl |   produced | structural sinks
+  --- ---------------------- ---- ---- | ---------- ---------- ---------- ---------- ---------- | ----------- | ---------- | ---------- | ----------------
+  0   iron_ore               DEP   0 $ |      0.000      0.000      0.000      0.000     16.000 |      16.000 |      0.000 |   167529.7 | PROC
+  1   coal                   DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+  2   petroleum              DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |    26074.0 | NONE
+  3   silica                 DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |     9813.8 | NONE
+  4   copper_ore             DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |    17686.4 | NONE
+  5   rare_earth_ore         DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+  6   agricultural_produce   DEP   0 $ |     96.943      0.000      0.000      0.000    213.399 |     310.342 |      0.000 |    21419.9 | HH+PROC
+  7   water                  DEP   0 $ |    411.963      0.000      0.000      0.000      0.000 |     411.963 |      0.000 |    46466.2 | HH
+  8   iron_nickel_ore        DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+  9   platinum_group_metals  DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+  10  regolith               DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+  11  stone                  DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |      121.5 | PROC+CONS
+  12  timber                 DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |    11774.9 | PROC+CONS
+  13  sand                   DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | PROC+CONS
+  14  clay                   DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | PROC+CONS
+  15  peat                   DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | PROC
+  16  tobacco                DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+  17  spices                 DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+  18  coffee                 DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+  19  furs                   --    0 - |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+  20  steel                  REC   3 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | CONS
+  21  refined_fuel           --    0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+  22  food_rations           REC   1 $ |    289.231      0.000      0.000      0.000      0.000 |     289.231 |    192.250 |    13938.4 | HH+upk
+  23  charcoal               REC   1 $ |      0.000      0.000      0.000      0.000     44.000 |      44.000 |      0.000 |      390.8 | PROC
+  24  iron_blooms            REC   2 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |      117.0 | PROC
+  25  trade_goods_misc       REC   1 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |      270.0 | NONE
+  26  propellant             --    0 - |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+  27  silicon                --    0 $ |      0.000    247.320      0.000      0.000      0.000 |     247.320 |      0.000 |        0.0 | BG
+  28  refined_copper         --    0 $ |      0.000    247.320      0.000      0.000      0.000 |     247.320 |      0.000 |        0.0 | BG
+  29  ree_alloy              --    0 $ |      0.000    185.490      0.000      0.000      0.000 |     185.490 |      0.000 |        0.0 | BG
+  30  machinery              --    0 $ |      0.000    185.490      0.000      0.000      0.000 |     185.490 |      0.000 |        0.0 | BG
+  31  alloys                 --    0 $ |      0.000    185.490      0.000      0.000      0.000 |     185.490 |      0.000 |        0.0 | BG
+  32  electronics            --    0 $ |      0.000    185.490      0.000      0.000      0.000 |     185.490 |      0.000 |        0.0 | BG
+  33  spacecraft_components  --    0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+  34  clean_water            --    0 $ |    144.269      0.000      0.000      0.000      0.000 |     144.269 |      0.000 |        0.0 | HH
+  35  consumer_goods         --    0 $ |    103.050      0.000      0.000      0.000      0.000 |     103.050 |      0.000 |        0.0 | HH
+  36  medical_supplies       --    0 $ |     61.830      0.000      0.000      0.000      0.000 |      61.830 |      0.000 |        0.0 | HH
+  37  ordnance               REC   3 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |     26.915 |        0.0 | upk
+  38  ceramics               REC   1 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+  39  dressed_stone          REC   1 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+  40  planks                 REC   1 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | PROC
+  41  tools                  REC   3 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+  42  hides                  DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |     2231.0 | PROC
+  43  fibre                  DEP   0 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |    13047.5 | PROC
+  44  leather                REC   1 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |      160.6 | NONE
+  45  cloth                  REC   1 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | PROC
+  46  rigging                REC   2 $ |      0.000      0.000      0.000      0.000      0.000 |       0.000 |      0.000 |        0.0 | NONE
+      TOTAL                            |   1107.286   1236.600      0.000      0.000    273.399 |    2617.285 |    219.165 |   331041.6 |
+      BREADTH                          |          6          6          0          0          3 |             |          2 |            |  (resources touched)
+
+  --- what this band cannot buy ---
+  produced in-band, NO market sink : ceramics, dressed_stone, leather, ordnance, rigging, tools, trade_goods_misc
+  extractable, NO market sink      : coal, coffee, copper_ore, iron_nickel_ore, petroleum, platinum_group_metals, rare_earth_ore, regolith, silica, spices, tobacco
+  a basket names it, band cannot make it or dig it: alloys, clean_water, consumer_goods, electronics, machinery, medical_supplies, ree_alloy, refined_copper, silicon
+  a basket names it, NO market prices it (both injectors SKIP it silently): (none)
+  live injecting passes this band  : 3 of 5 measured
+
+=== VERIFICATION ===
+  [PASS] R2  the print name table matches resource_names entry-for-entry and covers the enum
+  [PASS] R1  all eight MARKETS.md demand channels enumerated, each PRESENT or ABSENT
+  [PASS] R1  at least one era band was censused
+  [PASS] R2  ancient: the want register reconciles — construction half never exceeds the folded want
+  [PASS] R2  ancient: every resource classified (produced/deposit/depth/sinks all resolved)
+  [PASS] R2  ancient: the instrument is non-vacuous — some pass injected some demand
+
+--- R4  THE HAND-BUILT FINDING (0 CE band) ---
+  hand-built (NR-671) : ceramics, dressed_stone, leather, ordnance, rigging, tools, trade_goods_misc
+  census              : ceramics, dressed_stone, leather, ordnance, rigging, tools, trade_goods_misc
+  in census only      : (none)
+  in hand list only   : (none)
+  [PASS] R4  the census reproduces the hand-built produced-with-no-sink set at 0 CE
+
+PASS — 0 failure(s)
