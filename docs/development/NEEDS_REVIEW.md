@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*63 entries — 47 open, 16 resolved.*
+*67 entries — 51 open, 16 resolved.*
 
 ---
 
@@ -466,12 +466,40 @@ Flagged at the moment it arose, per the novelty rule. Every prior verb moves goo
 
 *Files: `docs/economy/FINANCE.md`, `src/world/corp_command.cpp`*
 
-### NR-654 — One of three wave-1 worktrees was cut from the SESSION-START commit, not current HEAD
+### NR-654 — ALL THREE wave-1 worktrees were cut from the session-start commit, not current HEAD
 *observation · raised 2026-08-26 · from Sprint 20 wave 1: three agents launched in one message, BL-637 reported it could not read its own backlog item or requirement group.*
 
-Three worktree agents were launched in a single message from HEAD e40e38d8. Two were cut from e40e38d8 as expected; the third was cut from 638cdd65 - the commit HEAD sat at when the SESSION began, five commits earlier. It reported the symptom honestly (BL-637 and its requirement group both returned nothing matched, REFINED.md still held Sprint 19) rather than inventing an interpretation, which is the only reason it was caught. THIS TIME IT WAS HARMLESS - the stale agent was the tooling one, and its deliverable did not depend on anything written this session. Had it hit either src/ agent it would have been serious: both were briefed to read authority-doc sections that DO NOT EXIST at 638cdd65, so they would have built against a design they could not see. This is the io-worktree-agents-stale-base pattern recurring. Worth a standing check before any wave: verify git merge-base <branch> main for every launched worktree, and re-brief or relaunch any agent whose base predates the design it was told to read.
+Three worktree agents were launched in a single message from HEAD e40e38d8. ALL THREE were cut from 638cdd65 instead - the commit HEAD sat at when the SESSION began, five commits earlier. The main session's merge-base check looked clean for two of them only because those agents had ALREADY fast-forwarded themselves before the check ran; the correction is recorded here rather than left standing. Two of the three noticed and said so - BL-637 reported it could not read its own backlog item or requirement group, BL-626 reported the same and fast-forwarded to main before starting any work. That is two independent confirmations of a systemic behaviour, not one worktree's bad luck. THE RISK IS NOT HYPOTHETICAL: both src/ agents were briefed to read authority-doc sections written EARLIER THE SAME SESSION, which do not exist at 638cdd65. An agent that did not check would have built against a design it could not see and reported success. This is the io-worktree-agents-stale-base pattern recurring. Proposed standing check, cheap and mechanical: before trusting any wave, run git merge-base <branch> main for every launched worktree, and re-brief or relaunch any agent whose base predates the design it was told to read. Better still, brief every agent to fast-forward to main first and say so - the two that survived did exactly that on their own initiative.
 
 *Files: `docs/development/DELIVERY.md`*
+
+### NR-655 — A filed return CANNOT see subsidies or contract payouts - and the buyout would undervalue every firm that earns them
+*question · raised 2026-08-26 · from Sprint 20 wave 1, BL-626 (quarterly return): the agent found it and the main session confirmed it at app.cpp:1271/1281.*
+
+MEASURED, not suspected. apply_budget runs at app.cpp:1271 and run_nation_step at :1281 - ten lines later. So a return files BEFORE national transfers and mercenary-contract payouts touch the balance, and corp_budget::subsidies is always 0 in a filed record. Two consequences. (1) The retain property R2 holds exactly only where nothing outside the money loop moves a balance; on a real campaign construction, hire, survey, convoy and nation payouts all do. (2) THE ONE THAT MATTERS: BL-628 prices a buyout off trailing_net, so a firm earning through mercenary contracts - which CONTRACTS.md calls THE income loop - reads as unprofitable on its own filed returns and would be systematically undervalued. THE FORK: (A) add an eighth field, 'other' = whole-tick balance delta minus money-loop net, filed after the tick's last mover, so the seven flows still explain net AND net+other telescopes exactly; the buyout prices off the sum. (B) keep it as built and document trailing_net as money-loop profit only, accepting the undervaluation. (C) file after everything and let net be the whole delta, losing the property that the seven flows explain it. RECOMMEND (A): one extra field, nothing hidden, everything telescopes, and it is the legible answer rather than the clever one. It needs a new item that BL-628 requires, and it changes what FINANCE.md says about where the return is filed - the doc's 'at the end of apply_budget' is my wording from earlier today and it is the part that is wrong.
+
+*Files: `docs/economy/FINANCE.md`, `src/world/budget_system.cpp`, `src/core/app.cpp`*
+
+### NR-656 — book_value is flat build_cost, NOT what the build press charges - and the agent was right to diverge
+*decision taken on your behalf · raised 2026-08-26 · from Sprint 20 wave 1, BL-626: flagged as an assumption by the agent, checked in the main session.*
+
+FINANCE.md § The quarterly return says book_value is 'the same construction cost the build press already charges - one number, one authority.' It is not, and it should not be. construction.cpp:132 charges econ.build_cost + material_cost, and material_cost (construction.cpp:120-126) values the resource build cost AT THE CURRENT MARKET PRICE. Folding that into book value would make a firm's balance sheet mark-to-market: the same building's book value would move every quarter with commodity prices the firm does not own, and BL-628's buyout price would swing with it. The agent implemented the flat build_cost and flagged the divergence rather than silently matching the doc. Taken on Ben's behalf: the IMPLEMENTATION is right and the DOC is wrong - book value is historical cost, deliberately stable, and FINANCE.md's sentence is being corrected rather than the code. Overturnable: if you want the materials in, it is a one-line change, but the buyout price becomes commodity-sensitive.
+
+*Files: `docs/economy/FINANCE.md`, `src/world/budget_system.cpp`*
+
+### NR-657 — net is the balance difference, not corp_budget::net() - a ULP apart, and only one of them telescopes
+*decision taken on your behalf · raised 2026-08-26 · from Sprint 20 wave 1, BL-626: the agent's one stated design call.*
+
+FINANCE.md's field table names the source as corp_budget::net() while describing the value as 'the exact balance delta'. Those are not the same float: apply_budget accumulates its delta interleaved and its own comment forbids re-grouping, so net() can differ by a ULP. Only the difference of two consecutive balances telescopes exactly, which is what the retain property demands. The agent chose the balance difference and recorded why in the struct's doc comment. Endorsed - the property is the point of the record, and a doc sentence that names a source is worth less than a record that cannot lie. FINANCE.md's table is being corrected to say so.
+
+*Files: `docs/economy/FINANCE.md`, `src/world/components.hpp`*
+
+### NR-658 — build_harness.js is unusable from an agent Bash session - second independent report
+*observation · raised 2026-08-26 · from Sprint 20 wave 1, BL-626.*
+
+The committed harness build route dies with "'cl' is not recognized" when invoked from the Bash tool: its cmd /c spawn is mangled by Git Bash. The agent worked around it by generating an equivalent .bat over the same glob-derived 53-TU source set and running that. This is the same failure the io-headless-build-invocation note already records, now hit again by a fresh agent with no memory of it - which is the signal worth acting on. Not a code defect in the harnesses themselves, but every agent that needs to build one pays this tax and some will conclude the harness is broken rather than the invocation. Worth a small fix to build_harness.js or a documented Bash-safe entry point.
+
+*Files: `tools/verify/`, `docs/development/DEVELOPMENT_PRACTICES.md`*
 
 ---
 

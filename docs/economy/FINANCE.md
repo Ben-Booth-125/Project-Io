@@ -154,14 +154,25 @@ profitability, updated each quarter with company balance sheets."*
 | `income` / `expenditure` | `corp_budget` — the market cash flows from `clear_markets` |
 | `maintenance` / `wages` | `corp_budget` — summed `compute_building_opex` |
 | `interest` / `levies` / `upkeep` | `corp_budget` — the debt charge, enacted law, standing force |
-| `net` | `corp_budget::net()` — the exact balance delta |
+| `net` | The difference of two consecutive balances across the money loop — see below |
 | `balance` | closing `corporation_component.balance` |
 | `holdings` | `assets.size()` — the building count |
-| `book_value` | Sum of `build_cost` over the holdings, from the recipe registry |
+| `book_value` | Sum of `build_cost` over the holdings, from the recipe registry — historical cost, deliberately **not** what the build press charges |
 
 Nothing here is estimated. `holdings` and `book_value` are the two **stock** figures that make the
-row a balance sheet rather than an income statement alone, and `book_value` is the same
-construction cost the build press already charges — one number, one authority.
+row a balance sheet rather than an income statement alone.
+
+**Two fields need their reason stated, because the obvious source is the wrong one.**
+
+- **`net` is a balance difference, not `corp_budget::net()`.** The two are a ULP apart: the money
+  loop accumulates its delta interleaved and forbids re-grouping, so only the difference of two
+  consecutive balances telescopes *exactly*. The retain property below is the whole point of the
+  record, and it is worth more than naming a tidier source.
+- **`book_value` is historical cost, and deliberately NOT what the build press charges.** The press
+  charges `build_cost` **plus** a materials term valued at the *current market price*. Folding that
+  in would make a firm's balance sheet mark-to-market — the same building's book value moving every
+  quarter with commodity prices the firm does not own, and the acquisition price swinging with it. A
+  book value that moves on its own is not a book value.
 
 **Retention is a rolling 40 quarters** (ten years; Ben, 2026-08-26), oldest dropped first, per
 corporation. Bounded by construction, and that is the point: the record is world state and crosses
@@ -177,6 +188,15 @@ that surface is unchanged.
 **Determinism.** Returns append in a sorted walk by `entity_id`, one row per corp per tick, fixed
 width on the save seam. No branch reads a return during the tick that writes it, so the record is
 a pure downstream observation of the loop and cannot feed back into it.
+
+**What a return does NOT see, stated because it changes what can be priced from one.** The money
+loop is not the only thing that moves a balance in a quarter. National transfers and mercenary
+contract payouts land *after* it, and construction, hire, survey and convoy spend land elsewhere in
+the tick. A return therefore explains the **money loop's** movement exactly and the *quarter's*
+movement only partly — which is fine for reading profitability and **not** fine for pricing a firm,
+since a corporation earning through contracts would read as unprofitable on its own returns. Closing
+that gap is owed work, and it is a precondition of the acquisition price below rather than a detail
+of it.
 
 ## Disclosure — who may read a return
 
