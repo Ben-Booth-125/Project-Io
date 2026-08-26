@@ -4,7 +4,7 @@
 
 Two pillars define the game's end goals: **Trade** and **Conflict**. Every other system creates the conditions, constraints, or capabilities that flow into one or both.
 
-The player is a **mercenary company** (Ben, 2026-08-12, NR-177; CONCEPT.md § Player identity) — an owner of assets and operations, whose motive is narrower than a governing body's (it does not legislate) and whose agency reaches force directly: what it can field, procured from independent suppliers. The operating **corporations** the player deals with are arm's-length counterparties, not a linked treasury or a shared economic arm; the ones the player's syndicate controls by majority equity are the player's own (BL-524, syndicate tier). Profit is the motive for every corporation, and that shapes the economic layer throughout.
+The player is a **mercenary company** (Ben, 2026-08-12, NR-177; CONCEPT.md § Player identity) — an owner of assets and operations, whose motive is narrower than a governing body's (it does not legislate) and whose agency reaches force directly: what it can field, procured from independent suppliers. The operating **corporations** the player deals with are arm's-length counterparties, not a linked treasury or a shared economic arm; a corporation becomes the player's own only by **buyout**, which takes the firm whole (`docs/economy/FINANCE.md` § Whole-firm acquisition). Profit is the motive for every corporation, and that shapes the economic layer throughout.
 
 Each system below therefore answers one test: **does it change what the company can field, or what it must answer to?** A system that can only ever move a cost or a price, touching neither, is built for the corporate player the identity moved away from.
 

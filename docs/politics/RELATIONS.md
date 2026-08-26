@@ -30,7 +30,7 @@ is stored, and there is no second table it can disagree with.
 **Standing is the odd one and the naming is a known hazard.** It is not a relation at all: it is a
 coarse public read of how powerful a corporation is, with no second party anywhere in it. NR-304
 records the collision being noticed when stance was named — *"called it 'stance', not 'standing' —
-the latter is taken by BL-262's power read."*
+the latter is taken by the power read."*
 
 The distinction that keeps them straight, from `stance.hpp`'s own header: **"stance is how a corp
 feels about another; standing is how strong it is."**
@@ -52,8 +52,8 @@ They converge deliberately:
 **Sentiment** is one directed, continuous, derived value from an **observer** to a **subject**,
 where an actor is a corporation or a nation. Directed, because every use needs it — reputation is
 keyed (buyer, supplier), a nation reads a corp and never the reverse, a grudge is asymmetric by
-nature; symmetry, where a consumer wants it, is a read that asks twice. Continuous, with bands as a
-*presentation* choice (the BL-262 precedent), never the storage.
+nature; symmetry, where a consumer wants it, is a read that asks twice. Continuous, and if it is ever
+presented in bands that is a *presentation* choice, never the storage.
 
 **Stance sits on top as the declared layer**, unchanged by the substrate beneath it.
 
@@ -124,7 +124,7 @@ subject), holding two floats per row. Four properties, all load-bearing:
 | `contract_completed` | a procurement contract delivered as promised |
 | `contract_cancelled` | a procurement contract cancelled by the counterparty |
 | `trade_conducted` | goods actually moved between the pair — commerce as its own slow warming |
-| `equity_taken` | the observer wanted a firm and the subject took it — BL-524's syndicate tier; Ben's own worked example, *"buying a background firm that they wanted"*. Sentiment is where an acquisition's *political* cost lands |
+| `equity_taken` | the observer wanted a firm and the subject took it — a **buyout** (`docs/economy/FINANCE.md` § Whole-firm acquisition); Ben's own worked example, *"buying a background firm that they wanted"*. Sentiment is where an acquisition's *political* cost lands |
 | `hostility_declared` | the subject declared hostility toward the observer |
 | `friendship_accepted` | a friendship offer from the subject was accepted — both parties observe it, each in their own row |
 | `levy_charged` | the observer was charged under a law the subject authored — the corp→nation grain's bread and butter |
@@ -255,24 +255,30 @@ corp's own hand is BL-161 (counterparty allow/deny).
 
 ### 4. Standing — a readout, read by one surface
 
-`src/world/standing.{hpp,cpp}` (BL-262, scoring system). Five bands — negligible, minor, notable,
-major, dominant — on three axes: **reach** (distinct bodies with a building), **capital**
-(balance), **market share** (this corp's clearing income over the total).
+`src/world/standing.{hpp,cpp}`. Three axes: **reach** (distinct bodies with a building),
+**capital** (balance), **market share** (this corp's clearing income over the total).
 
-Two design properties worth keeping:
+**The five bands are retired** (Ben, 2026-08-26: *"We don't need company information to be
+invisible"*). Every axis now reads as an exact figure, and what varies between corporations is
+not how coarse the number is but **whether there is one at all**:
 
-**It is visibility-honest.** The player's own figures are exact; every other corporation is shown
-only as a **band, never a number** — `DISCOVERY.md`'s competitor-visibility rule (BL-068). The exact
-figures are always computed; the UI decides what to show.
+- **Reach and market share are public for everyone.** Both are derived from facts already
+  observable — buildings are visible on canvas, market supply/demand aggregates are the deliberate
+  public signal (`DISCOVERY.md` § Competitor visibility). Nothing was ever hidden about them
+  except by the banding, so nothing is lost by printing them.
+- **Capital is a filed figure and follows the ownership class.** Exact for a `public`
+  corporation, absent for a `private` or `closed` one — the same binary disclosure the quarterly
+  return takes (`docs/economy/FINANCE.md` § Disclosure). A dash means *this firm does not file*,
+  never *you have not earned this*.
 
-**It is deliberately NOT unified with `corp_ai`'s scorer** (BL-262 call 5). The AI optimises an
-internal ground-truth quantity; this is a public coarse read. Unifying them would make every rival
-directly optimise the published number — **a Goodhart trap**, and the reason the duplication is
-correct rather than lazy.
+**It is still deliberately NOT unified with `corp_ai`'s scorer.** The AI optimises an internal
+ground-truth quantity; this is a published read. Unifying them would make every rival directly
+optimise the published number — **a Goodhart trap**, and the reason the duplication is correct
+rather than lazy. Retiring the bands does not touch that property.
 
-*Production is intentionally absent from the axes, though BL-262's full design calls for four. A
-rival's true output needs their recipe and workforce dial, both private under BL-068 — there is no
-honest visible-information source for it, so the axis is left out rather than faked.*
+*Production is intentionally absent from the axes. A rival's true output needs their recipe and
+workforce dial, and neither is a filed figure — there is no honest source for it, so the axis is
+left out rather than faked.*
 
 ### 5. The nation's read of a corporation
 

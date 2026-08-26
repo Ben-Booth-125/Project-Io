@@ -10,16 +10,19 @@
 > - **Slot 8** (Diplomacy, provisionally) hosts the **all-corporations table** this doc describes —
 >   `src/ui/corporation_panel.cpp`, `foldout_begin("Corporations")`.
 >
-> Everything below describes the slot-8 rival-field table. Its long-run home is `BL-262`
-> (scoring system), which owns the banded "how do I stand against whom" read, and `BL-449`
-> (stance needs a surface) / `BL-475` (corp ledger stance detail), which own the stance column.
+> Everything below describes the slot-8 rival-field table. The stance column is `BL-449`
+> (stance needs a surface) / `BL-475` (corp ledger stance detail). **The banded "how do I stand
+> against whom" read is retired** (Ben, 2026-08-26) — figures are exact where a corporation
+> files and absent where it does not; see `docs/politics/RELATIONS.md` § Standing and
+> `docs/economy/FINANCE.md` § Disclosure. The profitability table that supersedes this
+> surface's financial half is BL-627 (profitability ledger).
 
 > **Working design doc** for the ledger-mockup pass (Power BI). Strawman answers — Ben revises.
 > Menu slot: `nav rail slot 8` · Source: `src/ui/corporation_panel.cpp` · Mock table(s): `corporations.csv`, `cashflow.csv`
 > Host: shell fold-out column, ~380px @1720.
 
 ## 1. Top question — the one thing this answers at first glance
-**"Who are the corporations, and where do I stand among them?"** The table answers this literally: one row per corp, `Corporation | Reach | Capital | Share | Stance`, the player's row tinted (`IM_COL32(255,255,255,40)`). The first-glance read is the **standing profile** — am I ahead of or behind my rivals, on which axis. The three axes are `corp_standing` (`src/world/standing.hpp`): **Reach** (distinct bodies with ≥1 owned building), **Capital** (`balance`), **Share** (this corp's clearing income over total clearing income this tick). **The player's row shows exact figures; every rival row shows a band label only** — negligible / minor / notable / major / dominant, from fixed boundaries where a value exactly on a boundary lands in the higher band. Rival internals are private under the competitor-visibility rule (`DISCOVERY.md`), so no rival balance is ever printed, and **no totals or aggregate row exists** — `BL-262`'s hard rule. Secondary questions: *by what strategy is each competing* (focus mix), *how big is each* (building count), *who is climbing vs bleeding* (net cash direction, in `cashflow.csv`), and — the column the others don't carry — *how do we stand toward each other*. This is the **drill-down onto the field of players**; whole-economy aggregate belongs to Economy, not here.
+**"Who are the corporations, and where do I stand among them?"** The table answers this literally: one row per corp, `Corporation | Reach | Capital | Share | Stance`, the player's row tinted (`IM_COL32(255,255,255,40)`). The first-glance read is the **standing profile** — am I ahead of or behind my rivals, on which axis. The three axes are `corp_standing` (`src/world/standing.hpp`): **Reach** (distinct bodies with ≥1 owned building), **Capital** (`balance`), **Share** (this corp's clearing income over total clearing income this tick). **Every row shows exact figures; the bands are retired** (Ben, 2026-08-26). Reach and Share are public for every corporation — buildings are visible and market aggregates are the deliberate public signal. Capital is a filed figure and follows the target's ownership class: exact for a `public` corporation, a dash for a `private` or `closed` one. A dash means *this firm does not file*, never *you have not earned this*. Secondary questions: *by what strategy is each competing* (focus mix), *how big is each* (building count), *who is climbing vs bleeding* (net cash direction, in `cashflow.csv`), and — the column the others don't carry — *how do we stand toward each other*. This is the **drill-down onto the field of players**; whole-economy aggregate belongs to Economy, not here.
 
 **Stance column.** Per rival row: the label (Hostile / Friend / Neutral — `is_hostile`, `are_friends`), then the transition presses. **Declare Hostile** opens a confirm (*"Dissolves any friendship. Not unilaterally reversible."* → Declare / Cancel); **Offer Friendship** sends an offer (row reads *Offer sent*) and **Accept Friendship** answers one; **Return to Neutral** withdraws. Hostility is directed and declared, friendship symmetric and mutually chosen (`RELATIONS.md`, Ben 2026-08-17). The player's own row shows `-`.
 
@@ -63,4 +66,4 @@ Nav-rail slot-8 icon toggles the ledger open/closed. With **two views**: re-clic
 - **Net/tick direction.** Add a signed (banded for rivals) net-per-tick to Standings so the ranking shows *direction*, not just a static snapshot? It needs `report.budgets` plumbed into the panel.
 - **Lens: fixed or follow?** I set it **fixed = corporation** on open. Confirm you don't want it disarmed when the ledger closes (I left the lens persisting).
 - **Sort selector.** Do you want a by-reach / by-capital / by-share sort combo (a selector, not a view), or is the fixed deterministic `entity_id` order enough for the prototype?
-- **Does the table survive `BL-262` (scoring system), or does the scoring surface absorb it?** The banded profile is already the scoring system's first slice; the stance column is the part with no other home short of `BL-475` (corp ledger stance detail).
+- **Does this table survive BL-627 (profitability ledger), or does the profitability table absorb it?** With the bands retired, the financial half of Standings is a thinner version of what the profitability ledger prints per quarter. The stance column is the part with no other home short of `BL-475` (corp ledger stance detail).

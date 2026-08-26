@@ -10,7 +10,7 @@ The reason for the identity (Ben, 2026-08-03, restated 2026-08-10): a corporatio
 
 It follows that every system answers one **design test** (BL-094 § 2026-08-10): **does this change what the company can FIELD, or what it must ANSWER TO?** A system that only ever changes a cost or a price, touching neither procurement nor accountability, is being designed for the corporate player the identity moved away from.
 
-Ownership is separate from identity. A **corporation** is the operating firm; a **syndicate** is the ownership tier above it, and the player's syndicate is one of seven (BL-524, syndicate tier; `docs/GLOSSARY.md` § Syndicate). Equity above a > 50% majority confers operating control; below it, a holding is purely financial.
+Ownership is separate from identity. A **corporation** is the operating firm, it has exactly one owner, and there is no ownership tier above it (Ben, 2026-08-26). Ownership moves **whole** — a **buyout** takes the firm outright, holdings, pools, balance and filed returns together — never as a fractional stake. Which firms can be priced and bought at all is a generated fact: `docs/GLOSSARY.md` § Ownership class.
 ### Asset-based existence
 The player persists as long as they hold any asset. Owning a single building keeps the company alive; the parent nation must also be destroyed for total elimination.
 ### Development through ages
