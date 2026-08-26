@@ -156,6 +156,12 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
     {
         bc.workforce_assigned = existing->workforce_assigned;
         bc.workforce_target   = existing->workforce_target;
+        // BL-641: carry the REAL supply factor. A hypothetical building is fully
+        // supplied by construction (the field's default), which is the honest
+        // assumption for one that does not exist yet; a real one is priced at
+        // what it is actually running at, or the Build door would quote a
+        // starved factory at its nominal.
+        bc.supply_factor_permille = existing->supply_factor_permille;
     }
     // `wt_scalar` is workforce_target/100 inside compute_building_opex, and the
     // revenue terms below assume target 100 scales to 1. Carry the real scalar
@@ -225,6 +231,7 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
         // does — this figure is shown to the player on the Build door.
         const float nominal = econ.base_rate
                               * richness_rate_scalar(econ, tc.resource_deposit[ri]) * wf
+                              * building_supply_scalar(bc)
                               * (1.0f - tc.hazard_level)
                               * placement_rules::stack_output_scalar(rank);
 
@@ -277,7 +284,7 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
     {
         if (const recipe* rcp = reg.get_recipe(recipe_id))
         {
-            const float batches = econ.base_rate * wf;
+            const float batches = econ.base_rate * wf * building_supply_scalar(bc);
             for (std::size_t ri = 0; ri < resource_count; ++ri)
             {
                 const float p = price(static_cast<resource_type>(ri));

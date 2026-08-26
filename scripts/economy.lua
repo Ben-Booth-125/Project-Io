@@ -286,6 +286,159 @@ economy = {
     -- research_institute it owns — passive, no workforce dependency (the
     -- building staffs at zero). First-cut authored constant; retune by playtest.
     --
+    -- BL-641: BUILDING UPKEEP IN GOODS — the Industry demand channel.
+    --
+    -- A unit pays upkeep in credits AND a goods vector (economy.military.
+    -- unit_upkeep below); a building paid credits only. That asymmetry was an
+    -- omission, not a design, and it is the largest single reason the goods
+    -- roster has more producers than consumers: nothing in the world consumed
+    -- on a scale that GROWS with the world. Closing it makes every firm a
+    -- consumer, so the sink scales with how much industry exists rather than
+    -- with an authored weight somebody has to maintain (MARKETS.md § Demand
+    -- channels property 1; the design is FINANCE.md § Upkeep is credits AND
+    -- goods — for buildings too).
+    --
+    -- THE SHAPE IS unit_upkeep's, on the other kind of asset. A per-type basket
+    -- is drawn from the owner's pool on the building's own body in ascending
+    -- building id — the order is load-bearing, because two buildings of one
+    -- corp on one body draw the same stock and the order decides which goes
+    -- short — and an unmet draw WEAKENS the building by the same subtraction an
+    -- out-of-supply unit takes. It never destroys, idles or decommissions it: a
+    -- factory short of its tools runs badly, it does not vanish.
+    --
+    -- ERA-BANDED, because MARKETS.md property 2 says demand is. An ancient
+    -- workshop runs on tools and planks; an industrial one on machinery and
+    -- electronics. A basket under `any` applies in every campaign, one under a
+    -- band only in that band, and a building's draw is the SUM of the baskets
+    -- that apply — so a line common to both arcs is authored once.
+    --
+    -- A ZERO ENTRY IS SKIPPED EXACTLY AS AN ABSENT ONE (the BL-454 precedent).
+    -- The shape landed with every rate at 0.0 and was proved bit-identical
+    -- against econ_harness / econ_bankruptcy / econ_stability before a single
+    -- number was authored; turning the sink on is therefore a DATA change and
+    -- never a code change, and setting this whole table back to zero restores
+    -- the pre-BL-641 economy exactly.
+    --
+    -- WHO DRAWS. Only a COMPLETED, non-decommissioned building. Under
+    -- construction it is already bidding for materials through the Construction
+    -- channel and charging operating goods too would count one building twice;
+    -- decommissioned it is not operating at all.
+    --
+    -- MAGNITUDE, and it is derived rather than picked. The anchor is the
+    -- building's OWN credit maintenance, which is the one figure in this file
+    -- already denominated in "what it costs to keep this building standing for
+    -- a tick". Target: the goods half is worth ROUGHLY HALF the credit half at
+    -- authored base_price (world_gen.lua), so upkeep-in-goods is a real second
+    -- cost without doubling the cost of owning anything. That is deliberately
+    -- gentler than the unit vector's own 2x equipment:wage ratio — a regiment
+    -- is mostly its equipment, a factory is mostly its wage bill — and it keeps
+    -- BL-635's lesson in view: an upkeep line derived without checking it
+    -- against what the asset earns is how upkeep came to be 90% of a spawning
+    -- corp's outgoings.
+    --
+    -- Authored base_price, from scripts/world_gen.lua: tools 25.5, planks 4.3,
+    -- machinery 22.0, electronics 29.0.
+    --
+    --   extraction_site      maintenance 5.0  -> target ~2.5 of goods
+    --     ancient : tools  0.07 x 25.5 = 1.785
+    --               planks 0.15 x  4.3 = 0.645   total 2.43
+    --       A dig shed wears out picks and props. Both are ancient-roster
+    --       terminal goods with a producer (Toolmaker, Sawmill) and, before
+    --       this, no consumer at all — tools and planks are literally two of
+    --       the seven goods the 0 CE census reports as produced with no sink.
+    --     industrial : machinery 0.11 x 22.0 = 2.42
+    --       A mine is machinery, and one line reads better than three.
+    --
+    --   processing_facility  maintenance 10.0 -> target ~5.0 of goods
+    --     ancient : tools  0.14 x 25.5 = 3.57
+    --               planks 0.30 x  4.3 = 1.29    total 4.86
+    --       EXACTLY twice the extraction site's basket, as its maintenance is
+    --       exactly twice — one ratio, not two independently-picked numbers.
+    --     industrial : machinery   0.15 x 22.0 = 3.30
+    --                  electronics 0.06 x 29.0 = 1.74   total 5.04
+    --
+    --   port / inland_logistics_hub / military_base / research_institute /
+    --   schooling / university / launchpad: NOT AUTHORED, deliberately, and it
+    --   is a scoping call rather than an oversight. Roads, ports and hubs kept
+    --   standing are the INFRASTRUCTURE channel (BL-643), a different row of
+    --   MARKETS.md's table with its own owner; a garrison's consumption is the
+    --   Conflict channel's (BL-646); a research institute's is Research's
+    --   (BL-645). Authoring them here would quietly claim three channels this
+    --   item does not own. Extraction and processing ARE Industry — they are
+    --   what "every firm" means — and they are 100% of the buildings any corp
+    --   in the shipped world actually operates.
+    --
+    -- SUPPLY CURVE. The same numbers unit_upkeep uses, deliberately: one rule,
+    -- one curve, two kinds of asset. decay 50 (5%/tick) means a fully-supplied
+    -- building left unsupplied reaches zero output in 20 ticks (5 years at one
+    -- tick/quarter) — long enough that one bad quarter is survivable, short
+    -- enough that sustained neglect genuinely hollows a firm out. recovery 100
+    -- is 2x the decay, so fixing a supply failure repairs faster than the
+    -- failure did damage.
+    --
+    -- ===================================================================
+    -- THE RATES SHIP AT ZERO. This is NOT the derivation above failing to
+    -- be finished — it is what turning it on MEASURED, and the measurement
+    -- says the sink cannot be switched on until its supply side exists.
+    -- The derived figures are kept in the trailing comments so switching it
+    -- on is four numbers, exactly as BL-635 kept unit_upkeep's pre-rescale
+    -- values rather than rewriting them away.
+    --
+    -- WHAT WAS MEASURED. tools/verify/demand_census.exe --fast --band ancient,
+    -- against docs/development/baseline_census_2026-08-26.txt:
+    --
+    --                        RATES OFF (baseline)   RATES ON (derived above)
+    --   buildings                  584                    576
+    --   ... complete & operating   227                     19
+    --   ... under construction       0                     47
+    --   units / heads         326 / 7690             309 / 6840
+    --
+    -- Turning the sink on collapsed the operating firm count by 92% over an
+    -- 80-tick warm start. That is not a magnitude to be halved: HALVING IT
+    -- ONLY DELAYS IT, because the cause is structural.
+    --
+    -- THE CAUSE, and it is the finding worth keeping. NOTHING IN THE SHIPPED
+    -- ANCIENT WORLD PRODUCES TOOLS OR PLANKS — the census reports `produced`
+    -- 0.0 for both, before and after. So every draw goes unmet, every tick;
+    -- the supply factor decays 50/tick to zero inside 20 ticks; output goes
+    -- to zero with it; the firm is then loss-making and BL-079's reflex tier
+    -- idles it. The shortfall rule worked exactly as designed — it was fed a
+    -- good nobody makes.
+    --
+    -- AND WHY NOBODY MAKES THEM IS THE SAME LOOP, from the other end. This
+    -- draw is a POOL draw (FINANCE.md's own shape, copied from
+    -- run_unit_upkeep) and never reaches `market_component::demand`. So
+    -- wanting tools does not RAISE THE PRICE of tools, no rival ever scores
+    -- building a Toolmaker, and the supply that would meet the draw is never
+    -- induced. Tools and planks were on the census's "produced in-band, NO
+    -- market sink" list before this item, and a pool-only draw leaves them
+    -- there. Whether the Industry channel should also register a market WANT
+    -- — as run_construction and run_processing both do, and as MARKETS.md
+    -- § Demand channels arguably requires of a demand channel — is Ben's
+    -- call, not this file's.
+    --
+    -- SO WHAT LANDS. The shape, inert, with its ordering, its shortfall rule
+    -- and its era bands all built and verified (tools/verify/building_upkeep).
+    -- Switching it on is a data change the moment either half of the loop is
+    -- closed: an ancient band that actually makes tools, or an Industry draw
+    -- that prices what it wants.
+    -- ===================================================================
+    building_upkeep = {
+        supply_decay_permille    = 50,   -- the ONE subtraction, per tick, on an unmet draw
+        supply_recovery_permille = 100,  -- regained per tick while the draw is met
+
+        goods = {
+            extraction_site = {
+                ancient    = { tools = 0.0, planks = 0.0 },      -- derived 0.07 / 0.15
+                industrial = { machinery = 0.0 },                -- derived 0.11
+            },
+            processing_facility = {
+                ancient    = { tools = 0.0, planks = 0.0 },      -- derived 0.14 / 0.30
+                industrial = { machinery = 0.0, electronics = 0.0 }, -- derived 0.15 / 0.06
+            },
+        },
+    },
+
     -- BL-455 (2026-08-17) removed `military_points_per_base_tick` from here with
     -- the field it fed: it credited an accumulator that nothing in src/ ever
     -- read. `science` kept its rate because it now HAS a reader —

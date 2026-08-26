@@ -17,7 +17,8 @@
 // hand-built finding), not on the economy.
 //
 // WHY IT LOADS LUA. The demand baskets ARE Lua data (economy.population_demand,
-// economy.background_demand, economy.military.unit_upkeep), the recipe roster and
+// economy.background_demand, economy.military.unit_upkeep, economy.building_upkeep),
+// the recipe roster and
 // its era tags are Lua data, and so are the per-building construction baskets.
 // Restating any of it in C++ would make the census an answer about a world nobody
 // plays. Build it with:
@@ -58,7 +59,8 @@
 // built the consumer yet on this seed. A STRUCTURAL sink is a statement about the
 // content: does any pass in this band NAME this resource at all — a household
 // basket entry, a background basket entry, an input to an era-allowed recipe, a
-// line in an era-available building's construction basket. A good with no
+// line in an era-available building's construction basket, a line in its BL-641
+// operating-upkeep basket. A good with no
 // structural sink is dead however rich the world gets, and that is the failure
 // MARKETS.md § Demand channels says the census must catch.
 //
@@ -207,9 +209,12 @@ struct channel_row
 const channel_row k_channels[] = {
     { "Household",      ch_state::present,
       "inject_population_demand (market_clearing.cpp) <- economy.population_demand basket" },
-    { "Industry",       ch_state::absent,
-      "no goods vector on building upkeep -- apply_budget charges maintenance+wages in CREDITS only; "
-      "cf. run_unit_upkeep, which does carry one (owner BL-641)" },
+    { "Industry",       ch_state::present,
+      "run_building_upkeep (economy_system.cpp) <- economy.building_upkeep.goods, per building type "
+      "and ERA-BANDED, scaling with BUILDING COUNT (MARKETS.md property 1). A POOL draw, like the "
+      "standing-force one below, so it consumes goods WITHOUT pricing them -- and the rates ship at "
+      "ZERO because turning them on starves every firm of a good the band does not make; see the "
+      "`indust/pl` column and economy.lua's own measurement note (BL-641)" },
     { "Construction",   ch_state::present,
       "run_construction -> economy_report::wants (economy_system.cpp) <- economy.buildings.resource_costs "
       "/ material_overrides. Fires only where something is BUILDING (owner BL-642)" },
@@ -388,6 +393,7 @@ struct classification
     bool sink_process     = false;    ///< input to an era-allowed recipe
     bool sink_construct   = false;    ///< line in an era-available building's basket
     bool sink_unit_upkeep = false;    ///< pool draw, NOT a market bid
+    bool sink_industry    = false;    ///< BL-641 building upkeep — pool draw, NOT a market bid
 
     /// Does ANY market carry a base price for it? Both basket injectors skip a
     /// resource whose `base_price` is 0 ("untradeable -- no base price to anchor
@@ -411,6 +417,7 @@ std::string sink_word(const classification& c)
     if (c.sink_process)     add("PROC");
     if (c.sink_construct)   add("CONS");
     if (c.sink_unit_upkeep) add("upk");   // lower case: not a market bid
+    if (c.sink_industry)    add("ind");   // BL-641, likewise a pool draw
     if (s.empty())
         s = "NONE";
     return s;
@@ -522,6 +529,22 @@ classify(const world& w, const recipe_registry& reg)
         if (up.goods_per_head[r] > 0.0f)
             c[r].sink_unit_upkeep = true;
 
+    // --- BL-641: the INDUSTRY pool draw ------------------------------------
+    // Read from the registry the same way the construction baskets above are:
+    // over every building type AVAILABLE IN THIS BAND, through the registry's own
+    // band-composing accessor, so the census cannot disagree with the draw
+    // run_building_upkeep actually makes.
+    for (std::size_t t = 0; t < building_type_count; ++t)
+    {
+        const building_type bt = static_cast<building_type>(t);
+        if (!reg.building_available(bt))
+            continue;
+        const auto basket = building_upkeep_goods(reg.building_upkeep(), bt, reg.era());
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (basket[r] > 0.0f)
+                c[r].sink_industry = true;
+    }
+
     return c;
 }
 
@@ -536,13 +559,18 @@ struct band_result
 
     // world shape
     int   tiles = 0, markets = 0, centres = 0, buildings = 0, under_construction = 0;
+    // BL-641: how many buildings the Industry draw actually reaches. Printed
+    // because the world count alone makes the `indust/pl` figure unreadable —
+    // "576 buildings" and a 0.63 tools draw only reconcile once you know how
+    // many of the 576 are eligible AND carry an authored basket.
+    int   industry_eligible = 0, industry_drawing = 0;
     int   corps = 0, units = 0, heads = 0;
     double centre_scale = 0.0;
     int   recipes_allowed = 0, recipes_authored = 0, max_depth = 0;
 
     // the census tick's attribution
     res_row household{}, background{}, interbody{}, construction{}, processing{};
-    res_row wants_raw{}, wants_folded{}, upkeep_pool{};
+    res_row wants_raw{}, wants_folded{}, upkeep_pool{}, industry_pool{};
     double  wants_dropped_no_market = 0.0;
 
     // observed production over the whole run
@@ -726,6 +754,37 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
         }
     }
 
+    // BL-641 — the INDUSTRY pool draw, measured the same way: what one tick of
+    // run_building_upkeep would draw across the whole world. Sized off the pass's
+    // OWN eligibility rule (complete, not decommissioned) and its own band-composing
+    // accessor, so what is printed is what is drawn. Ascending building id, matching
+    // the pass, though a sum commutes — the order is kept because a census that
+    // walked an unordered map would be a bad example to copy.
+    {
+        std::vector<entity_id> bids;
+        bids.reserve(w.buildings.size());
+        for (const auto& kv : w.buildings)
+            bids.push_back(kv.first);
+        std::sort(bids.begin(), bids.end());
+        for (const entity_id bid : bids)
+        {
+            const building_component& bc = w.buildings.at(bid);
+            if (bc.ticks_remaining > 0 || bc.decommissioned)
+                continue;
+            ++out.industry_eligible;
+            const auto basket = building_upkeep_goods(reg.building_upkeep(), bc.type, reg.era());
+            bool draws = false;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                out.industry_pool[r] += basket[r];
+                if (basket[r] > 0.0f)
+                    draws = true;
+            }
+            if (draws)
+                ++out.industry_drawing;
+        }
+    }
+
     // --- world shape and classification ------------------------------------
     out.tiles     = static_cast<int>(w.tiles.size());
     out.markets   = static_cast<int>(w.markets.size());
@@ -796,16 +855,19 @@ void print_band(const band_result& b)
                 b.under_construction, b.corps, b.units, b.heads);
     std::printf("  registry  : %d of %d authored recipes allowed in band; max chain depth %d\n",
                 b.recipes_allowed, b.recipes_authored, b.max_depth);
+    std::printf("  industry  : %d of %d buildings eligible to draw upkeep (complete, not "
+                "decommissioned); %d of those carry an authored basket in this band\n",
+                b.industry_eligible, b.buildings, b.industry_drawing);
 
     std::printf("\n  --- per-resource demand census, census tick, summed over every market ---\n");
-    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s | %11s | %10s | %10s | %s\n",
+    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s | %11s | %10s %10s | %10s | %s\n",
                 "id", "resource", "prod", "d px",
                 "household", "backgrnd", "interbody", "construct", "process",
-                "MKT TOTAL", "upkeep/pl", "produced", "structural sinks");
-    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s | %11s | %10s | %10s | %s\n",
+                "MKT TOTAL", "upkeep/pl", "indust/pl", "produced", "structural sinks");
+    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s | %11s | %10s %10s | %10s | %s\n",
                 "---", "----------------------", "----", "----",
                 "----------", "----------", "----------", "----------", "----------",
-                "-----------", "----------", "----------", "----------------");
+                "-----------", "----------", "----------", "----------", "----------------");
 
     for (std::size_t r = 0; r < resource_count; ++r)
     {
@@ -813,27 +875,27 @@ void print_band(const band_result& b)
         const double total = b.household[r] + b.background[r] + b.interbody[r]
                            + b.construction[r] + b.processing[r];
         std::printf("  %-3zu %-22s %-4s %2d %-1s | %10.3f %10.3f %10.3f %10.3f %10.3f | %11.3f | "
-                    "%10.3f | %10.1f | %s\n",
+                    "%10.3f %10.3f | %10.1f | %s\n",
                     r, rname(r), prod_word(c), c.depth, c.priced ? "$" : "-",
                     b.household[r], b.background[r], b.interbody[r],
                     b.construction[r], b.processing[r], total,
-                    b.upkeep_pool[r], b.produced[r], sink_word(c).c_str());
+                    b.upkeep_pool[r], b.industry_pool[r], b.produced[r], sink_word(c).c_str());
     }
 
     std::printf("  %-3s %-22s %-4s %-4s | %10.3f %10.3f %10.3f %10.3f %10.3f | %11.3f | "
-                "%10.3f | %10.1f |\n",
+                "%10.3f %10.3f | %10.1f |\n",
                 "", "TOTAL", "", "",
                 total_of(b.household), total_of(b.background), total_of(b.interbody),
                 total_of(b.construction), total_of(b.processing),
                 total_of(b.household) + total_of(b.background) + total_of(b.interbody)
                     + total_of(b.construction) + total_of(b.processing),
-                total_of(b.upkeep_pool), total_of(b.produced));
-    std::printf("  %-3s %-22s %-4s %-4s | %10d %10d %10d %10d %10d | %11s | %10d | %10s |  "
+                total_of(b.upkeep_pool), total_of(b.industry_pool), total_of(b.produced));
+    std::printf("  %-3s %-22s %-4s %-4s | %10d %10d %10d %10d %10d | %11s | %10d %10d | %10s |  "
                 "(resources touched)\n",
                 "", "BREADTH", "", "",
                 touched_by(b.household), touched_by(b.background), touched_by(b.interbody),
                 touched_by(b.construction), touched_by(b.processing), "",
-                touched_by(b.upkeep_pool), "");
+                touched_by(b.upkeep_pool), touched_by(b.industry_pool), "");
 
     if (b.wants_dropped_no_market > 0.0)
         std::printf("  note: %.3f units of want were registered on bodies carrying no market and "

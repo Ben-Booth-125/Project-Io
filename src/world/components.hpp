@@ -708,6 +708,27 @@ struct building_component
     /// value refuses the whole stream.
     float wage_bid = 0.0f;
 
+    /// BL-641. How well this building is supplied, per-mille (1000 = fully
+    /// supplied). THE SAME QUANTITY `unit_component::supply_factor_permille`
+    /// is, on the other kind of asset, and moved by the same rule: the
+    /// building-upkeep pass (economy_system.cpp § run_building_upkeep) draws a
+    /// per-type goods vector from the owner's pool on this building's own body,
+    /// and an unmet draw takes the SAME subtraction an out-of-supply unit takes.
+    /// It never destroys, idles or decommissions the building — a factory short
+    /// of its tools runs badly; it does not vanish (FINANCE.md § Upkeep is
+    /// credits AND goods — for buildings too).
+    ///
+    /// WHAT READS IT: `building_supply_scalar` below, folded into the nominal
+    /// output of extraction and processing — so an unsupplied firm is measurably
+    /// weaker IN PRODUCTION, exactly as an unsupplied army is measurably weaker
+    /// in the resolver. Both the live tick and the profitability preview read it
+    /// through that one helper, so they cannot drift.
+    ///
+    /// SERIALISED (world_save.cpp's building record) — `world_save_version`
+    /// 17 → 18 moved with it; a non-1000-clamped, out-of-[0,1000] value refuses
+    /// the whole stream.
+    int32_t supply_factor_permille = 1000;
+
     /// BL-430: economy ticks remaining before this building's recipe may be
     /// switched again through the PLAYER-grade seam (corp_command's set_recipe
     /// verb, and the construction_panel UI, which shares its gate). Set from
@@ -716,6 +737,25 @@ struct building_component
     /// the BL-079 reflex switch, which stays free/instant — see recipe_switch_params.
     int  recipe_switch_cooldown = 0;
 };
+
+/// BL-641. The output scalar `building_component::supply_factor_permille`
+/// expresses, as a multiplier on nominal output. THE ONE CONVERSION — the live
+/// extraction/processing tick and the profitability preview both call this, so
+/// a preview can never price output the tick will not deliver.
+///
+/// A fully-supplied building (the default, and the ONLY state reachable while
+/// the authored upkeep rates are zero) returns exactly 1.0f and the caller's
+/// arithmetic is bit-for-bit what it was before this field existed. Values above
+/// 1000 are clamped rather than rewarded: supply cannot make a building better
+/// than its own nominal, only worse.
+inline float building_supply_scalar(const building_component& b)
+{
+    return (b.supply_factor_permille >= 1000)
+             ? 1.0f
+             : ((b.supply_factor_permille <= 0)
+                    ? 0.0f
+                    : static_cast<float>(b.supply_factor_permille) / 1000.0f);
+}
 
 /// Pooled resource quantities held by an entity.
 /// Used for building output buffers, convoy cargo, and similar stores.

@@ -489,6 +489,92 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_military = mp;
     }
 
+    // BL-641 building upkeep in goods (economy.building_upkeep).
+    //
+    // ABSENT TABLE = every rate zero = the pre-BL-641 arithmetic, unchanged —
+    // the same tolerance economy.military.unit_upkeep's own absent-table case
+    // has, and the property R4 rests on: the shape lands inert and turning the
+    // sink on is a data change.
+    //
+    // Two levels of key, both of them named rather than positional: a building
+    // type, then an era band. An unknown building-type key or an unknown band
+    // key THROWS rather than being skipped — a typo'd `procesing_facility`
+    // would otherwise author a basket nothing ever draws, which is precisely
+    // the silent-nothing this seam must not do (read_resource_map's own
+    // unknown-resource contract, one level up).
+    sol::optional<sol::table> bupk = (*econ)["building_upkeep"];
+    if (bupk)
+    {
+        struct named_type { const char* key; building_type type; };
+        const named_type upkeep_types[] = {
+            { "extraction_site",      building_type::extraction_site },
+            { "processing_facility",  building_type::processing_facility },
+            { "port",                 building_type::port },
+            { "launchpad",            building_type::launchpad },
+            { "inland_logistics_hub", building_type::inland_logistics_hub },
+            { "military_base",        building_type::military_base },
+            { "research_institute",   building_type::research_institute },
+            { "schooling",            building_type::schooling },
+            { "university",           building_type::university },
+        };
+        struct named_band { const char* key; era_band band; };
+        const named_band bands[] = {
+            { "any",        era_band::any },
+            { "ancient",    era_band::ancient },
+            { "industrial", era_band::industrial },
+        };
+
+        building_upkeep_params bp;
+        bp.supply_decay_permille =
+            bupk->get_or("supply_decay_permille",    bp.supply_decay_permille);
+        bp.supply_recovery_permille =
+            bupk->get_or("supply_recovery_permille", bp.supply_recovery_permille);
+        // Both are per-mille of a 0..1000 factor, so the honest domain is
+        // [0, 1000]. Rejected by name rather than clamped, the untrusted-input
+        // rule applied at the authoring boundary (economy.acquisition's
+        // precedent below): a negative decay would HEAL an unsupplied building
+        // and a decay above 1000 is not a rate at all.
+        if (bp.supply_decay_permille < 0 || bp.supply_decay_permille > 1000)
+            throw std::runtime_error("recipe_registry: building_upkeep.supply_decay_permille "
+                                     "is outside [0, 1000]");
+        if (bp.supply_recovery_permille < 0 || bp.supply_recovery_permille > 1000)
+            throw std::runtime_error("recipe_registry: building_upkeep.supply_recovery_permille "
+                                     "is outside [0, 1000]");
+
+        sol::optional<sol::table> goods = (*bupk)["goods"];
+        if (goods)
+        {
+            for (const auto& kv : *goods)
+            {
+                const std::string tkey = kv.first.as<std::string>();
+                const named_type* nt = nullptr;
+                for (const named_type& cand : upkeep_types)
+                    if (tkey == cand.key) { nt = &cand; break; }
+                if (nt == nullptr)
+                    throw std::runtime_error("recipe_registry: building_upkeep.goods names an "
+                                             "unknown building type '" + tkey + "'");
+
+                sol::table per_band = kv.second.as<sol::table>();
+                for (const auto& bkv : per_band)
+                {
+                    const std::string bkey = bkv.first.as<std::string>();
+                    const named_band* nb = nullptr;
+                    for (const named_band& cand : bands)
+                        if (bkey == cand.key) { nb = &cand; break; }
+                    if (nb == nullptr)
+                        throw std::runtime_error("recipe_registry: building_upkeep.goods." + tkey
+                                                 + " names an unknown era band '" + bkey
+                                                 + "' (expected any, ancient or industrial)");
+                    read_resource_map(bkv.second.as<sol::table>(),
+                                      bp.goods[static_cast<std::size_t>(nt->type)]
+                                              [static_cast<std::size_t>(nb->band)],
+                                      "building_upkeep.goods." + tkey + "." + bkey);
+                }
+            }
+        }
+        m_building_upkeep = bp;
+    }
+
     // BL-350 procurement/contract tunables (economy.procurement).
     sol::optional<sol::table> procurement = (*econ)["procurement"];
     if (procurement)

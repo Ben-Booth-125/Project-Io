@@ -114,6 +114,14 @@ int main()
     if (bid_building != null_entity)
         w.buildings.at(bid_building).wage_bid = 0.4375f;
 
+    // BL-641: `supply_factor_permille` is the OTHER new persistent field in the
+    // building record, and it defaults to 1000 on every building in a world whose
+    // upkeep rates ship at zero — a uniform column P1's byte-equality would pass
+    // over without noticing a misread. Pin the same building to a distinctive
+    // value, for the same reason and by the same discipline as the wage bid above.
+    if (bid_building != null_entity)
+        w.buildings.at(bid_building).supply_factor_permille = 637;
+
     // BL-631: `ownership_class` is a NEW persistent field in the corp record.
     // A `no_prehistory()` world reaches it through the national-character
     // fallback, which can class a whole world alike — so pin one corp to a
@@ -221,6 +229,15 @@ int main()
         check(read_ok && bit != loaded.buildings.end()
                   && bit->second.wage_bid == 0.4375f,
               "P1 building wage_bid (BL-614) round-trips at its written value");
+    }
+
+    // BL-641: likewise for the building supply factor.
+    if (bid_building != null_entity)
+    {
+        const auto bit = loaded.buildings.find(bid_building);
+        check(read_ok && bit != loaded.buildings.end()
+                  && bit->second.supply_factor_permille == 637,
+              "P1 building supply_factor_permille (BL-641) round-trips at its written value");
     }
 
     // BL-626: the filed quarterly returns survive by VALUE, in order, with the
