@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*86 entries — 62 open, 24 resolved.*
+*89 entries — 65 open, 24 resolved.*
 
 ---
 
@@ -577,6 +577,27 @@ haulage_measure reports 0 failures at 1368 convoys dispatched, 1014 intra-body, 
 The MCP spec of 2026-07-28 made the protocol STATELESS: it removed `Mcp-Session-Id` and the initialize handshake from Streamable HTTP, and deprecated Roots / Sampling / Logging on a 12-month clock. § 10a's description of MCP was written before that release. It is not WRONG in what it claims about Io's own server, and `tools/mcp/server.js` is unaffected (the 2026-08-22 roadmap keeps stdio first-class and extends the HTTP approach to local servers speaking Streamable HTTP over stdio, so no action falls out of that either). But the section describes a protocol shape that has since changed, and a deprecation on a 12-month clock is the kind of thing that is cheap to note now and expensive to discover later. Worth a read and a small amendment when someone is next in that file - not urgent, and explicitly NOT a finding of the sweep, which was right to keep its diff clean.
 
 *Files: `docs/ai/AI_OPPONENT.md`, `tools/mcp/server.js`*
+
+### NR-678 — I wrote 'electronics' into the industrial household basket in two docs; the data has it in background demand
+*decision taken on your behalf · raised 2026-08-26 · from Sprint 20 wave 4, BL-640: the agent found the doc and the data disagreeing and correctly declined to resolve it by editing either the design or the weights.*
+
+POPULATION.md § Population demand and MARKETS.md § Demand channels both said an industrial household wants 'consumer goods, medical supplies and ELECTRONICS'. The industrial tranche is actually clean_water / consumer_goods / medical_supplies; electronics lives in background_demand. I wrote that sentence as illustration this morning and it became a claim. Taken on Ben's behalf: both docs now name what the basket really carries, because a doc asserting a weight that does not exist is worse than a thin basket. BUT THE UNDERLYING QUESTION IS REAL AND IS BEN'S: should an industrial household consume electronics directly? It is plausible on its face - consumer electronics are a household good - and it would give electronics a demand channel that scales with population rather than with the background-industrial stopgap. Adding it is one Lua row. Not done, because which goods a household wants is a content decision about what the game is about, not a typo fix.
+
+*Files: `docs/economy/POPULATION.md`, `docs/economy/MARKETS.md`, `scripts/economy.lua`*
+
+### NR-679 — Banding the baskets HALVED the generated world - 584 buildings / 104 corps -> 261 / 64
+*observation · raised 2026-08-26 · from Sprint 20 wave 4, BL-640: the agent found it, named it as its own, and flagged it before merge rather than after.*
+
+Pass 6 generates background firms until a body's real production reaches ~90% of its real demand. That stop condition reads the same baskets BL-640 just banded - through `body_demand` in corporation_generation.cpp, which was NOT in the brief's file list and which the agent repointed for correctness. Before the band, Pass 6 was chasing demand for silicon, machinery, alloys and electronics that the ancient band STRUCTURALLY CANNOT PRODUCE, so it kept adding firms against a gap that could never close. The behaviour is now correct and the world is half the size: 584 buildings / 104 corps -> 261 / 64. THIS IS A LARGE GENERATED-WORLD CHANGE AND EVERY DOWNSTREAM MEASUREMENT MOVES WITH IT - market saturation, prices, spawn viability, the haulage baseline (already flagged as drifted in NR-674), and the spectator golden. Worth Ben's eye on the FEEL as much as the numbers: a world with 64 corps rather than 104 is a visibly different economy, and it is the honest one. The old count was inflated by chasing an unclosable target.
+
+*Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`, `docs/economy/MARKETS.md`*
+
+### NR-680 — rigging's exemption named BL-640 as its buyer, and BL-640 does not buy it
+*question · raised 2026-08-26 · from Sprint 20 wave 4, BL-640: the agent declined to invent a buyer or to widen its own requirement to cover one.*
+
+chain_depth's exemption for `rigging` claimed 'the era-banded household basket (BL-640) owns the buyer'. It does not: POPULATION.md's ancient household is ceramics, cloth, leather and dressed stone, and rigging is ship's tackle - not a household good by any reading. The agent re-pointed the claim prose to say so and LEFT THE ROW RED rather than widening R2's four goods to make its own item look better. Correct, and it leaves rigging genuinely unowned. Candidates worth weighing: the Infrastructure channel (BL-643) if ports and hubs draw materials - a shipwright's output is closer to infrastructure than to a household; or Construction (BL-642) if a port's resource_costs name it. Three of the four remaining red goods now have this shape - rigging, tools and trade_goods_misc all need a channel to claim them, and ordnance needs BL-646.
+
+*Files: `tools/verify/chain_depth.cpp`, `docs/economy/LOGISTICS.md`, `docs/economy/PRODUCTION.md`*
 
 ---
 

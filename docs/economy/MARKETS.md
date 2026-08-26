@@ -207,7 +207,7 @@ weight. A channel whose size is a constant is a stopgap, and should be labelled 
 original gap. Recipes carry an `era` field (BL-433) and are masked by band; the demand baskets did
 not, so they were authored in industrial goods and an ancient campaign inherited a basket naming
 things nothing in that band can make. **An ancient household wants ceramics, cloth, leather and
-dressed stone; an industrial one wants consumer goods, medical supplies and electronics.** Same
+dressed stone; an industrial one wants clean water, consumer goods and medical supplies.** Same
 mechanism, banded input — no new concept, and the ancient chain's terminal goods stop being dead
 ends the moment the basket knows which era it is in.
 

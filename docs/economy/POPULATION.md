@@ -170,7 +170,7 @@ one, and the markets worth reaching.
 as recipes are (BL-433's `era` field), and the omission was load-bearing: a basket authored in
 industrial goods left an ancient campaign wanting three things, because the other half of it names
 goods nothing in that band can produce. **An ancient household wants ceramics, cloth, leather and
-dressed stone; an industrial one wants consumer goods, medical supplies and electronics.** The two
+dressed stone; an industrial one wants clean water, consumer goods and medical supplies.** The two
 ladders compose — era decides *which* value chain, stratum decides *how far up it* — and together
 they are what makes the household channel the sink for terminal artisan goods, which is what those
 goods were authored to be. See [`MARKETS.md`](MARKETS.md) § Demand channels for the register this
