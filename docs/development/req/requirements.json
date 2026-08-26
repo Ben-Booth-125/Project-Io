@@ -4062,30 +4062,30 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
-      "ad hoc: run against the live tree, output checked"
+      "ad hoc: scan run against the live tree, 43 refs + working tree, exit 0, reports 16"
      ],
      "requirement": "A tool under tools/session/ reports the next safe world_save_version, scanning git refs AND the working tree the way next_id.js scans for backlog ids, so a claim is unambiguous across concurrent worktrees.",
-     "notes": ""
+     "notes": "Verified in the main session, not self-reported: the agent could not read these rows from its stale base."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
-      "ad hoc: two-claim sequence checked"
+      "ad hoc: two-claim sequence run in the main session - second caller told 17, not 16"
      ],
      "requirement": "A recorded claim survives: a second invocation after a claim returns the NEXT number, not the same one. Two concurrent worktrees cannot both be told 16.",
-     "notes": ""
+     "notes": "Verified in the main session, not self-reported: the agent could not read these rows from its stale base."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
-      "doc: DEVELOPMENT_PRACTICES.md"
+      "doc: DEVELOPMENT_PRACTICES.md new section + DELIVERY.md pointer, read and checked"
      ],
      "requirement": "The workflow is documented in DEVELOPMENT_PRACTICES.md beside the existing save-format guidance, and the tool is named where a session will find it.",
-     "notes": ""
+     "notes": "Verified in the main session, not self-reported: the agent could not read these rows from its stale base."
     }
    ]
   }

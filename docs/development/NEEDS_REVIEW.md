@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*62 entries — 46 open, 16 resolved.*
+*63 entries — 47 open, 16 resolved.*
 
 ---
 
@@ -465,6 +465,13 @@ The purged BL-527 put corporation valuation in MARKETS.md on the argument that a
 Flagged at the moment it arose, per the novelty rule. Every prior verb moves goods, credits, units or sentiment; the buyout moves an ACTOR - a corporation stops existing and its entire asset graph re-points. Nothing in the corpus owned that before 2026-08-26 (the nearest thing was the purged syndicate arc, and it deliberately avoided transfer by holding equity instead). It now has an owner - FINANCE.md § Whole-firm acquisition - so the flag is about SCOPE, not homelessness: dissolution touches the HQ/influence-range recompute, unit muster bases, open market orders, the save format and every surface that resolves a corp id. BL-628 is sized L for that reason and it is the item most likely to be under-scoped.
 
 *Files: `docs/economy/FINANCE.md`, `src/world/corp_command.cpp`*
+
+### NR-654 — One of three wave-1 worktrees was cut from the SESSION-START commit, not current HEAD
+*observation · raised 2026-08-26 · from Sprint 20 wave 1: three agents launched in one message, BL-637 reported it could not read its own backlog item or requirement group.*
+
+Three worktree agents were launched in a single message from HEAD e40e38d8. Two were cut from e40e38d8 as expected; the third was cut from 638cdd65 - the commit HEAD sat at when the SESSION began, five commits earlier. It reported the symptom honestly (BL-637 and its requirement group both returned nothing matched, REFINED.md still held Sprint 19) rather than inventing an interpretation, which is the only reason it was caught. THIS TIME IT WAS HARMLESS - the stale agent was the tooling one, and its deliverable did not depend on anything written this session. Had it hit either src/ agent it would have been serious: both were briefed to read authority-doc sections that DO NOT EXIST at 638cdd65, so they would have built against a design they could not see. This is the io-worktree-agents-stale-base pattern recurring. Worth a standing check before any wave: verify git merge-base <branch> main for every launched worktree, and re-brief or relaunch any agent whose base predates the design it was told to read.
+
+*Files: `docs/development/DELIVERY.md`*
 
 ---
 
