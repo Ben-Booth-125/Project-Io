@@ -28,6 +28,35 @@ fake.
 
 ## 1. SOTA map
 
+> ### Sweep record
+>
+> The cut ritual runs a **diff against the last recorded sweep, never a from-scratch survey**
+> (`DEVELOPMENT_PRACTICES.md` § Cutting a release; NR-167, ruled 2026-08-13). This block is the
+> baseline the next one diffs against — keep it at the top, one entry per sweep, newest first.
+>
+> **2026-08-26 (v0.1.20).** Verdict: **the map below stands as written; no amendment required.**
+> Window 2026-08-13 → 2026-08-26, thirteen days, and a diff that short should mostly be empty — it
+> was. Areas 1, 2 and 4: no material change. Area 3: one in-window finding, **Qwen3.8-27B** (released
+> 2026-08-14/15, Apache 2.0, 27B dense, ~262K context, a 4-bit build ≈ 17 GB so it fits a single
+> 24 GB consumer card; reported 61.7 SWE-bench Pro / 84.3 OSWorld-Verified / 73.0 Terminal-Bench 2.1
+> — figures as reported by the sweep's sources, not independently verified here). It narrows § 10c.1's
+> "120B → runs on Ben's machine" gap without fine-tuning and **widens the margin on the C1 gate**
+> (`LANGUAGE_POLICY_FEASIBILITY.md`). It **changes no decision**: § 10g's ruling that Stage A/B stays
+> the action generator rests on determinism, legibility and *"distilling `corp_ai.cpp` yields
+> `corp_ai.cpp`"* — capability was never load-bearing for it, so a more capable local model does not
+> make a non-deterministic action generator acceptable. Nothing found required a cloud model, so
+> there were no out-of-scope-by-construction findings to weigh.
+>
+> *Limits of the 2026-08-26 sweep, recorded because the next one inherits them.* The agent's own
+> knowledge cutoff sat before the window, so it distinguished "new" from "new to it" **by published
+> date alone** and excluded anything it could not date — one candidate (a llama.cpp
+> multi-token-prediction merge reported at ~2.2–2.4× on dense 27B locally) was dropped for exactly
+> that reason and may belong in the next window. It could not enumerate arXiv new-submission listings
+> directly, and keyword search is ranked toward well-cited material, which **structurally
+> under-samples papers a fortnight old**. Read the emptiness of Areas 1, 2 and 4 with that in mind:
+> it is consistent with a quiet fortnight, and it is not proof of one.
+
+
 ### Area 1 — the classical game-AI toolkit
 
 The shipped-game consensus is blunt: **strategy games rarely use search-based planners for the

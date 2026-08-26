@@ -1315,6 +1315,19 @@
     "docs/economy/MARKETS.md"
    ],
    "resolution": "Ben, 2026-08-26: RATIFY. The census's vocabulary is written into MARKETS.md section Measuring it as a table - structural sink vs observed demand, REC/DEP, px - with the distinction that does the work called out: a structural sink with ZERO observed demand is the signature of a dead chain, and invisible to any check looking at only one of them."
+  },
+  {
+   "id": "NR-677",
+   "title": "AI_OPPONENT.md § 10a describes MCP as it was before the 2026-07-28 spec made it stateless",
+   "raised": "2026-08-26",
+   "kind": "observation",
+   "status": "open",
+   "source": "Found by the 2026-08-26 AI SOTA sweep, which correctly declined to promote it - it predates the sweep's window and is a doc-accuracy gap rather than a field development.",
+   "what": "The MCP spec of 2026-07-28 made the protocol STATELESS: it removed `Mcp-Session-Id` and the initialize handshake from Streamable HTTP, and deprecated Roots / Sampling / Logging on a 12-month clock. § 10a's description of MCP was written before that release. It is not WRONG in what it claims about Io's own server, and `tools/mcp/server.js` is unaffected (the 2026-08-22 roadmap keeps stdio first-class and extends the HTTP approach to local servers speaking Streamable HTTP over stdio, so no action falls out of that either). But the section describes a protocol shape that has since changed, and a deprecation on a 12-month clock is the kind of thing that is cheap to note now and expensive to discover later. Worth a read and a small amendment when someone is next in that file - not urgent, and explicitly NOT a finding of the sweep, which was right to keep its diff clean.",
+   "files": [
+    "docs/ai/AI_OPPONENT.md",
+    "tools/mcp/server.js"
+   ]
   }
  ]
 }

@@ -15,9 +15,10 @@ release.
 ## [0.1.20] — 2026-08-26
 
 *Sprints 20 and 21 wave 0 — the books open, and the discovery that the demand side was never
-built. The AI SOTA sweep is **still owed**: v0.1.19 skipped it by ruling and named this cut as
-the one that owes a diff against the 2026-08-13 baseline. Carried again, deliberately and on
-the record, rather than quietly dropped.*
+built. The **AI SOTA sweep owed since v0.1.19 was run** (2026-08-26) and its verdict recorded in
+`docs/ai/AI_OPPONENT.md` § 1: the map stands as written, no amendment required, no settled
+decision altered. The debt v0.1.19 deferred is cleared, and that sweep is now the baseline the
+next minor diffs against.*
 
 ### Added
 - **Every corporation files a quarterly return** (BL-626): the seven money-loop flows, the

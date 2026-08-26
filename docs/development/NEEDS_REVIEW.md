@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*85 entries — 61 open, 24 resolved.*
+*86 entries — 62 open, 24 resolved.*
 
 ---
 
@@ -570,6 +570,13 @@ BL-648's registry substantiates an exemption by reading the DATA the running pas
 haulage_measure reports 0 failures at 1368 convoys dispatched, 1014 intra-body, against a previously-noted baseline of 1055/802. The agent correctly did not re-bless anything and named the gap. It matters more than an ordinary number drift because of what this harness IS: convoy traffic can collapse with every state_hash golden digit-identical, so haulage_measure against its baseline is the only real check that trade is still happening. A baseline that has silently moved by ~30% is therefore a check that has quietly stopped meaning what it meant. Sprint 19's population work (~40x centre density) and Sprint 20's road and levy changes are the obvious candidates and neither was chased. Someone should establish the current number deliberately, with provenance, rather than letting the next reader compare against a figure from a different world.
 
 *Files: `tools/verify/haulage_measure.cpp`*
+
+### NR-677 — AI_OPPONENT.md § 10a describes MCP as it was before the 2026-07-28 spec made it stateless
+*observation · raised 2026-08-26 · from Found by the 2026-08-26 AI SOTA sweep, which correctly declined to promote it - it predates the sweep's window and is a doc-accuracy gap rather than a field development.*
+
+The MCP spec of 2026-07-28 made the protocol STATELESS: it removed `Mcp-Session-Id` and the initialize handshake from Streamable HTTP, and deprecated Roots / Sampling / Logging on a 12-month clock. § 10a's description of MCP was written before that release. It is not WRONG in what it claims about Io's own server, and `tools/mcp/server.js` is unaffected (the 2026-08-22 roadmap keeps stdio first-class and extends the HTTP approach to local servers speaking Streamable HTTP over stdio, so no action falls out of that either). But the section describes a protocol shape that has since changed, and a deprecation on a 12-month clock is the kind of thing that is cheap to note now and expensive to discover later. Worth a read and a small amendment when someone is next in that file - not urgent, and explicitly NOT a finding of the sweep, which was right to keep its diff clean.
+
+*Files: `docs/ai/AI_OPPONENT.md`, `tools/mcp/server.js`*
 
 ---
 
