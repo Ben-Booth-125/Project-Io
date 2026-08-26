@@ -914,6 +914,21 @@
     "tools/verify/spawn_viability.cpp",
     "docs/generation/CORPORATION_GENERATION.md"
    ]
+  },
+  {
+   "id": "NR-648",
+   "title": "Sweep verdict: every named corp insolvent by tick 3, and the cause is the BL-476 starting army under BL-454 upkeep",
+   "raised": "2026-08-26",
+   "kind": "observation",
+   "status": "open",
+   "source": "First spawn_viability runs (BL-626): 8 campaign-real seeds x 80 ticks, spectate AND played modes, 1,664 corp-rows; root cause read from corporation_generation.cpp / economy_system.cpp / scripts/economy.lua.",
+   "what": "THE DATA. All 8 seeds generate 104 corps (8 named + 96 background). Named corps: 0 of 64 solvent in EITHER mode; median close about -113k cr (rivals) / -116k (player slot); in debt by tick ~3 and for 77-78 of 80 ticks; trailing net about -2.7k/qtr near-uniform across focus and holdings. Background firms: 67% solvent, median close +1.2k. Focus medians: processing +1.2k, extraction -8.6k, trade -112k (all 14 trade corps are named or near-named shapes). Mode delta is NOISE at the median (played player-slot -115.5k vs spectate -116.8k) - endowment dominates acting; seed 1 is the cautionary outlier where the player slot's ONE spectate action closed it 56k WORSE (-173k): spending from insolvency compounds. THE CAUSE, a three-step dated chain, each step sound alone: (1) BL-330/BL-476 (2026-08-19, Ben's scoping call) seeds every NAMED corp - never a background firm - one military_base + one 50-head unit; (2) BL-454 (2026-08-17, \"upkeep is credits AND military goods\") makes that unit cost 6.0 cr/head/tick = 300 cr/qtr wages from tick 1, before any income ramps, plus the base's ~4.5/qtr maintenance floor, plus a goods draw (50 food_rations + 7 ordnance /tick) that drains stock the sell rule would otherwise turn into income - unmet goods starve supply_factor, never buy; (3) k_debt_interest_per_quarter (BL-073, 2%/qtr) compounds the immediate debt ~194x over 80 ticks: the fixed ~305/qtr alone builds -59k by tick 80, and the corps' own post-Sprint-19 operating losses put through the same compounding make up the rest of the -113k median. The near-identical craters across focus/holdings are the signature of interest-dominated dynamics. Consistent with history: the 2026-08-16 player_seed_sweep (every seed positive, 1.3k-55k) ran BEFORE upkeep existed and before rivals had armies. OPTIONS, not chosen: (a) upkeep on retainer - a seeded starting unit costs a reduced/zero wage until first mustered or mobilised; (b) warm-start grace - debt interest starts at tick 1 of live play, not warm-start tick 1; (c) seed the army with a funding counterweight (the spawn-forms question - e.g. the charter-loan form); (d) shrink/remove the seeded unit and let rivals hire when they can afford to (BL-324 already gives them the verb). (a), (b) and (d) are mechanical; (c) is BL-627's design session. Sweep data: build_gen/verify/spawn_viability{,_played}.csv, regenerate with the harness.",
+   "files": [
+    "tools/verify/spawn_viability.cpp",
+    "src/world/corporation_generation.cpp",
+    "src/world/economy_system.cpp",
+    "scripts/economy.lua"
+   ]
   }
  ]
 }

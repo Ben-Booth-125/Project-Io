@@ -10,7 +10,68 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — The warm-start stall found and killed; settlements become visible (flood-field pathfinding; BL-625; NR-645) (2026-08-25, latest)
+## Session — Sprint 20 opens: the spawn-viability sweep, and the starting army found guilty (BL-626, BL-627; NR-646–NR-648) (2026-08-26, latest)
+
+**The design session, settled fast.** Ben opened Sprint 20 on corporation viability: 0cr
+new-charter starts plus market forces "is not great — different starts provide different
+opportunities, and we should be gathering data on this." Assessment offered: market forces
+guarantee *some* corps profit, never *yours*; 0cr relocates start variance into an emergent,
+harder-to-control form; the right frame is a **floor, not equality** (variety is intended,
+dead-on-arrival is a defect); the in-house precedent is the planetology corridor — measure
+always-viable spans, then generate inside them. Ben's rulings: **A — build the sweep first,
+spawn forms wait for the data**, and *"there is nothing too special about player corporations,
+so we can use every angle to gather data"* — every corp is a data point. That second ruling
+lands mechanically as: the sweep defaults to **spectate** (BL-409), so every corp acts through
+the scored-utility layer and every row is comparable.
+
+**The instrument (BL-626, spawn viability sweep).** `tools/verify/spawn_viability.cpp`: one
+campaign-real world per seed (full 400-year prehistory; `--lean` smoke only), the 80-tick warm
+start run with an **app-faithful tick** — cadence counter (BL-568), shared LP pool (BL-597),
+corp AI — unlike the frozen ticks in `pregame_balance_harness`/`player_seed_sweep`. One CSV
+row per corp per seed: class / focus / nation, balance open/min/close, ticks in debt,
+trailing-year net, strategic decisions (drained from the `corp_decision_ring` with saturation
+guarded), holdings delta. `--played` runs the shipped warm start (player slot strategically
+passive); the mode delta separates acting from endowment. Report-first on the
+`road_reach_census` idiom — vacuity, first-seed determinism (`state_hash` + every closing
+balance) and ring attribution assert; the viability *verdict* rule deliberately does not
+(NR-647 puts it to Ben; NR-646 logs the delegated defaults). Live-Lua CMake-only target,
+ctest label `sweep` behind `IO_RUN_SWEEPS`. Built and run **in this Linux session** by
+extending the NR-264 lib-then-link recipe with Lua 5.4.7 + sol2 v3.5.0 from GitHub mirrors —
+the NR-558 "live-Lua harnesses can't build headless" gap is narrower than recorded, though the
+recipe stayed session-local rather than joining `build_harness.js`.
+
+**The data (8 seeds × 80 ticks, both modes, 1,664 corp-rows).** Every seed: 104 corps, 8
+named. **Zero of 64 named corps end solvent in either mode**; median close ≈ −113k cr, in
+debt by tick ~3 for 77–78 of 80 ticks, trailing net ≈ −2.7k/qtr *near-uniform across focus
+and holdings*. Background firms: 67% solvent, median +1.2k. The mode delta is noise at the
+median (played player-slot −115.5k vs spectate −116.8k) — endowment dominates acting — with
+one cautionary outlier: seed 1's player slot took ONE spectate action and closed 56k worse.
+
+**The cause — a three-step dated chain, each step sound alone (NR-648).** BL-476 (2026-08-19)
+seeds every *named* corp — never a background firm, Ben's own scoping call — a military_base
+plus a 50-head unit. BL-454 (2026-08-17) priced that unit at 6.0 cr/head/tick = **300 cr/qtr
+wages from tick 1**, before any income ramps, plus the base's maintenance floor and a goods
+draw (50 food_rations + 7 ordnance/tick) that drains sellable stock and starves
+`supply_factor` when unmet. BL-073's 2%/qtr debt interest then compounds the immediate debt
+~194× over the warm start: the fixed ~305/qtr alone digs −59k by tick 80. The near-identical
+craters across focus are the signature of interest-dominated dynamics — and the 2026-08-16
+`player_seed_sweep` (every seed positive) ran before upkeep existed and before rivals had
+armies, which is why nobody saw it coming. Options logged in NR-648 (retainer upkeep,
+warm-start interest grace, a funded form, hire-when-affordable), none chosen — the fix
+intersects BL-627 (corp spawn forms), which now waits on Ben's verdict-rule call (NR-647)
+and the forms session.
+
+**Docs.** CORPORATION_GENERATION.md Pass 4 rewritten: the stale seeded-range passage replaced
+with the new-charter design truth, viability-as-measured-floor, and spawn forms as a
+deliberate open design settled against the sweep data. `verifier-headless` skill and
+`tools/verify/README.md` gained the harness's entries.
+
+**Runtime.** ~2.5 h wall (the two 8-seed sweeps ran ~20 min each, in parallel). Design
+session → Light-plus delivery (harness + docs + stores, no `src/` touched).
+
+---
+
+## Session — The warm-start stall found and killed; settlements become visible (flood-field pathfinding; BL-625; NR-645) (2026-08-25)
 
 **Runtime:** ~3.5 h wall-clock. Modes in sequence: Design (perf assessment on Ben's "20 years
 of history hangs" report) → Delivery (the flood-field fix, Rule 0a-B) → branch surgery

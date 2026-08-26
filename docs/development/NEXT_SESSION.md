@@ -1,37 +1,42 @@
-# Next session — Sprint 20 design: corporation spawn forms & the viability pass
+# Next session — Sprint 20: read the sweep, rule on the army, settle the forms
 
-Ben's call (2026-08-25, closing the flood-field/BL-625 session): Sprint 20 is a **spawn
-viability pass** — gather data on corporation starts *before* the UI-truth work — and the
-**spawn forms need a design session first**.
+The 2026-08-26 session built and ran the spawn-viability sweep (BL-626, spawn viability
+sweep). The data is in and the headline is settled: **every named corp is insolvent by tick 3
+in every campaign-real seed**, and the cause is identified — the BL-476 starting army under
+BL-454 upkeep, compounded by BL-073 debt interest over the 80-tick warm start. Full data,
+arithmetic and options: NR-648. The devlog entry has the narrative.
 
-## What the session settles
+## What waits on Ben
 
-- The forms a corporation start can take (Ben: "there are a few forms for corporation starts
-  to take"). Owner doc on settling: `docs/generation/CORPORATION_GENERATION.md`.
-- The viability metric and its harness: measured over the real 80-tick warm start, relative
-  across forms on a fixed seed + rival field (absolute numbers are confounded by the open
-  economy pathologies — see the "economy tells the truth" theme).
+1. **The army ruling (NR-648).** Four options logged, none chosen: retainer upkeep for seeded
+   units, warm-start interest grace, a funded spawn form, or hire-when-affordable instead of
+   seeding. (a)/(b)/(d) are mechanical once ruled; (c) is the forms session.
+2. **The viability verdict rule (NR-647).** Which combination of solvent / earning / active
+   is "viable" — wanted before the forms session so the data is read against one definition.
+   Recommendation on file: runway (balance + 4× trailing net > 0) as headline, strict
+   solvent∧earning alongside.
+3. **The sweep defaults review (NR-646).** Spectate default, seeds 0..N-1, trailing-year
+   net, the active definition — delegated calls, reversible by flag.
+4. **The forms session (BL-627, corp spawn forms).** Candidate forms and constraints are in
+   the item; settle against the sweep data once 1–2 are ruled.
 
-## Evidence in hand (this session's dispatch triage)
+## Mechanics for whoever runs next
 
-- **The default start is insolvent**: Genom Systems opens at Cr −1, net −627/qtr, and
-  `dispatch_convoy` refuses a 2-unit haul on funds (wire test, 2026-08-25). Spawn viability
-  is not hypothetical.
-- Warm-start sweeps are newly affordable: gen + 12 ticks ≈ 20 s Release after the
-  flood-field fix. A 100-seed sweep is ~an hour; the world-snapshot cache (harness-truth
-  theme) would cut it further.
+- Sweep: `cmake --build build --target spawn_viability`, then
+  `spawn_viability [seeds] [ticks] [--played] [--lean] [--csv <path>]` from the repo root.
+  Ctest label `sweep` behind `IO_RUN_SWEEPS`. Data lands in `build_gen/verify/*.csv`
+  (gitignored — regenerate, don't hunt for it).
+- The 2026-08-26 session ran it on Linux by extending the NR-264 recipe with Lua 5.4.7 +
+  sol2 v3.5.0 (GitHub mirrors); folding that into `build_harness.js` would close part of the
+  NR-558 live-Lua gap — unfiled, mention-only.
 
-## Cautions carried from the close-out discussion
+## Carried debts (unchanged from the 2026-08-25 close-out)
 
-1. One deliberate baseline re-bless wave at the end of the pass, with provenance — not a
-   dribble (NR-596 precedent).
-2. Rivals must be able to bootstrap every spawn form ("never on cash" availability ruling:
-   a corp with no stock and no market access may have no legal candidates) — track rival
-   trajectories per form, or dead corps poison the seed's data.
-3. `--serve`'s 12-tick default understates the app's 80-tick warm start (`main.cpp` comment
-   is stale) — align before trusting sweep numbers.
-4. Design before cut (the NR-102 drift rule): settle the forms, then open the sprint.
-5. Owed regardless of theme: the live-click debt (dispatch form, Throughput lens container
-   access — three sprints running) goes in Sprint 20's definition of done. The dispatch
-   form's remaining UX fixes (pool-stock pre-check, priced-leg preview in the form) await
-   Ben's A/backlog-or-B/build-now call.
+- Two live clicks owed: dispatch form, Throughput lens (container access, three sprints
+  running) — in Sprint 20's definition of done.
+- Dispatch form UX fixes (pool-stock pre-check, priced-leg preview) await Ben's
+  A/backlog-or-B/build-now call.
+- One deliberate baseline re-bless wave at the END of the viability pass, with provenance
+  (NR-596 precedent) — not a dribble.
+- `--serve`'s 12-tick default vs the app's 80 (stale `main.cpp` comment) — align before
+  trusting wire-test numbers against sweep numbers.
