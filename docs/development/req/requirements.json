@@ -4134,6 +4134,63 @@
      "notes": ""
     }
    ]
+  },
+  {
+   "brief": "pass6-density-retune",
+   "batch": "sprint-20-wave-5",
+   "status": "open",
+   "title": "BL-655 - density recovers against the corrected demand basis, without gluts",
+   "promoted_from": "backlog.json BL-655 (PASS6_DENSITY_RETUNE)",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census before/after",
+      "headless: corp and building counts"
+     ],
+     "requirement": "THE DEMAND LEVER IS TRIED FIRST: per-scale-point basket weights (POPULATION.md cost of living) are raised, and the resulting corp count, operating-building count and price consequence are REPORTED before any change to Pass 6 target fraction is considered.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: measured, reported"
+     ],
+     "requirement": "THE GATE. Background-firm density recovers materially toward the pre-BL-640 world (584 buildings / 104 corps) - state the achieved numbers; do not assert a magic target. A partial recovery honestly reported beats a number reached by a lever that means something else.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census price columns",
+      "headless: econ_stability"
+     ],
+     "requirement": "PRICES HOLD. Report the price consequence per resource. A density reached by pinning prices at the band floor is a FAILURE of this route and must be reported as one, not passed.",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "review: the diff and its comment name the choice"
+     ],
+     "requirement": "If the demand lever cannot reach it, the Pass 6 target-fraction fallback is taken AND RECORDED AS A DELIBERATE OVERSUPPLY, naming the glut it creates. Never taken silently.",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census",
+      "headless: chain_depth"
+     ],
+     "requirement": "NO REGRESSION OF BL-640: no good returns to the census list a basket names it but the band cannot make or dig, and chain_depth red count does not rise above 8.",
+     "notes": ""
+    }
+   ]
   }
  ]
 }
