@@ -99,6 +99,14 @@ enum class corp_verb : uint8_t
     // grant covers a rival razing, so the verb exists on the seam (player /
     // agent reach) and the scorer never emits it.
     raze_centre,       ///< `corp` razes population centre `subject`. Occupation-context: requires the corp's own military presence (a unit) on the centre's body. Demotes to the razed tier (BL-624) — population zeroed, entity/name/tile/urban ground kept, the province anchor survives; the growth pass re-settles at a reduced gate.
+    // --- BL-628: the whole-firm buyout (2026-08-26) ---
+    // Appended AFTER raze_centre, same append-only rule. THIS VERB IS UNLIKE
+    // EVERY OTHER ONE ON THE SEAM: the rest move goods, credits, units,
+    // sentiment or a building; this one ERASES AN ACTOR. Nothing else in the
+    // codebase removes a corporation, which is why the whole-world dissolution
+    // walk (corp_command.cpp § dissolve_into) is the substance of the verb and
+    // the price is the easy half. FINANCE.md § Whole-firm acquisition.
+    buy_corporation,   ///< `corp` buys `counterparty` (a PUBLIC corporation) outright at `book_value + k_acquisition_multiple x trailing_net + balance`, floored at 0. Holdings, pools, balance and filed returns transfer; the target is dissolved. Never a fractional stake — there is no equity relation to hold.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -108,7 +116,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::raze_centre) + 1;
+    static_cast<uint8_t>(corp_verb::buy_corporation) + 1;
 
 /// Ceiling on one corporation's outstanding sell orders. The book is now
 /// reachable by command, so it is reachable by a scorer with a bug in it — this
@@ -252,6 +260,62 @@ enum class corp_command_result : uint8_t
 corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                                        const corp_command& cmd,
                                        entity_id* out_building = nullptr);
+
+// ---------------------------------------------------------------------------
+// BL-628 — the acquisition price (docs/economy/FINANCE.md § Whole-firm acquisition)
+// ---------------------------------------------------------------------------
+// Exposed rather than kept file-local for two reasons that will both be used:
+// the profitability ledger has to SHOW the price beside the row it would buy
+// (BL-627), and the rival scorer has to carry it as a candidate's `spend`
+// (BL-629). Neither may re-derive the arithmetic; there is one formula.
+
+/// Mean `net` over @p c's last `k_acquisition_trailing_quarters` filed returns,
+/// or over however many it has if it is younger. 0 for a firm that has never
+/// filed — which the seam refuses to price at all, so this value is never the
+/// thing that makes such a firm cheap.
+///
+/// **WHAT THIS CANNOT SEE, stated because it changes what the price means.** A
+/// filed return records the MONEY LOOP only (FINANCE.md § The quarterly return).
+/// National transfers and mercenary-contract payouts land after `apply_budget`
+/// in the same tick (`app.cpp`: `apply_budget` then `run_nation_step`), so a
+/// corporation earning through contracts reads as less profitable on its own
+/// returns than it is, and THIS VERB UNDERVALUES IT BY EXACTLY THAT GAP. Closing
+/// it is owed work filed as NR-655, deliberately not papered over here: the price
+/// is built as FINANCE.md specifies, and `tools/verify/whole_firm_buyout.cpp`
+/// row X states the exposure with a measured number rather than choosing a
+/// fixture that hides it.
+///
+/// @param c The target corporation.
+/// @return  Mean quarterly net over the trailing window; 0 with no filed returns.
+float corp_trailing_net(const corporation_component& c);
+
+/// The whole-firm acquisition price of @p target:
+/// `max(0, book_value + multiple * trailing_net + balance)`.
+///
+/// `book_value` is the LAST FILED return's — historical cost as disclosed, not a
+/// live recompute, because the doc's premise is that the price is read off the
+/// returns and a buyer must be able to reproduce it from the ledger surface.
+/// `balance` is the LIVE component balance, because the buyer receives exactly
+/// that cash and the doc's word is "cheaper by exactly what it owes"; at a tick
+/// boundary (where every command applies) the two coincide, since `apply_budget`
+/// files the closing balance it just wrote.
+///
+/// A NON-FINITE result is RETURNED AS-IS rather than floored, so a caller can
+/// tell "worthless" from "unpriceable": a corrupt filed return must reject the
+/// command, and applying the zero floor first would quietly turn a NaN into a
+/// free corporation (`NaN > 0` is false). Every caller must test the result's
+/// finiteness before spending against it.
+///
+/// Nothing clamps the profit term: a chronically loss-making firm prices below
+/// its book value, and should. The floor is ZERO and deliberately not book value
+/// — there is no salvage in the prototype, so book value is not a redemption
+/// anyone could take, and the price is a SINK (a public firm's sellers are a
+/// diffuse shareholder base, not a modelled actor).
+///
+/// @param target   The corporation being priced.
+/// @param multiple `economy.acquisition.multiple` (recipe_registry::acquisition()).
+/// @return         The price in credits, >= 0. 0 for a firm that has never filed.
+float corp_acquisition_price(const corporation_component& target, float multiple);
 
 // ---------------------------------------------------------------------------
 // Decision log (the AI's legibility surface / replay artifact)

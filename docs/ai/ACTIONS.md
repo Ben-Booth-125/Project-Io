@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*147 entries — 28 gameplay · 25 canvas · 14 lens · 47 ledger · 33 chrome.*
+*148 entries — 29 gameplay · 25 canvas · 14 lens · 47 ledger · 33 chrome.*
 
 ---
 
@@ -555,6 +555,25 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** The centre is DEMOTED, never erased (BL-624): population 0, scale 1, razed set; entity, name, tile record and urban land-use stamp all kept — razed ground reads as historied, and the extraction it blocked stays blocked. The centre still anchors its province (a ruin can be captured, so razing never deletes a conquest handle); the live province holder is not rewritten — the conquest consequence belongs to BL-518. While razed it contributes no labour, demand, agglomeration or habitability weight; the ordinary growth pass re-settles it at a reduced gate (half the promotion window) back to scale 1 with a small seed population.
 
 **Reason to select.** The strongest act against a settlement: passive decline only shrinks (scale floors at 1), and razing knocks it to the razed tier. An occupier razes to null the centre's economy without deleting the province's capture anchor — rare by design, because occupying is almost always worth more than ash, and the ruin re-settles cheaply if conditions return.
+
+### `gameplay.buy_corporation` — Seam-only for now (BL-628, whole-firm acquisition): a corp_verb issued against the corp-command seam (ProjectIo --serve, COMMAND opcode). The press that will host it is the Profitability ledger's buyout control (BL-627, profitability ledger) — the only surface that reads another corporation's filed return, and therefore the only one that can show the price before it is paid.
+
+**Press.** Over the seam: COMMAND corp=<id> verb=28 counterparty=<target corp id>. No other field is read.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `counterparty` | `entity_id` | The corporation to buy OUTRIGHT. Never a fractional stake — there is no equity relation, no share count and no controlling-holder threshold anywhere in the model, so this verb moves a whole firm in one step or not at all. |
+
+**Valid when:**
+- `counterparty` names a real corporation, is not null, and is not the acting corp itself (rejected_invalid otherwise). An id that FITS entity_id's domain but names nothing is still refused — fitting is not existing.
+- The target is not the player's corporation, by either `is_player` or `world::player_entity` (rejected_state otherwise).
+- The target's `ownership_class` is PUBLIC. A private or closed firm has no filed return to price it from and no negotiation verb yet (rejected_state otherwise).
+- The target has actually filed at least one quarterly return — a public firm that has never reached apply_budget cannot be priced from an empty ledger (rejected_state otherwise).
+- The acting corp's balance covers the price, under the solvency gate every spend takes (rejected_funds otherwise). A price that computes non-finite from a corrupt filed return is refused outright (rejected_invalid) rather than spent.
+
+**Expected output.** The price is `max(0, book_value + k_acquisition_multiple x trailing_net + balance)` — book_value from the target's LAST filed return (historical cost, as disclosed), trailing_net the mean `net` over its last 8 filed quarters (fewer if younger), balance its live signed cash, and k authored in scripts/economy.lua. Nothing clamps the profit term, so a chronically loss-making firm prices BELOW its book value; the only floor is zero, and the price is a SINK (a public firm's sellers are a diffuse shareholder base, not a modelled actor). On success the target's holdings, (corp, body) stockpile pools, balance and filed returns transfer to the acquirer and the target is DISSOLVED — the only verb in the game that erases an actor. hq_building / influence_range recompute over the merged holding set (the buyer's home body is kept); units re-point to the new owner through their recorded muster_base; convoys in flight, trade routes, accepted procurement contracts and mercenary contracts transfer; open market orders and live procurement quotes are CANCELLED rather than reassigned, because an order is a promise made by a party that no longer exists; live battles naming the target end; and its sentiment rows, stance rows, embargo predicate, earned techs and scalar modifiers are dropped. An `equity_taken` sentiment factor is emitted against the acquirer, observed by every surviving corporation.
+
+**Reason to select.** Buy a whole competitor rather than out-build it: its holdings, stock, cash and production arrive in one step, priced off a record it published itself. A firm whose filed returns read badly is cheap by exactly the amount the ledger says it is losing — so the verb rewards reading the Profitability ledger before anyone else does. Note that a firm earning through mercenary or procurement contracts reads as less profitable than it is (a filed return sees the money loop only), so it prices below what it is worth.
 
 ---
 

@@ -23,6 +23,12 @@
 #include <algorithm>
 #include <cassert> // BL-388: build-seam recipe-forwarding assertion
 #include <cmath>
+#include <cstddef> // BL-628: std::ptrdiff_t in the dissolution walk's vector erases
+#include <iterator> // BL-628: std::next, over the erase-while-walking sets
+#include <limits>  // BL-628: the HQ recompute's nearest-centroid search
+#include <set>     // BL-628: the stance tables the dissolution walk drops from
+#include <utility> // BL-628: std::pair / std::make_pair over the (corp, body) keys
+#include <vector>
 
 namespace {
 
@@ -305,6 +311,415 @@ std::size_t corp_order_count(const world& w, entity_id corp)
     return n;
 }
 
+// ---------------------------------------------------------------------------
+// BL-628 — the whole-firm buyout's dissolution walk
+// ---------------------------------------------------------------------------
+// THIS IS THE ONLY PLACE IN THE CODEBASE THAT ERASES AN ACTOR. Every other verb
+// moves goods, credits, units, sentiment or one building; `demolish_building`
+// (construction.cpp) is the nearest precedent and it erases exactly three things
+// (the building, the corp asset, the building stockpile) with a fourth —
+// orphaned units — swept up later by the upkeep pass (FINANCE.md § Standing-force
+// upkeep). A corporation is referenced by far more stores than that, and the
+// sweep cannot be deferred to a later pass the way an orphaned unit's can: once
+// the corp id is gone, no pass can recognise a row that names it.
+//
+// THE INVENTORY BELOW IS THE REQUIREMENT (R4). It was built by walking every
+// container in world.hpp that holds an `entity_id` naming a corporation. If a
+// future change adds another, it belongs here — and `whole_firm_buyout.cpp`
+// row R4 is the check that will notice, because it re-scans the world for ANY
+// surviving reference rather than asserting against a hand-written list.
+//
+// Three dispositions, and which one a store gets is a design decision, not a
+// convenience:
+//
+//   TRANSFER — the thing is property, and property is what was bought. Holdings,
+//              (corp, body) pools, balance, filed returns, units, convoys in
+//              flight, trade routes, accepted procurement contracts, accepted
+//              mercenary contracts.
+//   CANCEL   — the thing is a PROMISE made by a party that no longer exists, and
+//              there is nobody left to keep it. Open sell/buy orders (FINANCE.md
+//              says this in as many words), live procurement quotes, live battles.
+//   DROP     — the thing is an OPINION, a permission or a capability that was the
+//              dissolved firm's alone, and inheriting it would invent a fact.
+//              Sentiment rows, stance rows, the embargo predicate, earned techs,
+//              scalar modifiers.
+
+/// Odd-r offset (col,row) -> unit-hex local centre (hex_size = 1).
+///
+/// DUPLICATED from `corporation_generation.cpp`'s file-local `hex_unit_centre`;
+/// see `recompute_hq` below for why, and for what is owed.
+std::pair<float, float> buyout_hex_unit_centre(int col, int row)
+{
+    constexpr float kSqrt3 = 1.7320508075688772f;
+    const float x = kSqrt3 * static_cast<float>(col)
+                  + ((row & 1) ? kSqrt3 * 0.5f : 0.0f);
+    const float y = 1.5f * static_cast<float>(row);
+    return { x, y };
+}
+
+/// Re-designate @p cc's HQ and influence range over its (now merged) holding
+/// set, by Pass 3b's rule: the HQ is the holding nearest the holdings centroid
+/// on the corp's home body, and the range is the furthest holding's distance
+/// from that HQ plus a fixed projected reach. A corp with no holdings on the
+/// home body keeps `{null_entity, 0}` — no border.
+///
+/// The home body is the body of the corp's FIRST surviving holding, which after
+/// a buyout is one of the ACQUIRER's own (the target's holdings are appended
+/// after them) — so an acquisition never relocates the acquirer's seat to the
+/// bought firm's world. That is deliberate: the buyer's identity survives the
+/// purchase.
+///
+/// **OWED: this duplicates `designate_hq` / `corp_home_body`, both file-local to
+/// `corporation_generation.cpp`.** Hoisting the pair into a shared seam is the
+/// right fix and was NOT taken here because that file is owned by a concurrent
+/// task in this same wave. The constant below must stay in step with
+/// `kProjectedReachUnits` there until it is.
+void recompute_hq(const world& w, corporation_component& cc)
+{
+    constexpr float kProjectedReachUnits = 2.5f; // == corporation_generation.cpp's
+
+    cc.hq_building     = null_entity;
+    cc.influence_range = 0.0f;
+
+    // Home body = the body of the first holding that still resolves to a tile.
+    entity_id home_body = null_entity;
+    for (const entity_id b : cc.assets)
+    {
+        const auto bit = w.buildings.find(b);
+        if (bit == w.buildings.end())
+            continue;
+        const auto tit = w.tiles.find(bit->second.tile);
+        if (tit != w.tiles.end()) { home_body = tit->second.body; break; }
+    }
+    if (home_body == null_entity)
+        return;
+
+    // Walk `assets` in its own order — a vector, so this is deterministic
+    // whatever the building map's layout.
+    std::vector<std::pair<entity_id, std::pair<float, float>>> pts;
+    pts.reserve(cc.assets.size());
+    for (const entity_id bid : cc.assets)
+    {
+        const auto b = w.buildings.find(bid);
+        if (b == w.buildings.end())
+            continue;
+        const auto t = w.tiles.find(b->second.tile);
+        if (t == w.tiles.end() || t->second.body != home_body)
+            continue;
+        pts.emplace_back(bid, buyout_hex_unit_centre(t->second.grid_x, t->second.grid_y));
+    }
+    if (pts.empty())
+        return;
+
+    float cx = 0.0f, cy = 0.0f;
+    for (const auto& p : pts) { cx += p.second.first; cy += p.second.second; }
+    cx /= static_cast<float>(pts.size());
+    cy /= static_cast<float>(pts.size());
+
+    entity_id               hq   = pts.front().first;
+    std::pair<float, float> hq_c = pts.front().second;
+    float                   best = std::numeric_limits<float>::max();
+    for (const auto& p : pts)
+    {
+        const float dx = p.second.first - cx, dy = p.second.second - cy;
+        const float d2 = dx * dx + dy * dy;
+        if (d2 < best) { best = d2; hq = p.first; hq_c = p.second; }
+    }
+
+    float max_d = 0.0f;
+    for (const auto& p : pts)
+    {
+        const float dx = p.second.first - hq_c.first, dy = p.second.second - hq_c.second;
+        max_d = std::max(max_d, std::sqrt(dx * dx + dy * dy));
+    }
+    cc.hq_building     = hq;
+    cc.influence_range = max_d + kProjectedReachUnits;
+}
+
+/// Merge @p src's filed returns into @p dst's, PAIRWISE FROM THE NEWEST END.
+///
+/// **This is an interpretive call and it is flagged as one.** FINANCE.md says the
+/// target's filed returns "move to the acquirer" and does not say how two
+/// histories combine. Concatenation is not available: `quarterly_return` carries
+/// no tick field (by design — one row per corp per tick, appended in order), so
+/// there is no key to interleave two histories by, and appending would produce a
+/// record with two rows for the same quarter. Both vectors ARE contemporaneous —
+/// oldest first, newest last, one row per economy tick — so aligning them at the
+/// newest end is the only join the data structure actually supports.
+///
+/// What the merge means: the result is a PRO-FORMA combined history — what the
+/// merged firm's last N quarters would have read as, had it always been one firm.
+/// Flows and `net` sum; `balance` sums (combined cash); `holdings` and
+/// `book_value` sum (they are stocks, and the merged firm's holdings ARE the
+/// sum). The length is the longer of the two, capped at the retention window.
+///
+/// The consequence worth stating: the acquirer's own `trailing_net` afterwards
+/// reflects both firms' earnings, so a second buyer prices the merged firm off
+/// the merged record. That is the behaviour you want, and it is why summation is
+/// preferred to simply discarding the target's history.
+void merge_returns(std::vector<quarterly_return>& dst,
+                   const std::vector<quarterly_return>& src)
+{
+    if (src.empty())
+        return;
+
+    const std::size_t n = std::max(dst.size(), src.size());
+    std::vector<quarterly_return> out;
+    out.reserve(n);
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        // `back` counts BACK from the newest row of each history; 1 == newest.
+        const std::size_t back = n - i;
+        quarterly_return  row{};
+        const quarterly_return* a =
+            (dst.size() >= back) ? &dst[dst.size() - back] : nullptr;
+        const quarterly_return* b =
+            (src.size() >= back) ? &src[src.size() - back] : nullptr;
+        if (a) row = *a;
+        if (b)
+        {
+            row.income      += b->income;
+            row.expenditure += b->expenditure;
+            row.maintenance += b->maintenance;
+            row.wages       += b->wages;
+            row.interest    += b->interest;
+            row.levies      += b->levies;
+            row.upkeep      += b->upkeep;
+            row.net         += b->net;
+            row.balance     += b->balance;
+            row.holdings    += b->holdings;
+            row.book_value  += b->book_value;
+        }
+        out.push_back(row);
+    }
+    if (out.size() > k_quarterly_return_retention)
+        out.erase(out.begin(),
+                  out.begin()
+                      + static_cast<std::ptrdiff_t>(out.size()
+                                                    - k_quarterly_return_retention));
+    dst = std::move(out);
+}
+
+/// Transfer everything @p target owns to @p acquirer, then erase @p target from
+/// the world. Both ids name live corporations; the caller has already priced the
+/// firm and taken the payment. Reads no clock, no RNG, and no unordered
+/// container's ORDER — only its contents.
+void dissolve_into(world& w, entity_id acquirer, entity_id target)
+{
+    corporation_component& acq = w.corporations.at(acquirer);
+    // By VALUE: the source row is erased at the end of this function, and half the
+    // walk below would otherwise be reading through a reference into a map it is
+    // about to invalidate.
+    const corporation_component tgt = w.corporations.at(target);
+
+    // --- TRANSFER: holdings -------------------------------------------------
+    // Appended AFTER the acquirer's own, so `assets` order stays "the buyer's
+    // first" and `recompute_hq` keeps the buyer's home body.
+    acq.assets.insert(acq.assets.end(), tgt.assets.begin(), tgt.assets.end());
+
+    // --- TRANSFER: balance --------------------------------------------------
+    // Signed: buying a firm buys its cash AND its debts (FINANCE.md).
+    acq.balance += tgt.balance;
+
+    // --- TRANSFER: filed returns -------------------------------------------
+    merge_returns(acq.returns, tgt.returns);
+
+    // --- TRANSFER: (corp, body) stockpile pools ----------------------------
+    // Collected first, then merged, then erased: `pool_for` INSERTS, and mutating
+    // the map mid-walk is the kind of thing that reads fine and is wrong. The
+    // walk is over a std::map, so it is a sorted walk by (corp, body) — BL-158.
+    {
+        std::vector<std::pair<entity_id, stockpile_component>> moving;
+        for (auto it = w.corp_body_pools.lower_bound({target, entity_id{0}});
+             it != w.corp_body_pools.end() && it->first.first == target; ++it)
+            moving.emplace_back(it->first.second, it->second);
+        for (const auto& mv : moving)
+        {
+            w.corp_body_pools.erase(std::make_pair(target, mv.first));
+            stockpile_component& dst = w.pool_for(acquirer, mv.first);
+            for (std::size_t r = 0; r < resource_count; ++r)
+                dst.quantities[r] += mv.second.quantities[r];
+        }
+    }
+
+    // --- TRANSFER: workforce supply overrides ------------------------------
+    // The acquirer now runs the target's buildings on those bodies, so the
+    // authored labour supply follows the holdings. Where BOTH corps had a row on
+    // one body the acquirer's own is KEPT rather than summed: the override is
+    // "labour available to this corp here", and two firms drawing on one body's
+    // labour were never drawing on disjoint pools, so adding them would mint
+    // workers the body does not have.
+    {
+        std::vector<std::pair<entity_id, float>> moving;
+        for (auto it = w.workforce_supply_overrides.lower_bound({target, entity_id{0}});
+             it != w.workforce_supply_overrides.end() && it->first.first == target; ++it)
+            moving.emplace_back(it->first.second, it->second);
+        for (const auto& mv : moving)
+        {
+            w.workforce_supply_overrides.erase(std::make_pair(target, mv.first));
+            w.workforce_supply_overrides.emplace(std::make_pair(acquirer, mv.first), mv.second);
+        }
+    }
+
+    // --- TRANSFER: units, re-pointed THROUGH THEIR MUSTER BASE -------------
+    // Not a blanket `owner = acquirer`: the unit follows the corp that now owns
+    // the base it was raised at (`unit_component::muster_base`, the same key the
+    // upkeep pass's orphan sweep reads). After the holdings transfer above that
+    // resolves to the acquirer for every one of the target's bases — but going
+    // THROUGH the base rather than around it is what keeps this correct if a
+    // holding ever moves by some other route. A unit whose base has already been
+    // demolished has no owner to inherit from and falls back to the acquirer; the
+    // upkeep pass then disbands it exactly as it would have.
+    // Order-independent: a per-element assignment, so the unordered walk is safe.
+    for (auto& uit : w.units)
+    {
+        unit_component& uc = uit.second;
+        if (uc.owner != target)
+            continue;
+        const entity_id via = (uc.muster_base != null_entity)
+                                  ? owner_corp_of(w, uc.muster_base)
+                                  : null_entity;
+        uc.owner = (via != null_entity) ? via : acquirer;
+    }
+
+    // --- TRANSFER: convoys in flight ---------------------------------------
+    // A convoy is CARGO, not a promise: the goods left the source pool at
+    // dispatch and the haul is already paid for (`cost_paid`). Cancelling one
+    // would have to invent a return leg or destroy the stock — the same argument
+    // `hold_convoy` makes for not being a cancel.
+    for (convoy_component& c : w.convoys)
+        if (c.corp == target)
+            c.corp = acquirer;
+
+    // --- TRANSFER: trade routes, merging any pair that collides ------------
+    // A route is keyed (unordered body pair, corp), so re-pointing can produce
+    // two rows with the same key. They are folded into the FIRST such row —
+    // counts summed, last-traffic stamp taken as the later — so the fog reads one
+    // lane, not two. Walked in vector order; the erase is by index, descending,
+    // so no surviving row's position shifts under a pending removal.
+    for (trade_route& r : w.trade_routes)
+        if (r.corp == target)
+            r.corp = acquirer;
+    {
+        std::vector<std::size_t> drop;
+        for (std::size_t i = 0; i < w.trade_routes.size(); ++i)
+        {
+            if (std::find(drop.begin(), drop.end(), i) != drop.end())
+                continue;
+            for (std::size_t j = i + 1; j < w.trade_routes.size(); ++j)
+            {
+                if (std::find(drop.begin(), drop.end(), j) != drop.end())
+                    continue;
+                const trade_route& a = w.trade_routes[i];
+                const trade_route& b = w.trade_routes[j];
+                const bool same_pair = (a.body_a == b.body_a && a.body_b == b.body_b)
+                                    || (a.body_a == b.body_b && a.body_b == b.body_a);
+                if (!same_pair || a.corp != b.corp)
+                    continue;
+                w.trade_routes[i].convoy_count += b.convoy_count;
+                w.trade_routes[i].last_tick = std::max(a.last_tick, b.last_tick);
+                drop.push_back(j);
+            }
+        }
+        std::sort(drop.begin(), drop.end());
+        for (auto it = drop.rbegin(); it != drop.rend(); ++it)
+            w.trade_routes.erase(w.trade_routes.begin() + static_cast<std::ptrdiff_t>(*it));
+    }
+
+    // --- CANCEL: the order book --------------------------------------------
+    // FINANCE.md, in as many words: open market orders are CANCELLED rather than
+    // reassigned — an order is a promise made by a party that no longer exists.
+    // Both sides of the book, though only the sell side has a press today.
+    w.sell_orders.erase(std::remove_if(w.sell_orders.begin(), w.sell_orders.end(),
+                                       [&](const sell_order& o) { return o.corp == target; }),
+                        w.sell_orders.end());
+    w.buy_orders.erase(std::remove_if(w.buy_orders.begin(), w.buy_orders.end(),
+                                      [&](const buy_order& o) { return o.corp == target; }),
+                       w.buy_orders.end());
+
+    // --- CANCEL: live procurement quotes -----------------------------------
+    // A quote is an unaccepted OFFER — the order book's argument exactly. Nothing
+    // has been paid and nobody is owed anything; the counterparty simply asks
+    // again if it still wants the goods.
+    w.procurement_quotes.erase(
+        std::remove_if(w.procurement_quotes.begin(), w.procurement_quotes.end(),
+                       [&](const procurement_quote& q)
+                       { return q.buyer == target || q.supplier == target; }),
+        w.procurement_quotes.end());
+
+    // --- TRANSFER: accepted procurement contracts --------------------------
+    // An ACCEPTED contract is different from a quote and from an order: a deposit
+    // has changed hands and delivery is part-paid, so it is an asset (or a
+    // liability) of the firm that was bought and it transfers with the rest. The
+    // one case that cannot transfer is a contract that would leave the acquirer on
+    // BOTH sides — there is no buying from yourself — and those are dropped, the
+    // deposit already paid staying paid.
+    for (procurement_contract& c : w.procurement_contracts)
+    {
+        if (c.buyer == target)    c.buyer    = acquirer;
+        if (c.supplier == target) c.supplier = acquirer;
+    }
+    w.procurement_contracts.erase(
+        std::remove_if(w.procurement_contracts.begin(), w.procurement_contracts.end(),
+                       [](const procurement_contract& c) { return c.buyer == c.supplier; }),
+        w.procurement_contracts.end());
+
+    // --- TRANSFER: mercenary contracts -------------------------------------
+    // The committed force transferred above (the `units` array is unchanged and
+    // those units are now the acquirer's), so the contractor follows it. The
+    // client is a NATION and is untouched. A terminal row is re-pointed too: it is
+    // the ledger's record of work done, and the firm that did it is now part of
+    // the acquirer.
+    for (mercenary_contract& c : w.mercenary_contracts)
+        if (c.contractor == target)
+            c.contractor = acquirer;
+
+    // --- CANCEL: live battles ----------------------------------------------
+    // A battle is a fight between two parties; one of them ceasing to exist ends
+    // it, and there is no honest way to substitute a combatant mid-engagement.
+    // The stance rows that opened it are dropped just below, so nothing re-opens
+    // it on the next tick.
+    w.battles.erase(std::remove_if(w.battles.begin(), w.battles.end(),
+                                   [&](const active_battle& b)
+                                   { return b.attacker == target || b.defender == target; }),
+                    w.battles.end());
+
+    // --- DROP: stance ------------------------------------------------------
+    // A declaration is about a party. Inheriting the target's hostilities would
+    // hand the acquirer wars it never declared, and inheriting its friendships
+    // would mint agreement the other side never gave (a friendship row is
+    // evidence BOTH corps chose it — stance.hpp's invariant 1).
+    const auto drop_pairs = [&](std::set<std::pair<entity_id, entity_id>>& s)
+    {
+        for (auto it = s.begin(); it != s.end();)
+            it = (it->first == target || it->second == target) ? s.erase(it) : std::next(it);
+    };
+    drop_pairs(w.corp_hostile_pairs);
+    drop_pairs(w.corp_friend_pairs);
+    drop_pairs(w.corp_friend_offers);
+
+    // --- DROP: sentiment rows ----------------------------------------------
+    // Sentiment is an OPINION held BY someone ABOUT someone. Both directions go:
+    // nobody has an opinion of a firm that no longer exists, and the dissolved
+    // firm's own opinions die with it. Merging them into the acquirer's rows would
+    // invent feelings neither party ever had.
+    for (auto it = w.sentiment.pairs.begin(); it != w.sentiment.pairs.end();)
+        it = (it->first.first == target || it->first.second == target)
+                 ? w.sentiment.pairs.erase(it)
+                 : std::next(it);
+
+    // --- DROP: permissions and capabilities that were the target's alone ---
+    w.corp_embargo_conditions.erase(target); // a refusal-to-deal predicate is the firm's own
+    w.earned_techs.erase(target);            // FINANCE.md lists what transfers; research is not on it
+    w.corp_modifiers.erase(target);          // scalar modifiers were applied TO that firm
+
+    // --- The seat, recomputed over the merged holding set -------------------
+    recompute_hq(w, acq);
+
+    // --- The actor is gone --------------------------------------------------
+    w.corporations.erase(target);
+}
+
 corp_command_result map_construction(construction_result r)
 {
     switch (r)
@@ -325,6 +740,52 @@ corp_command_result map_construction(construction_result r)
 }
 
 } // namespace
+
+// ---------------------------------------------------------------------------
+// BL-628 — the acquisition price (docs/economy/FINANCE.md § Whole-firm acquisition)
+// ---------------------------------------------------------------------------
+
+float corp_trailing_net(const corporation_component& c)
+{
+    if (c.returns.empty())
+        return 0.0f;
+
+    const std::size_t n = std::min(c.returns.size(), k_acquisition_trailing_quarters);
+    // Accumulated in DOUBLE and over the newest n rows in filed order, so the sum
+    // is a pure function of the record rather than of how the window happened to
+    // be walked. n is at most 8, so this cannot overflow anything.
+    double sum = 0.0;
+    for (std::size_t i = c.returns.size() - n; i < c.returns.size(); ++i)
+        sum += static_cast<double>(c.returns[i].net);
+    return static_cast<float>(sum / static_cast<double>(n));
+}
+
+float corp_acquisition_price(const corporation_component& target, float multiple)
+{
+    if (target.returns.empty())
+        return 0.0f; // never filed — the seam refuses to price it at all
+
+    const double book    = static_cast<double>(target.returns.back().book_value);
+    const double profit  = static_cast<double>(multiple)
+                         * static_cast<double>(corp_trailing_net(target));
+    const double cash    = static_cast<double>(target.balance);
+    const double priced  = book + profit + cash;
+
+    // A NON-FINITE PRICE IS PROPAGATED, NEVER FLOORED. This ordering is
+    // load-bearing and was put here by a harness failure, not by foresight: with
+    // the floor applied first, `NaN > 0.0` is false, so a corrupt filed return
+    // priced the firm at exactly ZERO and the seam's own `isfinite` guard saw a
+    // perfectly finite number. A corrupt record must reject the command, not
+    // hand the caller a free corporation.
+    if (!std::isfinite(priced))
+        return static_cast<float>(priced);
+
+    // The floor is ZERO and deliberately not book value — FINANCE.md § Whole-firm
+    // acquisition: there is no salvage in the prototype, so book value is not a
+    // redemption anyone could take, and the price is a SINK rather than a payment
+    // to a modelled seller. A firm priced at zero is worthless, stated plainly.
+    return (priced > 0.0) ? static_cast<float>(priced) : 0.0f;
+}
 
 corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                                        const corp_command& cmd,
@@ -1330,6 +1791,116 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             cit->second.population         = 0;
             cit->second.scale              = 1;
             cit->second.growth_accumulator = 0;
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::buy_corporation:
+        {
+            // BL-628, docs/economy/FINANCE.md § Whole-firm acquisition. The whole
+            // firm, never a fractional stake: there is no equity relation, no
+            // share count, no controlling-holder threshold and no dividend split
+            // anywhere in the model, so the verb moves a corporation in one step
+            // or not at all.
+            //
+            // EVERY CHECK BELOW RUNS BEFORE ANY MUTATION, and they are ordered
+            // cheapest-and-most-structural first. R2/R6 both turn on this: a
+            // refusal must leave the world byte-identical, and the one verb that
+            // erases an actor is the worst possible place to discover a
+            // half-applied command.
+            const entity_id target = cmd.counterparty;
+
+            // (1) Domain. `counterparty` is the field the wire already parses and
+            // range-checks against entity_id's own domain (agent_protocol.cpp);
+            // this is the seam's half of that pair, which the wire cannot do —
+            // fitting is not existing.
+            if (target == null_entity || target == cmd.corp)
+                return corp_command_result::rejected_invalid;
+            const auto tit = w.corporations.find(target);
+            if (tit == w.corporations.end())
+                return corp_command_result::rejected_invalid;
+
+            // (2) THE PLAYER'S CORP IS NOT BUYABLE THROUGH THIS SEAM.
+            //
+            // FINANCE.md's "who may be bought" rule is about ownership CLASS and
+            // says nothing about the player, because the design is written from
+            // the buyer's side. Read literally it would let a public player corp
+            // be erased — and erasing `w.player_entity`'s corporation leaves that
+            // field dangling, which is precisely the failure R4 exists to prevent,
+            // quite apart from ending the campaign without a rule granting it.
+            // Refused here rather than in `corp_ai.cpp` because the seam is where
+            // an invariant belongs: a scorer-side guard would not bind a wire
+            // caller. `is_player` OR the anchor id, since spectator mode (BL-409)
+            // degrades the flag while the anchor stays.
+            //
+            // ASSUMPTION, flagged for Ben: if the intended design is that a rival
+            // CAN buy the player out, this gate is the line to delete, and the
+            // dangling `player_entity` needs a rule of its own.
+            if (tit->second.is_player || target == w.player_entity)
+                return corp_command_result::rejected_state;
+
+            // (3) The class gate. A public firm files, so it can be priced; a
+            // private or closed one cannot be priced and has no negotiation verb.
+            if (tit->second.ownership_class != ownership_class::publicly_held)
+                return corp_command_result::rejected_state;
+
+            // (4) It must actually have filed. A public corporation that has not
+            // yet reached its first `apply_budget` has no book value, no trailing
+            // net and no disclosed record at all — pricing it at `max(0, balance)`
+            // would be inventing a price from an empty ledger, and pricing it at
+            // zero would make every brand-new public firm free. Refused instead.
+            if (tit->second.returns.empty())
+                return corp_command_result::rejected_state;
+
+            const float price = corp_acquisition_price(tit->second, reg.acquisition().multiple);
+            // Defence in depth against a NaN reaching a balance: the authored
+            // multiple is validated finite at load and every input is a
+            // serialised float, so this should be unreachable — but a NaN price
+            // would pass a `balance < price` test and silently poison the
+            // acquirer's balance forever.
+            if (!std::isfinite(price))
+                return corp_command_result::rejected_invalid;
+
+            // (5) The solvency gate, exactly as every other spend takes it
+            // (io-standing-rules § "Availability is cash-free; spending is not").
+            corporation_component& acq = w.corporations.at(cmd.corp);
+            if (acq.balance < price)
+                return corp_command_result::rejected_funds;
+
+            // --- COMMIT. Nothing below may fail. -----------------------------
+            // The price is a SINK, not a transfer: a public firm's sellers are a
+            // diffuse shareholder base, not a modelled actor, so there is nobody
+            // to credit. Same treatment construction already gives a build cost
+            // (a levy is explicitly a transfer BECAUSE an ordinary spend is not).
+            acq.balance -= price;
+            dissolve_into(w, cmd.corp, target);
+
+            // (6) The political cost. `equity_taken` — "the observer wanted a firm
+            // and the subject took it" (RELATIONS.md § The factors). Every corp
+            // that still exists and is not the acquirer is an observer: the
+            // acquisition market is open, so any of them could have bought the
+            // firm, and the design's own sentence puts the cost "on the rivals who
+            // wanted the same firm". Modelling WHICH rival wanted it would need a
+            // want the model does not carry.
+            //
+            // A sorted walk over `w.corporations` keys, not the unordered map's
+            // own order — the fold is order-independent by construction
+            // (sentiment.cpp canonicalises its batch), but the walk that GATHERS
+            // the events must still be deterministic. Weight is authored and
+            // currently zero, so this is inert until `economy.sentiment.factors`
+            // gives `equity_taken` a number; that inertness is BL-545's rule, not
+            // an omission.
+            {
+                std::vector<entity_id> observers;
+                observers.reserve(w.corporations.size());
+                for (const auto& kv : w.corporations)
+                    if (kv.first != cmd.corp)
+                        observers.push_back(kv.first);
+                std::sort(observers.begin(), observers.end());
+                for (const entity_id o : observers)
+                    w.note_conduct(reg.sentiment(), o, cmd.corp,
+                                   sentiment_factor_kind::equity_taken, 1.0f);
+            }
+
             return corp_command_result::applied;
         }
     }
