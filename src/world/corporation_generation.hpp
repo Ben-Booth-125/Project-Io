@@ -92,6 +92,52 @@ std::vector<entity_id> generate_corporations(
     const struct settlement_state* settle = nullptr,
     struct generation_progress* progress = nullptr);
 
+// ---------------------------------------------------------------------------
+// Pass 2b — ownership class (BL-631)
+//
+// Exposed rather than file-local for one reason: the ownership_class harness
+// has to check the MAPPING, not just its end-to-end consequences, and a check
+// that can only observe finished corporations cannot tell a correct derivation
+// from a lucky one. Both functions are pure: no rng parameter, no world, no
+// hidden state — which is what makes "the derivation consumes no additional
+// randomness" a property of the signature rather than a claim about the body.
+// ---------------------------------------------------------------------------
+
+/// Pass 2b's derivation: the ownership class a corporation anchored in @p p
+/// carries. Reads the SAME BL-218 industrialisation-timing scalar
+/// `focus_from_region` reads — never an authored table (BL-219's principle).
+///
+///  * never industrialised            -> `closed`   (no filing, no market in the firm)
+///  * industrialised after the median -> `private`  (it trades; its books are its own)
+///  * industrialised at or before it, under enforceable-promise institutions
+///                                    -> `public`   (it files, and it can be bought)
+///  * industrialised early but STATIST -> `private`
+///
+/// @param p        The corporation's home region.
+/// @param median   `settlement_state::median_industrial_year` (0 = nobody did).
+/// @param politics The home NATION's ideology — settlement.cpp derives it from
+///                 the same first-furnace record, so this adds no new signal.
+///                 It supplies only the enforceable-promise term; the region
+///                 stays the primary discriminator, so two corps in one nation
+///                 still differ (CORPORATION_GENERATION.md § Pass 2 -
+///                 "per-region, not per-nation, and that is the point").
+ownership_class ownership_from_region(const struct region& p,
+                                      int64_t median,
+                                      ideology politics);
+
+/// The no-home-region fallback: the same read one grain up, taken from the
+/// national character alone. Used by the rung-3 case (a nation the settlement
+/// pass never reached), by the whole no-settlement path, and by every BL-365
+/// background firm — which has a home nation but never a home region. Nothing
+/// here branches on `is_background`; the flag is not an input.
+///
+/// The nation's `politics` IS its industrialisation-timing tercile
+/// (settlement.cpp: never -> isolationist, early -> mercantile, mid ->
+/// technocratic, late -> authoritarian), so this is the region mapping with the
+/// tercile standing in for the region's own furnace year.
+ownership_class ownership_from_character(ideology politics);
+
+
 /// BL-365 — generate REAL background corporations (`is_background = true`) that
 /// produce and consume through the normal recipe/workforce/market pipeline,
 /// replacing the old abstract nation-substrate demand/supply injection

@@ -1104,6 +1104,31 @@ enum class industrial_focus : uint8_t
     trade       = 2, ///< Logistics and market operators; prefer port-adjacent tiles.
 };
 
+/// Whether a corporation's books and its equity are open to outsiders — Pass 2b
+/// of CORPORATION_GENERATION.md, design BL-631 (ownership class).
+///
+/// DERIVED, never authored. It reads the *same* BL-218 industrialisation-timing
+/// scalar Pass 2 already reads for focus (`region::industrialised`,
+/// `region::industrial_year` against `settlement_state::median_industrial_year`),
+/// plus the home nation's `politics` — which settlement.cpp derives from that
+/// same first-furnace record. There is no weighting table anywhere on this path:
+/// that is BL-219's principle, and it binds here exactly as it binds focus.
+///
+/// The enumerator names carry a trailing qualifier because `public` and
+/// `private` are C++ keywords; the design's words for them are *public*,
+/// *private* and *closed*.
+///
+/// The class does two jobs, both FINANCE.md's: it decides whether the corp files
+/// a quarterly return the player may read (§ Disclosure), and whether the corp
+/// may be bought outright (§ Whole-firm acquisition). Generation's part is only
+/// to derive the field.
+enum class ownership_class : uint8_t
+{
+    publicly_held  = 0, ///< *public* — early industrialiser, enforceable-promise institutions. Files; buyable.
+    privately_held = 1, ///< *private* — late or statist industrialiser. Exists and trades; its books are its own.
+    closed         = 2, ///< *closed* — never industrialised. No filing, no market in the firm at all.
+};
+
 // ---------------------------------------------------------------------------
 // The quarterly return (BL-626)
 // ---------------------------------------------------------------------------
@@ -1182,6 +1207,23 @@ struct corporation_component
 
     /// Primary industrial focus; drawn by Pass 2 (focus assignment).
     industrial_focus focus = ::industrial_focus::extraction;
+
+    /// Ownership class; DERIVED by Pass 2b (BL-631) from the corporation's home
+    /// region's industrialisation timing — the same read Pass 2 makes for
+    /// `focus` — with the home nation's `politics` supplying the
+    /// enforceable-promise term. A corporation with no home region (the rung-3
+    /// case, and every BL-365 background firm) takes it from the national
+    /// character instead, exactly as its focus does; nothing about the class
+    /// branches on `is_background`.
+    ///
+    /// SERIALISED (world_save.cpp's corp record, immediately after `focus`) —
+    /// `world_save_version` moved with it.
+    ///
+    /// The member deliberately shares its enum's name, as REFINED.md's symbol
+    /// contract for this slice specifies; the declaration qualifies the type
+    /// with `::` for that reason, and so must any later member of this struct
+    /// that needs it.
+    ::ownership_class ownership_class = ::ownership_class::closed;
 
     /// Starting capital in the economy's base currency unit; set by Pass 4.
     float starting_capital = 0.0f;

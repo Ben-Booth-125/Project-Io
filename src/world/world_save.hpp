@@ -176,17 +176,32 @@ inline constexpr uint32_t world_save_magic =
 /// contract as every prior bump. The reader additionally refuses a value
 /// other than 0/1 — the writer cannot have produced one.
 ///
-/// Bumped to 16 by BL-626 (quarterly return): the corporation record
-/// (`w_corp` / `r_corp`) gains `corporation_component::returns` — a
-/// count-prefixed run of eleven-field `quarterly_return` records, appended
-/// after `produced_ever`, in declaration order. A v15 stream's corporation
-/// records simply END there, so every container written after the corporations
-/// reads misaligned from the first one onward; it is refused whole on the same
-/// strict-equality contract as every prior bump. The reader additionally
-/// refuses a non-finite figure and a run longer than
-/// `k_quarterly_return_retention` — the writer, which trims to that bound
-/// every tick, cannot have produced either.
-inline constexpr uint32_t world_save_version = 16;
+/// Bumped 15 -> 17 by Sprint 20 wave 1, which landed TWO corporation-record
+/// changes concurrently from separate worktrees. They are stacked here rather
+/// than renumbered, because the constant is a strict-equality gate and never an
+/// offset into anything, so intermediate numbers cost nothing:
+///
+/// **16 — BL-626 (quarterly return).** The corporation record (`w_corp` /
+/// `r_corp`) gains `corporation_component::returns` — a count-prefixed run of
+/// eleven-field `quarterly_return` records, appended after `produced_ever`, in
+/// declaration order. An older stream's corporation records simply END there, so
+/// every container written after the corporations reads misaligned from the first
+/// one onward. The reader additionally refuses a non-finite figure and a run
+/// longer than `k_quarterly_return_retention` — the writer, which trims to that
+/// bound every tick, cannot have produced either.
+///
+/// **17 — BL-631 (ownership class).** The same record gains
+/// `corporation_component::ownership_class` — one enum byte immediately after
+/// `focus`, in declaration order. That is a MID-RECORD gap, so an older stream's
+/// corp records misread every field from `starting_capital` onward. The reader
+/// additionally refuses a value past `max_ownership` — the writer cannot have
+/// produced one.
+///
+/// Both are refused whole on the same strict-equality contract as every prior
+/// bump. Nothing in `tools/verify` asserts this value as a literal, by design:
+/// the checks name it symbolically, which is the only reason the stack above
+/// could be resolved at the merge without either slice's assertions breaking.
+inline constexpr uint32_t world_save_version = 17;
 
 /// Write @p w as a complete world snapshot.
 ///

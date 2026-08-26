@@ -114,6 +114,18 @@ int main()
     if (bid_building != null_entity)
         w.buildings.at(bid_building).wage_bid = 0.4375f;
 
+    // BL-631: `ownership_class` is a NEW persistent field in the corp record.
+    // A `no_prehistory()` world reaches it through the national-character
+    // fallback, which can class a whole world alike — so pin one corp to a
+    // distinctive value before the trip, or P1's byte-equality could pass over a
+    // uniform column. Lowest corp id, same discipline as the fixtures around it.
+    entity_id oc_corp = null_entity;
+    for (const auto& [cid, cc] : w.corporations)
+        if (oc_corp == null_entity || cid < oc_corp)
+            oc_corp = cid;
+    if (oc_corp != null_entity)
+        w.corporations.at(oc_corp).ownership_class = ownership_class::publicly_held;
+
     // BL-616: decline rides `growth_accumulator` as a NEGATIVE consecutive-
     // failure streak (no new persistent field, no version bump) — so make one
     // centre's accumulator negative before the round trip: a reader that
@@ -303,9 +315,16 @@ int main()
             // same record would shift with it. The whole stream is refused
             // instead -- a v4 save is not migrated, it is rejected, and the
             // destination is not touched.
-            static_assert(world_save_version == 16,
-                          "P9..P19 name v4..v15 as refused "
-                          "predecessors; re-read these rows on a bump");
+            // P9..P19 name v4..v14 as refused predecessors; P20 names the
+            // immediately-prior format symbolically. DELIBERATELY NOT PINNED TO A
+            // LITERAL: two slices each claimed a version in one wave from separate
+            // worktrees, so a literal here breaks whichever lands second and would
+            // be re-blessed rather than read. What must hold is the property the
+            // rows actually rest on -- every literal below is a PAST format, never
+            // the current one.
+            static_assert(world_save_version > 14,
+                          "P9..P19 name v4..v14 as refused predecessors; "
+                          "re-read these rows on a bump");
             std::string bad = bytes_once;
             const uint32_t v4 = 4;
             std::memcpy(&bad[4], &v4, sizeof v4);
@@ -427,18 +446,28 @@ int main()
             check(!from_bytes(bad, victim), "P19 a v14-versioned stream is refused");
         }
         {
-            // BL-626: the IMMEDIATE previous format. A v15 corporation record
-            // simply ENDS after `produced_ever`, where the count-prefixed
-            // `returns` run now continues -- so every container written after
-            // the corporations reads misaligned from the first one onward.
-            // Refused whole, same contract as every prior bump. Named through
-            // the constant: BL-631 is claiming the next version on another
-            // branch this wave, and a literal here would break at the stack.
+            // P20 (R5) -- the IMMEDIATELY PRIOR format, named through the constant
+            // rather than by number. Sprint 20 wave 1 put TWO changes in the corp
+            // record and this one row covers both:
+            //   BL-631: `ownership_class`, one enum byte after `focus` -- a
+            //     MID-RECORD gap, so a reader that accepted an older stream would
+            //     misread starting_capital / balance / is_player / is_background in
+            //     every corp, and everything serialised after `corporations` besides.
+            //   BL-626: `returns`, a count-prefixed run after `produced_ever` -- an
+            //     older corp record simply ENDS there, so every container written
+            //     after the corporations reads misaligned from the first one onward.
+            // Refused whole, same strict-equality contract as every prior bump.
+            //
+            // SYMBOLIC ON PURPOSE. Two slices claimed a version from separate
+            // worktrees in one wave; a literal here would have had to be re-pinned
+            // at the integration merge, which makes the check the thing that gets
+            // re-blessed. `world_save_version - 1` is true of whatever number the
+            // stack settles on -- and it is why this merge cost no assertion.
             std::string bad = bytes_once;
-            const uint32_t prior = world_save_version - 1u;
-            std::memcpy(&bad[4], &prior, sizeof prior);
+            const uint32_t prev = world_save_version - 1u;
+            std::memcpy(&bad[4], &prev, sizeof prev);
             check(!from_bytes(bad, victim),
-                  "P20 a stream at world_save_version - 1 is refused (BL-626's returns)");
+                  "P20 a stream at world_save_version - 1 is refused");
         }
         {
             // Truncated mid-way through the tile store -- far enough in that a
