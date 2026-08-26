@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*54 entries — 41 open, 13 resolved.*
+*62 entries — 49 open, 13 resolved.*
 
 ---
 
@@ -430,6 +430,62 @@ state_hash folds the fields a tick may mutate, but the population-centre record'
 The six T7/T8 intra-body dispatch assertions (shortfall dispatches one convoy, cost debit, cost arithmetic 0.4, the two 0.352 discounts, decommissioned-hub no-discount) fail identically when the harness is built against unmodified HEAD (5778a932) - verified in a throwaway worktree. So the drift predates the 2026-08-25 flood-field change; the likely suspect is a dispatch-gate landed since the harness's synthetic worlds were authored (e.g. BL-597's passive-LP draw refusing anchorless bodies), but that is unconfirmed. Needs a session to rebase the harness's synthetic worlds onto the current dispatch contract - not a weakening of the assertions.
 
 *Files: `tools/verify/logistics_harness.cpp`*
+
+### NR-646 — Disclosure is BINARY - reconciling 'private firms do not file' with 'retire the bands'
+*decision taken on your behalf · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
+
+Two of the same form's rulings pull opposite ways read literally: disclosure is gated by ownership class (public files, private/closed do not), AND BL-262's banding is retired because company information need not be invisible. Taken on Ben's behalf: disclosure is BINARY. A public firm shows exact figures, a private or closed one shows a dash, and there is no graded middle - which is precisely WHY the bands go rather than being re-scoped. A dash therefore always means 'this firm does not file', never 'you have not earned this'. Overturnable: the alternative is that private firms show a band, which keeps the banding machinery alive.
+
+*Files: `docs/economy/FINANCE.md`, `docs/politics/RELATIONS.md`*
+
+### NR-647 — Does the OPERATIONAL fog go too, or only the financial banding?
+*question · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
+
+'We don't need company information to be invisible' was said while retiring BL-262 (the banded standing read). BL-068's competitor-visibility rule in DISCOVERY.md is a separate and wider thing: a rival hover card shows type and owner only, no production rates, no stockpiles, and the doc's stated principle is that intelligence is earned by reasoning over public signals. Narrow reading: only the financial banding goes, operational internals stay private. Wide reading: the whole competitor fog goes. The narrow reading is the one this session wrote to, because the disclosure gate would be pointless under the wide one. DISCOVERY.md has NOT been edited pending the answer.
+
+*Files: `docs/ui/DISCOVERY.md`*
+
+### NR-648 — The buyout price is a SINK, and that is why the floor is zero
+*decision taken on your behalf · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
+
+A whole-firm price needs a floor, and there is no salvage in the prototype - construction.hpp refunds nothing on demolition and calls salvage a separate design question - so flooring at book value would invent a redemption nobody can take. Taken on Ben's behalf: the acquisition price is a SINK, the same treatment construction already gives a build cost (FINANCE.md calls a levy a transfer specifically BECAUSE an ordinary spend is not), and the floor is therefore zero because a sink cannot run backwards. A public firm's sellers are a diffuse shareholder base, not a modelled actor, so there is nobody a negative price could be paid by. The alternative worth considering: the price is a TRANSFER to the target's home nation treasury, which would give nations a stake in corporate churn.
+
+*Files: `docs/economy/FINANCE.md`*
+
+### NR-649 — The spawn shortlist does NOT solve the shallow-opening problem the corp-choice screen was built for
+*observation · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
+
+BL-435's selection screen existed on a MEASURED finding: over 24 seeds the generator handed the player a pure-extraction corp on 13 of them, so the chain-depth ladder had no rung to stand on, and player_seed_sweep records it. Solvency was explicitly NOT the discriminator - all 24 seeds ended positive. The replacement (BL-630, spawn shortlist) gates on VIABILITY, and a shallow pure-extraction corp is usually perfectly viable, so it will clear the floor every time. Retiring the screen therefore restores the exact distribution the screen was built to fix, unless the shortlist takes a second, DEPTH criterion alongside the viability one. Not filed as a blocker because BL-630 is buildable either way; the criterion is Ben's call.
+
+*Files: `docs/generation/CORPORATION_GENERATION.md`, `tools/verify/player_seed_sweep.cpp`*
+
+### NR-650 — The purged syndicate arc was still asserted by five authority docs three days after the purge
+*observation · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
+
+BL-524..BL-530 (the syndicate/equity tier) were purged on 2026-08-23, but GLOSSARY.md still carried a full Syndicate entry, and CONCEPT.md, SYSTEMS.md, RELATIONS.md and ROADMAP.md each asserted the two-tier ownership model as settled design. This session removed all five, since Ben's whole-firm ruling overturns the model outright. The general lesson is the one worth Ben's eye: a PURGE moves backlog prose but does not touch the authority docs the purged items had already written into, so a purge needs a doc sweep the way a landing does. PHANTOMS.md still carries five syndicate mentions - left alone deliberately, since it is a scan record of what was designed, not an authority.
+
+*Files: `docs/GLOSSARY.md`, `docs/CONCEPT.md`, `docs/SYSTEMS.md`, `docs/politics/RELATIONS.md`, `docs/development/ROADMAP.md`, `docs/development/PHANTOMS.md`*
+
+### NR-651 — Valuation lives in FINANCE.md, not MARKETS.md - a whole firm has no order book
+*decision taken on your behalf · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
+
+The purged BL-527 put corporation valuation in MARKETS.md on the argument that an equity price IS a price and belongs in resolve_price's existing machinery - band, EMA smoothing, order book. That argument depended on FRACTIONAL shares trading repeatedly. Ben's whole-firm ruling removes the repeated trade: a firm changes hands once, at a computed price, with no book and no counterparty to clear against. Taken on Ben's behalf: the valuation formula lives in FINANCE.md beside the money loop it reads, and MARKETS.md is untouched. Revisit only if fractional stakes ever return.
+
+*Files: `docs/economy/FINANCE.md`, `docs/economy/MARKETS.md`*
+
+### NR-652 — NOVEL: ownership transfer is a mechanic class no authority doc owned before this session
+*novel-work · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
+
+Flagged at the moment it arose, per the novelty rule. Every prior verb moves goods, credits, units or sentiment; the buyout moves an ACTOR - a corporation stops existing and its entire asset graph re-points. Nothing in the corpus owned that before 2026-08-26 (the nearest thing was the purged syndicate arc, and it deliberately avoided transfer by holding equity instead). It now has an owner - FINANCE.md § Whole-firm acquisition - so the flag is about SCOPE, not homelessness: dissolution touches the HQ/influence-range recompute, unit muster bases, open market orders, the save format and every surface that resolves a corp id. BL-628 is sized L for that reason and it is the item most likely to be under-scoped.
+
+*Files: `docs/economy/FINANCE.md`, `src/world/corp_command.cpp`*
+
+### NR-653 — Sprint 20 is not open, and its inherited debts are unchanged by this design
+*observation · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
+
+Ben ruled this ledger a SIBLING of the spawn-viability pass rather than its carrier, so Sprint 20's theme is unchanged and the sprint is still uncut - the design-before-cut ordering NEXT_SESSION.md names. Carried forward untouched by this session and still owed: the two live clicks (dispatch form, Throughput lens container access - three sprints running), the v0.1.18 tag Ben left uncut, and the dispatch form's remaining UX fixes awaiting an A/backlog-or-B/build-now call. Note also that BL-630 (spawn shortlist) and the viability pass BOTH move the warm start's ordering, so whichever lands second inherits the other's golden re-bless - they should share one wave, not two.
+
+*Files: `docs/development/NEXT_SESSION.md`, `docs/development/sprints.json`*
 
 ---
 

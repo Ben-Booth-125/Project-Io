@@ -1070,6 +1070,230 @@
    "authority_doc": "docs/ui/ICONS.md",
    "design": "@docs/development/archive/backlog-design-2026-Q3.json",
    "archived": "docs/development/archive/backlog-design-2026-Q3.json"
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": "v0.1.20",
+   "sprint": null,
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-626",
+   "short_name": "QUARTERLY_RETURN",
+   "category": "Economy",
+   "title": "The quarterly return - every corporation files a balance sheet each econ tick",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/budget_system.hpp",
+    "src/world/budget_system.cpp",
+    "src/world/components.hpp",
+    "src/world/world_save.cpp",
+    "tools/verify/",
+    "docs/economy/FINANCE.md"
+   ],
+   "design": "Design settled in FINANCE.md § The quarterly return (Ben, 2026-08-26). THE WORK: append a per-corp record at the end of apply_budget carrying corp_budget's seven flows, net(), the closing balance, assets.size() and book value (sum of registry build_cost over the holdings). Rolling 40 quarters, oldest dropped first. World state, so it versions the save format and appends in a sorted entity_id walk. It is a RETAIN, not a second computation - if the record can disagree with the loop the implementation is wrong. A harness assertion that the summed net over a run equals the balance delta is the check that keeps it honest."
+  },
+  {
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": "v0.1.20",
+   "sprint": null,
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-626",
+    "BL-631"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-627",
+   "short_name": "PROFITABILITY_LEDGER",
+   "category": "UI",
+   "title": "The profitability ledger - the whole field's filed returns, one row per corporation",
+   "authority_doc": "docs/ui/question_log.json",
+   "files": [
+    "src/ui/",
+    "docs/ui/question_log.json",
+    "docs/ui/ledgers/"
+   ],
+   "design": "The surface for BL-626 (quarterly return) and the host of the buyout press. DESIGN-OWED BY CONSTRUCTION, not by omission: its question_log.json pair - the question it answers, why it earns its space, the item that demanded it - is required on every surface and its wording is Ben's. What is already settled: a table, one row per corporation, refreshed each quarter; exact figures where the firm files and a dash where it does not (FINANCE.md § Disclosure); no bands anywhere. Open: which rail slot it takes, and whether it absorbs the financial half of the slot-8 Corporations table (docs/ui/ledgers/corporation.md carries that as its own open question)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 5,
+   "version_goal": "v0.1.20",
+   "sprint": null,
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-626",
+    "BL-631"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-628",
+   "short_name": "WHOLE_FIRM_BUYOUT",
+   "category": "Economy",
+   "title": "Whole-firm acquisition - buy a public corporation outright, holdings, pools, balance and all",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/corp_command.hpp",
+    "src/world/corp_command.cpp",
+    "src/world/components.hpp",
+    "scripts/economy.lua",
+    "docs/economy/FINANCE.md",
+    "docs/ai/ACTIONS.json"
+   ],
+   "design": "Design settled in FINANCE.md § Whole-firm acquisition (Ben, 2026-08-26). THE WORK: a buy_corporation verb on the corp_command seam. Price = max(0, book_value + k_acquisition_multiple x trailing_net + balance), trailing_net the mean over the last 8 filed quarters, k authored in economy.lua. Gated on the target's ownership_class == public. On success transfer holdings, pools, balance and filed returns, then dissolve the target - recompute hq_building/influence_range over the merged set, re-point units through muster_base, CANCEL open market orders rather than reassign them. Emit an equity_taken sentiment factor. Every field validated as the value that lands (the AI-facing-seam rule); a rejection mutates nothing. Updates its ACTIONS.json entry."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": "v0.1.20",
+   "sprint": null,
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-628"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-629",
+   "short_name": "RIVAL_ACQUISITION",
+   "category": "AI",
+   "title": "Rivals buy firms too - buy_corporation joins the scored-utility candidate list",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/corp_ai.hpp",
+    "docs/ai/AI_OPPONENT.md",
+    ".claude/rules/io-standing-rules.md"
+   ],
+   "design": "The symmetry half of BL-628 (whole-firm buyout), and a widening of the BL-202/BL-203 exception in its established shape: deterministic, seeded, scored-utility, a legal verb and never a planner. THE WORK: score buy_corporation in corp_ai.cpp's existing candidate list, capped at one acquisition per evaluation, its price carried in the candidate's spend under the solvency gate so a rival cannot buy itself below its reserve floor. Availability is gated on the target's ownership class, not on the acquirer's cash - the 'never on cash' ruling's shape. Record the grant in the standing rules with its date, as every prior widening is recorded."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 5,
+   "version_goal": "v0.1.20",
+   "sprint": null,
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-626"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-630",
+   "short_name": "SPAWN_SHORTLIST",
+   "category": "Generation",
+   "title": "The spawn shortlist - warm start in spectate, then seat the player on a viable corp at random",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/core/app.cpp",
+    "src/core/app.hpp",
+    "src/ui/startup_screens.cpp",
+    "src/core/verify_api.cpp",
+    "scripts/verify/corp_choice.lua",
+    "tools/verify/player_seed_sweep.cpp",
+    "docs/generation/CORPORATION_GENERATION.md",
+    "docs/ui/STARTUP.md"
+   ],
+   "design": "Design settled in CORPORATION_GENERATION.md § The spawn shortlist, and the seat, and STARTUP.md § The seat (Ben, 2026-08-26). THE WORK: move the 80-tick warm start ahead of seating and run it under corp_ai_params::spectating; shortlist the specialists clearing the viability floor (solvent at the end, trailing net over 8 quarters non-negative); draw one against the world seed and re-point is_player/player_entity. Remove app_screen::choosing_corp, draw_corp_choice_screen, build_corp_choices, apply_corp_choice, the Surprise me press, verify.show_corp_choice and scripts/verify/corp_choice.lua. THE COST, taken knowingly: every corp is scorer-driven through the warm start where the seated one used to be excluded, so every seed's opening moves and the goldens re-bless ONCE, in a single wave with dated provenance. player_seed_sweep --guard is re-pointed at the shortlist's properties. NOT SOLVED by this item: the shallow-opening distribution the old screen was built for - carried in the review queue."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": "v0.1.20",
+   "sprint": null,
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-631",
+   "short_name": "OWNERSHIP_CLASS",
+   "category": "Generation",
+   "title": "Ownership class - public, private or closed, derived from the region's industrialisation timing",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/corporation_generation.cpp",
+    "src/world/components.hpp",
+    "src/world/world_save.cpp",
+    "docs/generation/CORPORATION_GENERATION.md"
+   ],
+   "design": "Design settled in CORPORATION_GENERATION.md § Pass 2b (Ben, 2026-08-26). THE WORK: an ownership_class field on corporation_component, derived from the SAME BL-218 industrialisation-timing scalar Pass 2 already reads for focus - early industrialiser with strong enforceable-promise institutions -> public, late or statist -> private, never industrialised -> closed. No authored table (the BL-219 principle). No home region falls back to national character, as focus does. Background firms class by the same read; nothing branches on is_background. The Pass 2 world-level reject-and-reroll takes a second condition: at least one public specialist, else nothing files and nothing is buyable. An unmet floor after the attempt cap stands as-is. Versions the save format."
+  },
+  {
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "C",
+   "difficulty": 2,
+   "version_goal": "v0.1.20",
+   "sprint": null,
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-630"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-632",
+   "short_name": "WARM_START_PROGRESS",
+   "category": "UI",
+   "title": "The loading screen's second phase - what the warm start shows while it runs",
+   "authority_doc": "docs/ui/STARTUP.md",
+   "files": [
+    "src/core/app.cpp",
+    "src/ui/startup_screens.cpp",
+    "docs/ui/STARTUP.md"
+   ],
+   "design": "Falls out of BL-630 (spawn shortlist): the warm start moves onto the loading screen as a second phase after the carve, and eighty econ ticks is long enough that it needs a surface. DESIGN-OWED - what it shows is Ben's call. The obvious candidates are the carve's own idiom (a ledger column of corps with their running net) or a plain progress read. Note the publish-contract limit the carve already documents: the tap is atomics-only, so a corporation's generated NAME cannot cross it."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": "v0.1.20",
+   "sprint": null,
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-631"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-633",
+   "short_name": "RETIRE_STANDING_BANDS",
+   "category": "UI",
+   "title": "Retire the standing bands - exact figures where a firm files, a dash where it does not",
+   "authority_doc": "docs/politics/RELATIONS.md",
+   "files": [
+    "src/world/standing.hpp",
+    "src/world/standing.cpp",
+    "src/ui/corporation_panel.cpp",
+    "src/ui/corporation_panel.hpp",
+    "tools/verify/standing_harness.cpp",
+    "docs/politics/RELATIONS.md",
+    "docs/ui/DISCOVERY.md",
+    "docs/ui/ledgers/corporation.md"
+   ],
+   "design": "Ben, 2026-08-26: 'We don't need company information to be invisible.' Design settled in RELATIONS.md § Standing. THE WORK: delete standing_band, its three banding functions and their boundary constants from standing.{hpp,cpp}; the Corporations panel prints exact reach and market share for EVERY corporation (both derive from already-public facts - buildings on canvas, market aggregates) and prints capital only where ownership_class == public, a dash otherwise. standing_harness loses its band assertions and gains the disclosure gate instead. The Goodhart separation from corp_ai's scorer is NOT touched - it is a property of what the read is for, not of how coarse it was."
   }
  ]
 }
