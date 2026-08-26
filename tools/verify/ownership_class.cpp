@@ -1,21 +1,44 @@
 // ---------------------------------------------------------------------------
-// ownership_class -- BL-631, Pass 2b of CORPORATION_GENERATION.md.
+// ownership_class -- BL-631's Pass 2b, re-pointed to Stage 1 by BL-638.
 //
-// Covers the `ownership-class` requirement group R1..R6.
+// Covers `ownership-class` R1..R6 AND `charter-ownership-class` R1..R4. The two
+// groups overlap deliberately: BL-638 changed WHICH signal Pass 2b reads and
+// changed nothing else, so every structural row BL-631 wrote (derivability, the
+// fallback, the reroll, the save seam, determinism) still stands and still runs.
 //
-//   R1  corporation_component carries an ownership_class DERIVED from the same
-//       BL-218 industrialisation-timing scalar Pass 2 reads for focus, with no
-//       authored weighting table on the settled path.
+//   R1  corporation_component carries an ownership_class DERIVED from HISTORY.md
+//       Stage 1 -- the enforceable promise, through `settlement_state::charter`
+//       -- with no authored weighting table on the settled path.
+//
+//       BL-638's R1 is the same row with the signal named: the derivation must
+//       read the charter's diffusion frame and NOT `median_industrial_year`.
+//       That is checked structurally (the signature no longer takes a median)
+//       and behaviourally (the class moves with the charter, and does not move
+//       with a region's furnace year at all).
 //   R2  MEASURED, NOT ASSERTED. The mapping holds directionally across a seed
-//       sweep; the distribution is REPORTED. There is no magic number here on
-//       purpose -- a pinned share would be a target to tune the derivation
-//       toward, which is exactly what BL-219 retired.
+//       sweep; the distribution is REPORTED at BOTH epochs. There is no magic
+//       share here on purpose -- a pinned share would be a target to tune the
+//       derivation toward, which is exactly what BL-219 retired.
+//
+//       BL-638's R2 is THE GATE, and it is a non-degeneracy property rather than
+//       a target: at the DEFAULT 0 CE epoch at least one specialist must class
+//       public on a MAJORITY of the swept seeds. Under the retired Stage 4 read
+//       that number was zero of eight -- all 64 corporations and all 1298
+//       regions classed `closed`, so nothing filed and nothing was buyable in
+//       any default world.
 //   R3  A corp with no home region falls back to national character, exactly as
 //       its focus does; background firms class by the same read, and nothing
 //       branches on is_background to decide a class.
 //   R4  Pass 2's world-level reject-and-reroll takes a SECOND condition -- at
 //       least one public specialist -- and never patches an individual corp. An
 //       unmet floor after the attempt cap STANDS and is reported.
+//
+//       BL-638's R3 keeps BL-631's reachability WAIVER alive across the
+//       re-pointing. "The floor is unmeetable here" is a real state even now
+//       that public is reachable on ordinary worlds: a world with no agrarian
+//       cradle wrote no charter, and nothing there can ever class public. That
+//       is asserted directly against the mapping rather than left to luck in the
+//       sweep, because the re-pointing made it rare.
 //   R5  The field round-trips the save at world_save_version; the prior version
 //       is refused whole. Every version assertion here is SYMBOLIC.
 //   R6  Two generations of one seed assign identical classes, and the
@@ -124,16 +147,34 @@ bool from_bytes(const std::string& bytes, world& w)
     return read_world_snapshot(w, in);
 }
 
+/// A synthetic charter frame. The seat sits at (100, 60) on a 261-wide grid --
+/// the homeworld's own width, so the wrap arithmetic under test is the real one.
+charter_reach make_charter(int near_d, int far_d, int oath_culture = 0,
+                           int port_reach = 0)
+{
+    charter_reach ch;
+    ch.written    = true;
+    ch.culture    = oath_culture;
+    ch.col        = 100;
+    ch.row        = 60;
+    ch.grid_w     = 261;
+    ch.near_dist  = near_d;
+    ch.far_dist   = far_d;
+    ch.port_reach = port_reach;
+    return ch;
+}
+
 /// A synthetic region carrying only the fields the derivation reads. Everything
 /// else stays at its default, which is the point: if the mapping ever grew a
 /// dependency on a field this does not set, these rows would start disagreeing
 /// with the end-to-end check.
-region make_region(bool industrialised, int64_t industrial_year, region_class dominant)
+region make_region(int col, int row, int culture, int port_q = 0)
 {
     region p;
-    p.industrialised  = industrialised;
-    p.industrial_year = industrial_year;
-    p.dominant        = dominant;
+    p.col     = col;
+    p.row     = row;
+    p.culture = culture;
+    p.port_q  = port_q;
     return p;
 }
 
@@ -170,7 +211,7 @@ derivability audit_derivability(const world& w, const settlement_state& ss)
             if (nation_ids[static_cast<std::size_t>(p.nation)] != cc.home_nation) continue;
             has_region = true;
             reachable.insert(static_cast<int>(
-                ownership_from_region(p, ss.median_industrial_year, pol)));
+                ownership_from_region(p, ss.charter, pol)));
         }
         if (!has_region)
         {
@@ -196,13 +237,15 @@ struct sweep_row
     uint32_t seed = 0;
     std::array<int, 3> corp_classes = { 0, 0, 0 };
     std::array<int, 3> region_classes = { 0, 0, 0 };
-    int  regions_never = 0;
-    int  regions_late  = 0;
-    int  regions_early_enforceable = 0;
-    int  regions_early_statist     = 0;
+    int  regions_out    = 0;  ///< The charter never reached them -> closed.
+    int  regions_copied = 0;  ///< It reached them as a copy only  -> private.
+    int  regions_lived_open    = 0;  ///< Lived, open polity    -> public.
+    int  regions_lived_statist = 0;  ///< Lived, statist polity -> private.
     bool public_floor_met = false;
     bool public_reachable = false;   ///< Could ANY region of the world yield a public firm?
-    int64_t median = 0;
+    int64_t median = 0;              ///< Reported only -- the RETIRED signal, for contrast.
+    bool charter_written = false;
+    int  charter_near = 0, charter_far = 0;
     derivability deriv;
 };
 
@@ -244,18 +287,22 @@ sweep_row measure(uint32_t seed, int64_t epoch_year,
             if (nit != w.nations.end())
                 pol = nit->second.politics;
         }
-        const ownership_class oc = ownership_from_region(rp, ss->median_industrial_year, pol);
+        const ownership_class oc = ownership_from_region(rp, ss->charter, pol);
         row.region_classes[static_cast<std::size_t>(oc)]++;
         if (oc == ownership_class::publicly_held) row.public_reachable = true;
 
-        const bool early = rp.industrialised
-                        && ss->median_industrial_year > 0
-                        && rp.industrial_year <= ss->median_industrial_year;
-        if (!rp.industrialised || ss->median_industrial_year <= 0) ++row.regions_never;
-        else if (!early)                                           ++row.regions_late;
-        else if (oc == ownership_class::publicly_held)              ++row.regions_early_enforceable;
-        else                                                        ++row.regions_early_statist;
+        // The diffusion cross-tab. Re-derived from the two PREDICATES rather
+        // than from the class, so the assertions below compare two independent
+        // reads of the frame instead of restating one.
+        if (!charter_copied(ss->charter, rp))     ++row.regions_out;
+        else if (!charter_lived(ss->charter, rp)) ++row.regions_copied;
+        else if (oc == ownership_class::publicly_held) ++row.regions_lived_open;
+        else                                           ++row.regions_lived_statist;
     }
+
+    row.charter_written = ss->charter.written;
+    row.charter_near    = ss->charter.near_dist;
+    row.charter_far     = ss->charter.far_dist;
 
     if (classes_out)
     {
@@ -285,67 +332,109 @@ int main(int argc, char* argv[])
     // -----------------------------------------------------------------------
     // R1 (part 1) -- the mapping itself, over synthetic regions.
     // -----------------------------------------------------------------------
-    std::printf("--- R1: the derivation reads the industrialisation-timing scalar ---\n");
+    std::printf("--- R1: the derivation reads Stage 1, the enforceable promise ---\n");
     {
-        constexpr int64_t median = 1900;
+        // Seat at (100, 60). Lived within 10, copied within 30, oath culture 0.
+        const charter_reach ch = make_charter(/*near=*/10, /*far=*/30, /*oath=*/0);
 
-        const region never_ind = make_region(false, 0, region_class::ore);
-        const region early_ind = make_region(true, 1850, region_class::ore);
-        const region on_median = make_region(true, median, region_class::ore);
-        const region late_ind  = make_region(true, 1950, region_class::ore);
+        const region hearth   = make_region(105, 62, /*culture=*/3); // inside the lived band
+        const region copier   = make_region(125, 60, /*culture=*/3); // inside the copied band
+        const region beyond   = make_region(180, 60, /*culture=*/3); // past both
+        const region oath_far = make_region(180, 60, /*culture=*/0); // past both, but oath-keeping
 
-        // never industrialised -> closed, whatever the institutions say.
-        bool never_all_closed = true;
+        // Out of reach -> closed, whatever the institutions say. This is the
+        // rung the design keeps for "no charter, no filing, no market at all".
+        bool beyond_all_closed = true;
         for (const ideology pol : { ideology::authoritarian, ideology::technocratic,
                                     ideology::mercantile, ideology::isolationist })
-            never_all_closed &= ownership_from_region(never_ind, median, pol)
-                             == ownership_class::closed;
-        check(never_all_closed,
-              "R1 a never-industrialised region is closed under every national character");
+            beyond_all_closed &= ownership_from_region(beyond, ch, pol)
+                              == ownership_class::closed;
+        check(beyond_all_closed,
+              "R1 ground the charter never reached is closed under every national character");
 
-        check(ownership_from_region(late_ind, median, ideology::mercantile)
-                  == ownership_class::privately_held
-           && ownership_from_region(late_ind, median, ideology::technocratic)
-                  == ownership_class::privately_held,
-              "R1 a LATE industrialiser is private even under open-market institutions");
+        bool copier_all_private = true;
+        for (const ideology pol : { ideology::authoritarian, ideology::technocratic,
+                                    ideology::mercantile, ideology::isolationist })
+            copier_all_private &= ownership_from_region(copier, ch, pol)
+                               == ownership_class::privately_held;
+        check(copier_all_private,
+              "R1 ground that only COPIED the charter is private under every character");
 
-        check(ownership_from_region(early_ind, median, ideology::mercantile)
+        check(ownership_from_region(hearth, ch, ideology::mercantile)
                   == ownership_class::publicly_held
-           && ownership_from_region(early_ind, median, ideology::technocratic)
+           && ownership_from_region(hearth, ch, ideology::isolationist)
                   == ownership_class::publicly_held,
-              "R1 an EARLY industrialiser under enforceable-promise institutions is public");
+              "R1 ground inside the seat's hinterland LIVES the promise and is public");
 
-        check(ownership_from_region(early_ind, median, ideology::authoritarian)
+        check(ownership_from_region(hearth, ch, ideology::authoritarian)
                   == ownership_class::privately_held,
-              "R1 an EARLY industrialiser under a STATIST character is private");
+              "R1 lived, but under a STATIST polity that holds the firm close -> private");
 
-        check(ownership_from_region(on_median, median, ideology::mercantile)
+        check(ownership_from_region(oath_far, ch, ideology::mercantile)
                   == ownership_class::publicly_held,
-              "R1 the median year itself counts as early (<=), matching focus_from_region");
+              "R1 the oath-keeping culture carries the promise past every radius");
 
-        // A world where nobody industrialised has no median to be early against.
-        check(ownership_from_region(early_ind, 0, ideology::mercantile)
-                  == ownership_class::closed,
-              "R1 with no world median (nobody industrialised) the class is closed");
+        // The port term: the charter is a merchant's instrument and arrives by
+        // ship, so a full port discounts `port_reach` off its contact distance.
+        {
+            const charter_reach sea = make_charter(10, 30, /*oath=*/0, /*port_reach=*/25);
+            const region landlocked = make_region(150, 60, /*culture=*/3, /*port_q=*/0);
+            const region harbour    = make_region(150, 60, /*culture=*/3, /*port_q=*/1000);
+            check(ownership_from_region(landlocked, sea, ideology::mercantile)
+                      == ownership_class::closed
+               && ownership_from_region(harbour, sea, ideology::mercantile)
+                      == ownership_class::privately_held,
+                  "R1 a harbour catches the charter from ground a landlocked twin cannot");
+        }
+
+        // NO CHARTER WAS EVER WRITTEN -- a world with no agrarian cradle. Every
+        // region closed, and this is R3's waiver made assertable.
+        {
+            charter_reach none;              // written == false
+            none.grid_w = 261;
+            bool all_closed = true;
+            for (const ideology pol : { ideology::authoritarian, ideology::technocratic,
+                                        ideology::mercantile, ideology::isolationist })
+                all_closed &= ownership_from_region(hearth, none, pol)
+                           == ownership_class::closed;
+            check(all_closed,
+                  "R1 a world that wrote no charter classes every region closed");
+        }
+
+        // THE RE-POINTING ITSELF (BL-638 R1). The class must not move with the
+        // furnace record at all -- that is the retired signal. Two regions
+        // identical but for industrialisation must class identically.
+        {
+            region furnace = hearth;
+            furnace.industrialised  = true;
+            furnace.industrial_year = 1820;
+            region cold = hearth;
+            cold.industrialised  = false;
+            cold.industrial_year = 0;
+            check(ownership_from_region(furnace, ch, ideology::mercantile)
+                      == ownership_from_region(cold, ch, ideology::mercantile),
+                  "R1 the class is BLIND to the furnace record -- Stage 4 is not the input");
+        }
 
         // The endowment class -- which is what decides FOCUS -- must not move the
-        // ownership class. If it ever does, the two fields have stopped being one
-        // read of one scalar.
+        // ownership class either. If it ever does, the two fields have stopped
+        // being independent reads of independent facts.
         bool endowment_blind = true;
         for (const region_class rc : { region_class::none, region_class::farm,
                                        region_class::ore, region_class::energy,
                                        region_class::port })
         {
-            const region rp = make_region(true, 1850, rc);
-            endowment_blind &= ownership_from_region(rp, median, ideology::mercantile)
+            region rp = hearth;
+            rp.dominant = rc;
+            endowment_blind &= ownership_from_region(rp, ch, ideology::mercantile)
                             == ownership_class::publicly_held;
         }
         check(endowment_blind,
-              "R1 the class is blind to the ancient endowment -- timing is the whole input");
+              "R1 the class is blind to the ancient endowment -- the charter is the whole input");
 
         // Purity: same inputs, same answer, no hidden state between calls.
-        check(ownership_from_region(early_ind, median, ideology::mercantile)
-                  == ownership_from_region(early_ind, median, ideology::mercantile),
+        check(ownership_from_region(hearth, ch, ideology::mercantile)
+                  == ownership_from_region(hearth, ch, ideology::mercantile),
               "R1 the derivation is pure (repeat call, identical answer)");
     }
 
@@ -373,13 +462,18 @@ int main(int argc, char* argv[])
     // the single most important thing this harness has to say.
     //
     // The DEFAULT campaign is an antiquity world (world_params::epoch_year = 0
-    // since NR-177). settlement.cpp Stage 4 breaks out before lighting a furnace
-    // on one, so median_industrial_year is 0, every region is
-    // never-industrialised, and every corporation is `closed` -- correctly, by
-    // the design's own third rung, but it means the default world has NOTHING
-    // that files a return and NOTHING that can be bought. Sweeping only the
-    // default epoch would report that as a distribution and hide it; sweeping
-    // only 1960 would hide it the other way. So: both, side by side.
+    // since NR-177), and BL-631's own measured row here is what exposed BL-638:
+    // settlement.cpp's Stage 4 breaks out before lighting a furnace on one, so
+    // median_industrial_year was 0, every region read as never-industrialised,
+    // and all 64 corporations across 8 seeds classed `closed`. The default world
+    // had NOTHING that filed a return and NOTHING that could be bought.
+    //
+    // Re-pointed to Stage 1, the default epoch is the ONE that has to be
+    // non-degenerate, because it is the one people play. The 1960 arc stays in
+    // the sweep as the contrast: if the two epochs ever agree exactly, the
+    // derivation has stopped reading anything the era changes. So: both, side by
+    // side, and the `median` column is printed at each purely to show that the
+    // retired signal no longer moves the answer.
     // -----------------------------------------------------------------------
     struct sweep_result
     {
@@ -388,7 +482,8 @@ int main(int argc, char* argv[])
         std::array<int, 3> region_totals = { 0, 0, 0 };
         int total_corps = 0, undeliverable = 0, floors_met = 0, reachable_worlds = 0;
         int via_region = 0, via_character = 0;
-        int t_never = 0, t_late = 0, t_early_enf = 0, t_early_statist = 0;
+        int t_out = 0, t_copied = 0, t_lived_open = 0, t_lived_statist = 0;
+        int charter_worlds = 0;
     };
 
     auto run_sweep = [&](int64_t epoch, const char* label) {
@@ -397,15 +492,16 @@ int main(int argc, char* argv[])
         for (uint32_t sd = 0; sd < seeds; ++sd)
             sr.rows.push_back(measure(sd, epoch, nullptr));
 
-        std::printf("%6s | %5s %6s %7s | %5s %6s %7s | %8s | %s\n",
+        std::printf("%6s | %5s %6s %7s | %5s %6s %7s | %8s | %9s | %s\n",
                     "seed", "pub", "priv", "closed",
-                    "r:pub", "r:priv", "r:clsd", "median", "public floor");
+                    "r:pub", "r:priv", "r:clsd", "median", "reach n/f", "public floor");
         for (const sweep_row& r : sr.rows)
-            std::printf("%6u | %5d %6d %7d | %5d %6d %7d | %8lld | %s\n",
+            std::printf("%6u | %5d %6d %7d | %5d %6d %7d | %8lld | %4d/%4d | %s\n",
                         r.seed,
                         r.corp_classes[0], r.corp_classes[1], r.corp_classes[2],
                         r.region_classes[0], r.region_classes[1], r.region_classes[2],
                         (long long)r.median,
+                        r.charter_near, r.charter_far,
                         r.public_floor_met ? "met"
                                            : (r.public_reachable ? "UNMET (stands)"
                                                                  : "unmeetable (waived)"));
@@ -422,10 +518,11 @@ int main(int argc, char* argv[])
             sr.via_character += r.deriv.via_character;
             sr.floors_met    += r.public_floor_met ? 1 : 0;
             sr.reachable_worlds += r.public_reachable ? 1 : 0;
-            sr.t_never       += r.regions_never;
-            sr.t_late        += r.regions_late;
-            sr.t_early_enf   += r.regions_early_enforceable;
-            sr.t_early_statist += r.regions_early_statist;
+            sr.t_out           += r.regions_out;
+            sr.t_copied        += r.regions_copied;
+            sr.t_lived_open    += r.regions_lived_open;
+            sr.t_lived_statist += r.regions_lived_statist;
+            sr.charter_worlds  += r.charter_written ? 1 : 0;
         }
         return sr;
     };
@@ -445,9 +542,11 @@ int main(int argc, char* argv[])
                     sr.region_totals[0], rs ? 100.0 * sr.region_totals[0] / rs : 0.0,
                     sr.region_totals[1], rs ? 100.0 * sr.region_totals[1] / rs : 0.0,
                     sr.region_totals[2], rs ? 100.0 * sr.region_totals[2] / rs : 0.0, rs);
-        std::printf("  timing buckets: never %d -> closed | late %d -> private | "
-                    "early+enforceable %d -> public | early+statist %d -> private\n",
-                    sr.t_never, sr.t_late, sr.t_early_enf, sr.t_early_statist);
+        std::printf("  diffusion buckets: out-of-reach %d -> closed | copied %d -> private | "
+                    "lived+open %d -> public | lived+statist %d -> private\n",
+                    sr.t_out, sr.t_copied, sr.t_lived_open, sr.t_lived_statist);
+        std::printf("  a charter was written in %d of %u worlds\n",
+                    sr.charter_worlds, seeds);
         std::printf("  public floor: met in %d of %u worlds; reachable at all in %d of %u\n",
                     sr.floors_met, seeds, sr.reachable_worlds, seeds);
         std::printf("  derivability: %d corps (by region %d, by national character %d), "
@@ -464,20 +563,29 @@ int main(int argc, char* argv[])
     // epochs. This is R2's claim stated as a check rather than as a share.
     for (const sweep_result* sr : { &antiquity, &modern })
     {
-        check(sr->t_never == sr->region_totals[2],
-              "R2 every never-industrialised region, and only those, class closed");
-        check(sr->t_early_enf == sr->region_totals[0],
-              "R2 every early+enforceable region, and only those, class public");
-        check(sr->t_late + sr->t_early_statist == sr->region_totals[1],
-              "R2 late and early-statist regions, and only those, class private");
+        check(sr->t_out == sr->region_totals[2],
+              "R2 every out-of-reach region, and only those, class closed");
+        check(sr->t_lived_open == sr->region_totals[0],
+              "R2 every lived+open region, and only those, class public");
+        check(sr->t_copied + sr->t_lived_statist == sr->region_totals[1],
+              "R2 copied and lived+statist regions, and only those, class private");
     }
-    check(modern.region_totals[0] > 0 && modern.region_totals[1] > 0,
-          "R2 the 1960 arc exercises the public AND private rungs (the mapping is "
-          "not degenerate)");
-    check(antiquity.region_totals[2] == antiquity.region_totals[0]
-                                      + antiquity.region_totals[1]
-                                      + antiquity.region_totals[2],
-          "R2 the antiquity default classes every region closed -- no furnace ever lights");
+
+    // THE GATE (BL-638 R2). Stated as a non-degeneracy property, never as a
+    // share: the number that must move is the count of DEFAULT worlds in which
+    // anything at all can file a return or be bought. It was 0 of 8.
+    check(antiquity.floors_met * 2 > static_cast<int>(seeds),
+          "R2 GATE: at the DEFAULT 0 CE epoch a majority of worlds seat at least one "
+          "PUBLIC specialist");
+    for (const sweep_result* sr : { &antiquity, &modern })
+    {
+        check(sr->region_totals[0] > 0 && sr->region_totals[1] > 0
+           && sr->region_totals[2] > 0,
+              "R2 all three rungs are exercised at this epoch (the mapping is not "
+              "degenerate)");
+    }
+    check(antiquity.corp_totals[2] < antiquity.total_corps,
+          "R2 the antiquity default no longer classes EVERY corporation closed");
 
     const std::vector<sweep_row>& rows = modern.rows;
     const int total_corps   = antiquity.total_corps + modern.total_corps;
@@ -500,12 +608,15 @@ int main(int argc, char* argv[])
     std::printf("(1960 arc) public floor met in %d of %u worlds; "
                 "unmet floors STAND (never hand-fixed)\n",
                 floors_met, seeds);
-    std::printf("(antiquity default) floor UNMEETABLE in %d of %u worlds and WAIVED there -- "
-                "no region\n     industrialises, so no reroll could ever produce a public "
-                "firm. Waiving keeps the\n     default world byte-identical to its "
-                "pre-BL-631 self instead of reshuffling every\n     corporation for an "
-                "unsatisfiable condition; it is the same 'unmeetable by\n     construction' "
-                "waiver the focus floor already carries for corp_count < 3.\n",
+    std::printf("(antiquity default) floor UNMEETABLE in %d of %u worlds and WAIVED there.\n"
+                "     BL-638 made this RARE, not dead: under the retired Stage 4 read it fired "
+                "on every\n     default world, because no furnace ever lit on one. What "
+                "survives is the genuine\n     case -- a world that wrote no charter, or a "
+                "nation every one of whose regions sits\n     beyond the charter's reach. No "
+                "reroll could produce a public firm there, and burning\n     all six attempts "
+                "against it would silently relocate every corporation in the world.\n"
+                "     Same 'unmeetable by construction' waiver the focus floor carries for "
+                "corp_count < 3.\n",
                 seeds - antiquity.reachable_worlds, seeds);
     for (const sweep_row& r : rows)
         if (!r.public_floor_met)

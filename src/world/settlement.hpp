@@ -158,6 +158,73 @@ struct region
     int work_industrial_mod = 0; ///< Pull-forward on the industrial clock.
 };
 
+// ---------------------------------------------------------------------------
+// Stage 1 — the enforceable promise, as a diffusion frame (BL-638)
+// ---------------------------------------------------------------------------
+
+/// WHERE the enforceable promise was written, and how far it travelled from
+/// there. HISTORY.md § Stage 1: contract law extends beyond kinship until an
+/// entity can outlive its members and own, sue and be sued. The ladder already
+/// picks the seat (`history_ladder_state::charter_cradle` — the best-placed
+/// TRADING cradle, because Stage 1 is about promises between strangers) and
+/// the creeds already plant the sealed-oath god on it. This frame is the third
+/// read of that same fact: which ground the charter reached.
+///
+/// ERA-AGNOSTIC BY CONSTRUCTION, which is the whole reason it exists. The
+/// ladder picks a charter cradle in EVERY era, so a class derived from this
+/// frame says something on an antiquity world as well as an industrial one.
+/// Stage 4's furnace dates cannot: an antiquity world skips Stage 4 entirely,
+/// so `median_industrial_year` is 0 there and anything reading it collapses.
+///
+/// Pure: `derive_charter_reach` takes no rng and the two predicates take no
+/// state beyond the frame and the region.
+struct charter_reach
+{
+    /// True once a charter cradle exists at all. A world with no agrarian
+    /// cradle wrote no charter, and NOTHING reached the promise there — an
+    /// honest all-closed world, and the one the public floor's unmeetable
+    /// waiver exists for.
+    bool written = false;
+
+    /// Index into `creed_state::cultures` of the people who keep the sealed
+    /// oath — the charter cradle's own culture. -1 when no creed pass ran.
+    int culture = -1;
+
+    int col = 0;      ///< The seat's core tile (the charter cradle's).
+    int row = 0;
+    int grid_w = 0;   ///< Column wrap for the contact metric.
+
+    /// Contact distance within which the charter is LIVED rather than merely
+    /// known — the seat's own trading hinterland.
+    int near_dist = 0;
+    /// ... and within which it has at least been COPIED. Beyond this, nothing.
+    int far_dist = 0;
+    /// How much distance a fully-port region discounts: the charter is a
+    /// merchant's instrument and arrives by ship, which is why the ladder
+    /// weights coastal access so heavily when it picks the seat at all.
+    int port_reach = 0;
+};
+
+/// Derive the frame from the ladder and the creeds.
+///
+/// The two radii are set by the ground, not by a target: the same barrier
+/// terrain that prices conquest prices contact, so the charter's copies travel
+/// far across open country and stall against broken country. At zero
+/// resistance the copied band is half the world; at total resistance, a tenth
+/// of it. The lived band is half the copied one.
+charter_reach derive_charter_reach(const history_ladder_state& hl,
+                                   const creed_state& cs, int gw, int gh);
+
+/// Does this region LIVE the enforceable promise — its own creed witnesses the
+/// sealed oath, or it sits inside the seat's trading hinterland?
+bool charter_lived(const charter_reach& ch, const region& p);
+
+/// Has the promise at least REACHED this region — lived, or copied from
+/// neighbours in contact with the seat? HISTORY.md § Stage 2's lesson is that
+/// an institution re-emerges next door, so the reach deliberately ignores
+/// political borders: it is a map of contact, not of sovereignty.
+bool charter_copied(const charter_reach& ch, const region& p);
+
 /// What the settlement pass computed for one body.
 struct settlement_state
 {
@@ -172,6 +239,12 @@ struct settlement_state
     /// The world-median industrialisation year over industrialised regions,
     /// or 0 when none industrialised. BL-219's "early vs late" pivot reads it.
     int64_t median_industrial_year = 0;
+
+    /// Stage 1's diffusion frame (BL-638). Carried on the settlement record
+    /// rather than passed separately because every consumer already holds one:
+    /// the corporation pass takes `const settlement_state*`, and the generation
+    /// report copies this struct whole.
+    charter_reach charter;
 };
 
 /// Settle the body: place regions, inherit each one's cradle culture, survey
