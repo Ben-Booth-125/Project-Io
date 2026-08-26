@@ -175,7 +175,25 @@ inline constexpr uint32_t world_save_magic =
 /// MID-RECORD gap, so it is refused whole on the same strict-equality
 /// contract as every prior bump. The reader additionally refuses a value
 /// other than 0/1 — the writer cannot have produced one.
-inline constexpr uint32_t world_save_version = 15;
+///
+/// Bumped to 17 by BL-631 (ownership class): the corporation record (`w_corp` /
+/// `r_corp`) gains `corporation_component::ownership_class` — one enum byte
+/// immediately after `focus`, in declaration order. That is a MID-RECORD gap, so
+/// an older stream's corp records misread every field from `starting_capital`
+/// onward and everything serialised after `corporations` besides; it is refused
+/// whole on the same strict-equality contract as every prior bump. The reader
+/// additionally refuses a value past `max_ownership` — the writer cannot have
+/// produced one.
+///
+/// **16 is RESERVED, not skipped.** BL-626 (quarterly return) claims it
+/// concurrently in the same wave-1 fan-out, from a separate worktree; this slice
+/// claims 17 so the two can be stacked at the integration merge without either
+/// having to renumber. If BL-626 does not land, 16 is simply an unused number —
+/// the constant is a strict-equality gate, never an offset into anything, so a
+/// gap costs nothing. Nothing in `tools/verify` asserts this value as a literal
+/// for exactly this reason: the checks name it symbolically so a renumber at the
+/// merge cannot break them.
+inline constexpr uint32_t world_save_version = 17;
 
 /// Write @p w as a complete world snapshot.
 ///

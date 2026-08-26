@@ -1253,6 +1253,77 @@ void seed_starting_military(world& w, entity_id corp_id,
 } // namespace
 
 // ---------------------------------------------------------------------------
+// Pass 2b — ownership class (BL-631). One more mapping over an existing signal.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Does this national character carry the institutions that make a promise
+/// enforceable — and therefore, per the design, a share transferable?
+///
+/// The nation's `politics` is its industrialisation-timing tercile and nothing
+/// else (settlement.cpp, the "ideology <- industrialisation timing against
+/// neighbours" block), so this is a read of the same scalar, not a second
+/// signal smuggled in:
+///
+///   * `authoritarian` — the LATE tercile, and the enum's own "centralised
+///     state authority". This is the design's *statist* case, and it is the one
+///     the "late OR STATIST -> private" rung exists to catch: an early region
+///     inside a statist realm still does not get a transferable share.
+///   * `isolationist` — the NEVER tercile. A realm whose furnaces never lit has
+///     no such institutions to have built.
+///   * `mercantile` (early) and `technocratic` (mid) both lit furnaces inside a
+///     regime that had to make promises stick to do it. Neither is statist.
+///
+/// Note what this deliberately does NOT do: it does not re-test the region's
+/// own timing. `ownership_from_region` has already established that the region
+/// industrialised early; the nation term answers only "under what institutions",
+/// which keeps the REGION the primary discriminator and preserves Pass 2's
+/// per-region variation.
+bool enforceable_promise(ideology politics)
+{
+    return politics == ideology::mercantile || politics == ideology::technocratic;
+}
+
+} // namespace
+
+ownership_class ownership_from_region(const region& p, int64_t median, ideology politics)
+{
+    // NEVER INDUSTRIALISED -> closed. No filing, no market in the firm at all.
+    // `median <= 0` is the world where nobody industrialised, in which case no
+    // region can be "early" against it — the same guard `focus_from_region`
+    // makes before it shifts a tier.
+    if (!p.industrialised || median <= 0)
+        return ownership_class::closed;
+
+    // LATE -> private. The firm exists and trades, but its books are its own.
+    if (p.industrial_year > median)
+        return ownership_class::privately_held;
+
+    // EARLY. The institutions that make a contract enforceable are the ones
+    // that make a share transferable — a region that had one had the other.
+    return enforceable_promise(politics) ? ownership_class::publicly_held
+                                         : ownership_class::privately_held;
+}
+
+ownership_class ownership_from_character(ideology politics)
+{
+    switch (politics)
+    {
+        // never industrialised -> closed
+        case ideology::isolationist:  return ownership_class::closed;
+        // the late tercile, and the statist one -> private
+        case ideology::authoritarian: return ownership_class::privately_held;
+        // the MID tercile. With no region to say "early", the nation's own
+        // timing is the only timing there is, and mid is not an early mover.
+        case ideology::technocratic:  return ownership_class::privately_held;
+        // the EARLY tercile, and the enum's own open-markets rung -> public
+        case ideology::mercantile:    return ownership_class::publicly_held;
+    }
+    return ownership_class::closed;
+}
+
+// ---------------------------------------------------------------------------
 // Public entry point
 // ---------------------------------------------------------------------------
 
@@ -1325,6 +1396,13 @@ std::vector<entity_id> generate_corporations(
     // the specialists premise this rewrite is required to preserve.
     std::vector<int> home_region_idx(static_cast<std::size_t>(corp_count), -1);
 
+    // Pass 2b (BL-631) - one class per corp, filled by the SAME walk that fills
+    // the focus above. Parallel to corp_focuses, not a second pass: both are
+    // reads of one region record, so a corp cannot end up with a focus from one
+    // attempt and a class from another.
+    std::vector<ownership_class> corp_ownership(
+        static_cast<std::size_t>(corp_count), ownership_class::closed);
+
     if (settle && !settle->regions.empty())
     {
         // BL-219 — focus DERIVED from the corp's home region, then a
@@ -1332,11 +1410,60 @@ std::vector<entity_id> generate_corporations(
         // the SET is not a quota on any MEMBER, so no individual corporation's
         // focus ever becomes inexplicable; the reroll re-picks which regions
         // the corps anchor to, it never patches a corp's focus directly.
+        // BL-631 -- IS THE PUBLIC FLOOR MEETABLE AT ALL? Answered once, before
+        // any attempt, because the answer cannot change between attempts: a
+        // reroll re-picks WHICH region each corp anchors to, never which regions
+        // exist or what their furnace years are.
+        //
+        // This matters far more than it looks. The default campaign is an
+        // ANTIQUITY world (`world_params::epoch_year` = 0 CE since NR-177), and
+        // settlement.cpp's Stage 4 breaks out before lighting a single furnace on
+        // one: `median_industrial_year` is 0, every region is never-industrialised,
+        // and every corporation is therefore `closed` no matter which region it
+        // anchors to. Without this pre-pass the new floor could never be satisfied
+        // there, so every default world would burn all six attempts and stand on
+        // attempt 5's region set instead of the first attempt that met the FOCUS
+        // floor -- silently relocating every corporation in every default world,
+        // to satisfy a condition that was unsatisfiable before the first draw.
+        //
+        // So the floor is WAIVED when it is unmeetable by construction. That is
+        // not a new escape hatch: it is exactly the waiver the focus floor already
+        // carries for `corp_count < 3` ("unmeetable by construction, so it does not
+        // apply"), applied to the second condition. Where public IS reachable the
+        // floor bites normally and the reroll does its job.
+        bool public_reachable = false;
+        for (int c = 0; c < corp_count && !public_reachable; ++c)
+        {
+            const entity_id home_nid = nation_ids[static_cast<std::size_t>(
+                home_nation_idx[static_cast<std::size_t>(c)])];
+            const auto nit = w.nations.find(home_nid);
+            const ideology pol = (nit != w.nations.end())
+                ? nit->second.politics : ideology::isolationist;
+
+            bool any_region = false;
+            for (const region& p : settle->regions)
+            {
+                if (p.nation < 0 || p.nation >= nation_count) continue;
+                if (nation_ids[static_cast<std::size_t>(p.nation)] != home_nid) continue;
+                any_region = true;
+                if (ownership_from_region(p, settle->median_industrial_year, pol)
+                        == ownership_class::publicly_held)
+                {
+                    public_reachable = true;
+                    break;
+                }
+            }
+            if (!any_region
+             && ownership_from_character(pol) == ownership_class::publicly_held)
+                public_reachable = true;
+        }
+
         constexpr int max_attempts = 6;
         for (int attempt = 0; attempt < max_attempts; ++attempt)
         {
             std::mt19937 attempt_rng(seed_focus ^ (static_cast<uint32_t>(attempt) * 0x9E3779B1u));
             focus_counts = { 0, 0, 0 };
+            int public_count = 0;
 
             for (int c = 0; c < corp_count; ++c)
             {
@@ -1364,6 +1491,13 @@ std::vector<entity_id> generate_corporations(
                     corp_focuses[static_cast<std::size_t>(c)] =
                         static_cast<industrial_focus>(static_cast<uint8_t>(ef));
                     focus_counts[static_cast<std::size_t>(corp_focuses[static_cast<std::size_t>(c)])]++;
+                    // BL-631: the class takes the SAME fallback the focus just
+                    // took - national character, no region invented for it.
+                    const ideology pol = (it != w.nations.end())
+                        ? it->second.politics : ideology::isolationist;
+                    const ownership_class oc = ownership_from_character(pol);
+                    corp_ownership[static_cast<std::size_t>(c)] = oc;
+                    if (oc == ownership_class::publicly_held) ++public_count;
                     continue;
                 }
 
@@ -1371,21 +1505,47 @@ std::vector<entity_id> generate_corporations(
                 const int pi = options[static_cast<std::size_t>(pick(attempt_rng))];
                 home_region_idx[static_cast<std::size_t>(c)] = pi;
 
+                const region& home_p = settle->regions[static_cast<std::size_t>(pi)];
+
                 const industrial_focus f = focus_from_region(
-                    settle->regions[static_cast<std::size_t>(pi)],
-                    settle->median_industrial_year);
+                    home_p, settle->median_industrial_year);
                 corp_focuses[static_cast<std::size_t>(c)] = f;
                 focus_counts[static_cast<std::size_t>(f)]++;
+
+                // BL-631 - Pass 2b, off the same region record and the same
+                // median. The home nation supplies only the enforceable-promise
+                // term; the region stays the primary discriminator.
+                const auto nit = w.nations.find(home_nid);
+                const ideology pol = (nit != w.nations.end())
+                    ? nit->second.politics : ideology::isolationist;
+                const ownership_class oc = ownership_from_region(
+                    home_p, settle->median_industrial_year, pol);
+                corp_ownership[static_cast<std::size_t>(c)] = oc;
+                if (oc == ownership_class::publicly_held) ++public_count;
             }
 
-            // The floor: no focus class wholly unrepresented across the world.
-            // With fewer corps than classes the floor is unmeetable by
-            // construction, so it does not apply.
-            if (corp_count < 3) break;
-            if (focus_counts[0] > 0 && focus_counts[1] > 0 && focus_counts[2] > 0) break;
-            // Otherwise: reroll the whole set. The last attempt's emergent set
-            // stands rather than being patched — an unmet floor is honest, a
-            // hand-fixed corp is not.
+            // TWO conditions on ONE reroll (BL-631 joined BL-219 here).
+            //
+            //  1. No focus class wholly unrepresented across the world. With
+            //     fewer corps than classes that floor is unmeetable by
+            //     construction, so it does not apply.
+            //  2. At least one PUBLIC specialist. If nobody is public then
+            //     nothing in the world files a return and nothing is buyable,
+            //     which disables two whole FINANCE.md surfaces at once. It is NOT
+            //     waived by the corp_count < 3 case -- one corp can be public --
+            //     but it IS waived when no region any corp could anchor to would
+            //     yield a public firm (`public_reachable`, computed above).
+            //
+            // Neither condition patches a corporation. The reroll re-picks which
+            // regions the corps anchor to and derives every field again from
+            // scratch; an unmet floor after the attempt cap STANDS, on the same
+            // reasoning the focus floor always used - an honest unmet floor beats
+            // a hand-fixed corp.
+            const bool focus_floor_met =
+                corp_count < 3
+                || (focus_counts[0] > 0 && focus_counts[1] > 0 && focus_counts[2] > 0);
+            const bool public_floor_met = public_count > 0 || !public_reachable;
+            if (focus_floor_met && public_floor_met) break;
         }
     }
     else
@@ -1403,6 +1563,13 @@ std::vector<entity_id> generate_corporations(
             const industrial_focus focus = pick_focus(nation_ef, focus_counts, focus_rng);
             corp_focuses[static_cast<std::size_t>(c)] = focus;
             focus_counts[static_cast<std::size_t>(focus)]++;
+
+            // BL-631: no settlement pass means no region for anyone, so every
+            // corp on this path takes the national-character read - the same
+            // fallback the rung-3 case takes above. Consumes no randomness, so
+            // the pre-BL-631 RNG stream on this path is untouched.
+            corp_ownership[static_cast<std::size_t>(c)] = ownership_from_character(
+                (it != w.nations.end()) ? it->second.politics : ideology::isolationist);
         }
     }
 
@@ -1568,6 +1735,7 @@ std::vector<entity_id> generate_corporations(
         cc.home_nation      = nation_ids[static_cast<std::size_t>(
                                   home_nation_idx[static_cast<std::size_t>(c)])];
         cc.focus            = corp_focuses[static_cast<std::size_t>(c)];
+        cc.ownership_class  = corp_ownership[static_cast<std::size_t>(c)];
         cc.starting_capital = corp_capitals[static_cast<std::size_t>(c)];
         cc.balance          = corp_capitals[static_cast<std::size_t>(c)]; // opens at starting capital
         cc.is_player        = false;
@@ -1904,6 +2072,12 @@ std::vector<entity_id> generate_background_firms(
             cc.name          = make_corp_name(nit->second.name, name_rng);
             cc.home_nation   = home_nid;
             cc.focus         = focus;
+            // BL-631 Pass 2b. A background firm has a home NATION but never a
+            // home region, so it lands on the SAME no-home-region fallback the
+            // rung-3 case takes in generate_corporations. `is_background` is not
+            // an input to the class and no path here branches on it - the flag is
+            // set below purely to record what kind of firm this is.
+            cc.ownership_class = ownership_from_character(nit->second.politics);
             cc.starting_capital = 0.0f;
             cc.balance          = 0.0f;
             cc.is_player     = false;

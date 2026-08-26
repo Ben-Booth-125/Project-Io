@@ -40,6 +40,7 @@ constexpr auto max_building   = building_type::university; // BL-615: appended s
 constexpr auto max_survey     = survey_phase::surveyed;
 constexpr auto max_convoy     = convoy_mode::space;
 constexpr auto max_focus      = industrial_focus::trade;
+constexpr auto max_ownership  = ownership_class::closed; // BL-631: Pass 2b's derived class.
 constexpr auto max_ideology   = ideology::isolationist;
 constexpr auto max_posture    = expansionism::aggressive;
 constexpr auto max_econ_focus = economic_focus::trade;
@@ -296,6 +297,7 @@ void w_corp(std::ostream& o, const corporation_component& c)
     w_str(o, c.name);
     w_id(o, c.home_nation);
     w_enum(o, c.focus);
+    w_enum(o, c.ownership_class); // BL-631: world_save_version bumped for this.
     w_f32(o, c.starting_capital);
     w_f32(o, c.balance);
     w_bool(o, c.is_player);
@@ -310,6 +312,7 @@ void w_corp(std::ostream& o, const corporation_component& c)
 bool r_corp(std::istream& i, corporation_component& c)
 {
     return r_str(i, c.name) && r_id(i, c.home_nation) && r_enum(i, c.focus, max_focus)
+        && r_enum(i, c.ownership_class, max_ownership)
         && r_f32(i, c.starting_capital) && r_f32(i, c.balance) && r_bool(i, c.is_player)
         && r_bool(i, c.is_background) && r_ids(i, c.assets) && r_id(i, c.hq_building)
         && r_f32(i, c.influence_range) && r_f32(i, c.science)

@@ -114,6 +114,18 @@ int main()
     if (bid_building != null_entity)
         w.buildings.at(bid_building).wage_bid = 0.4375f;
 
+    // BL-631: `ownership_class` is a NEW persistent field in the corp record.
+    // A `no_prehistory()` world reaches it through the national-character
+    // fallback, which can class a whole world alike — so pin one corp to a
+    // distinctive value before the trip, or P1's byte-equality could pass over a
+    // uniform column. Lowest corp id, same discipline as the fixtures around it.
+    entity_id oc_corp = null_entity;
+    for (const auto& [cid, cc] : w.corporations)
+        if (oc_corp == null_entity || cid < oc_corp)
+            oc_corp = cid;
+    if (oc_corp != null_entity)
+        w.corporations.at(oc_corp).ownership_class = ownership_class::publicly_held;
+
     // BL-616: decline rides `growth_accumulator` as a NEGATIVE consecutive-
     // failure streak (no new persistent field, no version bump) — so make one
     // centre's accumulator negative before the round trip: a reader that
@@ -245,13 +257,20 @@ int main()
             // same record would shift with it. The whole stream is refused
             // instead -- a v4 save is not migrated, it is rejected, and the
             // destination is not touched.
-            static_assert(world_save_version == 15,
-                          "P9..P19 name v4..v14 as refused "
-                          "predecessors; re-read these rows on a bump");
+            // P9..P19 name v4..v14 as refused predecessors; P20 names the
+            // immediately-prior format symbolically. DELIBERATELY NOT PINNED TO A
+            // LITERAL (BL-631): BL-626 and BL-631 each claim a version in this
+            // wave from separate worktrees, so a literal here breaks whichever
+            // lands second and would be re-blessed rather than read. What must
+            // hold is the property the rows actually rest on - every literal
+            // below is a PAST format, never the current one.
+            static_assert(world_save_version > 14,
+                          "P9..P19 name v4..v14 as refused predecessors; "
+                          "re-read these rows on a bump");
             std::string bad = bytes_once;
             const uint32_t v4 = 4;
             std::memcpy(&bad[4], &v4, sizeof v4);
-            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused");
         }
         {
             // Sprint 16, BL-571: the IMMEDIATE previous format (BL-570's v5,
@@ -265,7 +284,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v5 = 5;
             std::memcpy(&bad[4], &v5, sizeof v5);
-            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused");
         }
         {
             // Sprint 16, BL-572: the IMMEDIATE previous format (BL-571's v6,
@@ -278,7 +297,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v6 = 6;
             std::memcpy(&bad[4], &v6, sizeof v6);
-            check(!from_bytes(bad, victim), "P11 a v6-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P11 a v6-versioned stream is refused");
         }
         {
             // Sprint 16, BL-573: the IMMEDIATE previous format (BL-572's v7,
@@ -290,7 +309,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v7 = 7;
             std::memcpy(&bad[4], &v7, sizeof v7);
-            check(!from_bytes(bad, victim), "P12 a v7-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P12 a v7-versioned stream is refused");
         }
         {
             // BL-585: the IMMEDIATE previous format (Sprint 16's v8, the
@@ -303,7 +322,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v8 = 8;
             std::memcpy(&bad[4], &v8, sizeof v8);
-            check(!from_bytes(bad, victim), "P13 a v8-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P13 a v8-versioned stream is refused");
         }
         {
             // BL-586 slice 2: the IMMEDIATE previous format (BL-585's v9, the
@@ -315,7 +334,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v9 = 9;
             std::memcpy(&bad[4], &v9, sizeof v9);
-            check(!from_bytes(bad, victim), "P14 a v9-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P14 a v9-versioned stream is refused");
         }
         {
             // v10 (BL-586 slice 2) is refused twice over after this wave: it has
@@ -327,7 +346,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v10 = 10;
             std::memcpy(&bad[4], &v10, sizeof v10);
-            check(!from_bytes(bad, victim), "P15 a v10-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P15 a v10-versioned stream is refused");
         }
         {
             // v11 (BL-612's intermediate shape, this wave) still lacks the
@@ -338,7 +357,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v11 = 11;
             std::memcpy(&bad[4], &v11, sizeof v11);
-            check(!from_bytes(bad, victim), "P16 a v11-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P16 a v11-versioned stream is refused");
         }
         {
             // v12 (BL-611's intermediate shape, this wave) predates BL-613's
@@ -348,7 +367,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v12 = 12;
             std::memcpy(&bad[4], &v12, sizeof v12);
-            check(!from_bytes(bad, victim), "P17 a v12-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P17 a v12-versioned stream is refused");
         }
         {
             // v13 (BL-613's renumbered intermediate) still lacks wage_bid in
@@ -357,7 +376,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v13 = 13;
             std::memcpy(&bad[4], &v13, sizeof v13);
-            check(!from_bytes(bad, victim), "P18 a v13-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P18 a v13-versioned stream is refused");
         }
         {
             // v14 (the pre-BL-624 release format) still lacks the razed flag
@@ -366,7 +385,27 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v14 = 14;
             std::memcpy(&bad[4], &v14, sizeof v14);
-            check(!from_bytes(bad, victim), "P19 a v14-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P19 a v14-versioned stream is refused");
+        }
+        {
+            // P20 (R5, BL-631 ownership class) -- the IMMEDIATELY PRIOR format,
+            // named through the constant rather than by number. It lacks
+            // corporation_component::ownership_class in the corp record: one enum
+            // byte after `focus`, a MID-RECORD gap, so a reader that accepted it
+            // would misread starting_capital / balance / is_player / is_background
+            // in every corp and everything serialised after `corporations`
+            // besides. Refused whole, same contract as every prior bump.
+            //
+            // SYMBOLIC ON PURPOSE. Two slices in this wave claim a version from
+            // separate worktrees; a literal here would have to be re-pinned at the
+            // merge, which is how a version row stops being a check and becomes a
+            // thing that gets re-blessed. `world_save_version - 1` is true of
+            // whatever number the stack settles on.
+            std::string bad = bytes_once;
+            const uint32_t prev = world_save_version - 1;
+            std::memcpy(&bad[4], &prev, sizeof prev);
+            check(!from_bytes(bad, victim),
+                  "P20 the immediately-prior version is refused");
         }
         {
             // Truncated mid-way through the tile store -- far enough in that a
