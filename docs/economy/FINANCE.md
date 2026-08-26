@@ -170,8 +170,18 @@ numbers are settled.
 
 ## Debt interest
 
-A negative balance compounds once per tick by `k_debt_interest_per_quarter` (0.02 —
-~2 %/qtr, ≈ 8 %/yr). Non-negative balances are never charged. The constant is the single
+A negative balance compounds once per tick by `k_debt_interest_per_quarter` (**0.015** —
+1.5 %/qtr, ≈ 6.1 %/yr; was 0.02 until Ben's ruling of 2026-08-26). Non-negative balances are
+never charged.
+
+**The rate is set against what compounding does over the PRE-GAME, not over a quarter.** The warm
+start runs 80 quarters before the player is seated, so the rate is applied eighty times to whatever
+deficit a corp is carrying: at 0.02 that is ×4.9, at 0.015 it is ×3.3. Measured 2026-08-26, nine of
+twelve seeded corps had gone underwater and interest was then **43–60 % of their entire loss**,
+against an operating gap of only −24 to −40 cr/qtr — so the debt was mostly the compounding, not
+the trading. Ben's framing for the cut: *"it's not fun to see an inevitable loss."* Paired with a
+non-zero opening capital (`corporation_params::base_capital`, 400), which is the buffer that stops
+a survivable bad quarter starting the spiral at all. The constant is the single
 source of truth: the live loop and the `econ_bankruptcy` harness read the same value.
 Interest is a pure function of balance × rate — deterministic. Design: BL-073 (debt
 interest).

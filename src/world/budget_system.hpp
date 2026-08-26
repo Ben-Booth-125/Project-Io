@@ -17,7 +17,7 @@
 /// factor; a non-negative balance is never charged. Single source of truth — both
 /// the live budget loop and the econ_bankruptcy harness read this constant, so they
 /// can never drift. Interest is a pure function of balance × rate (deterministic).
-inline constexpr float k_debt_interest_per_quarter = 0.02f;
+inline constexpr float k_debt_interest_per_quarter = 0.015f;
 
 /// Per-building operating cost for one tick (BL-074): the maintenance and wage
 /// components apply_budget charges. Extracted as the single source of the formula so
