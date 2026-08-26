@@ -34,4 +34,14 @@ namespace resource_names {
 /// not a case to guess through.
 resource_type resource_from_name(const std::string& name, bool& ok);
 
+/// The REVERSE of the same table: the Lua identifier for a `resource_type`
+/// (e.g. `resource_type::iron_ore` -> "iron_ore"). Added by BL-648 so a
+/// headless harness can NAME the good it is reporting on instead of printing
+/// a bare enum index — a list of ids is not an actionable failure.
+///
+/// Reads the one table above, so it cannot drift from it. A `resource_type`
+/// with no entry (a content bug the table's own comment warns about) comes
+/// back as "resource#<id>" rather than as an empty string.
+std::string name_of(resource_type r);
+
 } // namespace resource_names

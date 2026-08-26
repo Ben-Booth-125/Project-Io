@@ -1,10 +1,15 @@
 #include "resource_names.hpp"
 
 #include <unordered_map>
+#include <vector>
 
 namespace resource_names {
+namespace {
 
-resource_type resource_from_name(const std::string& name, bool& ok)
+/// THE table, hoisted out of `resource_from_name` so the reverse lookup below
+/// reads the SAME literal rather than a second copy of it (BL-648). A second
+/// copy is exactly the drift this header exists to prevent — see its comment.
+const std::unordered_map<std::string, resource_type>& name_table()
 {
     static const std::unordered_map<std::string, resource_type> table = {
         { "iron_ore",              resource_type::iron_ore },
@@ -65,10 +70,43 @@ resource_type resource_from_name(const std::string& name, bool& ok)
         { "cloth",                 resource_type::cloth },
         { "rigging",               resource_type::rigging },
     };
+    return table;
+}
 
-    const auto it = table.find(name);
+} // namespace
+
+resource_type resource_from_name(const std::string& name, bool& ok)
+{
+    const auto& table = name_table();
+    const auto  it    = table.find(name);
     ok = (it != table.end());
     return ok ? it->second : resource_type::iron_ore;
+}
+
+std::string name_of(resource_type r)
+{
+    // Built once by inverting `name_table()`. DETERMINISTIC despite the source
+    // being an unordered_map: where two Lua identifiers ever mapped to one
+    // resource_type, the lexicographically smallest wins, so the answer does
+    // not depend on bucket layout (io-standing-rules § Determinism).
+    static const std::vector<std::string> reverse = [] {
+        std::vector<std::string> v(resource_count);
+        for (const auto& [n, res] : name_table())
+        {
+            const std::size_t i = static_cast<std::size_t>(res);
+            if (i < v.size() && (v[i].empty() || n < v[i]))
+                v[i] = n;
+        }
+        return v;
+    }();
+
+    const std::size_t i = static_cast<std::size_t>(r);
+    if (i < reverse.size() && !reverse[i].empty())
+        return reverse[i];
+    // A resource_type with no entry is a content bug this table's own comment
+    // warns about; name it by id rather than by an empty string so a caller
+    // printing it produces something a reader can act on.
+    return "resource#" + std::to_string(i);
 }
 
 } // namespace resource_names
