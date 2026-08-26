@@ -66,8 +66,26 @@ with the new-charter design truth, viability-as-measured-floor, and spawn forms 
 deliberate open design settled against the sweep data. `verifier-headless` skill and
 `tools/verify/README.md` gained the harness's entries.
 
-**Runtime.** ~2.5 h wall (the two 8-seed sweeps ran ~20 min each, in parallel). Design
-session → Light-plus delivery (harness + docs + stores, no `src/` touched).
+**The loops session (same day, second half — Ben: "a pivotal session").** The sweep verdict
+led Ben past viability-as-money into core-gameplay-loop territory. Rulings: the starting army
+is **retired, the base stays** (BL-628, retire starting unit; NR-648 resolved). Thirteen
+gameplay loops were catalogued with a user story each and mapped on ease-of-access ×
+importance (the "Io Loop Map" artifact, Ben's account); Ben re-scored **mercenary contracts
+down to (5, 6)** — an enemy once made is hard to stay ahead of; wars are not day-1 content —
+and **space up level with research (6.5)**: Era 1 is the live build, but this is ultimately a
+space-themed 4X. His importance-axis reading rule: *if something is important, the player can
+see it immediately.* The session's biggest output is the **phase-one thesis**: the opening
+game is **corporate buyout** — rank background corps on profit, buy the ones your strategy
+needs, industry consolidates from private toward public. It lands at core attention beside
+production, fits the sweep data (the background firms ARE the working economy), and rides the
+BL-524 syndicate/equity tier; missing parts and the three settle-tensions (privacy vs the
+ledger, the BL-094 identity framing, rival symmetry) are queued in NEXT_SESSION.md. Viability
+gained its cleanest candidate definition: **time to first buyout**. Session closed to continue
+off-cloud.
+
+**Runtime.** ~4 h wall (the two 8-seed sweeps ran ~20 min each, in parallel). Design
+session → Light-plus delivery (harness + docs + stores, no `src/` touched) → loops design
+session.
 
 ---
 

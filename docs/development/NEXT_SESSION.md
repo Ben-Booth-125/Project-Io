@@ -1,4 +1,57 @@
-# Next session — Sprint 20: read the sweep, rule on the army, settle the forms
+# Next session — Sprint 20: the loop map is judged; build the buyout phase-one loop
+
+**READ THIS SECTION FIRST — it supersedes the older material below.** The 2026-08-26 session
+continued past the sweep into a gameplay-loops session Ben called pivotal. Outcomes:
+
+## The loop map (Ben's judged scores are final)
+
+Thirteen loops mapped on x = ease of access, y = importance, published as the "Io Loop Map"
+artifact (https://claude.ai/code/artifact/326932b3-97f0-4a8b-b5f3-86d3650e6d9f — Ben owns it;
+the full catalogue with stories, scores and build states is on the page). Ben's re-scores over
+Claude's first pass: **mercenary contracts down to (access 5, importance 6)** — strategic
+operations carry an immense cost, an enemy once made is hard to stay ahead of, and wars are
+not day-1 content; **space up to importance 6.5, level with research** — Era 1 is the live
+build but this is ultimately a space-themed 4X. Ben's reading rule for the importance axis:
+*if something is important, the player can see it immediately.*
+
+## The phase-one thesis (Ben, 2026-08-26 — strongly held, not yet doc-settled)
+
+The first phase of gameplay is **corporate buyout**: a ledger ranking background corps on
+profit, and early buyouts, so the player grows the industry their strategy needs — "scrambling
+to make enough money that major industry becomes more and more public, moving away from the
+decentralised and private markets for important goods." Story: *rank the private firms by
+profit and buy the ones my strategy needs, so the industry that matters becomes mine and the
+economy consolidates around the winners.* It sits at (7, 9) on the map — core attention,
+beside production.
+
+Why it fits (the session's assessment): the sweep measured background firms AS the working
+economy (96 of 104 corps, 67% solvent) while named specialists are broke — buyout turns that
+into content; the syndicate/equity tier (BL-524, majority = control) already carries the
+ownership model. Missing: the profit ledger, a deterministic valuation rule, the buyout verb
+on the corp-command seam, a willingness/premium rule, and rival scoring of the same verb.
+
+Three tensions named for the settle: (1) **privacy** — rival books are private; resolve via
+"public signals only for private firms, acquisition/scale opens the books" (opacity = early
+risk texture); (2) **the BL-094 identity test** — frame buyouts as owning your supply base
+(passes FIELD), not portfolio play; decide which framing CONCEPT.md gets; (3) **symmetry** —
+rivals must score buyouts deterministically, which is also what produces the consolidation
+arc and the mid-game scarcity of acquirable industry.
+
+**Viability definition that fell out: phase-one viability = time to first buyout** — a
+measurable spawn_viability column once the verb exists.
+
+## Work queued for off-cloud (Ben: "we will need to work on the rest off cloud")
+
+1. Write the phase-one arc into CONCEPT.md and the buyout design into its owning doc, on
+   Ben's confirm; mint the items (ledger, valuation, buyout verb, rival scoring).
+2. BL-628 (retire starting unit) — ruled, refined, unbuilt; goldens re-bless in the ONE
+   end-of-pass wave.
+3. NR-647 (viability verdict rule) — likely superseded by time-to-first-buyout; confirm.
+4. The older queue below (sweep mechanics, carried debts) still stands.
+
+---
+
+# Older handoff — Sprint 20: read the sweep, rule on the army, settle the forms
 
 The 2026-08-26 session built and ran the spawn-viability sweep (BL-626, spawn viability
 sweep). The data is in and the headline is settled: **every named corp is insolvent by tick 3
