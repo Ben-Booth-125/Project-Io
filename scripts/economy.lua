@@ -324,6 +324,60 @@ economy = {
         -- these numbers for Ben's calibration by playtest — this is a reasoned
         -- first cut against the BL-543 value anchor, not a final ruling.
         --
+        -- BL-635 (spawn solvency, 2026-08-26): THE WHOLE VECTOR RESCALED BY
+        -- 0.025. The derivation below is kept verbatim because it is still the
+        -- shape of the thing and it is still internally consistent — what it
+        -- got wrong is a UNIT, and reading it is how the unit error is seen.
+        --
+        -- WHAT WAS MEASURED. tools/verify/spawn_solvency.cpp, 8 seeds of the
+        -- shipped 0 CE spawn, 80-tick warm start, per-flow attribution read off
+        -- BL-626's filed quarterly returns: the seated corporation's operating
+        -- outgoings were 667.5 cr/qtr against 21.2 cr/qtr of gross income, and
+        -- UPKEEP WAS 600.0 OF THE 667.5 — 89.9% of everything the corp paid,
+        -- and 28x everything it earned. Every swept seed was underwater by
+        -- ~120,000 credits after the warm start.
+        --
+        -- THE UNIT ERROR, which is what makes this a defect rather than a
+        -- taste. The derivation's closing claim is that "keeping a standing
+        -- unit for a year costs meaningfully less than raising a fresh one",
+        -- and it demonstrates that by comparing 24 (annualised
+        -- credits_per_head) against 40 (hire_base_cost). Those are not the same
+        -- quantity. credits_per_head is PER HEAD; hire_base_cost is PER UNIT,
+        -- and a unit is `hire_batch_manpower` = 50 heads. In consistent units
+        -- the old rate said a Levy Spear costs 40 credits to raise and
+        -- 50 x 6.0 x 4 = 1,200 credits a year to keep — thirty times its own
+        -- hire price, and sixty times an extraction site's entire annual
+        -- maintenance (5.0/tick). The same 50x reaches the goods half: one
+        -- ration per head per tick is 50 rations a quarter from ONE regiment,
+        -- against a processing facility's whole output of 8 batches a tick.
+        --
+        -- THE FACTOR. Restore the derivation's OWN stated property in
+        -- consistent units:
+        --     4 ticks x 50 heads x credits_per_head  <  hire_base_cost (40)
+        --     => credits_per_head < 0.2
+        -- 0.15 is chosen with headroom below that edge, exactly as
+        -- credits_per_head_per_power was chosen with headroom below its own —
+        -- so a Levy Spear costs 40 to raise and 30 a year to keep. That is
+        -- 0.15 / 6.0 = 0.025, and EVERY entry below is multiplied by it,
+        -- credits and goods alike.
+        --
+        -- WHY UNIFORMLY. The anchor value_anchor.cpp asserts is a RATIO —
+        -- SUM(goods_per_head[r] x base_price[r]) ~= 2 x wage_per_head — so
+        -- scaling both halves by one factor leaves every roster row exactly
+        -- where it was in the band. The relation is preserved, not weakened;
+        -- what changed is the scale it is denominated in. The power bound
+        -- rescales with it: (0.3005 x 0.667 - 0.15) / 420 = 0.00012, and
+        -- 0.0001 keeps the same proportional headroom 0.004 kept below
+        -- 0.004793.
+        --
+        -- WHAT IS LOST, said out loud: "one ration per head per tick" was the
+        -- legible anchor for the food line and 0.025 rations per head is not
+        -- legible at all. The legibility belonged to a per-head reading of a
+        -- quantity the economy consumes per-BUILDING, which is the same
+        -- mismatch this rescale corrects; recovering it means restating the
+        -- goods draw per unit rather than per head, which is a design change
+        -- and not this item's.
+        --
         -- THE ANCHOR (NATIONS.md § 3, Ben 2026-08-22): "the equipment needed to
         -- sustain a unit costs about 2x their salary for that year", clarified
         -- to price the GOODS draw against the WAGE's flat term using authored
@@ -387,16 +441,20 @@ economy = {
         -- BL-325 S3), so the "how far is still reachable" number a building
         -- already answers is the same number a unit's supply line answers.
         unit_upkeep = {
-            credits_per_head           = 6.0,   -- flat wage per head per tick
-            credits_per_head_per_power  = 0.004, -- wage scaled by the roster row's power_mod (bounded <= 0.004793, see derivation above)
+            -- BL-635: every figure in this table is its pre-2026-08-26 value
+            -- x 0.025. The old values are kept in the trailing comments so the
+            -- rescale is one readable multiplication rather than a rewrite.
+            credits_per_head           = 0.15,   -- flat wage per head per tick (was 6.0)
+            credits_per_head_per_power = 0.0001, -- wage scaled by the roster row's power_mod (was 0.004; bounded <= 0.00012, see derivation above)
 
             -- The goods half of the vector, per head per tick. ORDNANCE is the
             -- good (BL-457 added it as the roster's first terminal MILITARY
             -- good precisely so this draw could consume it); food_rations is
-            -- the sanctioned second line.
+            -- the sanctioned second line. Both rescaled by the same 0.025, so
+            -- value_anchor's equipment:wage ratio is untouched.
             goods_per_head = {
-                ordnance     = 0.14,
-                food_rations = 1.0,
+                ordnance     = 0.0035, -- was 0.14
+                food_rations = 0.025,  -- was 1.0
             },
 
             supply_decay_permille    = 50,   -- the ONE decay subtraction, per tick
