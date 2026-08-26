@@ -1120,6 +1120,30 @@
    ],
    "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
    "design": "Ben, 2026-08-25 (dispatch-triage close-out): \"there are a few forms for corporation starts to take\" - the spawn-form design session Sprint 20 owes. Reordered by Ben 2026-08-26: the forms are settled AGAINST the BL-626 (spawn viability sweep) data, not ahead of it. Candidate forms on the table from the 2026-08-26 session, each solving viability differently, none chosen: (1) new charter (current: 0cr, lean assets - honest but needs a guaranteed early income, e.g. a seeded procurement contract on the existing contracts loop); (2) charter loan - opening capital as DEBT on the existing k_debt_interest_per_quarter mechanism, cash to act with market discipline intact; (3) established firm - larger holdings plus operating history, wealth as assets not cash; (4) backed subsidiary - a nation or parent stake, tying starts into the politics layer. Constraints carried from the close-out: every form must be one a RIVAL can bootstrap (the \"never on cash\" availability ruling means a corp with no stock and no market access may have no legal candidates - a form that strands rivals poisons every seed's data); relative comparison across forms on a fixed seed + rival field, absolute numbers being confounded by the open economy pathologies; one deliberate baseline re-bless wave at the end of the viability pass, with provenance, not a dribble (NR-596 precedent). The frame settled 2026-08-26 and written into CORPORATION_GENERATION.md Pass 4: viability is a FLOOR, not equality - different starts giving different opportunities is intended variety, a start dead before turn one is a defect. The verdict rule (which combination of solvent/earning/active is \"viable\") is part of this design, first-cut ingredients logged for Ben's review."
+  },
+  {
+   "id": "BL-628",
+   "short_name": "RETIRE_STARTING_UNIT",
+   "title": "Retire the seeded starting unit; every corp opens with a base and no standing force",
+   "status": "refined",
+   "glyph": "○",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": "post-v0.1.19",
+   "sprint": "20",
+   "category": "Generation",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "files": [
+    "src/world/corporation_generation.cpp",
+    "docs/military/MILITARY.md",
+    "tools/verify/rival_military_seeding_harness.cpp"
+   ],
+   "authority_doc": "docs/military/MILITARY.md",
+   "design": "Ben, 2026-08-26, ruling on NR-648 (the spawn-viability sweep verdict): \"We can retire the starting army. Not the base.\" The sweep measured the BL-476 seeded 50-head unit - 300 cr/qtr wages from tick 1 under BL-454 upkeep, compounded ~194x by BL-073 debt interest over the 80-tick warm start - as the dominant cause of every named corp opening ~-113k cr insolvent in every campaign-real seed. WORK: seed_starting_military keeps authoring the military_base (the muster point, and BL-331/BL-476 symmetry) and stops creating the unit_component; a corp raises its first unit through hire_unit when it can carry the upkeep (BL-324 already gives rivals the verb, scored under the solvency gate). Touches: rival_military_seeding_harness (asserts 1 base + 1 unit per named corp - the unit half inverts), the Kepler player stub in hard_coded_world.cpp (decide: same retirement for consistency, or out of scope - it has no muster_base and no upkeep pressure in that fixture world), and every state_hash golden (units join the hash) - fold the re-bless into the ONE deliberate end-of-pass wave with provenance (NR-596 precedent), not a dribble. Re-run spawn_viability after: the residual named-corp operating loss (~equal share of the crater) is then the remaining viability question the spawn forms (BL-627) answer."
   }
  ]
 }

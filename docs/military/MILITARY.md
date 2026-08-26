@@ -279,9 +279,14 @@ by entity id), which is what keeps the container's iteration order off the deter
 - `src/world/hard_coded_world.cpp` — the Kepler player stub, count 50, type 0. No `muster_base`
   (that world has none), so it is deliberately never orphaned.
 - `src/world/corporation_generation.cpp` — `seed_starting_military`: every non-background corp's
-  starting unit beside its starting base (BL-331, starting military presence; BL-476, rivals start
-  armed), count 50, roster row 0, placed on the nearest valid land tile to the HQ. Records that
-  base as its `muster_base`. BL-365 background firms are unarmed on purpose.
+  starting **base** (BL-331, starting military presence; BL-476, rivals start armed), placed on
+  the nearest valid land tile to the HQ. **The starting unit is retired; the base stays (Ben,
+  2026-08-26, ruling on NR-648)** — the spawn-viability sweep measured the seeded 50-head unit's
+  upkeep, compounded by debt interest across the warm start, as the dominant cause of every named
+  corp opening ~−113k cr insolvent. A corp raises its first unit through the same `hire_unit`
+  verb as any later one, when it can carry the upkeep; the base is the muster point waiting for
+  that choice. BL-628 (retire starting unit) owns the change. BL-365 background firms are unarmed
+  on purpose.
 - `src/world/corp_command.cpp` — the `hire_unit` verb, count `hire_batch_manpower` = 50. Records
   the tile's qualifying base, lowest entity id first.
 - `src/world/nation_generation.cpp` — a nation's garrisons, owner set to the nation entity, no
