@@ -105,6 +105,38 @@ The fallback path, for any body with no settlement pass: focus is drawn with wei
 shaped by the home nation's `economic_focus` and by the current distribution of already-generated
 corporations, providing diversity without enforcing a strict quota.
 
+### Pass 2b — Ownership class
+
+Each corporation also receives an `ownership_class` — **public**, **private** or **closed** —
+and it is **derived from the home region, not authored**, on exactly the principle BL-219
+established when it retired the focus-weighting table. It reads the *same*
+industrialisation-timing scalar Pass 2 already reads for focus, so this is one more mapping over
+an existing signal rather than new machinery. Design: BL-631 (ownership class).
+
+- **Early industrialiser, strong enforceable-promise institutions → `public`.** The institutions
+  that make a contract enforceable are the institutions that make a share transferable; a region
+  that had one had the other.
+- **Late or statist industrialiser → `private`.** The firm exists and trades, but its books are
+  its own.
+- **Never industrialised → `closed`.** No filing, no market in the firm at all.
+
+A corporation with no home region — the rung-3 case where the settlement pass never reached the
+nation — takes its class from the national character, the same fallback its focus takes.
+Background firms (Pass 6) are classed by the same read; nothing about the class branches on
+`is_background`.
+
+**The class does two jobs, and both are load-bearing.** It decides whether the corporation files
+a quarterly return the player may read, and it decides whether the corporation may be bought
+outright. Both are [`FINANCE.md`](../economy/FINANCE.md)'s — § Disclosure and § Whole-firm
+acquisition. Generation's part is only to derive the field.
+
+**The floor rides the existing reroll.** If *no* specialist comes out `public`, nothing in the
+world files and nothing is buyable, so the world-level reject-and-reroll of Pass 2 takes a second
+condition alongside the focus-diversity one — one reroll, two conditions, never a patch to an
+individual corp. An unmet floor after the attempt cap stands as-is, exactly as the focus floor's
+does. Note that the **spawn shortlist is unaffected either way**: it reads world truth, not
+disclosure, so a world where nobody files still seats a player correctly.
+
 ### Pass 3 — Starting asset placement
 
 Each corporation receives a **lean, focus-coherent set of holdings** placed on tiles
@@ -250,44 +282,60 @@ consequences of Pass 6's output — how real background supply meets real popula
 
 ## Player corporation
 
-One generated corporation is flagged as `is_player = true`. The generator makes that draw, and
-no special generation rules apply: the player starts on the same footing as any other
-corporation. The draw is a **default** rather than a verdict — the player is offered the set and
-picks.
+One generated corporation is flagged as `is_player = true`. No special generation rules apply:
+the player starts on the same footing as any other corporation, and the flag is set **after** the
+world has been run forward, not during the passes above.
 
-**Corporation selection screen** (BL-435, corporation selection). `app_screen::choosing_corp` is
-a stage between generation completing and the pre-game warm start, listing every **specialist**
-corporation with its name, industrial focus, home nation and holdings by building type, plus a
-**Surprise me** that takes the generator's own seeded pick. Selection *re-points* `is_player` /
-`world::player_entity` (`app::apply_corp_choice`) rather than replacing the draw, so determinism
-is untouched and every path that never opens the screen is bit-identical. Surface detail is
-`docs/ui/STARTUP.md` § Starting-corp selection; that doc owns the screen.
+### The spawn shortlist, and the seat
 
-*Why the screen exists* — measured, not assumed. `tools/verify/player_seed_sweep` over 24 seeds
-found the generator handing the player a pure-extraction corp on 13 of them, so the chain-depth
-ladder (BL-428, chain-depth ladder) and the Method page had no rung to stand on, while better
-openings existed unchosen in the very same world. Solvency is **not** the discriminator: all 24
-ended positive. The economy produces shallow openings, not broke ones — and rejection-sampling
-seeds would hide the distribution rather than expose it.
+Ben's call, 2026-08-26: **which corporation the player runs is drawn at random from a shortlist
+of the viable ones.** Design: BL-630 (spawn shortlist). The sequence:
 
-*The pool is the specialists.* Ben's call, 2026-08-16: the 8 corps this pipeline's Passes 1–5
-create, not Pass 6's background firms. That is a property of *when* the stage opens (before
-`generate_background_firms`), belt-and-braced by an `is_background` skip in `build_corp_choices`,
-and asserted per-seed by `player_seed_sweep --guard`.
+1. **Generate** — Passes 1–6, exactly as above. No corporation is the player's yet.
+2. **Warm-start in spectate** — the pre-game ticks run with **no seated corp**, under
+   `corp_ai_params::spectating`.
+3. **Shortlist** — every specialist whose quarterly returns clear the viability floor.
+4. **Seat** — one is drawn from the shortlist against the world seed, and `is_player` /
+   `world::player_entity` are re-pointed onto it.
+
+**Spectate is the machine this needs, and it already exists.** BL-409 settled that under
+`spectating` the no-auto-act prohibition has *no subject*: every corp evaluates on the same
+staggered cadence, and admitting one more corp shifts no rival's cadence slot, because the index
+is over the sorted corp set. A warm start with nobody seated is precisely that case, so the
+reorder introduces no new concept and no new exception — it uses the one already granted.
+
+**What the reorder costs, stated plainly.** Until now the chosen corp was excluded from `corp_ai`
+for all of the warm ticks; after it, every corporation is scorer-driven through the whole warm
+start. **Every seed's opening position therefore changes**, and the goldens re-bless — once,
+deliberately, in a single wave with dated provenance, never as a dribble. Ben took that cost
+knowingly on 2026-08-26.
+
+**The viability floor is measured, not authored.** Its metric is the spawn-viability pass's to
+settle, and the shape it must have is: a specialist qualifies if it is solvent at the end of the
+warm start and its trailing net over the last 8 filed quarters is non-negative. Determinism is
+unaffected — the draw consumes the world seed, so a seed reproduces its seat exactly.
+
+**An unmet floor stands.** If no specialist clears, the highest trailing-net specialist is seated
+and the world records that the floor went unmet. That is a viability signal to be read, not a
+failure to be hidden — the same position § Pass 2's diversity floor takes.
+
+**What this retires.** The starting-corp selection stage (`app_screen::choosing_corp`) and its
+*Surprise me* press are removed; `docs/ui/STARTUP.md` owns that screen and its removal. The
+analytical profile and re-roll verbs that were outside the screen's scope remain outside this
+mechanism's too, and their natural home is still the New World wizard.
+
+**What this does NOT solve, and the screen did.** The selection stage was built on a *measured*
+problem: over 24 seeds the generator handed the player a pure-extraction corp on 13 of them, so
+the chain-depth ladder had no rung to stand on. **A profitability floor does not address that** —
+a shallow pure-extraction corp can be perfectly profitable and will clear the floor every time.
+Whether the shortlist should carry a second, depth criterion alongside viability is open and is
+recorded in the review queue; until it is answered, the shallow-opening distribution
+`player_seed_sweep` measured is unchanged by this design.
 
 *Depth, not wealth.* A processor-bearing corp is the **deeper** start, not the richer one: a
 processing facility earns **less** per tick than the extraction site it replaces (BL-436,
-processing under-earns extraction, owns the correction). Neither this doc nor the screen may
-call it the richer opening while that holds.
-
-**Outside the screen's scope**: the *analytical profile* — territory position, resource access,
-home-nation political context — and the **re-roll** verbs (accept / re-roll within the nation /
-pick a different nation to generate within). The screen is a chooser over the corps the world
-already made. Its natural fuller home is the **New World wizard** (`PLANETOLOGY.md`
-§ Preferences, not parameters), as a corporation round after round C. BL-094 (player militia
-pivot) changes this screen's subject with the player's identity.
-
----
+processing under-earns extraction). Nothing in the shortlist or its surfaces may call it the
+richer opening while that holds.
 
 ## Corporate seeding is watched — split by kind
 

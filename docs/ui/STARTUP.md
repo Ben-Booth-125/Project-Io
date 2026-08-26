@@ -9,16 +9,18 @@ the opening view the flow hands over to.
 
 ## The screen state machine
 
-`app_screen` (`app.hpp`) has five states; `run()` opens on **`menu`**:
+`app_screen` (`app.hpp`) has four states; `run()` opens on **`menu`**:
 
 ```
-menu  →  generating  →  building  →  choosing_corp  →  in_game
-(main menu)  (New World wizard)  (the carve)  (pick your corp)  (play)
+menu  →  generating  →  building  →  in_game
+(main menu)  (New World wizard)  (carve, then warm start)  (play)
 ```
 
 `building` is the loading screen the world is carved on (CORPORATION_GENERATION.md
-§ Corporate seeding is watched). `choosing_corp` is the starting-corp selection
-stage — see § Starting-corp selection below.
+§ Corporate seeding is watched); it also hosts the pre-game warm start that runs
+after the carve. There is **no corp-selection stage** — the player is seated on a
+corporation drawn from the spawn shortlist once the warm start has finished. See
+§ The seat below.
 
 **Only `in_game` simulates.** On the menu and wizard the loop just pumps events
 and draws — the world, economy, and sim clock are not built until the wizard's
@@ -102,44 +104,38 @@ The wizard's "Begin", and the one and only generation call:
 2. `setup_world(m_pending_world_params)` — build the world; fills
    `m_generation_report` (presentation artefact, off the serialisation seam).
 3. `load_economy()` — recipes + economy constants from Lua.
-4. **Pre-game warm start** ([C3]): seed the balance history, then run 12
-   quarterly econ ticks (~3 in-game years) so every corp opens onto non-empty
-   pools and live markets, not a cold zero state. `run_verify` stays cold.
-5. Rebase the clock again (generation + warm-start wall time must not become
+4. **Pre-game warm start** ([C3]): seed the balance history, then run
+   `app::pre_game_ticks` (**80**) quarterly econ ticks, sliced across loading-screen
+   frames, so every corp opens onto non-empty pools and live markets rather than a
+   cold zero state. It runs **in spectate** — `corp_ai_params::spectating`, no corp
+   seated — because the seat is decided from what the warm start produces.
+   `run_verify` stays cold.
+5. **Seat the player**: shortlist the specialists whose filed returns clear the
+   viability floor, draw one against the world seed, and re-point `is_player` /
+   `world::player_entity` onto it. Owned by CORPORATION_GENERATION.md § The spawn
+   shortlist, and the seat.
+6. Rebase the clock again (generation + warm-start wall time must not become
    in-game days), then `m_screen = in_game`.
 
 Play opens on the corporation's home planet — the Planetary rung, home body
 selected (CANVASES.md § Default state).
 
-## Starting-corp selection — `draw_corp_choice_screen`
+## The seat
 
-The stage is BL-435 (starting-corp choice). Which corporation the player runs is
-a **stated choice, not a lottery**: the generator's seeded draw is the fallback,
-never the only path. Measured across 24 seeds, a pure draw hands the player a
-pure-extraction corp on 13 of them, while better openings sit unchosen in the
-same world.
+The starting-corp **selection screen is retired** (Ben, 2026-08-26): which corporation
+the player runs is drawn at random from a viability shortlist rather than picked. The
+mechanism — the warm start in spectate, the floor, the draw, and what the reorder costs
+in re-blessed goldens — is owned by
+[`CORPORATION_GENERATION.md`](../generation/CORPORATION_GENERATION.md) § The spawn
+shortlist, and the seat. This doc owns only the screen consequences:
 
-**It lives in exactly one frame, and both constraints are hard.** `poll_worldgen`
-opens it the moment generation returns, which is (1) **after** the corps exist,
-(2) **before** `start_new_game_prelude` runs `generate_background_firms`, so
-`m_world.corporations` still holds exactly the specialist set that is the pool,
-and (3) **before** the pre-game warm start, so the corp the player picks is the
-corp `corp_ai` excludes for all 80 warm ticks. No later frame satisfies all three.
+- `app_screen::choosing_corp`, `draw_corp_choice_screen`, `build_corp_choices`,
+  `apply_corp_choice` and the *Surprise me* press all go, along with
+  `verify.show_corp_choice` and `scripts/verify/corp_choice.lua`.
+- The three hard ordering constraints that pinned the old stage to a single frame
+  dissolve with it. The seat now happens **after** background firms and **after** the
+  warm start, which is what makes a profitability read possible at all — the old stage
+  showed no balances precisely because it ran before any had moved.
+- The loading screen gains a second phase: the carve, then the warm start it now hosts.
+  What that phase shows while it runs is unbuilt and is BL-632's (warm-start progress).
 
-**What it shows:** name, industrial focus, home nation, and holdings as
-`N proc / N extr / N other`. **Balance is deliberately absent** — opening balances
-are seeded *by* the warm start, which has not run, so every corp reads 0.0 here.
-
-**What it must not claim.** A processor-bearing corp is the **deeper** opening, not
-the richer one: BL-436 (processing profitability) measured a processing facility
-as earning *less* per tick than the extraction site it replaces. No copy on this
-screen ranks the openings, and none should until that is untrue.
-
-**"Surprise me"** takes the generator's own seeded pick, so it reproduces the
-pure-draw behaviour for that seed exactly. Selection **re-points**
-`is_player`/`player_entity` (`apply_corp_choice`) rather than replacing the draw,
-which is why every harness and golden that never opens this screen is
-bit-identical whether or not the stage is shown. Both automated paths
-(`--autostart`, the verify harness) auto-take that fallback; a check reaches the
-screen through `verify.show_corp_choice` (`scripts/verify/corp_choice.lua`), and
-the headless properties it depends on are asserted by `player_seed_sweep --guard`.

@@ -138,6 +138,117 @@ source of truth: the live loop and the `econ_bankruptcy` harness read the same v
 Interest is a pure function of balance × rate — deterministic. Design: BL-073 (debt
 interest).
 
+## The quarterly return
+
+One economy tick is one quarter, so the ledger's cadence is the money loop's own. At the end of
+`apply_budget` every corporation writes a **quarterly return** — the seven flows it just paid, its
+closing balance, and two stock figures. It is a *retain*, not a second computation: every flow
+already exists in `corp_budget`, and `net()` is by construction the delta applied to the balance,
+so a return can never disagree with the loop that produced it.
+
+Design: BL-626 (quarterly return record). Ben, 2026-08-26: *"a table ledger that tracks
+profitability, updated each quarter with company balance sheets."*
+
+| Field | Source |
+|---|---|
+| `income` / `expenditure` | `corp_budget` — the market cash flows from `clear_markets` |
+| `maintenance` / `wages` | `corp_budget` — summed `compute_building_opex` |
+| `interest` / `levies` / `upkeep` | `corp_budget` — the debt charge, enacted law, standing force |
+| `net` | `corp_budget::net()` — the exact balance delta |
+| `balance` | closing `corporation_component.balance` |
+| `holdings` | `assets.size()` — the building count |
+| `book_value` | Sum of `build_cost` over the holdings, from the recipe registry |
+
+Nothing here is estimated. `holdings` and `book_value` are the two **stock** figures that make the
+row a balance sheet rather than an income statement alone, and `book_value` is the same
+construction cost the build press already charges — one number, one authority.
+
+**Retention is a rolling 40 quarters** (ten years; Ben, 2026-08-26), oldest dropped first, per
+corporation. Bounded by construction, and that is the point: the record is world state and crosses
+the serialisation seam, so it must not grow with campaign length. Ten years carries a trailing
+profit read through a full boom-bust while keeping the whole field's history small.
+
+**It is world-side, and that is the change.** `ui::player_plot_history` is a UI cache — player corp
+only, 64 samples, never serialised. The return is none of those things: the buyout prices every
+corporation from it, the spawn shortlist reads it before a player exists, and a reloaded campaign
+must come back with its history intact. The player's own profit chart keeps reading the UI cache;
+that surface is unchanged.
+
+**Determinism.** Returns append in a sorted walk by `entity_id`, one row per corp per tick, fixed
+width on the save seam. No branch reads a return during the tick that writes it, so the record is
+a pure downstream observation of the loop and cannot feed back into it.
+
+## Disclosure — who may read a return
+
+Every corporation writes a return. **What may be read is decided by the target's ownership class**,
+not by the fog: `public` corporations file, `private` and `closed` corporations do not. The class
+is generated from the home region's industrialisation timing —
+[`CORPORATION_GENERATION.md`](../generation/CORPORATION_GENERATION.md) owns that derivation.
+
+**Disclosure is binary.** A public firm's row shows exact figures; a private or closed firm's row
+shows its name, focus and class, and a dash where the figures would be. There is no graded middle:
+the banded standing read — negligible / minor / notable / major / dominant — is **retired**
+(Ben, 2026-08-26: *"We don't need company information to be invisible"*). So the reason a number is
+absent is always that the firm does not file, never that the player has not earned it.
+
+Two consequences fall out, and both are wanted. **Class decides what is legible**, so how readable
+a world is becomes a generated fact varying by seed rather than a global setting. And **class
+decides what is buyable** (below) — a firm that files is a firm you can price.
+
+## Whole-firm acquisition — the buyout
+
+Ben's call, 2026-08-26: a buyout takes the **whole firm outright**, never a fractional stake. There
+is no equity relation, no share count, no controlling-holder threshold, no dividend split — a
+corporation has one owner, and the verb moves it in a single step. Design: BL-628 (whole-firm
+acquisition).
+
+**The price is read off the target's own returns:**
+
+```
+price = max(0, book_value + k_acquisition_multiple x trailing_net + balance)
+```
+
+- `trailing_net` is the mean `net` over the target's last **8** filed quarters — two years of the
+  forty retained, or fewer if the firm is younger than that.
+- `k_acquisition_multiple` is authored in `scripts/economy.lua`, so tuning the acquisition market
+  is a data change rather than a code one.
+- `balance` is signed. Buying a firm buys its cash **and its debts**, so a leveraged target is
+  cheaper by exactly what it owes and a hoarding one costs more.
+- **Nothing clamps the profit term.** A chronically loss-making firm prices below its book value,
+  and it should — that is the ledger telling the truth about it.
+
+**Why the floor is zero, and why it is not book value.** There is no salvage in the prototype:
+`construction.hpp` refunds nothing on demolition and names salvage a separate design question, so
+book value is not a redemption anyone can take, and flooring there would be an invented one. Zero
+is the floor for a mechanical reason instead — **the price is a sink**, the same treatment
+construction already gives a build cost (a levy is explicitly a transfer *because* an ordinary
+spend is not). A public firm's sellers are a diffuse shareholder base, not a modelled actor, so
+there is nobody a negative price could be paid by. A firm priced at zero is worthless, stated
+plainly.
+
+**What transfers.** The target's holdings, its stockpile pools, its balance and its filed returns
+move to the acquirer; the target corporation is then dissolved. Three seams are walked in the same
+move and none of them are new: `hq_building` / `influence_range` recompute from the merged holding
+set (Pass 3b's rule unchanged), standing units re-point to the acquiring owner through their
+recorded `muster_base`, and open market orders are **cancelled** rather than reassigned — an order
+is a promise made by a party that no longer exists.
+
+**Who may be bought.** A **public** corporation may be bought on the open market at the price
+above, with no consent — its books are open, so it can be priced. A **private** or **closed** one
+may not: there is no filed return to price it from and no negotiation verb yet. That is the second
+job the ownership class does, and it is why the class is worth generating rather than authoring.
+
+**What it costs politically.** Nothing new is needed. `equity_taken` already exists as a sentiment
+factor ([`RELATIONS.md`](../politics/RELATIONS.md) § The factors) — *"the observer wanted a firm
+and the subject took it"*. An acquisition's political cost lands there, on the rivals who wanted
+the same firm.
+
+**Rivals buy too.** `buy_corporation` joins the `corp_command` seam and is scored in
+`corp_ai.cpp`'s existing deterministic candidate list, capped at one acquisition per evaluation and
+carried in the candidate's `spend` under the solvency gate — the shape every widening in
+`.claude/rules/io-standing-rules.md` takes, a legal verb on the scorer and never a planner.
+Design: BL-629 (rival acquisition).
+
 ## Surfaces
 
 - **Budget ledger** — the itemised flow breakdown, player corp only
@@ -147,6 +258,11 @@ interest).
   plus the `[in debt]` flag. See `docs/ui/HEADER.md`.
 - **Per-building profitability** — unit economics per building via
   `building_profit.hpp`, surfaced in selection / construction / hover.
+- **Profitability ledger** — the whole field's filed returns, one row per corporation,
+  refreshed each quarter, and the host of the buyout press. It is the only surface that reads
+  another corporation's return, and it reads only what that corporation files. Design: BL-627
+  (profitability ledger); its `question_log.json` pair is Ben's wording and is owed before it
+  is built.
 
 ## Adjacent design
 
