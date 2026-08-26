@@ -205,8 +205,16 @@ not by the fog: `public` corporations file, `private` and `closed` corporations 
 is generated from the home region's industrialisation timing —
 [`CORPORATION_GENERATION.md`](../generation/CORPORATION_GENERATION.md) owns that derivation.
 
-**Disclosure is binary.** A public firm's row shows exact figures; a private or closed firm's row
-shows its name, focus and class, and a dash where the figures would be. There is no graded middle:
+**A corporation always reads its own books.** Disclosure governs what one firm may learn about
+**another** — it is a competitor rule, and turning it on its author would be nonsense: a firm that
+could not read its own balance sheet could not be run. The observer's own corporation therefore
+shows exact figures on every surface regardless of its class, and the class decides only what it
+publishes to everyone else. (A closed firm reading its own books and publishing none is exactly
+what "closed" means.)
+
+**Otherwise disclosure is binary.** Another public firm's row shows exact figures; another private
+or closed firm's row shows its name, focus and class, and a dash where the figures would be. There
+is no graded middle:
 the banded standing read — negligible / minor / notable / major / dominant — is **retired**
 (Ben, 2026-08-26: *"We don't need company information to be invisible"*). So the reason a number is
 absent is always that the firm does not file, never that the player has not earned it.

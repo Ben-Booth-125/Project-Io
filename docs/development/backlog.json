@@ -1430,6 +1430,29 @@
     "docs/generation/CORPORATION_GENERATION.md"
    ],
    "design": "MEASURED FIX for what BL-631 landed correctly and NR-659 then exposed: at the default 0 CE epoch every corporation and all 1298 regions class closed across 8 seeds, because settlement.cpp:441/470 breaks out of the energy transition for antiquity and median_industrial_year stays 0. Pass 2b's third rung fires correctly on a degenerate input. Consequence: nothing files, nothing is buyable, and Sprint 20's goal cannot happen on the default world - BL-627, BL-628 and BL-634 all rest on this. THE WORK: re-point the derivation from HISTORY.md Stage 4 (energy transition, which antiquity skips) to Stage 1 (THE ENFORCEABLE PROMISE, which the ladder pass runs in every era). The signal already exists as history_ladder::charter_cradle - the Charter Act, first perpetual company registered, which is corporate personhood itself. This is what Pass 2b's own justifying sentence always named: the institutions that make a contract enforceable are the institutions that make a share transferable. Same shape, no new machinery, and the mapping becomes ERA-AGNOSTIC rather than silently post-industrial. Keep BL-631's reachability waiver even though public becomes reachable again - 'the floor is unmeetable here' stays a real state. Re-run ownership_class R2 and report the new distribution at BOTH epochs; the row measures, it does not assert a target. This is the era-relative gates class Sprint 19's retro named, recurring one sprint later."
+  },
+  {
+   "id": "BL-639",
+   "short_name": "CORP_PANEL_COLUMN_BUDGET",
+   "title": "The Corporations panel does not fit its column - names cut to one letter, Declare Hostile clipped",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": "v0.1.20",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "authority_doc": "docs/ui/LAYOUT.md",
+   "files": [
+    "src/ui/corporation_panel.cpp",
+    "docs/ui/ledgers/corporation.md"
+   ],
+   "design": "OBSERVED LIVE, 2026-08-26 (BL-633's capture), and pre-existing - BL-633 changed no width and no column count. Five columns carrying 62+62+62+220 px of fixed width do not fit the shell fold-out column (380-460 px by resolution) at 1280x720: the Corporation NAME column collapses to a single letter ('F', 'E', 'C') and the Stance column's 'Declare Hostile' button clips off the right edge as 'De...'. This is BL-449's shape exactly - the surface that shipped clean on a compile AND a 36/36 harness while being unusable - still live in the same panel. THE WORK: re-budget the columns against shell_column_width(disp.x) rather than fixed pixels, and decide whether the stance presses belong in-row at this width at all or behind the row's Selection drill. Note NR-663: expect_no_clipping did NOT catch this, because ImGui SmallButton labels are not instrumented into the overflow ledger - so this needs a real look, not a green row."
   }
  ]
 }

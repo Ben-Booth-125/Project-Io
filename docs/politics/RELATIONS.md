@@ -266,10 +266,13 @@ not how coarse the number is but **whether there is one at all**:
   observable — buildings are visible on canvas, market supply/demand aggregates are the deliberate
   public signal (`DISCOVERY.md` § Competitor visibility). Nothing was ever hidden about them
   except by the banding, so nothing is lost by printing them.
-- **Capital is a filed figure and follows the ownership class.** Exact for a `public`
-  corporation, absent for a `private` or `closed` one — the same binary disclosure the quarterly
-  return takes (`docs/economy/FINANCE.md` § Disclosure). A dash means *this firm does not file*,
-  never *you have not earned this*.
+- **Capital is a filed figure and follows the ownership class — for everyone but you.** The
+  observer's **own** corporation always shows exact figures: disclosure is a rule about reading
+  *another* firm, and a corporation that could not read its own balance sheet could not be run.
+  For every other corporation it is exact where the firm is `public` and absent where it is
+  `private` or `closed` — the same binary disclosure the quarterly return takes
+  (`docs/economy/FINANCE.md` § Disclosure). A dash means *this firm does not file*, never *you have
+  not earned this*.
 
 **It is still deliberately NOT unified with `corp_ai`'s scorer.** The AI optimises an internal
 ground-truth quantity; this is a published read. Unifying them would make every rival directly

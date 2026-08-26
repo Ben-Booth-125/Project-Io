@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*70 entries — 53 open, 17 resolved.*
+*73 entries — 56 open, 17 resolved.*
 
 ---
 
@@ -514,6 +514,27 @@ Pass 2b added a second condition to Pass 2's world-level reject-and-reroll: at l
 spectator_determinism fails its 81ADF917369317C7 row. The agent built the harness against MAIN's unmodified sources and got the identical actual value (C91FB6ADA80B65CE) and the identical failure, so the drift predates this wave. It correctly did NOT re-bless - a golden re-blessed by whoever happens to trip over it is a golden nobody reviewed. Someone needs to find which landed change moved it and re-bless deliberately, with dated provenance, per the harness's own provenance-log idiom. Note the standing rule attached to this harness: the two properties it guarantees are that the flag DEFAULTS FALSE (an ordinary session is byte-identical) and that admitting one more corp shifts no rival's cadence slot - a state_hash constant is dated evidence, not the invariant itself.
 
 *Files: `tools/verify/spectator_determinism.cpp`*
+
+### NR-662 — The disclosure rule as written locks the PLAYER out of its own balance sheet
+*decision taken on your behalf · raised 2026-08-26 · from Sprint 20 wave 2, BL-633: the agent implemented the rule literally, saw the consequence, and asked rather than carving out an exception on its own.*
+
+I wrote 'capital is exact for a public corporation, absent for a private or closed one' into FINANCE.md and RELATIONS.md with NO carve-out for the observer's own firm. The agent implemented it literally and correctly - and on a default antiquity world, where every corp is closed, THE PLAYER CANNOT READ THEIR OWN CAPITAL in the Corporations panel. That is my error, not the implementation's. Taken on Ben's behalf and written into both docs: disclosure is a rule about reading ANOTHER firm. A corporation always reads its own books, whatever its class - a firm that could not would be unrunnable, and a closed firm reading its own books while publishing none is exactly what closed MEANS. The code change is one line (is_player/owner exemption on capital_disclosed) and is owed with BL-633's merge. Overturnable, but I cannot construct the argument for the other side.
+
+*Files: `docs/economy/FINANCE.md`, `docs/politics/RELATIONS.md`, `src/world/standing.cpp`, `src/ui/corporation_panel.cpp`*
+
+### NR-663 — expect_no_clipping reported CLEAN while a genuinely clipped button was on screen
+*observation · raised 2026-08-26 · from Sprint 20 wave 2, BL-633: the agent flagged its own green row as vacuous, and separately reported the real defect.*
+
+Two findings that are only interesting together. (1) The agent's acceptance script passed expect_no_clipping with '0 failure(s), 0 record(s) total' - the overflow ledger saw NOTHING, so the pass is vacuous, and the agent said so rather than banking it. (2) In the same session it reported a real, visible layout defect in the same panel: the Corporation name column is squeezed to a SINGLE LETTER and the Stance column's 'Declare Hostile' button clips off the right edge as 'De...'. So the clipping detector returned clean on a frame that contained actual clipping. Cause: ImGui SmallButton labels are not instrumented into the overflow ledger. THIS IS THE EXACT FAILURE CLASS THE LIVE-CLICK RULE EXISTS FOR - BL-449 shipped on a compile and a 36/36 harness and was unusable for precisely this reason - and it means the automated substitute we have for a live click cannot currently see the defect that motivated the rule. Worth instrumenting SmallButton, or the ledger's clean verdict will keep meaning less than it appears to. The layout defect itself is BL-639.
+
+*Files: `src/ui/`, `scripts/verify/`, `tools/verify/`*
+
+### NR-664 — A new verify script (corp_disclosure.lua) is written but unregistered - registration needs Ben
+*question · raised 2026-08-26 · from Sprint 20 wave 2, BL-633.*
+
+The agent authored scripts/verify/corp_disclosure.lua - an acceptance script that injects a real press through ImGui's own event queue and hit-test via verify.click (BL-521), so a control rendering past the panel's edge FAILS there rather than passing on a screenshot. It correctly did not name it in verifier-visual's SKILL.md, because 'tool creation is skill creation' and registering a check needs Ben's permission. The script works (it selected Faros-YelenKalen International by clicking a row). Ben's call: register it as a named check, or leave it as an ad-hoc script. Recommend registering - an injected press is materially stronger than a capture, and it is the closest thing we have to the live click that keeps slipping.
+
+*Files: `scripts/verify/corp_disclosure.lua`, `.claude/skills/verifier-visual/SKILL.md`*
 
 ---
 
