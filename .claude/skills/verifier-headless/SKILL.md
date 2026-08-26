@@ -24,6 +24,15 @@ in `tools/verify/README.md`.
 - **`econ_harness`** — Layer 3 economy arithmetic (production → market clearing →
   budget) against a hand-built world + registry. Links `world.cpp`,
   `economy_system.cpp`, `market_clearing.cpp`, `budget_system.cpp`.
+- **`quarterly_return`** — BL-626, requirement group `quarterly-return` R1–R6: the
+  balance sheet `apply_budget` files for every corporation every economy tick. Asserts
+  the record is a **retain** and not a second computation — the seven flows are
+  bit-identical to `corp_budget`'s, the filed `net` equals the loop's own delta
+  EXACTLY (both on an isolated fixture and per-tick on a really generated world), the
+  rolling 40-quarter retention drops the oldest first, `book_value` is the registry
+  `build_cost` the build press charges, the returns round-trip the save (version named
+  symbolically, never as a literal), and the pre-game warm start's 80 ticks produce
+  byte-identical records across two runs. Build via `build_harness.js`.
 - **`econ_stability`** — runs the economy loop (production → market clearing →
   budget) over 100 ticks on a small fixed world and asserts multi-tick stability:
   prices stay in the `[0.25×, 4×]` band, no NaN/Inf, deposit reserves decrease

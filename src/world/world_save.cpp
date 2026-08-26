@@ -291,6 +291,44 @@ bool r_nation_budget(std::istream& i, nation_budget& b)
     return std::isfinite(b.reserve_fraction);
 }
 
+// BL-626: one filed quarterly return. Eleven fixed-width fields, declaration
+// order, no strings and no nested containers — so the whole history is a plain
+// count-prefixed run of identical records. Retention is bounded at
+// `k_quarterly_return_retention` by the writer, which is why the reader can
+// refuse a longer run outright rather than truncating it.
+void w_return(std::ostream& o, const quarterly_return& q)
+{
+    w_f32(o, q.income);
+    w_f32(o, q.expenditure);
+    w_f32(o, q.maintenance);
+    w_f32(o, q.wages);
+    w_f32(o, q.interest);
+    w_f32(o, q.levies);
+    w_f32(o, q.upkeep);
+    w_f32(o, q.net);
+    w_f32(o, q.balance);
+    w_u32(o, q.holdings);
+    w_f32(o, q.book_value);
+}
+
+bool r_return(std::istream& i, quarterly_return& q)
+{
+    if (!(r_f32(i, q.income) && r_f32(i, q.expenditure) && r_f32(i, q.maintenance)
+          && r_f32(i, q.wages) && r_f32(i, q.interest) && r_f32(i, q.levies)
+          && r_f32(i, q.upkeep) && r_f32(i, q.net) && r_f32(i, q.balance)
+          && r_u32(i, q.holdings) && r_f32(i, q.book_value)))
+        return false;
+    // The writer cannot have produced a non-finite figure — the money loop that
+    // fills the record is finite by construction — so one here means the stream
+    // is corrupt rather than merely odd. Same rejection shape as the sentiment
+    // record's (BL-546).
+    return std::isfinite(q.income) && std::isfinite(q.expenditure)
+        && std::isfinite(q.maintenance) && std::isfinite(q.wages)
+        && std::isfinite(q.interest) && std::isfinite(q.levies)
+        && std::isfinite(q.upkeep) && std::isfinite(q.net) && std::isfinite(q.balance)
+        && std::isfinite(q.book_value);
+}
+
 void w_corp(std::ostream& o, const corporation_component& c)
 {
     w_str(o, c.name);
@@ -305,15 +343,21 @@ void w_corp(std::ostream& o, const corporation_component& c)
     w_f32(o, c.influence_range);
     w_f32(o, c.science);
     w_bool_array(o, c.produced_ever);
+    w_vec(o, c.returns, w_return); // BL-626: world_save_version 16
 }
 
 bool r_corp(std::istream& i, corporation_component& c)
 {
-    return r_str(i, c.name) && r_id(i, c.home_nation) && r_enum(i, c.focus, max_focus)
-        && r_f32(i, c.starting_capital) && r_f32(i, c.balance) && r_bool(i, c.is_player)
-        && r_bool(i, c.is_background) && r_ids(i, c.assets) && r_id(i, c.hq_building)
-        && r_f32(i, c.influence_range) && r_f32(i, c.science)
-        && r_bool_array(i, c.produced_ever);
+    if (!(r_str(i, c.name) && r_id(i, c.home_nation) && r_enum(i, c.focus, max_focus)
+          && r_f32(i, c.starting_capital) && r_f32(i, c.balance) && r_bool(i, c.is_player)
+          && r_bool(i, c.is_background) && r_ids(i, c.assets) && r_id(i, c.hq_building)
+          && r_f32(i, c.influence_range) && r_f32(i, c.science)
+          && r_bool_array(i, c.produced_ever) && r_vec(i, c.returns, r_return)))
+        return false;
+    // BL-626: retention is bounded by the writer, so a longer run is a corrupt
+    // stream, not a longer history. Refused rather than trimmed — trimming would
+    // silently pick which quarters to believe.
+    return c.returns.size() <= k_quarterly_return_retention;
 }
 
 void w_convoy(std::ostream& o, const convoy_component& c)

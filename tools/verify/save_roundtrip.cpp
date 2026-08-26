@@ -145,6 +145,39 @@ int main()
     else
         razed_centre = null_entity; // a one-centre world: skip the fixture
 
+    // BL-626: `corporation_component::returns` is a NEW persistent container
+    // (format v16), empty at generation because it is apply_budget that fills
+    // it -- and this harness never runs the economy. So hand-file a short
+    // history on the lowest-id corp, with every field distinct, before the
+    // round trip: an empty vector would let P1's byte-equality pass over the
+    // whole record. The full behavioural coverage is
+    // tools/verify/quarterly_return.cpp; what is owed HERE is the seam.
+    entity_id filing_corp = null_entity;
+    for (const auto& [cid, cc] : w.corporations)
+        if (filing_corp == null_entity || cid < filing_corp)
+            filing_corp = cid;
+    if (filing_corp != null_entity)
+    {
+        std::vector<quarterly_return>& hist = w.corporations.at(filing_corp).returns;
+        for (int q = 0; q < 3; ++q)
+        {
+            const float k = static_cast<float>(q + 1);
+            quarterly_return r;
+            r.income      = 100.0f * k;
+            r.expenditure =  11.0f * k;
+            r.maintenance =  12.0f * k;
+            r.wages       =  13.0f * k;
+            r.interest    =  14.0f * k;
+            r.levies      =  15.0f * k;
+            r.upkeep      =  16.0f * k;
+            r.net         = -19.0f * k;   // signed, so a sign-losing read fails
+            r.balance     = 5000.0f - 19.0f * k;
+            r.holdings    = static_cast<uint32_t>(q + 2);
+            r.book_value  = 250.0f * k;
+            hist.push_back(r);
+        }
+    }
+
     // -----------------------------------------------------------------------
     // P1 (R1) -- a round trip preserves every serialised field
     // -----------------------------------------------------------------------
@@ -176,6 +209,31 @@ int main()
         check(read_ok && bit != loaded.buildings.end()
                   && bit->second.wage_bid == 0.4375f,
               "P1 building wage_bid (BL-614) round-trips at its written value");
+    }
+
+    // BL-626: the filed quarterly returns survive by VALUE, in order, with the
+    // signed `net` intact — the field a sign-losing or reordering read would
+    // get wrong while still producing an equal-length record.
+    if (filing_corp != null_entity)
+    {
+        const auto cit = loaded.corporations.find(filing_corp);
+        bool ok = read_ok && cit != loaded.corporations.end()
+               && cit->second.returns.size() == w.corporations.at(filing_corp).returns.size();
+        if (ok)
+        {
+            const auto& want = w.corporations.at(filing_corp).returns;
+            const auto& got  = cit->second.returns;
+            for (std::size_t i = 0; i < want.size() && ok; ++i)
+                ok = got[i].income == want[i].income
+                  && got[i].expenditure == want[i].expenditure
+                  && got[i].maintenance == want[i].maintenance
+                  && got[i].wages == want[i].wages && got[i].interest == want[i].interest
+                  && got[i].levies == want[i].levies && got[i].upkeep == want[i].upkeep
+                  && got[i].net == want[i].net && got[i].balance == want[i].balance
+                  && got[i].holdings == want[i].holdings
+                  && got[i].book_value == want[i].book_value;
+        }
+        check(ok, "P1 filed quarterly returns (BL-626) round-trip by value, in order");
     }
 
     // BL-624: the razed centre reloads as the ruin it is — flag, zeroed
@@ -245,13 +303,13 @@ int main()
             // same record would shift with it. The whole stream is refused
             // instead -- a v4 save is not migrated, it is rejected, and the
             // destination is not touched.
-            static_assert(world_save_version == 15,
-                          "P9..P19 name v4..v14 as refused "
+            static_assert(world_save_version == 16,
+                          "P9..P19 name v4..v15 as refused "
                           "predecessors; re-read these rows on a bump");
             std::string bad = bytes_once;
             const uint32_t v4 = 4;
             std::memcpy(&bad[4], &v4, sizeof v4);
-            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P9 a v4-versioned stream is refused");
         }
         {
             // Sprint 16, BL-571: the IMMEDIATE previous format (BL-570's v5,
@@ -265,7 +323,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v5 = 5;
             std::memcpy(&bad[4], &v5, sizeof v5);
-            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P10 a v5-versioned stream is refused");
         }
         {
             // Sprint 16, BL-572: the IMMEDIATE previous format (BL-571's v6,
@@ -278,7 +336,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v6 = 6;
             std::memcpy(&bad[4], &v6, sizeof v6);
-            check(!from_bytes(bad, victim), "P11 a v6-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P11 a v6-versioned stream is refused");
         }
         {
             // Sprint 16, BL-573: the IMMEDIATE previous format (BL-572's v7,
@@ -290,7 +348,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v7 = 7;
             std::memcpy(&bad[4], &v7, sizeof v7);
-            check(!from_bytes(bad, victim), "P12 a v7-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P12 a v7-versioned stream is refused");
         }
         {
             // BL-585: the IMMEDIATE previous format (Sprint 16's v8, the
@@ -303,7 +361,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v8 = 8;
             std::memcpy(&bad[4], &v8, sizeof v8);
-            check(!from_bytes(bad, victim), "P13 a v8-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P13 a v8-versioned stream is refused");
         }
         {
             // BL-586 slice 2: the IMMEDIATE previous format (BL-585's v9, the
@@ -315,7 +373,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v9 = 9;
             std::memcpy(&bad[4], &v9, sizeof v9);
-            check(!from_bytes(bad, victim), "P14 a v9-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P14 a v9-versioned stream is refused");
         }
         {
             // v10 (BL-586 slice 2) is refused twice over after this wave: it has
@@ -327,7 +385,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v10 = 10;
             std::memcpy(&bad[4], &v10, sizeof v10);
-            check(!from_bytes(bad, victim), "P15 a v10-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P15 a v10-versioned stream is refused");
         }
         {
             // v11 (BL-612's intermediate shape, this wave) still lacks the
@@ -338,7 +396,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v11 = 11;
             std::memcpy(&bad[4], &v11, sizeof v11);
-            check(!from_bytes(bad, victim), "P16 a v11-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P16 a v11-versioned stream is refused");
         }
         {
             // v12 (BL-611's intermediate shape, this wave) predates BL-613's
@@ -348,7 +406,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v12 = 12;
             std::memcpy(&bad[4], &v12, sizeof v12);
-            check(!from_bytes(bad, victim), "P17 a v12-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P17 a v12-versioned stream is refused");
         }
         {
             // v13 (BL-613's renumbered intermediate) still lacks wage_bid in
@@ -357,7 +415,7 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v13 = 13;
             std::memcpy(&bad[4], &v13, sizeof v13);
-            check(!from_bytes(bad, victim), "P18 a v13-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P18 a v13-versioned stream is refused");
         }
         {
             // v14 (the pre-BL-624 release format) still lacks the razed flag
@@ -366,7 +424,21 @@ int main()
             std::string bad = bytes_once;
             const uint32_t v14 = 14;
             std::memcpy(&bad[4], &v14, sizeof v14);
-            check(!from_bytes(bad, victim), "P19 a v14-versioned stream is refused (format is v15)");
+            check(!from_bytes(bad, victim), "P19 a v14-versioned stream is refused");
+        }
+        {
+            // BL-626: the IMMEDIATE previous format. A v15 corporation record
+            // simply ENDS after `produced_ever`, where the count-prefixed
+            // `returns` run now continues -- so every container written after
+            // the corporations reads misaligned from the first one onward.
+            // Refused whole, same contract as every prior bump. Named through
+            // the constant: BL-631 is claiming the next version on another
+            // branch this wave, and a literal here would break at the stack.
+            std::string bad = bytes_once;
+            const uint32_t prior = world_save_version - 1u;
+            std::memcpy(&bad[4], &prior, sizeof prior);
+            check(!from_bytes(bad, victim),
+                  "P20 a stream at world_save_version - 1 is refused (BL-626's returns)");
         }
         {
             // Truncated mid-way through the tile store -- far enough in that a
