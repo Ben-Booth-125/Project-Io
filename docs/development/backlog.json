@@ -1072,7 +1072,7 @@
    "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "A",
    "difficulty": 4,
@@ -1096,7 +1096,9 @@
     "tools/verify/",
     "docs/economy/FINANCE.md"
    ],
-   "design": "Design settled in FINANCE.md § The quarterly return (Ben, 2026-08-26). THE WORK: append a per-corp record at the end of apply_budget carrying corp_budget's seven flows, net(), the closing balance, assets.size() and book value (sum of registry build_cost over the holdings). Rolling 40 quarters, oldest dropped first. World state, so it versions the save format and appends in a sorted entity_id walk. It is a RETAIN, not a second computation - if the record can disagree with the loop the implementation is wrong. A harness assertion that the summed net over a run equals the balance delta is the check that keeps it honest."
+   "completed": "2026-08-26",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "status": "design-owed",
@@ -1214,7 +1216,7 @@
    "design": "Design settled in CORPORATION_GENERATION.md § The spawn shortlist, and the seat, and STARTUP.md § The seat (Ben, 2026-08-26). THE WORK: move the 80-tick warm start ahead of seating and run it under corp_ai_params::spectating; shortlist the specialists clearing the viability floor (solvent at the end, trailing net over 8 quarters non-negative); draw one against the world seed and re-point is_player/player_entity. Remove app_screen::choosing_corp, draw_corp_choice_screen, build_corp_choices, apply_corp_choice, the Surprise me press, verify.show_corp_choice and scripts/verify/corp_choice.lua. THE COST, taken knowingly: every corp is scorer-driven through the warm start where the seated one used to be excluded, so every seed's opening moves and the goldens re-bless ONCE, in a single wave with dated provenance. player_seed_sweep --guard is re-pointed at the shortlist's properties. NOT SOLVED by this item: the shallow-opening distribution the old screen was built for - carried in the review queue. WEIGHTED DRAW (Ben, 2026-08-26, answering NR-649): 'mostly random for now, targeted towards population centres and processing, rather than extraction.' The floor filters; the draw over the shortlist is BIASED, never gated - a pure-extraction corp on thin ground stays drawable, just less often. Two weights, both off existing signals: a processor among the holdings weights up (the depth lever the viability floor cannot provide), and holdings on or near populated ground weight up. The weights are a first cut; player_seed_sweep REPORTS the resulting distribution rather than asserting it against a target."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "A",
    "difficulty": 3,
@@ -1236,7 +1238,9 @@
     "src/world/world_save.cpp",
     "docs/generation/CORPORATION_GENERATION.md"
    ],
-   "design": "Design settled in CORPORATION_GENERATION.md § Pass 2b (Ben, 2026-08-26). THE WORK: an ownership_class field on corporation_component, derived from the SAME BL-218 industrialisation-timing scalar Pass 2 already reads for focus - early industrialiser with strong enforceable-promise institutions -> public, late or statist -> private, never industrialised -> closed. No authored table (the BL-219 principle). No home region falls back to national character, as focus does. Background firms class by the same read; nothing branches on is_background. The Pass 2 world-level reject-and-reroll takes a second condition: at least one public specialist, else nothing files and nothing is buyable. An unmet floor after the attempt cap stands as-is. Versions the save format."
+   "completed": "2026-08-26",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "status": "design-owed",
@@ -1375,7 +1379,7 @@
    "design": "Carried from Sprint 18 and named in NEXT_SESSION.md as owed in Sprint 20's definition of done. Two visual requirements were marked complete on a scripted capture alone, which the 2026-08-19 rule says is not sufficient: a capture proves a surface renders, not that a press on it is reachable. The dispatch form and the Throughput lens both owe a live click. BLOCKED, and the blocker is environmental rather than a design gap - NR-622 records that the container cannot approve the OS-level computer-use dialog, which is why this has slipped three sprints rather than one. DESIGN-OWED on the route out: either Ben clicks them himself in one pass, or the session gets a path to drive the live app that does not need that dialog. Filing it as an item so it has an owner instead of living only in a handoff note."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "B",
    "difficulty": 2,
@@ -1396,7 +1400,36 @@
     "src/world/world_save.cpp",
     "docs/development/DEVELOPMENT_PRACTICES.md"
    ],
-   "design": "Sprint 19's retro asked for this by name: two concurrent worktree agents both claimed the same save version, resolved cleanly by stacking at merge but only because someone noticed. Sprint 20 walks straight back into it - BL-626 (quarterly return) and BL-631 (ownership class) both version the save format, and they are separable work. THE WORK: a shared registry and a claim tool in tools/session/, the same shape next_id.js already has for backlog ids, scanning refs and the working tree so a claim is unambiguous across concurrent worktrees. Small, and it pays for itself the first time two agents run in parallel over world_save.cpp."
+   "completed": "2026-08-26",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
+  },
+  {
+   "id": "BL-638",
+   "short_name": "CHARTER_OWNERSHIP_CLASS",
+   "title": "Re-point ownership class from the energy transition to the enforceable promise",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": "v0.1.20",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-631"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Generation",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/corporation_generation.cpp",
+    "src/world/history_ladder.hpp",
+    "tools/verify/ownership_class.cpp",
+    "docs/generation/CORPORATION_GENERATION.md"
+   ],
+   "design": "MEASURED FIX for what BL-631 landed correctly and NR-659 then exposed: at the default 0 CE epoch every corporation and all 1298 regions class closed across 8 seeds, because settlement.cpp:441/470 breaks out of the energy transition for antiquity and median_industrial_year stays 0. Pass 2b's third rung fires correctly on a degenerate input. Consequence: nothing files, nothing is buyable, and Sprint 20's goal cannot happen on the default world - BL-627, BL-628 and BL-634 all rest on this. THE WORK: re-point the derivation from HISTORY.md Stage 4 (energy transition, which antiquity skips) to Stage 1 (THE ENFORCEABLE PROMISE, which the ladder pass runs in every era). The signal already exists as history_ladder::charter_cradle - the Charter Act, first perpetual company registered, which is corporate personhood itself. This is what Pass 2b's own justifying sentence always named: the institutions that make a contract enforceable are the institutions that make a share transferable. Same shape, no new machinery, and the mapping becomes ERA-AGNOSTIC rather than silently post-industrial. Keep BL-631's reachability waiver even though public becomes reachable again - 'the floor is unmeetable here' stays a real state. Re-run ownership_class R2 and report the new distribution at BOTH epochs; the row measures, it does not assert a target. This is the era-relative gates class Sprint 19's retro named, recurring one sprint later."
   }
  ]
 }

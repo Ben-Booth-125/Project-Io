@@ -165,8 +165,10 @@ void apply_budget(world& w,
 
             // BL-626 book value: the registry's flat construction cost, summed
             // over the holdings in `assets` order (a vector — fixed, so the sum
-            // is deterministic). Read from the registry the build press itself
-            // charges (construction.cpp's `econ.build_cost`), never re-derived.
+            // is deterministic). HISTORICAL COST, deliberately NOT the press's
+            // charge: construction.cpp bills `econ.build_cost + material_cost`,
+            // and that second term is priced at the CURRENT MARKET. Taking it
+            // here would make the balance sheet mark-to-market.
             // Accumulated here rather than in a second walk so the two can never
             // disagree about which buildings the corp holds; it touches no term
             // of `delta`, so the money arithmetic is untouched.

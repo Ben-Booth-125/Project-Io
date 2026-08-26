@@ -3860,35 +3860,7 @@
    "resolved": "2026-08-25",
    "promoted_from": "backlog.json BL-623 (PROVINCES_BEFORE_ROADS) - Sprint 19, the world reads lived-in",
    "batch": "sprint-19-wave-3",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: province_partition_harness re-specified rows"
-     ],
-     "requirement": "The homeworld pipeline runs provinces (+ anchor foundings) before roads; the partition reads no road data; P6/P7 recompute reproducibility holds against the new input set; every land province holds >= 1 settlement.",
-     "notes": ""
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: road_generation_harness R3 strengthened"
-     ],
-     "requirement": "Every centre - anchor foundings included - joins the road lattice (local street + spur or backbone); the off-lattice exemption (R3b) is retired.",
-     "notes": ""
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: world_audit"
-     ],
-     "requirement": "world_audit's corp-holdings and reach checks pass with corporations placed after the reordered roads.",
-     "notes": ""
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "razed-settlement-tier",
@@ -3897,197 +3869,34 @@
    "resolved": "2026-08-25",
    "promoted_from": "backlog.json BL-624 (RAZED_SETTLEMENT_TIER) - Sprint 19, the world reads lived-in",
    "batch": "sprint-19-wave-3",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: population_dynamics P3 re-specified"
-     ],
-     "requirement": "raze_centre demotes (population 0, razed set, entity/name/tile/urban kept) instead of erasing; the razed centre still anchors its province; rejections still mutate nothing.",
-     "notes": ""
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: population_dynamics new row"
-     ],
-     "requirement": "A razed centre regrows through the ordinary growth pass at the reduced gate, clearing razed and returning to scale 1; deterministic and replay-identical.",
-     "notes": ""
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: save_roundtrip rows"
-     ],
-     "requirement": "The razed field round-trips the save at v15; a v14 stream is refused whole.",
-     "notes": ""
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "quarterly-return",
    "title": "BL-626 - every corporation files a quarterly return at the end of apply_budget",
-   "status": "open",
+   "status": "complete",
    "promoted_from": "backlog.json BL-626 (QUARTERLY_RETURN) - Sprint 20, the books open",
    "batch": "sprint-20-wave-1",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "headless: quarterly_return R1"
-     ],
-     "requirement": "apply_budget appends one return per corporation per econ tick, in a sorted entity_id walk, carrying corp_budget's seven flows, net(), the closing balance, assets.size() and book_value.",
-     "notes": ""
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "headless: quarterly_return R2"
-     ],
-     "requirement": "THE RETAIN PROPERTY: over any run, the sum of a corp's filed net equals its balance delta exactly. The record cannot disagree with the loop that wrote it.",
-     "notes": ""
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "headless: quarterly_return R3"
-     ],
-     "requirement": "Retention is exactly 40 quarters, oldest dropped first. A corp run past 40 ticks holds exactly 40 returns, ending with the most recent.",
-     "notes": ""
-    },
-    {
-     "id": "R4",
-     "status": "pending",
-     "verification": [
-      "headless: quarterly_return R4"
-     ],
-     "requirement": "book_value is the sum of the recipe registry's build_cost over the corp's holdings - the same number the build press charges, read from one authority.",
-     "notes": ""
-    },
-    {
-     "id": "R5",
-     "status": "pending",
-     "verification": [
-      "headless: save_roundtrip new rows"
-     ],
-     "requirement": "The returns round-trip the save at world_save_version 16 (reserved); a stream at the prior version is refused whole. Assertions reference the constant symbolically, never a literal, so a later stack does not break them.",
-     "notes": ""
-    },
-    {
-     "id": "R6",
-     "status": "pending",
-     "verification": [
-      "headless: quarterly_return R6 (end-to-end + determinism)"
-     ],
-     "requirement": "ITEM-SPANNING GATE. End to end over the pre-game warm start: every corporation has a filed history, and each corp's last return's balance equals its live corporation_component.balance. Two identical runs produce byte-identical records.",
-     "notes": ""
-    }
-   ]
+   "resolved": "2026-08-26",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "ownership-class",
    "title": "BL-631 - public, private or closed, derived from the region's industrialisation timing",
-   "status": "open",
+   "status": "complete",
    "promoted_from": "backlog.json BL-631 (OWNERSHIP_CLASS) - Sprint 20, the books open",
    "batch": "sprint-20-wave-1",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "headless: ownership_class R1"
-     ],
-     "requirement": "corporation_component carries an ownership_class field whose value is derived from the SAME BL-218 industrialisation-timing scalar Pass 2 reads for focus. No authored weighting table exists anywhere on the settled path.",
-     "notes": ""
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "headless: ownership_class R2 (measured, reported)"
-     ],
-     "requirement": "The mapping holds directionally across a seed sweep: early industrialisers with strong enforceable-promise institutions class public, late or statist ones private, never-industrialised ones closed. The measured distribution is REPORTED, not asserted against a magic number.",
-     "notes": ""
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "headless: ownership_class R3"
-     ],
-     "requirement": "A corporation with no home region falls back to national character, exactly as its focus does. Background firms class by the same read, and no code path branches on is_background to decide a class.",
-     "notes": ""
-    },
-    {
-     "id": "R4",
-     "status": "pending",
-     "verification": [
-      "headless: ownership_class R4"
-     ],
-     "requirement": "Pass 2's world-level reject-and-reroll takes a second condition - at least one public specialist - and never patches an individual corp. An unmet floor after the attempt cap STANDS and is reported, not hand-fixed.",
-     "notes": ""
-    },
-    {
-     "id": "R5",
-     "status": "pending",
-     "verification": [
-      "headless: save_roundtrip new row"
-     ],
-     "requirement": "The field round-trips the save at world_save_version 17 (reserved); the prior version is refused whole. Assertions reference the constant symbolically.",
-     "notes": ""
-    },
-    {
-     "id": "R6",
-     "status": "pending",
-     "verification": [
-      "headless: ownership_class R6"
-     ],
-     "requirement": "Generation stays deterministic: two generations of one seed assign identical classes, and the derivation consumes no additional randomness.",
-     "notes": ""
-    }
-   ]
+   "resolved": "2026-08-26",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "save-version-reservation",
    "title": "BL-637 - reserve save-format versions the way next_id reserves backlog ids",
-   "status": "open",
+   "status": "complete",
    "promoted_from": "backlog.json BL-637 (SAVE_VERSION_RESERVATION) - Sprint 20, the books open",
    "batch": "sprint-20-wave-1",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "ad hoc: scan run against the live tree, 43 refs + working tree, exit 0, reports 16"
-     ],
-     "requirement": "A tool under tools/session/ reports the next safe world_save_version, scanning git refs AND the working tree the way next_id.js scans for backlog ids, so a claim is unambiguous across concurrent worktrees.",
-     "notes": "Verified in the main session, not self-reported: the agent could not read these rows from its stale base."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "ad hoc: two-claim sequence run in the main session - second caller told 17, not 16"
-     ],
-     "requirement": "A recorded claim survives: a second invocation after a claim returns the NEXT number, not the same one. Two concurrent worktrees cannot both be told 16.",
-     "notes": "Verified in the main session, not self-reported: the agent could not read these rows from its stale base."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "doc: DEVELOPMENT_PRACTICES.md new section + DELIVERY.md pointer, read and checked"
-     ],
-     "requirement": "The workflow is documented in DEVELOPMENT_PRACTICES.md beside the existing save-format guidance, and the tool is named where a session will find it.",
-     "notes": "Verified in the main session, not self-reported: the agent could not read these rows from its stale base."
-    }
-   ]
+   "resolved": "2026-08-26",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   }
  ]
 }

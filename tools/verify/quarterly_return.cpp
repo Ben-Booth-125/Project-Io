@@ -40,8 +40,9 @@
 //       and asserting the retained window is the LAST 40 of that sequence, in
 //       order — which a wrong-end trim or a ring-buffer rotation would fail.
 //
-//   R4  book_value is the recipe registry's `build_cost` summed over the
-//       holdings — the same number the build press charges. Checked against an
+//   R4  book_value is the recipe registry's flat `build_cost` summed over the
+//       holdings — historical cost, and deliberately NOT the build press's
+//       charge (which adds a market-priced materials term). Checked against an
 //       independent sum, with a non-vacuity guard (non-zero, and different for
 //       corps holding different building sets).
 //
@@ -381,7 +382,7 @@ void run_fixture_rows(const recipe_registry& reg)
         check(window_ok, "R3", "the retained 40 are the LAST 40, in order (oldest dropped first)");
     }
 
-    // --- R4: book_value is the build press's number, and is not a constant --
+    // --- R4: book_value is flat build_cost (historical), and is not a constant --
     {
         fixture f = build_fixture(reg);
         tick(f.w, reg, 0);

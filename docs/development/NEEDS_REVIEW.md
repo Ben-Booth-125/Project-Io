@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*70 entries — 54 open, 16 resolved.*
+*70 entries — 53 open, 17 resolved.*
 
 ---
 
@@ -448,7 +448,7 @@ A whole-firm price needs a floor, and there is no salvage in the prototype - con
 ### NR-650 — The purged syndicate arc was still asserted by five authority docs three days after the purge
 *observation · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
 
-BL-524..BL-530 (the syndicate/equity tier) were purged on 2026-08-23, but GLOSSARY.md still carried a full Syndicate entry, and CONCEPT.md, SYSTEMS.md, RELATIONS.md and ROADMAP.md each asserted the two-tier ownership model as settled design. This session removed all five, since Ben's whole-firm ruling overturns the model outright. The general lesson is the one worth Ben's eye: a PURGE moves backlog prose but does not touch the authority docs the purged items had already written into, so a purge needs a doc sweep the way a landing does. PHANTOMS.md still carries five syndicate mentions - left alone deliberately, since it is a scan record of what was designed, not an authority.
+BL-524..BL-530 (the syndicate/equity tier) were purged on 2026-08-23, but GLOSSARY.md still carried a full Syndicate entry, and CONCEPT.md, SYSTEMS.md, RELATIONS.md and ROADMAP.md each asserted the two-tier ownership model as settled design. This session removed all five, since Ben's whole-firm ruling overturns the model outright. The general lesson is the one worth Ben's eye: a PURGE moves backlog prose but does not touch the authority docs the purged items had already written into, so a purge needs a doc sweep the way a landing does. PHANTOMS.md still carries five syndicate mentions - left alone deliberately, since it is a scan record of what was designed, not an authority. SECOND CONSUMER FOUND, same session: story_check.js reports 50 failures, every one a user story tracing to a retired id (BL-428, BL-429 and the rest of the BL-001..BL-568 range). USER_STORIES.md is the second route from docs to code, and the purge cut it at the knees without anyone noticing for three days. Same lesson, now twice: a purge moves backlog prose and leaves every CONSUMER of a backlog id pointing at nothing - authority docs in one direction, user stories in the other. Pre-existing and not this wave’s; recorded so the sweep, when it happens, covers both.
 
 *Files: `docs/GLOSSARY.md`, `docs/CONCEPT.md`, `docs/SYSTEMS.md`, `docs/politics/RELATIONS.md`, `docs/development/ROADMAP.md`, `docs/development/PHANTOMS.md`*
 
@@ -469,7 +469,7 @@ Flagged at the moment it arose, per the novelty rule. Every prior verb moves goo
 ### NR-654 — ALL THREE wave-1 worktrees were cut from the session-start commit, not current HEAD
 *observation · raised 2026-08-26 · from Sprint 20 wave 1: three agents launched in one message, BL-637 reported it could not read its own backlog item or requirement group.*
 
-Three worktree agents were launched in a single message from HEAD e40e38d8. ALL THREE were cut from 638cdd65 instead - the commit HEAD sat at when the SESSION began, five commits earlier. The main session's merge-base check looked clean for two of them only because those agents had ALREADY fast-forwarded themselves before the check ran; the correction is recorded here rather than left standing. Two of the three noticed and said so - BL-637 reported it could not read its own backlog item or requirement group, BL-626 reported the same and fast-forwarded to main before starting any work. That is two independent confirmations of a systemic behaviour, not one worktree's bad luck. THE RISK IS NOT HYPOTHETICAL: both src/ agents were briefed to read authority-doc sections written EARLIER THE SAME SESSION, which do not exist at 638cdd65. An agent that did not check would have built against a design it could not see and reported success. This is the io-worktree-agents-stale-base pattern recurring. Proposed standing check, cheap and mechanical: before trusting any wave, run git merge-base <branch> main for every launched worktree, and re-brief or relaunch any agent whose base predates the design it was told to read. Better still, brief every agent to fast-forward to main first and say so - the two that survived did exactly that on their own initiative.
+Three worktree agents were launched in a single message from HEAD e40e38d8. ALL THREE were cut from 638cdd65 instead - the commit HEAD sat at when the SESSION began, five commits earlier. The main session's merge-base check looked clean for two of them only because those agents had ALREADY fast-forwarded themselves before the check ran; the correction is recorded here rather than left standing. Two of the three noticed and said so - BL-637 reported it could not read its own backlog item or requirement group, BL-626 reported the same and fast-forwarded to main before starting any work. That is two independent confirmations of a systemic behaviour, not one worktree's bad luck. THE RISK IS NOT HYPOTHETICAL: both src/ agents were briefed to read authority-doc sections written EARLIER THE SAME SESSION, which do not exist at 638cdd65. An agent that did not check would have built against a design it could not see and reported success. This is the io-worktree-agents-stale-base pattern recurring. Proposed standing check, cheap and mechanical: before trusting any wave, run git merge-base <branch> main for every launched worktree, and re-brief or relaunch any agent whose base predates the design it was told to read. Better still, brief every agent to fast-forward to main first and say so - the two that survived did exactly that on their own initiative. UPDATE, same session: a third confirmation arrived - BL-631 also reported basing on 638cdd65 and merging main before starting. Three of three. The pattern is not that some worktrees go stale; it is that they ALL did, and only the agents that checked survived it.
 
 *Files: `docs/development/DELIVERY.md`*
 
@@ -493,13 +493,6 @@ FINANCE.md § The quarterly return says book_value is 'the same construction cos
 FINANCE.md's field table names the source as corp_budget::net() while describing the value as 'the exact balance delta'. Those are not the same float: apply_budget accumulates its delta interleaved and its own comment forbids re-grouping, so net() can differ by a ULP. Only the difference of two consecutive balances telescopes exactly, which is what the retain property demands. The agent chose the balance difference and recorded why in the struct's doc comment. Endorsed - the property is the point of the record, and a doc sentence that names a source is worth less than a record that cannot lie. FINANCE.md's table is being corrected to say so.
 
 *Files: `docs/economy/FINANCE.md`, `src/world/components.hpp`*
-
-### NR-658 — build_harness.js is unusable from an agent Bash session - second independent report
-*observation · raised 2026-08-26 · from Sprint 20 wave 1, BL-626.*
-
-The committed harness build route dies with "'cl' is not recognized" when invoked from the Bash tool: its cmd /c spawn is mangled by Git Bash. The agent worked around it by generating an equivalent .bat over the same glob-derived 53-TU source set and running that. This is the same failure the io-headless-build-invocation note already records, now hit again by a fresh agent with no memory of it - which is the signal worth acting on. Not a code defect in the harnesses themselves, but every agent that needs to build one pays this tax and some will conclude the harness is broken rather than the invocation. Worth a small fix to build_harness.js or a documented Bash-safe entry point.
-
-*Files: `tools/verify/`, `docs/development/DEVELOPMENT_PRACTICES.md`*
 
 ### NR-659 — The default campaign classes EVERY corporation closed - nothing files, nothing is buyable, and the sprint goal is unreachable there
 *question · raised 2026-08-26 · from Sprint 20 wave 1, BL-631 (ownership class): the agent measured it; the main session traced the cause and checked the fix target.*
@@ -672,4 +665,13 @@ Ben ruled this ledger a SIBLING of the spawn-viability pass rather than its carr
 > **RESOLVED.** Ben, 2026-08-26: Sprint 20 opened same day with the ledger + viability theme, so the sibling framing became one sprint in two phases rather than two sprints. The inherited debts now have owners: the live clicks are BL-636 (live-click debt), the shared golden re-bless is written into the sprint notes, and the v0.1.18 tag stays Ben’s call.
 
 *Files: `docs/development/NEXT_SESSION.md`, `docs/development/sprints.json`*
+
+### NR-658 — build_harness.js is unusable from an agent Bash session - second independent report
+*observation · raised 2026-08-26 · from Sprint 20 wave 1, BL-626.*
+
+The committed harness build route dies with "'cl' is not recognized" when invoked from the Bash tool: its cmd /c spawn is mangled by Git Bash. The agent worked around it by generating an equivalent .bat over the same glob-derived 53-TU source set and running that. This is the same failure the io-headless-build-invocation note already records, now hit again by a fresh agent with no memory of it - which is the signal worth acting on. Not a code defect in the harnesses themselves, but every agent that needs to build one pays this tax and some will conclude the harness is broken rather than the invocation. Worth a small fix to build_harness.js or a documented Bash-safe entry point.
+
+> **RESOLVED.** FIXED, 2026-08-26, in the wave-1 integration: tools/verify/build_harness.bat is a committed Bash-safe entry point. It establishes the MSVC environment ONCE in its own shell before node runs, so the inner spawn inherits a PATH that already has cl on it instead of building one across a mangled quoting boundary. Arguments, output location and exit code are build_harness.js’s own - the wrapper adds nothing but the environment. Verified by building five harnesses through it. Three sessions hit this and each rediscovered the same workaround, which is what made it worth a committed fix rather than a fourth note.
+
+*Files: `tools/verify/`, `docs/development/DEVELOPMENT_PRACTICES.md`*
 

@@ -446,6 +446,19 @@ int main()
             check(!from_bytes(bad, victim), "P19 a v14-versioned stream is refused");
         }
         {
+            // P19b -- v15, the last ACTUALLY RELEASED format, and the coverage
+            // hole Sprint 20 wave 1's version stack opened: P19 pins 14 and P20
+            // names `world_save_version - 1` (16 after the stack), so without
+            // this row nothing asserts the one format real saves on disk carry.
+            // A v15 corp record lacks BOTH of wave 1's additions -- no
+            // `ownership_class` byte after `focus`, no `returns` run after
+            // `produced_ever`. Refused whole.
+            std::string bad = bytes_once;
+            const uint32_t v15 = 15;
+            std::memcpy(&bad[4], &v15, sizeof v15);
+            check(!from_bytes(bad, victim), "P19b a v15-versioned stream is refused");
+        }
+        {
             // P20 (R5) -- the IMMEDIATELY PRIOR format, named through the constant
             // rather than by number. Sprint 20 wave 1 put TWO changes in the corp
             // record and this one row covers both:

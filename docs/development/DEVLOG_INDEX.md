@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 181 entries across 2 volume(s).
+One line per session, newest first — 182 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-25 | [The warm-start stall found and killed; settlements become visible (flood-field pathfinding; BL-625; NR-645)](DEVLOG.md) | BL-599 BL-619 BL-621 BL-623 BL-625 | DEVLOG.md |
 | 2026-08-25 | [Population design settles, Sprint 19 opens and lands both build waves (BL-610–BL-618, BL-620; NR-628–NR-641)](DEVLOG.md) | BL-070 BL-086 BL-376 BL-514 BL-596 BL-597 BL-598 BL-601 BL-603 BL-604 BL-610 BL-611 BL-612 BL-613 BL-614 BL-615 BL-616 BL-617 BL-618 BL-619 BL-620 | DEVLOG.md |
 | 2026-08-24 | [Sprint 17 designed, delivered end to end, and cut as v0.1.17 (BL-585–BL-594)](DEVLOG.md) | BL-409 BL-429 BL-585 BL-586 BL-587 BL-588 BL-589 BL-590 BL-591 BL-592 BL-593 BL-594 | DEVLOG.md |
 | 2026-08-23 | [Sprint 16 Batch Delivery opens: BL-571/BL-572 ratified, the batch planned, Wave 1 lands (BL-569, BL-575)](DEVLOG.md) | BL-348 BL-349 BL-436 BL-569 BL-570 BL-571 BL-572 BL-573 BL-574 BL-575 BL-576 BL-577 BL-578 BL-579 BL-594 BL-595 | DEVLOG.md |

@@ -1151,9 +1151,14 @@ enum class ownership_class : uint8_t
 ///
 /// `holdings` and `book_value` are the two STOCK figures that make the row a
 /// balance sheet rather than an income statement alone. `book_value` is the sum
-/// of the recipe registry's `build_cost` over the corp's holdings — the same
-/// number the build press charges, read from that one authority and never
-/// re-derived.
+/// of the recipe registry's flat `build_cost` over the corp's holdings — which is
+/// HISTORICAL COST, and deliberately NOT what the build press charges. The press
+/// adds a materials term valued at the CURRENT MARKET PRICE
+/// (`construction.cpp`'s `econ.build_cost + material_cost`); folding that in
+/// would make this row mark-to-market, moving a firm's book value every quarter
+/// with commodity prices it does not own and swinging the acquisition price with
+/// it. A book value that moves on its own is not a book value.
+/// Authority: `docs/economy/FINANCE.md` § The quarterly return.
 ///
 /// Nothing here is estimated, and nothing here is read during the tick that
 /// writes it: the record is a pure downstream observation of the money loop and

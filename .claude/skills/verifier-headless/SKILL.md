@@ -29,10 +29,20 @@ in `tools/verify/README.md`.
   the record is a **retain** and not a second computation — the seven flows are
   bit-identical to `corp_budget`'s, the filed `net` equals the loop's own delta
   EXACTLY (both on an isolated fixture and per-tick on a really generated world), the
-  rolling 40-quarter retention drops the oldest first, `book_value` is the registry
-  `build_cost` the build press charges, the returns round-trip the save (version named
+  rolling 40-quarter retention drops the oldest first, `book_value` is the registry's
+  flat `build_cost` (historical cost — deliberately NOT the press's charge, which adds
+  a market-priced materials term), the returns round-trip the save (version named
   symbolically, never as a literal), and the pre-game warm start's 80 ticks produce
   byte-identical records across two runs. Build via `build_harness.js`.
+- **`ownership_class`** — BL-631, requirement group `ownership-class` R1–R6: whether a
+  corporation is `publicly_held` / `privately_held` / `closed`, derived from its home
+  region's history rather than an authored table. Asserts the derivation is pure and
+  draws no randomness (two generations of one seed classify identically), that a
+  region-less corp falls back to national character, that the world-level
+  reject-and-reroll takes its public floor without ever patching an individual corp,
+  and that the field round-trips the save. R2 is a **measured** row: it REPORTS the
+  class distribution across a seed sweep rather than asserting it against a number —
+  which is how the antiquity finding of NR-659 surfaced. Build via `build_harness.js`.
 - **`econ_stability`** — runs the economy loop (production → market clearing →
   budget) over 100 ticks on a small fixed world and asserts multi-tick stability:
   prices stay in the `[0.25×, 4×]` band, no NaN/Inf, deposit reserves decrease

@@ -108,17 +108,32 @@ corporations, providing diversity without enforcing a strict quota.
 ### Pass 2b — Ownership class
 
 Each corporation also receives an `ownership_class` — **public**, **private** or **closed** —
-and it is **derived from the home region, not authored**, on exactly the principle BL-219
-established when it retired the focus-weighting table. It reads the *same*
-industrialisation-timing scalar Pass 2 already reads for focus, so this is one more mapping over
-an existing signal rather than new machinery. Design: BL-631 (ownership class).
+and it is **derived, not authored**, on exactly the principle BL-219 established when it retired
+the focus-weighting table. It is one more mapping over a signal generation already produces
+rather than new machinery. Design: BL-631 (ownership class); the signal it reads is BL-638's.
 
-- **Early industrialiser, strong enforceable-promise institutions → `public`.** The institutions
-  that make a contract enforceable are the institutions that make a share transferable; a region
-  that had one had the other.
-- **Late or statist industrialiser → `private`.** The firm exists and trades, but its books are
-  its own.
-- **Never industrialised → `closed`.** No filing, no market in the firm at all.
+**The signal is the ENFORCEABLE PROMISE, not industrialisation.** This is stated first because
+the obvious reading is the wrong one and it was measured wrong once. The institutions that make a
+contract enforceable are the institutions that make a share transferable — so what decides whether
+a firm can have outside owners at all is [`HISTORY.md`](../lore/HISTORY.md)'s **Stage 1**, the
+Charter Act that registers the first perpetual company and invents corporate personhood. Its
+output already exists on the ladder (`history_ladder::charter_cradle`), and the ladder pass runs
+Stage 1 in **every era**.
+
+Reading Stage 4 — the energy transition — instead looks equivalent and is not: antiquity worlds
+skip Stage 4 entirely, so an industrialisation-timing read collapses every corporation in a
+default campaign to `closed` and leaves nothing to file and nothing to buy. **A class derived from
+an era's own institutions is era-agnostic; one derived from industry is silently post-industrial.**
+
+- **Reached the enforceable promise, and kept it → `public`.** Corporate personhood exists here and
+  the polity honours it, so a firm can have owners who are not its operators.
+- **Reached it, but the polity holds the firm close → `private`.** The firm exists and trades; its
+  books are its own. A statist or isolationist character lands here.
+- **Never reached it → `closed`.** No charter, no filing, no market in the firm at all.
+
+How widely the charter *diffuses* from its cradle is the part that decides the spread, and it is
+**measured rather than asserted**: the check reports the resulting distribution at more than one
+epoch instead of testing it against a target number.
 
 A corporation with no home region — the rung-3 case where the settlement pass never reached the
 nation — takes its class from the national character, the same fallback its focus takes.
@@ -134,7 +149,14 @@ acquisition. Generation's part is only to derive the field.
 world files and nothing is buyable, so the world-level reject-and-reroll of Pass 2 takes a second
 condition alongside the focus-diversity one — one reroll, two conditions, never a patch to an
 individual corp. An unmet floor after the attempt cap stands as-is, exactly as the focus floor's
-does. Note that the **spawn shortlist is unaffected either way**: it reads world truth, not
+does.
+
+**And the floor is waived where it is unmeetable by construction.** If no region any corporation
+could anchor to can yield `public` at all, the condition is not unmet — it is unaskable, and
+rerolling against it would burn every attempt and stand on the last one, silently relocating every
+corporation in the world in service of something that could never have happened. This is the same
+waiver the focus floor already carries when there are fewer corps than focus classes. A floor that
+cannot be met is not a floor. Note that the **spawn shortlist is unaffected either way**: it reads world truth, not
 disclosure, so a world where nobody files still seats a player correctly.
 
 ### Pass 3 — Starting asset placement
