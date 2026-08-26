@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*81 entries — 64 open, 17 resolved.*
+*83 entries — 66 open, 17 resolved.*
 
 ---
 
@@ -591,6 +591,20 @@ There was no such list. The CONSTRAINT exists - PRODUCTION.md admission rule, ch
 The NR-662 self-exemption reads `cs.is_player`, which derives from world::player_entity. Under spectator mode (BL-409) that field degrades to a camera/ledger anchor with NO ownership meaning - the standing rules say so explicitly. So under spectate exactly one corp discloses its capital for no reason other than where the camera is pointing, which is a small incoherence rather than a leak: BL-408's god view already makes everything readable there, so nothing is hidden that spectate does not intend to show anyway. Recorded rather than fixed because the right fix depends on a question worth asking once: should ANY disclosure gate consult player_entity under spectate, or should the whole disclosure layer be bypassed there the way the fog already is? The second is tidier and matches the precedent.
 
 *Files: `src/world/standing.cpp`, `docs/ui/DISCOVERY.md`*
+
+### NR-673 — NOVEL: a check that forces PRODUCTION CODE to declare what it does
+*novel-work · raised 2026-08-26 · from Sprint 21 wave 0, BL-648: the agent raised the flag; the main session endorses the pattern and thinks it generalises.*
+
+BL-648's registry substantiates an exemption by reading the DATA the running pass multiplies by - four of five probes read Lua-authored vectors, so a demand channel landing in economy.lua flips a row green with no harness edit at all. The fifth could not: a convoy launch's propellant burn was a private C++ constant, and no amount of reading Lua finds it. The agent's three options were to re-type the constant into the harness (rebuilding the exact loophole the item exists to close), leave propellant falsely red, or make the PASS DECLARE ITS DRAW - exporting launch_draw_per_convoy so the gate, the debit and the registry became one object. It took the third, which is right, and it is a PATTERN no doc in the corpus owns: a verification requirement reaching back into production code and changing its shape so that what it consumes is declared rather than inferred. Worth Ben's eye because it generalises - every future 'does anything actually do X' guard faces the same three options, and the third is the only one that cannot rot. The residual risk is named in the code: deleting the draw while leaving the vector standing. Far narrower than a prose string.
+
+*Files: `tools/verify/chain_depth.cpp`, `src/world/supply_system.hpp`, `docs/development/DEVELOPMENT_PRACTICES.md`*
+
+### NR-674 — haulage_measure's convoy baseline has moved - 1368/1014 against the noted 1055/802
+*observation · raised 2026-08-26 · from Sprint 21 wave 0, BL-648's verification sweep.*
+
+haulage_measure reports 0 failures at 1368 convoys dispatched, 1014 intra-body, against a previously-noted baseline of 1055/802. The agent correctly did not re-bless anything and named the gap. It matters more than an ordinary number drift because of what this harness IS: convoy traffic can collapse with every state_hash golden digit-identical, so haulage_measure against its baseline is the only real check that trade is still happening. A baseline that has silently moved by ~30% is therefore a check that has quietly stopped meaning what it meant. Sprint 19's population work (~40x centre density) and Sprint 20's road and levy changes are the obvious candidates and neither was chased. Someone should establish the current number deliberately, with provenance, rather than letting the next reader compare against a figure from a different world.
+
+*Files: `tools/verify/haulage_measure.cpp`*
 
 ---
 
