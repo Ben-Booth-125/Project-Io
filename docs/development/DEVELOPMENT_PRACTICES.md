@@ -443,6 +443,58 @@ these are the recurring "do not" rules that come up while building:
 
 ---
 
+## Save-format versions (`world_save_version`)
+
+`world_save_version` in [`../../src/world/world_save.hpp`](../../src/world/world_save.hpp) is
+the save format's compatibility contract. The reader enforces **strict equality** — a stream
+whose version is not the current one is refused whole — so the number is not a label on a
+change, it *is* the change. Two different record layouts wearing one version is the worst
+outcome the format can produce: a save that reads as valid and is not.
+
+Which means the number is a **shared registry**, exactly like a `BL-` id, and it collides the
+same way. Two worktree agents each read `= 13`, each write `= 14`, and nothing in either
+branch is wrong on its own; the duplicate exists only in the union, at the merge point. That
+happened in Sprint 19 (2026-08-25) and was caught only because a human read both diffs.
+
+**Before you edit the constant, allocate the number:**
+
+```
+node tools/session/next_save_version.js [count] [--claim "<OWNER>"] [--allow-no-refs]
+```
+
+It is `next_id.js` one field over, and behaves the same way:
+
+- It scans `world_save.hpp` on **every ref** (local + remote-tracking) *and* the working tree,
+  so the max it reports is the max across all in-flight branches, not your stale local one.
+- `--claim "<OWNER>"` appends the allocation to
+  `docs/development/save_version_reservations.jsonl` — an append-only JSONL ledger, one claim
+  per line, folded back into the next scan. This is the half that makes concurrency safe: the
+  claim exists **before** any header edit or commit does, so a second worktree running the tool
+  a second later is told the *next* number, not the same one. Pass the backlog short handle as
+  OWNER (`--claim "BL-624 razed settlement tier"`) — it is what a human reads at the merge point.
+- `count` reserves a consecutive run, for a wave that will spend several bumps.
+- It reports two kinds of **collision**: one version claimed by two owners in the ledger, and
+  one version carried above `main` by two branches' headers. Neither is fatal to the scan — the
+  printed number is still safe — but both must be resolved before merging, by keeping the
+  earlier claim and renumbering the later one.
+- **Exit 0 means the scan was trustworthy; exit 1 means it was not** and the number is a guess.
+  A refless or partial scan refuses rather than printing a confident answer, because a
+  collision-defence tool that fails open is worse than none — it is trusted. `--allow-no-refs`
+  is the deliberate override.
+
+Commit the ledger line with the work. If you abandon the bump, delete the line — an unspent
+reservation costs one version number, which is cheap, but a stale one misleads the next reader.
+
+**Renumbering a bump touches more than the constant.** If the integrator has to stack two
+claims, the later one moves in four places: the constant itself, its explanatory block in
+`world_save.hpp`'s version history, the `world_save_version N` comments on the changed
+field(s) in `world_save.cpp` / `components.hpp`, and the `static_assert` in
+`tools/verify/save_roundtrip.cpp`. Prior renumbers are recorded in the header's own history
+(BL-613/BL-614 were authored as v11/v12 and became v13/v14 at wave-1 integration) — the tool
+exists so that stays a rarity rather than the routine.
+
+---
+
 ## Dependency acquisition (BL-302)
 
 SDL3, Lua, sol2 and ImGui are fetched by FetchContent at **configure** time — ~120 MB of
