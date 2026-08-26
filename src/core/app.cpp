@@ -298,14 +298,6 @@ int app::run(autostart_mode autostart)
     {
         process_events(running);
 
-        // BL-435: both windowed autostarts drive themselves to the game, so
-        // neither can stop at a screen waiting for a click. They take the
-        // generator's seeded pick — identical to `Surprise me`, and identical to
-        // what every autostart did before this screen existed. To actually SEE
-        // the chooser, start a game from the menu.
-        if (autostart != autostart_mode::none && m_screen == app_screen::choosing_corp)
-            apply_corp_choice(m_world.player_entity);
-
         // Nothing simulates on the menu or the staged generation screen — just pump
         // events and draw. The sim clock is rebased when the generation screen hands
         // over, so time spent reading it never lands as elapsed in-game days.
@@ -563,6 +555,10 @@ void app::poll_worldgen()
             m_warm_ticks_done  = -1;
             m_warm_starting    = false;
             m_worldgen_progress.sub_total.store(0, std::memory_order_relaxed);
+            // BL-630: the warm start is over, so the returns the floor reads now
+            // exist. Seat BEFORE finish_new_game, which is what flips to
+            // `in_game` — the first drawn frame must already have a player.
+            seat_player();
             finish_new_game();
         }
         return;
@@ -575,26 +571,24 @@ void app::poll_worldgen()
 
     m_world = m_worldgen_future.get();
 
-    // BL-435 — the starting-corp choice, and this is the only frame it can
-    // happen in. `m_world.corporations` right now holds exactly the specialist
-    // corps (start_new_game_prelude below adds BL-365's background firms), and
-    // the warm start has not run (corp_ai would freeze whichever corp is
-    // flagged). Both constraints are satisfied here and nowhere later.
-    //
     // Phase 1 — the cheap main-thread tail (~20 ms measured): setup_world, the
-    // Lua economy load, background firms — plus arming the sliced warm start,
-    // all now live in apply_corp_choice so the two paths cannot drift.
-    build_corp_choices();
-    if (m_corp_choices.size() > 1)
-    {
-        m_screen = app_screen::choosing_corp;
-        return;
-    }
-
-    // Degenerate world (one corp, or none): nothing to choose between, so skip
-    // the stage rather than showing a list of one. The generator's own pick
-    // stands, which is exactly what "surprise me" would have done.
-    apply_corp_choice(m_world.player_entity);
+    // Lua economy load, background firms — then arm the sliced warm start.
+    //
+    // BL-630 straightened this out. The old code branched here into the
+    // starting-corp selection stage, which had to sit in this one frame because
+    // corp_ai excluded the flagged corp and the pool had to be read before
+    // background firms existed. Both constraints are gone: the warm start runs
+    // under spectate with NOBODY seated, and the seat is drawn afterwards from
+    // the specialists (`is_background == false` names that pool explicitly, so
+    // it no longer depends on WHEN the list is read).
+    start_new_game_prelude();
+    m_warm_starting   = true;
+    m_warm_ticks_done = 0;
+    m_econ_steps      = 0; // BL-568: a new campaign's cadence starts at slot 0.
+    m_warm_begin      = std::chrono::steady_clock::now();
+    m_worldgen_progress.sub_progress.store(0, std::memory_order_relaxed);
+    m_worldgen_progress.sub_total.store(pre_game_ticks, std::memory_order_relaxed);
+    m_screen = app_screen::building;
 }
 
 void app::draw_building_screen()
@@ -820,204 +814,53 @@ void app::draw_building_carve()
 }
 
 // ---------------------------------------------------------------------------
-// Starting-corp selection (BL-435, 2026-08-16)
+// The seat (BL-630, 2026-08-26)
 // ---------------------------------------------------------------------------
 //
-// The seed used to decide which corporation the player was, by a uniform draw in
-// corporation_generation.cpp. Measured over 24 seeds, that handed the player a
-// corp with NO processing facility 13 times — so the Method page (BL-430/431) and
-// the chain-depth ladder (BL-428) opened with nothing to stand on, while other
-// corporations in the same world had processors all along.
+// Which corporation the player runs is DRAWN from a viability shortlist, not
+// picked from a screen. The mechanism lives in world/spawn_seat.cpp so the
+// headless sweep and the app read one implementation; this function is the
+// app-side half — call it, log it, and repair the player-scoped UI caches the
+// warm start filled against the provisional pick.
 //
-// The generator's draw is deliberately LEFT IN PLACE. It still runs, it still
-// flags a corp, and it becomes the "surprise me" default here. That is what keeps
-// every harness and golden that never opens this screen bit-identical: selection
-// RE-POINTS an existing decision rather than replacing the mechanism that made it.
+// Authority: CORPORATION_GENERATION.md § The spawn shortlist, and the seat.
 
-void app::build_corp_choices()
+void app::seat_player()
 {
-    m_corp_choices.clear();
-    m_corp_choice_default = -1;
-    m_corp_choice_hover   = -1;
+    m_seat_result = seat_player_corporation(m_world, m_active_world_params.seed);
 
-    static const char* const focus_name[3] = { "Extraction", "Processing", "Trade" };
-
-    for (const auto& [id, cc] : m_world.corporations)
+    // The player-scoped history caches were filled through the warm start
+    // against whichever corp the GENERATOR provisionally flagged, so at this
+    // instant they belong to somebody else. Rebuild the balance series from the
+    // seated corp's own filed returns (BL-626 made those world state, which is
+    // exactly what lets this be a rebuild rather than a loss) and drop the two
+    // flow series, which have no per-quarter record to rebuild from and would
+    // otherwise chart a stranger's money.
+    m_balance_history.clear();
+    m_income_history.clear();
+    m_expenditure_history.clear();
+    if (const auto cit = m_world.corporations.find(m_world.player_entity);
+        cit != m_world.corporations.end())
     {
-        // The pool is the SPECIALIST set (R2). In the real flow this filter never
-        // fires — the stage opens in the one frame before generate_background_firms
-        // runs, so nothing here is a background firm yet. It is stated anyway
-        // because the pool being specialists-only is currently a property of WHEN
-        // this is called, and a positional guarantee is one refactor from silently
-        // becoming false. It is also what lets verify.show_corp_choice render the
-        // real pool from an already-started world.
-        if (cc.is_background)
-            continue;
-        corp_choice ch;
-        ch.id   = id;
-        ch.name = cc.name;
-        const int f = static_cast<int>(cc.focus);
-        ch.focus = (f >= 0 && f < 3) ? focus_name[f] : "?";
-        if (const auto nit = m_world.nations.find(cc.home_nation); nit != m_world.nations.end())
-            ch.nation = nit->second.name;
-        for (const entity_id bid : cc.assets)
-        {
-            const auto bit = m_world.buildings.find(bid);
-            if (bit == m_world.buildings.end())
-                continue;
-            switch (bit->second.type)
-            {
-                case building_type::processing_facility: ++ch.processing; break;
-                case building_type::extraction_site:     ++ch.extraction; break;
-                default:                                 ++ch.other;      break;
-            }
-        }
-        m_corp_choices.push_back(std::move(ch));
+        for (const quarterly_return& q : cit->second.returns)
+            ui::push_capped(m_balance_history, q.balance);
+        if (m_balance_history.empty())
+            ui::push_capped(m_balance_history, cit->second.balance);
     }
 
-    // Sort by entity id. `corporations` is an unordered_map, so an unsorted list
-    // would present the same world's corps in a different order run to run — the
-    // BL-406 lesson, applied to a screen rather than to a number. Ids are handed
-    // out in generation order, so this is also the order the loading screen's own
-    // corp ledger already used.
-    std::sort(m_corp_choices.begin(), m_corp_choices.end(),
-              [](const corp_choice& a, const corp_choice& b) { return a.id < b.id; });
-
-    for (std::size_t i = 0; i < m_corp_choices.size(); ++i)
-        if (m_corp_choices[i].id == m_world.player_entity)
-            m_corp_choice_default = static_cast<int>(i);
-}
-
-void app::apply_corp_choice(entity_id chosen)
-{
-    // Re-point rather than re-draw. Clearing every flag before setting one keeps
-    // the world.hpp invariant the header states outright — "exactly one entry
-    // will have is_player == true, and player_entity will equal that entry's
-    // key" — true even if this is somehow called twice.
-    if (m_world.corporations.find(chosen) != m_world.corporations.end())
-    {
-        for (auto& [id, cc] : m_world.corporations)
-            cc.is_player = false;
-        m_world.corporations[chosen].is_player = true;
-        m_world.player_entity                  = chosen;
-    }
-
-    m_corp_choices.clear();
-
-    // Everything the old path did at this point, unchanged and in the same
-    // order: the cheap main-thread tail, then the sliced warm start. The warm
-    // start now runs with the CHOSEN corp flagged, which is the entire point of
-    // the stage sitting before it.
-    start_new_game_prelude();
-    m_warm_starting   = true;
-    m_warm_ticks_done = 0;
-    m_econ_steps      = 0; // BL-568: a new campaign's cadence starts at slot 0.
-    m_warm_begin      = std::chrono::steady_clock::now();
-    m_worldgen_progress.sub_progress.store(0, std::memory_order_relaxed);
-    m_worldgen_progress.sub_total.store(pre_game_ticks, std::memory_order_relaxed);
-    m_screen = app_screen::building;
-}
-
-void app::draw_corp_choice_screen()
-{
-    const ImVec2 disp = ImGui::GetIO().DisplaySize;
-    ImGui::SetNextWindowPos({disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Always, {0.5f, 0.5f});
-    ImGui::SetNextWindowSize({std::min(disp.x - 80.0f, 900.0f), 0.0f}, ImGuiCond_Always);
-    constexpr ImGuiWindowFlags flags =
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-        ImGuiWindowFlags_AlwaysAutoResize;
-
-    ImGui::Begin("##corp_choice", nullptr, flags);
-
-    ImGui::TextUnformatted("Choose your corporation");
-    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(150, 158, 172, 255));
-    ImGui::TextUnformatted(
-        "The world is generated. These are its established firms — pick the one you will run.");
-    ImGui::PopStyleColor();
-    ImGui::Separator();
-    ImGui::Dummy({0.0f, 4.0f});
-
-    // Holdings, not money. Opening balances are seeded BY the warm start, which
-    // has deliberately not run yet (see poll_worldgen), so every corp's balance
-    // is 0.0 at this instant — a column of zeroes would be worse than no column.
-    if (ImGui::BeginTable("corps", 5,
-                          ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH |
-                          ImGuiTableFlags_SizingStretchProp))
-    {
-        // Holdings carries the widest cell — "2 proc / 0 extr / 1 other" — and the
-        // first capture (2026-08-16) caught it clipped to "/ 1 otl" against the
-        // Choose column. Weights rebalanced off that measurement, not by eye.
-        ImGui::TableSetupColumn("Corporation", ImGuiTableColumnFlags_WidthStretch, 0.36f);
-        ImGui::TableSetupColumn("Focus",       ImGuiTableColumnFlags_WidthStretch, 0.14f);
-        ImGui::TableSetupColumn("Nation",      ImGuiTableColumnFlags_WidthStretch, 0.22f);
-        ImGui::TableSetupColumn("Holdings",    ImGuiTableColumnFlags_WidthStretch, 0.28f);
-        ImGui::TableSetupColumn("",            ImGuiTableColumnFlags_WidthFixed,   72.0f);
-        ImGui::TableHeadersRow();
-
-        for (int i = 0; i < static_cast<int>(m_corp_choices.size()); ++i)
-        {
-            const corp_choice& c = m_corp_choices[static_cast<std::size_t>(i)];
-            ImGui::TableNextRow();
-            ImGui::PushID(i);
-
-            ImGui::TableNextColumn();
-            ImGui::TextUnformatted(c.name.c_str());
-            ImGui::TableNextColumn();
-            ImGui::TextUnformatted(c.focus.c_str());
-            ImGui::TableNextColumn();
-            ImGui::TextUnformatted(c.nation.empty() ? "-" : c.nation.c_str());
-
-            // A corp with no processing facility is a legitimate opening, not an
-            // error — but it is the one BL-435 exists to stop handing out blind,
-            // so the count is stated plainly rather than hidden behind a total.
-            ImGui::TableNextColumn();
-            ImGui::Text("%d proc / %d extr", c.processing, c.extraction);
-            if (c.other > 0)
-            {
-                ImGui::SameLine();
-                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
-                ImGui::Text("/ %d other", c.other);
-                ImGui::PopStyleColor();
-            }
-
-            ImGui::TableNextColumn();
-            if (ImGui::Button("Choose", {64.0f, 0.0f}))
-            {
-                ImGui::PopID();
-                ImGui::EndTable();
-                ImGui::End();
-                apply_corp_choice(c.id);
-                return; // `this` state changed under us; nothing else may touch it this frame.
-            }
-            ImGui::PopID();
-        }
-        ImGui::EndTable();
-    }
-
-    ImGui::Dummy({0.0f, 6.0f});
-    ImGui::Separator();
-    ImGui::Dummy({0.0f, 4.0f});
-
-    // "Surprise me" is not a random re-roll: it takes the generator's own seeded
-    // pick, so choosing it reproduces pre-BL-435 behaviour for this seed exactly.
-    if (ImGui::Button("Surprise me", {120.0f, 0.0f}))
-    {
-        const entity_id fallback =
-            (m_corp_choice_default >= 0 &&
-             m_corp_choice_default < static_cast<int>(m_corp_choices.size()))
-                ? m_corp_choices[static_cast<std::size_t>(m_corp_choice_default)].id
-                : m_world.player_entity;
-        ImGui::End();
-        apply_corp_choice(fallback);
-        return;
-    }
-    ImGui::SameLine();
-    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
-    ImGui::TextUnformatted("— take the corporation the seed would have given you.");
-    ImGui::PopStyleColor();
-
-    ImGui::End();
+    // Printed alongside the other start_new_game phase lines. AN UNMET FLOOR IS
+    // SAID OUT LOUD (CORPORATION_GENERATION.md: "a viability signal to be read,
+    // not a failure to be hidden") — nothing here patches a corp to make the
+    // shortlist non-empty.
+    const char* name = "(none)";
+    if (const auto cit = m_world.corporations.find(m_seat_result.seated);
+        cit != m_world.corporations.end())
+        name = cit->second.name.c_str();
+    std::printf("[start_new_game] seat: %s — shortlist %d of %d specialists%s\n",
+                name, m_seat_result.shortlist_size, m_seat_result.specialist_count,
+                m_seat_result.floor_unmet
+                    ? "   <-- VIABILITY FLOOR UNMET (highest trailing net seated)" : "");
+    std::fflush(stdout);
 }
 
 void app::start_new_game_prelude()
@@ -1264,7 +1107,16 @@ void app::step_economy()
     // BL-409: under spectate the session has no human seat, so the strategic
     // tier evaluates every corp — the player's included. Default false, so an
     // ordinary played session runs exactly as before.
-    m_last_econ_report = run_economy_step(m_world, m_registry, m_ui.spectating, &tick_lp_pools);
+    //
+    // BL-630 adds the SECOND case with no human seat, and it is the same case
+    // rather than a new exception: through the pre-game warm start nobody has
+    // been seated yet (the seat is drawn from what these ticks produce), so the
+    // prohibition this flag lifts has no subject to protect. Every corp is
+    // scorer-driven for all 80 ticks and every corp files real returns — which
+    // is what makes a viability read possible at all.
+    m_last_econ_report = run_economy_step(m_world, m_registry,
+                                          m_ui.spectating || m_warm_starting,
+                                          &tick_lp_pools);
     lap(1); // economy step (production + corp AI)
     auto flows = clear_markets(m_world, m_registry, m_last_econ_report);
     lap(2); // market clearing
@@ -1829,8 +1681,6 @@ void app::render()
     {
         if (m_screen == app_screen::building)
             draw_building_screen();
-        else if (m_screen == app_screen::choosing_corp)
-            draw_corp_choice_screen();
         else if (m_screen == app_screen::generating)
             draw_generation_screen();
         else

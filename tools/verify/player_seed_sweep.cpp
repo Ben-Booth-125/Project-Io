@@ -29,6 +29,17 @@
 // the table exactly.
 //
 // Run: .\build\player_seed_sweep.exe [seed_count] [warm_ticks]
+//      .\build\player_seed_sweep.exe --seat  [seed_count] [--fast]
+//      .\build\player_seed_sweep.exe --guard [seed_count] [--fast]
+//
+// BL-630 (2026-08-26) ADDED THE MODE THIS FILE NOW LEADS WITH. The two default
+// conditions above ("worth playing" == a processor, and solvent) were written
+// when the seed alone decided the player's corp. They no longer decide anything:
+// the player is SEATED after the warm start, on a corp drawn from a viability
+// shortlist with a bias toward processing and population. `--seat` measures what
+// that draw actually produces and `--guard` asserts the properties it must hold;
+// the original sweep is kept below because it still answers the question it was
+// written for - how good is the GENERATOR'S opening, before any seat logic.
 
 #include "scripting/lua_state.hpp"
 #include "world/budget_system.hpp"
@@ -39,7 +50,11 @@
 #include "harness_params.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/contract_template.hpp"
+#include "world/nation_step.hpp"
+#include "world/spawn_seat.hpp"
 #include "world/supply_system.hpp"
+#include "world/tech_gate.hpp"
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -211,134 +226,339 @@ int run_roster(uint32_t seed, const recipe_registry& reg)
     return 0;
 }
 
-// --- BL-435 task E: the guard ------------------------------------------------
+// --- BL-630: the seat sweep --------------------------------------------------
 //
-// `player_seed_sweep --guard [n_seeds]` is the one ASSERTING mode of an otherwise
-// reporting tool, and the split is deliberate. The default sweep answers a design
-// question ("how good are the openings?") whose answer is arguable, so it prints
-// and exits 0. This mode asserts only the properties the selection screen NEEDS to
-// be true of every world, which are not arguable:
+// `player_seed_sweep --seat  [n] [--fast]`  REPORTS the seat distribution.
+// `player_seed_sweep --guard [n] [--fast]`  asserts what the seat must hold.
 //
-//   G1  Every seed offers a CHOICE — at least two specialist corps. A selection
-//       screen over a pool of one is a dialog box.
-//   G2  Specialists and background firms stay DISJOINT and the specialist pool
-//       stays small. R2: the pool is the 8 specialists, not the 17-29 background
-//       firms; if a refactor started flagging specialists as background (or the
-//       reverse) the screen would quietly offer the wrong world.
-//   G3  No DEAD specialist — none with neither extraction nor processing. Ben's
-//       2026-08-16 call; a corp holding only base_rate-0 buildings cannot earn.
-//   G4  Every seed contains at least one specialist WITH a processing facility,
-//       and the mean coverage stays materially above the pre-BL-435 2.96/8.
+// One implementation, two verdicts, and the split is the same one this file has
+// always drawn: the distribution is a DESIGN reading whose answer is arguable,
+// so it prints and exits 0; the guard's rows are properties that are not
+// arguable, so they fail loudly.
 //
-// G4 is the only band, and it is stated as depth, not wealth. BL-436 measured a
-// processing facility as currently earning LESS per tick than the extraction site
-// it replaces, so a processor-bearing corp is the DEEPER opening (the chain-depth
-// ladder and the Method page have something to stand on) and NOT the richer one.
-// This guard must never be re-read as a profitability floor.
-constexpr float guard_mean_proc_floor = 4.0f; // pre-BL-435 2.96/8, post-B measured 5.83/8
+// WHY THIS MODE HAD TO REPLACE THE OLD ONE. The retired `--guard` asserted the
+// properties a SELECTION SCREEN depended on — "every seed offers a choice of at
+// least two", "the specialist pool stays small enough to list". The screen is
+// gone (BL-630), so those rows guarded nothing. What replaces them are the
+// shortlist's own properties, and above all the one the design leans hardest on:
+// THE WEIGHTING IS A BIAS AND NEVER A SECOND GATE. A shortlisted pure-extraction
+// corp on thin ground must stay drawable, only less often — S3 below is what
+// makes that checkable rather than merely asserted in a comment.
+//
+// R3 IS MEASURED, NOT ASSERTED (CORPORATION_GENERATION.md: "the weights are a
+// first cut, and what matters more than their values is that the sweep REPORTS
+// the resulting distribution rather than asserting it against a target"). There
+// is deliberately NO row here of the form "a processor is seated at least X% of
+// the time". A bias is not a guarantee, and a harness that pretended otherwise
+// would turn the first cut into a contract nobody chose.
+//
+// THE REAL SPAWN BY DEFAULT, unlike this file's older modes. The population
+// weight reads the settlement pass's output, so a world with its pre-epoch
+// year-tick sim switched off is a different quantity wearing the same name —
+// the scope declaration `no_prehistory()` makes elsewhere in this file does not
+// hold for this question. `--fast` is for iteration only and says so in its
+// header line, exactly as spawn_solvency's does.
 
-int run_guard(int n_seeds, const recipe_registry& reg)
+/// BL-573: run_nation_step's template registry. Empty is correct — nothing here
+/// asks a contract question, and an empty roster opens no contracts.
+const contract_template_registry g_no_contract_templates;
+
+/// The app's warm-start tick, composed as `app::step_economy` composes it, with
+/// the one difference that IS BL-630: `spectating = true`. Nobody is seated
+/// through the warm start, so the no-auto-act prohibition has no subject and
+/// every corp is scorer-driven (BL-409). A sweep that ran this false would
+/// measure a world one corp never acted in and call it the shipped spawn.
+void warm_tick(world& w, const recipe_registry& reg, int t)
 {
-    std::printf("player_seed_sweep --guard — %d seeds, the properties selection depends on\n\n",
-                n_seeds);
+    w.current_econ_tick = t;
+    w.current_day_tick  = t;
+    lp_pool_map lp;
+    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
+                     reg.logistics_cost(convoy_mode::space), &lp);
+    advance_convoys(w);
+    economy_report rep = run_economy_step(w, reg, /*spectating=*/true, &lp);
+    auto flows = clear_markets(w, reg, rep);
+    apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
+                 &rep.building_labour);
+    run_nation_step(w, reg, rep, t, g_no_contract_templates);
+    advance_tech_gates(w);
+    credit_arrived_convoys(w, t);
+}
 
-    int  min_spec = 9999, max_spec = 0, dead_specs = 0, seeds_no_proc = 0, overlap = 0;
-    int  total_spec = 0, total_spec_proc = 0;
-    bool threw = false;
+constexpr int k_seat_warm_ticks = 80; ///< app::pre_game_ticks.
+/// How many seeds get the two-independently-built-worlds treatment (S4).
+constexpr int k_reproduce_seeds  = 4;
+
+struct seat_row
+{
+    uint32_t  seed          = 0;
+    bool      threw         = false;
+    entity_id seated        = null_entity;
+    bool      seated_is_specialist = false;
+    bool      floor_unmet   = false;
+    int       specialists   = 0;
+    int       shortlisted   = 0;
+    /// The seated corp's own facts.
+    bool      seat_processor = false;
+    float     seat_pop_share = 0.0f;
+    float     seat_weight    = 0.0f;
+    float     seat_balance   = 0.0f;
+    float     seat_trailing  = 0.0f;
+    /// The SHORTLIST's composition, so the distribution can be read against what
+    /// was actually on offer rather than against the whole specialist set.
+    int       shortlisted_with_proc = 0;
+    int       shortlisted_near_pop  = 0;   ///< population_share > 0.
+    /// The smallest weight any shortlisted corp carried, over this seed. S3's
+    /// input: it must never reach zero, or the bias has become a gate.
+    float     min_shortlist_weight  = 0.0f;
+    /// A second, independently built world on the same seed seated the same corp.
+    /// Only sampled over the first `k_reproduce_seeds`.
+    bool      reproduced        = false;
+    bool      reproduce_checked = false;
+};
+
+/// Build one world, warm-start it, seat it. Returns the seat result plus the
+/// world, because the caller needs both to describe what was seated.
+spawn_seat_result build_and_seat(uint32_t seed, const recipe_registry& reg,
+                                 bool fast, world& out_world)
+{
+    world_params p = fast ? no_prehistory() : world_params{};
+    p.seed = seed;
+    out_world = make_hard_coded_world(p);
+    // The app's own ordering: background firms need the loaded registry, then
+    // the recipe authoring pass, then the warm start (app::start_new_game_prelude).
+    generate_background_firms(out_world, reg, seed ^ 0x8A21F00Du);
+    assign_default_recipes(out_world, reg);
+    for (int t = 1; t <= k_seat_warm_ticks; ++t)
+        warm_tick(out_world, reg, t);
+    return seat_player_corporation(out_world, seed);
+}
+
+int run_seat(int n_seeds, const recipe_registry& reg, bool fast, bool assert_mode)
+{
+    std::printf("player_seed_sweep %s — %d seeds, %d warm ticks in spectate, %s spawn\n",
+                assert_mode ? "--guard" : "--seat", n_seeds, k_seat_warm_ticks,
+                fast ? "FAST (prehistory OFF — iteration only, NOT the shipped spawn)"
+                     : "the shipped");
+    std::printf("BL-630. The floor filters; the draw over the shortlist is BIASED, never gated.\n\n");
+
+    std::printf("seed  spec  short  proc  pop%%  weight   balance   trail8  unmet  seated\n");
+    std::printf("----  ----  -----  ----  ----  ------  --------  -------  -----  ------\n");
+
+    std::vector<seat_row> rows;
+    rows.reserve(static_cast<std::size_t>(n_seeds));
 
     for (int i = 0; i < n_seeds; ++i)
     {
-        const uint32_t seed = static_cast<uint32_t>(i);
+        seat_row r;
+        r.seed = static_cast<uint32_t>(i);
+        std::string seat_name = "-";
         try
         {
-            world_params p = no_prehistory();
-            p.seed = seed;
-            world w = make_hard_coded_world(p);
-            seed_default_recipes(w, reg);
+            world w;
+            const spawn_seat_result res = build_and_seat(r.seed, reg, fast, w);
 
-            std::vector<entity_id> specialists;
-            for (const auto& [id, cc] : w.corporations)
+            r.seated      = res.seated;
+            r.floor_unmet = res.floor_unmet;
+            r.specialists = res.specialist_count;
+            r.shortlisted = res.shortlist_size;
+
+            if (const auto cit = w.corporations.find(res.seated); cit != w.corporations.end())
             {
-                specialists.push_back(id);
-                if (cc.is_background) ++overlap; // a specialist already flagged background
+                seat_name = cit->second.name;
+                r.seated_is_specialist = !cit->second.is_background;
+                r.seat_balance         = cit->second.balance;
             }
-            std::sort(specialists.begin(), specialists.end());
 
-            generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
-
-            int spec = 0, spec_proc = 0, dead = 0;
-            for (const entity_id id : specialists)
+            bool first = true;
+            for (const spawn_seat_candidate& c : res.candidates)
             {
-                const auto cit = w.corporations.find(id);
-                if (cit == w.corporations.end()) continue;
-                if (cit->second.is_background) ++overlap; // flipped by background generation
-                int proc = 0, extr = 0;
-                for (const entity_id bid : cit->second.assets)
+                if (c.corp == res.seated)
                 {
-                    const auto bit = w.buildings.find(bid);
-                    if (bit == w.buildings.end()) continue;
-                    if (bit->second.type == building_type::processing_facility) ++proc;
-                    else if (bit->second.type == building_type::extraction_site) ++extr;
+                    r.seat_processor = c.has_processor;
+                    r.seat_pop_share = c.population_share;
+                    r.seat_weight    = c.weight;
+                    r.seat_trailing  = c.trailing_net;
                 }
-                ++spec;
-                if (proc >= 1)            ++spec_proc;
-                if (proc == 0 && extr == 0) ++dead;
+                if (!c.shortlisted)
+                    continue;
+                if (c.has_processor)          ++r.shortlisted_with_proc;
+                if (c.population_share > 0.0f) ++r.shortlisted_near_pop;
+                if (first || c.weight < r.min_shortlist_weight)
+                    r.min_shortlist_weight = c.weight;
+                first = false;
             }
 
-            min_spec = std::min(min_spec, spec);
-            max_spec = std::max(max_spec, spec);
-            total_spec += spec;
-            total_spec_proc += spec_proc;
-            dead_specs += dead;
-            if (spec_proc == 0) ++seeds_no_proc;
-
-            std::printf("seed %3u  specialists %2d  with processor %2d  dead %d\n",
-                        seed, spec, spec_proc, dead);
-            std::fflush(stdout);
+            // S4's input: the SAME seed, a SECOND INDEPENDENTLY BUILT WORLD.
+            // Re-seating the same world in place would prove only that the
+            // function is a function; the spectator_determinism convention,
+            // applied to a draw.
+            //
+            // SAMPLED, not exhaustive: a second world doubles the sweep's cost
+            // (~25 s of generation plus 80 warm ticks each), and the property is
+            // structural — an unordered walk or an unseeded stream would break
+            // on the first seed, not the twentieth. The sample size is stated in
+            // S4's own row so nobody reads it as a full sweep.
+            if (i < k_reproduce_seeds)
+            {
+                world w2;
+                const spawn_seat_result res2 = build_and_seat(r.seed, reg, fast, w2);
+                r.reproduced = (res2.seated == res.seated)
+                            && (res2.shortlist_size == res.shortlist_size)
+                            && (res2.floor_unmet == res.floor_unmet);
+                r.reproduce_checked = true;
+            }
+        }
+        catch (const std::exception& e)
+        {
+            r.threw = true;
+            std::printf("%4u  THREW: %s\n", r.seed, e.what());
         }
         catch (...)
         {
-            threw = true;
-            std::printf("seed %3u  THREW\n", seed);
+            r.threw = true;
+            std::printf("%4u  THREW: unknown\n", r.seed);
+        }
+
+        if (!r.threw)
+            std::printf("%4u  %4d  %5d  %4s  %4.0f  %6.2f  %8.0f  %7.0f  %5s  %s%s\n",
+                        r.seed, r.specialists, r.shortlisted,
+                        r.seat_processor ? "YES" : "no",
+                        static_cast<double>(r.seat_pop_share * 100.0f),
+                        static_cast<double>(r.seat_weight),
+                        static_cast<double>(r.seat_balance),
+                        static_cast<double>(r.seat_trailing),
+                        r.floor_unmet ? "UNMET" : "-",
+                        seat_name.c_str(),
+                        (r.reproduce_checked && !r.reproduced) ? "   <-- NOT REPRODUCED" : "");
+        std::fflush(stdout);
+        rows.push_back(r);
+    }
+
+    // --- R3: the distribution, reported ------------------------------------
+    int done = 0, with_proc = 0, near_pop = 0, both = 0, neither = 0;
+    int drawn = 0, drawn_proc = 0, drawn_pop = 0;
+    int unmet = 0, non_specialist = 0, unseated = 0, threw = 0;
+    int not_reproduced = 0, reproduce_checked = 0;
+    int total_short = 0, total_short_proc = 0, total_short_pop = 0, total_spec = 0;
+    float min_weight = 0.0f;
+    bool  have_weight = false;
+    for (const seat_row& r : rows)
+    {
+        if (r.threw) { ++threw; continue; }
+        ++done;
+        total_spec  += r.specialists;
+        total_short += r.shortlisted;
+        total_short_proc += r.shortlisted_with_proc;
+        total_short_pop  += r.shortlisted_near_pop;
+        if (!r.floor_unmet)
+        {
+            ++drawn;
+            if (r.seat_processor)        ++drawn_proc;
+            if (r.seat_pop_share > 0.0f) ++drawn_pop;
+        }
+        if (r.seat_processor)                       ++with_proc;
+        if (r.seat_pop_share > 0.0f)                ++near_pop;
+        if (r.seat_processor && r.seat_pop_share > 0.0f) ++both;
+        if (!r.seat_processor && r.seat_pop_share <= 0.0f) ++neither;
+        if (r.floor_unmet)                          ++unmet;
+        if (r.seated == null_entity)                ++unseated;
+        else if (!r.seated_is_specialist)           ++non_specialist;
+        if (r.reproduce_checked) { ++reproduce_checked; if (!r.reproduced) ++not_reproduced; }
+        if (r.shortlisted > 0 && (!have_weight || r.min_shortlist_weight < min_weight))
+        {
+            min_weight  = r.min_shortlist_weight;
+            have_weight = true;
         }
     }
 
-    const float mean_proc =
-        total_spec > 0 ? static_cast<float>(total_spec_proc) * 8.0f / static_cast<float>(total_spec)
-                       : 0.0f;
+    auto pct = [](int a, int b) { return b > 0 ? 100.0 * a / b : 0.0; };
 
+    // WHICH MECHANISM ACTUALLY DECIDED THE SEAT. Printed FIRST and unconditionally,
+    // because every percentage below is meaningless without it: when the shortlist
+    // is empty the WEIGHTED DRAW NEVER RUNS and the seat is the floor-unmet
+    // fallback (highest trailing net), which reads no weight at all. A sweep that
+    // reported a "seat distribution" over seeds the draw never touched would be
+    // attributing the fallback's behaviour to the bias.
+    std::printf("\n=== which mechanism decided the seat ===\n");
+    std::printf("  the WEIGHTED DRAW ran on ......... %3d/%-3d seeds  (%.1f%%)\n",
+                done - unmet, done, pct(done - unmet, done));
+    std::printf("  the FLOOR-UNMET FALLBACK ran on .. %3d/%-3d seeds  (%.1f%%)\n",
+                unmet, done, pct(unmet, done));
+    std::printf("  Only the first group measures the weights. Read the R3 rows below\n"
+                "  against this split, never on their own.\n");
+
+    std::printf("\n=== R3 — the seat distribution over %d seeds (REPORTED, not asserted) ===\n", done);
+    std::printf("  seated corp HAS A PROCESSOR ............ %3d/%-3d  (%.1f%%)\n",
+                with_proc, done, pct(with_proc, done));
+    std::printf("  seated corp NEAR POPULATED GROUND ...... %3d/%-3d  (%.1f%%)\n",
+                near_pop, done, pct(near_pop, done));
+    std::printf("  seated corp BOTH ...................... %3d/%-3d  (%.1f%%)\n",
+                both, done, pct(both, done));
+    std::printf("  seated corp NEITHER ................... %3d/%-3d  (%.1f%%)\n",
+                neither, done, pct(neither, done));
+    std::printf("\n  what was ON OFFER, for the comparison the percentages above need:\n");
+    std::printf("    shortlisted / specialists ........... %d/%d  (%.1f%%)\n",
+                total_short, total_spec, pct(total_short, total_spec));
+    std::printf("    of the shortlisted, with a processor . %d/%d  (%.1f%%)\n",
+                total_short_proc, total_short, pct(total_short_proc, total_short));
+    std::printf("    of the shortlisted, near population .. %d/%d  (%.1f%%)\n",
+                total_short_pop, total_short, pct(total_short_pop, total_short));
+    std::printf("\n  The bias is legible as the GAP between each seated row and its\n"
+                "  on-offer row. Equal shares would mean the weights did nothing;\n"
+                "  100%% would mean they had become a gate, which they must not be.\n");
+    std::printf("\n  viability floor UNMET on %d/%d seeds%s\n", unmet, done,
+                unmet ? "   (highest trailing net seated; the fact stands, nothing was patched)"
+                      : "");
+    std::printf("  OF THE SEEDS THE DRAW ACTUALLY RAN ON (%d): processor %d (%.1f%%), "
+                "near population %d (%.1f%%)\n",
+                drawn, drawn_proc, pct(drawn_proc, drawn), drawn_pop, pct(drawn_pop, drawn));
+    std::printf("  historical comparison: the retired selection screen was built because a\n"
+                "  UNIFORM draw handed the player a pure-extraction corp on 13 of 24 seeds\n"
+                "  (54.2%%) — i.e. a processor %.1f%% of the time, against %.1f%% here.\n",
+                100.0 - 54.2, pct(with_proc, done));
+
+    if (!assert_mode)
+        return threw ? 1 : 0;
+
+    // --- the guard ----------------------------------------------------------
     auto row = [](const char* id, bool ok, const char* what) {
-        std::printf("%s  %-4s  %s\n", ok ? "PASS" : "FAIL", id, what);
+        std::printf("%s  %-3s  %s\n", ok ? "PASS" : "FAIL", id, what);
         return ok;
     };
 
-    std::printf("\n=== guard ===\n");
+    std::printf("\n=== guard — the properties the seat must hold ===\n");
     bool all = true;
-    char buf[192];
+    char buf[224];
 
-    std::snprintf(buf, sizeof buf, "every seed offers a choice (min specialists %d, need >= 2)",
-                  min_spec);
-    all &= row("G1", !threw && min_spec >= 2, buf);
-
-    std::snprintf(buf, sizeof buf,
-                  "specialist/background split holds (max specialists %d, need <= 12; "
-                  "mis-flagged %d, need 0)", max_spec, overlap);
-    all &= row("G2", max_spec <= 12 && overlap == 0, buf);
+    std::snprintf(buf, sizeof buf, "every seed seats somebody (%d unseated, %d threw)",
+                  unseated, threw);
+    all &= row("S1", threw == 0 && unseated == 0 && done == n_seeds, buf);
 
     std::snprintf(buf, sizeof buf,
-                  "no specialist that cannot produce at all (%d dead of %d)",
-                  dead_specs, total_spec);
-    all &= row("G3", dead_specs == 0, buf);
+                  "the seat is always a SPECIALIST, never a background firm (%d violations)",
+                  non_specialist);
+    all &= row("S2", non_specialist == 0, buf);
 
     std::snprintf(buf, sizeof buf,
-                  "processor coverage: %d of %d specialists (%.2f per 8), every seed has "
-                  ">= 1 (%d seeds without); floor %.2f/8, pre-BL-435 2.96/8",
-                  total_spec_proc, total_spec, static_cast<double>(mean_proc), seeds_no_proc,
-                  static_cast<double>(guard_mean_proc_floor));
-    all &= row("G4", seeds_no_proc == 0 && mean_proc >= guard_mean_proc_floor, buf);
+                  "the weighting is a BIAS, never a gate: the smallest weight any "
+                  "shortlisted corp carried is %.2f, and must be > 0 (a shortlisted "
+                  "pure-extraction corp on thin ground scores exactly 1.00)",
+                  static_cast<double>(min_weight));
+    all &= row("S3", have_weight && min_weight > 0.0f, buf);
 
-    if (threw)
-        all &= row("G0", false, "generation threw on at least one seed");
+    std::snprintf(buf, sizeof buf,
+                  "the draw is REPRODUCIBLE — same seed, two independently built worlds, "
+                  "same seat (%d of the first %d seeds checked, %d disagreed)",
+                  reproduce_checked, k_reproduce_seeds, not_reproduced);
+    all &= row("S4", reproduce_checked > 0 && not_reproduced == 0, buf);
+
+    std::snprintf(buf, sizeof buf,
+                  "an unmet floor is RECORDED rather than hidden: %d/%d seeds unmet, and "
+                  "every one of them still seated a specialist (this row REPORTS the "
+                  "count — an unmet floor is a viability signal, not a failure)",
+                  unmet, done);
+    all &= row("S5", unmet == 0 || non_specialist == 0, buf);
 
     std::printf("\n%s\n", all ? "ALL PASS" : "FAILURES ABOVE");
     return all ? 0 : 1;
@@ -350,15 +570,21 @@ int main(int argc, char** argv)
 {
     const bool roster_mode = (argc > 1 && std::string(argv[1]) == "--roster");
     const bool guard_mode  = (argc > 1 && std::string(argv[1]) == "--guard");
-    const bool mode_arg = roster_mode || guard_mode;
+    const bool seat_mode   = (argc > 1 && std::string(argv[1]) == "--seat");
+    const bool mode_arg = roster_mode || guard_mode || seat_mode;
+    bool fast = false;
+    for (int a = 1; a < argc; ++a)
+        if (std::string(argv[a]) == "--fast")
+            fast = true;
     const int n_seeds   = (!mode_arg && argc > 1) ? std::atoi(argv[1]) : 24;
     const int warm_ticks = (!mode_arg && argc > 2) ? std::atoi(argv[2]) : 12;
     if (!mode_arg && (n_seeds <= 0 || warm_ticks <= 0))
     {
-        std::printf("usage: %s [seed_count] [warm_ticks]  (both positive)\n"
-                    "       %s --roster <seed>       (every corp's opening, one seed)\n"
-                    "       %s --guard [seed_count]  (assert what selection depends on)\n",
-                    argv[0], argv[0], argv[0]);
+        std::printf("usage: %s [seed_count] [warm_ticks]   (both positive)\n"
+                    "       %s --roster <seed>              (every corp's opening, one seed)\n"
+                    "       %s --seat  [seed_count] [--fast] (REPORT the seat distribution)\n"
+                    "       %s --guard [seed_count] [--fast] (assert what the seat holds)\n",
+                    argv[0], argv[0], argv[0], argv[0]);
         return 2;
     }
 
@@ -380,12 +606,15 @@ int main(int argc, char** argv)
     if (roster_mode)
         return run_roster(static_cast<uint32_t>(argc > 2 ? std::atoi(argv[2]) : 0), reg);
 
-    // Same placement, same reason: a guard run against an empty registry would
-    // measure a world where nothing can be processed.
-    if (guard_mode)
+    // Same placement, same reason: a seat sweep against an empty registry would
+    // measure a world where nothing can be processed, and every corp would fail
+    // the viability floor for a reason that is not the world's.
+    if (seat_mode || guard_mode)
     {
-        const int g_seeds = (argc > 2) ? std::atoi(argv[2]) : 24;
-        return run_guard(g_seeds > 0 ? g_seeds : 24, reg);
+        int g_seeds = 24;
+        if (argc > 2 && std::string(argv[2]) != "--fast")
+            g_seeds = std::atoi(argv[2]);
+        return run_seat(g_seeds > 0 ? g_seeds : 24, reg, fast, guard_mode);
     }
 
     std::printf("player_seed_sweep — %d seeds, %d warm ticks (%.2f in-game years)\n\n",

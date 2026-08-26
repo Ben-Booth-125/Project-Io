@@ -262,14 +262,9 @@ int app::run_autostart()
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(300);
     while (m_screen != app_screen::in_game && std::chrono::steady_clock::now() < deadline)
     {
+        // BL-630: no fork to take. poll_worldgen drives generation, then the
+        // warm start, then the seat, and lands on in_game by itself.
         poll_worldgen();
-        // BL-435: an automated run has nobody to press Choose, so it takes the
-        // generator's own seeded pick — the same corp `Surprise me` selects, and
-        // the same corp every run before BL-435 got. That is what keeps every
-        // verify capture and golden bit-identical across this change: the screen
-        // is a fork the automated path deliberately never takes.
-        if (m_screen == app_screen::choosing_corp)
-            apply_corp_choice(m_world.player_entity);
         std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 Hz, as the app polls
     }
     if (m_screen != app_screen::in_game)
@@ -853,55 +848,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         p.seed = static_cast<uint32_t>(seed);
         setup_world(p);
         load_economy();
-    });
-
-    // BL-435 — park on (or leave) the starting-corp selection stage so a visual
-    // check can see it at all. Both automated paths (--autostart and the verify
-    // harness's own start) take the generator's seeded pick the instant the
-    // screen appears, deliberately, because that is what keeps every existing
-    // capture bit-identical. The cost is that the screen was unreachable to
-    // --verify, and a check written against an unreachable surface is
-    // green-but-blind (the NR-255 failure mode).
-    //
-    // This re-enters the stage from an ALREADY-STARTED world, so it is a render
-    // of the real screen against real generated corps, not a replay of the
-    // original frame: background firms exist by now and build_corp_choices skips
-    // them, so the list is the same specialist pool the live stage shows. It
-    // does not arm a choice — pressing Choose here would re-run the prelude on a
-    // running world. A capture-only script never presses, and none does.
-    v.set_function("show_corp_choice", [this](bool on) {
-        if (on)
-        {
-            build_corp_choices();
-            m_screen = app_screen::choosing_corp;
-        }
-        else
-        {
-            m_corp_choices.clear();
-            m_screen = app_screen::in_game;
-        }
-    });
-
-    // The armed selection list, so a check can assert what the screen offers
-    // rather than only photograph it. One row per selectable opening; holdings
-    // are the counts the screen prints. Deliberately no wealth field: BL-436
-    // measured processing as currently earning LESS than the extraction it
-    // replaces, so nothing here may be read as "the richer corp".
-    v.set_function("corp_choices", [this]() {
-        sol::table out = m_lua.state().create_table();
-        int idx = 0;
-        for (const corp_choice& c : m_corp_choices)
-        {
-            sol::table row  = m_lua.state().create_table();
-            row["name"]       = c.name;
-            row["focus"]      = c.focus;
-            row["nation"]     = c.nation;
-            row["processing"] = c.processing;
-            row["extraction"] = c.extraction;
-            row["other"]      = c.other;
-            out[++idx]        = row;
-        }
-        return out;
     });
 
     v.set_function("show_generation", [this](bool on) {
