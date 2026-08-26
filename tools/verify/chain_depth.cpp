@@ -71,10 +71,14 @@
 #include "world/components.hpp"
 #include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/resource_names.hpp" // BL-648: NAME the good in a failure, never an id
+#include "world/supply_system.hpp"  // BL-648: the launch draw declares what it burns
 #include "world/tech_gate.hpp" // BL-589: the start-gate audit reads recipe_unlocked/advance_tech_gates
 #include "world/world.hpp"
 
 #include <algorithm>
+#include <array>
+#include <cstdint>
 #include <cstdio>
 #include <string>
 #include <unordered_map>
@@ -113,6 +117,237 @@ constexpr resource_type RAW_B = resource_type::coal;
 constexpr resource_type MID   = resource_type::steel;
 constexpr resource_type DEEP  = resource_type::machinery;
 constexpr resource_type FAR   = resource_type::alloys;
+
+// ---------------------------------------------------------------------------
+// THE INJECTOR REGISTRY (BL-648 — an exemption must name a pass that injects)
+// ---------------------------------------------------------------------------
+//
+// WHAT WENT WRONG. R1's exemption table let a resource pass the orphan check by
+// NAMING a consumer in prose — "mercantile demand, terminal artisan good". A
+// name is not a pass. Ten goods rested on a *mercantile demand* that has never
+// existed: market_clearing.cpp has exactly three demand injections and none of
+// them is it. The row was green throughout, which is how the ancient roster came
+// to terminate in artisan goods nobody buys. MARKETS.md § Demand channels states
+// the rule this registry enforces: **a consumer is a MECHANISM, not a noun** —
+// a good is wanted when some pass adds to a market's `demand` for it, or draws
+// it from a pool.
+//
+// WHERE THE REGISTRY IS DERIVED FROM, and why it cannot drift (R4). Every entry
+// resolves through the SAME object the running pass multiplies by. Not one line
+// below contains a hand-written resource name, which is the whole point — a
+// second hand-maintained list beside the first is the loophole rebuilt:
+//
+//   population_demand           reg.population_demand().demand_basket
+//                               (economy.population_demand in Lua; the exact
+//                               vector inject_population_demand scales by
+//                               centre scale and elasticity)
+//   background_demand           reg.background_demand().demand_basket
+//                               (economy.background_demand; likewise for
+//                               inject_background_demand)
+//   unit_upkeep_draw            reg.military().upkeep.goods_per_head
+//                               (economy.military.unit_upkeep; the per-head,
+//                               per-tick vector run_unit_upkeep draws from the
+//                               (owner, body) pool)
+//   construction_material_draw  reg.economics(t).resource_build_cost, every
+//                               per-building override reg.resource_build_cost_for
+//                               resolves, and reg.road_econ(tier).resource_build_cost
+//                               (the vectors run_economy_step's build pass and
+//                               road placement actually consume from market
+//                               inventory)
+//   launch_draw                 launch_draw_per_convoy() — supply_system's OWN
+//                               exported draw vector, the one price_convoy_leg
+//                               gates on and commit_convoy debits
+//
+// THE ONE HONEST COMPROMISE, stated rather than hidden. Four of the five are
+// Lua-authored data and are therefore derived in the strongest sense: change the
+// number and the registry changes with it, with no C++ edit anywhere. The fifth
+// is not — a launch's burn is a C++ constant, and no amount of reading Lua will
+// find it. Rather than re-type it here (a second copy, i.e. the defect) or drop
+// propellant into the red list (a false alarm against a draw that demonstrably
+// runs), BL-648 made the pass EXPORT what it draws: supply_system.hpp's
+// `launch_draw_per_convoy()` is now the single definition that both the gate and
+// the debit read. The residual risk is narrow and worth naming — deleting the
+// draw while leaving the vector standing would leave this registry asserting a
+// pass that no longer fires. That is a far smaller surface than a prose string,
+// and R4 below pins the property that matters: the probes read live state.
+//
+// TWO PASSES ARE DELIBERATELY ABSENT, and neither absence is an oversight:
+//   * inject_interbody_demand ORIGINATES nothing. It pulls a fraction of a home
+//     market's *already-injected* unmet demand onto outposts, so its answer for
+//     a good nothing else wants is identically zero. A redistributor cannot be
+//     the reason a good is alive.
+//   * procurement (BL-350 request_quote/accept_quote) is a resource-AGNOSTIC
+//     transfer between two corps' pools, elected per command. Admitting it would
+//     substantiate every resource in the roster at once — the exemption table's
+//     original sin in a new costume — and nothing consumes what it delivers.
+enum class injector
+{
+    none = 0,                   ///< The claim names no pass this registry knows.
+    population_demand,
+    background_demand,
+    unit_upkeep_draw,
+    construction_material_draw,
+    launch_draw,
+};
+
+const char* injector_label(injector i)
+{
+    switch (i)
+    {
+        case injector::none:                       return "(names no pass)";
+        case injector::population_demand:          return "inject_population_demand";
+        case injector::background_demand:          return "inject_background_demand";
+        case injector::unit_upkeep_draw:           return "run_unit_upkeep goods draw";
+        case injector::construction_material_draw: return "construction material draw";
+        case injector::launch_draw:                return "commit_convoy launch draw";
+    }
+    return "(unknown injector)";
+}
+
+/// Every injector but `none`, in declaration order — the deterministic walk the
+/// census and R4 both use. Listing the ENUM is not a second list of resources:
+/// what each entry moves is still computed, never authored.
+constexpr injector k_injectors[] = {
+    injector::population_demand, injector::background_demand,
+    injector::unit_upkeep_draw,  injector::construction_material_draw,
+    injector::launch_draw,
+};
+
+/// Does the pass named by @p i really move resource @p r? Every branch reads the
+/// live vector the pass itself reads — see the header comment above.
+bool injector_moves(const recipe_registry& reg, injector i, std::size_t r)
+{
+    switch (i)
+    {
+        case injector::none:
+            return false;
+        case injector::population_demand:
+            return reg.population_demand().demand_basket[r] > 0.0f;
+        case injector::background_demand:
+            return reg.background_demand().demand_basket[r] > 0.0f;
+        case injector::unit_upkeep_draw:
+            return reg.military().upkeep.goods_per_head[r] > 0.0f;
+        case injector::launch_draw:
+            return launch_draw_per_convoy()[r] > 0.0f;
+        case injector::construction_material_draw:
+        {
+            // The base cost of every building type, then every per-building
+            // override (BL-590) `resource_build_cost_for` resolves, then the
+            // road ladder. Generic over the roster, so a future override is
+            // covered without an edit here.
+            for (int t = 1; t <= 9; ++t) // building_type 1..9; `none` (0) has no economics
+                if (reg.economics(static_cast<building_type>(t)).resource_build_cost[r] > 0.0f)
+                    return true;
+            for (const resource_type target : placement_rules::k_extractable)
+                if (reg.resource_build_cost_for(building_type::extraction_site,
+                                                target, no_recipe)[r] > 0.0f)
+                    return true;
+            const int n = reg.recipe_count(building_type::processing_facility);
+            for (int k = 0; k < n; ++k)
+            {
+                const recipe& rc = reg.recipe_at(building_type::processing_facility, k);
+                if (reg.resource_build_cost_for(building_type::processing_facility,
+                                                resource_type::iron_ore,
+                                                reg.recipe_id(rc.name))[r] > 0.0f)
+                    return true;
+            }
+            for (std::uint8_t tier = 1; tier <= 3; ++tier)
+                if (reg.road_econ(tier).resource_build_cost[r] > 0.0f)
+                    return true;
+            return false;
+        }
+    }
+    return false;
+}
+
+/// One row of R1's exemption table: the good, the pass its author CLAIMS wants
+/// it, and the prose reason. The claim is authored — an author asserting
+/// something is fine; what BL-648 changed is that the assertion is now CHECKED
+/// against the registry instead of taken on trust.
+struct exemption
+{
+    resource_type res;
+    injector      via;
+    const char*   claim;
+};
+
+/// THE table. `injector::none` is not a placeholder to be tidied away later — it
+/// is the honest record of a claim with no pass behind it, and the row it makes
+/// fail is this item succeeding.
+const exemption k_actor_consumed[] = {
+    // --- Claims that name a real pass ------------------------------------
+    { resource_type::propellant, injector::launch_draw,
+      "per-convoy dispatch, space mode (BL-308)" },
+    { resource_type::clean_water, injector::population_demand,
+      "population centres, the BL-368 habitability tranche" },
+    { resource_type::consumer_goods, injector::population_demand,
+      "population centres, the BL-368 habitability tranche" },
+    { resource_type::medical_supplies, injector::population_demand,
+      "population centres, the BL-368 habitability tranche" },
+    // BL-457/BL-454. Named rather than assumed, per this table's own rule:
+    // ordnance is drawn per-tick, per unit, by the upkeep pass. If BL-454 is
+    // ever reverted this row does not become a lie in silence — the rate it
+    // resolves through goes to zero and R1 says so by name. R4 pins exactly
+    // that behaviour rather than trusting this comment.
+    { resource_type::ordnance, injector::unit_upkeep_draw,
+      "BL-454 unit upkeep draw (per-tick, per unit)" },
+
+    // --- Claims with no pass behind them ---------------------------------
+    // Everything below names a want that was never built. Each stays here,
+    // with its claim intact, because a named list is what makes the failure
+    // actionable — moving a good onto a fake recipe consumer to quiet the row
+    // would destroy the only record of what is owed. MARKETS.md § Demand
+    // channels carries the owning item for each channel.
+    { resource_type::spacecraft_components, injector::none,
+      "BL-350 procurement contracts (terminal object) - but procurement is a "
+      "resource-agnostic transfer between two corps' pools, and nothing consumes "
+      "what it delivers; the Space-programme budget line (BL-644) owns the first real buyer" },
+    { resource_type::tobacco, injector::none,
+      "mercantile demand, endemic good (BL-191) - endemic luxury demand (BL-647) owns the buyer" },
+    { resource_type::spices, injector::none,
+      "mercantile demand, endemic good (BL-191) - endemic luxury demand (BL-647) owns the buyer" },
+    { resource_type::coffee, injector::none,
+      "mercantile demand, endemic good (BL-191) - endemic luxury demand (BL-647) owns the buyer" },
+    { resource_type::furs, injector::none,
+      "mercantile demand, endemic good (BL-191) - endemic luxury demand (BL-647) owns the buyer" },
+    { resource_type::trade_goods_misc, injector::none,
+      "mercantile demand, endemic-luxury placeholder - endemic luxury demand (BL-647) owns the buyer" },
+    { resource_type::ceramics, injector::none,
+      "mercantile demand, terminal artisan good (BL-586) - the era-banded household basket (BL-640) owns the buyer" },
+    { resource_type::dressed_stone, injector::none,
+      "mercantile demand, terminal construction good (BL-586) - construction actually draws (BL-642) owns the buyer" },
+    { resource_type::tools, injector::none,
+      "mercantile demand for now; a construction-material draw (BL-590) when it lands" },
+    { resource_type::leather, injector::none,
+      "mercantile demand, terminal artisan good (BL-586 slice 2) - the era-banded household basket (BL-640) owns the buyer" },
+    { resource_type::rigging, injector::none,
+      "mercantile demand, terminal trade good (BL-586 slice 2, the Shipwright's output) - "
+      "the era-banded household basket (BL-640) owns the buyer" },
+};
+
+const exemption* exemption_for(std::size_t r)
+{
+    for (const exemption& e : k_actor_consumed)
+        if (static_cast<std::size_t>(e.res) == r)
+            return &e;
+    return nullptr;
+}
+
+/// The whole admission test for a non-recipe consumer, in one place so R1 and
+/// R4 cannot answer it differently.
+bool exemption_substantiated(const recipe_registry& reg, std::size_t r)
+{
+    const exemption* e = exemption_for(r);
+    return e != nullptr && injector_moves(reg, e->via, r);
+}
+
+/// Name the good. `resource_names::name_of` reverses the ONE canonical
+/// name<->enum table (BL-414), so this is not the fourth hand-rolled copy the
+/// old comment here rightly refused to add.
+std::string res_name(std::size_t r)
+{
+    return resource_names::name_of(static_cast<resource_type>(r));
+}
 
 } // namespace
 
@@ -470,10 +705,14 @@ int main()
     // recipe or extractable from a deposit) and must be WANTED (consumed by a
     // recipe, or by a named non-recipe actor from the table below).
     //
-    // Resource NAMES are not printed: the only lookup table lives in the UI
-    // layer, and BL-414 (resource name triple-desync) owns consolidating it.
-    // Adding a fourth hand-rolled copy here to prettify a harness would make
-    // that item worse. Ids match components.hpp's enum, same as D6 above.
+    // BL-648 SHARPENED THE SECOND HALF. "Wanted" no longer means "an exemption
+    // row exists" — the row's named consumer must resolve to a pass in the
+    // injector registry above that really moves the good. See that registry's
+    // comment for what went wrong and where each probe reads from.
+    //
+    // Resource names ARE printed now, which is also BL-648's doing: a list of
+    // enum indices is not an actionable failure. `resource_names::name_of`
+    // reverses BL-414's single canonical table rather than adding a copy of it.
     std::printf("\nR1 - no orphan resources, either direction\n");
     {
         lua_state lua;
@@ -488,49 +727,11 @@ int main()
         // file, not about one campaign's view of it.
         reg.set_era(era_band::any);
 
-        // The EXPLICIT exemption list BL-432's design asks for — a good that is
-        // consumed by a named actor rather than by a recipe. Each entry names
-        // the actor, so an orphan cannot hide here as an assumed terminal.
-        struct exemption { resource_type res; const char* consumer; };
-        static const exemption k_actor_consumed[] = {
-            { resource_type::spacecraft_components, "BL-350 procurement contracts (terminal object)" },
-            { resource_type::propellant,            "per-convoy dispatch, space mode (BL-308)" },
-            { resource_type::clean_water,           "population centres, inject_population_demand" },
-            { resource_type::consumer_goods,        "population centres, inject_population_demand" },
-            { resource_type::medical_supplies,      "population centres, inject_population_demand" },
-            { resource_type::tobacco,               "mercantile demand, endemic good (BL-191)" },
-            { resource_type::spices,                "mercantile demand, endemic good (BL-191)" },
-            { resource_type::coffee,                "mercantile demand, endemic good (BL-191)" },
-            { resource_type::furs,                  "mercantile demand, endemic good (BL-191)" },
-            { resource_type::trade_goods_misc,      "mercantile demand, endemic-luxury placeholder" },
-            // BL-457/BL-454. Named rather than assumed, per this table's own
-            // rule: ordnance is drawn per-tick, per unit, by the upkeep pass in
-            // economy_system.cpp. If BL-454 is ever reverted, this line becomes
-            // a lie and the row is supposed to catch it — delete the exemption
-            // with the consumer, not after someone notices the good is dead.
-            { resource_type::ordnance,              "BL-454 unit upkeep draw (per-tick, per unit)" },
-            // BL-585/BL-586 (2026-08-24). Three of the ancient roster's slice-1
-            // outputs are TERMINAL — sold to the market, reprocessed by nothing —
-            // same shape as trade_goods_misc above. `tools` gains a real second
-            // consumer (a construction-material draw) when BL-590 lands; this
-            // exemption names that as the plan rather than assuming it now.
-            { resource_type::ceramics,              "mercantile demand, terminal artisan good (BL-586)" },
-            { resource_type::dressed_stone,         "mercantile demand, terminal construction good (BL-586)" },
-            { resource_type::tools,                 "mercantile demand for now; BL-590 construction-material draw when it lands" },
-            // BL-586 slice 2 (2026-08-24). `leather` (Tannery) and `rigging`
-            // (Shipwright) are TERMINAL, same shape as the row above; `cloth`
-            // (Weaver) is NOT exempted here — it has a real recipe consumer,
-            // the Shipwright, so it is expected to show `consumed[r] == true`
-            // on its own.
-            { resource_type::leather,               "mercantile demand, terminal artisan good (BL-586 slice 2)" },
-            { resource_type::rigging,               "mercantile demand, terminal trade good (BL-586 slice 2, the Shipwright's output)" },
-        };
-        auto exempt_consumer = [&](std::size_t r) -> const char* {
-            for (const exemption& e : k_actor_consumed)
-                if (static_cast<std::size_t>(e.res) == r)
-                    return e.consumer;
-            return nullptr;
-        };
+        // The exemption table itself now lives at file scope (`k_actor_consumed`,
+        // beside the registry), because R4 has to interrogate the SAME table this
+        // row admits on. `cloth` is deliberately absent from it: the Weaver's
+        // output feeds the Shipwright, so it is expected to show
+        // `consumed[r] == true` on its own merits.
 
         std::vector<bool> produced(resource_count, false);
         std::vector<bool> consumed(resource_count, false);
@@ -557,27 +758,70 @@ int main()
                                        resource_type::coffee,  resource_type::furs })
             extractable[static_cast<std::size_t>(e)] = true;
 
-        std::vector<std::size_t> unobtainable, unwanted;
+        // THE CENSUS the registry makes possible, printed before the verdict so a
+        // green row is never silent about what is holding it up. Ascending
+        // resource index inside each injector; injectors in declaration order.
+        std::printf("      injector registry - what each pass really moves:\n");
+        for (const injector inj : k_injectors)
+        {
+            std::string moved;
+            int         n_moved = 0;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (injector_moves(reg, inj, r))
+                {
+                    moved += (n_moved++ ? ", " : "") + res_name(r);
+                }
+            std::printf("        %-28s %2d good%s%s%s\n", injector_label(inj), n_moved,
+                        n_moved == 1 ? "" : "s", n_moved ? ": " : "", moved.c_str());
+        }
+
+        std::vector<std::size_t> unobtainable, unwanted, unsubstantiated;
         for (std::size_t r = 0; r < resource_count; ++r)
         {
             if (!produced[r] && !extractable[r])
                 unobtainable.push_back(r);
-            if (!consumed[r] && exempt_consumer(r) == nullptr)
+            if (consumed[r])
+                continue; // a recipe wants it; the exemption machinery is not involved
+            if (exemption_for(r) == nullptr)
                 unwanted.push_back(r);
+            else if (!exemption_substantiated(reg, r))
+                unsubstantiated.push_back(r);
         }
 
         for (std::size_t r : unobtainable)
-            std::printf("      UNOBTAINABLE: resource id %zu - no recipe produces it and no deposit yields it\n", r);
+            std::printf("      UNOBTAINABLE: %s (id %zu) - no recipe produces it and no deposit yields it\n",
+                        res_name(r).c_str(), r);
         for (std::size_t r : unwanted)
-            std::printf("      UNWANTED: resource id %zu - no recipe consumes it and no actor is named for it\n", r);
-        std::printf("      %zu resources: %zu unobtainable, %zu unwanted, %zu actor-consumed exemptions\n",
-                    resource_count, unobtainable.size(), unwanted.size(),
+            std::printf("      UNWANTED: %s (id %zu) - no recipe consumes it and no actor is named for it\n",
+                        res_name(r).c_str(), r);
+        // The actionable half (BL-648). Each line is one good and the exact claim
+        // that could not be substantiated — the list Sprint 21's demand-channel
+        // items exist to shorten, one good at a time.
+        for (std::size_t r : unsubstantiated)
+        {
+            const exemption* e = exemption_for(r);
+            std::printf("      UNSUBSTANTIATED: %s (id %zu)\n"
+                        "          claims: \"%s\"\n"
+                        "          resolves to: %s - which injects nothing for this good\n",
+                        res_name(r).c_str(), r, e->claim, injector_label(e->via));
+        }
+        std::printf("      %zu resources: %zu unobtainable, %zu unwanted, %zu unsubstantiated, "
+                    "%zu actor-consumed exemptions\n",
+                    resource_count, unobtainable.size(), unwanted.size(), unsubstantiated.size(),
                     sizeof(k_actor_consumed) / sizeof(k_actor_consumed[0]));
 
         check(unobtainable.empty(),
               "every resource is obtainable - produced by a recipe or extractable from a deposit");
         check(unwanted.empty(),
               "every resource is wanted - consumed by a recipe, or by a named actor on the exemption list");
+        // BL-648. EXPECTED RED, and expected to STAY red until the demand
+        // channels MARKETS.md registers are built: a known-red guard carrying a
+        // named list is worth more than a green one that means nothing. It must
+        // never be quieted by weakening this assertion, nor by moving a good onto
+        // a recipe consumer authored only to absorb it.
+        check(unsubstantiated.empty(),
+              "every actor-consumed exemption names a pass in the injector registry "
+              "that really adds demand for the good or draws it from a pool");
     }
 
     // --- R1b: producer and consumer reachable in the SAME era band ------------
@@ -640,7 +884,21 @@ int main()
         // ancient-only producer for an ancient-only endemic-luxury good is
         // therefore a design choice (industrial fills the same role with
         // consumer_goods), not a strand, and must not be flagged here.
-        static const resource_type k_actor_consumed[] = {
+        //
+        // BL-648 LEFT THIS LIST ALONE, and that is a decision rather than an
+        // omission. Deriving it from the injector registry is the obviously
+        // tidier move and it is NOT this item's: the registry's derived set
+        // adds the whole population and background baskets (food_rations,
+        // agricultural_produce, water, silicon, machinery, alloys, electronics,
+        // ...) to "wanted in every band", and since none of those passes is
+        // era-gated an ancient campaign really does want goods only the
+        // industrial arc can make. That is a SECOND, larger red list of the
+        // same defect class R1b was written for, and it belongs to whichever
+        // demand-channel item bands the baskets (MARKETS.md § Demand channels,
+        // property 2) — not folded silently into BL-648's diff, where it would
+        // bury the ten goods this item exists to name. Named rather than
+        // assumed, per this file's own habit.
+        static const resource_type k_band_independent_actors[] = {
             resource_type::spacecraft_components, resource_type::propellant,
             resource_type::clean_water,           resource_type::consumer_goods,
             resource_type::medical_supplies,      resource_type::ordnance,
@@ -651,7 +909,7 @@ int main()
             // not force a band-independent want here.
         };
         auto actor_consumed = [&](std::size_t r) {
-            for (const resource_type e : k_actor_consumed)
+            for (const resource_type e : k_band_independent_actors)
                 if (static_cast<std::size_t>(e) == r)
                     return true;
             return false;
@@ -703,10 +961,11 @@ int main()
                     if (known_gap_tracked(r, band))
                     {
                         ++gap_count;
-                        std::printf("      known gap (tracked): resource id %zu (%s)\n", r, band_name);
+                        std::printf("      known gap (tracked): %s (id %zu, %s)\n",
+                                    res_name(r).c_str(), r, band_name);
                         continue;
                     }
-                    stranded.push_back("resource id " + std::to_string(r) + " (" + band_name + ")");
+                    stranded.push_back(res_name(r) + " (id " + std::to_string(r) + ", " + band_name + ")");
                 }
             }
         }
@@ -987,6 +1246,90 @@ int main()
         check(checked > 0, "ANTI-VACUITY: the roster actually authors per-building overrides");
         check(offenders.empty(),
               "every named building's material basket is obtainable in its own band");
+    }
+
+    // --- R4: the injector registry is DERIVED, not a second authored list -----
+    //
+    // BL-648's own failure mode, tested rather than promised. R1 is only worth
+    // more than the prose table it replaced if `injector_moves` genuinely reads
+    // the vector the running pass reads; a probe that returned a baked-in answer
+    // would look identical from the outside and would be the same loophole with
+    // more ceremony. So this row MOVES THE DATA and requires the verdict to move
+    // with it — the one property a hand-maintained copy cannot fake.
+    //
+    // No Lua here on purpose: a default-constructed registry has empty baskets,
+    // so what the probes report can only have come from what is set below.
+    std::printf("\nR4 - the injector registry is derived from live data, not a second list\n");
+    {
+        const std::size_t i_clean_water = static_cast<std::size_t>(resource_type::clean_water);
+        const std::size_t i_ordnance    = static_cast<std::size_t>(resource_type::ordnance);
+        const std::size_t i_ceramics    = static_cast<std::size_t>(resource_type::ceramics);
+
+        // 1. A registry that was never loaded substantiates NOTHING. If the
+        //    probes carried a baked-in list, these would still read as wanted.
+        recipe_registry blank;
+        check(!exemption_substantiated(blank, i_clean_water)
+                  && !exemption_substantiated(blank, i_ordnance),
+              "an empty registry substantiates no exemption - the probes read data, not a literal");
+
+        // 2. Author the want, and the SAME exemption row goes green. This is the
+        //    population basket's own field, so a Lua edit alone moves the verdict.
+        population_demand_params pd{};
+        pd.demand_basket[i_clean_water] = 0.35f;
+        blank.set_population_demand(pd);
+        check(exemption_substantiated(blank, i_clean_water),
+              "authoring a population-basket weight substantiates clean_water's exemption with no harness edit");
+        check(!exemption_substantiated(blank, i_ordnance),
+              "...and substantiates ONLY the good authored, not the whole exemption table");
+
+        // 3. The regression the old table asked for in a comment and could not
+        //    enforce: revert BL-454's draw and ordnance's exemption must become
+        //    a lie the row reports, not a lie the row keeps green.
+        military_capability_params mil{};
+        mil.upkeep.goods_per_head[i_ordnance] = 0.0035f;
+        blank.set_military(mil);
+        check(exemption_substantiated(blank, i_ordnance),
+              "a live unit-upkeep rate substantiates ordnance's exemption");
+        mil.upkeep.goods_per_head[i_ordnance] = 0.0f; // as if BL-454 were reverted
+        blank.set_military(mil);
+        check(!exemption_substantiated(blank, i_ordnance),
+              "zeroing the upkeep rate UNSUBSTANTIATES it - a reverted draw cannot leave a green row behind");
+
+        // 4. No amount of authoring in one channel launders a claim that names
+        //    no pass at all. `ceramics` claims a mercantile demand; giving the
+        //    population basket a weight for it must not help, because its row
+        //    does not name that pass.
+        population_demand_params pd2 = blank.population_demand();
+        pd2.demand_basket[i_ceramics] = 1.0f;
+        blank.set_population_demand(pd2);
+        check(!exemption_substantiated(blank, i_ceramics),
+              "an injector::none claim stays unsubstantiated however the data moves - "
+              "the row must be repointed at the pass that lands, not merely surrounded by one");
+
+        // 5. ANTI-VACUITY against the SHIPPED registry: a registered pass that
+        //    moves nothing is the same defect one level up - a named injector
+        //    that does not inject. Every one of the five must carry real goods.
+        lua_state lua;
+        lua.load("scripts/recipes.lua");
+        lua.load("scripts/economy.lua");
+        recipe_registry reg;
+        reg.load_from_lua(lua);
+        reg.set_era(era_band::any);
+
+        std::vector<std::string> empty_injectors;
+        for (const injector inj : k_injectors)
+        {
+            int n_moved = 0;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (injector_moves(reg, inj, r))
+                    ++n_moved;
+            if (n_moved == 0)
+                empty_injectors.push_back(injector_label(inj));
+        }
+        for (const std::string& e : empty_injectors)
+            std::printf("      EMPTY INJECTOR: %s moves nothing in the shipped registry\n", e.c_str());
+        check(empty_injectors.empty(),
+              "ANTI-VACUITY: every pass in the injector registry really moves at least one good");
     }
 
     std::printf("\n=== %s (%d failure%s) ===\n",

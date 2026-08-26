@@ -220,6 +220,22 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
                             entity_id src_body, entity_id dest_market_id,
                             std::size_t ri, float qty, float logistics_cost_space);
 
+/// The goods ONE space-mode convoy launch burns from the dispatching corp's
+/// on-body pool (BL-308) — per LAUNCH, not per tonne and not per AU: the pad is
+/// the thing being fuelled, so a launch costs the same whatever it carries.
+///
+/// EXPORTED, AND AS A VECTOR, because of BL-648 rather than for generality's
+/// own sake. `tools/verify/chain_depth.cpp` R1 no longer accepts a prose string
+/// as proof that a good has a consumer; it resolves each exemption against a
+/// registry of the passes that REALLY draw, and a private `constexpr float` in
+/// supply_system.cpp's anonymous namespace could only reach that registry as a
+/// second hand-maintained copy — precisely the loophole BL-648 closes. This is
+/// THE definition: `price_convoy_leg` gates on this vector and `commit_convoy`
+/// debits it, so the draw and the thing the registry reads are one object, and
+/// naming a second launch consumable is a one-line change here that the
+/// registry picks up with no harness edit at all.
+const std::array<float, resource_count>& launch_draw_per_convoy();
+
 /// Commit a priced leg: debit the corp's balance and its source pool, burn the
 /// launch's propellant on the space lane, and append the convoy. The ONE place
 /// a `convoy_component` is created.

@@ -314,25 +314,18 @@ bool corp_has_launchpad_on(const world& w, const corporation_component& corp, en
     return false;
 }
 
-/// Propellant burned by one space-mode convoy launch (BL-308). PRODUCTION.md
-/// § Launchpad specifies the cost *per launch*, not per tonne or per AU — the
-/// pad is the thing being fuelled, so a launch costs the same whatever it
-/// carries. One authored round unit, in the same magnitude family as the recipe
-/// batches (scripts/recipes.lua): two batches of the atmosphere route, or three
-/// of the airless one, buys a launch.
-constexpr float propellant_per_launch = 1.0f;
-
-/// Propellant the corp can actually burn launching `cargo` units of `ri` off
-/// `body` — its on-body stockpile, minus the cargo itself when the cargo IS
-/// propellant (a launch cannot burn the propellant it is exporting).
-float launch_propellant_available(const world& w, entity_id corp, entity_id body,
-                                  std::size_t ri, float cargo_qty)
+/// Stock of the drawn good `dr` the corp can actually burn launching `cargo_qty`
+/// units of `ri` off `body` — its on-body stockpile, minus the cargo itself when
+/// the cargo IS the drawn good (a launch cannot burn the propellant it is
+/// exporting).
+float launch_draw_available(const world& w, entity_id corp, entity_id body,
+                            std::size_t dr, std::size_t ri, float cargo_qty)
 {
     const auto pit = w.corp_body_pools.find({corp, body});
     if (pit == w.corp_body_pools.end())
         return 0.0f;
-    float avail = pit->second.quantities[static_cast<std::size_t>(resource_type::propellant)];
-    if (ri == static_cast<std::size_t>(resource_type::propellant))
+    float avail = pit->second.quantities[dr];
+    if (ri == dr)
         avail -= cargo_qty;
     return avail;
 }
@@ -421,6 +414,24 @@ float node_discount_fraction(const logistics_path& path, const logistics_nodes& 
 // ---------------------------------------------------------------------------
 // The shared dispatch (BL-452) — see supply_system.hpp for why it is shared.
 // ---------------------------------------------------------------------------
+
+const std::array<float, resource_count>& launch_draw_per_convoy()
+{
+    // PRODUCTION.md § Launchpad specifies the cost *per launch*, not per tonne
+    // or per AU. One authored round unit of propellant, in the same magnitude
+    // family as the recipe batches (scripts/recipes.lua): two batches of the
+    // atmosphere route, or three of the airless one, buys a launch.
+    //
+    // A vector rather than a scalar so the pass DECLARES what it draws — see
+    // the header for why BL-648 needs that. Pure, immutable, computed once;
+    // nothing here reads world state, so it cannot vary between replays.
+    static const std::array<float, resource_count> draw = [] {
+        std::array<float, resource_count> d{};
+        d[static_cast<std::size_t>(resource_type::propellant)] = 1.0f;
+        return d;
+    }();
+    return draw;
+}
 
 logistics_nodes collect_logistics_nodes(const world& w)
 {
@@ -518,11 +529,17 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
         if (!corp_has_launchpad_on(w, corp, src_body))
             return leg;
         // BL-308: the pad also has to be FUELLED. A launch burns
-        // propellant_per_launch from the corp's stockpile on the source body;
-        // without it the lane is shut exactly as if no pad existed.
-        // Deterministic — a pure read of the pool.
-        if (launch_propellant_available(w, corp_id, src_body, ri, qty) < propellant_per_launch)
-            return leg;
+        // `launch_draw_per_convoy()` from the corp's stockpile on the source
+        // body; without it the lane is shut exactly as if no pad existed.
+        // Deterministic — a pure read of the pool, walked in ascending resource
+        // index so a multi-good draw cannot depend on container layout.
+        {
+            const auto& launch_draw = launch_draw_per_convoy();
+            for (std::size_t dr = 0; dr < resource_count; ++dr)
+                if (launch_draw[dr] > 0.0f
+                    && launch_draw_available(w, corp_id, src_body, dr, ri, qty) < launch_draw[dr])
+                    return leg;
+        }
         mode      = convoy_mode::space;
         // BL-354: evaluated at the tick-pure angle, so sourcing, pricing and
         // convoy speed are a pure function of tick, never of frame rate.
@@ -627,13 +644,19 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
     corp.balance -= leg.cost;
     w.pool_for(corp_id, src_body).quantities[ri] -= qty;
 
-    // BL-308: burn the launch's propellant. Charged once per launch (not per
-    // unit, not per AU) and only on the space lane; price_convoy_leg's
-    // availability gate already ran against this same pool, so this cannot
-    // drive it negative.
+    // BL-308: burn the launch's draw. Charged once per launch (not per unit,
+    // not per AU) and only on the space lane; price_convoy_leg's availability
+    // gate already ran against this same pool and the same vector, so this
+    // cannot drive it negative. Ascending resource index — the same
+    // determinism discipline the gate above uses.
     if (leg.mode == convoy_mode::space)
-        w.pool_for(corp_id, src_body).quantities[
-            static_cast<std::size_t>(resource_type::propellant)] -= propellant_per_launch;
+    {
+        auto&       quantities  = w.pool_for(corp_id, src_body).quantities;
+        const auto& launch_draw = launch_draw_per_convoy();
+        for (std::size_t dr = 0; dr < resource_count; ++dr)
+            if (launch_draw[dr] > 0.0f)
+                quantities[dr] -= launch_draw[dr];
+    }
 
     convoy_component c;
     c.id             = w.allocate_convoy_id();
