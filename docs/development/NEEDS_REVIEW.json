@@ -988,13 +988,14 @@
    "title": "Sprint 20 is not open, and its inherited debts are unchanged by this design",
    "raised": "2026-08-26",
    "kind": "observation",
-   "status": "open",
+   "status": "resolved",
    "source": "Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.",
    "what": "Ben ruled this ledger a SIBLING of the spawn-viability pass rather than its carrier, so Sprint 20's theme is unchanged and the sprint is still uncut - the design-before-cut ordering NEXT_SESSION.md names. Carried forward untouched by this session and still owed: the two live clicks (dispatch form, Throughput lens container access - three sprints running), the v0.1.18 tag Ben left uncut, and the dispatch form's remaining UX fixes awaiting an A/backlog-or-B/build-now call. Note also that BL-630 (spawn shortlist) and the viability pass BOTH move the warm start's ordering, so whichever lands second inherits the other's golden re-bless - they should share one wave, not two.",
    "files": [
     "docs/development/NEXT_SESSION.md",
     "docs/development/sprints.json"
-   ]
+   ],
+   "resolution": "Ben, 2026-08-26: Sprint 20 opened same day with the ledger + viability theme, so the sibling framing became one sprint in two phases rather than two sprints. The inherited debts now have owners: the live clicks are BL-636 (live-click debt), the shared golden re-bless is written into the sprint notes, and the v0.1.18 tag stays Ben’s call."
   }
  ]
 }

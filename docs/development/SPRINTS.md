@@ -43,9 +43,30 @@ and/or a version goal (v0.1.1 etc.).
 
 **Sprint-number ceiling advanced to 19 (Ben, 2026-08-25: 'Open sprint 19 with these items').** The 2026-08-24 ceiling stands in spirit - author no sprint past the one Ben opens - with 19 now the horizon.
 
+**Sprint-number ceiling advanced to 20 (Ben, 2026-08-26: 'Write this up as sprint 20').** The 2026-08-24 ceiling stands in spirit - author no sprint past the one Ben opens - with 20 now the horizon.
+
 ## Open now
 
-*Nothing open.*
+### Sprint 20 — The books open, and the start earns its way
+*Open · opened 2026-08-26*
+
+**Goal.** Land the quarterly return and the surfaces it feeds - a table ledger of every corporation's filed balance sheet, refreshed each quarter, hosting the buyout press and seating the player on a viable corp at spawn. Then PROVE the start, on Ben's own criterion (2026-08-26): a corporation can save up over a few economy ticks to buy another company, and still be making a profit afterwards. The felt goal: an opening position that compounds instead of bleeding - you can see what every firm is worth, you can buy one, and you are better off for it.
+
+**Planned.**
+- BL-637 (save-version reservation) - FIRST if anything runs in parallel: BL-626 and BL-631 both version the save format
+- BL-631 (ownership class) - wave 1, generation: Pass 2b, derived from industrialisation timing; the gate on disclosure and on what is buyable
+- BL-626 (quarterly return) - wave 1, economy: the record itself, a retain over corp_budget, rolling 40 quarters
+- BL-635 (spawn solvency) - wave 1 diagnosis / wave 2 fix: the measured Cr -1, net -627/qtr opening. Nothing else in the sprint works until this does
+- BL-628 (whole-firm buyout) - wave 2: the verb, the price, the dissolution walk. Requires BL-626 + BL-631
+- BL-633 (retire standing bands) - wave 2: exact where a firm files, a dash where it does not. Requires BL-631
+- BL-630 (spawn shortlist) - wave 2: warm start in spectate, viability floor, seeded random seat. Carries the golden re-bless
+- BL-629 (rival acquisition) - wave 3: buy_corporation in the scored-utility candidate list; owns the saving-up-is-not-planning distinction
+- BL-627 (profitability ledger) - wave 3, UI: DESIGN-OWED on its question_log pair, which is Ben's wording
+- BL-634 (acquisition viability) - wave 3 and the sprint's definition of done: the harness that measures Ben's criterion
+- BL-632 (warm-start progress) - GATED: design-owed, what the loading screen's second phase shows is Ben's call
+- BL-636 (live-click debt) - OWED, blocked: dispatch form + Throughput lens, three sprints running (NR-622 is the blocker)
+
+Sprint-number ceiling advanced to 20 on Ben's instruction, 2026-08-26 ('Write this up as sprint 20') - the 2026-08-24 ruling stands in spirit, author no sprint past the one Ben opens. THEME CHANGE from the handoff: NEXT_SESSION.md framed Sprint 20 as a spawn-viability pass with the corporation spawn FORMS settled first. Ben's 2026-08-26 design session redirected it - the ledger is designed and the viability question is now asked through the acquisition loop rather than through spawn forms, which are not in this sprint. COLLISION TO PLAN AROUND: BL-626 and BL-631 both touch world_save.cpp and components.hpp, so they either share one agent or claim versions through BL-637 first. GOLDEN RE-BLESS: BL-630 moves the warm start ahead of seating, so every seed's opening changes - ONE deliberate wave with dated provenance at the end of the sprint, never a dribble (the NR-596 precedent). Owed alongside and inherited: the v0.1.18 tag Ben left uncut, and the dispatch form's remaining UX fixes awaiting an A/backlog-or-B/build-now call. Open questions that can move the sprint: NR-647 (does the operational fog go too) and NR-649 (should the shortlist carry a depth criterion, not only viability).
 
 ## Where things stand
 
@@ -83,9 +104,10 @@ and/or a version goal (v0.1.1 etc.).
 | 18 | Logistic Points land with their consumers | Closed 2026-08-25 — all eight landed (BL-596..BL-603, BL-606..BL-608); Sprint 17b merged alongside; v0.1.18 uncut pending Ben |
 | 26 | Re-baseline (the gate; nothing else may open first) | Subsumed — split at execution into 26a/26b, themselves deleted in the 2026-08-24 purge |
 | 19 | The world reads lived-in - population foundations | Closed 2026-08-25 - thirteen of fourteen items landed (BL-610..BL-618, BL-620, BL-621, BL-623, BL-624); v0.1.19 recut after the NR-640 verdict wave |
+| 20 | The books open, and the start earns its way | Opened 2026-08-26 - the profitability ledger designed, then the spawn proved viable end to end |
 
-**Next up.** Sprint 19 (opened 2026-08-25) is the active sprint - population foundations, BL-610..BL-619. Owed with it: two live clicks (dispatch form, Throughput lens) and the v0.1.18 tag, left uncut because a release is Ben's to call.
+**Next up.** Sprint 20 (opened 2026-08-26) is the active sprint - the profitability ledger and a viable spawn, BL-626..BL-637. Its definition of done is BL-634's measured loop: save up, buy a firm, stay profitable. Owed with it: two live clicks (BL-636) and the v0.1.18 tag, left uncut because a release is Ben's to call.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*31 sprints archived cold; 0 open/gated in the hot store (1 completed and awaiting archive_sprints.js).*
+*32 sprints archived cold; 1 open/gated in the hot store.*

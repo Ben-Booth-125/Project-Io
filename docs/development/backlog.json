@@ -1077,7 +1077,7 @@
    "priority": "A",
    "difficulty": 4,
    "version_goal": "v0.1.20",
-   "sprint": null,
+   "sprint": "20",
    "written": "2026-08-26",
    "author": "Ben",
    "requires": [],
@@ -1104,7 +1104,7 @@
    "priority": "A",
    "difficulty": 4,
    "version_goal": "v0.1.20",
-   "sprint": null,
+   "sprint": "20",
    "written": "2026-08-26",
    "author": "Ben",
    "requires": [
@@ -1131,7 +1131,7 @@
    "priority": "A",
    "difficulty": 5,
    "version_goal": "v0.1.20",
-   "sprint": null,
+   "sprint": "20",
    "written": "2026-08-26",
    "author": "Ben",
    "requires": [
@@ -1180,7 +1180,7 @@
     "docs/ai/AI_OPPONENT.md",
     ".claude/rules/io-standing-rules.md"
    ],
-   "design": "The symmetry half of BL-628 (whole-firm buyout), and a widening of the BL-202/BL-203 exception in its established shape: deterministic, seeded, scored-utility, a legal verb and never a planner. THE WORK: score buy_corporation in corp_ai.cpp's existing candidate list, capped at one acquisition per evaluation, its price carried in the candidate's spend under the solvency gate so a rival cannot buy itself below its reserve floor. Availability is gated on the target's ownership class, not on the acquirer's cash - the 'never on cash' ruling's shape. Record the grant in the standing rules with its date, as every prior widening is recorded."
+   "design": "The symmetry half of BL-628 (whole-firm buyout), and a widening of the BL-202/BL-203 exception in its established shape: deterministic, seeded, scored-utility, a legal verb and never a planner. THE WORK: score buy_corporation in corp_ai.cpp's existing candidate list, capped at one acquisition per evaluation, its price carried in the candidate's spend under the solvency gate so a rival cannot buy itself below its reserve floor. Availability is gated on the target's ownership class, not on the acquirer's cash - the 'never on cash' ruling's shape. Record the grant in the standing rules with its date, as every prior widening is recorded. SAVING UP IS NOT PLANNING, and this item owns the distinction: Ben's Sprint 20 goal wants a corp to accumulate cash toward an acquisition, but a scorer that defers a cheap build today in order to afford a firm tomorrow is edging toward the planner the standing rules forbid. The honest route needs no new machinery - accumulation is EMERGENT when the buy candidate outscores the marginal build, since a tick with no affordable positive candidate simply banks its cash. Whether that actually happens at the authored weights is a measurement, and BL-634 (acquisition viability) is where it is taken."
   },
   {
    "status": "designed",
@@ -1188,7 +1188,7 @@
    "priority": "A",
    "difficulty": 5,
    "version_goal": "v0.1.20",
-   "sprint": null,
+   "sprint": "20",
    "written": "2026-08-26",
    "author": "Ben",
    "requires": [
@@ -1219,7 +1219,7 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": "v0.1.20",
-   "sprint": null,
+   "sprint": "20",
    "written": "2026-08-26",
    "author": "Ben",
    "requires": [],
@@ -1244,7 +1244,7 @@
    "priority": "C",
    "difficulty": 2,
    "version_goal": "v0.1.20",
-   "sprint": null,
+   "sprint": "20",
    "written": "2026-08-26",
    "author": "Ben",
    "requires": [
@@ -1270,7 +1270,7 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": "v0.1.20",
-   "sprint": null,
+   "sprint": "20",
    "written": "2026-08-26",
    "author": "Ben",
    "requires": [
@@ -1294,6 +1294,109 @@
     "docs/ui/ledgers/corporation.md"
    ],
    "design": "Ben, 2026-08-26: 'We don't need company information to be invisible.' Design settled in RELATIONS.md § Standing. THE WORK: delete standing_band, its three banding functions and their boundary constants from standing.{hpp,cpp}; the Corporations panel prints exact reach and market share for EVERY corporation (both derive from already-public facts - buildings on canvas, market aggregates) and prints capital only where ownership_class == public, a dash otherwise. standing_harness loses its band assertions and gains the disclosure gate instead. The Goodhart separation from corp_ai's scorer is NOT touched - it is a property of what the read is for, not of how coarse it was."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": "v0.1.20",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-626",
+    "BL-628",
+    "BL-635"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-634",
+   "short_name": "ACQUISITION_VIABILITY",
+   "category": "Economy",
+   "title": "The acquisition loop is the sprint's definition of done - measure it, then move the constants",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "tools/verify/",
+    "scripts/economy.lua",
+    "docs/economy/FINANCE.md",
+    "docs/development/DEVELOPMENT_PRACTICES.md"
+   ],
+   "design": "Ben's goal for Sprint 20, stated 2026-08-26: 'corporations can save up in a few economy ticks to buy another company, and then continue making a profit.' That is a MEASURABLE loop and this item is the instrument for it - a headless harness over world/*, run past the warm start, asserting three things in order: (1) a seated corp's balance climbs rather than bleeds, (2) it reaches the price of the cheapest buyable public firm within a stated number of quarters, (3) its net is still positive N quarters AFTER the acquisition, with the acquired holdings folded in. Measured relative across seeds on a fixed rival field, per the spawn-viability pass's own rule - absolute numbers are confounded by the open economy pathologies. k_acquisition_multiple is CALIBRATED from what this measures, never guessed: measure first, then move the constant, and never weaken an assertion to make it pass. The harness is the deliverable, not a one-off script - it gets a skill entry under verifier-headless."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": "v0.1.20",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-635",
+   "short_name": "SPAWN_SOLVENCY",
+   "category": "Economy",
+   "title": "The default spawn is insolvent at the gate - diagnose why, and fix the cause",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/budget_system.cpp",
+    "src/world/corporation_generation.cpp",
+    "scripts/economy.lua",
+    "tools/verify/",
+    "docs/economy/FINANCE.md"
+   ],
+   "design": "MEASURED, not suspected (wire test, 2026-08-25, recorded in NEXT_SESSION.md): Genom Systems opens at Cr -1 with net -627/qtr, and dispatch_convoy refuses a two-unit haul on funds. Nothing else in this sprint works until this does - a corp that bleeds every quarter never saves up for anything, so BL-634's loop cannot even start. THE WORK is diagnosis first: which flow dominates the negative net at the gate (wages, maintenance, the generation-seeded extraction levy that reaches the player from turn one, or thin market income), measured per flow from BL-626's own returns across a seed sweep. Then fix the CAUSE, at whichever layer the measurement points to - opening capital, the levy rate, the opex constants, or the holding count. Do NOT clamp the balance and do not hand the player a subsidy; an honest constraint beats a forced outcome."
+  },
+  {
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": "v0.1.20",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": "Container cannot approve the OS-level computer-use dialog (NR-622)",
+   "parked": false,
+   "id": "BL-636",
+   "short_name": "LIVE_CLICK_DEBT",
+   "category": "UI",
+   "title": "Three sprints of owed live clicks - dispatch form and Throughput lens container access",
+   "authority_doc": "docs/development/DELIVERY.md",
+   "files": [
+    "docs/development/DELIVERY.md",
+    "docs/development/NEEDS_REVIEW.json"
+   ],
+   "design": "Carried from Sprint 18 and named in NEXT_SESSION.md as owed in Sprint 20's definition of done. Two visual requirements were marked complete on a scripted capture alone, which the 2026-08-19 rule says is not sufficient: a capture proves a surface renders, not that a press on it is reachable. The dispatch form and the Throughput lens both owe a live click. BLOCKED, and the blocker is environmental rather than a design gap - NR-622 records that the container cannot approve the OS-level computer-use dialog, which is why this has slipped three sprints rather than one. DESIGN-OWED on the route out: either Ben clicks them himself in one pass, or the session gets a path to drive the live app that does not need that dialog. Filing it as an item so it has an owner instead of living only in a handoff note."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "version_goal": "v0.1.20",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-637",
+   "short_name": "SAVE_VERSION_RESERVATION",
+   "category": "Tooling",
+   "title": "Reserve save-format versions the way next_id reserves backlog ids",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/session/",
+    "src/world/world_save.cpp",
+    "docs/development/DEVELOPMENT_PRACTICES.md"
+   ],
+   "design": "Sprint 19's retro asked for this by name: two concurrent worktree agents both claimed the same save version, resolved cleanly by stacking at merge but only because someone noticed. Sprint 20 walks straight back into it - BL-626 (quarterly return) and BL-631 (ownership class) both version the save format, and they are separable work. THE WORK: a shared registry and a claim tool in tools/session/, the same shape next_id.js already has for backlog ids, scanning refs and the working tree so a claim is unambiguous across concurrent worktrees. Small, and it pays for itself the first time two agents run in parallel over world_save.cpp."
   }
  ]
 }

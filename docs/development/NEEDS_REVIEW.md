@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*62 entries — 49 open, 13 resolved.*
+*62 entries — 48 open, 14 resolved.*
 
 ---
 
@@ -480,13 +480,6 @@ Flagged at the moment it arose, per the novelty rule. Every prior verb moves goo
 
 *Files: `docs/economy/FINANCE.md`, `src/world/corp_command.cpp`*
 
-### NR-653 — Sprint 20 is not open, and its inherited debts are unchanged by this design
-*observation · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
-
-Ben ruled this ledger a SIBLING of the spawn-viability pass rather than its carrier, so Sprint 20's theme is unchanged and the sprint is still uncut - the design-before-cut ordering NEXT_SESSION.md names. Carried forward untouched by this session and still owed: the two live clicks (dispatch form, Throughput lens container access - three sprints running), the v0.1.18 tag Ben left uncut, and the dispatch form's remaining UX fixes awaiting an A/backlog-or-B/build-now call. Note also that BL-630 (spawn shortlist) and the viability pass BOTH move the warm start's ordering, so whichever lands second inherits the other's golden re-bless - they should share one wave, not two.
-
-*Files: `docs/development/NEXT_SESSION.md`, `docs/development/sprints.json`*
-
 ---
 
 ## Resolved
@@ -610,4 +603,13 @@ scripts/verify/golden/tech_tree_{tabs,era1,antiquity}.png are 1720x1080 against 
 > **RESOLVED.** Ben, 2026-08-25: delete the three stale goldens - done same session; re-admitting the surface stays a deliberate copy-in per the NR-237 curated-set policy.
 
 *Files: `scripts/verify/golden/tech_tree_tabs.png`, `scripts/verify/golden/tech_tree_era1.png`, `scripts/verify/golden/tech_tree_antiquity.png`*
+
+### NR-653 — Sprint 20 is not open, and its inherited debts are unchanged by this design
+*observation · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
+
+Ben ruled this ledger a SIBLING of the spawn-viability pass rather than its carrier, so Sprint 20's theme is unchanged and the sprint is still uncut - the design-before-cut ordering NEXT_SESSION.md names. Carried forward untouched by this session and still owed: the two live clicks (dispatch form, Throughput lens container access - three sprints running), the v0.1.18 tag Ben left uncut, and the dispatch form's remaining UX fixes awaiting an A/backlog-or-B/build-now call. Note also that BL-630 (spawn shortlist) and the viability pass BOTH move the warm start's ordering, so whichever lands second inherits the other's golden re-bless - they should share one wave, not two.
+
+> **RESOLVED.** Ben, 2026-08-26: Sprint 20 opened same day with the ledger + viability theme, so the sibling framing became one sprint in two phases rather than two sprints. The inherited debts now have owners: the live clicks are BL-636 (live-click debt), the shared golden re-bless is written into the sprint notes, and the v0.1.18 tag stays Ben’s call.
+
+*Files: `docs/development/NEXT_SESSION.md`, `docs/development/sprints.json`*
 
