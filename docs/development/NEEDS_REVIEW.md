@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*67 entries — 51 open, 16 resolved.*
+*70 entries — 54 open, 16 resolved.*
 
 ---
 
@@ -500,6 +500,27 @@ FINANCE.md's field table names the source as corp_budget::net() while describing
 The committed harness build route dies with "'cl' is not recognized" when invoked from the Bash tool: its cmd /c spawn is mangled by Git Bash. The agent worked around it by generating an equivalent .bat over the same glob-derived 53-TU source set and running that. This is the same failure the io-headless-build-invocation note already records, now hit again by a fresh agent with no memory of it - which is the signal worth acting on. Not a code defect in the harnesses themselves, but every agent that needs to build one pays this tax and some will conclude the harness is broken rather than the invocation. Worth a small fix to build_harness.js or a documented Bash-safe entry point.
 
 *Files: `tools/verify/`, `docs/development/DEVELOPMENT_PRACTICES.md`*
+
+### NR-659 — The default campaign classes EVERY corporation closed - nothing files, nothing is buyable, and the sprint goal is unreachable there
+*question · raised 2026-08-26 · from Sprint 20 wave 1, BL-631 (ownership class): the agent measured it; the main session traced the cause and checked the fix target.*
+
+MEASURED across 8 seeds. At the default epoch (0 CE) every one of 64 corporations and all 1298 regions class `closed`. At epoch 1960 the spread appears (public 4, private 11, closed 49). CAUSE: settlement.cpp:441/470 does `if (antiquity) break;` for stop_year < 1700, so no furnace ever lights and median_industrial_year stays 0 - every region reads as never-industrialised, which is Pass 2b's third rung firing CORRECTLY on a degenerate input. CONSEQUENCE: on the default world the profitability ledger is empty, nothing is buyable, and Sprint 20's whole goal - save up, buy a firm, stay profitable - cannot happen. BL-627, BL-628 and BL-634 all rest on this. THE FIX LOOKS PRECISE AND SMALL. Pass 2b reads the ENERGY TRANSITION (HISTORY.md Stage 4), which antiquity skips - but the design's own justifying sentence names the ENFORCEABLE PROMISE (Stage 1): 'the institutions that make a contract enforceable are the institutions that make a share transferable.' Stage 1 runs in the ladder pass (Stages 0-2), which antiquity does NOT skip, and its output already exists as history_ladder::charter_cradle (history_ladder.hpp:92) - the Charter Act, first perpetual company registered, which is literally corporate personhood. Recommend re-pointing the derivation from Stage 4 to Stage 1. Same shape, same no-new-machinery property, and it makes the mapping era-agnostic. WORTH SAYING PLAINLY: this is the ERA-RELATIVE GATES class that Sprint 19's retro named as its lesson - an absolute or late-era signal read in an era where it does not exist, producing a legitimate-but-wrong world. It recurred one sprint later, in a design written this morning, and was caught the same way: because the agent measured the distribution and NAMED the consequence instead of shipping it. Related: NR-641 (all-Track antiquity world).
+
+*Files: `docs/generation/CORPORATION_GENERATION.md`, `src/world/corporation_generation.cpp`, `src/world/settlement.cpp`, `docs/lore/HISTORY.md`*
+
+### NR-660 — NOVEL: the public-class floor is UNMEETABLE by construction on the default world - a waiver was applied by analogy
+*novel-work · raised 2026-08-26 · from Sprint 20 wave 1, BL-631: the agent raised the novelty flag; the main session endorses the call.*
+
+Pass 2b added a second condition to Pass 2's world-level reject-and-reroll: at least one public specialist. On the default world (see NR-659) no region can ever yield public, so the floor is unmeetable BY CONSTRUCTION - every default world would have burned all six attempts and stood on attempt 5's region set, silently relocating every corporation in service of a condition that cannot be satisfied. No doc owns 'what happens when a floor is unmeetable by construction'; Pass 2b assumes public is achievable. The agent waived the floor when no region any corp could anchor to yields public, by analogy with the waiver the focus floor already carries for corp_count < 3, and called it out in code and in the commit rather than burying it. ENDORSED: it is the same idiom, applied to the same kind of impossibility, and the alternative was a silent reshuffle of every default world. It becomes moot if NR-659's re-pointing lands, since public becomes reachable again - but the waiver should stay, because 'the floor is unmeetable here' is a real state and standing on attempt 5 for it is not an outcome anyone chose.
+
+*Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
+
+### NR-661 — spectator_determinism's golden was ALREADY stale on main before wave 1 touched anything
+*observation · raised 2026-08-26 · from Sprint 20 wave 1, BL-631: the agent isolated it against main's own sources.*
+
+spectator_determinism fails its 81ADF917369317C7 row. The agent built the harness against MAIN's unmodified sources and got the identical actual value (C91FB6ADA80B65CE) and the identical failure, so the drift predates this wave. It correctly did NOT re-bless - a golden re-blessed by whoever happens to trip over it is a golden nobody reviewed. Someone needs to find which landed change moved it and re-bless deliberately, with dated provenance, per the harness's own provenance-log idiom. Note the standing rule attached to this harness: the two properties it guarantees are that the flag DEFAULTS FALSE (an ordinary session is byte-identical) and that admitting one more corp shifts no rival's cadence slot - a state_hash constant is dated evidence, not the invariant itself.
+
+*Files: `tools/verify/spectator_determinism.cpp`*
 
 ---
 
