@@ -112,7 +112,9 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest releases — v0.1.14, v0.1.15, v0.1.17, v0.1.18 and v0.1.19
+## Latest releases — v0.1.17, v0.1.18, v0.1.19 and v0.1.20
+
+**v0.1.20 — the books open.** Every corporation now files a quarterly return, and whether you may read it is a generated fact: a firm's ownership class decides whether it publishes at all. A public firm can be bought outright, priced from its own filed books. Retiring the old banded read means a rival's figures are exact where the firm files and absent where it does not — a dash means *this firm does not file*, never *you have not earned this*. The release also records a measured negative: spawn viability is **not** solved, because 65.7 % of all demand at epoch 0 names goods that era cannot make, and the demand side of the economy is the next sprint's work.
 
 **v0.1.19 — the world reads lived-in.** Population density becomes a consequence of the
 simulated Era −1 history (~1,450 centres, one per ~6 land tiles), every land province is

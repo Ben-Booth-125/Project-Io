@@ -12,6 +12,70 @@ release.
 
 ## [Unreleased]
 
+## [0.1.20] — 2026-08-26
+
+*Sprints 20 and 21 wave 0 — the books open, and the discovery that the demand side was never
+built. The AI SOTA sweep is **still owed**: v0.1.19 skipped it by ruling and named this cut as
+the one that owes a diff against the 2026-08-13 baseline. Carried again, deliberately and on
+the record, rather than quietly dropped.*
+
+### Added
+- **Every corporation files a quarterly return** (BL-626): the seven money-loop flows, the
+  closing balance, holdings and book value, appended each economy tick in a sorted walk and
+  retained on a rolling 40 quarters. A **retain** over `corp_budget`, not a second computation —
+  the summed filed net equals the balance delta exactly, asserted over 640 rows.
+- **Ownership class — public / private / closed** (BL-631, BL-638): derived from the home
+  region's history, never authored. Reads HISTORY.md **Stage 1, the enforceable promise** (the
+  Charter Act) rather than the energy transition, so the mapping is era-agnostic; the charter
+  spreads by its oath-keeping culture and by trade contact discounted by harbour quality.
+- **Disclosure** (BL-626, BL-633): a public corporation files a return anyone may read; a
+  private or closed one shows a dash. Binary, never graded — and a corporation always reads its
+  **own** books whatever its class, because disclosure governs reading *another* firm.
+- **Whole-firm acquisition** (BL-628): buy a public corporation outright, priced from its own
+  filed returns. Holdings, pools, balance and history transfer; the target dissolves under a
+  four-way rule — TRANSFER property, CANCEL a promise with nobody left to keep it, DROP an
+  opinion that was the dissolved firm's alone, KEEP the historical record, because history is
+  not property and is never rewritten.
+- **The demand-channel register** (MARKETS.md): eight channels, on one rule — *a consumer is a
+  mechanism, not a noun.*
+- **The admission-rule guard** (BL-648): an exemption must now name a pass that really injects
+  demand. **It is red on eleven goods and that is intended** — the way to green a row is to
+  build the channel that buys the good.
+- **The demand census** (BL-649): per resource, per era band, the total modelled demand and
+  which passes inject it. Reports; never asserts a magnitude.
+- **`next_save_version.js`** (BL-637) and **`build_harness.bat`**: a save-format claim registry,
+  and a Bash-safe harness build route that three separate sessions had worked around by hand.
+
+### Changed
+- **Standing bands retired** (BL-633): reach and market share are exact for every corporation;
+  capital follows disclosure. The Goodhart separation from the AI's own scorer is untouched.
+- **Spawn solvency** (BL-635): three defects fixed at their causes — a per-head/per-batch units
+  mismatch that made a levy spear cost 40 credits to raise and 1,200 a year to keep, a duplicate
+  player unit, and an extraction levy taking ~90 % of gross output value. Operating net
+  **−646 → −28 cr/qtr**; closing balance **−120,335 → −412**.
+- `world_save_version` **15 → 17**, stacked at the integration merge from two concurrent claims.
+
+### Fixed
+- A **non-finite acquisition price is refused rather than floored**: applying `max(0, …)` before
+  the validity check turned a `NaN` into a clean zero and bought a firm for free. The clamp was
+  the vulnerability.
+- `spawn_solvency` did not load `world_gen.lua` despite its header saying so, and both demand
+  injectors **skip an unpriced resource silently** — so a whole diagnosis was measured without
+  market prices. Loader fixed; the conclusion re-measured and unchanged; the silent skip has its
+  own item (BL-652).
+- Stale assertions retired: `unit_march_harness` pinned a verb as the roster's last while its own
+  comment said verbs are appended routinely; `save_roundtrip` gained a row for v15, the last
+  released format, which the version stack had left asserted by nothing.
+
+### Known — deliberately not green
+- **Spawn viability is not solved.** Net ≥ 0 on 3 of 12 seeds. The money loop is fixed; the
+  residual is that **65.7 % of all demand at epoch 0 names goods the ancient band cannot make**,
+  so most corps' output has no buyer. Sprint 21 is that work.
+- `chain_depth` carries **one intended failure** (see Added). A second is a real regression.
+- BL-633's Corporations panel has **no live click** yet, and its columns do not fit the fold-out
+  at 1280×720 — names collapse to one letter and "Declare Hostile" clips (BL-639).
+
+
 ## [0.1.19] — 2026-08-25
 
 *Sprint 19 — the world reads lived-in (population foundations). The AI SOTA sweep for this
