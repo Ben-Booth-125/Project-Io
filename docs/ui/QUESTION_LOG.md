@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**45 surfaces** — 4 settled, 41 awaiting Ben's wording.
+**46 surfaces** — 4 settled, 42 awaiting Ben's wording.
 
 ---
 
@@ -115,6 +115,14 @@ alphabetical order.
 **Because:** CONTRACTS.md settles the mercenary contract as the sell side of the income loop: a client nation offers a fee to make a fact about the world true by a deadline. Without a surface listing open offers the player cannot act on the mechanism at all — offers exist in world::mercenary_offers whether or not anyone can see them, which is exactly the BL-089 activity-fog framing this view honours (an offer is hidden unless its target body is at least Known). The view is also where the force-picker lives: CONTRACTS.md Q1 rules the player chooses the force, never the contract, so the Accept press has to open onto something.
 
 *Demanded by BL-576 · `src/ui/contracts_ledger.cpp` · id `contracts_ledger_offers`*
+
+### Corporation panel — the standing columns (Reach / Capital / Share)
+
+**Answers:** How large is each corporation, how much of the market does it hold, and what is it worth?
+
+**Because:** The columns used to read as five bands — negligible / minor / notable / major / dominant — for every row but the player's own, on the premise that a rival's figures were private. Ben retired that premise on 2026-08-26: "We don't need company information to be invisible." Two of the three axes were never hidden by anything except the banding — reach is a count of bodies the player can already see buildings on, and market share is derived from the supply/demand aggregates DISCOVERY.md names as the deliberate public signal — so the band was destroying information the world was already giving away, and buying no privacy for it. They print exactly, for every corporation. Capital is the one axis that is genuinely a FILED figure, so it follows the firm's ownership class instead: exact where the firm files, a dash where it does not (FINANCE.md § Disclosure), with the reason on hover. That is what earns the space — the column now carries a fact about the FIRM that nothing else on screen carries, and the dash reads as 'this firm does not file', never as 'you have not earned this'. What it deliberately does NOT gain is any operational quantity: production rates, stockpile levels, recipes and workforce dials stay private, and the rival hover card still shows type and owner only. An open book tells you what a firm earned, never how it operates.
+
+*Demanded by BL-633, BL-262, BL-631 · `src/ui/corporation_panel.cpp`, `src/world/standing.cpp` · id `corporation_panel_standing`*
 
 ### AI decision feed
 

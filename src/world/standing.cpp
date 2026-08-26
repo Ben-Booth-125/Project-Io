@@ -3,46 +3,12 @@
 #include <algorithm>
 #include <unordered_set>
 
-const char* standing_band_label(standing_band b)
+// The disclosure gate (BL-633). Binary by FINANCE.md § Disclosure: a `public` corporation files
+// a return the player may read; a `private` or `closed` one does not file at all. There is no
+// graded middle — the five bands that used to supply one are retired.
+bool corp_files_return(ownership_class oc)
 {
-    switch (b)
-    {
-        case standing_band::negligible: return "Negligible";
-        case standing_band::minor:      return "Minor";
-        case standing_band::notable:    return "Notable";
-        case standing_band::major:      return "Major";
-        case standing_band::dominant:   return "Dominant";
-    }
-    return "Negligible";
-}
-
-// Boundary rule: a value exactly ON a documented boundary lands in the HIGHER band. Walked
-// bottom-up with strict '<' tests so the first test that fails to exclude wins the band.
-standing_band band_reach(int bodies)
-{
-    if (bodies <= 0) return standing_band::negligible;
-    if (bodies == 1) return standing_band::minor;
-    if (bodies == 2) return standing_band::notable;
-    if (bodies == 3) return standing_band::major;
-    return standing_band::dominant; // 4+
-}
-
-standing_band band_capital(float balance)
-{
-    if (balance < 0.0f)      return standing_band::negligible;
-    if (balance < 5000.0f)   return standing_band::minor;
-    if (balance < 20000.0f)  return standing_band::notable;
-    if (balance < 50000.0f)  return standing_band::major;
-    return standing_band::dominant; // >= 50000
-}
-
-standing_band band_market_share(float share01)
-{
-    if (share01 < 0.05f) return standing_band::negligible;
-    if (share01 < 0.15f) return standing_band::minor;
-    if (share01 < 0.30f) return standing_band::notable;
-    if (share01 < 0.50f) return standing_band::major;
-    return standing_band::dominant; // >= 0.50
+    return oc == ownership_class::publicly_held;
 }
 
 std::vector<corp_standing> compute_corp_standings(
@@ -74,7 +40,8 @@ std::vector<corp_standing> compute_corp_standings(
         cs.is_player = (id == w.player_entity);
 
         // Reach: distinct bodies with >= 1 owned building. Building ownership/location is
-        // visible per BL-068, so walking the corp's own asset list is honest for any corp.
+        // visible on-canvas (DISCOVERY.md § Competitor visibility), so walking the corp's own
+        // asset list is honest for any corp and the figure is public for every one of them.
         std::unordered_set<entity_id> bodies;
         for (const entity_id bld_id : cc.assets)
         {
@@ -88,15 +55,16 @@ std::vector<corp_standing> compute_corp_standings(
         }
         cs.reach_bodies = static_cast<int>(bodies.size());
 
-        cs.capital_balance = cc.balance;
+        // Capital is a FILED figure: exact where the firm files, absent where it does not.
+        // The gate is the firm's own ownership class, never a fact about the reader.
+        cs.capital_balance   = cc.balance;
+        cs.capital_disclosed = corp_files_return(cc.ownership_class);
 
+        // Market share: derived from the market aggregates, which are the deliberate public
+        // signal — public for every corp for the same reason reach is.
         const auto fit = cash_flow.find(id);
         const float own_income = (fit != cash_flow.end()) ? fit->second.income : 0.0f;
         cs.market_share = (total_income > 0.0f) ? (own_income / total_income) : 0.0f;
-
-        cs.reach_band   = band_reach(cs.reach_bodies);
-        cs.capital_band = band_capital(cs.capital_balance);
-        cs.share_band   = band_market_share(cs.market_share);
 
         out.push_back(cs);
     }
