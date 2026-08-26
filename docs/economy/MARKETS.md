@@ -211,7 +211,22 @@ dressed stone; an industrial one wants clean water, consumer goods and medical s
 mechanism, banded input — no new concept, and the ancient chain's terminal goods stop being dead
 ends the moment the basket knows which era it is in.
 
-**3. Every channel is a lever on what the player chases.** Demand is not bookkeeping; it is the
+**3. A channel that CONSUMES without PRICING cannot bootstrap its own supply.** Measured, not
+reasoned: BL-641 turned building upkeep on and operating firms collapsed **227 → 19**. Not a
+magnitude problem — the goods it drew (tools, planks) are *produced 0.0* in that band, so every
+draw went unmet, the supply factor decayed, output followed, and the reflex tier idled the firm.
+Halving the rate only delays it. And the loop cannot close from the other end either, because a
+**pool draw never reaches a market's `demand`**: wanting tools never raises their price, so no
+rival ever scores a Toolmaker and the supply is never induced.
+
+So a channel has to do one of two things — bid on the market so its want becomes a price signal,
+or draw from a pool for a good the world already makes. `run_construction` and `run_processing`
+bid; `run_unit_upkeep` does not, and it has the same latent defect. **A sink that cannot call forth
+its own supply is a slow way to shut the economy down**, and the cost of learning that is one
+harness run rather than a shipped world nobody can play. Every channel below inherits this
+question, and it is the first thing to ask of each.
+
+**4. Every channel is a lever on what the player chases.** Demand is not bookkeeping; it is the
 design's statement about what the game is *about*. A good with no buyer is a good the player has no
 reason to build toward, and a good with a *state* buyer plays differently from one with a
 *household* buyer — the first is lumpy, political and worth lobbying for; the second is steady,

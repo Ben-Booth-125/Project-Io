@@ -1370,6 +1370,46 @@
     "docs/economy/LOGISTICS.md",
     "docs/economy/PRODUCTION.md"
    ]
+  },
+  {
+   "id": "NR-681",
+   "title": "NOVEL: a demand channel that consumes without pricing cannot bootstrap its own supply",
+   "raised": "2026-08-26",
+   "kind": "novel-work",
+   "status": "open",
+   "source": "Sprint 20 wave 4, BL-641: the agent raised the flag, and the property is now written into MARKETS.md as the register's third.",
+   "what": "The implementation was owned end to end by FINANCE.md and copied cleanly from run_unit_upkeep. What is novel is what turning it on MEASURED: operating firms 227 -> 19, because a pool draw for a good the band produces at 0.0 starves the drawer and never signals the market that would supply it. That is a CROSS-CHANNEL property no doc stated, and four unbuilt channels were designed the same way this morning. It is now property 3 of MARKETS.md section Demand channels, and BL-654 owns the question it raises. Worth Ben's eye on the meta-point as much as the mechanism: the item shipped INERT rather than shipping a collapse or quietly picking a smaller rate that would have hidden the same defect behind a slower decay - which is the difference between a measurement and a number that looks acceptable.",
+   "files": [
+    "docs/economy/MARKETS.md",
+    "src/world/economy_system.cpp"
+   ]
+  },
+  {
+   "id": "NR-682",
+   "title": "The building-upkeep state_hash fold is SPARSE - a deliberate departure from BL-454",
+   "raised": "2026-08-26",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Sprint 20 wave 4, BL-641: taken by the agent, documented in code, and flagged rather than buried.",
+   "what": "BL-641 folds building supply_factor into world::state_hash only where a building is NOT fully supplied. It is complete as a DETECTOR - any differing factor means at least one side is non-neutral and folds (id, value) - but it contributes nothing in a world where the mechanism never fires, which is why no golden moved and spectator_determinism still reads E350DF2A50BF4BAA. BL-454 took the other route for unit upkeep and accepted moving the golden. The sparse fold is cheaper and, with rates at 0.0, keeps this landing invisible to every golden - which is exactly what you want from a shape that ships inert. The cost is an inconsistency between two folds doing the same job, and the question of which is the house pattern is unanswered. Overturnable; if the rates ever go non-zero the two should probably agree.",
+   "files": [
+    "src/world/world.cpp",
+    "src/world/components.hpp",
+    "tools/verify/spectator_determinism.cpp"
+   ]
+  },
+  {
+   "id": "NR-683",
+   "title": "The committed census baseline is format-stale after one day",
+   "raised": "2026-08-26",
+   "kind": "observation",
+   "status": "open",
+   "source": "Sprint 20 wave 4, BL-641: the agent declined to re-bless a committed baseline, correctly.",
+   "what": "docs/development/baseline_census_2026-08-26.txt was committed this morning as the durable before for Sprint 20/21's tuning passes. BL-641 added a column (industry) and a diagnostic line, so the file no longer matches the report's format - the ECONOMIC figures still compare cleanly, which is what matters, but a naive diff now shows format noise alongside signal. The agent did not re-bless it, which is right: a baseline someone re-blesses whenever the format moves is not a baseline. Worth deciding once how this file ages - regenerate it at each wave boundary with a dated filename and keep the series, or pin the comparison to the economic rows only and let the format drift. The second is less work and more robust.",
+   "files": [
+    "docs/development/baseline_census_2026-08-26.txt",
+    "tools/verify/demand_census.cpp"
+   ]
   }
  ]
 }

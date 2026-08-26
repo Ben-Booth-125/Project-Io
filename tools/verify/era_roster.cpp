@@ -37,6 +37,7 @@
 #include "scripting/lua_state.hpp"
 #include "world/recipe_registry.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -98,7 +99,33 @@ const char* k_ancient_recipes[] = {
 };
 
 /// Chains shared by both arcs — no era tag at all.
-const char* k_shared_recipes[] = { "food_rations", "refined_copper" };
+// DERIVED, not listed (2026-08-26, NR-675). This was a hand-kept pair
+// { "food_rations", "refined_copper" } and it went red the moment Ben ruled
+// refined_copper's absent era tag an oversight and tagged it `industrial`. The list
+// encoded the roster of the day it was written; the PROPERTY it protects is
+// "whatever the author tagged SHARED really does survive the mask", which is
+// answerable from the authored data and cannot drift from it.
+//
+// Its two siblings, k_industrial_recipes and k_ancient_recipes, stay hand-kept ON
+// PURPOSE and are NOT derived: those encode the RULED opening — what a human decided
+// each band should offer — so deriving them from the same data they are meant to
+// check would make the rows tautological. The distinction is the point: derive a
+// list that MIRRORS the data, keep a list that JUDGES it.
+//
+// Same lesson BL-648 drew about the exemption table one wave earlier.
+std::vector<std::string> shared_recipes(const recipe_registry& reg)
+{
+    std::vector<std::string> out;
+    const int n = reg.recipe_count(building_type::processing_facility);
+    for (int i = 0; i < n; ++i)
+    {
+        const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+        if (rc.era == era_band::any)
+            out.push_back(rc.name);
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+}
 
 } // namespace
 
@@ -123,7 +150,8 @@ int main()
 
     // Absolute ids captured under the default band, to compare against every other.
     std::vector<uint16_t> ids_any;
-    for (const char* n : k_shared_recipes)
+    const std::vector<std::string> k_shared = shared_recipes(reg);
+    for (const std::string& n : k_shared)
         ids_any.push_back(reg.recipe_id(n));
     for (const char* n : k_industrial_recipes)
         ids_any.push_back(reg.recipe_id(n));
@@ -153,13 +181,16 @@ int main()
     check(!any_industrial_offered, "no industrial recipe is browsable in the ancient band");
 
     bool all_shared_offered = true;
-    for (const char* n : k_shared_recipes)
-        if (!contains(anc, n))
+    std::printf("      shared (era=any) recipes, derived: %d\n", (int)k_shared.size());
+    for (const std::string& n : k_shared)
+        if (!contains(anc, n.c_str()))
         {
-            std::printf("      missing from ancient: %s\n", n);
+            std::printf("      missing from ancient: %s\n", n.c_str());
             all_shared_offered = false;
         }
     check(all_shared_offered, "every shared recipe survives into the ancient band");
+    check(!k_shared.empty(),
+          "ANTI-VACUITY: at least one recipe is authored shared (an empty set passes the row above for free)");
 
     bool all_ancient_offered = true;
     for (const char* n : k_ancient_recipes)
@@ -216,7 +247,7 @@ int main()
         reg.set_era(band);
         std::size_t k = 0;
         bool stable = true;
-        for (const char* n : k_shared_recipes)
+        for (const std::string& n : k_shared)
             if (reg.recipe_id(n) != ids_any[k++])
                 stable = false;
         for (const char* n : k_industrial_recipes)

@@ -695,7 +695,7 @@ int main()
             if (rc.name == "refined_copper")
             {
                 saw_refined_copper_locked = !placeable;
-                continue; // asserted separately below — it is the one deliberate lock
+                continue; // asserted separately below — it is the one deliberate closure
             }
             const bool should_be_open = expected_open(rc.name);
             if (placeable != should_be_open)
@@ -706,8 +706,31 @@ int main()
             std::printf("      MISMATCH: %s\n", m.c_str());
         check(mismatches.empty(),
               "every recipe outside the one ruled lock matches the ruled opening exactly");
-        check(saw_refined_copper_locked,
-              "refined_copper is tech_locked at tick 0 (E0-EC-03), the one deliberate closure");
+        // RE-SPECIFIED 2026-08-26 (NR-675). The property this protects is "the one
+        // deliberate closure HOLDS at tick 0" — it was never "the closure is spelled
+        // tech_lock". Ben ruled refined_copper's missing era tag an oversight and
+        // tagged it `industrial`, so the ancient band no longer LISTS the recipe at
+        // all and the loop above cannot see it to find it locked. Same closure,
+        // earlier mechanism. Asserting either one alone would now be asserting the
+        // spelling rather than the property, so this takes both and REPORTS which it
+        // observed — equal strength, and it survives the closure being re-spelled
+        // again. If refined_copper ever becomes openable at tick 0 by any route, this
+        // row fails, which is what it is for.
+        const bool copper_in_band =
+            [&]
+        {
+            const int m = reg.recipe_count(building_type::processing_facility);
+            for (int i = 0; i < m; ++i)
+                if (reg.recipe_at(building_type::processing_facility, i).name == "refined_copper")
+                    return true;
+            return false;
+        }();
+        std::printf("      refined_copper closure at tick 0: %s\n",
+                    !copper_in_band ? "ABSENT from the ancient band (era tag, NR-675)"
+                                    : (saw_refined_copper_locked ? "present but TECH-LOCKED (E0-EC-03)"
+                                                                 : "OPEN — the closure has been lost"));
+        check(!copper_in_band || saw_refined_copper_locked,
+              "refined_copper is closed at tick 0 — by era band or by tech lock, the one deliberate closure");
 
         // Not a permanent orphan: build a corp whose state satisfies E0-EC-03's
         // own authored predicate (one processing facility, Cr 400+ surplus) and
