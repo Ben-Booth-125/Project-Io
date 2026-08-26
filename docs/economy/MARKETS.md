@@ -223,8 +223,34 @@ So a channel has to do one of two things — bid on the market so its want becom
 or draw from a pool for a good the world already makes. `run_construction` and `run_processing`
 bid; `run_unit_upkeep` does not, and it has the same latent defect. **A sink that cannot call forth
 its own supply is a slow way to shut the economy down**, and the cost of learning that is one
-harness run rather than a shipped world nobody can play. Every channel below inherits this
-question, and it is the first thing to ask of each.
+harness run rather than a shipped world nobody can play.
+
+### Settled: a short pool BUYS, up to a reservation ceiling
+
+Ben's ruling, 2026-08-26 (BL-654): *"Buy on the market, but at a threshold, buying is not allowed.
+This goes hand in hand with maximum and minimum prices for goods."* And **one rule for every goods
+draw** — unit upkeep takes the same shape, not a second one.
+
+- **Short pool → buy the shortfall on the market**, spending credits. The draw becomes a real
+  participant, so the want lands in `demand`, the price moves, and a rival scoring the building
+  that supplies it finally has a reason to. That is the half BL-641 was missing.
+- **Above a reservation ceiling, it does not buy.** The draw goes unmet and the shortfall rule
+  applies — the building weakens, exactly as an unsupplied unit does. Going without is an outcome
+  the design already knows how to express.
+
+**This is the exact mirror of a rule the market already has.** Step 11's `floor_price` is a
+seller's reservation — *"hold rather than sell below this"*, never a price the market is made to
+pay (BL-386). The ceiling is the buyer's — **"go without rather than buy above this"**, never a
+price the market is made to accept. Both sides may now decline a trade, and neither may dictate
+one, which is what stops a starving building bidding a good to its cap or spending itself to death
+chasing a shortfall it cannot fix.
+
+The ceiling belongs to the **price band's** authored family (`floor_mult` / `ceil_mult`,
+§ Price resolution) rather than to upkeep, because it is a statement about what a good is worth
+paying, not about who is buying. Its value is measured, not guessed.
+
+Every remaining channel inherits this question and is checked against it **before** it is built:
+BL-643 (infrastructure), BL-644 (state), BL-645 (research), BL-646 (conflict).
 
 **4. Every channel is a lever on what the player chases.** Demand is not bookkeeping; it is the
 design's statement about what the game is *about*. A good with no buyer is a good the player has no

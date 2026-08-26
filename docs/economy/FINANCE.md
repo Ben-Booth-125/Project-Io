@@ -63,6 +63,13 @@ property the derivation must hold, in consistent units: a few years of upkeep on
 stays under the batch's own hire price. Scale both halves of the vector by one factor when
 retuning, so the equipment-to-wage ratio the roster is anchored on survives.
 
+**A short pool BUYS before it goes short (Ben, 2026-08-26, BL-654).** Before the shortfall rule
+below fires, the draw bids the missing quantity onto the market and pays for what it gets — so
+wanting a good becomes a price signal and somebody has a reason to supply it. It bids only below a
+**reservation ceiling**; above that it declines to buy and goes without, which is where the rule
+below takes over. One rule for every goods draw: this is the same shape building upkeep takes, not
+a second one. The market half is [](../economy/MARKETS.md) § Settled: a short pool BUYS.
+
 **The shortfall rule is ONE rule with TWO triggers.** A pool can be empty, and when the
 goods do not arrive the unit *weakens* rather than vanishing. The unit's
 `supply_factor_permille` takes the same subtraction whether (a) it is beyond the reach

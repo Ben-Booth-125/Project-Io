@@ -1348,14 +1348,15 @@
    "title": "Banding the baskets HALVED the generated world - 584 buildings / 104 corps -> 261 / 64",
    "raised": "2026-08-26",
    "kind": "observation",
-   "status": "open",
+   "status": "resolved",
    "source": "Sprint 20 wave 4, BL-640: the agent found it, named it as its own, and flagged it before merge rather than after.",
    "what": "Pass 6 generates background firms until a body's real production reaches ~90% of its real demand. That stop condition reads the same baskets BL-640 just banded - through `body_demand` in corporation_generation.cpp, which was NOT in the brief's file list and which the agent repointed for correctness. Before the band, Pass 6 was chasing demand for silicon, machinery, alloys and electronics that the ancient band STRUCTURALLY CANNOT PRODUCE, so it kept adding firms against a gap that could never close. The behaviour is now correct and the world is half the size: 584 buildings / 104 corps -> 261 / 64. THIS IS A LARGE GENERATED-WORLD CHANGE AND EVERY DOWNSTREAM MEASUREMENT MOVES WITH IT - market saturation, prices, spawn viability, the haulage baseline (already flagged as drifted in NR-674), and the spectator golden. Worth Ben's eye on the FEEL as much as the numbers: a world with 64 corps rather than 104 is a visibly different economy, and it is the honest one. The old count was inflated by chasing an unclosable target.",
    "files": [
     "src/world/corporation_generation.cpp",
     "docs/generation/CORPORATION_GENERATION.md",
     "docs/economy/MARKETS.md"
-   ]
+   ],
+   "resolution": "Ben, 2026-08-26: KEEP THE FIX, retune density upward. BL-655 owns it, and carries the distinction that matters - raising Pass 6's target fraction reaches the old count by making the world OVERPRODUCE (gluts, floored prices), while raising the demand baskets reaches it by making the world CONSUME more (prices hold). Try the demand side first; record an oversupply as deliberate if it is taken."
   },
   {
    "id": "NR-680",
@@ -1376,13 +1377,14 @@
    "title": "NOVEL: a demand channel that consumes without pricing cannot bootstrap its own supply",
    "raised": "2026-08-26",
    "kind": "novel-work",
-   "status": "open",
+   "status": "resolved",
    "source": "Sprint 20 wave 4, BL-641: the agent raised the flag, and the property is now written into MARKETS.md as the register's third.",
    "what": "The implementation was owned end to end by FINANCE.md and copied cleanly from run_unit_upkeep. What is novel is what turning it on MEASURED: operating firms 227 -> 19, because a pool draw for a good the band produces at 0.0 starves the drawer and never signals the market that would supply it. That is a CROSS-CHANNEL property no doc stated, and four unbuilt channels were designed the same way this morning. It is now property 3 of MARKETS.md section Demand channels, and BL-654 owns the question it raises. Worth Ben's eye on the meta-point as much as the mechanism: the item shipped INERT rather than shipping a collapse or quietly picking a smaller rate that would have hidden the same defect behind a slower decay - which is the difference between a measurement and a number that looks acceptable.",
    "files": [
     "docs/economy/MARKETS.md",
     "src/world/economy_system.cpp"
-   ]
+   ],
+   "resolution": "Ben, 2026-08-26: answered by the BL-654 ruling - a short pool BUYS, up to a reservation ceiling, and one rule covers every goods draw. The novel property stands as MARKETS.md's property 3 and now has its settled answer beneath it."
   },
   {
    "id": "NR-682",

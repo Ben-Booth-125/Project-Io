@@ -1512,7 +1512,7 @@
     "tools/verify/",
     "docs/economy/FINANCE.md"
    ],
-   "design": "Design in FINANCE.md section Upkeep is credits AND goods - for buildings too. THE LARGEST STRUCTURAL SINK AVAILABLE, and it invents nothing: a unit already pays credits plus a goods vector through run_unit_upkeep, and a building pays credits only. That asymmetry is an omission, not a design. THE WORK: a per-building-type goods vector drawn against the owner's pool on the building's own body, in a fixed order (two buildings of one corp on one body draw the same stock and the order decides which goes short). The shortfall rule is the SAME rule - an unmet draw weakens the building by the same subtraction an out-of-supply unit takes; a factory short of tools runs badly, it does not vanish. Rates authored in economy.lua per building type, era-banded, every rate authorable at 0.0 so the SHAPE can land before the numbers are settled (the BL-454 precedent). Why it matters more than the others: demand then scales with how much industry exists, with no weight for anyone to maintain. MOVED INTO SPRINT 20 (Ben, 2026-08-26): these are the two levers that actually move spawn viability, and Sprint 20 owns the viability question through BL-634. Built in the same session as the diagnosis so the census and spawn_solvency baselines are hours old rather than a sprint stale."
+   "design": "Design in FINANCE.md section Upkeep is credits AND goods - for buildings too. THE LARGEST STRUCTURAL SINK AVAILABLE, and it invents nothing: a unit already pays credits plus a goods vector through run_unit_upkeep, and a building pays credits only. That asymmetry is an omission, not a design. THE WORK: a per-building-type goods vector drawn against the owner's pool on the building's own body, in a fixed order (two buildings of one corp on one body draw the same stock and the order decides which goes short). The shortfall rule is the SAME rule - an unmet draw weakens the building by the same subtraction an out-of-supply unit takes; a factory short of tools runs badly, it does not vanish. Rates authored in economy.lua per building type, era-banded, every rate authorable at 0.0 so the SHAPE can land before the numbers are settled (the BL-454 precedent). Why it matters more than the others: demand then scales with how much industry exists, with no weight for anyone to maintain. MOVED INTO SPRINT 20 (Ben, 2026-08-26): these are the two levers that actually move spawn viability, and Sprint 20 owns the viability question through BL-634. Built in the same session as the diagnosis so the census and spawn_solvency baselines are hours old rather than a sprint stale. RATES STAY 0.0 UNTIL BL-654 LANDS (Ben, 2026-08-26). The measured collapse (227 -> 19 operating firms) is a consequence of drawing without bidding, not of the rate; BL-654's buy-with-a-ceiling is what makes a non-zero rate survivable, and the rate is then measured against the census and the operating-firm count rather than chosen."
   },
   {
    "status": "designed",
@@ -1824,9 +1824,9 @@
    "id": "BL-654",
    "short_name": "A_CHANNEL_MUST_BID",
    "category": "Economy",
-   "title": "A goods draw must bid on the market, not only drain a pool",
-   "status": "design-owed",
-   "glyph": "~",
+   "title": "A short pool buys on the market, up to a reservation ceiling",
+   "status": "designed",
+   "glyph": "✓",
    "priority": "A",
    "difficulty": 4,
    "version_goal": "v0.1.21",
@@ -1845,7 +1845,34 @@
     "docs/economy/MARKETS.md",
     "docs/economy/FINANCE.md"
    ],
-   "design": "THE BLOCKER UNDER BL-641, AND PROBABLY UNDER FOUR MORE CHANNELS. Measured 2026-08-26: with building upkeep rates on, operating firms went 227 -> 19, because the goods drawn are produced 0.0 in band and a POOL DRAW never reaches market_component::demand - so the want never becomes a price, no rival scores the building that would supply it, and the sink starves itself. run_construction and run_processing already bid; run_unit_upkeep does not and carries the same latent defect. DESIGN-OWED, and the open question is Ben's because it widens FINANCE.md: should a goods draw place real demand on the market when the pool is short - and if so, does it BUY (spending credits, which makes upkeep a market participant) or merely SIGNAL (raising price without a transaction, which is cheaper but invents demand nobody pays for)? The first is coherent and expensive; the second is a thumb on the scale and should probably be refused on the same grounds the project refuses clamps. Until this is settled, BL-641's rates stay at 0.0 and every remaining channel (BL-643 infrastructure, BL-644 state, BL-645 research, BL-646 conflict) should be checked against property 3 before it is built, not after."
+   "design": "THE BLOCKER UNDER BL-641, AND PROBABLY UNDER FOUR MORE CHANNELS. Measured 2026-08-26: with building upkeep rates on, operating firms went 227 -> 19, because the goods drawn are produced 0.0 in band and a POOL DRAW never reaches market_component::demand - so the want never becomes a price, no rival scores the building that would supply it, and the sink starves itself. run_construction and run_processing already bid; run_unit_upkeep does not and carries the same latent defect. DESIGN-OWED, and the open question is Ben's because it widens FINANCE.md: should a goods draw place real demand on the market when the pool is short - and if so, does it BUY (spending credits, which makes upkeep a market participant) or merely SIGNAL (raising price without a transaction, which is cheaper but invents demand nobody pays for)? The first is coherent and expensive; the second is a thumb on the scale and should probably be refused on the same grounds the project refuses clamps. Until this is settled, BL-641's rates stay at 0.0 and every remaining channel (BL-643 infrastructure, BL-644 state, BL-645 research, BL-646 conflict) should be checked against property 3 before it is built, not after. SETTLED (Ben, 2026-08-26): 'Buy on the market, but at a threshold, buying is not allowed. This goes hand in hand with maximum and minimum prices for goods.' And ONE RULE FOR EVERY GOODS DRAW - unit upkeep takes the same shape, not a second one. Written into MARKETS.md section Settled: a short pool BUYS, up to a reservation ceiling. THE WORK: a short pool bids the shortfall into market_component::demand and pays for what it gets; above the ceiling it does not bid at all and the existing shortfall rule weakens the building (or unit) instead. The ceiling is authored in the PRICE BAND family beside floor_mult/ceil_mult, not in upkeep - it is a statement about what a good is worth paying, not about who is buying - and its value is MEASURED against the census and the operating-firm count, never guessed. It is the exact mirror of BL-386's seller-side floor_price: both sides may decline a trade, neither may dictate one. Turning BL-641's rates non-zero is gated on this landing."
+  },
+  {
+   "id": "BL-655",
+   "short_name": "PASS6_DENSITY_RETUNE",
+   "category": "Generation",
+   "title": "Retune background-firm density upward against the corrected demand basis",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": "v0.1.21",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-640"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "scripts/economy.lua",
+    "src/world/corporation_generation.cpp",
+    "tools/verify/",
+    "docs/generation/CORPORATION_GENERATION.md"
+   ],
+   "design": "Ben's ruling on NR-679, 2026-08-26: KEEP BL-640's fix, and retune density back up toward the old world. The fix is not in question - Pass 6 was chasing ~90% of a demand that included goods the ancient band cannot produce, so it added firms against a gap that could never close, and correcting it took the world from 584 buildings / 104 corps to 261 / 64. TWO LEVERS REACH THE SAME COUNT AND THEY MEAN DIFFERENT THINGS, which is the whole of this item: (a) RAISE PASS 6'S TARGET FRACTION above 0.90 - the world then deliberately OVERPRODUCES, which means gluts, prices pinned at the floor, and thinner margins for everyone; it reaches the count without anyone wanting more. (b) RAISE THE DEMAND BASKETS - the world CONSUMES more per head, so more firms are supported at the same ~90% ratio and prices hold. TRY (b) FIRST: it preserves what BL-640 established, and POPULATION.md already names the knob as an open item - the cost of living, how much it costs a head to live, deliberately unquantified. (a) is the fallback and should be recorded as a deliberate oversupply if taken. MEASURE BOTH with demand_census against the committed baseline plus the corp and operating-building counts, and report the price consequence - a density that is right only because everything is worthless is not right."
   }
  ]
 }

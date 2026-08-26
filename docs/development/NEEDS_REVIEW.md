@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*92 entries — 68 open, 24 resolved.*
+*92 entries — 66 open, 26 resolved.*
 
 ---
 
@@ -585,26 +585,12 @@ POPULATION.md § Population demand and MARKETS.md § Demand channels both said a
 
 *Files: `docs/economy/POPULATION.md`, `docs/economy/MARKETS.md`, `scripts/economy.lua`*
 
-### NR-679 — Banding the baskets HALVED the generated world - 584 buildings / 104 corps -> 261 / 64
-*observation · raised 2026-08-26 · from Sprint 20 wave 4, BL-640: the agent found it, named it as its own, and flagged it before merge rather than after.*
-
-Pass 6 generates background firms until a body's real production reaches ~90% of its real demand. That stop condition reads the same baskets BL-640 just banded - through `body_demand` in corporation_generation.cpp, which was NOT in the brief's file list and which the agent repointed for correctness. Before the band, Pass 6 was chasing demand for silicon, machinery, alloys and electronics that the ancient band STRUCTURALLY CANNOT PRODUCE, so it kept adding firms against a gap that could never close. The behaviour is now correct and the world is half the size: 584 buildings / 104 corps -> 261 / 64. THIS IS A LARGE GENERATED-WORLD CHANGE AND EVERY DOWNSTREAM MEASUREMENT MOVES WITH IT - market saturation, prices, spawn viability, the haulage baseline (already flagged as drifted in NR-674), and the spectator golden. Worth Ben's eye on the FEEL as much as the numbers: a world with 64 corps rather than 104 is a visibly different economy, and it is the honest one. The old count was inflated by chasing an unclosable target.
-
-*Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`, `docs/economy/MARKETS.md`*
-
 ### NR-680 — rigging's exemption named BL-640 as its buyer, and BL-640 does not buy it
 *question · raised 2026-08-26 · from Sprint 20 wave 4, BL-640: the agent declined to invent a buyer or to widen its own requirement to cover one.*
 
 chain_depth's exemption for `rigging` claimed 'the era-banded household basket (BL-640) owns the buyer'. It does not: POPULATION.md's ancient household is ceramics, cloth, leather and dressed stone, and rigging is ship's tackle - not a household good by any reading. The agent re-pointed the claim prose to say so and LEFT THE ROW RED rather than widening R2's four goods to make its own item look better. Correct, and it leaves rigging genuinely unowned. Candidates worth weighing: the Infrastructure channel (BL-643) if ports and hubs draw materials - a shipwright's output is closer to infrastructure than to a household; or Construction (BL-642) if a port's resource_costs name it. Three of the four remaining red goods now have this shape - rigging, tools and trade_goods_misc all need a channel to claim them, and ordnance needs BL-646.
 
 *Files: `tools/verify/chain_depth.cpp`, `docs/economy/LOGISTICS.md`, `docs/economy/PRODUCTION.md`*
-
-### NR-681 — NOVEL: a demand channel that consumes without pricing cannot bootstrap its own supply
-*novel-work · raised 2026-08-26 · from Sprint 20 wave 4, BL-641: the agent raised the flag, and the property is now written into MARKETS.md as the register's third.*
-
-The implementation was owned end to end by FINANCE.md and copied cleanly from run_unit_upkeep. What is novel is what turning it on MEASURED: operating firms 227 -> 19, because a pool draw for a good the band produces at 0.0 starves the drawer and never signals the market that would supply it. That is a CROSS-CHANNEL property no doc stated, and four unbuilt channels were designed the same way this morning. It is now property 3 of MARKETS.md section Demand channels, and BL-654 owns the question it raises. Worth Ben's eye on the meta-point as much as the mechanism: the item shipped INERT rather than shipping a collapse or quietly picking a smaller rate that would have hidden the same defect behind a slower decay - which is the difference between a measurement and a number that looks acceptable.
-
-*Files: `docs/economy/MARKETS.md`, `src/world/economy_system.cpp`*
 
 ### NR-682 — The building-upkeep state_hash fold is SPARSE - a deliberate departure from BL-454
 *decision taken on your behalf · raised 2026-08-26 · from Sprint 20 wave 4, BL-641: taken by the agent, documented in code, and flagged rather than buried.*
@@ -842,4 +828,22 @@ MARKETS.md § Measuring it owns the task, so the work was not unowned - but the 
 > **RESOLVED.** Ben, 2026-08-26: RATIFY. The census's vocabulary is written into MARKETS.md section Measuring it as a table - structural sink vs observed demand, REC/DEP, px - with the distinction that does the work called out: a structural sink with ZERO observed demand is the signature of a dead chain, and invisible to any check looking at only one of them.
 
 *Files: `tools/verify/demand_census.cpp`, `docs/economy/MARKETS.md`*
+
+### NR-679 — Banding the baskets HALVED the generated world - 584 buildings / 104 corps -> 261 / 64
+*observation · raised 2026-08-26 · from Sprint 20 wave 4, BL-640: the agent found it, named it as its own, and flagged it before merge rather than after.*
+
+Pass 6 generates background firms until a body's real production reaches ~90% of its real demand. That stop condition reads the same baskets BL-640 just banded - through `body_demand` in corporation_generation.cpp, which was NOT in the brief's file list and which the agent repointed for correctness. Before the band, Pass 6 was chasing demand for silicon, machinery, alloys and electronics that the ancient band STRUCTURALLY CANNOT PRODUCE, so it kept adding firms against a gap that could never close. The behaviour is now correct and the world is half the size: 584 buildings / 104 corps -> 261 / 64. THIS IS A LARGE GENERATED-WORLD CHANGE AND EVERY DOWNSTREAM MEASUREMENT MOVES WITH IT - market saturation, prices, spawn viability, the haulage baseline (already flagged as drifted in NR-674), and the spectator golden. Worth Ben's eye on the FEEL as much as the numbers: a world with 64 corps rather than 104 is a visibly different economy, and it is the honest one. The old count was inflated by chasing an unclosable target.
+
+> **RESOLVED.** Ben, 2026-08-26: KEEP THE FIX, retune density upward. BL-655 owns it, and carries the distinction that matters - raising Pass 6's target fraction reaches the old count by making the world OVERPRODUCE (gluts, floored prices), while raising the demand baskets reaches it by making the world CONSUME more (prices hold). Try the demand side first; record an oversupply as deliberate if it is taken.
+
+*Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`, `docs/economy/MARKETS.md`*
+
+### NR-681 — NOVEL: a demand channel that consumes without pricing cannot bootstrap its own supply
+*novel-work · raised 2026-08-26 · from Sprint 20 wave 4, BL-641: the agent raised the flag, and the property is now written into MARKETS.md as the register's third.*
+
+The implementation was owned end to end by FINANCE.md and copied cleanly from run_unit_upkeep. What is novel is what turning it on MEASURED: operating firms 227 -> 19, because a pool draw for a good the band produces at 0.0 starves the drawer and never signals the market that would supply it. That is a CROSS-CHANNEL property no doc stated, and four unbuilt channels were designed the same way this morning. It is now property 3 of MARKETS.md section Demand channels, and BL-654 owns the question it raises. Worth Ben's eye on the meta-point as much as the mechanism: the item shipped INERT rather than shipping a collapse or quietly picking a smaller rate that would have hidden the same defect behind a slower decay - which is the difference between a measurement and a number that looks acceptable.
+
+> **RESOLVED.** Ben, 2026-08-26: answered by the BL-654 ruling - a short pool BUYS, up to a reservation ceiling, and one rule covers every goods draw. The novel property stands as MARKETS.md's property 3 and now has its settled answer beneath it.
+
+*Files: `docs/economy/MARKETS.md`, `src/world/economy_system.cpp`*
 
