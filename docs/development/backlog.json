@@ -1873,6 +1873,31 @@
     "docs/generation/CORPORATION_GENERATION.md"
    ],
    "design": "Ben's ruling on NR-679, 2026-08-26: KEEP BL-640's fix, and retune density back up toward the old world. The fix is not in question - Pass 6 was chasing ~90% of a demand that included goods the ancient band cannot produce, so it added firms against a gap that could never close, and correcting it took the world from 584 buildings / 104 corps to 261 / 64. TWO LEVERS REACH THE SAME COUNT AND THEY MEAN DIFFERENT THINGS, which is the whole of this item: (a) RAISE PASS 6'S TARGET FRACTION above 0.90 - the world then deliberately OVERPRODUCES, which means gluts, prices pinned at the floor, and thinner margins for everyone; it reaches the count without anyone wanting more. (b) RAISE THE DEMAND BASKETS - the world CONSUMES more per head, so more firms are supported at the same ~90% ratio and prices hold. TRY (b) FIRST: it preserves what BL-640 established, and POPULATION.md already names the knob as an open item - the cost of living, how much it costs a head to live, deliberately unquantified. (a) is the fallback and should be recorded as a deliberate oversupply if taken. MEASURE BOTH with demand_census against the committed baseline plus the corp and operating-building counts, and report the price consequence - a density that is right only because everything is worthless is not right."
+  },
+  {
+   "id": "BL-656",
+   "short_name": "PASS6_CAP_IS_THE_DESIGN",
+   "category": "Generation",
+   "title": "Decide what actually shapes background density - the ratio, or the per-resource cap",
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 2,
+   "version_goal": "post-v0.1.21",
+   "sprint": null,
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-655"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/corporation_generation.cpp",
+    "docs/generation/CORPORATION_GENERATION.md"
+   ],
+   "design": "Raised by BL-655's measurement and by its novelty flag. Pass 6 is documented as stopping on a 0.90 production/demand ratio, described as 'an emergent measurement rather than an injected clearing constant' and 'a stop condition, not a firm-count budget'. MEASURED: the ratio NEVER BINDS on the worlds we generate. `per_resource_firm_cap = 8` binds on every demanded resource, so the count is exactly specialists + 8 x basket breadth - which reproduced 104, 64 and 56 corps exactly across three configurations. Its own comment still says 'provisional - measure, then pin'. The doc has been corrected to describe what the code does; what is OPEN is which behaviour is wanted. THREE READINGS: (a) the cap is the real design and the ratio is dead weight - pin the cap deliberately, say density is breadth-driven, and delete the ratio; (b) the ratio is the real design and the cap is an emergency brake set too low - raise it until the ratio binds, which restores the 'calibrated, not authored' property the doc claims; (c) both, with the cap as a genuine guard against a pathological basket. Note the consequence either way: under (a) density becomes a function of how many DIFFERENT goods are wanted, so every demand channel Sprint 21 adds moves the world's size - which may be a feature."
   }
  ]
 }

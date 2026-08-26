@@ -314,12 +314,23 @@ asset-placement machinery as Passes 1–3, just run repeatedly rather than a fix
 
 **Trigger and stop condition — calibrated, not authored.** Pass 6 keeps generating background
 firms and holdings, body by body, until the body's real production reaches a **target fraction of
-its real demand** for the tradeable resource set — **0.90**, an emergent measurement rather than
-an injected clearing constant. It is a stop condition, not a firm-count budget: retuning recipes,
-deposits, or population moves how many firms Pass 6 places, not the design authority for how
-many it should place. This keeps the market's saturation and its live opportunity margin correct
-without hand-tuning a count every time an upstream generator changes. On the default world it
-places 17–29 firms against the 8 specialists.
+its real demand** for the tradeable resource set — **0.90** — or until a **per-resource firm cap**
+is reached, whichever comes first. Retuning recipes, deposits, or population moves how many firms
+Pass 6 places; the design does not author a count.
+
+> **Which of the two actually binds — measured, 2026-08-26 (BL-655), correcting this paragraph.**
+> On the worlds we generate today, **the 0.90 ratio never binds**. The cap does, on every demanded
+> resource, so the firm count is *exactly* `specialists + cap × (number of goods with demand)` —
+> which reproduced every observed number: 12 demanded goods gave 104 corps, 7 gave 64, 6 gave 56.
+> The consequence is the one worth carrying: **density is set by the BREADTH of the demand baskets,
+> not by how much is consumed.** Doubling `demand_scale` moved the corp count by zero. Adding one
+> good to the household basket moves it by the cap.
+>
+> This paragraph previously said the ratio was "an emergent measurement rather than an injected
+> clearing constant" and "a stop condition, not a firm-count budget". Measurement says the opposite
+> of both, and the cap's own code comment still reads *"provisional — measure, then pin"* while
+> having quietly become the load-bearing shaping constraint. Whether that is the design anyone
+> wants is open (BL-656); what is settled is that the doc now describes what the code does.
 
 **Background firms are full participants, not a cheaper model.** Once placed, a background firm is
 otherwise ordinary: it runs the **full corp_ai scored-utility layer** — build, demolish, survey,

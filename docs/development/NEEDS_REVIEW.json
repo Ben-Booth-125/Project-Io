@@ -1412,6 +1412,46 @@
     "docs/development/baseline_census_2026-08-26.txt",
     "tools/verify/demand_census.cpp"
    ]
+  },
+  {
+   "id": "NR-684",
+   "title": "The equal-tranche invariant was counting UNITS, not value - the ancient band was half the cost of living",
+   "raised": "2026-08-26",
+   "kind": "observation",
+   "status": "open",
+   "source": "Sprint 20 wave 5, BL-655: found while sizing the retune, and the fix is why the numbers are defensible.",
+   "what": "BL-640 sized the ancient household tranche to total 0.75, equal to the industrial tranche's 0.75, on the reasoning that the band should change WHICH value chain a household consumes and not HOW MUCH. The invariant was counting units. Priced at base_price, the ancient household cost 3.12 cr per scale-point against the industrial household's 6.15 - so the band was halving the cost of living, which is exactly what it was written not to do. BL-655 re-sized against VALUE: the ancient tranche now costs 6.145 against 6.150, and a head costs 10.80 cr in either band. Worth recording as a pattern, not just a fix: an invariant stated in the units of the data (weights) rather than the units of the meaning (credits) reads as correct and measures as wrong, and this one survived a review and a merge before anybody priced it.",
+   "files": [
+    "scripts/economy.lua",
+    "docs/economy/POPULATION.md"
+   ]
+  },
+  {
+   "id": "NR-685",
+   "title": "Density stopped at 88 of 104 on purpose - the last two goods belong to other items",
+   "raised": "2026-08-26",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Sprint 20 wave 5, BL-655.",
+   "what": "The retune reached 352 buildings / 88 corps against the pre-BL-640 584 / 104. It stopped there deliberately. The next two goods that would each add a tranche - `tools` and `trade_goods_misc` - are real ancient household candidates and both are in-band, but their buyers are OWNED by BL-590 (construction draw) and BL-647 (endemic luxury). Taking them would have hit 104 and quietly annexed two other items' designs, which is how a count gets reached and a roster gets confused. `peat` was the third candidate and the price instrument vetoed it - already 6.90x base, so household demand would have deepened a shortage. ENDORSED. If Ben wants 104 sooner, the honest route is to land BL-590 and BL-647 rather than to widen this basket, and the count then follows from those items rather than being borrowed against them.",
+   "files": [
+    "scripts/economy.lua",
+    "docs/development/backlog.json"
+   ]
+  },
+  {
+   "id": "NR-686",
+   "title": "A Lua-only change does NOT reach the play build - the script copy is attached to the compile target",
+   "raised": "2026-08-26",
+   "kind": "observation",
+   "status": "open",
+   "source": "Sprint 20 wave 5: caught while handing Ben the Release build to judge BL-655 density.",
+   "what": "BL-655 changed scripts/economy.lua and no C++ at all. Both trees were rebuilt and both printed BUILD_OK - and BOTH SHIPPED THE OLD SCRIPTS. The CMake copy-scripts step is a side effect of building the ProjectIo target, so when nothing recompiles it does not fire, and build/scripts and build_rel/scripts keep whatever they had. Caught only because the handover was verified by grepping the OUTPUT tree for the new weights rather than trusting BUILD_OK. WHY IT MATTERS MORE THAN IT LOOKS: this session is a tuning sprint. Most of Sprint 21 is Lua - demand baskets, upkeep rates, price-band constants - so the class of change most likely to be evaluated is exactly the class that silently does not ship. Ben would have judged the old density and we would both have believed the number. A harness reading scripts/ directly is unaffected, which is why every measurement in this session was right while the playable build was wrong - the two paths disagree and nothing says so. FIX CANDIDATES: make the copy its own always-run target rather than a side effect of compiling; or have the app resolve scripts/ from the repo root in a dev build so there is one copy and it cannot go stale. The second removes the failure mode rather than making it fire more often.",
+   "files": [
+    "CMakeLists.txt",
+    "build_app.bat",
+    "src/core/app.cpp"
+   ]
   }
  ]
 }
