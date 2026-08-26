@@ -81,6 +81,15 @@ float body_mean_habitability(const world& w, entity_id body);
 ///                   plus the BL-073 interest line) whose net() equals the delta
 ///                   applied to that corp's balance. Null for the headless harnesses,
 ///                   which only need the balance mutation.
+/// BL-626: at the END of the pass, every corporation files a `quarterly_return`
+/// (components.hpp) — the seven flows it just paid, the exact delta applied to
+/// its balance, the closing balance, and the two stock figures (`assets.size()`
+/// and the registry `build_cost` summed over the holdings). Filed in a sorted
+/// `entity_id` walk, rolling retention of `k_quarterly_return_retention`
+/// quarters. It is a RETAIN of what this function already computed and is NOT
+/// gated on `breakdown` — a record that existed only when a UI asked for one
+/// would be a second computation, which is precisely what it is not.
+///
 /// @param production Optional (BL-343): this tick's per-building reports, from
 ///                   `economy_report::buildings`. The LAW ENFORCEMENT SEAM — the
 ///                   extraction levy is a per-unit charge on raw output, so it is

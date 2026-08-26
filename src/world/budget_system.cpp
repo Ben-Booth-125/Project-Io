@@ -4,6 +4,8 @@
 #include "unit_roster.hpp" // BL-454: resolve_unit_upkeep (the credit half)
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <map>
 #include <tuple>
 #include <vector>
@@ -115,8 +117,23 @@ void apply_budget(world& w,
     // loop in sorted order. Debits stay per-corp and are untouched.
     std::vector<std::tuple<entity_id, entity_id, float>> levy_credits;
 
+    // BL-626: this tick's quarterly returns, keyed by corp. Collected here and
+    // FILED after the loop, in the map's own ascending entity_id order, because
+    // `w.corporations` is an unordered_map and the append must not inherit its
+    // layout-dependent walk (io-standing-rules § Determinism). Nothing in the
+    // loop reads a return, so a return can never feed back into the money loop
+    // that produced it.
+    std::map<entity_id, quarterly_return> filed_returns;
+
     for (auto& [corp, cc] : w.corporations)
     {
+        // BL-626: the opening balance, captured before a single flow lands. The
+        // filed `net` is the DIFFERENCE of this and the closing balance — the
+        // movement the loop actually applied — not a re-grouped sum of the
+        // flows, which could differ by a float ULP and would not telescope.
+        const float opening_balance = cc.balance;
+        float       book_value      = 0.0f;
+
         // Capture the flows into `bud` for the BL-072 breakdown, but keep the
         // balance update on the SAME interleaved `delta` the pre-BL-072 code used,
         // so the shipped economy is bit-identical (grouping the sums could drift by
@@ -145,6 +162,15 @@ void apply_budget(world& w,
                 continue;
             const building_component&  b = bit->second;
             const building_economics&  e = reg.economics(b.type);
+
+            // BL-626 book value: the registry's flat construction cost, summed
+            // over the holdings in `assets` order (a vector — fixed, so the sum
+            // is deterministic). Read from the registry the build press itself
+            // charges (construction.cpp's `econ.build_cost`), never re-derived.
+            // Accumulated here rather than in a second walk so the two can never
+            // disagree about which buildings the corp holds; it touches no term
+            // of `delta`, so the money arithmetic is untouched.
+            book_value += e.build_cost;
 
             entity_id body = null_entity;
             const auto tit = w.tiles.find(b.tile);
@@ -286,6 +312,25 @@ void apply_budget(world& w,
 
         if (breakdown)
             (*breakdown)[corp] = bud;
+
+        // BL-626: retain the tick as a quarterly return. Deliberately NOT gated
+        // on `breakdown` — that sink is optional and the headless harnesses omit
+        // it, and a record that only existed when a UI happened to ask for one
+        // would be exactly the second computation this is not. Every field is
+        // copied from what the loop already produced.
+        quarterly_return qr;
+        qr.income      = bud.income;
+        qr.expenditure = bud.expenditure;
+        qr.maintenance = bud.maintenance;
+        qr.wages       = bud.wages;
+        qr.interest    = bud.interest;
+        qr.levies      = bud.levies;
+        qr.upkeep      = bud.upkeep;
+        qr.net         = cc.balance - opening_balance; // the exact delta applied
+        qr.balance     = cc.balance;
+        qr.holdings    = static_cast<uint32_t>(cc.assets.size());
+        qr.book_value  = book_value;
+        filed_returns.emplace(corp, qr);
     }
 
     // Apply the levy credits in (corp, nation) order — a total independent of
@@ -301,5 +346,22 @@ void apply_budget(world& w,
             if (nat != w.nations.end())
                 nat->second.treasury += amount;
         }
+    }
+
+    // BL-626: file the returns. Ascending entity_id (the map's own order), one
+    // row per corporation per tick, rolling retention of the last
+    // `k_quarterly_return_retention` quarters with the oldest dropped first.
+    for (const auto& [corp, qr] : filed_returns)
+    {
+        const auto cit = w.corporations.find(corp);
+        if (cit == w.corporations.end())
+            continue; // cannot happen: the key came from this same container
+        std::vector<quarterly_return>& hist = cit->second.returns;
+        hist.push_back(qr);
+        if (hist.size() > k_quarterly_return_retention)
+            hist.erase(hist.begin(),
+                       hist.begin()
+                           + static_cast<std::ptrdiff_t>(hist.size()
+                                                         - k_quarterly_return_retention));
     }
 }

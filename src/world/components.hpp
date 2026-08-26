@@ -3,6 +3,7 @@
 #include "entity.hpp"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -1104,6 +1105,65 @@ enum class industrial_focus : uint8_t
 };
 
 // ---------------------------------------------------------------------------
+// The quarterly return (BL-626)
+// ---------------------------------------------------------------------------
+
+/// One corporation's filed balance sheet for one economy tick. An economy tick
+/// IS one quarter (`k_ticks_per_year` == 4), so the ledger's cadence is the money
+/// loop's own; `apply_budget` files one of these per corporation at the end of
+/// every tick. Authority: docs/economy/FINANCE.md § The quarterly return.
+///
+/// **It is a RETAIN, not a second computation.** Every flow here already exists
+/// in `corp_budget` and is copied across unchanged; `net` is the movement the
+/// loop actually applied to `corporation_component::balance` this tick, read off
+/// the balance itself rather than re-derived from the flows. That is the property
+/// that makes the record incapable of disagreeing with the loop that wrote it:
+/// summing a corp's filed `net` over a run telescopes back to its balance delta
+/// exactly, because each term IS a difference of two consecutive balances.
+/// (`corp_budget::net()` is the same quantity to within float grouping — the
+/// budget loop accumulates its delta interleaved and deliberately does not
+/// re-group, so a re-grouped sum can differ by a ULP and would not telescope.)
+///
+/// `holdings` and `book_value` are the two STOCK figures that make the row a
+/// balance sheet rather than an income statement alone. `book_value` is the sum
+/// of the recipe registry's `build_cost` over the corp's holdings — the same
+/// number the build press charges, read from that one authority and never
+/// re-derived.
+///
+/// Nothing here is estimated, and nothing here is read during the tick that
+/// writes it: the record is a pure downstream observation of the money loop and
+/// cannot feed back into it.
+struct quarterly_return
+{
+    // The seven flows, copied from `corp_budget` (economy_system.hpp).
+    float income      = 0.0f;
+    float expenditure = 0.0f;
+    float maintenance = 0.0f;
+    float wages       = 0.0f;
+    float interest    = 0.0f;
+    float levies      = 0.0f;
+    float upkeep      = 0.0f;
+
+    /// The exact balance delta this tick — closing balance less opening balance.
+    float net = 0.0f;
+
+    /// Closing `corporation_component::balance`, after interest.
+    float balance = 0.0f;
+
+    /// `corporation_component::assets.size()` — the building count.
+    uint32_t holdings = 0;
+
+    /// Sum of `recipe_registry::economics(type).build_cost` over the holdings.
+    float book_value = 0.0f;
+};
+
+/// Rolling retention of `corporation_component::returns`: ten years at four
+/// economy ticks to the year (Ben, 2026-08-26). Bounded by construction, and
+/// that is the point — the record is world state and crosses the serialisation
+/// seam, so it must not grow with campaign length. Oldest dropped first.
+inline constexpr std::size_t k_quarterly_return_retention = 40;
+
+// ---------------------------------------------------------------------------
 // Corporation component
 // ---------------------------------------------------------------------------
 
@@ -1218,6 +1278,18 @@ struct corporation_component
     /// plain array keeps this trivially copyable and order-independent, which
     /// matters because the economy reads a number off it (the BL-406 lesson).
     std::array<bool, resource_count> produced_ever = {};
+
+    /// BL-626: the corporation's filed quarterly returns, oldest first, at most
+    /// `k_quarterly_return_retention` of them. Appended by `apply_budget` in a
+    /// sorted `entity_id` walk, one row per economy tick.
+    ///
+    /// WORLD STATE, and that is the change this field represents.
+    /// `ui::player_plot_history` is a UI cache — player corp only, 64 samples,
+    /// never serialised. This is none of those things: it crosses the save seam,
+    /// it exists for every corporation, and a reloaded campaign comes back with
+    /// its history intact. The player's own profit chart keeps reading the UI
+    /// cache; that surface is unchanged.
+    std::vector<quarterly_return> returns;
 };
 
 /// BL-428: how far down the production graph @p c has actually reached — the

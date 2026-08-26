@@ -175,7 +175,18 @@ inline constexpr uint32_t world_save_magic =
 /// MID-RECORD gap, so it is refused whole on the same strict-equality
 /// contract as every prior bump. The reader additionally refuses a value
 /// other than 0/1 — the writer cannot have produced one.
-inline constexpr uint32_t world_save_version = 15;
+///
+/// Bumped to 16 by BL-626 (quarterly return): the corporation record
+/// (`w_corp` / `r_corp`) gains `corporation_component::returns` — a
+/// count-prefixed run of eleven-field `quarterly_return` records, appended
+/// after `produced_ever`, in declaration order. A v15 stream's corporation
+/// records simply END there, so every container written after the corporations
+/// reads misaligned from the first one onward; it is refused whole on the same
+/// strict-equality contract as every prior bump. The reader additionally
+/// refuses a non-finite figure and a run longer than
+/// `k_quarterly_return_retention` — the writer, which trims to that bound
+/// every tick, cannot have produced either.
+inline constexpr uint32_t world_save_version = 16;
 
 /// Write @p w as a complete world snapshot.
 ///
