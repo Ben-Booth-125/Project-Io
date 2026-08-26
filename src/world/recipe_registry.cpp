@@ -506,6 +506,25 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_procurement = pp;
     }
 
+    // BL-628 whole-firm acquisition (economy.acquisition).
+    //
+    // One key, read through `read_checked` and REJECTED by name on violation
+    // rather than clamped — the seam's untrusted-input rule applied at the
+    // authoring boundary, as economy.nation_ai already does. The domain is the
+    // honest one: a multiple is a count of quarters' earnings, so it is
+    // non-negative and finite; the upper bound is left open because a high
+    // multiple is a tuning choice, not a malformed value. A NEGATIVE multiple
+    // would invert the profit term (a profitable firm made cheap by its own
+    // earnings) and is refused rather than accepted as an exotic setting.
+    sol::optional<sol::table> acquisition_tbl = (*econ)["acquisition"];
+    if (acquisition_tbl)
+    {
+        acquisition_params ap = m_acquisition;
+        read_checked(*acquisition_tbl, "multiple", ap.multiple,
+                     0.0, std::numeric_limits<double>::infinity(), "economy.acquisition");
+        m_acquisition = ap;
+    }
+
     // BL-545/BL-546 relational substrate (economy.sentiment).
     //
     // The two `contract_*` Trust weights are SEEDED FROM PROCUREMENT FIRST, so

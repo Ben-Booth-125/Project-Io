@@ -1193,6 +1193,18 @@ struct quarterly_return
 /// seam, so it must not grow with campaign length. Oldest dropped first.
 inline constexpr std::size_t k_quarterly_return_retention = 40;
 
+/// BL-628: how many filed quarters the whole-firm acquisition price averages
+/// `net` over — EIGHT, two years of the forty retained (FINANCE.md § Whole-firm
+/// acquisition), or fewer if the firm is younger than that.
+///
+/// A CONSTANT, not an authored parameter, while `k_acquisition_multiple` IS
+/// authored (`scripts/economy.lua`, `economy.acquisition.multiple`). The split is
+/// deliberate and follows the doc: the multiple is the acquisition market's
+/// price level and is meant to be tuned; the window is the design's statement of
+/// how much history a price is entitled to read, and moving it silently changes
+/// what a filed return MEANS rather than what it is worth.
+inline constexpr std::size_t k_acquisition_trailing_quarters = 8;
+
 // ---------------------------------------------------------------------------
 // Corporation component
 // ---------------------------------------------------------------------------

@@ -80,7 +80,7 @@ namespace {
 //   CORPS                                           -> one JSON line per corp, then END
 //   BODIES                                          -> one JSON line per body, then END
 //   BLACKBOARD corp=<id> ticks=<n>                  -> facts as BL-206 JSONL, then END
-//   COMMAND corp=<id> verb=<0-14> subject=<id> tile=<id> type=<building_type>
+//   COMMAND corp=<id> verb=<corp_verb> subject=<id> tile=<id> type=<building_type>
 //           target=<resource_type>
 //           recipe=<id> workforce=<n> road_tier=<n> unit_type=<n>
 //           quantity=<f> floor_price=<f> order=<n> counterparty=<id>
@@ -92,7 +92,10 @@ namespace {
 // `resource_type`; deliberately NOT written out as numeric ranges here, because
 // a hard-coded range is a second definition that goes stale the moment either
 // enum grows. This block previously claimed `verb=<0-7>` while the enum held
-// fifteen, and `type=<0-4>` while it held seven.
+// fifteen, and `type=<0-4>` while it held seven. `verb` lost its numeric range
+// for the same reason with BL-628 (it read `<0-14>` while the enum held
+// twenty-eight); `corp_verb_count` in corp_command.hpp is the one definition,
+// and `agent_protocol.cpp` gates the wire against it.
 //
 // Every `corp_verb` is reachable here; which keys a given verb reads is
 // `apply_corp_command`'s business, and unread keys cost nothing. Keep this list

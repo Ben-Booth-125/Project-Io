@@ -524,6 +524,33 @@ economy = {
     -- magnitude (-2.0) — a round, legible number that satisfies CONTRACTS.md's
     -- "failed... down hardest" ordering against contract_cancelled's "down,
     -- but less". Iterate by playtest; nothing else derives this figure.
+    -- BL-628: the whole-firm buyout's price level (docs/economy/FINANCE.md
+    -- § Whole-firm acquisition). The price is
+    --
+    --     max(0, book_value + multiple x trailing_net + balance)
+    --
+    -- where trailing_net is the mean filed `net` over the last EIGHT quarters
+    -- (k_acquisition_trailing_quarters, components.hpp — a constant, because the
+    -- window says how much history a price may read, which is a design statement
+    -- rather than a price level).
+    --
+    -- One economy tick is one quarter, so `multiple = 8` is TWO YEARS of
+    -- purchase against two years of observation: the buyer pays two years of
+    -- what the last two years actually earned. Round and legible, and nothing
+    -- else derives it — move it by playtest. It is authored here precisely so
+    -- that tuning the acquisition market is a data change.
+    --
+    -- SIGNED and unclamped by design. A chronically loss-making firm prices
+    -- BELOW its book value and should; the only floor is zero, and that floor is
+    -- there because the price is a SINK (there is no modelled seller to pay a
+    -- negative price to), not because book value is a redemption anyone could
+    -- take — the prototype refunds nothing on demolition.
+    --
+    -- Rejected at load, never clamped, if it is not a finite number >= 0.
+    acquisition = {
+        multiple = 8.0,
+    },
+
     sentiment = {
         trust_decay_per_tick  = 0.074125,
         access_decay_per_tick = 0.074125,

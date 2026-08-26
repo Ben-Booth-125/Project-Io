@@ -43,6 +43,21 @@ in `tools/verify/README.md`.
   and that the field round-trips the save. R2 is a **measured** row: it REPORTS the
   class distribution across a seed sweep rather than asserting it against a number —
   which is how the antiquity finding of NR-659 surfaced. Build via `build_harness.js`.
+- **`whole_firm_buyout`** — BL-628, requirement group `whole-firm-buyout` R1–R6: the
+  `buy_corporation` verb, the one thing in the codebase that **erases an actor**.
+  Asserts the price (`max(0, book_value + k_acquisition_multiple × trailing_net +
+  balance)`) against an independent recomputation from the filed record, with the
+  young-firm, loss-making (prices BELOW book, unclamped) and zero-floor cases each
+  given their own row; that a private, closed, never-filed or player-owned target is
+  refused with the world **byte-identical** either side of the command; that holdings,
+  pools, balance and returns transfer while open orders are CANCELLED; and — R4, the
+  row this harness exists for — that **nothing dangles**, checked by a generic scanner
+  that re-walks every corp-referencing container in `world.hpp` rather than mirroring
+  the implementation's own list, run on a fixture, on a warm-started generated world,
+  and again after four further economy ticks. Row **X** is a *measurement, not an
+  assertion of correctness*: it states in credits how far this verb undervalues a
+  contract-earning firm, because a filed return cannot see post-`apply_budget` income
+  (NR-655). Build via `build_harness.bat`.
 - **`econ_stability`** — runs the economy loop (production → market clearing →
   budget) over 100 ticks on a small fixed world and asserts multi-tick stability:
   prices stay in the `[0.25×, 4×]` band, no NaN/Inf, deposit reserves decrease

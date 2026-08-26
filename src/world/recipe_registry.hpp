@@ -536,6 +536,26 @@ struct procurement_params
     float offbody_freight_fraction = 0.05f;
 };
 
+/// BL-628 whole-firm acquisition tunables, authored in scripts/economy.lua under
+/// the top-level `acquisition` table. One number today, and a table rather than a
+/// loose float because the acquisition market is the kind of thing that grows a
+/// second term (a control premium, a minimum-filings gate) the moment it is
+/// played with.
+struct acquisition_params
+{
+    /// `k_acquisition_multiple` — how many quarters of trailing earnings the
+    /// profit term is worth (FINANCE.md § Whole-firm acquisition). One economy
+    /// tick is one quarter, so 8 is TWO YEARS of purchase against the eight
+    /// quarters of observation `k_acquisition_trailing_quarters` averages: the
+    /// buyer pays two years of what the last two years actually earned. A round,
+    /// legible first cut, to be moved by playtest and nothing else — it is
+    /// authored precisely so that moving it is a data change.
+    ///
+    /// The term is SIGNED and unclamped by design: a loss-making firm prices
+    /// below its book value, which is the ledger telling the truth about it.
+    float multiple = 8.0f;
+};
+
 /// BL-546: THE TWO PROCUREMENT RATES ARE TWO SENTIMENT FACTOR WEIGHTS.
 ///
 /// Reputation stopped being its own store (`world::corp_reputation`) and became
@@ -751,6 +771,12 @@ public:
     /// the home so that wiring the scorer (T6) reads one authored object.
     const nation_ai_params& nation_ai() const { return m_nation_ai; }
 
+    /// BL-628 whole-firm acquisition tunables (economy.acquisition in Lua).
+    /// One number, `multiple`, range-checked at load and rejected rather than
+    /// clamped. The trailing WINDOW is not here: it is
+    /// `k_acquisition_trailing_quarters` (components.hpp), a constant on purpose.
+    const acquisition_params& acquisition() const { return m_acquisition; }
+
     /// BL-430 player-facing recipe-switch cost/cooldown (economy.recipe_switch in Lua).
     const recipe_switch_params& recipe_switch() const { return m_recipe_switch; }
 
@@ -943,6 +969,7 @@ public:
     void set_sentiment(const sentiment_params& p) { m_sentiment = p; }
     void set_nation_ai(const nation_ai_params& p) { m_nation_ai = p; }
     void set_recipe_switch(const recipe_switch_params& p) { m_recipe_switch = p; }
+    void set_acquisition(const acquisition_params& p) { m_acquisition = p; }
     void set_economics(building_type type, const building_economics& e)
     {
         m_building_econ[static_cast<std::size_t>(type)] = e;
@@ -1160,6 +1187,10 @@ private:
     /// BL-430 recipe-switch cost/cooldown. Defaults to free/instant so a
     /// hand-built harness registry that never sets this behaves as it always did.
     recipe_switch_params m_recipe_switch = {};
+
+    /// BL-628 acquisition tunables. Defaults match economy.lua, so a hand-built
+    /// harness registry prices a buyout exactly as the shipped game does.
+    acquisition_params m_acquisition = {};
 
     /// Logistics base cost per unit distance per unit cargo, indexed by convoy_mode
     /// (land=0, sea=1, air=2, space=3). Defaults match economy.lua values.
