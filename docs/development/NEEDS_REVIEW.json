@@ -908,12 +908,13 @@
    "title": "Does the OPERATIONAL fog go too, or only the financial banding?",
    "raised": "2026-08-26",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.",
    "what": "'We don't need company information to be invisible' was said while retiring BL-262 (the banded standing read). BL-068's competitor-visibility rule in DISCOVERY.md is a separate and wider thing: a rival hover card shows type and owner only, no production rates, no stockpiles, and the doc's stated principle is that intelligence is earned by reasoning over public signals. Narrow reading: only the financial banding goes, operational internals stay private. Wide reading: the whole competitor fog goes. The narrow reading is the one this session wrote to, because the disclosure gate would be pointless under the wide one. DISCOVERY.md has NOT been edited pending the answer.",
    "files": [
     "docs/ui/DISCOVERY.md"
-   ]
+   ],
+   "resolution": "Ben, 2026-08-26: 'Operational fog should persist.' The NARROW reading is confirmed - only the financial banding goes. DISCOVERY.md now carries both halves: filed financials are public wherever a firm files, and a new subsection states that production rates, stockpiles, recipes and workforce dials are untouched. The line written into the doc: an open book tells you what a firm earned, never how it operates."
   },
   {
    "id": "NR-648",
@@ -932,13 +933,14 @@
    "title": "The spawn shortlist does NOT solve the shallow-opening problem the corp-choice screen was built for",
    "raised": "2026-08-26",
    "kind": "observation",
-   "status": "open",
+   "status": "resolved",
    "source": "Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.",
    "what": "BL-435's selection screen existed on a MEASURED finding: over 24 seeds the generator handed the player a pure-extraction corp on 13 of them, so the chain-depth ladder had no rung to stand on, and player_seed_sweep records it. Solvency was explicitly NOT the discriminator - all 24 seeds ended positive. The replacement (BL-630, spawn shortlist) gates on VIABILITY, and a shallow pure-extraction corp is usually perfectly viable, so it will clear the floor every time. Retiring the screen therefore restores the exact distribution the screen was built to fix, unless the shortlist takes a second, DEPTH criterion alongside the viability one. Not filed as a blocker because BL-630 is buildable either way; the criterion is Ben's call.",
    "files": [
     "docs/generation/CORPORATION_GENERATION.md",
     "tools/verify/player_seed_sweep.cpp"
-   ]
+   ],
+   "resolution": "Ben, 2026-08-26: 'The shortlist can be mostly random for now, targeted towards population centres and processing, rather than extraction.' So the depth concern IS addressed, but as a WEIGHTED DRAW rather than a second gate - a shallow corp stays drawable, just less often. Written into CORPORATION_GENERATION.md and into BL-630; player_seed_sweep reports the resulting distribution rather than asserting a target."
   },
   {
    "id": "NR-650",

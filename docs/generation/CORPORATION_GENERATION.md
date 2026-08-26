@@ -315,6 +315,32 @@ settle, and the shape it must have is: a specialist qualifies if it is solvent a
 warm start and its trailing net over the last 8 filed quarters is non-negative. Determinism is
 unaffected — the draw consumes the world seed, so a seed reproduces its seat exactly.
 
+**The draw over the shortlist is WEIGHTED, not uniform.** Ben, 2026-08-26: *"mostly random for now,
+targeted towards population centres and processing, rather than extraction."* The floor is a filter;
+the weighting is a **bias and never a second gate** — a shortlisted corp holding nothing but
+extraction on thin ground can still be drawn, only less often. Two weights, both read off facts the
+passes above have already produced:
+
+- **Processing over extraction.** A corp whose holdings include a processor weights up. This is the
+  **depth** lever, and it is the whole reason the draw is weighted rather than flat: the selection
+  screen this mechanism replaces existed because a pure draw handed the player a pure-extraction
+  corp on 13 of 24 seeds, and a viability floor alone would never have rejected one — a shallow
+  corp is usually perfectly profitable. Viability answers *can this corp survive*; the weighting
+  answers *is there a game in it*.
+- **Population centres.** A corp whose holdings sit on or near populated ground weights up, because
+  labour, demand and market access are all there. This reads the settlement pass's own output, so
+  it is one more consumer of an existing signal rather than new machinery.
+
+*Depth, not wealth* still binds (below): weighting **toward** a processor is not a claim that a
+processor-bearing corp is richer. It is not — it earns less per tick than the extraction site it
+replaces. The bias buys a deeper opening, and pays for it.
+
+**"Mostly random for now" is the operative phrase.** The weights are a first cut, and what matters
+more than their values is that the sweep **reports the resulting distribution** rather than
+asserting it against a target. A bias is not a guarantee, and the honest measure of this design is
+what share of seeds actually seat a processor-bearing corp near population once the weights are
+live.
+
 **An unmet floor stands.** If no specialist clears, the highest trailing-net specialist is seated
 and the world records that the floor went unmet. That is a viability signal to be read, not a
 failure to be hidden — the same position § Pass 2's diversity floor takes.
@@ -324,13 +350,13 @@ failure to be hidden — the same position § Pass 2's diversity floor takes.
 analytical profile and re-roll verbs that were outside the screen's scope remain outside this
 mechanism's too, and their natural home is still the New World wizard.
 
-**What this does NOT solve, and the screen did.** The selection stage was built on a *measured*
-problem: over 24 seeds the generator handed the player a pure-extraction corp on 13 of them, so
-the chain-depth ladder had no rung to stand on. **A profitability floor does not address that** —
-a shallow pure-extraction corp can be perfectly profitable and will clear the floor every time.
-Whether the shortlist should carry a second, depth criterion alongside viability is open and is
-recorded in the review queue; until it is answered, the shallow-opening distribution
-`player_seed_sweep` measured is unchanged by this design.
+**What the floor alone does not solve — and where it is solved instead.** The selection stage was
+built on a *measured* problem: over 24 seeds the generator handed the player a pure-extraction corp
+on 13 of them, so the chain-depth ladder had no rung to stand on. A viability floor does not touch
+that, because a shallow pure-extraction corp is usually perfectly profitable and clears the floor
+every time. It is the **weighted draw above**, not the floor, that carries the depth concern — and
+because the weighting is a bias rather than a gate, the shallow opening remains *possible*, just no
+longer the default. `player_seed_sweep` is the instrument that says by how much.
 
 *Depth, not wealth.* A processor-bearing corp is the **deeper** start, not the richer one: a
 processing facility earns **less** per tick than the extraction site it replaces (BL-436,

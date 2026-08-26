@@ -75,8 +75,27 @@ branch point is `is_player_owned(world, building)` (with `owner_corp_of` behind 
   *infers* rival state from market movement: a rising price in a good a rival is known to extract
   means their output is down, or demand is up elsewhere — not a fact read off a panel.
 
+- **Filed financials are public wherever a firm files** (Ben, 2026-08-26). A corporation's
+  **ownership class** decides whether it publishes a quarterly return at all; where it does, the
+  figures are exact and unbanded. This is a **disclosure regime, not a hole in the fog** — what is
+  published is published in full, and what is not published is absent entirely rather than blurred.
+  `docs/economy/FINANCE.md` § Disclosure owns it.
+
 This rule is what makes decisions interesting rather than trivial: intelligence is *earned by
 reasoning over public signals*, not handed over.
+
+### The operational fog is unchanged
+
+**Ben, 2026-08-26: operational fog persists.** Retiring the banded standing read was a ruling about
+**published financial** information only, and it does not reach any of the rest of this section.
+Production rates, stockpile quantities, assigned recipes and workforce dials all stay private; a
+rival hover card still shows type and owner only; and the principle above still governs everything
+outside a filed return.
+
+The line is worth stating in one sentence, because it is the line every future surface has to find:
+**an open book tells you what a firm earned, never how it operates.** A return is an accounting
+statement — flows, balance, holding count, book value. It is not a production report, and no
+surface may reconstruct one from it.
 
 ### The spectator exemption — god view
 

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*62 entries — 48 open, 14 resolved.*
+*62 entries — 46 open, 16 resolved.*
 
 ---
 
@@ -438,26 +438,12 @@ Two of the same form's rulings pull opposite ways read literally: disclosure is 
 
 *Files: `docs/economy/FINANCE.md`, `docs/politics/RELATIONS.md`*
 
-### NR-647 — Does the OPERATIONAL fog go too, or only the financial banding?
-*question · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
-
-'We don't need company information to be invisible' was said while retiring BL-262 (the banded standing read). BL-068's competitor-visibility rule in DISCOVERY.md is a separate and wider thing: a rival hover card shows type and owner only, no production rates, no stockpiles, and the doc's stated principle is that intelligence is earned by reasoning over public signals. Narrow reading: only the financial banding goes, operational internals stay private. Wide reading: the whole competitor fog goes. The narrow reading is the one this session wrote to, because the disclosure gate would be pointless under the wide one. DISCOVERY.md has NOT been edited pending the answer.
-
-*Files: `docs/ui/DISCOVERY.md`*
-
 ### NR-648 — The buyout price is a SINK, and that is why the floor is zero
 *decision taken on your behalf · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
 
 A whole-firm price needs a floor, and there is no salvage in the prototype - construction.hpp refunds nothing on demolition and calls salvage a separate design question - so flooring at book value would invent a redemption nobody can take. Taken on Ben's behalf: the acquisition price is a SINK, the same treatment construction already gives a build cost (FINANCE.md calls a levy a transfer specifically BECAUSE an ordinary spend is not), and the floor is therefore zero because a sink cannot run backwards. A public firm's sellers are a diffuse shareholder base, not a modelled actor, so there is nobody a negative price could be paid by. The alternative worth considering: the price is a TRANSFER to the target's home nation treasury, which would give nations a stake in corporate churn.
 
 *Files: `docs/economy/FINANCE.md`*
-
-### NR-649 — The spawn shortlist does NOT solve the shallow-opening problem the corp-choice screen was built for
-*observation · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
-
-BL-435's selection screen existed on a MEASURED finding: over 24 seeds the generator handed the player a pure-extraction corp on 13 of them, so the chain-depth ladder had no rung to stand on, and player_seed_sweep records it. Solvency was explicitly NOT the discriminator - all 24 seeds ended positive. The replacement (BL-630, spawn shortlist) gates on VIABILITY, and a shallow pure-extraction corp is usually perfectly viable, so it will clear the floor every time. Retiring the screen therefore restores the exact distribution the screen was built to fix, unless the shortlist takes a second, DEPTH criterion alongside the viability one. Not filed as a blocker because BL-630 is buildable either way; the criterion is Ben's call.
-
-*Files: `docs/generation/CORPORATION_GENERATION.md`, `tools/verify/player_seed_sweep.cpp`*
 
 ### NR-650 — The purged syndicate arc was still asserted by five authority docs three days after the purge
 *observation · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
@@ -603,6 +589,24 @@ scripts/verify/golden/tech_tree_{tabs,era1,antiquity}.png are 1720x1080 against 
 > **RESOLVED.** Ben, 2026-08-25: delete the three stale goldens - done same session; re-admitting the surface stays a deliberate copy-in per the NR-237 curated-set policy.
 
 *Files: `scripts/verify/golden/tech_tree_tabs.png`, `scripts/verify/golden/tech_tree_era1.png`, `scripts/verify/golden/tech_tree_antiquity.png`*
+
+### NR-647 — Does the OPERATIONAL fog go too, or only the financial banding?
+*question · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
+
+'We don't need company information to be invisible' was said while retiring BL-262 (the banded standing read). BL-068's competitor-visibility rule in DISCOVERY.md is a separate and wider thing: a rival hover card shows type and owner only, no production rates, no stockpiles, and the doc's stated principle is that intelligence is earned by reasoning over public signals. Narrow reading: only the financial banding goes, operational internals stay private. Wide reading: the whole competitor fog goes. The narrow reading is the one this session wrote to, because the disclosure gate would be pointless under the wide one. DISCOVERY.md has NOT been edited pending the answer.
+
+> **RESOLVED.** Ben, 2026-08-26: 'Operational fog should persist.' The NARROW reading is confirmed - only the financial banding goes. DISCOVERY.md now carries both halves: filed financials are public wherever a firm files, and a new subsection states that production rates, stockpiles, recipes and workforce dials are untouched. The line written into the doc: an open book tells you what a firm earned, never how it operates.
+
+*Files: `docs/ui/DISCOVERY.md`*
+
+### NR-649 — The spawn shortlist does NOT solve the shallow-opening problem the corp-choice screen was built for
+*observation · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
+
+BL-435's selection screen existed on a MEASURED finding: over 24 seeds the generator handed the player a pure-extraction corp on 13 of them, so the chain-depth ladder had no rung to stand on, and player_seed_sweep records it. Solvency was explicitly NOT the discriminator - all 24 seeds ended positive. The replacement (BL-630, spawn shortlist) gates on VIABILITY, and a shallow pure-extraction corp is usually perfectly viable, so it will clear the floor every time. Retiring the screen therefore restores the exact distribution the screen was built to fix, unless the shortlist takes a second, DEPTH criterion alongside the viability one. Not filed as a blocker because BL-630 is buildable either way; the criterion is Ben's call.
+
+> **RESOLVED.** Ben, 2026-08-26: 'The shortlist can be mostly random for now, targeted towards population centres and processing, rather than extraction.' So the depth concern IS addressed, but as a WEIGHTED DRAW rather than a second gate - a shallow corp stays drawable, just less often. Written into CORPORATION_GENERATION.md and into BL-630; player_seed_sweep reports the resulting distribution rather than asserting a target.
+
+*Files: `docs/generation/CORPORATION_GENERATION.md`, `tools/verify/player_seed_sweep.cpp`*
 
 ### NR-653 — Sprint 20 is not open, and its inherited debts are unchanged by this design
 *observation · raised 2026-08-26 · from Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.*
