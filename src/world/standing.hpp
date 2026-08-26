@@ -53,8 +53,10 @@ struct corp_standing
     float capital_balance = 0.0f; ///< corporation_component.balance. Readable only where `capital_disclosed`.
     float market_share    = 0.0f; ///< This corp's clearing income / total clearing income this tick, in [0,1]; 0 if total is 0. PUBLIC for every corp.
 
-    /// Whether `capital_balance` may be shown. `corp_files_return(ownership_class)` — the firm's
-    /// own filing status, not a fact about the reader. False => the UI prints a dash.
+    /// Whether `capital_balance` may be shown: `corp_files_return(ownership_class)`, the firm's
+    /// own filing status — OR the observer's own corporation, which always reads its own books
+    /// whatever its class (NR-662; disclosure is a rule about reading ANOTHER firm).
+    /// False => the UI prints a dash.
     bool capital_disclosed = false;
 };
 

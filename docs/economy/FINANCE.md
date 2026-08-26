@@ -52,10 +52,16 @@ in two different places on purpose:
 Rates are authored in `scripts/economy.lua` under `economy.military.unit_upkeep`
 (`unit_upkeep_params`, declared with the roster in `world/unit_roster.hpp`, since the
 cost is per-type data). **Ordnance** is the good; `food_rations` is the sanctioned second
-line. Every rate — `credits_per_head`, `credits_per_head_per_power`, and both
-`goods_per_head` entries — is authored at **`0.0`**: the shape is complete, and turning
-upkeep on is editing a number rather than adding a line. A zero entry is skipped by the
-pass exactly as an absent one is.
+line. A zero entry is skipped by the pass exactly as an absent one is.
+
+**The rates carry a units hazard, and it has bitten once.** They are authored **per head**,
+while a unit is raised as a batch (`hire_batch_manpower`) and priced **per unit**. Deriving a
+per-head rate against a per-unit hire price therefore inflates the standing cost by the batch
+size — which is how a levy spear came to cost 40 credits to raise and 1,200 a year to keep,
+and how upkeep came to be **90 % of a spawning corporation's operating outgoings**. The
+property the derivation must hold, in consistent units: a few years of upkeep on a full batch
+stays under the batch's own hire price. Scale both halves of the vector by one factor when
+retuning, so the equipment-to-wage ratio the roster is anchored on survives.
 
 **The shortfall rule is ONE rule with TWO triggers.** A pool can be empty, and when the
 goods do not arrive the unit *weakens* rather than vanishing. The unit's

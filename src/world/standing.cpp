@@ -56,9 +56,15 @@ std::vector<corp_standing> compute_corp_standings(
         cs.reach_bodies = static_cast<int>(bodies.size());
 
         // Capital is a FILED figure: exact where the firm files, absent where it does not.
-        // The gate is the firm's own ownership class, never a fact about the reader.
+        // The gate is the firm's own ownership class -- with ONE exemption, and it is not an
+        // exception to the rule so much as the rule's own scope (NR-662): disclosure governs
+        // what one firm may learn about ANOTHER. A corporation always reads its own books,
+        // whatever its class. Without this, a default antiquity world -- where every corp is
+        // `closed` -- leaves the player unable to read their own balance, and a firm that
+        // cannot read its own balance sheet cannot be run. A closed firm reading its own books
+        // while publishing none is exactly what `closed` means.
         cs.capital_balance   = cc.balance;
-        cs.capital_disclosed = corp_files_return(cc.ownership_class);
+        cs.capital_disclosed = cs.is_player || corp_files_return(cc.ownership_class);
 
         // Market share: derived from the market aggregates, which are the deliberate public
         // signal — public for every corp for the same reason reach is.
