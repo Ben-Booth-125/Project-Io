@@ -201,7 +201,18 @@ inline constexpr uint32_t world_save_magic =
 /// bump. Nothing in `tools/verify` asserts this value as a literal, by design:
 /// the checks name it symbolically, which is the only reason the stack above
 /// could be resolved at the merge without either slice's assertions breaking.
-inline constexpr uint32_t world_save_version = 17;
+///
+/// Bumped to 18 by BL-641 (building upkeep in goods): the building record
+/// (`w_building` / `r_building`) gains
+/// `building_component::supply_factor_permille` — one int in declaration order,
+/// between `wage_bid` and `recipe_switch_cooldown`. That is a MID-RECORD gap, so
+/// a v17 stream's building records misread `recipe_switch_cooldown` and every
+/// field after them; refused whole on the same strict-equality contract as every
+/// prior bump. The reader additionally refuses a value outside [0, 1000] — the
+/// pass that writes it clamps to exactly that range, so the writer cannot have
+/// produced one. Claimed through `tools/session/next_save_version.js --claim`
+/// (docs/development/save_version_reservations.jsonl).
+inline constexpr uint32_t world_save_version = 18;
 
 /// Write @p w as a complete world snapshot.
 ///

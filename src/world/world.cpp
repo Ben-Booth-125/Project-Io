@@ -76,6 +76,29 @@ uint64_t world::state_hash(int tick) const
             fnv1a_i32(h, b.decommissioned ? 1 : 0);
             fnv1a_i32(h, b.ticks_remaining);
             fnv1a_f32(h, b.construction_progress);
+            // BL-641's supply factor is real state the building-upkeep pass
+            // writes, so a divergence in it is a real divergence and it has to
+            // be folded. It is folded SPARSELY — only when the building is not
+            // fully supplied — and that is a deliberate, complete choice rather
+            // than a partial one:
+            //
+            //   * COMPLETE as a detector. Two worlds that differ in any
+            //     building's factor differ here: at least one side is
+            //     non-neutral, and the non-neutral side folds (id, value) while
+            //     the other folds nothing. Neutral state contributes nothing,
+            //     exactly as a pool that was never created contributes nothing
+            //     to the `corp_body_pools` walk below.
+            //   * WHY IT MATTERS. At the shipped rates every building is
+            //     neutral, so a world in which this mechanism has never fired
+            //     hashes exactly as it did before the field existed. That is
+            //     BL-641's R4 — the shape lands inert and turning the sink on is
+            //     a data change — and it is what lets the pinned world-hash
+            //     goldens (spectator_determinism) stand unmoved.
+            if (b.supply_factor_permille != 1000)
+            {
+                fnv1a_u32(h, id);
+                fnv1a_i32(h, b.supply_factor_permille);
+            }
         }
     }
 

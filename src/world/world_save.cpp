@@ -141,6 +141,7 @@ void w_building(std::ostream& o, const building_component& b)
     w_int(o, b.loss_streak);
     w_int(o, b.ai_cooldown);
     w_f32(o, b.wage_bid); // BL-614: world_save_version 14 (v12 pre-renumber)
+    w_int(o, b.supply_factor_permille); // BL-641: world_save_version 18
     w_int(o, b.recipe_switch_cooldown);
 }
 
@@ -153,13 +154,21 @@ bool r_building(std::istream& i, building_component& b)
         && r_int(i, b.active_recipe_index) && r_int(i, b.ticks_remaining)
         && r_f32(i, b.construction_progress) && r_int(i, b.loss_streak)
         && r_int(i, b.ai_cooldown) && r_f32(i, b.wage_bid)
+        && r_int(i, b.supply_factor_permille)
         && r_int(i, b.recipe_switch_cooldown)))
         return false;
     // BL-614: `wage_bid` is non-negative by contract (a bid raises, never
     // undercuts, in this cut). The writer cannot have produced a NaN or a
     // negative, so a stream carrying one is corrupt — refuse whole, never
     // clamp (the r_nation qualification precedent one record up).
-    return std::isfinite(b.wage_bid) && b.wage_bid >= 0.0f;
+    //
+    // BL-641: `supply_factor_permille` is a per-mille of a 0..1000 factor, and
+    // the pass that writes it clamps into exactly that range at both ends — so a
+    // stream carrying anything outside it is corrupt on the same reasoning.
+    // Refused whole, never clamped: a clamp here would silently repair a
+    // divergence the save exists to reveal.
+    return std::isfinite(b.wage_bid) && b.wage_bid >= 0.0f
+        && b.supply_factor_permille >= 0 && b.supply_factor_permille <= 1000;
 }
 
 void w_stockpile(std::ostream& o, const stockpile_component& s) { w_f32_array(o, s.quantities); }

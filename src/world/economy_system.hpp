@@ -420,6 +420,69 @@ struct unit_upkeep_tick
 unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg);
 
 // ---------------------------------------------------------------------------
+// BL-641 — the building pass
+// ---------------------------------------------------------------------------
+
+/// What one run of the building-upkeep pass did. Pure observability, the
+/// `unit_upkeep_tick` shape — nothing reads it to make a decision, so recording
+/// it cannot perturb determinism.
+struct building_upkeep_tick
+{
+    int buildings = 0; ///< Completed, non-decommissioned buildings the pass drew for.
+    int drawing   = 0; ///< Of those, the ones whose type/band authored a non-zero basket.
+    int unmet     = 0; ///< Buildings whose goods draw could not be met from the pool.
+    int weakened  = 0; ///< Buildings whose supply factor fell this tick.
+    int recovered = 0; ///< Buildings whose supply factor rose this tick.
+};
+
+/// BL-641's building pass — the GOODS half of a building's upkeep, and the same
+/// decay rule the unit pass applies to the other kind of asset. Runs inside
+/// run_economy_step beside `run_unit_upkeep`; exported so a harness can drive it
+/// directly. Design: FINANCE.md § Upkeep is credits AND goods — for buildings
+/// too; the demand channel it fills is MARKETS.md § Demand channels (Industry).
+///
+/// A unit pays credits AND a goods vector; a building paid credits only. That
+/// asymmetry was an omission, and it is the largest single reason the goods
+/// roster has more producers than consumers — nothing consumed on a scale that
+/// GROWS with the world. This makes every firm a consumer, so the sink scales
+/// with how much industry exists rather than with an authored weight.
+///
+/// Per building, in ASCENDING BUILDING ID:
+///
+///  1. WHO DRAWS. A building draws only once it is COMPLETE
+///     (`ticks_remaining == 0`) and not decommissioned. Under construction it is
+///     already drawing materials through the construction channel, and charging
+///     it operating goods too would double-count the same building; torn down it
+///     is not operating at all. Its owner is the corp whose `assets` name it.
+///
+///  2. THE GOODS DRAW. `building_upkeep_goods` resolves the per-type basket for
+///     the registry's CAMPAIGN BAND — an ancient workshop runs on tools and
+///     planks, an industrial one on machinery and electronics — and each good is
+///     drawn from the owner's pool ON THE BUILDING'S OWN BODY. The pool can be
+///     empty, so the draw takes what is there and NEVER goes negative; a short
+///     draw marks the building unmet.
+///
+///     THE ORDER IS LOAD-BEARING, exactly as it is for units: two buildings of
+///     one corp on one body draw the same stock, so the visit order decides
+///     which one goes short. `w.buildings` is unordered, so ids are sorted.
+///
+///  3. THE SHORTFALL RULE IS THE SAME RULE. An unmet draw subtracts
+///     `supply_decay_permille` from the building's `supply_factor_permille`; a
+///     met draw adds `supply_recovery_permille` back, ceilinged at 1000. It
+///     NEVER destroys, idles or decommissions the building — a factory short of
+///     its tools runs badly, it does not vanish. What "runs badly" means is
+///     `building_supply_scalar` folded into nominal output (components.hpp).
+///     Deterministic scalar arithmetic, no RNG.
+///
+/// The CREDIT half is deliberately not here — it stays in `maintenance` and
+/// `wages`, which is where the money loop already carries it (budget_system).
+///
+/// Inert at the shipped-zero rates: every `building_upkeep_params` rate defaults
+/// to zero, which means no basket resolves non-zero, no pool is touched (not
+/// even created), no draw can go unmet, and no supply factor ever moves.
+building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg);
+
+// ---------------------------------------------------------------------------
 // BL-470 — the unit march pass
 // ---------------------------------------------------------------------------
 

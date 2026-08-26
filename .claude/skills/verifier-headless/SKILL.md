@@ -67,6 +67,27 @@ in `tools/verify/README.md`.
   assertion of correctness*: it states in credits how far this verb undervalues a
   contract-earning firm, because a filed return cannot see post-`apply_budget` income
   (NR-655). Build via `build_harness.bat`.
+- **`building_upkeep`** — BL-641's building pass: a building's upkeep is credits AND
+  a goods vector, as a unit's already is (`docs/economy/FINANCE.md` § Upkeep is
+  credits AND goods — for buildings too; the Industry channel of `MARKETS.md`
+  § Demand channels). Asserts **relations, not magnitudes** — the authored rates are
+  a first cut and are deliberately not pinned here. R1: the draw is per building
+  type, taken from the owner's pool **on the building's own body**, in **ascending
+  building id** — asserted by starving two buildings of one corp on one body of all
+  but one draw's worth and checking the LOWER id is the one supplied, which is what
+  makes the order load-bearing rather than cosmetic. R2: the shortfall rule is the
+  SAME rule an out-of-supply unit takes — an unmet draw subtracts
+  `supply_decay_permille` and, after 41 unmet ticks, the building still **exists**,
+  is **not decommissioned**, is **not idled** and is still on its owner's books; a
+  met draw recovers, ceilinged at 1000. R3: rates are per type and **era-banded** (an
+  `any` basket applies in both arcs, a banded one only in its own), and a **zero
+  entry is skipped exactly as an absent one** — down to creating no pool that did not
+  already exist, which is the property the inertness rests on. R6: two independently
+  built worlds run 12 contended ticks to identical supply factors and pools. Build
+  via `build_harness.bat`. The two rows it deliberately does NOT carry: bit-identity
+  at zero rates is a **byte-compare** of `econ_harness` / `econ_bankruptcy` /
+  `econ_stability` across the change, and the Industry channel reading PRESENT is
+  `demand_census`, which needs the real Lua.
 - **`econ_stability`** — runs the economy loop (production → market clearing →
   budget) over 100 ticks on a small fixed world and asserts multi-tick stability:
   prices stay in the `[0.25×, 4×]` band, no NaN/Inf, deposit reserves decrease

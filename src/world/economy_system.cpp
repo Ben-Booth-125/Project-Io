@@ -102,10 +102,15 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
     // Apply the player's workforce target (0–200 % of nominal capacity).
     const float wt_scalar = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
     const building_economics& e = reg.economics(building_type::extraction_site);
+    // BL-641: an under-supplied site runs badly. `building_supply_scalar`
+    // returns exactly 1.0f for a fully-supplied building — the only state
+    // reachable while the authored upkeep rates are zero — so the arithmetic
+    // here is bit-for-bit what it was before the field existed.
     const float nominal = e.base_rate
          * richness_rate_scalar(e, tc.resource_deposit[ri])
          * (b.workforce_assigned * contention)
          * wt_scalar
+         * building_supply_scalar(b)
          * (1.0f - tc.hazard_level);
     // BL-479: fold the owning corp's earned extraction_rate modifiers into the
     // single definition of the draw. `null_entity` (or a corp with none) hands
@@ -296,8 +301,12 @@ building_report run_processing(world& w, const recipe_registry& reg,
     const recipe* rcp = reg.get_recipe(b.recipe);
     // Apply the player's workforce target (0–200 % of nominal capacity).
     const float wt_scalar    = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
+    // BL-641: an under-supplied facility runs badly — the same scalar the
+    // extraction path folds in, from the same helper. Exactly 1.0f while the
+    // building is fully supplied, so a zero-rate world is bit-identical.
     const float batches_full =
-        reg.economics(building_type::processing_facility).base_rate * effective_workforce * wt_scalar;
+        reg.economics(building_type::processing_facility).base_rate * effective_workforce * wt_scalar
+        * building_supply_scalar(b);
 
     if (body == null_entity || rcp == nullptr || batches_full <= 0.0f)
     {
@@ -1939,6 +1948,15 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // same tick rather than leaving them live for one. See run_unit_upkeep.
     run_unit_upkeep(w, reg);
 
+    // BL-641: the building pass — the goods half of a building's upkeep and the
+    // same decay rule, on the other kind of asset. Beside the unit pass rather
+    // than earlier, for the same reason it is last: the strategic tier above
+    // demolishes at tick rate, so a building torn down THIS tick is already gone
+    // from `w.buildings` and never draws. Running after production also means a
+    // building may consume what it just made, which is the honest ordering — a
+    // workshop's tools come out of stock, not out of next quarter's.
+    run_building_upkeep(w, reg);
+
     return report;
 }
 
@@ -2289,6 +2307,117 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg)
         w.units.erase(id);
         ++out.disbanded;
     }
+    return out;
+}
+
+// ---------------------------------------------------------------------------
+// BL-641 — the building pass
+// ---------------------------------------------------------------------------
+
+building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg)
+{
+    building_upkeep_tick out;
+    if (w.buildings.empty())
+        return out;
+
+    const building_upkeep_params& up = reg.building_upkeep();
+    const era_band band = reg.era();
+
+    // Resolve each type's basket ONCE, not per building — the basket is per
+    // (type, band) and nothing in the loop can change either. `any_goods` is the
+    // zero-skip R3 requires: a zero entry costs exactly what an absent one does,
+    // which is what lets this land inert.
+    std::array<std::array<float, resource_count>, building_type_count> basket{};
+    std::array<bool, building_type_count> any_goods{};
+    for (std::size_t t = 0; t < building_type_count; ++t)
+    {
+        basket[t] = building_upkeep_goods(up, static_cast<building_type>(t), band);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (basket[t][r] > 0.0f)
+            {
+                any_goods[t] = true;
+                break;
+            }
+    }
+
+    // OWNERSHIP. `building_component` carries no owner — a corp's `assets` vector
+    // is the edge — so the reverse map is built here. `w.corporations` is
+    // unordered and this walk is order-INDEPENDENT (each building has exactly one
+    // owner, so the finished map is the same whatever order it was filled in);
+    // the DRAW below then walks the std::map, which is sorted by building id.
+    std::map<entity_id, entity_id> owner_of;
+    for (const auto& [corp, cc] : w.corporations)
+        for (const entity_id bid : cc.assets)
+            if (w.buildings.find(bid) != w.buildings.end())
+                owner_of[bid] = corp;
+
+    // Ascending building id. The pass writes a SHARED pool (two buildings of one
+    // corp on one body draw the same stock), so the visit order decides which one
+    // goes short — load-bearing, not cosmetic, exactly as run_unit_upkeep's is.
+    // io-standing-rules § Determinism.
+    for (const auto& [bid, corp] : owner_of)
+    {
+        building_component& b = w.buildings.at(bid);
+
+        // Under construction: already drawing through the CONSTRUCTION channel
+        // (run_construction's per-tick material bid), so charging operating goods
+        // as well would count the same building in two channels. Decommissioned:
+        // not operating, so nothing to supply — it still pays its material
+        // maintenance floor in CREDITS, which is the other half of the cost and
+        // is not this pass's business. Neither state moves the supply factor: a
+        // building that is not drawing cannot go short, and must not silently
+        // heal either.
+        if (b.ticks_remaining > 0 || b.decommissioned)
+            continue;
+
+        ++out.buildings;
+
+        const std::size_t ti = static_cast<std::size_t>(b.type);
+        if (ti >= building_type_count || !any_goods[ti])
+            continue; // nothing authored for this type in this band — inert
+
+        ++out.drawing;
+
+        const entity_id body = building_body(w, b);
+        if (body == null_entity)
+            continue; // detached tile; nothing to draw against
+
+        // pool_for INSERTS on first access, so it is reached only when there is
+        // something to draw — an all-zero table never creates a pool, which is
+        // what keeps a zero-rate world byte-identical down to its pool set.
+        stockpile_component& pool = w.pool_for(corp, body);
+        bool unmet = false;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float need = basket[ti][r];
+            if (need <= 0.0f)
+                continue;
+            const float have = std::max(0.0f, pool.quantities[r]);
+            const float take = std::min(need, have);
+            pool.quantities[r] = have - take; // never negative, by construction
+            if (take < need)
+                unmet = true;
+        }
+
+        // THE SHORTFALL RULE IS THE SAME RULE. An unmet draw takes the same
+        // subtraction an out-of-supply unit takes; it never destroys, idles or
+        // decommissions the building. A met draw recovers, ceilinged at 1000.
+        const int before = b.supply_factor_permille;
+        if (unmet)
+        {
+            ++out.unmet;
+            b.supply_factor_permille =
+                std::max(0, b.supply_factor_permille - up.supply_decay_permille);
+        }
+        else
+        {
+            b.supply_factor_permille =
+                std::min(1000, b.supply_factor_permille + up.supply_recovery_permille);
+        }
+        if (b.supply_factor_permille < before)      ++out.weakened;
+        else if (b.supply_factor_permille > before) ++out.recovered;
+    }
+
     return out;
 }
 

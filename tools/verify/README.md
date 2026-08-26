@@ -119,6 +119,19 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\econ_stability.cpp ^
    /Fo:build_gen\verify\econ_stability\ /Fe:build_gen\verify\econ_stability.exe
 .\build_gen\verify\econ_stability.exe
 
+:: Building upkeep in goods (BL-641) — the Industry demand channel. A building's
+:: upkeep is credits AND a goods vector, as a unit's already is: a per-type,
+:: era-banded basket drawn from the owner's pool on the building's own body in
+:: ascending building id, with an unmet draw WEAKENING the building by the same
+:: subtraction an out-of-supply unit takes and never destroying it. Relations,
+:: not magnitudes — the authored rates are not pinned here. Prefer
+::   cmd //c tools\verify\build_harness.bat building_upkeep
+cl /nologo /std:c++20 /EHsc /I src tools\verify\building_upkeep.cpp ^
+   src\world\world.cpp src\world\economy_system.cpp ^
+   src\world\market_clearing.cpp src\world\budget_system.cpp ^
+   /Fo:build_gen\verify\building_upkeep\ /Fe:build_gen\verify\building_upkeep.exe
+.\build_gen\verify\building_upkeep.exe
+
 :: Resource-chain roster (BL-340) — every one of the seven new goods (silicon,
 :: refined_copper, ree_alloy, machinery, alloys, electronics,
 :: spacecraft_components) is produced (a building's output_quantity > 0 at

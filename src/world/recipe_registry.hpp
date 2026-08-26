@@ -33,6 +33,12 @@ enum class era_band : uint8_t
     industrial = 2, ///< The 1960 arc, including everything space-facing.
 };
 
+/// One past the last band — the size of any per-band table. Derived from the
+/// enum's tail, the same way `resource_count` and `building_type_count` derive
+/// from theirs: appending a band means moving this with it.
+inline constexpr std::size_t era_band_count =
+    static_cast<std::size_t>(era_band::industrial) + 1;
+
 /// The band a campaign's epoch year belongs to. Uses the SAME 1700 threshold the
 /// antiquity branch already documents on world_params::epoch_year, so the split
 /// between the two arcs is one number in the codebase rather than two.
@@ -194,6 +200,98 @@ inline float richness_rate_scalar(const building_economics& e, float richness)
     return (s < e.richness_min) ? e.richness_min
          : (s > e.richness_max) ? e.richness_max
                                 : s;
+}
+
+// ---------------------------------------------------------------------------
+// BL-641 — building upkeep in goods
+// ---------------------------------------------------------------------------
+//
+// A unit pays upkeep in credits AND a goods vector (`unit_upkeep_params`); a
+// building paid credits only. That asymmetry was an omission, not a design, and
+// it is the largest single reason the goods roster has more producers than
+// consumers — nothing in the world consumed on a scale that GROWS with the
+// world. Closing it makes every firm a consumer, so demand scales with how much
+// industry exists rather than with a weight somebody has to maintain
+// (docs/economy/MARKETS.md § Demand channels, the Industry channel; the design
+// is FINANCE.md § Upkeep is credits AND goods — for buildings too).
+//
+// The shape is NOT new. It is § Standing-force upkeep's, applied to the other
+// kind of asset: a per-type goods vector drawn from the owner's pool on the
+// asset's own body, in a fixed order, with an unmet draw WEAKENING the asset by
+// the same subtraction rather than destroying it.
+//
+// WHY THE RATES LIVE HERE AND NOT IN `building_economics`. The credit half
+// (maintenance, base_wage) is per-type and nothing else; the goods half is per
+// type AND per era band, because an ancient workshop runs on tools and planks
+// while an industrial one runs on machinery and electronics. One table keyed by
+// both, plus the one decay curve that governs every type, reads as one feature
+// rather than as a field scattered across nine building entries.
+
+/// Per-tick building upkeep rates, authored in scripts/economy.lua under
+/// `economy.building_upkeep`. Reached through `recipe_registry::building_upkeep()`.
+///
+/// EVERY RATE DEFAULTS TO ZERO, and that is the BL-454 precedent restated: the
+/// shape lands INERT. With the goods table at zero no pool is touched (not even
+/// created), no draw can go unmet, and no building's supply factor ever moves —
+/// so the economy is bit-identical to the pre-BL-641 build and turning the sink
+/// on is a DATA change rather than a code change. A zero entry is skipped
+/// exactly as an absent one is.
+struct building_upkeep_params
+{
+    /// Goods drawn per COMPLETED, non-decommissioned building per tick, keyed
+    /// [building_type][era_band] and resource-indexed. Authored as ordinary
+    /// `{resource_name = qty}` tables so naming a good is a one-line economy.lua
+    /// change and never a code change.
+    ///
+    /// THE BAND RULE, and it is `era_permits` restated for a vector: a basket
+    /// authored under `any` applies in every campaign, a basket authored under a
+    /// band applies only in that band, and a building's draw is the SUM of the
+    /// baskets that apply. That lets a line common to both arcs be authored once
+    /// while a band-specific line stays band-specific. See `building_upkeep_goods`.
+    std::array<std::array<std::array<float, resource_count>, era_band_count>,
+               building_type_count> goods = {};
+
+    /// The ONE decay subtraction, per-mille of supply factor per tick, applied
+    /// when a building's draw goes unmet. Deliberately the same quantity and the
+    /// same rule as `unit_upkeep_params::supply_decay_permille` — a building has
+    /// only the ONE trigger (a unit's out-of-reach trigger has no building
+    /// counterpart; a building cannot march out of supply).
+    int supply_decay_permille = 0;
+
+    /// Regained per tick while the draw is met (or while there is nothing to
+    /// draw). Ceilinged at 1000 (fully supplied).
+    int supply_recovery_permille = 0;
+};
+
+/// Resolve @p bt's upkeep basket for a campaign running in band @p campaign,
+/// per the band rule on `building_upkeep_params::goods`. A building type outside
+/// the table resolves to an all-zero basket rather than failing — an unknown
+/// type is a data problem, not a reason to make a building free.
+///
+/// Free function, not a member, so every reader — the live pass, a harness, the
+/// census — composes the bands identically. `any` as the CAMPAIGN band (the
+/// unset default every hand-built harness registry carries) draws the `any`
+/// basket alone, never the union of both arcs: a registry that was never told
+/// which era it is in must not be handed an ancient workshop's tools AND an
+/// industrial one's electronics.
+inline std::array<float, resource_count>
+building_upkeep_goods(const building_upkeep_params& p, building_type bt, era_band campaign)
+{
+    std::array<float, resource_count> out{};
+    const std::size_t bi = static_cast<std::size_t>(bt);
+    if (bi >= building_type_count)
+        return out;
+    const auto& per_band = p.goods[bi];
+    const auto& base     = per_band[static_cast<std::size_t>(era_band::any)];
+    for (std::size_t r = 0; r < resource_count; ++r)
+        out[r] = base[r];
+    if (campaign != era_band::any)
+    {
+        const auto& banded = per_band[static_cast<std::size_t>(campaign)];
+        for (std::size_t r = 0; r < resource_count; ++r)
+            out[r] += banded[r];
+    }
+    return out;
 }
 
 /// BL-365 population-growth-gate tunables, authored in scripts/economy.lua under
@@ -753,6 +851,11 @@ public:
     /// BL-332 capability-point accumulation rates (economy.military in Lua).
     const military_capability_params& military() const { return m_military; }
 
+    /// BL-641 building-upkeep rates (economy.building_upkeep in Lua): the
+    /// per-type, era-banded goods vector plus the one decay curve. Every rate
+    /// defaults to zero, so a hand-built harness registry draws nothing.
+    const building_upkeep_params& building_upkeep() const { return m_building_upkeep; }
+
     /// BL-350 procurement/contract tunables (economy.procurement in Lua).
     const procurement_params& procurement() const { return m_procurement; }
 
@@ -954,6 +1057,7 @@ public:
     void set_market_emergence(const market_emergence_params& m) { m_market_emergence = m; }
     void set_construction(const construction_params& c) { m_construction = c; }
     void set_military(const military_capability_params& m) { m_military = m; }
+    void set_building_upkeep(const building_upkeep_params& b) { m_building_upkeep = b; }
     /// BL-546: seeds the two `contract_*` Trust weights from @p p in the same
     /// call, so a harness that sets a procurement rate never gets a registry
     /// whose sentiment table disagrees with it.
@@ -1164,6 +1268,12 @@ private:
     /// BL-332 capability-point rates. Defaults match economy.lua so a
     /// hand-built harness registry behaves sensibly without Lua.
     military_capability_params m_military = {};
+
+    /// BL-641 building-upkeep rates. Every rate defaults to ZERO — the goods
+    /// sink is inert until `economy.building_upkeep` authors one, which is what
+    /// keeps every pre-BL-641 harness (all of which hand-build their registry)
+    /// bit-identical.
+    building_upkeep_params m_building_upkeep = {};
 
     /// BL-350 procurement tunables. Defaults match economy.lua.
     procurement_params m_procurement = {};
