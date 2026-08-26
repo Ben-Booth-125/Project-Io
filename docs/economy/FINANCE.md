@@ -68,7 +68,7 @@ below fires, the draw bids the missing quantity onto the market and pays for wha
 wanting a good becomes a price signal and somebody has a reason to supply it. It bids only below a
 **reservation ceiling**; above that it declines to buy and goes without, which is where the rule
 below takes over. One rule for every goods draw: this is the same shape building upkeep takes, not
-a second one. The market half is [](../economy/MARKETS.md) § Settled: a short pool BUYS.
+a second one. The market half is [MARKETS.md](MARKETS.md) § Settled: a short pool BUYS.
 
 **The shortfall rule is ONE rule with TWO triggers.** A pool can be empty, and when the
 goods do not arrive the unit *weakens* rather than vanishing. The unit's
