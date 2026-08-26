@@ -164,9 +164,20 @@ Two demand signals carry this. A centre's **own** market demand is one unit of `
 **Demand ladders with scale** (Ben, 2026-08-25). The basket's *composition*, not only its size,
 follows the stratum: higher strata consume up the value chain — a city pulls consumer goods, a
 metropolis electronics — so big centres are demand **endpoints** that give goods value from day
-one, and the markets worth reaching. What is deliberately **unquantified**: the cost of living —
-how much it costs a head to live, and which goods each stratum consumes in what proportion
-(§ Open items).
+one, and the markets worth reaching.
+
+**And it ladders by ERA as well as by stratum (BL-640).** The basket is masked by era band exactly
+as recipes are (BL-433's `era` field), and the omission was load-bearing: a basket authored in
+industrial goods left an ancient campaign wanting three things, because the other half of it names
+goods nothing in that band can produce. **An ancient household wants ceramics, cloth, leather and
+dressed stone; an industrial one wants consumer goods, medical supplies and electronics.** The two
+ladders compose — era decides *which* value chain, stratum decides *how far up it* — and together
+they are what makes the household channel the sink for terminal artisan goods, which is what those
+goods were authored to be. See [`MARKETS.md`](MARKETS.md) § Demand channels for the register this
+belongs to.
+
+What remains deliberately **unquantified**: the cost of living — how much it costs a head to live,
+and which goods each stratum consumes in what proportion (§ Open items).
 
 ---
 

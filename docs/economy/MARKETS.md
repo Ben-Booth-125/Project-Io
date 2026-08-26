@@ -167,6 +167,107 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
 Cash flows accrue per corp and are applied to balances by `apply_budget`
 (`src/world/budget_system.cpp`).
 
+## Demand channels — where a want comes from
+
+A price is resolved against demand, and demand is never ambient. **Every unit of it is injected by
+a named pass**, and this section is the register of those passes. It exists because the roster grew
+a supply side faster than a demand side and the gap was invisible from inside: a resource can
+satisfy the admission rule by naming a consumer nobody ever built.
+
+**The rule, and it is the whole section in one line: a consumer is a MECHANISM, not a noun.**
+"Sold to the market" is not a consumer. "Mercantile demand" is not a consumer. A good is wanted
+when some pass adds to a market's `demand` for it, or draws it from a pool — and where no pass
+does, the good is dead however plausible its name reads. Design: BL-648 (the admission rule names
+an injector).
+
+### The eight channels
+
+Each is owned by the doc that owns its actor; this table is the index, not the design.
+
+| Channel | Who wants it | Scales with | Owner |
+|---|---|---|---|
+| **Household** | population centres, by stratum | centre scale × era | [`POPULATION.md`](POPULATION.md) |
+| **Industry** | every building, as operating upkeep | building count | [`FINANCE.md`](FINANCE.md) |
+| **Construction** | anything being built; centres as they grow | build rate, population | [`PRODUCTION.md`](PRODUCTION.md) |
+| **Infrastructure** | roads, ports and hubs, kept standing | network size | [`LOGISTICS.md`](LOGISTICS.md) |
+| **State** | nations, through budget lines | treasury × weight | [`../politics/NATIONS.md`](../politics/NATIONS.md) |
+| **Research** | the tech ladder | research rate | [`RESEARCH.md`](RESEARCH.md) |
+| **Conflict** | battles, burning what they fire | war | [`../military/MILITARY.md`](../military/MILITARY.md) |
+| **Endemic trade** | a nation's acquired taste | wealth × character | [`RESOURCES.md`](RESOURCES.md) |
+
+### Three properties the set has to hold
+
+**1. Demand must SCALE with the economy, or it decays into a fixed basket.** Household, Industry,
+Construction and Infrastructure all grow as the world grows — more people, more buildings, more
+road. That is what stops the next roster widening re-opening this hole: a good consumed by
+*industry* is wanted in proportion to how much industry exists, without anyone re-authoring a
+weight. A channel whose size is a constant is a stopgap, and should be labelled one.
+
+**2. Demand is ERA-BANDED, exactly as recipes are.** This is the single largest cause of the
+original gap. Recipes carry an `era` field (BL-433) and are masked by band; the demand baskets did
+not, so they were authored in industrial goods and an ancient campaign inherited a basket naming
+things nothing in that band can make. **An ancient household wants ceramics, cloth, leather and
+dressed stone; an industrial one wants consumer goods, medical supplies and electronics.** Same
+mechanism, banded input — no new concept, and the ancient chain's terminal goods stop being dead
+ends the moment the basket knows which era it is in.
+
+**3. Every channel is a lever on what the player chases.** Demand is not bookkeeping; it is the
+design's statement about what the game is *about*. A good with no buyer is a good the player has no
+reason to build toward, and a good with a *state* buyer plays differently from one with a
+*household* buyer — the first is lumpy, political and worth lobbying for; the second is steady,
+broad and worth scaling into. Choosing which channel wants a good is choosing what kind of
+gameplay that good produces.
+
+### What each channel adds, and what it already has
+
+- **Household** (BL-640, era-banded household basket). The basket gains an era band and the
+  stratum ladder POPULATION.md § Population demand already calls for and leaves unquantified. It is
+  the sink for terminal artisan goods — the ancient roster's ceramics, cloth, leather, dressed
+  stone — which is what those goods were authored to be.
+- **Industry** (BL-641, building upkeep in goods). Today a building pays maintenance and wages in
+  **credits only**, while a unit pays credits **and a goods vector** (`run_unit_upkeep`). Giving
+  buildings the same shape turns every firm in the world into a consumer, and it is the single
+  largest structural sink available: tools and planks keep an ancient workshop running, machinery
+  and electronics an industrial one. The precedent, the shortfall rule and the pool-draw ordering
+  all already exist — this is the unit-upkeep vector applied to the other kind of asset.
+- **Construction** (BL-642, construction actually draws). Materials are authored per building
+  (`resource_costs`) and charged at the build press — but generation *places* buildings rather than
+  constructing them, so the draw never fires during the opening years, and stone and timber have a
+  construction sink on paper with no pull in practice. Two halves: make the opening years build,
+  and make **centres draw materials as they grow**, which is the half that does not decay after the
+  warm start. An ancient economy's largest material sink is building.
+- **Infrastructure** (BL-643, network upkeep draws materials). The `logistics_maintenance` budget
+  line already exists and names exactly this. A road network that consumes stone and timber to stay
+  standing is a permanent sink scaled by geography rather than by population — and it gives the
+  network a running cost that makes reach a decision rather than a ratchet.
+- **State** (BL-644, the space programme line). Nations already hold a weighted budget over nine
+  priority lines, and one of them — `strategic_reserve`, "buying goods to hold" — is a goods-buying
+  channel **already designed and not yet claimed on**. A tenth line, a *space programme*, buys
+  `spacecraft_components` and `propellant` for government satellite launches: the first buyer for
+  space goods that is not a militia contract, and thematically the gate into space. Lumpy,
+  political, worth lobbying for — see property 3.
+- **Research** (BL-645, research consumes goods). `academic_research` and `military_research` are
+  budget lines that spend credits; research that also consumes **goods** makes the tech ladder an
+  economic decision rather than a free accumulator, and gives the top of the chain a buyer. Folds
+  into the RESEARCH.md design session (BL-619) rather than pre-empting it.
+- **Conflict** (BL-646, battles burn ordnance). Ordnance is priced at the top of the ancient roster
+  and its only draw is a per-head upkeep rate small enough to be nil. A battle that consumes what
+  it fires makes war a demand shock — the sink that couples the game's two pillars, so that
+  *Conflict* moves *Trade*.
+- **Endemic trade** (BL-647, endemic luxury demand). Tobacco, spices, coffee and furs are on the
+  roster, extractable, priced, and wanted by nothing at all. The natural buyer is a household one
+  that scales with **wealth** rather than headcount, flavoured by national character — so different
+  nations crave different luxuries and the trade route is asymmetric by construction. This is the
+  most *Trade*-shaped channel of the eight: extract where it grows, sell where the money is.
+
+### Measuring it
+
+A demand model is only as good as the census that checks it, and the failure it must catch is a
+good that reads plausible and has no buyer. BL-649 (demand census) is the instrument: per resource,
+per era band, the total modelled demand and the passes that inject it — so a dead good is a row in
+a report rather than a discovery made three sprints later. It is also what makes a *tuning* pass
+possible at all, since the question "did that change help" needs a before.
+
 ## Background corporations
 
 **The market saturates because real firms produce and consume, not because a substrate pass

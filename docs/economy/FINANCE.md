@@ -136,6 +136,31 @@ BL-049 (wage/maintenance split).
 Maintenance and wage constants per building type load from the recipe registry
 (`scripts/economy.lua`).
 
+### Upkeep is credits AND goods — for buildings too
+
+A building's operating cost is **credits only**, while a unit standing beside it pays credits *and
+a goods vector*. That asymmetry is not a design; it is an omission, and it is the largest single
+reason the goods roster has more producers than consumers. Design: BL-641 (building upkeep in
+goods).
+
+The shape is already built and does not need inventing — it is § Standing-force upkeep's, applied
+to the other kind of asset:
+
+- The **credit** half stays where it is, in `maintenance` and `wages`.
+- The **goods** half is a pool draw against the owner's pool on the building's own body, in a fixed
+  order, exactly as `run_unit_upkeep` draws — because two buildings of one corp on one body draw the
+  same stock and the order decides which goes short.
+- **The shortfall rule is the same rule.** A draw that goes unmet weakens the building rather than
+  destroying it, by the same subtraction an out-of-supply unit takes. A factory short of its tools
+  runs badly; it does not vanish.
+
+What it changes economically is the point: **every firm in the world becomes a consumer**, so
+demand scales with how much industry exists rather than with an authored weight somebody has to
+maintain. An ancient workshop keeps running on tools and planks; an industrial one on machinery and
+electronics. Rates are per building type, authored in `scripts/economy.lua`, and — as with unit
+upkeep — a zero entry is skipped exactly as an absent one is, so the shape can land before the
+numbers are settled.
+
 ## Debt interest
 
 A negative balance compounds once per tick by `k_debt_interest_per_quarter` (0.02 —

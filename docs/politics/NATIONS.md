@@ -118,7 +118,16 @@ indexed by them):
 | `public_works` | works a corporation builds and the nation pays for |
 | `charters` | paying a corporation to exist somewhere it otherwise would not |
 
-The first five are Ben's (2026-08-22); the last four were proposed alongside them and accepted.
+| `space_programme` | government satellite launches — `spacecraft_components` and `propellant`, bought through the procurement seam. The first buyer for space goods that is not a militia contract, and the state's own stake in the gate into space (BL-644) |
+
+The first five are Ben's (2026-08-22); the next four were proposed alongside them and accepted;
+`space_programme` is Ben's, 2026-08-26.
+
+**Two of these lines are how a NATION becomes a demand channel** ([`MARKETS.md`](../economy/MARKETS.md)
+§ Demand channels). `strategic_reserve` already names goods-buying and no consumer claims on it yet;
+`space_programme` is the new one. State demand behaves unlike household demand and that is
+deliberate — it arrives in lumps, it follows a weight a rival can lobby to move, and it is therefore
+worth playing *politics* over rather than merely scaling into.
 The spend mechanics are generic over the enum, and a line no consumer claims on is simply skipped.
 Most lines take no subject — a flat weighted claim on the tick's spendable — but `line_takes_subject`
 (`nation_budget.hpp`) names the two that do: `public_exploration` and `contracted_force`, whose

@@ -24,6 +24,26 @@ produce **research points (RP)**, and RP purchases unlocks.
   replayable; a rival corp or nation reaching an unlock does so through the same verbs and the
   same arithmetic.
 
+## Research consumes goods, not only credits
+
+Settled 2026-08-26 (Ben): research is a **demand channel**
+([`MARKETS.md`](MARKETS.md) § Demand channels), not only a credit sink. RP accrual draws a basket of
+real goods alongside whatever it costs in credits, which does two things at once — it gives the top
+of the production chain a buyer, and it makes the tech ladder an *economic* decision rather than a
+free accumulator that only time gates.
+
+Two properties this must keep, and they are why it belongs here rather than in the budget:
+
+- **The basket is era-banded**, like every other demand basket — an ancient ladder consumes tools
+  and cloth where an industrial one consumes electronics and machinery.
+- **A shortfall slows research; it does not void it.** The same shape every other goods draw takes
+  (§ the shortfall rule in FINANCE.md): unmet input weakens the output rather than cancelling it, so
+  a research programme starved of inputs is *behind*, never broken.
+
+Design: BL-645 (research consumes goods). The rates, and whether the draw sits on the university or
+on the nation's budget lines, belong to this doc's own design session (BL-619) rather than being
+settled ahead of it.
+
 ## What is open
 
 - The RP economy: accrual rates, whether RP is per-corp, per-nation, or both, and whether it

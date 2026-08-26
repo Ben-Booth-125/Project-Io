@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*79 entries — 62 open, 17 resolved.*
+*80 entries — 63 open, 17 resolved.*
 
 ---
 
@@ -577,6 +577,13 @@ Worth recording as a pattern, not just a fixed bug. The price is max(0, book + k
 FINANCE.md's ownership-class rules are silent on the player's own corporation. Read literally, a public player corp could be bought and ERASED, leaving world::player_entity dangling. BL-628 refuses it - gated at the command seam rather than in corp_ai.cpp, because a scorer-side guard would not bind a wire caller, which is the right place for it either way. But the underlying question is Ben's and it is not small: every widening in the standing rules concerns what may be done TO a corp a human owns, and being bought out is the furthest possible version of that. If the answer is ever yes, player_entity needs a rule of its own (does the player follow the assets? get a game-over? re-seat?). Recorded in FINANCE.md as a live question rather than left as a default fallen into. Note the spectator precedent: under corp_ai_params::spectating the prohibition has no subject, so a buy-the-player gate arguably should not apply there either.
 
 *Files: `docs/economy/FINANCE.md`, `.claude/rules/io-standing-rules.md`, `src/world/corp_command.cpp`*
+
+### NR-671 — The ancient economy has TWO live demand sinks - mercantile demand is named as a consumer everywhere and implemented nowhere
+*question · raised 2026-08-26 · from Ben's question, 2026-08-26: 'how much profit do we really expect to make anyway - do we have a list mapping resources to consumers?' Built the map from scripts/recipes.lua, economy.lua and world_gen.lua.*
+
+There was no such list. The CONSTRAINT exists - PRODUCTION.md admission rule, chain_depth R1/R1b - but not the map. Built, and it explains BL-635s residual completely. FOUR consumer channels exist in code: recipe inputs; population_demand (food_rations .60, agricultural_produce .20, water .30, clean_water .35, consumer_goods .25, medical_supplies .15); background_demand (silicon, refined_copper, ree_alloy, machinery, alloys, electronics - ALL INDUSTRIAL, so entirely inert at 0 CE); unit upkeep (ordnance, now 0.0035/head after BL-635); and construction materials (refined_fuel, steel, stone, timber). IN THE ANCIENT BAND that leaves essentially TWO live sinks: population wants food_rations and agricultural_produce (+water); construction draws stone and timber. Everything else terminates dead. SEVEN goods are produced in-band with no sink at all: trade_goods_misc 8.00, ceramics 3.40, dressed_stone 2.90, tools 25.50, leather 7.20, rigging 14.50, plus ordnance 43.00 whose only draw is now negligible. FOUR more are extractable raws with no sink in any band: tobacco, spices, coffee, furs. THE MECHANISM GAP: chain_depths exemption table (k_actor_consumed) exempts ten of these from the orphan check by naming their consumer as MERCANTILE DEMAND. Grep says mercantile demand does not exist - market_clearing.cpp has exactly three injections (population, background, interbody) and none is it. So the guard passes because the exemption asserts a consumer that was never built. Honest in intent (BL-586 named these terminal, sold) but sold requires a buyer. CONSEQUENCE: the ancient value chain is stone->dressed_stone DEAD, timber->planks->tools DEAD, clay->ceramics DEAD, hides->leather DEAD, fibre->cloth->rigging DEAD, sand->glass->trade_goods_misc DEAD; only agri->food_rations->population and the charcoal->blooms->steel->construction line are live. Which is EXACTLY BL-635s measurement: iron_ore and agricultural_produce sites run 80/80, stone/timber/fibre idle 80/80. Spawn viability is therefore not a constant to tune - the demand side of the ancient economy was never authored. The supply side landed 2026-08-24 (BL-585/BL-586); its demand counterpart did not.
+
+*Files: `scripts/economy.lua`, `scripts/recipes.lua`, `src/world/market_clearing.cpp`, `tools/verify/chain_depth.cpp`, `docs/economy/PRODUCTION.md`*
 
 ---
 

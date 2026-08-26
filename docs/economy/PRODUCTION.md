@@ -6,6 +6,15 @@ See **`docs/economy/RESOURCES.md`** for the full resource list, tier definitions
 
 **The admission rule.** A `resource_type` value earns its place by being consumed by an authored recipe or contracted for by a named actor, and nothing else gets in. A raw with an authored deposit and no price is *minable but unsellable* — a processing building drawing on it stalls forever — so every deposit raw carries a base price, and every priced good has a producer and a consumer reachable in the same era band. `tools/verify/chain_depth.cpp` (rows R1 and R1b) holds the line.
 
+**A consumer is a mechanism, not a noun (BL-648).** The rule above has one loophole and it has
+already been walked through: `chain_depth`'s exemption table lets a good pass by *naming* a
+consumer — "sold to the market", "mercantile demand" — and a name is not a pass that injects
+demand. Ten goods were admitted on a mercantile demand that was never built, which is how the
+ancient roster came to terminate in artisan goods nobody buys. The rule is therefore sharpened:
+**an exemption must name a pass that actually adds to a market's demand or draws from a pool**, and
+the row fails when it cannot find one. The register of legitimate passes is
+[`MARKETS.md`](MARKETS.md) § Demand channels.
+
 ---
 
 ## Extraction

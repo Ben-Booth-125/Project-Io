@@ -45,7 +45,29 @@ and/or a version goal (v0.1.1 etc.).
 
 **Sprint-number ceiling advanced to 20 (Ben, 2026-08-26: 'Write this up as sprint 20').** The 2026-08-24 ceiling stands in spirit - author no sprint past the one Ben opens - with 20 now the horizon.
 
+**Sprint-number ceiling advanced to 21 (Ben, 2026-08-26: 'A, and open it as sprint 21').** The 2026-08-24 ceiling stands in spirit - author no sprint past the one Ben opens - with 21 now the horizon. Two sprints are open (20, 21), inside the three-sprint cap.
+
 ## Open now
+
+### Sprint 21 — The other half of the economy - demand
+*Open · opened 2026-08-26*
+
+**Goal.** Author the demand side. The roster grew a supply chain and never grew the demand for it, so the ancient economy terminates in artisan goods nobody buys and most spawns are structurally unprofitable - not mistuned, unbought. Eight demand channels (MARKETS.md § Demand channels), of which the load-bearing ones scale with the economy rather than with an authored weight. Then MEASURE, and expect to go round more than once: Ben, 2026-08-26 - 'we will get interesting data and do a few passes over viability'. The felt goal: a world where the goods a player is meant to chase are wanted by somebody, and it is legible WHO.
+
+**Planned.**
+- BL-648 (admission rule names an injector) - FIRST. The guard that stops this recurring. Expect it RED on ten goods the day it lands; the rest of the sprint turns it green
+- BL-649 (demand census) - FIRST, with it. The instrument: per resource, per band, who actually wants it. Run before and after every pass, deltas kept
+- BL-640 (era-banded household basket) - wave 1: the basket ladders by era as well as stratum; resurrects four of the seven ancient dead ends
+- BL-641 (building upkeep in goods) - wave 1: the largest structural sink. A unit already pays credits + goods; a building pays credits only
+- BL-642 (construction actually draws) - wave 1: the opening years build, and centres draw materials as they grow
+- BL-644 (space programme budget line) - wave 2: the tenth line, and space goods' first buyer that is not a militia contract
+- BL-647 (endemic luxury demand) - wave 2: tobacco, spices, coffee and furs, wanted by wealth and flavoured by national character
+- BL-643 (network upkeep draws) - wave 2: a sink scaled by geography rather than population
+- BL-646 (battles burn ordnance) - wave 2: the only channel that couples the two pillars - Conflict moves Trade
+- BL-645 (research consumes goods) - GATED on BL-619, which is a design session with Ben, not a build slice
+- VIABILITY PASSES - after each wave: census, measure spawn viability, retune, repeat. The passes are the sprint, not an epilogue
+
+Opened on Ben's instruction, 2026-08-26 ('A, and open it as sprint 21'), after the session's own measurement answered his question: the ancient band has TWO live demand sinks, and ten goods pass the orphan check by naming a 'mercantile demand' that grep says was never built (NR-671). Ceiling advanced to 21 on the same instruction. ORDERING IS LOAD-BEARING: BL-648 and BL-649 go FIRST, not last. The guard makes the gap visible and the census makes each pass measurable - without them a viability pass is a guess with a number attached. A red guard with a named list is worth more than a green one that means nothing; do not weaken it to pass while the channels are being built. SEVERAL CHANNELS ARE DESIGNED-BUT-INERT rather than missing, which is why the sprint is cheaper than it looks: `strategic_reserve` is already a goods-buying budget line no consumer claims on; `logistics_maintenance` already names network upkeep; recipes already carry the era field the demand baskets need; and `run_unit_upkeep` is already the credits-plus-goods shape BL-641 wants for buildings. RELATIONSHIP TO SPRINT 20: Sprint 20 stays open and owns the ledger, the buyout and the spawn shortlist. Its BL-634 (acquisition viability) CANNOT honestly pass until this sprint lands - a corp at -28/qtr never saves up for anything - so BL-634's measurement is the natural close-out for BOTH sprints. BL-630's shortlist gains a real mechanism to gate on once demand exists: BL-635 measured that a spawn's survival currently depends on whether the generator handed it a resource anyone wants.
 
 ### Sprint 20 — The books open, and the start earns its way
 *Open · opened 2026-08-26*
@@ -104,10 +126,11 @@ Sprint-number ceiling advanced to 20 on Ben's instruction, 2026-08-26 ('Write th
 | 18 | Logistic Points land with their consumers | Closed 2026-08-25 — all eight landed (BL-596..BL-603, BL-606..BL-608); Sprint 17b merged alongside; v0.1.18 uncut pending Ben |
 | 26 | Re-baseline (the gate; nothing else may open first) | Subsumed — split at execution into 26a/26b, themselves deleted in the 2026-08-24 purge |
 | 19 | The world reads lived-in - population foundations | Closed 2026-08-25 - thirteen of fourteen items landed (BL-610..BL-618, BL-620, BL-621, BL-623, BL-624); v0.1.19 recut after the NR-640 verdict wave |
+| 21 | The other half of the economy - demand | Opened 2026-08-26 - every good gets a buyer that is a mechanism, then viability is measured over repeated passes |
 | 20 | The books open, and the start earns its way | Opened 2026-08-26 - the profitability ledger designed, then the spawn proved viable end to end |
 
-**Next up.** Sprint 20 (opened 2026-08-26) is the active sprint - the profitability ledger and a viable spawn, BL-626..BL-637. Its definition of done is BL-634's measured loop: save up, buy a firm, stay profitable. Owed with it: two live clicks (BL-636) and the v0.1.18 tag, left uncut because a release is Ben's to call.
+**Next up.** TWO sprints open. Sprint 20 (the profitability ledger and a viable spawn) is mid-flight: wave 2 merged and sitting on a FIX FIRST review verdict; BL-630, BL-634, BL-627 and BL-629 unbuilt. Sprint 21 (demand) is opened but unstarted, and BL-648 + BL-649 are its entry point. Sprint 20's BL-634 is the honest close-out for both, since the acquisition loop cannot pass until demand exists.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*32 sprints archived cold; 1 open/gated in the hot store.*
+*32 sprints archived cold; 2 open/gated in the hot store.*
