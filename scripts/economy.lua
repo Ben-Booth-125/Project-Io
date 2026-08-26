@@ -856,15 +856,28 @@ economy = {
     -- world-scale pull, not per-centre (unlike population_demand below).
     -- Deliberately excludes spacecraft_components — the militia's procurement
     -- contracts are that good's only intended buyer (BL-340).
+    --
+    -- BL-640 (2026-08-26): BANDED, NOT DELETED. All six goods are industrial —
+    -- an ancient campaign could make none of them, and before this banding they
+    -- were 79.8% of every modelled want at 0 CE. The whole basket therefore moves
+    -- into an `industrial` row, so the pass injects nothing in the ancient band.
+    -- It stays because it is still the stand-in for the Industry channel until
+    -- BL-641 gives buildings a real upkeep goods vector; MARKETS.md property 1
+    -- says a channel whose size is a constant is a stopgap, and this one is
+    -- labelled one.
     background_demand = {
-        demand_basket = {
-            silicon         = 0.20,
-            refined_copper  = 0.20,
-            ree_alloy       = 0.15,
-            machinery       = 0.15,
-            alloys          = 0.15,
-            electronics     = 0.15,
-            -- spacecraft_components intentionally absent — militia-only demand.
+        -- No SHARED tranche: nothing this pass pulls is band-independent.
+        demand_basket = {},
+        baskets = {
+            { era = "industrial", demand_basket = {
+                silicon         = 0.20,
+                refined_copper  = 0.20,
+                ree_alloy       = 0.15,
+                machinery       = 0.15,
+                alloys          = 0.15,
+                electronics     = 0.15,
+                -- spacecraft_components intentionally absent — militia-only demand.
+            } },
         },
         demand_elasticity = 0.80,
         elasticity_min     = 0.30,
@@ -878,15 +891,61 @@ economy = {
     -- pure CONSUMER — no supply term. DEMAND = pcc.scale × demand_scale ×
     -- basket[r] × elasticity(price). Read by inject_population_demand
     -- (market_clearing.cpp), called from clear_markets after its demand reset.
+    --
+    -- BL-640 (2026-08-26): THE BASKET IS ERA-BANDED, through the same `era`
+    -- field and the same era_permits mask recipes have carried since BL-433.
+    -- Recipes were banded; the baskets were not, so a basket authored in
+    -- industrial goods left an ancient campaign wanting three things it could
+    -- never make (clean_water, consumer_goods, medical_supplies — census:
+    -- MARKETS.md § Demand channels, property 2 states the rule).
+    --
+    -- The split is by PRODUCIBILITY, not by taste. `demand_basket` below is the
+    -- SHARED tranche: subsistence, which every band both wants and can supply
+    -- (food_rations has an ancient recipe; agricultural_produce and water are
+    -- deposits, band-independent by construction). Each `baskets` row is the
+    -- band's own value chain on top of it.
+    --
+    -- THE TWO TRANCHE TOTALS ARE EQUAL (0.75 each), and that is the design, not
+    -- a coincidence: the band changes WHICH chain a household consumes, not HOW
+    -- MUCH it consumes. Rebalancing between the two is a tuning question the
+    -- census can now answer, because it can now see both.
+    --
+    -- ERA IS ONLY THE FIRST HALF of the ladder POPULATION.md § Population demand
+    -- describes — era decides which value chain, STRATUM decides how far up it.
+    -- The stratum half is not authored here: this pass still scales one basket
+    -- by pcc.scale linearly. A future stratum gate is a second field on these
+    -- same rows, not a second table.
     population_demand = {
-        -- Per-scale-point demand weight per resource. Unlisted resources get 0.
+        -- The SHARED (`any`) tranche: per-scale-point weight per resource, wanted
+        -- in every band. Unlisted resources get 0.
         demand_basket = {
             food_rations          = 0.60, -- population primary (replaces the old flat agri stub)
             agricultural_produce  = 0.20, -- direct consumption, lighter than the processed staple
             water                 = 0.30, -- life support
-            clean_water           = 0.35, -- BL-368 habitability tranche
-            consumer_goods        = 0.25, -- BL-368 habitability tranche
-            medical_supplies      = 0.15, -- BL-368 habitability tranche
+        },
+        baskets = {
+            -- The ancient household. The terminal artisan goods the 0 CE roster
+            -- ALREADY PRODUCES and, before this row, nobody bought: ceramics,
+            -- dressed_stone and leather each sat in the census's
+            -- "produced in-band, NO market sink" list. Cloth leads because
+            -- clothing is the largest recurring artisan want; dressed stone is
+            -- the household's share of building, distinct from BL-642's
+            -- construction draw.
+            { era = "ancient", demand_basket = {
+                cloth         = 0.25,
+                ceramics      = 0.20,
+                leather       = 0.15,
+                dressed_stone = 0.15,
+            } },
+            -- The industrial household: the BL-368 habitability tranche, moved
+            -- here UNCHANGED in both membership and weight. Nothing about the
+            -- industrial arc's demand is retuned by BL-640 — only the band it
+            -- is confined to.
+            { era = "industrial", demand_basket = {
+                clean_water      = 0.35,
+                consumer_goods   = 0.25,
+                medical_supplies = 0.15,
+            } },
         },
         demand_elasticity = 0.80, -- exponent on (base_price / price); matches the substrate shape
         elasticity_min    = 0.30,

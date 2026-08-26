@@ -45,6 +45,46 @@ era_band read_era(const sol::table& entry, const std::string& context)
                              + " (expected any, ancient or industrial)");
 }
 
+/// BL-640: read an optional `baskets = { { era = "...", demand_basket = {...} }, ... }`
+/// list of era-banded demand tranches onto @p dst, in authored order.
+///
+/// THE SAME MECHANISM RECIPES USE, not a parallel one: the band comes from
+/// `read_era` above, so an unknown string ("industial") throws at load exactly as
+/// it does on a recipe, and the mask applied later is `era_permits`.
+///
+/// STRICTER THAN A RECIPE IN ONE RESPECT, deliberately: `era` is REQUIRED on a
+/// row here, where it is optional on a recipe. A recipe with no band is the
+/// common case (most are shared); a row in `baskets` exists ONLY to carry a band,
+/// so an absent one is a typo rather than an intent — the shared tranche is the
+/// sibling `demand_basket` key, which is where a band-independent weight belongs.
+/// A row with no `demand_basket` is rejected for the same reason: it asserts a
+/// band and consumes nothing, which is never what was meant.
+void read_era_baskets(const sol::table& tbl, std::vector<era_basket>& dst,
+                      const std::string& context)
+{
+    sol::optional<sol::table> rows = tbl["baskets"];
+    if (!rows)
+        return;
+    for (std::size_t i = 1; i <= rows->size(); ++i)
+    {
+        const std::string rc = context + ".baskets[" + std::to_string(i) + "]";
+        sol::optional<sol::table> row = (*rows)[i];
+        if (!row)
+            throw std::runtime_error("recipe_registry: " + rc + " is not a table");
+        if (!(*row)["era"].valid())
+            throw std::runtime_error("recipe_registry: " + rc + " has no era "
+                                     "(a banded tranche must name its band; put a "
+                                     "band-independent weight in demand_basket instead)");
+        era_basket b;
+        b.era = read_era(*row, rc);
+        sol::optional<sol::table> basket = (*row)["demand_basket"];
+        if (!basket)
+            throw std::runtime_error("recipe_registry: " + rc + " has no demand_basket");
+        read_resource_map(*basket, b.demand_basket, rc + ".demand_basket");
+        dst.push_back(std::move(b));
+    }
+}
+
 /// Sprint N3 (NR-568): read an optional DECAY RATE, validated AS THE VALUE THAT
 /// LANDS — a finite number in [0, 1] — and REJECTED at load otherwise, naming
 /// the key. Never clamped: `decayed()` in sentiment.cpp does clamp a rate above
@@ -270,7 +310,9 @@ void recipe_registry::load_from_lua(lua_state& lua)
         pd.elasticity_min    = pop_demand->get_or("elasticity_min",    pd.elasticity_min);
         pd.elasticity_max    = pop_demand->get_or("elasticity_max",    pd.elasticity_max);
         pd.demand_scale      = pop_demand->get_or("demand_scale",      pd.demand_scale);
-        m_population_demand = pd;
+        // BL-640: the era-banded tranches beside the shared basket above.
+        read_era_baskets(*pop_demand, pd.baskets, "economy.population_demand");
+        set_population_demand(pd); // folds the tranches under the current band
     }
 
     // BL-340/BL-365 background-industrial-demand model (economy.background_demand).
@@ -286,7 +328,8 @@ void recipe_registry::load_from_lua(lua_state& lua)
         bd.elasticity_min    = bg_demand->get_or("elasticity_min",    bd.elasticity_min);
         bd.elasticity_max    = bg_demand->get_or("elasticity_max",    bd.elasticity_max);
         bd.demand_scale      = bg_demand->get_or("demand_scale",      bd.demand_scale);
-        m_background_demand = bd;
+        read_era_baskets(*bg_demand, bd.baskets, "economy.background_demand"); // BL-640
+        set_background_demand(bd);
     }
 
     // BL-442 price band (economy.price_band) — authored once here, read by BOTH

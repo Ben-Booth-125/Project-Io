@@ -243,7 +243,16 @@ void inject_population_demand(world& w, const recipe_registry& reg)
     // price-elastic exactly like the nation-substrate model (BL-078) —
     // cheaper than base -> consume more, dearer -> less. Population is a pure
     // CONSUMER here: no supply term is added, unlike inject_substrate_demand.
+    //
+    // BL-640: the basket is ERA-BANDED, exactly as recipes are (MARKETS.md
+    // § Demand channels, property 2). `population_demand_basket()` is the
+    // registry's fold of the shared tranche plus every banded row the campaign's
+    // band admits — an ancient household wants ceramics, cloth, leather and
+    // dressed stone where an industrial one wants clean water, consumer goods
+    // and medical supplies. Read it, NOT pd.demand_basket, which is the shared
+    // tranche alone.
     const population_demand_params& pd = reg.population_demand();
+    const std::array<float, resource_count>& basket = reg.population_demand_basket();
 
     for (const auto& [centre_id, pcc] : w.population_centres)
     {
@@ -264,7 +273,7 @@ void inject_population_demand(world& w, const recipe_registry& reg)
             const float base = mc.base_price[r];
             if (base <= 0.0f)
                 continue; // Untradeable — no base price to anchor the elasticity curve.
-            const float weighted = scale * pd.demand_basket[r];
+            const float weighted = scale * basket[r];
             if (weighted <= 0.0f)
                 continue;
 
@@ -282,7 +291,12 @@ void inject_background_demand(world& w, const recipe_registry& reg)
     // processing goods, world-scale rather than per-centre (unlike
     // inject_population_demand above) — real background firms alone would
     // under-consume these during the early game before enough of them exist.
+    //
+    // BL-640: banded, NOT deleted. All six goods are industrial, so this pass
+    // injects nothing in an ancient campaign — but it remains the stopgap
+    // standing in for the Industry channel (BL-641) until that lands.
     const background_demand_params& bd = reg.background_demand();
+    const std::array<float, resource_count>& basket = reg.background_demand_basket();
 
     // Per-body population scale: sum of every centre's scale on that body,
     // gathered once so every market on a multi-market body (BL-096) sees the
@@ -312,9 +326,10 @@ void inject_background_demand(world& w, const recipe_registry& reg)
             const float base = mc.base_price[r];
             if (base <= 0.0f)
                 continue; // untradeable — no base price to anchor the elasticity curve.
-            const float weighted = scale * bd.demand_basket[r];
+            const float weighted = scale * basket[r];
             if (weighted <= 0.0f)
-                continue; // spacecraft_components (and anything else unlisted) stays at 0.
+                continue; // spacecraft_components (and anything else unlisted, or
+                          // out of band) stays at 0.
 
             const float price   = (mc.price[r] > 0.0f) ? mc.price[r] : base;
             const float elastic = std::clamp(std::pow(base / price, bd.demand_elasticity),

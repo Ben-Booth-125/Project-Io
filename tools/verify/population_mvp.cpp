@@ -97,7 +97,8 @@ static void test_population_on_kepler()
 
     // The comment here used to read "empty -- population injection runs
     // unconditionally", and that premise died with BL-368. inject_population_demand
-    // now reads reg.population_demand().demand_basket, which on a default-
+    // now reads reg.population_demand_basket() (BL-640: the era-resolved fold
+    // of the shared tranche and the band's own), which on a default-
     // constructed registry is all zeroes — so this assertion has been measuring an
     // empty basket rather than an absent population, and failing for a reason that
     // had nothing to do with what it tests.
