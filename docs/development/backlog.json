@@ -1070,6 +1070,56 @@
    "authority_doc": "docs/ui/ICONS.md",
    "design": "@docs/development/archive/backlog-design-2026-Q3.json",
    "archived": "docs/development/archive/backlog-design-2026-Q3.json"
+  },
+  {
+   "id": "BL-626",
+   "short_name": "SPAWN_VIABILITY_SWEEP",
+   "title": "Spawn viability sweep: measure every corporation start over the real warm start",
+   "status": "complete",
+   "glyph": "○",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": "post-v0.1.19",
+   "sprint": "20",
+   "category": "Verification",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "files": [
+    "tools/verify/spawn_viability.cpp",
+    "CMakeLists.txt",
+    "tools/verify/README.md",
+    ".claude/skills/verifier-headless/SKILL.md",
+    "docs/generation/CORPORATION_GENERATION.md"
+   ],
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "design": "Ben, 2026-08-26, opening the Sprint 20 design session: corporations open at 0cr (the 2026-07-06 new-charter steer) and market forces are meant to ensure profit gets made - \"this is not great. It's simply always going to happen that different starts provide different opportunities, and we should be gathering data on this.\" His ruling: build the sweep FIRST, spawn forms wait for the data; and \"there is nothing too special about player corporations, so we can use every angle to gather data\" - every corp is a data point. WORK: tools/verify/spawn_viability.cpp, a live-Lua CMake-only sweep (the player_seed_sweep reasoning) generating one campaign-real world per seed (full 400-year prehistory; --lean smoke only) and running the 80-tick warm start with an app-faithful tick - cadence counter (BL-568), shared LP pool (BL-597), corp AI. Default mode SPECTATE (BL-409) so every corp including the player slot acts through the scored-utility layer and rows are comparable; --played runs the shipped warm start (player slot strategically passive); the delta separates acting from endowment. One CSV row per corp per seed: class (player-slot/rival/background), focus, nation, holdings open/close, balance open/min/close, ticks in debt, trailing-year net/qtr, strategic decisions taken (drained from the corp_decision_ring with saturation guarded), stockpile units at close, and three report-first flags (solvent/earning/active). Report-first on the road_reach_census idiom: the viability VERDICT rule is the design call the data feeds, so only vacuity, first-seed determinism (state_hash + every closing balance) and ring attribution assert. Registered ctest label \"sweep\" behind IO_RUN_SWEEPS. BUILT 2026-08-26 and run same-day on Linux via an extended NR-264 lib-then-link recipe (Lua 5.4.7 + sol2 3.5.0 from GitHub mirrors); first 8-seed campaign-real sweep data recorded in the session devlog and NR entries. The spawn-form design the data feeds is BL-627 (corporation spawn forms)."
+  },
+  {
+   "id": "BL-627",
+   "short_name": "CORP_SPAWN_FORMS",
+   "title": "Corporation spawn forms: settle the shapes a start can take, against the sweep data",
+   "status": "design",
+   "glyph": "○",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": "post-v0.1.19",
+   "sprint": "20",
+   "category": "Generation",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-626"
+   ],
+   "blocked_on": "A design session with Ben over the spawn_viability sweep data (Ben, 2026-08-26: sweep first, forms wait for the data).",
+   "parked": false,
+   "files": [
+    "docs/generation/CORPORATION_GENERATION.md"
+   ],
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "design": "Ben, 2026-08-25 (dispatch-triage close-out): \"there are a few forms for corporation starts to take\" - the spawn-form design session Sprint 20 owes. Reordered by Ben 2026-08-26: the forms are settled AGAINST the BL-626 (spawn viability sweep) data, not ahead of it. Candidate forms on the table from the 2026-08-26 session, each solving viability differently, none chosen: (1) new charter (current: 0cr, lean assets - honest but needs a guaranteed early income, e.g. a seeded procurement contract on the existing contracts loop); (2) charter loan - opening capital as DEBT on the existing k_debt_interest_per_quarter mechanism, cash to act with market discipline intact; (3) established firm - larger holdings plus operating history, wealth as assets not cash; (4) backed subsidiary - a nation or parent stake, tying starts into the politics layer. Constraints carried from the close-out: every form must be one a RIVAL can bootstrap (the \"never on cash\" availability ruling means a corp with no stock and no market access may have no legal candidates - a form that strands rivals poisons every seed's data); relative comparison across forms on a fixed seed + rival field, absolute numbers being confounded by the open economy pathologies; one deliberate baseline re-bless wave at the end of the viability pass, with provenance, not a dribble (NR-596 precedent). The frame settled 2026-08-26 and written into CORPORATION_GENERATION.md Pass 4: viability is a FLOOR, not equality - different starts giving different opportunities is intended variety, a start dead before turn one is a defect. The verdict rule (which combination of solvent/earning/active is \"viable\") is part of this design, first-cut ingredients logged for Ben's review."
   }
  ]
 }

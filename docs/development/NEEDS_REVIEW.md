@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*54 entries — 41 open, 13 resolved.*
+*56 entries — 43 open, 13 resolved.*
 
 ---
 
@@ -430,6 +430,20 @@ state_hash folds the fields a tick may mutate, but the population-centre record'
 The six T7/T8 intra-body dispatch assertions (shortfall dispatches one convoy, cost debit, cost arithmetic 0.4, the two 0.352 discounts, decommissioned-hub no-discount) fail identically when the harness is built against unmodified HEAD (5778a932) - verified in a throwaway worktree. So the drift predates the 2026-08-25 flood-field change; the likely suspect is a dispatch-gate landed since the harness's synthetic worlds were authored (e.g. BL-597's passive-LP draw refusing anchorless bodies), but that is unconfirmed. Needs a session to rebase the harness's synthetic worlds onto the current dispatch contract - not a weakening of the assertions.
 
 *Files: `tools/verify/logistics_harness.cpp`*
+
+### NR-646 — Sweep defaults chosen on your behalf: spectate mode, seeds 0..N-1, trailing-year net
+*decision taken on your behalf · raised 2026-08-26 · from Sprint 20 design session (sweep first, forms wait); BL-626 build.*
+
+Four defaults picked to get the instrument measuring, each reversible by flag or edit: (1) DEFAULT MODE IS SPECTATE (BL-409) - your "nothing too special about player corporations" read mechanically: with no human seat every corp acts through the scored-utility layer, so every row is comparable; the shipped warm start (player slot strategically passive) is the --played flag, not the default. (2) Seeds are 0..N-1 (seed 0 = the canonical world), default N=8 - deliberately overlapping the 8-seed census idiom, widen by argv when a distribution needs it. (3) "Earning" reads as trailing-YEAR net (balance[T] - balance[T-4])/4, one year smoothing out single-quarter noise. (4) "Active" reads as >=1 strategic decision drained from the corp_decision_ring OR holdings growth - evaluations that issued nothing do not count. None of these is asserted; all four shape which numbers the form design will look at.
+
+*Files: `tools/verify/spawn_viability.cpp`*
+
+### NR-647 — The viability verdict rule is yours to set: what combination of solvent / earning / active is "viable"?
+*question · raised 2026-08-26 · from BL-626 (spawn viability sweep); CORPORATION_GENERATION.md Pass 4 as amended 2026-08-26.*
+
+The sweep reports three per-corp ingredients after the warm start - solvent (closing balance >= 0), earning (trailing-year net > 0), active (took a strategic action or grew holdings) - and deliberately asserts NO combination as "viable": that rule decides what the spawn-form design optimises for, so it is a design call, not a harness constant. Options with trade-offs: (a) solvent AND earning - strict, reads as "self-sustaining by turn one", but the 2026-08-16 player_seed_sweep lesson says solvency alone was then no discriminator and depth mattered more; (b) solvent OR (earning AND active) - admits a corp that dipped but is climbing; (c) a runway read instead - balance + 4x trailing net > 0, "survives the next year", tolerant of warm-start debt spikes. Recommendation: (c) as the headline metric with (a) reported alongside; a floor, not equality, per the Pass 4 frame. Rule wanted before the forms session so the data is read against one definition.
+
+*Files: `tools/verify/spawn_viability.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
 
 ---
 

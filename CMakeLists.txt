@@ -563,6 +563,24 @@ target_link_libraries(pregame_balance_harness PRIVATE io_world_obj lua54)
 target_compile_features(pregame_balance_harness PRIVATE cxx_std_20)
 target_compile_options(pregame_balance_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# spawn_viability (BL-626) — the Sprint 20 spawn-viability sweep. Live-Lua for
+# the same reason player_seed_sweep is: it runs the real economy over the real
+# authored recipes, per seed, and a hand-built registry would flatten exactly
+# the per-spawn variance it exists to measure. Same explicit-declaration shape
+# as pregame_balance_harness above.
+add_executable(spawn_viability
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/spawn_viability.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(spawn_viability PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(spawn_viability PRIVATE io_world_obj lua54)
+target_compile_features(spawn_viability PRIVATE cxx_std_20)
+target_compile_options(spawn_viability PRIVATE ${IO_WARNING_FLAGS})
+
 # persona_counsel_harness (BL-207) needs a live sol2/Lua state too — it loads
 # the real scripts/personas/*.lua packs through src/scripting/persona_pack.cpp.
 # Same shape as pregame_balance_harness above: add back the sol2/Lua TU +
@@ -1033,6 +1051,15 @@ set(IO_TEST_SWEEP_HARNESSES
     # belongs here on substrate_census's own reasoning rather than in the gate.
     settlement_density
 
+    # CATEGORY (1), added 2026-08-26 (BL-626, Sprint 20). spawn_viability
+    # generates a full world per seed with the shipped 400-year pre-epoch era
+    # (the campaign-real start is the whole question) and runs the 80-tick warm
+    # start on each — minutes per default run, and it REPORTS a distribution
+    # the spawn-form design will be read against, gating nothing a routine run
+    # needs. Its three assertions (vacuity, determinism, ring attribution) run
+    # whenever it runs; run it by name for the data.
+    spawn_viability
+
     # PARKED FOR A DIFFERENT REASON (2026-08-12), and the distinction matters.
     #
     # The two above are open-ended exploration tools whose cost IS the point.
@@ -1079,6 +1106,7 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     era_roster
     haulage_measure
     player_seed_sweep
+    spawn_viability
     interbody_pull_harness
     pregame_balance_harness
     persona_counsel_harness

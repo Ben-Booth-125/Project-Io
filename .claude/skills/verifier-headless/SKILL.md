@@ -401,6 +401,23 @@ in `tools/verify/README.md`.
   wealth** — BL-436 measured a processing facility as currently earning *less* per tick than the
   extraction site it replaces, so this floor must never be re-read as a profitability gate.
   `player_seed_sweep.exe --guard 24`, or `--roster <seed>` for every corp's opening on one seed.
+- **`spawn_viability`** — The Sprint 20 spawn-viability sweep (BL-626): is a given corporation
+  START viable — solvent, earning, able to act — after the real 80-tick warm start? Live-Lua and
+  CMake-only (the `player_seed_sweep` reasoning), one full campaign-real world per seed (shipped
+  400-year prehistory; `--lean` skips it for smoke only, never for analysis rows). Where
+  `player_seed_sweep` reports the player corp's opening, this one records **every corp** — Ben,
+  2026-08-26: *"there is nothing too special about player corporations"* — one CSV row per corp
+  per seed (class player-slot/rival/background, focus, nation, balance open/min/close, ticks in
+  debt, trailing-year net, strategic decisions taken, holdings delta), by default under
+  **spectate** (BL-409: every corp acts, so every row is comparable); `--played` runs the shipped
+  warm start instead, and the delta between modes is itself data (acting vs endowment). Its tick
+  mirrors the CURRENT app step — cadence counter, shared LP pool, corp AI — unlike the older
+  frozen-tick sweeps. **Report-first**: three hard assertions only (vacuity, first-seed
+  determinism by `state_hash` + closing balances, decision-ring attribution never saturated); the
+  viability VERDICT rule is deliberately not asserted — the ingredients feed the Sprint 20
+  spawn-form design, and the first-cut definition sits with Ben (NR, 2026-08-26).
+  `spawn_viability [seed_count=8] [warm_ticks=80] [--played] [--lean] [--csv <path>]`; ctest
+  label `sweep`, gated behind `IO_RUN_SWEEPS` like every full-world-per-seed instrument.
 - **`era_roster`** — The era gate over the authored economy data (BL-433). The **fourth live-Lua
   harness**: it asks what the *authored* `era` tags do, so it loads the real `scripts/economy.lua`
   + `recipes.lua` rather than hand-building a registry — a hand-built fixture could only confirm

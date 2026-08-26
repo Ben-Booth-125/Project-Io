@@ -69,6 +69,18 @@ restating them as constants — it is deliberately Lua-free — so **if `logisti
 moves, move `kLandRate`/`kSeaRate` with it**. Re-run it before touching BL-188, the convoy mode
 selection, or the sea/land logistics rates.
 
+`spawn_viability` (Sprint 20, BL-626) is the spawn-viability sweep: one campaign-real world per
+seed (full prehistory), the 80-tick warm start run with an app-faithful tick (cadence counter,
+shared LP pool, corp AI), and one CSV row per corporation per seed — class, focus, nation,
+balance open/min/close, ticks in debt, trailing-year net, strategic decisions taken, holdings
+delta. Default mode is **spectate** (BL-409: every corp acts, so every corp is a comparable data
+point — Ben's 2026-08-26 "nothing too special about player corporations"); `--played` runs the
+shipped warm start where the player slot is strategically passive, and the delta between the two
+modes separates acting from endowment. Report-first on the `road_reach_census` idiom: the
+viability *verdict* is a design call the data feeds (the Sprint 20 spawn-form session), so only
+vacuity, first-seed determinism and decision-ring attribution assert. Live-Lua, CMake-only
+(`cmake --build build --target spawn_viability`); ctest label `sweep` behind `IO_RUN_SWEEPS`.
+
 `tile_height_retention` (BL-517) guards the retained per-tile heightmap. Its assertions are shaped
 around the item's negative scope — height must be **captured**, never recomputed: H1 asserts every
 `tile_component::height` is bit-identical to `generation_record::height`, H3 that the value is the

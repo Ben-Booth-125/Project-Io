@@ -172,10 +172,37 @@ corp can build is BL-182's (§ Open items). Audited by `world_audit` (BL-182 R1/
 
 ### Pass 4 — Financial profile
 
-Each corporation receives starting capital drawn from a seeded range. A tunable
-`wealth_variance` parameter controls spread. Corporations with `processing` or `trade`
-focus receive slightly higher starting capital to offset their lack of direct resource
-access.
+**Every corporation opens as a new charter: no seeded cash (Ben, 2026-07-06).** The
+opening balance is **earned**, not granted — whatever the pre-game warm start below
+produces from the corp's placed assets, its stockpile, and the market it sits on. The
+generator retains a `base_capital` × `wealth_variance` seeded-range mechanism as a dormant
+tuning surface (`compute_capital`, `corporation_generation.cpp`), but the design position
+is `base_capital = 0` for every corp, player and rival and background alike.
+
+**Spawn viability is a measured property, not an assumed one.** With no seeded cash,
+whether a given start is *viable* — solvent, earning, able to act — is an emergent fact of
+its endowment: deposits, focus, nation, market access. Different starts giving different
+opportunities is intended (variety); a start that is dead before turn one is a defect the
+measurement exists to catch. The instrument is BL-626 (spawn viability sweep): one
+campaign-real world per seed, the warm start run with an app-faithful tick, one record per
+corporation — **every corp is a data point, not only the player's** (Ben, 2026-08-26:
+*"there is nothing too special about player corporations, so we can use every angle to
+gather data"*). The sweep's default mode is spectate (BL-409), so every corp acts through
+the same scored-utility layer and rows are comparable; its `--played` mode measures the
+trajectory a strategically-passive player slot actually inherits, and the delta between
+the modes separates *acting* from *endowment*. The verdict rule — which combination of
+solvent / earning / active constitutes "viable" — is an open design call (NR, 2026-08-26);
+the sweep reports the ingredients rather than asserting a definition.
+
+**Spawn forms are a deliberate open design.** The shape a corporation start can take
+(Ben, 2026-08-25: *"there are a few forms for corporation starts to take"*) — new charter
+as above, or alternatives such as opening capital carried as debt on the standard interest
+mechanism, a larger established position, or a backed stake — is settled *against the
+sweep's data*, not ahead of it (Ben, 2026-08-26: sweep first, forms wait for the data).
+BL-627 (corporation spawn forms) owns that design; this section is amended when it
+settles. Any form must be one a rival can bootstrap — a corp with no stock and no market
+access may have no legal candidates under the "never on cash" availability ruling, and a
+form that strands rivals poisons every seed's data.
 
 **Pre-game operating history.** Corporations do not open cold. At campaign start the economy
 is run forward a fixed number of **pre-game ticks** (`app::pre_game_ticks` = 80, sliced across
