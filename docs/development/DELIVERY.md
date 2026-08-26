@@ -376,7 +376,10 @@ memory `backlog-id-collision-hazard`):
    filing a backlog item run **`node tools/session/next_id.js [count]`**: it scans *all* branches
    (local + remote) for the true max and returns the next safe id (or a reserved range for a
    session that will file several). Two sessions each grabbing "next = BL-114" off their own stale
-   file is the exact failure this prevents. `backlog_lint.js` is the **backstop** — it now FAILs on
+   file is the exact failure this prevents. The same rule and the same tool shape cover
+   `world_save_version`, a shared registry of the same kind — run
+   **`node tools/session/next_save_version.js`** before bumping it (DEVELOPMENT_PRACTICES.md
+   § Save-format versions). `backlog_lint.js` is the **backstop** — it now FAILs on
    a duplicate id at the merge point.
 3. **Integrate in one place, in order, and verify retroactively.** Worktree agents commit on their
    own branch and **never touch `main`**. The **integrator** (the main-tree session) merges branches
