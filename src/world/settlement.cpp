@@ -296,6 +296,104 @@ std::string quarter_word(const tongue_lexicon& lex, int col, int row, int gw, in
 } // namespace
 
 // ---------------------------------------------------------------------------
+// Stage 1 — the enforceable promise, as a diffusion frame (BL-638)
+//
+// Three facts the ladder and the creeds have ALREADY produced, read a third
+// time rather than re-derived:
+//
+//   1. WHERE. `history_ladder_state::charter_cradle` is the best-placed
+//      trading cradle — "coastal access dominates", because Stage 1 is about
+//      promises between STRANGERS and strangers arrive by sea.
+//   2. WHO. `run_creeds` plants the sealed-oath god ("who witnesses every
+//      bargain") on exactly that cradle's culture, and calls it "the seed
+//      Stage 1's Charter Act grows from". That culture is the one people who
+//      do not merely know the promise but keep it.
+//   3. HOW FAR. Barrier terrain prices contact the same way it prices
+//      conquest, so the ladder's `conquest_cost_q` is the resistance the
+//      charter's copies have to cross.
+//
+// Nothing here reads a furnace date, which is the point: Stage 4 never runs on
+// an antiquity world, Stage 1 runs in every era.
+// ---------------------------------------------------------------------------
+
+charter_reach derive_charter_reach(const history_ladder_state& hl,
+                                   const creed_state& cs, int gw, int gh)
+{
+    charter_reach ch;
+    ch.grid_w = gw;
+    if (gw <= 0 || gh <= 0) return ch;
+
+    // No cradle -> no charter was ever written -> nothing reached the promise.
+    // An honest all-closed world, not a degenerate one: it is the state the
+    // public floor's "unmeetable by construction" waiver exists for.
+    if (hl.charter_cradle < 0
+     || static_cast<std::size_t>(hl.charter_cradle) >= hl.cradles.size())
+        return ch;
+
+    const agrarian_cradle& seat =
+        hl.cradles[static_cast<std::size_t>(hl.charter_cradle)];
+    ch.written = true;
+    ch.col = seat.col;
+    ch.row = seat.row;
+
+    // The oath-keepers. Walked in cradle order, so the first match is the only
+    // match `run_creeds` could have produced (one culture per cradle).
+    for (std::size_t ci = 0; ci < cs.cultures.size(); ++ci)
+        if (cs.cultures[ci].cradle == hl.charter_cradle)
+        {
+            ch.culture = static_cast<int>(ci);
+            break;
+        }
+
+    // The two radii. `span` is the largest value `grid_dist` can return on this
+    // grid, so both bands are stated as a FRACTION OF THE WORLD rather than as
+    // a tile count that would silently change meaning if the grid did.
+    //
+    // The bounds are a shape, not a target: the charter never covers the whole
+    // world (there is always ground it never reached, so `closed` stays a real
+    // state) and never fails to cover its own hinterland (so `public` stays a
+    // real state). Resistance slides between them.
+    const int span = std::max(gw / 2, gh - 1);
+    const int floor_d = std::max(1, span / 10);
+    const int ceil_d  = std::max(floor_d, span / 2);
+    const int resist  = clampi(hl.conquest_cost_q, 0, 1000);
+    ch.far_dist   = floor_d + ((ceil_d - floor_d) * (1000 - resist)) / 1000;
+    ch.near_dist  = ch.far_dist / 2;
+    ch.port_reach = span / 5;
+    return ch;
+}
+
+namespace {
+
+/// Contact distance from the seat, discounted by how much of a port the region
+/// is — the sea road the charter actually travels.
+int charter_contact(const charter_reach& ch, const region& p)
+{
+    const int d = grid_dist(p.col, p.row, ch.col, ch.row, ch.grid_w);
+    return d - (ch.port_reach * clampi(p.port_q, 0, 1000)) / 1000;
+}
+
+} // namespace
+
+bool charter_lived(const charter_reach& ch, const region& p)
+{
+    if (!ch.written) return false;
+    // The oath-keepers carry it wherever they are — and only where they still
+    // are. Read from the CURRENT culture, not the founding one, so a conquest
+    // that replaced the founders' gods took their institutions with them, and
+    // a charter people who conquered outward carried theirs along.
+    if (ch.culture >= 0 && p.culture == ch.culture) return true;
+    return charter_contact(ch, p) <= ch.near_dist;
+}
+
+bool charter_copied(const charter_reach& ch, const region& p)
+{
+    if (!ch.written) return false;
+    if (ch.culture >= 0 && p.culture == ch.culture) return true;
+    return charter_contact(ch, p) <= ch.far_dist;
+}
+
+// ---------------------------------------------------------------------------
 // The settlement pass
 // ---------------------------------------------------------------------------
 
@@ -312,6 +410,11 @@ settlement_state run_settlement(const planetology_state& pl,
     settlement_state out;
     if (gw <= 0 || gh <= 0 || target_regions <= 0 || hl.cradles.empty())
         return out;
+
+    // Stage 1's frame (BL-638). Derived here because this pass already holds
+    // both inputs and every downstream consumer already holds this record.
+    // RNG-free, so it perturbs no stream.
+    out.charter = derive_charter_reach(hl, cs, gw, gh);
 
     const int total = gw * gh;
     rng r(seed, tag_settle);

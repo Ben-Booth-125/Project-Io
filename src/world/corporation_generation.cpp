@@ -1253,57 +1253,74 @@ void seed_starting_military(world& w, entity_id corp_id,
 } // namespace
 
 // ---------------------------------------------------------------------------
-// Pass 2b — ownership class (BL-631). One more mapping over an existing signal.
+// Pass 2b — ownership class (BL-631, re-pointed by BL-638). One more mapping
+// over an existing signal — and BL-638 is the story of which one.
+//
+// BL-631 derived the class from Stage 4's industrialisation timing. That read
+// looks equivalent to Stage 1's and is not, and its own measured row exposed the
+// difference: at the default 0 CE epoch all 64 corporations and all 1298 regions
+// across 8 seeds classed `closed`, because settlement.cpp breaks out of Stage 4
+// before lighting a furnace on an antiquity world. The mapping was correct; the
+// input was degenerate.
+//
+// So the signal is the ENFORCEABLE PROMISE. The institutions that make a
+// contract enforceable are the institutions that make a share transferable —
+// which is what Pass 2b's justifying sentence always said — and Stage 1 runs in
+// EVERY era. See `settlement.hpp`'s `charter_reach` for the frame itself.
 // ---------------------------------------------------------------------------
 
 namespace {
 
-/// Does this national character carry the institutions that make a promise
-/// enforceable — and therefore, per the design, a share transferable?
+/// Does this national character HOLD THE FIRM CLOSE — the design's rung-2
+/// polity, which has the promise and will not let a stranger own a share of it?
 ///
-/// The nation's `politics` is its industrialisation-timing tercile and nothing
-/// else (settlement.cpp, the "ideology <- industrialisation timing against
-/// neighbours" block), so this is a read of the same scalar, not a second
-/// signal smuggled in:
+/// Only `authoritarian`, and the exclusion is the load-bearing half.
+/// `nation_component::politics` is settlement.cpp's industrialisation-timing
+/// tercile ("ideology <- industrialisation timing against neighbours"), so each
+/// enumerator carries a furnace fact as well as a political word:
 ///
-///   * `authoritarian` — the LATE tercile, and the enum's own "centralised
-///     state authority". This is the design's *statist* case, and it is the one
-///     the "late OR STATIST -> private" rung exists to catch: an early region
-///     inside a statist realm still does not get a transferable share.
-///   * `isolationist` — the NEVER tercile. A realm whose furnaces never lit has
-///     no such institutions to have built.
-///   * `mercantile` (early) and `technocratic` (mid) both lit furnaces inside a
-///     regime that had to make promises stick to do it. Neither is statist.
+///   * `authoritarian` — the late tercile, AND the enum's own "centralised
+///     state authority". This is the design's *statist* case and the one rung 2
+///     names: a polity that lived the promise but keeps the books.
+///   * `isolationist` — the NEVER tercile, and NOT admitted here. On an
+///     antiquity world no furnace lights anywhere, so every nation is
+///     isolationist; reading that as "statist" would demote every region in
+///     every default campaign back to `private` and re-create, one rung down,
+///     exactly the degenerate distribution BL-638 exists to remove. "Nobody
+///     built a furnace" is a statement about industry, not about corporate law
+///     — treating it as one would smuggle Stage 4 back in through the polity
+///     term after the region term stopped reading it.
+///   * `mercantile` / `technocratic` — early and mid movers, neither statist.
 ///
-/// Note what this deliberately does NOT do: it does not re-test the region's
-/// own timing. `ownership_from_region` has already established that the region
-/// industrialised early; the nation term answers only "under what institutions",
-/// which keeps the REGION the primary discriminator and preserves Pass 2's
-/// per-region variation.
-bool enforceable_promise(ideology politics)
+/// The nation term is deliberately a DEMOTION and never a promotion: the region
+/// stays the primary discriminator, so two corps in one nation still differ.
+bool holds_the_firm_close(ideology politics)
 {
-    return politics == ideology::mercantile || politics == ideology::technocratic;
+    return politics == ideology::authoritarian;
 }
 
 } // namespace
 
-ownership_class ownership_from_region(const region& p, int64_t median, ideology politics)
+ownership_class ownership_from_region(const region& p, const charter_reach& ch,
+                                      ideology politics)
 {
-    // NEVER INDUSTRIALISED -> closed. No filing, no market in the firm at all.
-    // `median <= 0` is the world where nobody industrialised, in which case no
-    // region can be "early" against it — the same guard `focus_from_region`
-    // makes before it shifts a tier.
-    if (!p.industrialised || median <= 0)
+    // NEVER REACHED THE PROMISE -> closed. No charter, no filing, no market in
+    // the firm at all. Ground the charter never travelled to, or a world where
+    // no charter was ever written.
+    if (!charter_copied(ch, p))
         return ownership_class::closed;
 
-    // LATE -> private. The firm exists and trades, but its books are its own.
-    if (p.industrial_year > median)
+    // REACHED, BUT ONLY AS A COPY -> private. The institution arrived as a
+    // foreign practice rather than as this people's own oath: a firm can be a
+    // firm here and it trades, but its books stay its own.
+    if (!charter_lived(ch, p))
         return ownership_class::privately_held;
 
-    // EARLY. The institutions that make a contract enforceable are the ones
-    // that make a share transferable — a region that had one had the other.
-    return enforceable_promise(politics) ? ownership_class::publicly_held
-                                         : ownership_class::privately_held;
+    // LIVED IT. The institutions that make a contract enforceable are the ones
+    // that make a share transferable — so a firm here can have owners who are
+    // not its operators, unless the polity holds it close.
+    return holds_the_firm_close(politics) ? ownership_class::privately_held
+                                          : ownership_class::publicly_held;
 }
 
 ownership_class ownership_from_character(ideology politics)
@@ -1413,24 +1430,27 @@ std::vector<entity_id> generate_corporations(
         // BL-631 -- IS THE PUBLIC FLOOR MEETABLE AT ALL? Answered once, before
         // any attempt, because the answer cannot change between attempts: a
         // reroll re-picks WHICH region each corp anchors to, never which regions
-        // exist or what their furnace years are.
+        // exist or where the charter reached.
         //
-        // This matters far more than it looks. The default campaign is an
-        // ANTIQUITY world (`world_params::epoch_year` = 0 CE since NR-177), and
-        // settlement.cpp's Stage 4 breaks out before lighting a single furnace on
-        // one: `median_industrial_year` is 0, every region is never-industrialised,
-        // and every corporation is therefore `closed` no matter which region it
-        // anchors to. Without this pre-pass the new floor could never be satisfied
-        // there, so every default world would burn all six attempts and stand on
-        // attempt 5's region set instead of the first attempt that met the FOCUS
-        // floor -- silently relocating every corporation in every default world,
-        // to satisfy a condition that was unsatisfiable before the first draw.
+        // BL-638 MADE THIS RARE AND DID NOT MAKE IT DEAD. Under the retired
+        // Stage 4 read it fired on every default (0 CE) campaign: an antiquity
+        // world skips the energy transition, so `median_industrial_year` stayed 0,
+        // every region was never-industrialised and every corporation classed
+        // `closed` whichever region it anchored to. Re-pointing to Stage 1 removes
+        // that whole class of world, because the ladder picks a charter cradle in
+        // every era. What survives is the genuine case the design names: a world
+        // with no agrarian cradle wrote no charter at all, and a nation whose every
+        // region sits beyond the charter's reach can host no public firm however
+        // the reroll shuffles it.
         //
-        // So the floor is WAIVED when it is unmeetable by construction. That is
-        // not a new escape hatch: it is exactly the waiver the focus floor already
-        // carries for `corp_count < 3` ("unmeetable by construction, so it does not
-        // apply"), applied to the second condition. Where public IS reachable the
-        // floor bites normally and the reroll does its job.
+        // The floor is WAIVED there rather than burned against. Without this
+        // pre-pass such a world would spend all six attempts and stand on attempt
+        // 5's region set instead of the first attempt that met the FOCUS floor --
+        // silently relocating every corporation in it, to satisfy a condition that
+        // was unsatisfiable before the first draw. It is exactly the waiver the
+        // focus floor already carries for `corp_count < 3` ("unmeetable by
+        // construction, so it does not apply"), applied to the second condition.
+        // Where public IS reachable the floor bites normally.
         bool public_reachable = false;
         for (int c = 0; c < corp_count && !public_reachable; ++c)
         {
@@ -1446,7 +1466,7 @@ std::vector<entity_id> generate_corporations(
                 if (p.nation < 0 || p.nation >= nation_count) continue;
                 if (nation_ids[static_cast<std::size_t>(p.nation)] != home_nid) continue;
                 any_region = true;
-                if (ownership_from_region(p, settle->median_industrial_year, pol)
+                if (ownership_from_region(p, settle->charter, pol)
                         == ownership_class::publicly_held)
                 {
                     public_reachable = true;
@@ -1519,7 +1539,7 @@ std::vector<entity_id> generate_corporations(
                 const ideology pol = (nit != w.nations.end())
                     ? nit->second.politics : ideology::isolationist;
                 const ownership_class oc = ownership_from_region(
-                    home_p, settle->median_industrial_year, pol);
+                    home_p, settle->charter, pol);
                 corp_ownership[static_cast<std::size_t>(c)] = oc;
                 if (oc == ownership_class::publicly_held) ++public_count;
             }

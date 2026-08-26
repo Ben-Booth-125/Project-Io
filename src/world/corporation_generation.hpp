@@ -104,25 +104,32 @@ std::vector<entity_id> generate_corporations(
 // ---------------------------------------------------------------------------
 
 /// Pass 2b's derivation: the ownership class a corporation anchored in @p p
-/// carries. Reads the SAME BL-218 industrialisation-timing scalar
-/// `focus_from_region` reads — never an authored table (BL-219's principle).
+/// carries. Reads HISTORY.md's **Stage 1** — the enforceable promise — through
+/// the charter's diffusion frame, never an authored table (BL-219's principle).
 ///
-///  * never industrialised            -> `closed`   (no filing, no market in the firm)
-///  * industrialised after the median -> `private`  (it trades; its books are its own)
-///  * industrialised at or before it, under enforceable-promise institutions
-///                                    -> `public`   (it files, and it can be bought)
-///  * industrialised early but STATIST -> `private`
+///  * the charter never reached here   -> `closed`  (no filing, no market in the firm)
+///  * it reached here only as a COPY   -> `private` (it trades; its books are its own)
+///  * this ground LIVES the promise    -> `public`  (it files, and it can be bought)
+///  * lives it, but under a STATIST polity -> `private`
+///
+/// WHY STAGE 1 AND NOT STAGE 4 (BL-638). The obvious reading — early
+/// industrialisers get public firms — is the wrong one, and it was measured
+/// wrong once: an antiquity world skips Stage 4 entirely, so
+/// `median_industrial_year` is 0 there and the never-industrialised rung fires
+/// for every region in every default campaign. All 64 corporations across 8
+/// seeds classed `closed`; nothing filed and nothing was buyable. Stage 1 runs
+/// in every era, so a class derived from it is era-agnostic where a class
+/// derived from industry is silently post-industrial.
 ///
 /// @param p        The corporation's home region.
-/// @param median   `settlement_state::median_industrial_year` (0 = nobody did).
-/// @param politics The home NATION's ideology — settlement.cpp derives it from
-///                 the same first-furnace record, so this adds no new signal.
-///                 It supplies only the enforceable-promise term; the region
-///                 stays the primary discriminator, so two corps in one nation
-///                 still differ (CORPORATION_GENERATION.md § Pass 2 -
-///                 "per-region, not per-nation, and that is the point").
+/// @param ch       `settlement_state::charter` — the charter's diffusion frame.
+/// @param politics The home NATION's ideology. It supplies only the
+///                 holds-the-firm-close DEMOTION; the region stays the primary
+///                 discriminator, so two corps in one nation still differ
+///                 (CORPORATION_GENERATION.md § Pass 2 - "per-region, not
+///                 per-nation, and that is the point").
 ownership_class ownership_from_region(const struct region& p,
-                                      int64_t median,
+                                      const struct charter_reach& ch,
                                       ideology politics);
 
 /// The no-home-region fallback: the same read one grain up, taken from the
