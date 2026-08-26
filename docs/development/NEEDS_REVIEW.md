@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*85 entries — 68 open, 17 resolved.*
+*85 entries — 61 open, 24 resolved.*
 
 ---
 
@@ -473,13 +473,6 @@ Three worktree agents were launched in a single message from HEAD e40e38d8. ALL 
 
 *Files: `docs/development/DELIVERY.md`*
 
-### NR-655 — A filed return CANNOT see subsidies or contract payouts - and the buyout would undervalue every firm that earns them
-*question · raised 2026-08-26 · from Sprint 20 wave 1, BL-626 (quarterly return): the agent found it and the main session confirmed it at app.cpp:1271/1281.*
-
-MEASURED, not suspected. apply_budget runs at app.cpp:1271 and run_nation_step at :1281 - ten lines later. So a return files BEFORE national transfers and mercenary-contract payouts touch the balance, and corp_budget::subsidies is always 0 in a filed record. Two consequences. (1) The retain property R2 holds exactly only where nothing outside the money loop moves a balance; on a real campaign construction, hire, survey, convoy and nation payouts all do. (2) THE ONE THAT MATTERS: BL-628 prices a buyout off trailing_net, so a firm earning through mercenary contracts - which CONTRACTS.md calls THE income loop - reads as unprofitable on its own filed returns and would be systematically undervalued. THE FORK: (A) add an eighth field, 'other' = whole-tick balance delta minus money-loop net, filed after the tick's last mover, so the seven flows still explain net AND net+other telescopes exactly; the buyout prices off the sum. (B) keep it as built and document trailing_net as money-loop profit only, accepting the undervaluation. (C) file after everything and let net be the whole delta, losing the property that the seven flows explain it. RECOMMEND (A): one extra field, nothing hidden, everything telescopes, and it is the legible answer rather than the clever one. It needs a new item that BL-628 requires, and it changes what FINANCE.md says about where the return is filed - the doc's 'at the end of apply_budget' is my wording from earlier today and it is the part that is wrong.
-
-*Files: `docs/economy/FINANCE.md`, `src/world/budget_system.cpp`, `src/core/app.cpp`*
-
 ### NR-656 — book_value is flat build_cost, NOT what the build press charges - and the agent was right to diverge
 *decision taken on your behalf · raised 2026-08-26 · from Sprint 20 wave 1, BL-626: flagged as an assumption by the agent, checked in the main session.*
 
@@ -529,26 +522,12 @@ Two findings that are only interesting together. (1) The agent's acceptance scri
 
 *Files: `src/ui/`, `scripts/verify/`, `tools/verify/`*
 
-### NR-664 — A new verify script (corp_disclosure.lua) is written but unregistered - registration needs Ben
-*question · raised 2026-08-26 · from Sprint 20 wave 2, BL-633.*
-
-The agent authored scripts/verify/corp_disclosure.lua - an acceptance script that injects a real press through ImGui's own event queue and hit-test via verify.click (BL-521), so a control rendering past the panel's edge FAILS there rather than passing on a screenshot. It correctly did not name it in verifier-visual's SKILL.md, because 'tool creation is skill creation' and registering a check needs Ben's permission. The script works (it selected Faros-YelenKalen International by clicking a row). Ben's call: register it as a named check, or leave it as an ad-hoc script. Recommend registering - an injected press is materially stronger than a capture, and it is the closest thing we have to the live click that keeps slipping.
-
-*Files: `scripts/verify/corp_disclosure.lua`, `.claude/skills/verifier-visual/SKILL.md`*
-
 ### NR-665 — The private demote admits STATIST only, not the never-industrialised character - a departure from Pass 2b's literal text
 *decision taken on your behalf · raised 2026-08-26 · from Sprint 20 wave 2, BL-638: the agent departed from the doc, said so, and gave the reason.*
 
 Pass 2b as I wrote it said 'a statist OR ISOLATIONIST character lands here [private]'. The agent admitted `authoritarian` only and excluded `isolationist`, because nation_component::politics IS the industrialisation-timing tercile and `isolationist` is its NEVER rung - so on an antiquity world every nation is isolationist, and demoting on it would have re-created the exact degenerate distribution one rung down: every corporation `private` instead of every corporation `closed`. In its words: 'Nobody built a furnace is a statement about industry, not corporate law; treating it as one smuggles Stage 4 back in through the polity term.' ENDORSED and written into the doc. This is the SAME trap BL-638 exists to fix, reappearing in a different term of the same expression - which is worth noticing on its own: the industrial signal is threaded through more of generation than the obvious call site, so a future rule reading `politics` is reading industrialisation timing whether it means to or not. The fallback path (ownership_from_character) is untouched, where isolationist -> closed still holds.
 
 *Files: `docs/generation/CORPORATION_GENERATION.md`, `src/world/corporation_generation.cpp`*
-
-### NR-666 — The INDUSTRIAL epoch now yields FEWER public firms than antiquity - measured, and it reads backwards
-*question · raised 2026-08-26 · from Sprint 20 wave 2, BL-638's R2 sweep, 8 seeds at each epoch.*
-
-0 CE: public 20 of 64 corps (31.2%), floor met in 8 of 8 worlds. 1960: public 14 of 64 (21.9%), floor met in 5 of 8, three worlds standing floor-unmet. So the ANTIQUITY default now produces MORE publicly-held firms than the industrial arc, which is the opposite of what the history it models would suggest. The mechanism is legible and may be entirely fine: a 1960 world carries more regions (1550 vs 1298), the charter diffuses from a single cradle, so a bigger world dilutes its reach. But it means three modern worlds in eight have nothing to file and nothing to buy - the exact condition BL-638 was written to remove, now relocated to the other end of the timeline. TWO READINGS, and it is Ben's call which: (a) correct as-is - an unmet floor honestly stands, and a world where corporate personhood never spread is a legitimate world; (b) the reach radius should scale with the world's size or era rather than being fixed, so diffusion keeps pace with the ground it has to cover. Related dial: the agent measured that the CULTURAL carrier does most of the work (328 lived regions against 95 copied) because conquest_cost_q keeps the geometric radius near its floor - so if the map's shape should matter more than its peoples, that scaling is where to reach.
-
-*Files: `src/world/settlement.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
 
 ### NR-667 — ownership_class values change on every seed - any state_hash golden over the corp store will move
 *observation · raised 2026-08-26 · from Sprint 20 wave 2, BL-638: flagged by the agent, unresolved at its report.*
@@ -557,26 +536,12 @@ BL-638 changes the VALUE of a serialised field on every corporation in every see
 
 *Files: `tools/verify/spectator_determinism.cpp`, `src/world/corporation_generation.cpp`*
 
-### NR-668 — NR-655's exposure is now MEASURED: the buyout undervalues a contract-earning firm by 640 credits
-*question · raised 2026-08-26 · from Sprint 20 wave 2, BL-628: the harness was briefed to state the exposure rather than hide it, and it quantified it instead.*
-
-NR-655 raised this as a risk; BL-628's harness turned it into a number. Two fixtures, identical except that one earns through a mercenary contract: both file a trailing_net of 10.00, because the payout arrives in run_nation_step AFTER apply_budget has filed. Loop-only firm prices at 460.00; the contract earner at 1100.00 (its balance carries the cash). Had the return SEEN the payout, trailing_net would be 90.00 and the price 1740.00. MEASURED UNDERVALUATION: 640.00 credits, exactly k(8.0) x the 80.00/quarter the record cannot see. The harness asserts that the two firms' filed trailing_nets are IDENTICAL - i.e. it pins the blindness as a known property rather than letting a future fixture hide it. This makes NR-655's fork concrete: option A (an eighth `other` field filed after the tick's last mover) closes exactly this 640. Ben's call, and BL-628 is built and correct WITHOUT it - the price is what the doc specifies; the doc's input is what is short.
-
-*Files: `docs/economy/FINANCE.md`, `src/world/corp_command.cpp`, `src/world/budget_system.cpp`*
-
 ### NR-669 — The zero floor laundered a NaN into a FREE firm - caught by the harness, on the AI-facing seam
 *observation · raised 2026-08-26 · from Sprint 20 wave 2, BL-628: the agent found it in its own code and fixed it before reporting.*
 
 Worth recording as a pattern, not just a fixed bug. The price is max(0, book + k x trailing_net + balance). Applying the floor FIRST meant a NaN - reachable from a corrupt filed return - compared false against 0, so max returned 0.0f, and the seam's own isfinite guard then saw a clean number and let it through. A corrupt record bought a firm for FREE. The fix is one line (propagate non-finite, then floor) and is now pinned by two harness rows. THE GENERAL SHAPE: a sanitising operation placed BEFORE a validity check can launder the invalid value into a valid-looking one, and this is exactly the class the standing rules' AI-facing-seam paragraph exists for - validate as the value that lands, reject whole, never clamp. Here the clamp WAS the vulnerability. Written into FINANCE.md so the ordering is design, not an implementation detail someone can reorder later.
 
 *Files: `docs/economy/FINANCE.md`, `src/world/corp_command.cpp`, `.claude/rules/io-standing-rules.md`*
-
-### NR-670 — Should a rival ever be able to buy the PLAYER out?
-*question · raised 2026-08-26 · from Sprint 20 wave 2, BL-628: gated at the seam and flagged rather than assumed.*
-
-FINANCE.md's ownership-class rules are silent on the player's own corporation. Read literally, a public player corp could be bought and ERASED, leaving world::player_entity dangling. BL-628 refuses it - gated at the command seam rather than in corp_ai.cpp, because a scorer-side guard would not bind a wire caller, which is the right place for it either way. But the underlying question is Ben's and it is not small: every widening in the standing rules concerns what may be done TO a corp a human owns, and being bought out is the furthest possible version of that. If the answer is ever yes, player_entity needs a rule of its own (does the player follow the assets? get a game-over? re-seat?). Recorded in FINANCE.md as a live question rather than left as a default fallen into. Note the spectator precedent: under corp_ai_params::spectating the prohibition has no subject, so a buy-the-player gate arguably should not apply there either.
-
-*Files: `docs/economy/FINANCE.md`, `.claude/rules/io-standing-rules.md`, `src/world/corp_command.cpp`*
 
 ### NR-671 — The ancient economy has TWO live demand sinks - mercantile demand is named as a consumer everywhere and implemented nowhere
 *question · raised 2026-08-26 · from Ben's question, 2026-08-26: 'how much profit do we really expect to make anyway - do we have a list mapping resources to consumers?' Built the map from scripts/recipes.lua, economy.lua and world_gen.lua.*
@@ -605,20 +570,6 @@ BL-648's registry substantiates an exemption by reading the DATA the running pas
 haulage_measure reports 0 failures at 1368 convoys dispatched, 1014 intra-body, against a previously-noted baseline of 1055/802. The agent correctly did not re-bless anything and named the gap. It matters more than an ordinary number drift because of what this harness IS: convoy traffic can collapse with every state_hash golden digit-identical, so haulage_measure against its baseline is the only real check that trade is still happening. A baseline that has silently moved by ~30% is therefore a check that has quietly stopped meaning what it meant. Sprint 19's population work (~40x centre density) and Sprint 20's road and levy changes are the obvious candidates and neither was chased. Someone should establish the current number deliberately, with provenance, rather than letting the next reader compare against a figure from a different world.
 
 *Files: `tools/verify/haulage_measure.cpp`*
-
-### NR-675 — refined_copper is UNTAGGED in recipes.lua - a copper smelter runs at 0 CE while every sibling is industrial
-*question · raised 2026-08-26 · from Sprint 21 wave 0, BL-649's census: measured, not inferred - 8,940 units produced at 0 CE on seed 0.*
-
-scripts/recipes.lua's refined_copper recipe (~line 154) carries no `era =` field, so it defaults to `any` and is allowed in the ancient band. Every sibling refining recipe is tagged `industrial`. The census measures the consequence rather than guessing at it: 8,940 units of refined_copper produced at 0 CE, chain depth 1, and background_demand pays for it - which makes it one of the very few ancient chains with a live buyer, for what looks like an oversight. TWO READINGS and it is Ben's call: (a) it IS an oversight, tag it `industrial`, and the ancient band loses a chain it should not have had; (b) it is correct - copper smelting is genuinely ancient technology, unlike the rest of that group, and the tag was omitted on purpose. Reading (b) is historically defensible, which is exactly why it should not be decided by whoever notices it next. Nobody has touched the line.
-
-*Files: `scripts/recipes.lua`, `docs/economy/PRODUCTION.md`*
-
-### NR-676 — The census invented vocabulary the tuning passes will cite - worth ratifying once
-*novel-work · raised 2026-08-26 · from Sprint 21 wave 0, BL-649: the agent raised a mild novelty flag and it is the right call.*
-
-MARKETS.md § Measuring it owns the task, so the work was not unowned - but the census had to coin terms no doc defines, and every Sprint 21 tuning pass will now quote them: the STRUCTURAL SINK vs OBSERVED DEMAND distinction (a good can have a sink authored and still have zero demand this tick), the REC/DEP producibility split, and the `px` priced-on-any-market axis. It also split economy_report::wants into construction vs processing, recovered from world state rather than stored, with the residual asserted non-negative. None of it is controversial and all of it is useful; it just should be ratified into MARKETS.md § Demand channels once rather than accreting as harness-local jargon three passes deep. Cheap to do, and the alternative is a report nobody outside this session can read.
-
-*Files: `tools/verify/demand_census.cpp`, `docs/economy/MARKETS.md`*
 
 ---
 
@@ -771,6 +722,15 @@ Ben ruled this ledger a SIBLING of the spawn-viability pass rather than its carr
 
 *Files: `docs/development/NEXT_SESSION.md`, `docs/development/sprints.json`*
 
+### NR-655 — A filed return CANNOT see subsidies or contract payouts - and the buyout would undervalue every firm that earns them
+*question · raised 2026-08-26 · from Sprint 20 wave 1, BL-626 (quarterly return): the agent found it and the main session confirmed it at app.cpp:1271/1281.*
+
+MEASURED, not suspected. apply_budget runs at app.cpp:1271 and run_nation_step at :1281 - ten lines later. So a return files BEFORE national transfers and mercenary-contract payouts touch the balance, and corp_budget::subsidies is always 0 in a filed record. Two consequences. (1) The retain property R2 holds exactly only where nothing outside the money loop moves a balance; on a real campaign construction, hire, survey, convoy and nation payouts all do. (2) THE ONE THAT MATTERS: BL-628 prices a buyout off trailing_net, so a firm earning through mercenary contracts - which CONTRACTS.md calls THE income loop - reads as unprofitable on its own filed returns and would be systematically undervalued. THE FORK: (A) add an eighth field, 'other' = whole-tick balance delta minus money-loop net, filed after the tick's last mover, so the seven flows still explain net AND net+other telescopes exactly; the buyout prices off the sum. (B) keep it as built and document trailing_net as money-loop profit only, accepting the undervaluation. (C) file after everything and let net be the whole delta, losing the property that the seven flows explain it. RECOMMEND (A): one extra field, nothing hidden, everything telescopes, and it is the legible answer rather than the clever one. It needs a new item that BL-628 requires, and it changes what FINANCE.md says about where the return is filed - the doc's 'at the end of apply_budget' is my wording from earlier today and it is the part that is wrong.
+
+> **RESOLVED.** Ben, 2026-08-26: option A. A return gains an eighth field, `other`, filed after the tick's last mover. Written into FINANCE.md section The eighth field; BL-653 owns the work.
+
+*Files: `docs/economy/FINANCE.md`, `src/world/budget_system.cpp`, `src/core/app.cpp`*
+
 ### NR-658 — build_harness.js is unusable from an agent Bash session - second independent report
 *observation · raised 2026-08-26 · from Sprint 20 wave 1, BL-626.*
 
@@ -779,4 +739,58 @@ The committed harness build route dies with "'cl' is not recognized" when invoke
 > **RESOLVED.** FIXED, 2026-08-26, in the wave-1 integration: tools/verify/build_harness.bat is a committed Bash-safe entry point. It establishes the MSVC environment ONCE in its own shell before node runs, so the inner spawn inherits a PATH that already has cl on it instead of building one across a mangled quoting boundary. Arguments, output location and exit code are build_harness.js’s own - the wrapper adds nothing but the environment. Verified by building five harnesses through it. Three sessions hit this and each rediscovered the same workaround, which is what made it worth a committed fix rather than a fourth note.
 
 *Files: `tools/verify/`, `docs/development/DEVELOPMENT_PRACTICES.md`*
+
+### NR-664 — A new verify script (corp_disclosure.lua) is written but unregistered - registration needs Ben
+*question · raised 2026-08-26 · from Sprint 20 wave 2, BL-633.*
+
+The agent authored scripts/verify/corp_disclosure.lua - an acceptance script that injects a real press through ImGui's own event queue and hit-test via verify.click (BL-521), so a control rendering past the panel's edge FAILS there rather than passing on a screenshot. It correctly did not name it in verifier-visual's SKILL.md, because 'tool creation is skill creation' and registering a check needs Ben's permission. The script works (it selected Faros-YelenKalen International by clicking a row). Ben's call: register it as a named check, or leave it as an ad-hoc script. Recommend registering - an injected press is materially stronger than a capture, and it is the closest thing we have to the live click that keeps slipping.
+
+> **RESOLVED.** Ben, 2026-08-26: REGISTER. corp_disclosure.lua is now a named check in verifier-visual's SKILL.md, with its strengths and its one honest limit recorded - it injects a real press, and it still is not a live click.
+
+*Files: `scripts/verify/corp_disclosure.lua`, `.claude/skills/verifier-visual/SKILL.md`*
+
+### NR-666 — The INDUSTRIAL epoch now yields FEWER public firms than antiquity - measured, and it reads backwards
+*question · raised 2026-08-26 · from Sprint 20 wave 2, BL-638's R2 sweep, 8 seeds at each epoch.*
+
+0 CE: public 20 of 64 corps (31.2%), floor met in 8 of 8 worlds. 1960: public 14 of 64 (21.9%), floor met in 5 of 8, three worlds standing floor-unmet. So the ANTIQUITY default now produces MORE publicly-held firms than the industrial arc, which is the opposite of what the history it models would suggest. The mechanism is legible and may be entirely fine: a 1960 world carries more regions (1550 vs 1298), the charter diffuses from a single cradle, so a bigger world dilutes its reach. But it means three modern worlds in eight have nothing to file and nothing to buy - the exact condition BL-638 was written to remove, now relocated to the other end of the timeline. TWO READINGS, and it is Ben's call which: (a) correct as-is - an unmet floor honestly stands, and a world where corporate personhood never spread is a legitimate world; (b) the reach radius should scale with the world's size or era rather than being fixed, so diffusion keeps pace with the ground it has to cover. Related dial: the agent measured that the CULTURAL carrier does most of the work (328 lived regions against 95 copied) because conquest_cost_q keeps the geometric radius near its floor - so if the map's shape should matter more than its peoples, that scaling is where to reach.
+
+> **RESOLVED.** Ben, 2026-08-26: CORRECT AS-IS - an unmet floor honestly stands. A later epoch may yield fewer public firms than an earlier one; the dilution is legible and the result is a legitimate world. Written into CORPORATION_GENERATION.md with an explicit instruction NOT to add a size or era term to the radius to make the curve match intuition.
+
+*Files: `src/world/settlement.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
+
+### NR-668 — NR-655's exposure is now MEASURED: the buyout undervalues a contract-earning firm by 640 credits
+*question · raised 2026-08-26 · from Sprint 20 wave 2, BL-628: the harness was briefed to state the exposure rather than hide it, and it quantified it instead.*
+
+NR-655 raised this as a risk; BL-628's harness turned it into a number. Two fixtures, identical except that one earns through a mercenary contract: both file a trailing_net of 10.00, because the payout arrives in run_nation_step AFTER apply_budget has filed. Loop-only firm prices at 460.00; the contract earner at 1100.00 (its balance carries the cash). Had the return SEEN the payout, trailing_net would be 90.00 and the price 1740.00. MEASURED UNDERVALUATION: 640.00 credits, exactly k(8.0) x the 80.00/quarter the record cannot see. The harness asserts that the two firms' filed trailing_nets are IDENTICAL - i.e. it pins the blindness as a known property rather than letting a future fixture hide it. This makes NR-655's fork concrete: option A (an eighth `other` field filed after the tick's last mover) closes exactly this 640. Ben's call, and BL-628 is built and correct WITHOUT it - the price is what the doc specifies; the doc's input is what is short.
+
+> **RESOLVED.** Ben, 2026-08-26: closed by the same ruling as NR-655 - the eighth field closes exactly this 640 credits. BL-653. Its harness row pinning the blindness is to be INVERTED to pin the closure, not deleted.
+
+*Files: `docs/economy/FINANCE.md`, `src/world/corp_command.cpp`, `src/world/budget_system.cpp`*
+
+### NR-670 — Should a rival ever be able to buy the PLAYER out?
+*question · raised 2026-08-26 · from Sprint 20 wave 2, BL-628: gated at the seam and flagged rather than assumed.*
+
+FINANCE.md's ownership-class rules are silent on the player's own corporation. Read literally, a public player corp could be bought and ERASED, leaving world::player_entity dangling. BL-628 refuses it - gated at the command seam rather than in corp_ai.cpp, because a scorer-side guard would not bind a wire caller, which is the right place for it either way. But the underlying question is Ben's and it is not small: every widening in the standing rules concerns what may be done TO a corp a human owns, and being bought out is the furthest possible version of that. If the answer is ever yes, player_entity needs a rule of its own (does the player follow the assets? get a game-over? re-seat?). Recorded in FINANCE.md as a live question rather than left as a default fallen into. Note the spectator precedent: under corp_ai_params::spectating the prohibition has no subject, so a buy-the-player gate arguably should not apply there either.
+
+> **RESOLVED.** Ben, 2026-08-26: NEVER. The player's corporation is not buyable. Written into FINANCE.md as settled, with the reason: every other widening makes the world act ON the player, and erasing the seat is the one move that ends the conversation instead of continuing it. player_entity needs no rule of its own, since it cannot be left dangling by a verb that cannot fire.
+
+*Files: `docs/economy/FINANCE.md`, `.claude/rules/io-standing-rules.md`, `src/world/corp_command.cpp`*
+
+### NR-675 — refined_copper is UNTAGGED in recipes.lua - a copper smelter runs at 0 CE while every sibling is industrial
+*question · raised 2026-08-26 · from Sprint 21 wave 0, BL-649's census: measured, not inferred - 8,940 units produced at 0 CE on seed 0.*
+
+scripts/recipes.lua's refined_copper recipe (~line 154) carries no `era =` field, so it defaults to `any` and is allowed in the ancient band. Every sibling refining recipe is tagged `industrial`. The census measures the consequence rather than guessing at it: 8,940 units of refined_copper produced at 0 CE, chain depth 1, and background_demand pays for it - which makes it one of the very few ancient chains with a live buyer, for what looks like an oversight. TWO READINGS and it is Ben's call: (a) it IS an oversight, tag it `industrial`, and the ancient band loses a chain it should not have had; (b) it is correct - copper smelting is genuinely ancient technology, unlike the rest of that group, and the tag was omitted on purpose. Reading (b) is historically defensible, which is exactly why it should not be decided by whoever notices it next. Nobody has touched the line.
+
+> **RESOLVED.** Ben, 2026-08-26: OVERSIGHT - tagged `industrial`. MEASURED THROUGH THE NEW CENSUS, which is its first real use: total ancient market demand 2850.2 -> 2617.3 (-8.2%), and copper_ore JOINS THE DEAD EXTRACTABLE LIST (17,686 units dug with no ancient buyer) because the smelter was its only in-band consumer. That consequence is correct and is now visible rather than latent. Also observed in the diff: the construction channel read 35.0 before and 0.0 after purely because nothing happened to be mid-build at the sample tick - transient by nature, which is exactly BL-642's premise.
+
+*Files: `scripts/recipes.lua`, `docs/economy/PRODUCTION.md`*
+
+### NR-676 — The census invented vocabulary the tuning passes will cite - worth ratifying once
+*novel-work · raised 2026-08-26 · from Sprint 21 wave 0, BL-649: the agent raised a mild novelty flag and it is the right call.*
+
+MARKETS.md § Measuring it owns the task, so the work was not unowned - but the census had to coin terms no doc defines, and every Sprint 21 tuning pass will now quote them: the STRUCTURAL SINK vs OBSERVED DEMAND distinction (a good can have a sink authored and still have zero demand this tick), the REC/DEP producibility split, and the `px` priced-on-any-market axis. It also split economy_report::wants into construction vs processing, recovered from world state rather than stored, with the residual asserted non-negative. None of it is controversial and all of it is useful; it just should be ratified into MARKETS.md § Demand channels once rather than accreting as harness-local jargon three passes deep. Cheap to do, and the alternative is a report nobody outside this session can read.
+
+> **RESOLVED.** Ben, 2026-08-26: RATIFY. The census's vocabulary is written into MARKETS.md section Measuring it as a table - structural sink vs observed demand, REC/DEP, px - with the distinction that does the work called out: a structural sink with ZERO observed demand is the signature of a dead chain, and invisible to any check looking at only one of them.
+
+*Files: `tools/verify/demand_census.cpp`, `docs/economy/MARKETS.md`*
 

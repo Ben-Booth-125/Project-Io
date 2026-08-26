@@ -150,8 +150,17 @@ recipes = {
     },
 
     -- id 8 — Smelter: copper ore -> refined copper.
+    --
+    -- BL-649/NR-675 (Ben, 2026-08-26): tagged `industrial`. It carried NO era
+    -- field, so it defaulted to `any` and a copper smelter ran at 0 CE — 4,523
+    -- units on the default seed, paid for by background_demand — while every
+    -- sibling refining recipe in this group is tagged `industrial`. Ben ruled it
+    -- an oversight rather than a deliberate ancient exception. The ancient arc
+    -- reaches metal through the bloomery chain (timber -> charcoal -> blooms),
+    -- which is the same shape BL-429 gave steel.
     {
         name    = "refined_copper",
+        era     = "industrial", -- NR-675
         group   = "Metal Foundry", -- BL-434
         inputs  = { copper_ore = 2.0 },
         outputs = { refined_copper = 1.0 },

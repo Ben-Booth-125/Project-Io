@@ -28,6 +28,17 @@ without editing this file. The lens / canvas / panel checks form the bulk
 the ledger checks, …). v0.0.8 (Discovery & Intelligence) additions, named here per
 the "authorising a new check = naming it" convention:
 
+- **`corp_disclosure.lua`** (BL-633, registered on Ben's ruling 2026-08-26 — NR-664) — the
+  Corporations panel under the disclosure gate: exact reach and share on every row, capital where
+  the firm files and a dash where it does not. **It injects a REAL PRESS** through ImGui's own event
+  queue and hit-test (`verify.click`, BL-521) rather than only capturing a frame, so a control that
+  renders past the panel's edge FAILS here instead of passing on a screenshot — which is the
+  BL-449 failure mode this project keeps re-encountering. Treat it as the strongest automated
+  substitute for a live click, and still not a replacement for one: the same session that wrote it
+  had `expect_no_clipping` pass VACUOUSLY (0 records) on a frame containing a genuinely clipped
+  button (NR-663), because SmallButton labels are not instrumented into the overflow ledger.
+  Note the default world cannot exercise the exact-capital half of the gate — every corp is `closed`
+  at the antiquity default — so that half is covered headlessly in `standing_harness` instead.
 - **`survey.lua`** (BL-067) — Planetary survey mask progression (masked → raster
   partial → full) and the Solar-canvas survey badges (hidden `?` / scanning `k∕N` /
   surveyed). Driver: `verify.set_survey(body, regions_done)`.

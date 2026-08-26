@@ -220,14 +220,32 @@ that surface is unchanged.
 width on the save seam. No branch reads a return during the tick that writes it, so the record is
 a pure downstream observation of the loop and cannot feed back into it.
 
-**What a return does NOT see, stated because it changes what can be priced from one.** The money
-loop is not the only thing that moves a balance in a quarter. National transfers and mercenary
-contract payouts land *after* it, and construction, hire, survey and convoy spend land elsewhere in
-the tick. A return therefore explains the **money loop's** movement exactly and the *quarter's*
-movement only partly — which is fine for reading profitability and **not** fine for pricing a firm,
-since a corporation earning through contracts would read as unprofitable on its own returns. Closing
-that gap is owed work, and it is a precondition of the acquisition price below rather than a detail
-of it.
+### The eighth field — what the money loop does not move
+
+The money loop is not the only thing that moves a balance in a quarter. National transfers and
+mercenary-contract payouts land *after* it (`apply_budget` runs at `app.cpp:1271`, `run_nation_step`
+at `:1281`), and construction, hire, survey and convoy spend land elsewhere in the tick. Left there,
+a return would explain the money loop's movement exactly and the *quarter's* only partly — which is
+fine for reading profitability and **not** fine for pricing a firm: a corporation earning through
+contracts reads as unprofitable on its own books, and the acquisition price below undervalues it by
+a **measured 640 credits**.
+
+So a return carries an eighth field. **`other` = the whole-tick balance delta minus the money-loop
+net**, and the record is filed **after the tick's last mover** rather than at the end of
+`apply_budget` (Ben, 2026-08-26, ruling on NR-655/NR-668). Design: BL-653 (the eighth field).
+
+Three properties, and the shape is chosen for them:
+
+- **The seven flows still explain `net`.** Nothing about the money loop's own accounting changes;
+  `other` is the residue, not a re-cut of it.
+- **`net + other` telescopes exactly.** Summed over any run it equals the whole balance delta, which
+  is the retain property extended to the whole tick rather than one function within it.
+- **A firm is priced off the sum.** `trailing_net` becomes the mean of `net + other`, so contract
+  income is visible to the buyout and the 640-credit gap closes.
+
+`other` is deliberately **not** itemised. The moment it is split into named lines it becomes a second
+budget breakdown competing with `corp_budget`, and the reason there is one accounting authority is
+that two of them disagree.
 
 ## Disclosure — who may read a return
 
@@ -326,12 +344,18 @@ four further economy ticks — the sharpest of the three, because it proves ever
 survives ticking over the merged world. A store added later fails that row rather than passing
 silently.
 
-**The player's corporation is not buyable.** The class rules above are silent on it, and read
-literally a public player corp could be erased, leaving `player_entity` dangling. The gate sits at
-the command seam rather than in the scorer, because a scorer-side guard would not bind a wire
-caller. Whether a rival should ever be able to buy the player out is a live question, and it is the
-kind that belongs beside the standing rules on what may be done to a corp a human owns — not a
-default fallen into.
+**The player's corporation is not buyable. Settled** (Ben, 2026-08-26, ruling on NR-670): *never*.
+A rival may act against the player's corp in every other sanctioned way — score stance toward it,
+lobby a nation against it, outbid it, gate it out of a territory — but it may not end it. The gate
+sits at the command seam rather than in the scorer, because a scorer-side guard would not bind a
+wire caller, and `world::player_entity` therefore needs no rule of its own: it cannot be left
+dangling by a verb that cannot fire.
+
+Worth stating why this is a design rather than a convenience. Every widening recorded in
+`.claude/rules/io-standing-rules.md` concerns what may be done **to a corp a human owns**, and each
+one was granted because it makes the world act on the player rather than around them. Erasing the
+seat is the one move that ends the conversation instead of continuing it — the player has nothing
+left to answer with — so it sits outside the series rather than at its end.
 
 **Who may be bought.** A **public** corporation may be bought on the open market at the price
 above, with no consent — its books are open, so it can be priced. A **private** or **closed** one

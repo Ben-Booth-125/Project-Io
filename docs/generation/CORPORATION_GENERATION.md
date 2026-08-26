@@ -161,6 +161,15 @@ than one epoch rather than testing it against a number, and the two radii are bo
 shape: the charter must never cover the whole world (or `closed` stops being real) and never fail
 to cover its own hinterland (or `public` does).
 
+**A LATER epoch may yield FEWER public firms than an earlier one, and that stands** (Ben,
+2026-08-26, ruling on NR-666). Measured: 31.2 % of corporations public at 0 CE against 21.9 % at
+1960, with the public floor met in 8 of 8 worlds against 5 of 8. The mechanism is legible — a
+later world carries more regions, the charter diffuses from a single cradle, so more ground dilutes
+its reach — and the result is not a defect to tune away. **An unmet floor honestly stands**, which is
+this pass's rule everywhere else, and a world where corporate personhood never spread widely is a
+legitimate world rather than a broken one. Do not add a size or era term to the radius to make the
+curve read the way intuition expects it to.
+
 A corporation with no home region — the rung-3 case where the settlement pass never reached the
 nation — takes its class from the national character, the same fallback its focus takes.
 Background firms (Pass 6) are classed by the same read; nothing about the class branches on

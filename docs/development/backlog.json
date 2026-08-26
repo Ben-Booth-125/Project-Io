@@ -1789,6 +1789,36 @@
     "docs/economy/MARKETS.md"
    ],
    "design": "THE MECHANISM THAT MADE TWO SEPARATE BUGS INVISIBLE ON THE SAME DAY, which is why it is an item rather than a note. inject_population_demand and inject_background_demand both SKIP a basket entry whose resource carries no market base price - silently, with no warning and no row anywhere. Consequences observed 2026-08-26: (1) BL-649's census read as having no background demand at all on its first run, and (2) tools/verify/spawn_solvency.cpp - whose own header says it loads world_gen.lua and did not - measured BL-635's entire spawn diagnosis in a world where background demand did not exist. Neither failed. Both just quietly answered a question about a different world. THE WORK: an injector that cannot price a basket entry must report it - a named diagnostic on the first occurrence, and a harness row that FAILS on a basket naming an unpriced good, since that combination is always either a missing script or an authoring error and is never intended. A basket entry is a STATEMENT that somebody wants the good; silently dropping it turns a design statement into a no-op. Cheap, and it protects every measurement the rest of Sprint 21 depends on."
+  },
+  {
+   "id": "BL-653",
+   "short_name": "RETURN_EIGHTH_FIELD",
+   "category": "Economy",
+   "title": "The eighth field - a return sees the whole quarter, not just the money loop",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": "v0.1.21",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-626"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/budget_system.cpp",
+    "src/world/components.hpp",
+    "src/core/app.cpp",
+    "src/world/world_save.cpp",
+    "src/world/corp_command.cpp",
+    "tools/verify/",
+    "docs/economy/FINANCE.md"
+   ],
+   "design": "Ben's ruling, 2026-08-26, on NR-655/NR-668 - option A of the three-way fork, and the measurement that forced it: a firm earning through mercenary contracts files a trailing_net IDENTICAL to a firm that earns nothing there, so BL-628's buyout undervalues it by exactly 640 credits (k 8.0 x the 80/quarter the record cannot see). Design in FINANCE.md section The eighth field. THE WORK: add `other` to quarterly_return = the whole-tick balance delta minus the money-loop net, and MOVE THE FILING from the end of apply_budget to after the tick's last balance mover - which is the part that needs care, since apply_budget does not own the tick and the headless harnesses call it directly. Then re-point corp_trailing_net at the mean of (net + other) so the buyout prices off the whole quarter. THREE PROPERTIES TO ASSERT: the seven flows still explain `net` unchanged; net+other telescopes EXACTLY over a run (the retain property extended from one function to the whole tick); and BL-628's own harness row that currently PINS the 640-credit blindness must be re-specified to pin the closure instead - do not delete it, invert it. `other` is deliberately NOT itemised: split into named lines it becomes a second budget breakdown competing with corp_budget, and the reason there is one accounting authority is that two of them disagree. Versions the save format."
   }
  ]
 }

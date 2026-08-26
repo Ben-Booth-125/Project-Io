@@ -3951,6 +3951,71 @@
    "promoted_from": "backlog.json BL-649",
    "resolved": "2026-08-26",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "spawn-shortlist",
+   "title": "BL-630 - warm start in spectate, then seat the player at random from the viable set",
+   "status": "open",
+   "batch": "sprint-20-wave-3",
+   "promoted_from": "backlog.json BL-630",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: spawn_shortlist R1"
+     ],
+     "requirement": "The pre-game warm start runs BEFORE the player is seated, under corp_ai_params::spectating, with no corp flagged is_player for its whole duration.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: spawn_shortlist R2"
+     ],
+     "requirement": "The shortlist is the specialists clearing the viability floor; the seat is drawn from it against the WORLD SEED, so one seed reproduces one seat exactly across runs.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: spawn_shortlist R3, measured"
+     ],
+     "requirement": "The draw is WEIGHTED, not uniform (Ben, 2026-08-26): a processor among the holdings weights up, and holdings on or near populated ground weight up. It is a BIAS, never a gate - a pure-extraction corp on thin ground stays drawable. The resulting distribution is REPORTED across a sweep, never asserted against a target.",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: spawn_shortlist R4"
+     ],
+     "requirement": "An unmet floor STANDS: if no specialist clears, the highest trailing-net specialist is seated and the world records that the floor went unmet. No corp is conjured or patched.",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "review: grep clean",
+      "LIVE: the app goes generation -> play with no corp screen"
+     ],
+     "requirement": "app_screen::choosing_corp and its whole surface are GONE - draw_corp_choice_screen, build_corp_choices, apply_corp_choice, the Surprise me press, verify.show_corp_choice and scripts/verify/corp_choice.lua. Nothing references them.",
+     "notes": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "headless: the golden suite",
+      "review: one provenance entry per moved golden"
+     ],
+     "requirement": "The goldens move and are re-blessed ONCE, in one wave, with dated provenance - never a dribble. Every corp is scorer-driven through the warm start where the seated one used to be excluded, so every seed opening changes by construction.",
+     "notes": ""
+    }
+   ]
   }
  ]
 }

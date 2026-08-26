@@ -268,6 +268,21 @@ per era band, the total modelled demand and the passes that inject it — so a d
 a report rather than a discovery made three sprints later. It is also what makes a *tuning* pass
 possible at all, since the question "did that change help" needs a before.
 
+**The census's vocabulary is canon** (ratified on Ben's ruling, 2026-08-26 — NR-676), because every
+tuning pass will quote it and harness-local jargon three passes deep is unreadable:
+
+| Term | Means |
+|---|---|
+| **Structural sink** | A good *has* an authored consumer — a recipe input, a basket weight, a pool draw. A property of the design. |
+| **Observed demand** | What was actually bid for this tick. A property of the run. |
+| **`REC` / `DEP`** | Producibility: made by a recipe in this band, or dug from a deposit. A good can be neither, which is the most interesting row in the report. |
+| **`px`** | Priced on some market. **An unpriced good is invisible to both basket injectors, which skip it silently** — so this column is where a missing script shows up (BL-652). |
+
+The distinction that does the work is the first one: **a structural sink with zero observed demand
+is the signature of a dead chain**, and it is invisible to any check that looks at only one of them.
+A good with no sink at all is easy to notice; a good with a sink nobody exercises is what this
+economy actually had.
+
 ## Background corporations
 
 **The market saturates because real firms produce and consume, not because a substrate pass
