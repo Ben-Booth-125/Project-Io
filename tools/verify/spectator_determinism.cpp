@@ -255,7 +255,26 @@ constexpr int      k_ticks = 300;
 // settlement tier, save v15). Confirmed reproducible by R2's own
 // two-independently-built-worlds row (81ADF917369317C7 twice) on the merged
 // wave-3 tree. This is the constant v0.1.19 ships with.
-constexpr uint64_t k_unspectated_golden = 0x81ADF917369317C7ull;
+// Re-blessed 2026-08-26 (Sprint 20 wave 2). TWO layers again, and the first is
+// the same failure the 2026-08-25 note above repaired — recorded rather than
+// smoothed over, because it has now happened twice and that is the finding:
+// (1) the golden was ALREADY red on main BEFORE this sprint's wave 2. BL-631's
+// agent measured C91FB6ADA80B65CE against main's own unmodified sources and
+// correctly declined to re-bless (NR-661), so something landed between the
+// v0.1.19 recut and Sprint 20 that moved the world with no provenance line.
+// That gap is acknowledged here; which landing caused it was not chased.
+// (2) Sprint 20 wave 2 then moved it legitimately, three ways: BL-631 and
+// BL-638 write ownership_class onto every corporation (a serialised field whose
+// VALUES change on every seed), and BL-635 deleted a duplicate player unit
+// entity — which state_hash folds unconditionally — while retuning the levy
+// default (1.0 -> 0.1) and the whole unit_upkeep vector (x0.025).
+// Confirmed reproducible by R2's own two-independently-built-worlds row
+// (E350DF2A50BF4BAA twice) on the integrated wave-2 tree.
+// NOTE ON TIMING: REFINED.md had assigned this sprint's re-bless to BL-630 in
+// wave 3, once and late. Taken here instead, deliberately: wave 3 is now behind
+// Sprint 21, and a known-red golden left standing for that long is how layer (1)
+// above happens a third time. One bless, one provenance entry, measured first.
+constexpr uint64_t k_unspectated_golden = 0xE350DF2A50BF4BAAull;
 
 /// Hand-built registry mirroring scripts/economy.lua + scripts/recipes.lua for
 /// the building types the generator places. Copied from ai_skill_harness so the

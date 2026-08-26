@@ -1,98 +1,70 @@
 # Project Io — REFINED (active worklist)
 
-**Sprint 20 — the books open, and the start earns its way. Wave 2 (batch `sprint-20-wave-2`).**
-
-Wave 1 landed 2026-08-26: BL-626 (quarterly return), BL-631 (ownership class), BL-637
-(save-version reservation). Integrating build BUILD_OK, all harnesses green, save format at **17**.
-
-**Save versions are now claimed through the tool, not by hand** — that is what wave 1 built it
-for. If a wave-2 slice needs a bump: `node tools/session/next_save_version.js --claim "<BL-id
-short handle>"`, commit the ledger line, and assert the constant **symbolically**. None of the
-four tasks below is expected to need one.
+**Two sprints open.** Sprint 20's waves 1 and 2 have landed; Sprint 21's wave 0 is in flight.
 
 ---
 
-## T4 — BL-638 (charter ownership class) · agent: generation-dev · worktree
+## Sprint 21 — demand. Wave 0 (batch `sprint-21-wave-0`)
 
-Re-point the derivation from Stage 4 to Stage 1. **This is the wave's gating task** — until it
-lands, the default world classes every corporation `closed` and nothing downstream has anything
-to read or buy.
+The guard and the instrument, deliberately **before** any channel is built: without them a
+viability pass is a guess with a number attached.
 
-- `provides:` the re-pointed derivation reading `history_ladder::charter_cradle`
-- `consumes:` `corporation_component::ownership_class` (landed, BL-631)
-- Files: `src/world/corporation_generation.cpp`, `tools/verify/ownership_class.cpp`
-- Requirements: `charter-ownership-class` R1–R4
-- Authority: `docs/generation/CORPORATION_GENERATION.md` § Pass 2b
+### T8 — BL-648 (admission rule names an injector) · agent: economy-dev · worktree
+- `provides:` a registry of real demand injectors; `chain_depth` R1 resolving exemptions against it
+- `consumes:` — nothing
+- Files: `tools/verify/chain_depth.cpp`
+- Requirements: `admission-rule-injector` R1–R4
+- **Expected RED on ten goods when it lands.** That is the item working. Do not weaken it while the
+  channels are being built.
 
-## T5 — BL-628 (whole-firm buyout) · agent: economy-dev · worktree
+### T9 — BL-649 (demand census) · agent: economy-dev · worktree
+- `provides:` `tools/verify/demand_census.cpp` — per resource, per band, who injects demand
+- `consumes:` — nothing
+- Files: `tools/verify/`, its skill entry (owed, needs Ben)
+- Requirements: `demand-census` R1–R4
+- Reports; never asserts a magnitude. Run before and after every pass, deltas kept.
 
-The verb, the price, and the dissolution walk.
-
-- `provides:` `buy_corporation` corp_verb, `k_acquisition_multiple`, the dissolution path
-- `consumes:` `corporation_component::returns` + `book_value` (landed, BL-626);
-  `ownership_class` (landed, BL-631)
-- Files: `src/world/corp_command.{hpp,cpp}`, `src/world/components.hpp`, `scripts/economy.lua`,
-  `docs/ai/ACTIONS.json`, `tools/verify/whole_firm_buyout.cpp`
-- Requirements: `whole-firm-buyout` R1–R6
-- Authority: `docs/economy/FINANCE.md` § Whole-firm acquisition
-
-## T6 — BL-635 (spawn solvency) · agent: economy-dev · worktree
-
-Diagnose the measured Cr −1 / net −627 opening, then fix it at its cause.
-
-- `provides:` the per-flow diagnosis, and whatever constant or generation term the diagnosis
-  indicts
-- `consumes:` `corporation_component::returns` (landed, BL-626) — the diagnosis reads filed returns
-- Files: `scripts/economy.lua`, `src/world/economy_system.cpp`, `src/world/budget_system.cpp`,
-  and **possibly** `src/world/corporation_generation.cpp` — see the collision note
-- Requirements: `spawn-solvency` R1–R4
-- Authority: `docs/economy/FINANCE.md`
-
-## T7 — BL-633 (retire standing bands) · agent: ui-dev · worktree
-
-Exact where a firm files, a dash where it does not. The doc work is already done.
-
-- `provides:` band-free `corp_standing`, the disclosure-gated Corporations panel
-- `consumes:` `ownership_class` (landed, BL-631)
-- Files: `src/world/standing.{hpp,cpp}`, `src/ui/corporation_panel.{hpp,cpp}`,
-  `tools/verify/standing_harness.cpp`
-- Requirements: `retire-standing-bands` R1–R4
-- Authority: `docs/politics/RELATIONS.md` § Standing · `docs/ui/DISCOVERY.md`
-- **R2 needs a LIVE CLICK**, not just a capture. It is a panel with presses on it, and BL-449
-  shipped clean on a compile and a 36/36 harness while being unusable.
+### Wave 1 (not promoted)
+BL-640 (era-banded household basket) · BL-641 (building upkeep in goods) · BL-642 (construction
+actually draws). **Wave 2:** BL-644 (space programme line) · BL-647 (endemic luxury) · BL-643
+(network upkeep) · BL-646 (battles burn ordnance). **Gated:** BL-645 (research consumes goods),
+behind BL-619's design session.
 
 ---
 
-### Collision map (file layer)
+## Sprint 20 — landed, and what it still owes
 
-Mostly disjoint, with one real overlap: **T6 may need `corporation_generation.cpp`, which T4
-owns.** If BL-635's diagnosis indicts opening capital or the holding count, its fix lands in T4's
-file. T6 is briefed to make the minimal edit and say so; the main session resolves at merge. Every
-other pair is disjoint.
+**Wave 1** (2026-08-26): BL-626 (quarterly return), BL-631 (ownership class), BL-637 (save-version
+reservation). **Wave 2** (2026-08-26): BL-638 (charter ownership), BL-628 (whole-firm buyout),
+BL-633 (retire standing bands), BL-635 (spawn solvency). Integrating build BUILD_OK both times;
+save format at **17**; `spectator_determinism` re-blessed once to `E350DF2A50BF4BAA` with provenance.
 
-### Symbol contract
+### Two rows are deliberately not green, and both are results
 
-Every `consumes` entry names a symbol that **already landed in wave 1** — no wave-2 task depends
-on another wave-2 task's output. The wave is a four-way fan-out with a merge barrier at the end,
-and T4's gating role is about *world content* being non-degenerate, not about symbols.
+- **`spawn-solvency` R2 — FAILED, left red.** Net ≥ 0 moved 0/8 → 1/8 seeds. The money loop is
+  fixed (operating net −646 → −28 cr/qtr); the residual is 60 % maintenance on buildings whose
+  output has no buyer, which is Sprint 21's territory and not a constant anyone can tune (NR-671).
+- **`retire-standing-bands` R2 — PENDING.** No live click was reachable. Joins BL-636.
+
+### Wave 3 (not promoted — deliberately behind Sprint 21)
+
+- **BL-630 (spawn shortlist)** — its viability floor now has a real mechanism to gate on, but only
+  once demand exists.
+- **BL-634 (acquisition viability)** — the definition of done for *both* sprints. Cannot honestly
+  pass until Sprint 21 lands: a corp at −28/qtr never saves up for anything.
+- **BL-627 (profitability ledger)** — design-owed on its `question_log.json` pair, Ben's wording.
+- **BL-629 (rival acquisition)** — ready; BL-628 landed.
+- **BL-650 / BL-651** — the dissolution walk's last two loose ends, and `charter_reach` being
+  silently zeroed on load.
 
 ---
-
-## Wave 3 (not promoted yet)
-
-- **BL-630 (spawn shortlist)** — deliberately held back. Its viability floor reads what BL-635
-  decides "solvent" means, and a shortlist over a field of insolvent corps is meaningless. It also
-  carries the sprint's golden re-bless, which should happen once, late, in one wave.
-- **BL-634 (acquisition viability)** — the sprint's definition of done. Needs T5 and T6 landed.
-- **BL-627 (profitability ledger)** — design-owed on its `question_log.json` pair, which is Ben's
-  wording.
-- **BL-629 (rival acquisition)** — needs T5.
 
 ## Carried, not promoted
 
-- **BL-619 (research system)** — gated: a design session with Ben.
-- **BL-636 (live-click debt)** — blocked on NR-622's environment problem, not on design.
-- **BL-632 (warm-start progress)** — design-owed.
-- **NR-655's fork** — whether a return gains an eighth field so subsidies and contract payouts are
-  visible to it. Ben's call, and BL-628's price depends on the answer.
-- The **v0.1.18 / v0.1.19 tags** — a release is Ben's to call.
+- **BL-619 (research system)** — gated: a design session with Ben. BL-645 waits on it.
+- **BL-636 (live-click debt)** — dispatch form, Throughput lens, and now BL-633's panel; blocked on
+  NR-622's environment problem, not on design.
+- **BL-632 (warm-start progress)**, **BL-639 (corp panel column budget)**, **BL-622**, **BL-595**.
+- **NR-655 / NR-668** — whether a return gains an eighth field so subsidies and contract payouts are
+  visible to it. Measured at **640 credits** of undervaluation per acquisition. Ben's call.
+- The **v0.1.18 / v0.1.19 / v0.1.20** tags — a release is Ben's to call.

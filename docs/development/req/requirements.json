@@ -3901,203 +3901,126 @@
   {
    "brief": "charter-ownership-class",
    "title": "BL-638 - ownership class reads the enforceable promise, not the energy transition",
-   "status": "open",
+   "status": "complete",
    "batch": "sprint-20-wave-2",
    "promoted_from": "backlog.json BL-638 (CHARTER_OWNERSHIP_CLASS) - Sprint 20, from NR-659's measurement",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "headless: ownership_class R1 re-pointed"
-     ],
-     "requirement": "The derivation reads HISTORY.md Stage 1 (the enforceable promise) through history_ladder::charter_cradle, not the Stage 4 industrialisation timing. It stays pure and draws no randomness.",
-     "notes": ""
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "headless: ownership_class R2, both epochs, measured"
-     ],
-     "requirement": "THE GATE. At the DEFAULT epoch (0 CE) the class distribution is no longer degenerate: at least one specialist classes public on a majority of seeds in the sweep. The distribution is REPORTED at both 0 CE and a modern epoch, never asserted against a target.",
-     "notes": ""
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "headless: ownership_class R3"
-     ],
-     "requirement": "BL-631's reachability waiver survives. Where no anchorable region can yield public the floor is waived rather than burning every reroll attempt - a state that must stay reachable and asserted even though the re-pointing makes it rarer.",
-     "notes": ""
-    },
-    {
-     "id": "R4",
-     "status": "pending",
-     "verification": [
-      "headless: ownership_class full run",
-      "headless: save_roundtrip"
-     ],
-     "requirement": "No regression: every assertion BL-631's harness already passed still passes, and the field still round-trips the save at the current version.",
-     "notes": ""
-    }
-   ]
+   "resolved": "2026-08-26",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "whole-firm-buyout",
    "title": "BL-628 - buy a public corporation outright, priced from its own filed returns",
-   "status": "open",
+   "status": "complete",
    "batch": "sprint-20-wave-2",
    "promoted_from": "backlog.json BL-628 (WHOLE_FIRM_BUYOUT) - Sprint 20, the books open",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "headless: whole_firm_buyout R1"
-     ],
-     "requirement": "A buy_corporation verb on the corp_command seam prices the target as max(0, book_value + k_acquisition_multiple x trailing_net + balance), where trailing_net is the mean net over the last 8 filed quarters (or fewer if younger). k is authored in scripts/economy.lua.",
-     "notes": ""
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "headless: whole_firm_buyout R2"
-     ],
-     "requirement": "Gated on the target's ownership_class == public. A private or closed target is refused, and the refusal MUTATES NOTHING - no partial transfer, no balance move.",
-     "notes": ""
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "headless: whole_firm_buyout R3"
-     ],
-     "requirement": "On success holdings, stockpile pools, balance and filed returns transfer to the acquirer and the target is dissolved. hq_building/influence_range recompute over the merged set; units re-point through muster_base; open market orders are CANCELLED, not reassigned.",
-     "notes": ""
-    },
-    {
-     "id": "R4",
-     "status": "pending",
-     "verification": [
-      "headless: whole_firm_buyout R4",
-      "headless: save_roundtrip"
-     ],
-     "requirement": "No dangling reference survives the dissolution: no building, unit, order, contract or report row still resolves to the erased corp. The world round-trips the save after an acquisition.",
-     "notes": ""
-    },
-    {
-     "id": "R5",
-     "status": "pending",
-     "verification": [
-      "headless: whole_firm_buyout R5"
-     ],
-     "requirement": "The acquisition emits an equity_taken sentiment factor, and the spend is subject to the solvency gate exactly as every other spend is.",
-     "notes": ""
-    },
-    {
-     "id": "R6",
-     "status": "pending",
-     "verification": [
-      "headless: whole_firm_buyout R6",
-      "doc: docs/ai/ACTIONS.json"
-     ],
-     "requirement": "AI-FACING SEAM. Every field is validated as the value that lands, range-checked before any narrowing cast, with the whole command rejected on violation - never truncated, wrapped or clamped. The ACTIONS.json entry is updated.",
-     "notes": ""
-    }
-   ]
+   "resolved": "2026-08-26",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "spawn-solvency",
    "title": "BL-635 - the default spawn is insolvent at the gate; find the cause and fix it there",
-   "status": "open",
+   "status": "complete",
    "batch": "sprint-20-wave-2",
    "promoted_from": "backlog.json BL-635 (SPAWN_SOLVENCY) - Sprint 20, the books open",
+   "resolved": "2026-08-26",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "retire-standing-bands",
+   "title": "BL-633 - exact figures where a firm files, a dash where it does not",
+   "status": "complete",
+   "batch": "sprint-20-wave-2",
+   "promoted_from": "backlog.json BL-633 (RETIRE_STANDING_BANDS) - Sprint 20, the books open",
+   "resolved": "2026-08-26",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "admission-rule-injector",
+   "title": "BL-648 - an exemption must name a pass that actually injects demand",
+   "status": "open",
+   "batch": "sprint-21-wave-0",
+   "promoted_from": "backlog.json BL-648",
    "rows": [
     {
      "id": "R1",
      "status": "pending",
      "verification": [
-      "headless: spawn_solvency R1, measured"
+      "headless: chain_depth R1 re-specified"
      ],
-     "requirement": "DIAGNOSIS FIRST, and it is a deliverable in its own right: per-flow attribution of the opening net across a seed sweep, read from BL-626's filed returns, naming which of the seven flows dominates the negative. Reported, not asserted.",
+     "requirement": "chain_depth resolves each k_actor_consumed exemption against a REGISTRY of real injectors (the passes that add to market demand or draw from a pool), rather than accepting the prose string as proof.",
      "notes": ""
     },
     {
      "id": "R2",
      "status": "pending",
      "verification": [
-      "headless: spawn_solvency R2"
+      "headless: chain_depth R1/R1b, expected red with a named list"
      ],
-     "requirement": "THE GATE. After the fix, a seated corporation's net at the end of the warm start is non-negative on a majority of swept seeds, and its balance is above zero. Measured relative across seeds on a fixed rival field.",
+     "requirement": "THE ROW FAILS when an exemption names no findable injector. It is EXPECTED RED on the goods whose named consumer is mercantile demand; the failure names each good and the claim that could not be substantiated.",
      "notes": ""
     },
     {
      "id": "R3",
      "status": "pending",
      "verification": [
-      "headless: spawn_solvency R3",
-      "review: the diff shows no clamp"
+      "review: the diff removes no assertion"
      ],
-     "requirement": "The fix is at the CAUSE the diagnosis names - opening capital, levy rate, opex constants or holding count. No clamp on the balance, no floor, no subsidy handed to the player, and no assertion weakened to pass.",
+     "requirement": "No existing assertion is weakened to accommodate the new strictness, and no good is quietly moved from the exemption table to a fake recipe consumer to make the row pass.",
      "notes": ""
     },
     {
      "id": "R4",
      "status": "pending",
      "verification": [
-      "headless: spawn_solvency R4"
+      "headless: chain_depth R4"
      ],
-     "requirement": "Rivals are not broken by the fix: the background field stays solvent enough to keep acting, so the seed's data is not poisoned by dead corps.",
+     "requirement": "The registry of injectors is derived from the code that actually runs, not a second hand-maintained list that can drift from it.",
      "notes": ""
     }
    ]
   },
   {
-   "brief": "retire-standing-bands",
-   "title": "BL-633 - exact figures where a firm files, a dash where it does not",
+   "brief": "demand-census",
+   "title": "BL-649 - per resource, per era band, who actually wants it",
    "status": "open",
-   "batch": "sprint-20-wave-2",
-   "promoted_from": "backlog.json BL-633 (RETIRE_STANDING_BANDS) - Sprint 20, the books open",
+   "batch": "sprint-21-wave-0",
+   "promoted_from": "backlog.json BL-649",
    "rows": [
     {
      "id": "R1",
      "status": "pending",
      "verification": [
-      "headless: standing_harness re-specified"
+      "headless: demand_census R1"
      ],
-     "requirement": "standing_band, its three banding functions and their boundary constants are gone from standing.{hpp,cpp}. Nothing in src/ or tools/ still references them.",
+     "requirement": "A harness reports, per resource AND per era band, the total modelled demand and which passes inject it. Every one of the eight channels in MARKETS.md is represented or explicitly reported as absent.",
      "notes": ""
     },
     {
      "id": "R2",
      "status": "pending",
      "verification": [
-      "visual: a capture of the panel",
-      "LIVE CLICK: open the panel in the built app"
+      "headless: demand_census R2",
+      "review: no magnitude assertion in the diff"
      ],
-     "requirement": "The Corporations panel prints exact reach and market share for EVERY corporation - both derive from already-public facts - and prints capital only where ownership_class == public, a dash otherwise.",
+     "requirement": "It REPORTS and does not assert a target. No row fails on a magnitude; the harness fails only on an internal inconsistency (a channel it cannot enumerate, a resource it cannot classify).",
      "notes": ""
     },
     {
      "id": "R3",
      "status": "pending",
      "verification": [
-      "headless: standing_harness R3",
-      "review: the diff touches no hover-card field"
+      "headless: demand_census run twice, output byte-identical"
      ],
-     "requirement": "The operational fog is UNTOUCHED (Ben, 2026-08-26): no production rate, stockpile quantity, recipe or workforce dial becomes readable, and the rival hover card still shows type and owner only.",
+     "requirement": "The output is diffable between runs, so a before/after pair over a change is readable at a glance - stable ordering, stable formatting, no wall-clock or run-dependent noise.",
      "notes": ""
     },
     {
      "id": "R4",
      "status": "pending",
      "verification": [
-      "review: the diff adds no corp_ai read of standing"
+      "headless: demand_census R4"
      ],
-     "requirement": "The Goodhart separation survives: standing is still not unified with corp_ai's scorer, and no AI reads the published figures.",
+     "requirement": "It reproduces the sessions own hand-built finding as a regression check on itself: at the 0 CE band it names the same set of goods produced-with-no-sink that NR-671 lists.",
      "notes": ""
     }
    ]

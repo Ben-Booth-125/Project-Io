@@ -241,29 +241,42 @@ int main()
         // rival to `public` and its row files. Nothing about who is reading
         // enters the computation.
         // -----------------------------------------------------------------
+        // RE-SPECIFIED (NR-662). The property is still "the gate follows the FIRM,
+        // not the reader" -- but it is demonstrated on RIVALS, because disclosure
+        // governs what one firm may learn about ANOTHER and the observer's own
+        // corporation is outside its scope entirely. A corporation always reads its
+        // own books whatever its class; a firm that could not would be unrunnable,
+        // and a closed firm reading its own books while publishing none is exactly
+        // what `closed` means. FINANCE.md § Disclosure is the authority.
         {
             w.corporations.at(player_corp).ownership_class = ownership_class::closed;
+            w.corporations.at(rival_c).ownership_class     = ownership_class::closed;
             w.corporations.at(rival_b).ownership_class     = ownership_class::publicly_held;
             const std::vector<corp_standing> flipped = compute_corp_standings(w, flows);
 
-            bool player_now_closed = false;
+            bool player_still_reads_own = false;
+            bool rival_c_now_closed = false;
             bool rival_b_now_public = false;
             bool axes_unmoved = true;
             for (const corp_standing& cs : flipped)
             {
                 if (cs.corp == player_corp)
                 {
-                    player_now_closed = !cs.capital_disclosed;
+                    player_still_reads_own = cs.capital_disclosed;
                     axes_unmoved = axes_unmoved && cs.reach_bodies == 2 &&
                                    std::fabs(cs.market_share - 0.75f) < 1e-6f;
                 }
+                if (cs.corp == rival_c)
+                    rival_c_now_closed = !cs.capital_disclosed;
                 if (cs.corp == rival_b)
                     rival_b_now_public = cs.capital_disclosed;
             }
-            check(player_now_closed,
-                  "gate follows the FIRM: player's own corp set closed => capital_disclosed == false");
+            check(rival_c_now_closed,
+                  "gate follows the FIRM: a rival set closed => capital_disclosed == false");
             check(rival_b_now_public,
                   "gate follows the FIRM: a rival set public => capital_disclosed == true");
+            check(player_still_reads_own,
+                  "the observer reads its OWN books whatever its class (NR-662): player set closed => still disclosed");
             check(axes_unmoved,
                   "the public axes are unaffected by ownership class (reach/share unchanged)");
 
@@ -311,11 +324,20 @@ int main()
 
         // corporation_component defaults ownership_class to `closed`, so a corp nobody generated
         // a class for does NOT file — the safe default, and the one FINANCE.md wants.
+        // RE-SPECIFIED (NR-662): scoped to corps that are NOT the observer's own. This
+        // fixture sets w.player_entity = c1, and c1 reads its own books by the exemption
+        // above, so asserting over EVERY row would be asserting the opposite property.
         bool defaults_closed = true;
+        bool own_books_readable = false;
         for (const corp_standing& cs : out)
+        {
+            if (cs.is_player) { own_books_readable = cs.capital_disclosed; continue; }
             if (cs.capital_disclosed) defaults_closed = false;
+        }
         check(defaults_closed,
-              "a corp with the default ownership_class (closed) does not file — safe default");
+              "a RIVAL with the default ownership_class (closed) does not file — safe default");
+        check(own_books_readable,
+              "and the observer's own default-closed corp still reads its own books (NR-662)");
     }
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",

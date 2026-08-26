@@ -303,6 +303,7 @@ disposition of every store follows one rule with three outcomes:
 | **TRANSFER** | Property — holdings, stockpile pools, the balance, filed returns, units, convoys in flight, trade routes, accepted contracts | It has value and a new owner exists to hold it. A convoy in flight transfers rather than cancels **because its cargo already left the pool** — cancelling would mint the goods back into nothing. |
 | **CANCEL** | A promise with nobody left to keep it — open market orders on both sides, unaccepted quotes, live battles | An order is a promise made by a party that no longer exists. Reassigning it would bind the acquirer to a bargain it never struck. |
 | **DROP** | An opinion or a permission that was the dissolved firm's alone — its stance rows, its embargo conditions, its modifiers, a contract that would leave the acquirer on both sides | These were *about* being that firm. There is no one left to hold the opinion, and inheriting it would be inventing one. |
+| **KEEP** | The historical record — a history entry naming the firm, a battle it fought, a contract it completed | **History is not property and is never rewritten.** A firm that existed and was bought did exist, and a ledger that edits its own past to tidy up a dissolution is worth nothing. This is the one outcome where a reference to the erased corp SURVIVES on purpose, so it is stated here rather than left to look like an oversight. |
 
 The three seams with the most moving parts: `hq_building` / `influence_range` recompute from the
 merged holding set (Pass 3b's rule, unchanged), standing units re-point to the acquiring owner
@@ -312,6 +313,10 @@ through their recorded `muster_base`, and colliding pools **merge** — stock su
 stock figures, because a return carries no tick stamp and concatenation would produce two rows for
 one quarter. The result is a pro-forma combined history — which is also what a second buyer prices
 the merged firm from.
+
+**Ground follows the firm.** A province held by a corporation is property, not an opinion, so control of
+it transfers with the holdings. Holding ground is the sharpest case for the rule above: it is the one
+store where leaving a stale id would read as an unowned province rather than as inert data.
 
 **The check that makes this real is not a checklist.** A test that walks the same list the
 implementation walks passes whenever the implementation is self-consistently wrong. The harness

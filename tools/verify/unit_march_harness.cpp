@@ -813,8 +813,14 @@ void m7_untrusted_boundary_and_enum()
     // above are the first half and are untouched; these two are the second.
     check(static_cast<uint8_t>(corp_verb::withdraw_from_battle) == 24,
           "withdraw_from_battle was APPENDED at 24, renumbering nothing (BL-467)");
-    check(corp_verb_count == static_cast<uint8_t>(corp_verb::withdraw_from_battle) + 1,
-          "corp_verb_count tracks the last enumerator — the wire range gate is not stale");
+    // RE-SPECIFIED 2026-08-26. This pinned withdraw_from_battle as the LAST verb,
+    // which contradicted the property stated two lines above ("verbs are appended
+    // routinely"): it had already gone red at 28 verbs before Sprint 20 touched
+    // anything, and BL-628's buy_corporation took it to 29. The real property is
+    // that the range gate still COVERS this verb -- an appended verb must widen the
+    // count, never leave it behind, which is what would silently truncate the wire.
+    check(corp_verb_count > static_cast<uint8_t>(corp_verb::withdraw_from_battle),
+          "corp_verb_count still covers withdraw_from_battle — the wire range gate is not stale");
 
     // --- the rejection property ------------------------------------------
     world w;

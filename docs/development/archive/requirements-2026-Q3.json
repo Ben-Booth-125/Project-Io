@@ -583,6 +583,48 @@
       ],
       "resolution": "Complete, all rows met. ui::why_note — a closed-by-default toggle revealing exactly two lines. All three of the item's open questions settled and recorded. 4 goldens blessed and PASS at 0.0000%."
     },
+    "charter-ownership-class": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: ownership_class R1 re-pointed"
+          ],
+          "requirement": "The derivation reads HISTORY.md Stage 1 (the enforceable promise) through history_ladder::charter_cradle, not the Stage 4 industrialisation timing. It stays pure and draws no randomness.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: ownership_class R2, both epochs, measured"
+          ],
+          "requirement": "THE GATE. At the DEFAULT epoch (0 CE) the class distribution is no longer degenerate: at least one specialist classes public on a majority of seeds in the sweep. The distribution is REPORTED at both 0 CE and a modern epoch, never asserted against a target.",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: ownership_class R3"
+          ],
+          "requirement": "BL-631's reachability waiver survives. Where no anchorable region can yield public the floor is waived rather than burning every reroll attempt - a state that must stay reachable and asserted even though the re-pointing makes it rarer.",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "headless: ownership_class full run",
+            "headless: save_roundtrip"
+          ],
+          "requirement": "No regression: every assertion BL-631's harness already passed still passes, and the field still round-trips the save at the current version.",
+          "notes": ""
+        }
+      ],
+      "resolution": "Complete 2026-08-26. ownership_class ALL PASS at the integrated tree, integrating build BUILD_OK. THE GATE MOVED: at the default 0 CE epoch, 0 of 8 worlds seated a public specialist before; 8 of 8 after. 64 corps were all closed; now 20 public / 4 private / 40 closed. R2 reported at both epochs rather than asserted, which is how NR-666 (the industrial epoch now yields FEWER public firms than antiquity) surfaced."
+    },
     "checkpoint-branch-model": {
       "rows": [
         {
@@ -3599,6 +3641,49 @@
       ],
       "resolution": "All rows met. Three BL-323 S2 defects found by Ben's outside-the-box review, each ruled on live: (1) every place/demolish/completion/decommission-flip now invalidates the logistics caches via the shared invalidate_logistics_caches helper (Ben chose the simple every-event rule); (2) the first anchor-type placement on an anchor-less body skips the reach rule (existence of any committed anchor ends the exemption — no free-anchor spam); (3) is_supply_anchor now requires completion + not-decommissioned, matching the convoy-discount contract. logistics_reach_harness extended R9-R11: 26/26 PASS."
     },
+    "retire-standing-bands": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: standing_harness re-specified"
+          ],
+          "requirement": "standing_band, its three banding functions and their boundary constants are gone from standing.{hpp,cpp}. Nothing in src/ or tools/ still references them.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "pending",
+          "verification": [
+            "visual: a capture of the panel",
+            "LIVE CLICK: open the panel in the built app"
+          ],
+          "requirement": "The Corporations panel prints exact reach and market share for EVERY corporation - both derive from already-public facts - and prints capital where the firm files (ownership_class == public) OR where the row is the observer's OWN corporation, a dash otherwise. The self-exemption is NR-662: disclosure governs reading ANOTHER firm, and a corporation always reads its own books.",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: standing_harness R3",
+            "review: the diff touches no hover-card field"
+          ],
+          "requirement": "The operational fog is UNTOUCHED (Ben, 2026-08-26): no production rate, stockpile quantity, recipe or workforce dial becomes readable, and the rival hover card still shows type and owner only.",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "review: the diff adds no corp_ai read of standing"
+          ],
+          "requirement": "The Goodhart separation survives: standing is still not unified with corp_ai's scorer, and no AI reads the published figures.",
+          "notes": ""
+        }
+      ],
+      "resolution": "Complete 2026-08-26 WITH R2 PENDING. R1/R3/R4 pass; standing_harness 28 rows all pass after the NR-662 re-specification; integrating build BUILD_OK. R2's LIVE CLICK was not achieved - request_access returned user_denied with nobody present to approve - and the row is left PENDING rather than marked complete on a capture. What exists instead is stronger than a capture and weaker than a person: scripts/verify/corp_disclosure.lua injects a real press through ImGui's own event queue and hit-test, and it selected a corporation by clicking a row. The debt joins BL-636. Note NR-663: the automated clipping check passed VACUOUSLY on the same frame that contained a genuinely clipped button."
+    },
     "river-generation": {
       "rows": [
         {
@@ -4040,6 +4125,48 @@
         }
       ],
       "resolution": "Delivered. main() now wraps the run/run_verify dispatch in try/catch(const std::exception&), printing 'ProjectIo: fatal error: <what>' to stderr and returning 1 — a type-shape error in a user-edited economy.lua/recipes.lua (a sol::error, which derives from std::exception) exits cleanly instead of aborting unhandled. The optional per-key .as<>() guard in read_resource_map was judged unnecessary — the single main() catch covers every startup Lua path — and left out to keep the change to one file."
+    },
+    "spawn-solvency": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: spawn_solvency R1, measured"
+          ],
+          "requirement": "DIAGNOSIS FIRST, and it is a deliverable in its own right: per-flow attribution of the opening net across a seed sweep, read from BL-626's filed returns, naming which of the seven flows dominates the negative. Reported, not asserted.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "failed",
+          "verification": [
+            "headless: spawn_solvency R2"
+          ],
+          "requirement": "THE GATE. After the fix, a seated corporation's net at the end of the warm start is non-negative on a majority of swept seeds, and its balance is above zero. Measured relative across seeds on a fixed rival field.",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: spawn_solvency R3",
+            "review: the diff shows no clamp"
+          ],
+          "requirement": "The fix is at the CAUSE the diagnosis names - opening capital, levy rate, opex constants or holding count. No clamp on the balance, no floor, no subsidy handed to the player, and no assertion weakened to pass.",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "headless: spawn_solvency R4"
+          ],
+          "requirement": "Rivals are not broken by the fix: the background field stays solvent enough to keep acting, so the seed's data is not poisoned by dead corps.",
+          "notes": ""
+        }
+      ],
+      "resolution": "Complete 2026-08-26 WITH R2 FAILED AND LEFT RED - deliberately, and the red is the result. R1 delivered the diagnosis as its own deliverable: upkeep was 89.9% of operating outgoings, found by REFUSING to rank by size (interest was the largest number at 2160.7/qtr and is charged only on an already-negative balance, so it is the compounding of the deficit and never its cause). Three defects fixed at their causes: a per-head/per-batch units mismatch in the upkeep derivation (a levy spear cost 40 credits to raise and 1,200 a year to keep), a duplicate player unit stub, and a levy taking ~90% of the gross value of everything extracted. Operating net -646.4 -> -27.9 cr/qtr; closing balance -120,334.6 -> -412.3. R2's gate (net >= 0) moved 0/8 -> 1/8 seeds and is NOT MET. The residual is NOT a money flow: 60.2% is maintenance on buildings that cannot produce because their output has no buyer. That is Sprint 21's territory (NR-671), not a constant anyone can tune, and no assertion was weakened to hide it. R3 (no clamp) and R4 (rivals survive) both pass."
     },
     "start-gate-audit": {
       "rows": [
@@ -4704,6 +4831,67 @@
           "notes": ""
         }
       ]
+    },
+    "whole-firm-buyout": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: whole_firm_buyout R1"
+          ],
+          "requirement": "A buy_corporation verb on the corp_command seam prices the target as max(0, book_value + k_acquisition_multiple x trailing_net + balance), where trailing_net is the mean net over the last 8 filed quarters (or fewer if younger). k is authored in scripts/economy.lua.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: whole_firm_buyout R2"
+          ],
+          "requirement": "Gated on the target's ownership_class == public. A private or closed target is refused, and the refusal MUTATES NOTHING - no partial transfer, no balance move.",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: whole_firm_buyout R3"
+          ],
+          "requirement": "On success holdings, stockpile pools, balance and filed returns transfer to the acquirer and the target is dissolved. hq_building/influence_range recompute over the merged set; units re-point through muster_base; open market orders are CANCELLED, not reassigned.",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "headless: whole_firm_buyout R4",
+            "headless: save_roundtrip"
+          ],
+          "requirement": "No dangling reference survives the dissolution: no building, unit, order, contract or report row still resolves to the erased corp. The world round-trips the save after an acquisition.",
+          "notes": ""
+        },
+        {
+          "id": "R5",
+          "status": "complete",
+          "verification": [
+            "headless: whole_firm_buyout R5"
+          ],
+          "requirement": "The acquisition emits an equity_taken sentiment factor, and the spend is subject to the solvency gate exactly as every other spend is.",
+          "notes": ""
+        },
+        {
+          "id": "R6",
+          "status": "complete",
+          "verification": [
+            "headless: whole_firm_buyout R6",
+            "doc: docs/ai/ACTIONS.json"
+          ],
+          "requirement": "AI-FACING SEAM. Every field is validated as the value that lands, range-checked before any narrowing cast, with the whole command rejected on violation - never truncated, wrapped or clamped. The ACTIONS.json entry is updated.",
+          "notes": ""
+        }
+      ],
+      "resolution": "Complete 2026-08-26. whole_firm_buyout ALL PASS, 60 rows; save_roundtrip and quarterly_return unmoved; integrating build BUILD_OK. R4 was proved by re-walking the whole world for survivors rather than by a checklist mirroring the implementation - on a fixture carrying a reference of every kind, on a warm-started generated world, and again after four further economy ticks. Two bugs the harness caught in its own author's code, one of them a NaN laundered into a free firm by a zero floor applied before the validity check."
     },
     "wire-parser-validation": {
       "rows": [

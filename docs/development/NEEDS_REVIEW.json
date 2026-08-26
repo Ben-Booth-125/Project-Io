@@ -1243,6 +1243,19 @@
     "tools/verify/chain_depth.cpp",
     "docs/economy/PRODUCTION.md"
    ]
+  },
+  {
+   "id": "NR-672",
+   "title": "Under spectate, the camera-anchored corp discloses its capital while nothing owns it",
+   "raised": "2026-08-26",
+   "kind": "observation",
+   "status": "open",
+   "source": "Sprint 20 wave 2 review barrier, suggestion 8.",
+   "what": "The NR-662 self-exemption reads `cs.is_player`, which derives from world::player_entity. Under spectator mode (BL-409) that field degrades to a camera/ledger anchor with NO ownership meaning - the standing rules say so explicitly. So under spectate exactly one corp discloses its capital for no reason other than where the camera is pointing, which is a small incoherence rather than a leak: BL-408's god view already makes everything readable there, so nothing is hidden that spectate does not intend to show anyway. Recorded rather than fixed because the right fix depends on a question worth asking once: should ANY disclosure gate consult player_entity under spectate, or should the whole disclosure layer be bypassed there the way the fog already is? The second is tidier and matches the precedent.",
+   "files": [
+    "src/world/standing.cpp",
+    "docs/ui/DISCOVERY.md"
+   ]
   }
  ]
 }
