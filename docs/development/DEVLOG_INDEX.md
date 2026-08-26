@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 182 entries across 2 volume(s).
+One line per session, newest first — 183 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-26 | [The ledger, the buyout, and the discovery that the demand side was never built](DEVLOG.md) | BL-433 BL-626 BL-627 BL-628 BL-631 BL-633 BL-635 BL-637 BL-638 BL-648 BL-649 BL-650 BL-651 BL-652 | DEVLOG.md |
 | 2026-08-25 | [The warm-start stall found and killed; settlements become visible (flood-field pathfinding; BL-625; NR-645)](DEVLOG.md) | BL-599 BL-619 BL-621 BL-623 BL-625 | DEVLOG.md |
 | 2026-08-25 | [Population design settles, Sprint 19 opens and lands both build waves (BL-610–BL-618, BL-620; NR-628–NR-641)](DEVLOG.md) | BL-070 BL-086 BL-376 BL-514 BL-596 BL-597 BL-598 BL-601 BL-603 BL-604 BL-610 BL-611 BL-612 BL-613 BL-614 BL-615 BL-616 BL-617 BL-618 BL-619 BL-620 | DEVLOG.md |
 | 2026-08-24 | [Sprint 17 designed, delivered end to end, and cut as v0.1.17 (BL-585–BL-594)](DEVLOG.md) | BL-409 BL-429 BL-585 BL-586 BL-587 BL-588 BL-589 BL-590 BL-591 BL-592 BL-593 BL-594 | DEVLOG.md |

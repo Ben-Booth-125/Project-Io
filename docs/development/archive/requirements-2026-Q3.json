@@ -69,6 +69,47 @@
       ],
       "resolution": "Delivered one of BL-089's two documented deferrals: the Solar-canvas body hover tooltip now carries a short commercial-activity line keyed on body_activity_visibility (mirroring the Selection panel's draw_activity_section wording), excluding the star. Pure read, no new state. The OTHER deferral — the deterministic proximity 'glimpse' — remains deferred (it needs either a serialised last_glimpse_tick on body_component or orbital back-computation from mutated orbital_angle_rad; disproportionate determinism/save-seam risk for a polish minor). Code-verified (tooltip is hover-gated, not headlessly capturable)."
     },
+    "admission-rule-injector": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: chain_depth R1 re-specified"
+          ],
+          "requirement": "chain_depth resolves each k_actor_consumed exemption against a REGISTRY of real injectors (the passes that add to market demand or draw from a pool), rather than accepting the prose string as proof.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: chain_depth R1/R1b, expected red with a named list"
+          ],
+          "requirement": "THE ROW FAILS when an exemption names no findable injector. It is EXPECTED RED on the goods whose named consumer is mercantile demand; the failure names each good and the claim that could not be substantiated.",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "review: the diff removes no assertion"
+          ],
+          "requirement": "No existing assertion is weakened to accommodate the new strictness, and no good is quietly moved from the exemption table to a fake recipe consumer to make the row pass.",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "headless: chain_depth R4"
+          ],
+          "requirement": "The registry of injectors is derived from the code that actually runs, not a second hand-maintained list that can drift from it.",
+          "notes": ""
+        }
+      ],
+      "resolution": "Complete 2026-08-26. chain_depth 47 PASS / 1 FAIL at the integrated tree, and THE ONE FAILURE IS THE REQUIREMENT BEING MET: R2 asks the row to fail when an exemption names no findable injector, and it names eleven goods with the claim each could not substantiate. Eleven, not the ten expected - spacecraft_components was the surprise, because BL-350 procurement is a resource-agnostic TRANSFER and admitting it would substantiate the whole roster at once. R4 is the row that makes this durable: four of five probes read the Lua vectors the running passes multiply by, so a channel landing in economy.lua flips a good green with NO harness edit, and zeroing an upkeep rate demonstrably UNSUBSTANTIATES it again. The fifth probe could not read Lua, so the pass was made to declare its own draw rather than have the constant re-typed into the harness (NR-673). R3 verified: 8 check lines added, zero removed."
+    },
     "ancient-goods-append-and-slice-1": {
       "rows": [
         {
@@ -1351,6 +1392,48 @@
         }
       ],
       "resolution": "apply_budget charges interest = |balance| × k_debt_interest_per_quarter (0.02/qtr) once per tick on a now-negative balance; the constant lives in budget_system.hpp as the single source both the live loop and econ_bankruptcy read. The Interest (debt) line appears in the Balance Ledger breakdown, the header shows an explicit [in debt - interest accruing] badge, and the Treasury 'no consequence' note was corrected to reflect the new charge. Verified via debt_interest.lua (set_balance verify hook). econ_bankruptcy stays PASS (its solvent scenario never triggers interest; a loss-making spiral scenario in the harness is a noted follow-on)."
+    },
+    "demand-census": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: demand_census R1"
+          ],
+          "requirement": "A harness reports, per resource AND per era band, the total modelled demand and which passes inject it. Every one of the eight channels in MARKETS.md is represented or explicitly reported as absent.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: demand_census R2",
+            "review: no magnitude assertion in the diff"
+          ],
+          "requirement": "It REPORTS and does not assert a target. No row fails on a magnitude; the harness fails only on an internal inconsistency (a channel it cannot enumerate, a resource it cannot classify).",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: demand_census run twice, output byte-identical"
+          ],
+          "requirement": "The output is diffable between runs, so a before/after pair over a change is readable at a glance - stable ordering, stable formatting, no wall-clock or run-dependent noise.",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "headless: demand_census R4"
+          ],
+          "requirement": "It reproduces the sessions own hand-built finding as a regression check on itself: at the 0 CE band it names the same set of goods produced-with-no-sink that NR-671 lists.",
+          "notes": ""
+        }
+      ],
+      "resolution": "Complete 2026-08-26. demand_census PASS, 0 failures, at the integrated tree. R4 matched the hand-built list EXACTLY, both directions empty. R3 byte-identical across two full runs (sha256 98e2affd...). What it added beyond the hand pass is the magnitude: at 0 CE, background demand alone is 79.8% of all modelled market demand with five of its six goods unproducible in band, and 65.7% of ALL 0 CE demand names goods the ancient band cannot make. It also found the loader bug in spawn_solvency (fixed same day; BL-635's conclusion re-measured and unchanged) and the untagged refined_copper recipe (NR-675)."
     },
     "depth-readout-on-dashboard": {
       "rows": [

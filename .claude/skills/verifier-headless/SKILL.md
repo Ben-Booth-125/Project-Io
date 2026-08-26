@@ -34,6 +34,15 @@ in `tools/verify/README.md`.
   a market-priced materials term), the returns round-trip the save (version named
   symbolically, never as a literal), and the pre-game warm start's 80 ticks produce
   byte-identical records across two runs. Build via `build_harness.js`.
+- **`demand_census`** — BL-649, requirement group `demand-census` R1–R4: per resource and per era
+  band, the total modelled demand and **which passes inject it**, with every one of MARKETS.md's
+  eight channels either represented or explicitly reported ABSENT — an absent channel being the most
+  valuable row in the report. It **reports and never asserts a magnitude**, deliberately: the moment
+  it asserts a number people tune against the harness instead of reading it, so it fails only on an
+  internal inconsistency. Output is byte-identical across runs so a before/after pair reads at a
+  glance — run it either side of every Sprint 21 tuning pass and keep the deltas. Build via
+  `build_lua_harness.bat` (it needs the real Lua baskets); `--band ancient|industrial|both`,
+  `--seed`, `--ticks`, `--fast`.
 - **`ownership_class`** — BL-631, requirement group `ownership-class` R1–R6: whether a
   corporation is `publicly_held` / `privately_held` / `closed`, derived from its home
   region's history rather than an authored table. Asserts the derivation is pure and
@@ -322,7 +331,15 @@ in `tools/verify/README.md`.
   floor, never under the hold threshold, never a duplicate, never on the player's corp (R5).
   Links the world superset; CMake target `order_book_harness` via the generic glob. 43
   assertions, ~instant.
-- **`chain_depth`** — The growth-spine metric (BL-428): how far down the production graph a corp can
+- **`chain_depth`** — ⚠️ **CARRIES ONE INTENDED FAILURE since 2026-08-26 (BL-648). DO NOT "FIX" IT.**
+  R1's exemption row fails while any resource's admission claim names a consumer that no real pass
+  injects. Eleven goods are red today — tobacco, spices, coffee, furs, trade_goods_misc,
+  spacecraft_components, ceramics, dressed_stone, tools, leather, rigging — and the way to turn the
+  row green is to **build the demand channel that buys them** (Sprint 21, MARKETS.md § Demand
+  channels), never to weaken the assertion or re-point an exemption at a pass that does not move
+  the good. A green row here after a harness edit alone is the loophole this item closed, reopened.
+  Everything else in the harness passes; treat a SECOND failure as a real regression.
+  The growth-spine metric (BL-428): how far down the production graph a corp can
   reach, computed off the recipe graph rather than authored. **Mixed fixture strategy, on purpose** —
   D1–D5 are hand-built graphs, because they ask whether the metric computes what it claims and must
   not drift with the economy; D6 loads the real scripts, because it asks what the *shipped* graph's

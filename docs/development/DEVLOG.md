@@ -10,6 +10,119 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-08-26 — The ledger, the buyout, and the discovery that the demand side was never built
+
+**Mode:** Design → Full (Batch Delivery, three waves across two sprints).
+**Runtime:** one long session. Ten worktree agents, two review barriers, four integrating builds.
+
+### What Ben asked for, and what it turned into
+
+The session opened on a design request: *a table ledger that tracks profitability, updated each
+quarter with company balance sheets*, feeding a buyout menu in-game and a spawn shortlist before it.
+It closed having discovered that **the economy has no demand side**, and with a second sprint opened
+to build one.
+
+### Sprint 20 — the books open (eight items, landed)
+
+**Wave 1.** BL-626 (quarterly return — a *retain* over `corp_budget`, rolling 40 quarters, world-side
+and serialised), BL-631 (ownership class, derived not authored), BL-637 (save-version reservation —
+Sprint 19's retro asked for it by name, and this wave needed it immediately since two items bumped
+the format concurrently).
+
+**Wave 2.** BL-638 (charter ownership), BL-628 (whole-firm buyout), BL-633 (retire the standing
+bands), BL-635 (spawn solvency). Plus BL-650/BL-651 filed for the loose ends.
+
+### The five findings that mattered more than the items
+
+1. **A filed return cannot see subsidies or contract payouts.** `apply_budget` runs at `app.cpp:1271`,
+   `run_nation_step` at `:1281`. So the buyout undervalues a firm earning through mercenary
+   contracts — CONTRACTS.md's *income loop* — by a measured **640 credits**, exactly k(8.0) × the
+   80/quarter the record cannot see. The harness now asserts the blindness so no future fixture
+   hides it. Ben's fork, unanswered: NR-655 / NR-668.
+
+2. **The default world classed every corporation `closed`.** Pass 2b read HISTORY.md's Stage 4
+   (energy transition), which antiquity skips — so `median_industrial_year` stayed 0 across all 1,298
+   regions and 64 corps on 8 seeds. Nothing filed, nothing was buyable. The fix was hiding in the
+   design's own justifying sentence: read **Stage 1, the enforceable promise**, whose output already
+   exists as `history_ladder::charter_cradle`. 0 of 8 worlds → 8 of 8. **This was the era-relative
+   gates class Sprint 19's retro named as its lesson, recurring one sprint later in a design written
+   that morning** — and caught the same way, by an agent measuring a distribution and naming the
+   consequence instead of shipping it.
+
+3. **BL-635 found the cause by refusing to rank by size.** Interest was the largest number at
+   2,160 cr/qtr and is charged only on an already-negative balance — the compounding of the deficit,
+   never its cause. The real answer was upkeep at 89.9% of outgoings, and under *that* a units bug:
+   rates authored per **head**, units hired per **batch** of 50, so a levy spear cost 40 credits to
+   raise and 1,200 a year to keep.
+
+4. **A zero floor laundered a NaN into a free firm.** `max(0, price)` applied before the validity
+   check meant `NaN > 0` was false, `max` returned a clean `0.0f`, and the seam's own `isfinite`
+   guard passed it. The clamp *was* the vulnerability — which is the AI-facing-seam rule's own point,
+   arriving from a direction nobody had written down.
+
+5. **All three wave-1 worktrees were cut from the session-start commit**, five behind HEAD — including
+   both `src/` agents, briefed to read doc sections written that morning. Two noticed and
+   fast-forwarded; the third reported it could not find its own requirements. NR-654.
+
+### The question that changed the session
+
+Ben, mid-flight: *how much profit do we really expect to make anyway — do we have a list mapping
+resources to consumers?* There was no such list. The **constraint** existed (PRODUCTION.md's
+admission rule, `chain_depth` R1/R1b) but not the map. Building it found:
+
+- The ancient band has **two live demand sinks**. `background_demand` is entirely industrial goods
+  and therefore inert at 0 CE; three of `population_demand`'s six goods are unproducible there.
+- **Seven goods are produced in-band with no buyer at all** — including tools (25.50) and rigging
+  (14.50), the roster's most valuable ancient outputs.
+- Ten resources passed the orphan check by naming a **"mercantile demand" that does not exist**.
+  `market_clearing.cpp` has exactly three injections and none of them is it.
+
+Which explains BL-635's residual exactly: iron ore and agricultural produce run 80/80 ticks; stone,
+timber and fibre idle 80/80 with unexhausted deposits under them. **Spawn viability is not a constant
+anyone can tune — the demand side was never authored.** The supply side landed 2026-08-24; its
+counterpart did not.
+
+### Sprint 21 — demand (opened, wave 0 landed)
+
+Written into MARKETS.md as **eight demand channels** rather than a list of fixes, on one rule: *a
+consumer is a mechanism, not a noun.* Three properties the register must hold — demand scales with
+the economy or decays into a fixed basket; demand is **era-banded exactly as recipes have been since
+BL-433**; and every channel is a lever on what the player chases.
+
+**Wave 0** deliberately built the guard and the instrument before any channel:
+
+- **BL-648** makes an exemption resolve against a registry of real injectors. It is **red on eleven
+  goods** and that is the item working — one more than predicted, `spacecraft_components`, because
+  procurement is a resource-agnostic *transfer* and admitting it would substantiate the whole roster.
+  Four of five probes read the Lua vectors the running passes multiply by, so a channel landing in
+  `economy.lua` flips a good green with no harness edit. The fifth couldn't, so the pass was made to
+  **declare its own draw** — a pattern no doc owns (NR-673).
+- **BL-649**, the census, matched the hand-built list exactly and then supplied the magnitude:
+  **65.7% of all 0 CE demand names goods the ancient band cannot make.**
+
+It also found that `spawn_solvency.cpp` claimed to load `world_gen.lua` and did not — so BL-635's
+diagnosis was measured without market prices. Re-measured: **the conclusion is unchanged**, because
+the missing demand pointed at goods that band cannot produce anyway. The mechanism underneath got its
+own item (BL-652): both basket injectors **silently skip** a resource they cannot price, which is why
+two separate bugs were invisible on the same day.
+
+### Left deliberately not green
+
+- `spawn-solvency` **R2 FAILED** — 3/12 seeds. The money loop is fixed; the residual is demand.
+- `retire-standing-bands` **R2 PENDING** — no live click reachable; not marked green on a capture.
+- `chain_depth` carries **one intended failure**, flagged in its skill entry with an explicit
+  do-not-fix, because the way to make it green is to build the channels.
+
+### Owed to Ben
+
+NR-655/NR-668 (the eighth return field, worth 640 credits an acquisition) · NR-659 → BL-638's
+re-pointing, taken on his behalf · NR-662 (a corporation reads its own books — my error, corrected in
+two docs) · NR-666 (the industrial epoch now yields *fewer* public firms than antiquity) · NR-670
+(may a rival buy the player out?) · NR-675 (`refined_copper` untagged) · BL-627's `question_log` pair
+· the v0.1.18–v0.1.20 tags.
+
+---
+
 ## Session — The warm-start stall found and killed; settlements become visible (flood-field pathfinding; BL-625; NR-645) (2026-08-25, latest)
 
 **Runtime:** ~3.5 h wall-clock. Modes in sequence: Design (perf assessment on Ben's "20 years
