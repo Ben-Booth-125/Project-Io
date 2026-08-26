@@ -61,20 +61,6 @@ the "authorising a new check = naming it" convention:
   `verify.panel_view("history"|"history_round", i)` — the sub-view hook that lets a
   capture reach a ledger tab without a click — and `verify.scroll_panel` (below).
 
-- **`corp_choice.lua`** (BL-435, 2026-08-16) — the starting-corp selection stage. Notable for
-  *how it reaches the screen*: the stage lives in one frame of the real start-up sequence, and
-  every automated path (`--autostart`, this harness's own start) takes the generator's seeded pick
-  the instant it appears — deliberately, since that is what keeps all other captures and goldens
-  bit-identical. So it was unreachable to `--verify` until `verify.show_corp_choice(true)`
-  re-entered it from the started world, and a check written against an unreachable surface is
-  green-but-blind. Asserts what is true of every world — more than one opening, a pool the size of
-  the specialist set, every row named and focused — via `verify.corp_choices()`, then captures.
-  Capture-only, **no golden**: Ben has not eyeballed the layout, and blessing an unreviewed screen
-  pins whatever got built. It also needs a **warm-up capture** first, as `main_menu.lua` does; the
-  window is `AlwaysAutoResize` and a cold frame-1 capture came back empty (measured). Its first
-  real capture immediately earned its keep — the Holdings cell was clipped to "/ 1 otl" behind the
-  Choose button.
-
 - **`tile_texture.lua`** (BL-520, 2026-08-21) — the substrate grain and the cover pattern on
   the Planetary canvas. Four claims, and the captures are grouped by which one they test:
   the two passes are distinguishable (cover reads per tile, grain does not draw a seam); the

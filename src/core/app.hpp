@@ -10,6 +10,7 @@
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/spawn_seat.hpp"      // BL-630: the spawn shortlist and the seat
 #include "world/tech_tree.hpp"
 #include "world/works_roster.hpp"
 #include "world/world.hpp"
@@ -347,11 +348,12 @@ private:
     /// moved onto a worker thread because it takes ~25 s on the 312x145 grid and
     /// was called from inside an ImGui frame, so the UI never pumped and Windows
     /// reported the process as "not responding" — indistinguishable from a crash.
-    // BL-435 adds `choosing_corp` between `building` and play: generation has
-    // finished, the warm start has NOT started, and the player is picking which
-    // corporation to be. That position is the whole design — see the choice
-    // block further down for why it cannot sit anywhere else.
-    enum class app_screen { menu, generating, building, choosing_corp, in_game };
+    // BL-630 retired the `choosing_corp` stage that used to sit between
+    // `building` and play: the player is no longer asked which corporation to
+    // be, they are SEATED on one drawn from the spawn shortlist after the warm
+    // start (STARTUP.md § The seat). `building` now hosts both phases — the
+    // carve, then the warm start — and hands straight to `in_game`.
+    enum class app_screen { menu, generating, building, in_game };
     app_screen m_screen = app_screen::menu;
     /// Pending `--load` target, consumed by run() before the frame loop.
     std::string m_pending_load;
@@ -424,46 +426,27 @@ private:
     void launch_wizard_surface_build();       ///< Start the worker for the CURRENT pending params.
     void poll_wizard_surface();               ///< Per-frame: adopt a finished build, relaunch if stale.
 
-    // --- Starting-corp selection (BL-435, 2026-08-16) -----------------------
+    // --- The seat (BL-630, 2026-08-26) --------------------------------------
     //
-    // WHY THE STAGE SITS WHERE IT DOES, since two independent constraints pin it
-    // to the same single-frame window and neither is obvious from the screen:
+    // The starting-corp SELECTION stage is retired. The warm start now runs with
+    // NOBODY SEATED, under `corp_ai_params::spectating`, and the player is
+    // seated afterwards on a corporation drawn from the viability shortlist.
+    // Owned by CORPORATION_GENERATION.md § The spawn shortlist, and the seat.
     //
-    //  1. It must be BEFORE the warm start (Ben's call). corp_ai excludes the
-    //     player's corp, so whichever corp is flagged when the 80 pre-game ticks
-    //     run is the one that sits strategically frozen through all of them.
-    //     Choosing afterwards would hand the player a corp that had been
-    //     AI-driven, and freeze one they did not pick.
-    //  2. It must be BEFORE start_new_game_prelude(), which calls
-    //     generate_background_firms. Until that runs, `m_world.corporations`
-    //     holds EXACTLY the specialist corps generate_corporations made — which
-    //     is precisely the pool Ben chose as selectable. Reading the list at
-    //     this instant is what lets the pool be right without storing a second
-    //     copy of it on `world` and keeping the two in agreement forever.
-    //
-    /// One selectable opening, built once when the stage opens. Holdings are
-    /// counted here rather than re-walked per frame; balance is deliberately
-    /// absent, because opening balances are seeded BY the warm start and every
-    /// corp reads 0.0 at this point — a column of zeroes teaches nothing.
-    struct corp_choice
-    {
-        entity_id   id = null_entity;
-        std::string name;
-        std::string focus;      ///< Industrial focus, already stringified for display.
-        std::string nation;     ///< Home nation name, or empty when unregistered.
-        int         processing = 0;
-        int         extraction = 0;
-        int         other      = 0;
-    };
-    std::vector<corp_choice> m_corp_choices;
-    /// Index into m_corp_choices of the generator's own seeded pick. "Surprise
-    /// me" selects this, so the no-choice path reproduces pre-BL-435 behaviour
-    /// exactly rather than approximating it.
-    int  m_corp_choice_default = -1;
-    int  m_corp_choice_hover   = -1;   ///< Row under the cursor, or -1.
-    void build_corp_choices();         ///< Fill m_corp_choices from the specialist set.
-    void apply_corp_choice(entity_id chosen); ///< Re-point is_player/player_entity, then start the prelude.
-    void draw_corp_choice_screen();    ///< The stage itself.
+    // WHY THE REORDER IS THE WHOLE ITEM. The old stage was pinned before the
+    // warm start because corp_ai excluded the flagged corp, so whichever corp
+    // was the player's sat strategically frozen through all 80 pre-game ticks —
+    // which is exactly why no balance could be shown to choose on. Running the
+    // warm start under spectate removes the exclusion's SUBJECT (BL-409), so
+    // every corp is scorer-driven, every corp files real returns, and a
+    // profitability read becomes possible for the first time.
+
+    /// What `seat_player_corporation` decided at this campaign's start, kept for
+    /// the log line and for anything that later wants to say the floor went
+    /// unmet. Presentation state: never serialised, rebuilt on a new campaign,
+    /// empty after a `--load` (a saved campaign carries its seat in `world`).
+    spawn_seat_result m_seat_result;
+    void seat_player();                ///< Draw the seat and re-point the player-scoped caches.
 
     /// Pre-game warm start: 20 in-game years of quarterly econ ticks (Ben,
     /// 2026-08-10) — see start_new_game_prelude's warm-start comment.

@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**46 surfaces** — 4 settled, 42 awaiting Ben's wording.
+**45 surfaces** — 4 settled, 41 awaiting Ben's wording.
 
 ---
 
@@ -299,14 +299,6 @@ alphabetical order.
 **Because:** selection_kind::unit existed but fell through to the generic action/facts split with a bare Go to button - the only selection kind still on that path once the tile (BL-123) and building (BL-431 rework) cards moved to the 3-column band shape. BL-393 (UNITS_ARE_WRITE_ONLY_AND_INERT) already flags that units are largely inert in the live economy; Ben's direction was to build the CARD shape now anyway rather than wait on combat, so a unit selected today reads real unit_component fields (strength, count, roster type, owner) in the same picture/pager/actions shape as everything else, instead of standing out as the one kind that still looks unfinished. Paired with a repeat-click tile-cycle (Soldier -> Building -> Tile) in body_surface_canvas.cpp so a tile carrying a unit is actually reachable by clicking. BL-575 (unit marker + march UI, 2026-08-23) answers the "can I do anything with it" half for real: the action grid gained March (arms province-picking on the Planetary canvas, then dispatches corp_verb::march_unit on the qualifying province click), Halt (clears the standing order) and Disband (permanent, confirm popup, no refund — MILITARY.md § Marching) alongside the existing Go to, replacing three of the five reserved slots. All three route through the SAME corp-command seam corp_ai scores for rival units, so the player takes no shortcut around it.
 
 *Demanded by BL-393, BL-575 · `src/ui/selection_panel.cpp`, `src/ui/selection_panel.hpp`, `src/ui/ui_state.hpp`, `src/ui/body_surface_canvas.cpp`, `src/core/app.cpp` · id `selection_unit_card`*
-
-### Starting-corp selection stage (app_screen::choosing_corp, app::draw_corp_choice_screen)
-
-**Answers:** Which of this world's corporations am I going to run - and what does each one actually open with?
-
-**Because:** Which corp the player ran was an invisible lottery: the generator drew one and flagged it. Measured over 24 seeds (tools/verify/player_seed_sweep), that handed the player a pure-extraction corp on 13 of them, so the chain-depth ladder (BL-428) and the Method page (BL-430/BL-431) had no rung to stand on - while better openings sat unchosen in the same world. The screen earns its space by converting a hidden draw into a stated choice, which is also the honest alternative to rejection-sampling seeds (that would have hidden the distribution instead of exposing it). It shows name, industrial focus, home nation and holdings as N proc / N extr / N other. BALANCE IS DELIBERATELY ABSENT: opening balances are seeded BY the pre-game warm start, which has not run at this point, so every corp would read 0.0. And the screen deliberately does NOT rank the openings - BL-436 measured a processing facility as currently earning LESS per tick than the extraction site it replaces, so a processor-bearing corp is the DEEPER opening, not the richer one.
-
-*Demanded by BL-435 · `src/core/app.cpp`, `src/core/app.hpp`, `src/core/verify_api.cpp`, `scripts/verify/corp_choice.lua` · id `starting_corp_choice`*
 
 ### Strategy readout (nav slot 12)
 
