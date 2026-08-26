@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*95 entries — 69 open, 26 resolved.*
+*96 entries — 70 open, 26 resolved.*
 
 ---
 
@@ -626,6 +626,13 @@ The retune reached 352 buildings / 88 corps against the pre-BL-640 584 / 104. It
 BL-655 changed scripts/economy.lua and no C++ at all. Both trees were rebuilt and both printed BUILD_OK - and BOTH SHIPPED THE OLD SCRIPTS. The CMake copy-scripts step is a side effect of building the ProjectIo target, so when nothing recompiles it does not fire, and build/scripts and build_rel/scripts keep whatever they had. Caught only because the handover was verified by grepping the OUTPUT tree for the new weights rather than trusting BUILD_OK. WHY IT MATTERS MORE THAN IT LOOKS: this session is a tuning sprint. Most of Sprint 21 is Lua - demand baskets, upkeep rates, price-band constants - so the class of change most likely to be evaluated is exactly the class that silently does not ship. Ben would have judged the old density and we would both have believed the number. A harness reading scripts/ directly is unaffected, which is why every measurement in this session was right while the playable build was wrong - the two paths disagree and nothing says so. FIX CANDIDATES: make the copy its own always-run target rather than a side effect of compiling; or have the app resolve scripts/ from the repo root in a dev build so there is one copy and it cannot go stale. The second removes the failure mode rather than making it fire more often.
 
 *Files: `CMakeLists.txt`, `build_app.bat`, `src/core/app.cpp`*
+
+### NR-687 — The pre-game manufactures ZOMBIES - interest has no consequence attached, so a failing firm never fails
+*question · raised 2026-08-26 · from Ben, 2026-08-26, on the live build: 'still seeing a debt... mostly caused by compounding interest, but it should still not be happening.' Measured immediately after across 12 seeds.*
+
+BEN IS RIGHT AND THE ATTRIBUTION CONFIRMS IT. Of 12 swept seeds, 3 clear - and all three carry ZERO interest, income 68-104 cr/qtr, balance +2.1k to +3.9k. The other 9 are all marked (dip): they went negative once, and interest is then 43-60% OF THEIR ENTIRE LOSS (seed 0: op.net -40.1, net -88.5, interest 48.4; seed 7: -34.3 / -85.5 / 51.3). Their OPERATING net is only -24 to -40 cr/qtr - a modest, closeable gap. The debt is not the operating gap; it is 80 quarters of compounding on top of it, 1.02^80 = 4.9x. THE REAL DEFECT IS NOT THE RATE. 2%/qtr is a reasonable charge in play. The defect is that INTEREST HAS NO CONSEQUENCE ATTACHED: components.hpp says a balance 'may go negative (no insolvency consequence)', so a firm that would have died in year three keeps trading for twenty and is then handed to the player carrying the compounded wreckage. The pre-game is a HISTORY GENERATOR, and a history in which nothing ever fails is not a history - it is an accumulator. RECOMMENDED, and it is not 'switch interest off': KEEP the interest and ADD THE CONSEQUENCE IT IS SUPPOSED TO HAVE. A firm underwater for N consecutive quarters exits - dissolved, or absorbed through BL-628's dissolution machinery, which landed today and already knows how to move an actor's assets and cancel its promises. Three things fall out at once: the pre-game stops manufacturing zombies; the surviving field at seat time is SELF-SELECTED for viability, so BL-630's shortlist floor starts being met instead of falling through to its fallback on 23/24 seeds; and interest becomes the mechanism that identifies failure rather than a number that only accumulates. TWO WEAKER ALTERNATIVES, named so the choice is visible: suppress interest during the warm start only (cheap, but it hides the failure rather than resolving it, and a corp still enters play with an operating deficit); or raise opening capital (buys quarters, changes nothing structural - seed 1 earned 0.0 income across its whole trailing window and no starting balance survives that).
+
+*Files: `src/world/components.hpp`, `src/world/economy_system.cpp`, `src/world/corp_command.cpp`, `docs/economy/FINANCE.md`, `docs/generation/CORPORATION_GENERATION.md`*
 
 ---
 

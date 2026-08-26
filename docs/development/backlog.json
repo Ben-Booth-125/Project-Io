@@ -1898,6 +1898,35 @@
     "docs/generation/CORPORATION_GENERATION.md"
    ],
    "design": "Raised by BL-655's measurement and by its novelty flag. Pass 6 is documented as stopping on a 0.90 production/demand ratio, described as 'an emergent measurement rather than an injected clearing constant' and 'a stop condition, not a firm-count budget'. MEASURED: the ratio NEVER BINDS on the worlds we generate. `per_resource_firm_cap = 8` binds on every demanded resource, so the count is exactly specialists + 8 x basket breadth - which reproduced 104, 64 and 56 corps exactly across three configurations. Its own comment still says 'provisional - measure, then pin'. The doc has been corrected to describe what the code does; what is OPEN is which behaviour is wanted. THREE READINGS: (a) the cap is the real design and the ratio is dead weight - pin the cap deliberately, say density is breadth-driven, and delete the ratio; (b) the ratio is the real design and the cap is an emergency brake set too low - raise it until the ratio binds, which restores the 'calibrated, not authored' property the doc claims; (c) both, with the cap as a genuine guard against a pathological basket. Note the consequence either way: under (a) density becomes a function of how many DIFFERENT goods are wanted, so every demand channel Sprint 21 adds moves the world's size - which may be a feature."
+  },
+  {
+   "id": "BL-657",
+   "short_name": "A_FAILING_FIRM_FAILS",
+   "category": "Economy",
+   "title": "A firm underwater long enough exits - give interest the consequence it is supposed to have",
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": "v0.1.21",
+   "sprint": "20",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [
+    "BL-628"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/components.hpp",
+    "src/world/corp_command.cpp",
+    "scripts/economy.lua",
+    "tools/verify/",
+    "docs/economy/FINANCE.md"
+   ],
+   "design": "MEASURED 2026-08-26 from Ben's own observation of the live build. Of 12 seeds, 3 clear with ZERO interest; the 9 that fail all dipped negative once and interest is then 43-60% of their whole loss, against an operating gap of only -24 to -40 cr/qtr. 1.02^80 = 4.9x over the warm start. The rate is not the defect - components.hpp's 'no insolvency consequence' is. A firm that would have died in year three trades for twenty and is handed to the player as wreckage. THE WORK: a firm underwater for N consecutive quarters EXITS - dissolved, or absorbed via BL-628's dissolve_into, which already moves holdings, pools, balance and returns and cancels the promises nobody is left to keep. N and the trigger are authored in economy.lua and MEASURED, not picked. DESIGN-OWED on three questions that are Ben's: (1) dissolve or absorb - absorption by a solvent neighbour is richer and reuses the buyout path, dissolution is simpler and leaves ground free; (2) does this run IN PLAY as well as in the pre-game, i.e. can the player's own corp fail - NR-670 already ruled a rival may not BUY the player out, and this is a different question about the player failing on their own account; (3) what happens to the ground and the workforce - a dissolved firm's tiles should probably become available rather than stay held. EXPECTED CONSEQUENCE, and the reason this is priority A: the field at seat time becomes self-selected for viability, so BL-630's shortlist floor should start being met instead of falling through to its fallback on 23 of 24 seeds."
   }
  ]
 }
