@@ -197,7 +197,30 @@ entity_id choose_levy_author(const world& w);
 /// Seeds nothing when no author nation exists (a law with no author cannot
 /// exist), which is also why a nation-free harness world stays law-free.
 ///
+/// THE DEFAULT RATE IS 0.1, DOWN FROM 1.0 (BL-635, 2026-08-26), and the reason
+/// is a measurement rather than a preference. The levy is a FLAT charge in
+/// credits per unit of raw output — not ad valorem — so its bite is decided
+/// entirely by what a unit of raw output is worth, and at 1.0 it had drifted
+/// past the whole ancient tier's prices. `scripts/world_gen.lua` authors stone
+/// at 1.00 and timber at 1.50; a flat 1.0 therefore took 100% of a unit of
+/// stone and 67% of a unit of timber before the miner saw a credit.
+///
+/// tools/verify/spawn_solvency.cpp measured the effect end to end on the shipped
+/// 0 CE spawn: the seated corporation realised 1.27 credits per raw unit sold
+/// and paid 1.14 credits of levy on it — a levy taking ~90% of the gross value
+/// of everything it dug up, against 3.2% of the corp's outgoings by size, which
+/// is why a size-ranked attribution alone would have missed it.
+///
+/// 0.1 puts it at ~10% of a unit of stone and ~4% of a unit of iron ore. That is
+/// a tax on extraction, which is what the design says it is
+/// (docs/economy/FINANCE.md § Levies). Nothing about the mechanism changed: it
+/// is still flat per unit, still enacted at generation, still a transfer to the
+/// author nation's treasury, still bounded by jurisdiction.
+///
+/// A caller that passes its own rate is unaffected — the law harnesses all do,
+/// so this default moves only the generated world.
+///
 /// @param w    World; `laws` is appended to (or left untouched — see above).
 /// @param rate Credits per unit of raw output extracted in the author's
 ///             jurisdiction.
-void seed_prototype_laws(world& w, float rate = 1.0f);
+void seed_prototype_laws(world& w, float rate = 0.1f);

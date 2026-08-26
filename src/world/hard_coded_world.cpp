@@ -797,12 +797,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
     generate_roads(w, kepler);
 
     // Attach installations to the first two land tiles found in raster order.
-    // kepler_home_tile is also the player unit stub's starting position (BL-324) —
-    // reusing the same land-tile lookup rather than a second one.
-    entity_id kepler_home_tile = null_entity;
+    // This lookup used to publish its first tile as `kepler_home_tile` for the
+    // player unit stub further down; BL-635 deleted that stub (see below), and
+    // with it the only reader outside this block.
     {
         auto land = first_land_tiles(kepler_tiles, w, home_grid_width, home_grid_height, 2);
-        kepler_home_tile = land.size() > 0 ? land[0] : null_entity;
 
         const entity_id kepler_extraction = w.create_entity();
         w.buildings[kepler_extraction] = building_component{
@@ -1099,18 +1098,26 @@ world make_hard_coded_world(world_params params, generation_report* report,
         }
     }
 
-    // Player unit stub on Kepler, sited on the same home tile the installations
-    // used (BL-324: position is a tile id, not a body).
-    const entity_id kepler_unit = w.create_entity();
-    // BL-459 removed the stored `strength` field it used to set to 50 alongside
-    // count 50 — a literal duplicate. Strength is derived now (unit_strength,
-    // unit_roster.hpp). No muster base: the hard-coded world has none, so this
-    // stub is deliberately never orphaned by BL-454's unit pass.
-    w.units[kepler_unit] = unit_component{
-        .position = kepler_home_tile,
-        .owner    = w.player_entity,
-        .count    = 50,
-    };
+    // THE PLAYER UNIT STUB IS GONE (BL-635, 2026-08-26), and its removal is the
+    // deletion of a duplicate rather than a change of design.
+    //
+    // What stood here was a 50-head unit owned by `w.player_entity`, seeded on
+    // the Kepler home tile with no muster base — written when nothing else in
+    // the world produced a unit at all. Corporation generation has produced one
+    // since BL-324: `seed_starting_military` gives every generated corporation a
+    // military base and one 50-head unit on it. The player's corp IS a generated
+    // corporation, so it collected both, and this stub was never removed.
+    //
+    // MEASURED (tools/verify/spawn_solvency.cpp, 8 seeds of the shipped spawn):
+    // the seated corporation fielded 2 units / 100 heads on every single seed
+    // while a rival that had any force at all fielded 1 unit / 50 heads. Under
+    // BL-454's standing-force upkeep that asymmetry is not cosmetic — it is a
+    // recurring cash cost the player alone pays, twice over, from turn one, and
+    // nobody designed it.
+    //
+    // Removing it is not a subsidy: it takes the player's opening force DOWN to
+    // exactly what every rival is handed, which is what a level opening means.
+    // Nothing else referenced `kepler_unit`.
 
     // -----------------------------------------------------------------------
     // Selene — Kepler's moon (Luna analogue)

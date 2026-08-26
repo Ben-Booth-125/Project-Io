@@ -47,6 +47,10 @@ const LUA_TUS = new Set(['recipe_registry', 'works_registry', 'tech_tree', 'worl
 const NEEDS_LUA = new Map([
   ['pregame_balance_harness', 'constructs a lua_state and calls recipe_registry::load_from_lua'],
   ['persona_counsel_harness', 'loads scripts/personas/*.lua through src/scripting/persona_pack.cpp'],
+  ['spawn_solvency',          'loads the REAL scripts/recipes.lua + economy.lua through ' +
+                              'recipe_registry::load_from_lua — it measures magnitudes, not ' +
+                              'relations, so a restated registry would answer about a world ' +
+                              'that does not ship (BL-635)'],
 ]);
 
 function die(msg, code = 1) { console.error('build_harness: ' + msg); process.exit(code); }

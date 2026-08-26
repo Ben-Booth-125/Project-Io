@@ -563,6 +563,28 @@ target_link_libraries(pregame_balance_harness PRIVATE io_world_obj lua54)
 target_compile_features(pregame_balance_harness PRIVATE cxx_std_20)
 target_compile_options(pregame_balance_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# spawn_solvency (BL-635) is the fourth Lua-linked harness, and the reason is
+# stated in its own header: it asserts a MAGNITUDE, not a relation. Every other
+# economy harness restates scripts/economy.lua as C++ constants because the
+# property it checks holds whatever the constants are; this one reads the
+# per-flow attribution of the SHIPPED spawn off BL-626's filed quarterly returns,
+# and the shipped spawn opens at 0 CE, where the era band masks the recipe roster
+# down to the ancient one. A restated registry would answer about a world that
+# does not ship. Same shape as pregame_balance_harness above.
+add_executable(spawn_solvency
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/spawn_solvency.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/contract_template.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(spawn_solvency PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(spawn_solvency PRIVATE io_world_obj lua54)
+target_compile_features(spawn_solvency PRIVATE cxx_std_20)
+target_compile_options(spawn_solvency PRIVATE ${IO_WARNING_FLAGS})
+
 # persona_counsel_harness (BL-207) needs a live sol2/Lua state too — it loads
 # the real scripts/personas/*.lua packs through src/scripting/persona_pack.cpp.
 # Same shape as pregame_balance_harness above: add back the sol2/Lua TU +
@@ -1023,6 +1045,16 @@ set(IO_TEST_SWEEP_HARNESSES
     # generates a full world per seed with the shipped 400-year pre-epoch era.
     province_capacity_probe
 
+    # CATEGORY (1), added 2026-08-26 (BL-635). spawn_solvency generates a full
+    # world per seed WITH the shipped 400-year pre-epoch era and then runs the
+    # whole 80-tick pre-game warm start on each — measured at ~110 s a seed
+    # Release, and its default sweep is 8 of them. It cannot use no_prehistory():
+    # skipping the era leaves the buildings unstaffed, and a corp whose sites
+    # never run is not the spawn the item is about. Deliberate run:
+    #   $env:IO_RUN_SWEEPS=1; ctest --test-dir build -R spawn_solvency
+    # or the exe directly, `spawn_solvency [seeds] [--fast]`.
+    spawn_solvency
+
     # Same cost, same reason, added 2026-08-21 (Sprint B3): settlement_density
     # generates a full world per seed with the shipped 400-year pre-epoch era —
     # the nation set the era leaves behind is exactly what its per-nation column
@@ -1115,6 +1147,12 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     # would run from build/ under ctest and measure a stale or absent copy,
     # same trap price_band_harness's own entry above already documents.
     upkeep_harness
+    # ADDED 2026-08-26 (BL-635). spawn_solvency loads scripts/recipes.lua +
+    # economy.lua through recipe_registry::load_from_lua by relative path, and
+    # the whole point of the harness is that the magnitudes are the SHIPPED
+    # ones — run from build/ it would measure a default registry and report a
+    # spawn nobody plays.
+    spawn_solvency
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})
