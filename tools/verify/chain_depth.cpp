@@ -137,13 +137,18 @@ constexpr resource_type FAR   = resource_type::alloys;
 // below contains a hand-written resource name, which is the whole point — a
 // second hand-maintained list beside the first is the loophole rebuilt:
 //
-//   population_demand           reg.population_demand().demand_basket
-//                               (economy.population_demand in Lua; the exact
-//                               vector inject_population_demand scales by
-//                               centre scale and elasticity)
-//   background_demand           reg.background_demand().demand_basket
+//   population_demand           reg.population_demand_basket()
+//                               (economy.population_demand in Lua - the SHARED
+//                               `demand_basket` tranche plus every `baskets` row
+//                               the registry's band admits, i.e. the exact vector
+//                               inject_population_demand scales by centre scale
+//                               and elasticity. BL-640: banded, so this probe's
+//                               answer depends on the band the registry carries)
+//   background_demand           reg.background_demand_basket()
 //                               (economy.background_demand; likewise for
-//                               inject_background_demand)
+//                               inject_background_demand. All six of its goods
+//                               are banded industrial, so it moves NOTHING in an
+//                               ancient registry - which is the point)
 //   unit_upkeep_draw            reg.military().upkeep.goods_per_head
 //                               (economy.military.unit_upkeep; the per-head,
 //                               per-tick vector run_unit_upkeep draws from the
@@ -221,10 +226,15 @@ bool injector_moves(const recipe_registry& reg, injector i, std::size_t r)
     {
         case injector::none:
             return false;
+        // BL-640: the ERA-RESOLVED folds, not `.demand_basket` on the params
+        // (which is now the shared `any` tranche alone). These are the exact
+        // vectors inject_population_demand / inject_background_demand multiply
+        // by, so the probe still reads what the pass reads - and it now answers
+        // PER BAND, which is what makes R1b's derivation honest.
         case injector::population_demand:
-            return reg.population_demand().demand_basket[r] > 0.0f;
+            return reg.population_demand_basket()[r] > 0.0f;
         case injector::background_demand:
-            return reg.background_demand().demand_basket[r] > 0.0f;
+            return reg.background_demand_basket()[r] > 0.0f;
         case injector::unit_upkeep_draw:
             return reg.military().upkeep.goods_per_head[r] > 0.0f;
         case injector::launch_draw:
@@ -235,9 +245,18 @@ bool injector_moves(const recipe_registry& reg, injector i, std::size_t r)
             // override (BL-590) `resource_build_cost_for` resolves, then the
             // road ladder. Generic over the roster, so a future override is
             // covered without an edit here.
+            // BL-640: gated on building_available, so a probe against a registry
+            // carrying a BAND sees only that band's buildings. Under the default
+            // `any` band every type is available, so R1 and R4's own probes are
+            // unchanged; R1b, which sets a band, gets the truth instead.
             for (int t = 1; t <= 9; ++t) // building_type 1..9; `none` (0) has no economics
-                if (reg.economics(static_cast<building_type>(t)).resource_build_cost[r] > 0.0f)
+            {
+                const building_type bt = static_cast<building_type>(t);
+                if (!reg.building_available(bt))
+                    continue;
+                if (reg.economics(bt).resource_build_cost[r] > 0.0f)
                     return true;
+            }
             for (const resource_type target : placement_rules::k_extractable)
                 if (reg.resource_build_cost_for(building_type::extraction_site,
                                                 target, no_recipe)[r] > 0.0f)
@@ -292,6 +311,20 @@ const exemption k_actor_consumed[] = {
     { resource_type::ordnance, injector::unit_upkeep_draw,
       "BL-454 unit upkeep draw (per-tick, per unit)" },
 
+    // BL-640, and the three rows this item exists to move. They sat in the
+    // no-pass half below claiming a "mercantile demand" that never existed; the
+    // era-banded household basket is a real weight in economy.population_demand's
+    // `ancient` tranche, which is what `injector_moves` resolves through. No
+    // harness edit substantiates them - deleting the Lua row un-substantiates
+    // them again, exactly as R4 pins for clean_water and ordnance.
+    { resource_type::ceramics, injector::population_demand,
+      "the ancient household basket (BL-640) - terminal artisan good (BL-586)" },
+    { resource_type::leather, injector::population_demand,
+      "the ancient household basket (BL-640) - terminal artisan good (BL-586 slice 2)" },
+    { resource_type::dressed_stone, injector::population_demand,
+      "the ancient household basket (BL-640) - the household's share of building, "
+      "distinct from BL-642's construction draw, which owns the other share" },
+
     // --- Claims with no pass behind them ---------------------------------
     // Everything below names a want that was never built. Each stays here,
     // with its claim intact, because a named list is what makes the failure
@@ -312,17 +345,13 @@ const exemption k_actor_consumed[] = {
       "mercantile demand, endemic good (BL-191) - endemic luxury demand (BL-647) owns the buyer" },
     { resource_type::trade_goods_misc, injector::none,
       "mercantile demand, endemic-luxury placeholder - endemic luxury demand (BL-647) owns the buyer" },
-    { resource_type::ceramics, injector::none,
-      "mercantile demand, terminal artisan good (BL-586) - the era-banded household basket (BL-640) owns the buyer" },
-    { resource_type::dressed_stone, injector::none,
-      "mercantile demand, terminal construction good (BL-586) - construction actually draws (BL-642) owns the buyer" },
     { resource_type::tools, injector::none,
       "mercantile demand for now; a construction-material draw (BL-590) when it lands" },
-    { resource_type::leather, injector::none,
-      "mercantile demand, terminal artisan good (BL-586 slice 2) - the era-banded household basket (BL-640) owns the buyer" },
     { resource_type::rigging, injector::none,
-      "mercantile demand, terminal trade good (BL-586 slice 2, the Shipwright's output) - "
-      "the era-banded household basket (BL-640) owns the buyer" },
+      "mercantile demand, terminal trade good (BL-586 slice 2, the Shipwright's output). "
+      "ITS CLAIM NAMED BL-640 AND BL-640 DID NOT BUY IT: POPULATION.md's ancient household "
+      "is ceramics, cloth, leather and dressed stone - rigging is ship's tackle, not a "
+      "household good. Re-pointed at no pass rather than at a guess, and left red" },
 };
 
 const exemption* exemption_for(std::size_t r)
@@ -845,12 +874,13 @@ int main()
     // gate extraction by era — so only the RECIPE side of reachability can
     // strand a good.
     //
-    // Actor-consumed goods are treated as WANTED IN EVERY BAND, mirroring R1's
-    // table exactly (same list, same reasons) rather than guessing per-actor
-    // era scope: none of those consumers (unit upkeep, population demand,
-    // mercantile demand, procurement) is itself era-gated in economy_system.cpp
-    // or market_clearing.cpp today, so treating them as universal is the
-    // faithful reading of the CURRENT code, not an assumption layered over it.
+    // BL-640 REPLACED THIS ROW'S NOTION OF "WANTED". It used to treat every
+    // actor-consumed good as wanted in EVERY band, from a hand-narrowed list,
+    // on the faithful-at-the-time reading that no consumer was era-gated. Two
+    // of them are now: the population and background baskets carry `era` rows
+    // and are masked by era_permits exactly as recipes are. So the want is
+    // DERIVED per band from BL-648's injector registry instead - see the block
+    // below, which also records what that derivation exposed.
     std::printf("\nR1b - producer and consumer reachable in the SAME era band\n");
     {
         lua_state lua;
@@ -858,7 +888,7 @@ int main()
         lua.load("scripts/economy.lua");
         recipe_registry reg;
         reg.load_from_lua(lua);
-        reg.set_era(era_band::any);
+        reg.set_era(era_band::any); // opening state only; the band loop sets its own
 
         std::vector<bool> extractable(resource_count, false);
         for (const resource_type e : placement_rules::k_extractable)
@@ -867,50 +897,47 @@ int main()
                                        resource_type::coffee,  resource_type::furs })
             extractable[static_cast<std::size_t>(e)] = true;
 
-        // A NARROWER list than R1's own exemption table, and deliberately so.
-        // R1 only needs to know a good is wanted by SOMEONE, so it lumps every
-        // named actor together. This row asks whether that want is genuinely
-        // BAND-INDEPENDENT, which only holds for a REAL per-tick/per-contract
-        // stockpile draw — verified against source, not assumed:
-        //   spacecraft_components -> BL-350 procurement contracts (economy_system.cpp)
-        //   propellant             -> per-convoy dispatch (supply_system.cpp / corp_command.cpp)
-        //   clean_water/consumer_goods/medical_supplies -> inject_population_demand
-        //       (market_clearing.cpp:233, called unconditionally at :545)
-        //   ordnance                -> BL-454 unit upkeep, per-tick per-unit
-        // EXCLUDED on purpose: tobacco/spices/coffee/furs/trade_goods_misc.
-        // Grepping the C++ finds no programmatic draw against any of them at
-        // all — "mercantile demand" in R1's table means they are SELLABLE on
-        // the open market, not that any system requires them to exist. An
-        // ancient-only producer for an ancient-only endemic-luxury good is
-        // therefore a design choice (industrial fills the same role with
-        // consumer_goods), not a strand, and must not be flagged here.
+        // BL-640 R4: THE WANT IS DERIVED FROM THE INJECTOR REGISTRY, PER BAND.
         //
-        // BL-648 LEFT THIS LIST ALONE, and that is a decision rather than an
-        // omission. Deriving it from the injector registry is the obviously
-        // tidier move and it is NOT this item's: the registry's derived set
-        // adds the whole population and background baskets (food_rations,
-        // agricultural_produce, water, silicon, machinery, alloys, electronics,
-        // ...) to "wanted in every band", and since none of those passes is
-        // era-gated an ancient campaign really does want goods only the
-        // industrial arc can make. That is a SECOND, larger red list of the
-        // same defect class R1b was written for, and it belongs to whichever
-        // demand-channel item bands the baskets (MARKETS.md § Demand channels,
-        // property 2) — not folded silently into BL-648's diff, where it would
-        // bury the ten goods this item exists to name. Named rather than
-        // assumed, per this file's own habit.
-        static const resource_type k_band_independent_actors[] = {
-            resource_type::spacecraft_components, resource_type::propellant,
-            resource_type::clean_water,           resource_type::consumer_goods,
-            resource_type::medical_supplies,      resource_type::ordnance,
-            // BL-585/BL-586's ceramics/dressed_stone/tools are DELIBERATELY NOT
-            // here, same reasoning as the excluded tobacco/spices/coffee/furs/
-            // trade_goods_misc above: "mercantile demand" in R1's table means
-            // sellable-on-the-market, not a real programmatic draw, so it must
-            // not force a band-independent want here.
-        };
-        auto actor_consumed = [&](std::size_t r) {
-            for (const resource_type e : k_band_independent_actors)
-                if (static_cast<std::size_t>(e) == r)
+        // WHAT THIS REPLACED, and why it could not stay. Until now this row read
+        // a HAND-NARROWED list of "band-independent actors" - six resources
+        // typed out here, justified in a comment. BL-648 flagged the obvious
+        // move (derive it from the registry) and explicitly deferred it, because
+        // deriving it against UNBANDED baskets would have added the whole
+        // population and background baskets to "wanted in every band" and
+        // reported an ancient campaign as genuinely wanting silicon, machinery,
+        // alloys and electronics. That report would have been CORRECT - it was
+        // the defect, not a false alarm - but it belonged to the item that bands
+        // the baskets. This is that item, so the derivation lands here.
+        //
+        // THE DERIVATION. A resource is actor-wanted in band B if any pass in
+        // the injector registry moves it with the registry SET TO B. Nothing is
+        // typed out: `injector_moves` resolves every branch through the live
+        // vector the pass itself reads, and the two basket branches now resolve
+        // through the era-masked fold (recipe_registry::population_demand_basket).
+        // So the answer changes when scripts/economy.lua changes, in the right
+        // direction, with no edit here.
+        //
+        // WHAT THE DERIVATION EXPOSES that the hand list hid, stated rather than
+        // absorbed:
+        //   * The three habitability goods (clean_water, consumer_goods,
+        //     medical_supplies) LEAVE the ancient red list, because the basket
+        //     that wanted them is now banded industrial. Their k_known_gaps rows
+        //     went with them - see below.
+        //   * spacecraft_components leaves it too, for a DIFFERENT and less
+        //     comfortable reason: no pass in the registry moves it in either
+        //     band. Its R1 row stays red and says so; this row simply stops
+        //     double-counting a want that does not exist.
+        //   * Every pass that is NOT era-gated still reports band-independently,
+        //     which is the honest reading of the current code: the unit-upkeep
+        //     draw and the launch draw fire in both arcs, so propellant is still
+        //     wanted at 0 CE by a dispatch no ancient producer can supply.
+        //   * Construction and the two baskets DO vary by band now, so a
+        //     material or a household good the band cannot make is a finding
+        //     here rather than a silence.
+        auto actor_consumed = [](const recipe_registry& r, std::size_t res) {
+            for (const injector i : k_injectors)
+                if (injector_moves(r, i, res))
                     return true;
             return false;
         };
@@ -924,12 +951,25 @@ int main()
         // Remove an entry the moment its own item lands an ancient (or
         // industrial) route.
         struct known_gap { resource_type res; era_band band; const char* tracking; };
+        //
+        // BL-640 CLOSED FOUR OF THE FIVE, and the reasons differ - recorded
+        // rather than quietly deleted, because "the row went green" is only
+        // useful with the reason attached:
+        //   clean_water / consumer_goods / medical_supplies - REPAIRED. Their
+        //     rationale was literally "population demand is not era-gated". It
+        //     is now, so the ancient band no longer wants them, and the ancient
+        //     band gained ceramics / cloth / leather / dressed_stone instead -
+        //     each of which HAS an ancient producer, which is why no new row
+        //     replaces these three.
+        //   spacecraft_components - NOT repaired, RE-CLASSIFIED. Procurement is
+        //     still not era-gated, but procurement is not in the injector
+        //     registry (deliberately - see the registry header), so the derived
+        //     want no longer names it. It stays red in R1 with an
+        //     injector::none claim, which is the row that should carry it.
+        // Remove an entry the moment its own item lands an ancient (or
+        // industrial) route.
         static const known_gap k_known_gaps[] = {
-            { resource_type::spacecraft_components, era_band::ancient, "NR-355: BL-350 procurement is not era-gated; no ancient producer exists" },
-            { resource_type::propellant,             era_band::ancient, "NR-355: propellant dispatch is not era-gated; no ancient producer exists" },
-            { resource_type::clean_water,            era_band::ancient, "NR-355: population demand is not era-gated; no ancient producer exists" },
-            { resource_type::consumer_goods,         era_band::ancient, "NR-355: population demand is not era-gated; no ancient producer exists" },
-            { resource_type::medical_supplies,       era_band::ancient, "NR-355: population demand is not era-gated; no ancient producer exists" },
+            { resource_type::propellant, era_band::ancient, "NR-355: the per-convoy launch draw is not era-gated; no ancient producer exists" },
         };
         auto known_gap_tracked = [&](std::size_t r, era_band band) {
             for (const known_gap& g : k_known_gaps)
@@ -938,15 +978,21 @@ int main()
             return false;
         };
 
-        const int n = reg.recipe_count(building_type::processing_facility);
         std::vector<std::string> stranded;
         int gap_count = 0;
         for (const era_band band : { era_band::ancient, era_band::industrial })
         {
             const char* band_name = (band == era_band::ancient) ? "ancient" : "industrial";
+            // BL-640: the registry CARRIES the band while it is probed, so the
+            // injector registry's basket branches answer for this band and not
+            // for the union of both. The explicit era_permits filter below is
+            // now redundant (recipe_at walks the band's own mask) and is kept as
+            // the statement of intent it always was.
+            reg.set_era(band);
+            const int n = reg.recipe_count(building_type::processing_facility);
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                bool wanted    = actor_consumed(r);
+                bool wanted    = actor_consumed(reg, r);
                 bool reachable = extractable[r];
                 for (int i = 0; i < n && (!wanted || !reachable); ++i)
                 {
@@ -1263,7 +1309,11 @@ int main()
     {
         const std::size_t i_clean_water = static_cast<std::size_t>(resource_type::clean_water);
         const std::size_t i_ordnance    = static_cast<std::size_t>(resource_type::ordnance);
-        const std::size_t i_ceramics    = static_cast<std::size_t>(resource_type::ceramics);
+        // BL-640 moved ceramics onto injector::population_demand (it now has a
+        // real basket weight), so the "a claim naming no pass cannot be
+        // laundered" probe below needs a subject that still names none. `rigging`
+        // is that subject, and the property under test is unchanged.
+        const std::size_t i_rigging     = static_cast<std::size_t>(resource_type::rigging);
 
         // 1. A registry that was never loaded substantiates NOTHING. If the
         //    probes carried a baked-in list, these would still read as wanted.
@@ -1296,13 +1346,13 @@ int main()
               "zeroing the upkeep rate UNSUBSTANTIATES it - a reverted draw cannot leave a green row behind");
 
         // 4. No amount of authoring in one channel launders a claim that names
-        //    no pass at all. `ceramics` claims a mercantile demand; giving the
+        //    no pass at all. `rigging` claims a mercantile demand; giving the
         //    population basket a weight for it must not help, because its row
         //    does not name that pass.
         population_demand_params pd2 = blank.population_demand();
-        pd2.demand_basket[i_ceramics] = 1.0f;
+        pd2.demand_basket[i_rigging] = 1.0f;
         blank.set_population_demand(pd2);
-        check(!exemption_substantiated(blank, i_ceramics),
+        check(!exemption_substantiated(blank, i_rigging),
               "an injector::none claim stays unsubstantiated however the data moves - "
               "the row must be repointed at the pass that lands, not merely surrounded by one");
 

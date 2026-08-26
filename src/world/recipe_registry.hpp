@@ -49,6 +49,27 @@ inline bool era_permits(era_band campaign, era_band entry)
     return campaign == era_band::any || entry == era_band::any || entry == campaign;
 }
 
+/// BL-640: one era-banded tranche of a demand basket.
+///
+/// Authored as a row in `economy.population_demand.baskets` /
+/// `economy.background_demand.baskets`, each row carrying the SAME `era = "..."`
+/// field a recipe carries (BL-433) and read through the SAME `read_era` reader —
+/// so an unknown band string is a load-time error here exactly as it is there,
+/// never a silent fallback. This is deliberately not a parallel mechanism: the
+/// mask below is `era_permits`, the same predicate the recipe browse mask uses.
+///
+/// Why the baskets needed one at all (MARKETS.md § Demand channels, property 2):
+/// recipes have been banded since BL-433 but the demand baskets never were, so
+/// a basket authored in industrial goods left an ancient campaign wanting things
+/// nothing in that band can make. Era decides WHICH value chain a household
+/// consumes; the stratum ladder (POPULATION.md § Population demand) decides how
+/// far up it — the two compose, and this field is the first half.
+struct era_basket
+{
+    era_band                          era           = era_band::any;
+    std::array<float, resource_count> demand_basket = {};
+};
+
 /// A processing recipe: per-batch input and output quantities, indexed by
 /// resource_type. Reagents are simply inputs with no matching output. Authored
 /// in scripts/recipes.lua; the recipe's id is its index in recipe_registry::recipes.
@@ -315,9 +336,18 @@ struct market_emergence_params
 /// for the full model.
 struct population_demand_params
 {
-    /// Per-scale-point demand weight per resource. Indexed by
-    /// static_cast<std::size_t>(resource_type). Unlisted resources get 0.
+    /// The SHARED (`any`) tranche: per-scale-point demand weight per resource,
+    /// indexed by static_cast<std::size_t>(resource_type). Unlisted resources
+    /// get 0. BL-640: this is no longer the whole basket — see `baskets` below,
+    /// and read the era-resolved sum through
+    /// recipe_registry::population_demand_basket(), which is what the injector
+    /// multiplies by.
     std::array<float, resource_count> demand_basket = {};
+    /// BL-640 era-banded tranches, in authored order. The registry folds every
+    /// row `era_permits` admits onto the shared tranche above; a row the current
+    /// band excludes contributes nothing. Authored order, so the fold is a pure
+    /// function of the script and not of any container layout.
+    std::vector<era_basket> baskets;
     float demand_elasticity = 0.80f; ///< exponent on (base_price / price).
     float elasticity_min    = 0.30f; ///< clamp lo on the elasticity factor.
     float elasticity_max    = 2.50f; ///< clamp hi on the elasticity factor.
@@ -336,9 +366,17 @@ struct population_demand_params
 /// scaled per market by that market's body's total population scale.
 struct background_demand_params
 {
-    /// Per-population-scale-point demand weight per resource. Indexed by
-    /// static_cast<std::size_t>(resource_type). Unlisted resources get 0.
+    /// The SHARED (`any`) tranche: per-population-scale-point demand weight per
+    /// resource, indexed by static_cast<std::size_t>(resource_type). Unlisted
+    /// resources get 0. BL-640: read the era-resolved sum through
+    /// recipe_registry::background_demand_basket().
     std::array<float, resource_count> demand_basket = {};
+    /// BL-640 era-banded tranches, in authored order — same fold, same mask as
+    /// population_demand_params::baskets. All six of this stopgap's goods are
+    /// industrial, so today every row here is banded `industrial` and an ancient
+    /// campaign draws nothing from this pass. BANDED, NOT DELETED: the pass is
+    /// still the stand-in for the Industry channel until BL-641 lands.
+    std::vector<era_basket> baskets;
     float demand_elasticity = 0.80f; ///< exponent on (base_price / price).
     float elasticity_min    = 0.30f; ///< clamp lo on the elasticity factor.
     float elasticity_max    = 2.50f; ///< clamp hi on the elasticity factor.
@@ -736,8 +774,27 @@ public:
     /// BL-368 population-demand model tunables (economy.population_demand in Lua).
     const population_demand_params& population_demand() const { return m_population_demand; }
 
+    /// BL-640: the population basket AS MASKED BY THE CURRENT ERA — the shared
+    /// (`any`) tranche plus every banded row `era_permits` admits, summed in
+    /// authored order. THIS, not `population_demand().demand_basket` (the shared
+    /// tranche alone), is the vector inject_population_demand multiplies by, and
+    /// it is what any check asking "does this pass want this good" must read.
+    /// An unset band (`era_band::any`, the default) admits every row, exactly as
+    /// it admits every recipe.
+    const std::array<float, resource_count>& population_demand_basket() const
+    {
+        return m_population_basket;
+    }
+
     /// BL-340/BL-365 background-industrial-demand tunables (economy.background_demand in Lua).
     const background_demand_params& background_demand() const { return m_background_demand; }
+
+    /// BL-640: the background-industrial basket as masked by the current era.
+    /// Same fold, same caveat as population_demand_basket() above.
+    const std::array<float, resource_count>& background_demand_basket() const
+    {
+        return m_background_basket;
+    }
 
     /// BL-442 price band (economy.price_band in Lua) — the ONE authority for the
     /// [floor x, ceil x] clamp around base_price, read by both resolve_price
@@ -905,6 +962,7 @@ public:
     {
         m_era = e;
         rebuild_allowed();
+        rebuild_baskets(); // BL-640: the demand baskets ride the same band change.
     }
 
     /// Is this building type part of the current era's roster? Types are addressed
@@ -948,8 +1006,16 @@ public:
     void set_thresholds(float t_full, float t_idle) { m_t_full = t_full; m_t_idle = t_idle; }
     void set_growth(const growth_params& s) { m_growth = s; }
     void set_migration(const migration_params& m) { m_migration = m; }
-    void set_population_demand(const population_demand_params& p) { m_population_demand = p; }
-    void set_background_demand(const background_demand_params& b) { m_background_demand = b; }
+    void set_population_demand(const population_demand_params& p)
+    {
+        m_population_demand = p;
+        rebuild_baskets(); // BL-640: keep the era-resolved basket in step.
+    }
+    void set_background_demand(const background_demand_params& b)
+    {
+        m_background_demand = b;
+        rebuild_baskets();
+    }
     void set_price_band(const price_band_params& p) { m_price_band = p; }
     void set_market_emergence(const market_emergence_params& m) { m_market_emergence = m; }
     void set_construction(const construction_params& c) { m_construction = c; }
@@ -1016,6 +1082,32 @@ private:
             if (era_permits(m_era, m_recipes[i].era))
                 m_allowed.push_back(i);
         rebuild_depth();
+    }
+
+    /// BL-640: recompute the era-resolved demand baskets — the SAME mask, the
+    /// same predicate and the same authored-order walk `rebuild_allowed` uses
+    /// for recipes, applied to the two basket injectors' tranches. Effective
+    /// basket = the shared (`any`) tranche + every banded row era_permits admits.
+    ///
+    /// Deterministic by construction: `baskets` is a vector in authored order,
+    /// so nothing here depends on a container's layout.
+    void rebuild_baskets()
+    {
+        auto fold = [this](const std::array<float, resource_count>& shared,
+                           const std::vector<era_basket>&           rows,
+                           std::array<float, resource_count>&       dst)
+        {
+            dst = shared;
+            for (const era_basket& b : rows)
+            {
+                if (!era_permits(m_era, b.era))
+                    continue;
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    dst[r] += b.demand_basket[r];
+            }
+        };
+        fold(m_population_demand.demand_basket, m_population_demand.baskets, m_population_basket);
+        fold(m_background_demand.demand_basket, m_background_demand.baskets, m_background_basket);
     }
 
     /// BL-428: recompute chain depth over the era-allowed recipes.
@@ -1154,6 +1246,12 @@ private:
     migration_params m_migration = {};
     population_demand_params m_population_demand = {};
     background_demand_params m_background_demand = {};
+    /// BL-640: the era-resolved folds of the two above, rebuilt by
+    /// rebuild_baskets() on every band change and every setter. Cached rather
+    /// than recomputed per read: inject_population_demand walks it once per
+    /// centre per tick.
+    std::array<float, resource_count> m_population_basket = {};
+    std::array<float, resource_count> m_background_basket = {};
     price_band_params m_price_band = {};
     market_emergence_params m_market_emergence = {};
 

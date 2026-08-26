@@ -25,6 +25,14 @@
 //       roster, so every pre-BL-433 harness is unaffected.
 //   R4  An unknown era string is a load-time error naming the entry, not a silent
 //       fallback to `any` — a typo must not quietly re-admit a space-era building.
+//
+//   R5  BL-640: THE DEMAND BASKETS RIDE THE SAME GATE. `economy.population_demand`
+//       and `economy.background_demand` carry `baskets` rows tagged with the SAME
+//       `era` field, read by the SAME reader and masked by the SAME era_permits
+//       predicate — so the band that decides which recipes exist also decides
+//       which goods a household wants. R5 asserts both halves: the mask really
+//       swaps the tranches, and a mis-typed (or absent) band on a basket row is
+//       the same load-time error R4 pins for a recipe.
 
 #include "scripting/lua_state.hpp"
 #include "world/recipe_registry.hpp"
@@ -248,6 +256,101 @@ int main()
         check(threw, "a misspelled era is rejected rather than silently treated as `any`");
         check(threw && msg.find("industial") != std::string::npos,
               "...and the error names the offending value (\"" + msg + "\")");
+    }
+
+    // --- R5: BL-640 — the demand baskets are gated by the same band ------------
+    std::printf("\nR5 — the demand baskets ride the era gate (BL-640)\n");
+    {
+        const std::size_t i_ceramics       = static_cast<std::size_t>(resource_type::ceramics);
+        const std::size_t i_cloth          = static_cast<std::size_t>(resource_type::cloth);
+        const std::size_t i_leather        = static_cast<std::size_t>(resource_type::leather);
+        const std::size_t i_dressed_stone  = static_cast<std::size_t>(resource_type::dressed_stone);
+        const std::size_t i_consumer_goods = static_cast<std::size_t>(resource_type::consumer_goods);
+        const std::size_t i_clean_water    = static_cast<std::size_t>(resource_type::clean_water);
+        const std::size_t i_food_rations   = static_cast<std::size_t>(resource_type::food_rations);
+        const std::size_t i_silicon        = static_cast<std::size_t>(resource_type::silicon);
+
+        lua_state lua5;
+        recipe_registry r5 = load_registry(lua5);
+
+        // Default band `any` sees every tranche, exactly as it sees every recipe.
+        check(r5.population_demand_basket()[i_ceramics] > 0.0f
+                  && r5.population_demand_basket()[i_consumer_goods] > 0.0f,
+              "the default band folds BOTH household tranches (nothing is gated until a band is set)");
+        check(r5.background_demand_basket()[i_silicon] > 0.0f,
+              "...and the whole background-industrial basket with them");
+
+        r5.set_era(era_band::ancient);
+        check(r5.population_demand_basket()[i_ceramics]      > 0.0f
+                  && r5.population_demand_basket()[i_cloth]         > 0.0f
+                  && r5.population_demand_basket()[i_leather]       > 0.0f
+                  && r5.population_demand_basket()[i_dressed_stone] > 0.0f,
+              "the ancient household wants ceramics, cloth, leather and dressed stone");
+        check(r5.population_demand_basket()[i_consumer_goods] == 0.0f
+                  && r5.population_demand_basket()[i_clean_water] == 0.0f,
+              "...and wants NONE of the industrial habitability tranche it cannot make");
+        check(r5.background_demand_basket()[i_silicon] == 0.0f,
+              "the background-industrial stopgap injects nothing in the ancient band "
+              "(banded, not deleted — the table is still authored)");
+        check(r5.population_demand_basket()[i_food_rations] > 0.0f,
+              "the SHARED tranche survives the mask — subsistence is band-independent");
+
+        r5.set_era(era_band::industrial);
+        check(r5.population_demand_basket()[i_consumer_goods] > 0.0f
+                  && r5.population_demand_basket()[i_clean_water] > 0.0f,
+              "the industrial household keeps the BL-368 habitability tranche unchanged");
+        check(r5.population_demand_basket()[i_ceramics] == 0.0f
+                  && r5.population_demand_basket()[i_cloth] == 0.0f,
+              "...and does not inherit the ancient artisan tranche");
+        check(r5.background_demand_basket()[i_silicon] > 0.0f,
+              "the background-industrial basket is back in the band it belongs to");
+        check(r5.population_demand_basket()[i_food_rations] > 0.0f,
+              "the shared tranche survives this mask too");
+
+        // Idempotent and reversible: a band set twice, and set back, must land on
+        // the same numbers. A fold that accumulated instead of recomputing would
+        // fail here and nowhere else.
+        const float anc_ceramics_once = [&] {
+            r5.set_era(era_band::ancient);
+            return r5.population_demand_basket()[i_ceramics];
+        }();
+        r5.set_era(era_band::ancient);
+        r5.set_era(era_band::industrial);
+        r5.set_era(era_band::ancient);
+        check(r5.population_demand_basket()[i_ceramics] == anc_ceramics_once,
+              "the fold RECOMPUTES rather than accumulates — repeated band changes are idempotent");
+    }
+
+    // --- R5b: a mis-typed or absent band on a basket row is a load-time error --
+    std::printf("\nR5 — a bad band on a basket row throws (BL-640)\n");
+    {
+        lua_state bad;
+        bad.load("scripts/recipes.lua");
+        bad.load("scripts/economy.lua");
+        bad.state().safe_script("economy.population_demand.baskets[1].era = 'ancinet'");
+        recipe_registry r6;
+        bool threw = false;
+        std::string msg;
+        try { r6.load_from_lua(bad); }
+        catch (const std::exception& e) { threw = true; msg = e.what(); }
+        check(threw, "a misspelled band on a basket row is rejected, not silently `any`");
+        check(threw && msg.find("ancinet") != std::string::npos
+                  && msg.find("baskets[1]") != std::string::npos,
+              "...and the error names both the value and the row (\"" + msg + "\")");
+    }
+    {
+        lua_state bad;
+        bad.load("scripts/recipes.lua");
+        bad.load("scripts/economy.lua");
+        bad.state().safe_script("economy.population_demand.baskets[1].era = nil");
+        recipe_registry r7;
+        bool threw = false;
+        std::string msg;
+        try { r7.load_from_lua(bad); }
+        catch (const std::exception& e) { threw = true; msg = e.what(); }
+        check(threw, "a basket row with NO band is rejected — a banded tranche must name its band");
+        check(threw && msg.find("baskets[1]") != std::string::npos,
+              "...and the error names the row (\"" + msg + "\")");
     }
 
     std::printf("\n=== %s (%d failure%s) ===\n",

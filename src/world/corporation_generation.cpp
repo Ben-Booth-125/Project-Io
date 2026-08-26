@@ -1069,11 +1069,16 @@ std::array<float, resource_count> body_demand(const world& w, const recipe_regis
     if (total_scale <= 0.0f)
         return demand;
 
-    const population_demand_params&  pd = reg.population_demand();
-    const background_demand_params&  bd = reg.background_demand();
+    // BL-640: the ERA-RESOLVED baskets, the same vectors the two injectors
+    // multiply by. Sizing background production against the unbanded tranche
+    // would have generation chase demand the campaign's band never injects.
+    const population_demand_params&          pd = reg.population_demand();
+    const background_demand_params&          bd = reg.background_demand();
+    const std::array<float, resource_count>& pb = reg.population_demand_basket();
+    const std::array<float, resource_count>& bb = reg.background_demand_basket();
     for (std::size_t r = 0; r < resource_count; ++r)
-        demand[r] = total_scale * (pd.demand_scale * pd.demand_basket[r]
-                                  + bd.demand_scale * bd.demand_basket[r]);
+        demand[r] = total_scale * (pd.demand_scale * pb[r]
+                                  + bd.demand_scale * bb[r]);
     return demand;
 }
 

@@ -274,9 +274,24 @@ const char* state_word(ch_state s)
 // If the census disagrees with this list the disagreement is PRINTED, both ways,
 // and R4 goes red. It is not reconciled by adjusting either side: one of them is
 // wrong and which one is worth knowing.
+//
+// RE-BLESSED 2026-08-26 (BL-640, era-banded household basket) - three goods
+// removed, NOTHING relaxed. The assertion below is unchanged in strength: the
+// census set and this set must match EXACTLY, both directions, or R4 goes red.
+// What moved is the world, not the bar. `ceramics`, `dressed_stone` and
+// `leather` left the set because the ancient household basket now names them
+// (scripts/economy.lua, economy.population_demand.baskets, era = "ancient"),
+// so they have a real market bid at 0 CE for the first time.
+//
+// WHAT DELIBERATELY STAYED, so the reduction is a finding and not a sweep:
+//   ordnance          - still a POOL draw only (unit upkeep); no market bid.
+//   tools             - a construction-material draw (BL-590) owns its buyer.
+//   rigging           - ship's tackle, not a household good; POPULATION.md's
+//                       ancient household is ceramics, cloth, leather and
+//                       dressed stone, and rigging is none of them.
+//   trade_goods_misc  - endemic luxury demand (BL-647) owns its buyer.
 const char* const k_r4_expected[] = {
-    "ceramics", "dressed_stone", "leather", "ordnance",
-    "rigging", "tools", "trade_goods_misc",
+    "ordnance", "rigging", "tools", "trade_goods_misc",
 };
 constexpr std::size_t k_r4_expected_count =
     sizeof(k_r4_expected) / sizeof(k_r4_expected[0]);
@@ -459,14 +474,21 @@ classify(const world& w, const recipe_registry& reg)
                 c[r].has_deposit = true;
     }
 
-    // --- the two authored baskets ------------------------------------------
-    const population_demand_params&  pd = reg.population_demand();
-    const background_demand_params&  bd = reg.background_demand();
+    // --- the two authored baskets, AS MASKED BY THIS BAND -------------------
+    // BL-640: read population_demand_basket() / background_demand_basket(), the
+    // registry's era-resolved folds - the exact vectors inject_population_demand
+    // and inject_background_demand multiply by. `.demand_basket` on the params is
+    // now the SHARED (`any`) tranche alone, and reading it here would have this
+    // census attribute a structural sink to a band whose basket never names the
+    // good - precisely the defect the banding closes. `reg` already carries this
+    // band (set_era, above), so no extra state is threaded in.
+    const std::array<float, resource_count>& pd_basket = reg.population_demand_basket();
+    const std::array<float, resource_count>& bd_basket = reg.background_demand_basket();
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        if (pd.demand_basket[r] > 0.0f)
+        if (pd_basket[r] > 0.0f)
             c[r].sink_household = true;
-        if (bd.demand_basket[r] > 0.0f)
+        if (bd_basket[r] > 0.0f)
             c[r].sink_background = true;
     }
 
@@ -902,13 +924,16 @@ int main(int argc, char** argv)
         return 2;
     }
     {
-        const population_demand_params& pd = reg.population_demand();
+        // BL-640: the SHARED tranche plus every banded row (this registry is
+        // still band-agnostic here, so era_permits admits all of them) - an
+        // authored basket living entirely in `baskets` must not read as empty.
+        const std::array<float, resource_count>& pd_basket = reg.population_demand_basket();
         double basket = 0.0;
         for (std::size_t r = 0; r < resource_count; ++r)
-            basket += pd.demand_basket[r];
+            basket += pd_basket[r];
         if (basket <= 0.0)
         {
-            std::printf("FATAL: economy.population_demand.demand_basket is empty — "
+            std::printf("FATAL: economy.population_demand authored no basket weight at all — "
                         "the census would report every channel as dead.\n");
             return 2;
         }
