@@ -569,6 +569,13 @@ int main(int argc, char** argv)
     lua_state lua;
     lua.load("scripts/recipes.lua");
     lua.load("scripts/economy.lua");
+    // FIXED 2026-08-26 (found by BL-649's census, which hit the same bug on its own
+    // first run). This file's own header says it loads world_gen.lua and it did not.
+    // The consequence is NOT a missing table -- it is silent: world_gen.lua carries
+    // `kepler_market.base_price`, and BOTH basket injectors SKIP an unpriced resource
+    // without saying so, so background demand simply did not exist in the measured
+    // world and the diagnosis was taken against less demand than the game has.
+    lua.load("scripts/world_gen.lua");
     recipe_registry reg;
     reg.load_from_lua(lua);
 

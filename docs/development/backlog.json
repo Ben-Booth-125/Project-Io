@@ -1485,7 +1485,7 @@
     "src/world/recipe_registry.cpp",
     "docs/economy/POPULATION.md"
    ],
-   "design": "Design in POPULATION.md section Population demand and MARKETS.md section Demand channels. THE MEASURED CAUSE: population_demand's basket names food_rations, agricultural_produce, water, clean_water, consumer_goods, medical_supplies - and three of those six are made by NO ancient recipe, so a 0 CE campaign has three household goods. Recipes have carried an era field since BL-433; the demand baskets never did. THE WORK: band the basket the same way and author the ancient rows - ceramics, cloth, leather, dressed_stone - which are exactly the terminal artisan goods the ancient roster produces and nothing currently buys. Compose with the stratum ladder POPULATION.md already calls for: era decides WHICH value chain, stratum decides how far up it. This one item resurrects four of the seven ancient dead ends. SCOPE GREW, from BL-648's measurement (2026-08-26): this item also owns chain_depth's R1b list, and R1b hides a SECOND red list of the same defect class as the one BL-648 names. Neither inject_population_demand nor inject_background_demand is era-gated, so an ancient campaign genuinely 'wants' silicon, machinery, alloys and electronics - goods only the industrial arc can make - and R1b's hand-narrowed list quietly absorbs that. Banding the baskets is what makes R1b derivable from the injector registry instead of hand-maintained, so the two halves land together: band the demand, then let R1b read the banded truth. BL-648's agent deliberately did NOT fold this in, to avoid burying the ten goods that item exists to name - the right call, and it makes this item bigger than it looked when minted."
+   "design": "Design in POPULATION.md section Population demand and MARKETS.md section Demand channels. THE MEASURED CAUSE: population_demand's basket names food_rations, agricultural_produce, water, clean_water, consumer_goods, medical_supplies - and three of those six are made by NO ancient recipe, so a 0 CE campaign has three household goods. Recipes have carried an era field since BL-433; the demand baskets never did. THE WORK: band the basket the same way and author the ancient rows - ceramics, cloth, leather, dressed_stone - which are exactly the terminal artisan goods the ancient roster produces and nothing currently buys. Compose with the stratum ladder POPULATION.md already calls for: era decides WHICH value chain, stratum decides how far up it. This one item resurrects four of the seven ancient dead ends. SCOPE GREW, from BL-648's measurement (2026-08-26): this item also owns chain_depth's R1b list, and R1b hides a SECOND red list of the same defect class as the one BL-648 names. Neither inject_population_demand nor inject_background_demand is era-gated, so an ancient campaign genuinely 'wants' silicon, machinery, alloys and electronics - goods only the industrial arc can make - and R1b's hand-narrowed list quietly absorbs that. Banding the baskets is what makes R1b derivable from the injector registry instead of hand-maintained, so the two halves land together: band the demand, then let R1b read the banded truth. BL-648's agent deliberately did NOT fold this in, to avoid burying the ten goods that item exists to name - the right call, and it makes this item bigger than it looked when minted. THE MAGNITUDE, measured by BL-649's census (2026-08-26): at 0 CE, inject_background_demand alone is 8,417.8 of 10,544.0 total modelled market demand - 79.8% - and FIVE OF ITS SIX GOODS cannot be produced in that band at all. Household adds 435.4 more on clean_water / consumer_goods / medical_supplies, likewise unmakeable. So 65.7% OF ALL 0 CE DEMAND NAMES GOODS THE ANCIENT BAND CANNOT MAKE. That is not a rounding error in a basket, it is most of the demand in the world pointing at nothing, and it is why the ancient economy reads as having almost no buyers. Note the corollary for the tuning passes: fixing this will move prices everywhere, so the census must be run before and after and the deltas kept."
   },
   {
    "status": "designed",
@@ -1707,7 +1707,7 @@
     ".claude/skills/verifier-headless/SKILL.md",
     "docs/economy/MARKETS.md"
    ],
-   "design": "THE INSTRUMENT THE SPRINT'S PASSES NEED, and the reason it is filed as its own item rather than as a row on another: 'did that change help' has no answer without a before. THE WORK: a harness reporting, per resource and per era band, the total modelled demand and the PASSES that inject it - so a good with no buyer is a row in a report rather than a discovery made three sprints later. Report, never assert a target: this is a measuring instrument, and the moment it asserts a number it starts being tuned against instead of read. It should be run BEFORE and AFTER each of the sprint's viability passes and the deltas kept. Per CLAUDE.md's 'tool creation is skill creation' it wants a verifier-headless entry, which needs Ben's permission."
+   "design": "THE INSTRUMENT THE SPRINT'S PASSES NEED, and the reason it is filed as its own item rather than as a row on another: 'did that change help' has no answer without a before. THE WORK: a harness reporting, per resource and per era band, the total modelled demand and the PASSES that inject it - so a good with no buyer is a row in a report rather than a discovery made three sprints later. Report, never assert a target: this is a measuring instrument, and the moment it asserts a number it starts being tuned against instead of read. It should be run BEFORE and AFTER each of the sprint's viability passes and the deltas kept. Per CLAUDE.md's 'tool creation is skill creation' it wants a verifier-headless entry, which needs Ben's permission. OWED ON LANDING: the verifier-headless skill entry, which needs Ben's permission. Invocation: cmd //c tools\\verify\\build_lua_harness.bat demand_census, then build_gen\\verify\\demand_census.exe [--seed N] [--ticks N] [--fast] [--band ancient|industrial|both]."
   },
   {
    "id": "BL-650",
@@ -1761,6 +1761,30 @@
     "docs/generation/CORPORATION_GENERATION.md"
    ],
    "design": "Found by the wave-2 review barrier. BL-638 added settlement_state::charter (a charter_reach), and w_settlement/r_settlement do not carry it. The omission is SYMMETRIC so the stream stays consistent and no version bump is owed - it is not a corruption bug. It is a LATENT one: the field is silently zeroed on load, which is benign only while the sole readers are generate_corporations and its harness, both of which run before any save exists. It becomes wrong the moment BL-627 (profitability ledger), BL-629 (rival acquisition) or the generation ledger reads charter off a LOADED world - and it will read as 'this world has no charter' rather than as an error. TWO HONEST ROUTES, pick one and say why: serialise it (a version bump, claimed through next_save_version.js), or RECOMPUTE it on load from the ladder it is derived from, which costs no format change and cannot drift from its source. The second is probably right, since charter_reach is a pure function of already-serialised state."
+  },
+  {
+   "id": "BL-652",
+   "short_name": "INJECTORS_MUST_NOT_SKIP_SILENTLY",
+   "category": "Economy",
+   "title": "A demand injector that cannot price a basket entry must SAY SO, not skip it",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": "v0.1.21",
+   "sprint": "21",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/market_clearing.cpp",
+    "tools/verify/",
+    "docs/economy/MARKETS.md"
+   ],
+   "design": "THE MECHANISM THAT MADE TWO SEPARATE BUGS INVISIBLE ON THE SAME DAY, which is why it is an item rather than a note. inject_population_demand and inject_background_demand both SKIP a basket entry whose resource carries no market base price - silently, with no warning and no row anywhere. Consequences observed 2026-08-26: (1) BL-649's census read as having no background demand at all on its first run, and (2) tools/verify/spawn_solvency.cpp - whose own header says it loads world_gen.lua and did not - measured BL-635's entire spawn diagnosis in a world where background demand did not exist. Neither failed. Both just quietly answered a question about a different world. THE WORK: an injector that cannot price a basket entry must report it - a named diagnostic on the first occurrence, and a harness row that FAILS on a basket naming an unpriced good, since that combination is always either a missing script or an authoring error and is never intended. A basket entry is a STATEMENT that somebody wants the good; silently dropping it turns a design statement into a no-op. Cheap, and it protects every measurement the rest of Sprint 21 depends on."
   }
  ]
 }
