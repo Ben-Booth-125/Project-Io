@@ -605,6 +605,25 @@ struct band_result
     std::vector<std::string> no_sink_raws;       ///< extractable, unwanted
     std::vector<std::string> basket_unmakeable;  ///< a basket names what the band cannot produce
     std::vector<std::string> basket_unpriced;    ///< a basket names it, no market prices it -> skipped
+
+    // BL-655 R3 — THE PRICE CONSEQUENCE. Density and prices have to be read
+    // together or the count means nothing: firm density can be bought either by
+    // consuming more (demand rises, coverage and price hold) or by deliberately
+    // overproducing (coverage rises, price falls to the band floor). Those two
+    // reach the SAME building count and mean opposite things, and the demand
+    // table above cannot tell them apart. This block is the discriminator.
+    //
+    // Read at the census tick, after that tick's own resolve_price has run, so
+    // these are the prices clear_markets last settled on. `price_ratio` is
+    // price / base_price: the BL-442 band runs [floor_mult, ceil_mult] =
+    // [0.25, 10.0] around 1.0, so a resource sitting at 0.25 in every market
+    // that prices it is a glut, and one at 10.0 is an unservable shortage.
+    res_row price_mean{};       ///< mean settled price, over markets that price it
+    res_row price_ratio{};      ///< mean price / base_price
+    std::array<int, resource_count> markets_pricing{};   ///< markets carrying a base price for it
+    std::array<int, resource_count> markets_at_floor{};  ///< of those, how many sit AT the floor
+    std::array<int, resource_count> markets_at_ceil{};   ///< of those, how many sit AT the ceiling
+    float price_floor_mult = 0.0f, price_ceil_mult = 0.0f;  ///< echoed from registry, for the header
 };
 
 band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
@@ -705,6 +724,42 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     // prices clear_markets would read on this tick.
     const market_supply_snapshot prior_supply = snapshot_market_supply(w);
     const std::vector<entity_id> mids = sorted_keys_markets(w);
+
+    // --- BL-655 R3: the price consequence ----------------------------------
+    // Taken here, BEFORE the demand register is re-injected below: the prices
+    // standing now are the ones the census tick's clear_markets resolved, and
+    // nothing between here and the print touches market_component::price.
+    // The band comes off the registry (price_band()), never a local constant —
+    // the BL-442 rule.
+    {
+        const float floor_mult = reg.price_band().floor_mult;
+        const float ceil_mult  = reg.price_band().ceil_mult;
+        out.price_floor_mult   = floor_mult;
+        out.price_ceil_mult    = ceil_mult;
+        for (const entity_id mid : mids)          // sorted — no map-order dependence
+        {
+            const market_component& mc = w.markets.at(mid);
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                const float base = mc.base_price[r];
+                if (base <= 0.0f)
+                    continue;                     // unpriced: the `px` column already says so
+                out.markets_pricing[r] += 1;
+                out.price_mean[r]      += static_cast<double>(mc.price[r]);
+                out.price_ratio[r]     += static_cast<double>(mc.price[r] / base);
+                if (mc.price[r] <= base * floor_mult * 1.001f)
+                    out.markets_at_floor[r] += 1;
+                if (mc.price[r] >= base * ceil_mult * 0.999f)
+                    out.markets_at_ceil[r] += 1;
+            }
+        }
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (out.markets_pricing[r] > 0)
+            {
+                out.price_mean[r]  /= out.markets_pricing[r];
+                out.price_ratio[r] /= out.markets_pricing[r];
+            }
+    }
 
     zero_demand(w);
     inject_population_demand(w, reg);
@@ -922,6 +977,41 @@ void print_band(const band_result& b)
     if (b.wants_dropped_no_market > 0.0)
         std::printf("  note: %.3f units of want were registered on bodies carrying no market and "
                     "never reached a demand register.\n", b.wants_dropped_no_market);
+
+    // --- BL-655 R3: the price consequence, beside the density ---------------
+    // Only rows a market actually prices appear: an unpriced resource has no
+    // price consequence to report and the `px` column above already names it.
+    std::printf("\n  --- R3  the price consequence (census tick; band = [%.2f, %.2f] x base) ---\n",
+                b.price_floor_mult, b.price_ceil_mult);
+    std::printf("  A resource FLOORED in every market that prices it is a GLUT. Density bought by\n"
+                "  flooring prices is a failure of the demand route, not a success (BL-655 R3).\n");
+    std::printf("  %-3s %-22s | %10s %10s %10s | %7s %7s %7s | %s\n",
+                "id", "resource", "base", "price", "px/base",
+                "mkts", "floored", "ceiled", "verdict");
+    std::printf("  %-3s %-22s | %10s %10s %10s | %7s %7s %7s | %s\n",
+                "---", "----------------------", "----------", "----------", "----------",
+                "-------", "-------", "-------", "-------");
+    std::vector<std::string> floored_everywhere, ceiled_everywhere;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (b.markets_pricing[r] == 0)
+            continue;
+        const classification& c = b.cls[r];
+        if (!c.any_market_sink() && b.produced[r] <= 0.0)
+            continue;   // neither bought nor made here — no consequence to read
+        const double base  = (b.price_ratio[r] > 0.0) ? (b.price_mean[r] / b.price_ratio[r]) : 0.0;
+        const bool   floor = (b.markets_at_floor[r] == b.markets_pricing[r]);
+        const bool   ceil  = (b.markets_at_ceil[r] == b.markets_pricing[r]);
+        if (floor) floored_everywhere.emplace_back(rname(r));
+        if (ceil)  ceiled_everywhere.emplace_back(rname(r));
+        std::printf("  %-3zu %-22s | %10.3f %10.3f %10.3f | %7d %7d %7d | %s\n",
+                    r, rname(r), base, b.price_mean[r], b.price_ratio[r],
+                    b.markets_pricing[r], b.markets_at_floor[r], b.markets_at_ceil[r],
+                    floor ? "GLUT (floored everywhere)"
+                          : (ceil ? "SHORTAGE (ceiled everywhere)" : "in band"));
+    }
+    std::printf("  floored in EVERY market that prices it : %s\n", join(floored_everywhere).c_str());
+    std::printf("  ceiled  in EVERY market that prices it : %s\n", join(ceiled_everywhere).c_str());
 
     std::printf("\n  --- what this band cannot buy ---\n");
     std::printf("  produced in-band, NO market sink : %s\n", join(b.no_sink_produced).c_str());

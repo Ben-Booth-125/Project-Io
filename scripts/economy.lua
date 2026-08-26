@@ -905,10 +905,42 @@ economy = {
     -- deposits, band-independent by construction). Each `baskets` row is the
     -- band's own value chain on top of it.
     --
-    -- THE TWO TRANCHE TOTALS ARE EQUAL (0.75 each), and that is the design, not
-    -- a coincidence: the band changes WHICH chain a household consumes, not HOW
-    -- MUCH it consumes. Rebalancing between the two is a tuning question the
-    -- census can now answer, because it can now see both.
+    -- THE TWO TRANCHE TOTALS WERE EQUAL IN UNITS (0.75 each), and BL-655 found
+    -- that unit equality was measuring the wrong thing. A unit of ancient cloth
+    -- (base 3.7) and a unit of industrial consumer goods (base 12.0) are not
+    -- comparable quantities, so "0.75 = 0.75" made two very different costs of
+    -- living look identical. Priced out at base_price — the only cross-band
+    -- comparable measure the world has — the ancient household cost 3.12 credits
+    -- per scale point against the industrial household's 6.15. HALF. The band was
+    -- changing how much it costs to live, which is exactly what BL-640 said the
+    -- band must NOT do.
+    --
+    -- SO THE INVARIANT IS RESTATED IN CREDITS, and it is the answer to
+    -- POPULATION.md § Open items' "the cost of living — how much it costs a head
+    -- to live". The two band tranches now cost the SAME at base price:
+    --
+    --     ancient    0.25x3.7 + 0.20x3.4 + 0.15x7.2 + 0.15x2.9      (cloth, ceramics,
+    --              + 0.30x4.0 + 0.25x4.3 + 0.50x1.5  = 6.145 cr      leather, dressed stone,
+    --                                                                charcoal, planks, timber)
+    --     industrial 0.35x3.0 + 0.25x12.0 + 0.15x14.0 = 6.150 cr
+    --
+    -- 0.08% apart, and DERIVED from the industrial tranche rather than picked —
+    -- re-derive if world_gen.lua's base_price table moves. Add the shared tranche
+    -- (4.65 cr) and a head costs 10.80 credits per scale point to keep alive in
+    -- either band. The UNIT totals are now 1.80 ancient against 0.75 industrial:
+    -- an ancient household buys 2.4x as many things, each of them far cheaper,
+    -- which is what a pre-industrial basket of bulk fuel and timber should look
+    -- like next to a basket of medical supplies.
+    --
+    -- WHY THIS WAS RETUNED AT ALL (BL-655). Banding the baskets correctly took
+    -- the generated world from 584 buildings / 104 corps to 261 / 64, because
+    -- Pass 6 (CORPORATION_GENERATION.md § Pass 6) had been sizing background
+    -- firms against a demand that included six industrial goods the ancient band
+    -- structurally cannot produce. Ben's ruling: keep the fix, retune density up.
+    -- The lever taken is THIS one — the world consumes more per head, so more
+    -- firms are supported at the same ~90% coverage and prices hold. Pass 6's
+    -- target fraction was deliberately NOT raised: that reaches the same count by
+    -- making the world overproduce, and buys density with gluts.
     --
     -- ERA IS ONLY THE FIRST HALF of the ladder POPULATION.md § Population demand
     -- describes — era decides which value chain, STRATUM decides how far up it.
@@ -931,11 +963,34 @@ economy = {
             -- clothing is the largest recurring artisan want; dressed stone is
             -- the household's share of building, distinct from BL-642's
             -- construction draw.
+            --
+            -- BL-655 added the FUEL AND TIMBER lines. They are not padding to
+            -- reach a firm count: a pre-industrial household's largest recurring
+            -- volume after food is what it burns, and this basket had no fuel
+            -- line at all. charcoal is the worked fuel (a kiln's output, dearer
+            -- than the wood it comes from); timber is the raw one — firewood,
+            -- the poorest household's whole fuel bill — and is why timber is the
+            -- second-heaviest line here by weight and one of the lightest by
+            -- cost; planks are furniture, roofing and repair, the worked-wood
+            -- counterpart to dressed_stone's worked stone.
+            --
+            -- WHAT WAS DELIBERATELY LEFT OUT, and it bounds this retune: `tools`
+            -- and `trade_goods_misc` are both real ancient household goods, both
+            -- produced in-band, and both currently RED in chain_depth's
+            -- unsubstantiated list — naming either here would close a red and add
+            -- another tranche of background firms. They are not named because
+            -- another item already owns their buyer: BL-590 (a construction
+            -- material draw) for tools, BL-647 (endemic luxury demand) for
+            -- trade_goods_misc. Taking a good whose demand another item owns is
+            -- how a tuning change quietly becomes someone else's design.
             { era = "ancient", demand_basket = {
                 cloth         = 0.25,
                 ceramics      = 0.20,
                 leather       = 0.15,
                 dressed_stone = 0.15,
+                charcoal      = 0.30, -- the worked fuel: cooking and heat, every day
+                planks        = 0.25, -- furniture, roofing, repair
+                timber        = 0.50, -- firewood and unworked building wood; cheapest line, largest volume
             } },
             -- The industrial household: the BL-368 habitability tranche, moved
             -- here UNCHANGED in both membership and weight. Nothing about the
