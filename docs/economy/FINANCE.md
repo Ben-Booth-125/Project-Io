@@ -244,6 +244,12 @@ price = max(0, book_value + k_acquisition_multiple x trailing_net + balance)
   cheaper by exactly what it owes and a hoarding one costs more.
 - **Nothing clamps the profit term.** A chronically loss-making firm prices below its book value,
   and it should — that is the ledger telling the truth about it.
+- **A non-finite price is REFUSED, never floored.** The order of those two operations is
+  load-bearing and the obvious order is wrong: flooring first turns a `NaN` into a clean `0`, and a
+  corrupt filed return then buys a firm for free. Propagate non-finite, *then* floor.
+- **A public firm that has never filed cannot be priced, and is refused.** Pricing from an empty
+  ledger invents a number, and the natural invention — zero — would make every newly public firm
+  free.
 
 **Why the floor is zero, and why it is not book value.** There is no salvage in the prototype:
 `construction.hpp` refunds nothing on demolition and names salvage a separate design question, so
@@ -254,12 +260,42 @@ spend is not). A public firm's sellers are a diffuse shareholder base, not a mod
 there is nobody a negative price could be paid by. A firm priced at zero is worthless, stated
 plainly.
 
-**What transfers.** The target's holdings, its stockpile pools, its balance and its filed returns
-move to the acquirer; the target corporation is then dissolved. Three seams are walked in the same
-move and none of them are new: `hq_building` / `influence_range` recompute from the merged holding
-set (Pass 3b's rule unchanged), standing units re-point to the acquiring owner through their
-recorded `muster_base`, and open market orders are **cancelled** rather than reassigned — an order
-is a promise made by a party that no longer exists.
+### Dissolution — the three-way rule
+
+A buyout is the only verb in the game that **erases an actor**. Everything else moves goods,
+credits, units or sentiment; this ends a party that roughly nineteen stores are keyed by. Naming
+three of them and leaving the rest to judgement is how a dangling id gets shipped, so the
+disposition of every store follows one rule with three outcomes:
+
+| Outcome | What it applies to | Why |
+|---|---|---|
+| **TRANSFER** | Property — holdings, stockpile pools, the balance, filed returns, units, convoys in flight, trade routes, accepted contracts | It has value and a new owner exists to hold it. A convoy in flight transfers rather than cancels **because its cargo already left the pool** — cancelling would mint the goods back into nothing. |
+| **CANCEL** | A promise with nobody left to keep it — open market orders on both sides, unaccepted quotes, live battles | An order is a promise made by a party that no longer exists. Reassigning it would bind the acquirer to a bargain it never struck. |
+| **DROP** | An opinion or a permission that was the dissolved firm's alone — its stance rows, its embargo conditions, its modifiers, a contract that would leave the acquirer on both sides | These were *about* being that firm. There is no one left to hold the opinion, and inheriting it would be inventing one. |
+
+The three seams with the most moving parts: `hq_building` / `influence_range` recompute from the
+merged holding set (Pass 3b's rule, unchanged), standing units re-point to the acquiring owner
+through their recorded `muster_base`, and colliding pools **merge** — stock summed, never replaced.
+
+**Two histories become one.** Filed returns merge pairwise from the newest end, summing flows and
+stock figures, because a return carries no tick stamp and concatenation would produce two rows for
+one quarter. The result is a pro-forma combined history — which is also what a second buyer prices
+the merged firm from.
+
+**The check that makes this real is not a checklist.** A test that walks the same list the
+implementation walks passes whenever the implementation is self-consistently wrong. The harness
+instead **re-walks the whole world** and names every store still holding the erased id, on a
+fixture loaded with a reference of every kind, on a warm-started generated world, and again after
+four further economy ticks — the sharpest of the three, because it proves every downstream pass
+survives ticking over the merged world. A store added later fails that row rather than passing
+silently.
+
+**The player's corporation is not buyable.** The class rules above are silent on it, and read
+literally a public player corp could be erased, leaving `player_entity` dangling. The gate sits at
+the command seam rather than in the scorer, because a scorer-side guard would not bind a wire
+caller. Whether a rival should ever be able to buy the player out is a live question, and it is the
+kind that belongs beside the standing rules on what may be done to a corp a human owns — not a
+default fallen into.
 
 **Who may be bought.** A **public** corporation may be bought on the open market at the price
 above, with no consent — its books are open, so it can be priced. A **private** or **closed** one

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*76 entries — 59 open, 17 resolved.*
+*79 entries — 62 open, 17 resolved.*
 
 ---
 
@@ -556,6 +556,27 @@ Pass 2b as I wrote it said 'a statist OR ISOLATIONIST character lands here [priv
 BL-638 changes the VALUE of a serialised field on every corporation in every seed. charter_reach itself is generation-time only and unserialised, so the format is untouched - but any golden that hashes the corporation store moves. The agent correctly did not re-bless anything and did not run spectator_determinism or a state-hash harness. This must be checked at the merge and folded into the sprint's ONE deliberate re-bless wave with dated provenance - not re-blessed here, and not dribbled. Note NR-661: spectator_determinism's golden was ALREADY stale on main before this sprint, so a mover found there is not necessarily this change.
 
 *Files: `tools/verify/spectator_determinism.cpp`, `src/world/corporation_generation.cpp`*
+
+### NR-668 — NR-655's exposure is now MEASURED: the buyout undervalues a contract-earning firm by 640 credits
+*question · raised 2026-08-26 · from Sprint 20 wave 2, BL-628: the harness was briefed to state the exposure rather than hide it, and it quantified it instead.*
+
+NR-655 raised this as a risk; BL-628's harness turned it into a number. Two fixtures, identical except that one earns through a mercenary contract: both file a trailing_net of 10.00, because the payout arrives in run_nation_step AFTER apply_budget has filed. Loop-only firm prices at 460.00; the contract earner at 1100.00 (its balance carries the cash). Had the return SEEN the payout, trailing_net would be 90.00 and the price 1740.00. MEASURED UNDERVALUATION: 640.00 credits, exactly k(8.0) x the 80.00/quarter the record cannot see. The harness asserts that the two firms' filed trailing_nets are IDENTICAL - i.e. it pins the blindness as a known property rather than letting a future fixture hide it. This makes NR-655's fork concrete: option A (an eighth `other` field filed after the tick's last mover) closes exactly this 640. Ben's call, and BL-628 is built and correct WITHOUT it - the price is what the doc specifies; the doc's input is what is short.
+
+*Files: `docs/economy/FINANCE.md`, `src/world/corp_command.cpp`, `src/world/budget_system.cpp`*
+
+### NR-669 — The zero floor laundered a NaN into a FREE firm - caught by the harness, on the AI-facing seam
+*observation · raised 2026-08-26 · from Sprint 20 wave 2, BL-628: the agent found it in its own code and fixed it before reporting.*
+
+Worth recording as a pattern, not just a fixed bug. The price is max(0, book + k x trailing_net + balance). Applying the floor FIRST meant a NaN - reachable from a corrupt filed return - compared false against 0, so max returned 0.0f, and the seam's own isfinite guard then saw a clean number and let it through. A corrupt record bought a firm for FREE. The fix is one line (propagate non-finite, then floor) and is now pinned by two harness rows. THE GENERAL SHAPE: a sanitising operation placed BEFORE a validity check can launder the invalid value into a valid-looking one, and this is exactly the class the standing rules' AI-facing-seam paragraph exists for - validate as the value that lands, reject whole, never clamp. Here the clamp WAS the vulnerability. Written into FINANCE.md so the ordering is design, not an implementation detail someone can reorder later.
+
+*Files: `docs/economy/FINANCE.md`, `src/world/corp_command.cpp`, `.claude/rules/io-standing-rules.md`*
+
+### NR-670 — Should a rival ever be able to buy the PLAYER out?
+*question · raised 2026-08-26 · from Sprint 20 wave 2, BL-628: gated at the seam and flagged rather than assumed.*
+
+FINANCE.md's ownership-class rules are silent on the player's own corporation. Read literally, a public player corp could be bought and ERASED, leaving world::player_entity dangling. BL-628 refuses it - gated at the command seam rather than in corp_ai.cpp, because a scorer-side guard would not bind a wire caller, which is the right place for it either way. But the underlying question is Ben's and it is not small: every widening in the standing rules concerns what may be done TO a corp a human owns, and being bought out is the furthest possible version of that. If the answer is ever yes, player_entity needs a rule of its own (does the player follow the assets? get a game-over? re-seat?). Recorded in FINANCE.md as a live question rather than left as a default fallen into. Note the spectator precedent: under corp_ai_params::spectating the prohibition has no subject, so a buy-the-player gate arguably should not apply there either.
+
+*Files: `docs/economy/FINANCE.md`, `.claude/rules/io-standing-rules.md`, `src/world/corp_command.cpp`*
 
 ---
 
