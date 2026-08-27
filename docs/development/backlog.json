@@ -1187,7 +1187,7 @@
    "design": "The symmetry half of BL-628 (whole-firm buyout), and a widening of the BL-202/BL-203 exception in its established shape: deterministic, seeded, scored-utility, a legal verb and never a planner. THE WORK: score buy_corporation in corp_ai.cpp's existing candidate list, capped at one acquisition per evaluation, its price carried in the candidate's spend under the solvency gate so a rival cannot buy itself below its reserve floor. Availability is gated on the target's ownership class, not on the acquirer's cash - the 'never on cash' ruling's shape. Record the grant in the standing rules with its date, as every prior widening is recorded. SAVING UP IS NOT PLANNING, and this item owns the distinction: Ben's Sprint 20 goal wants a corp to accumulate cash toward an acquisition, but a scorer that defers a cheap build today in order to afford a firm tomorrow is edging toward the planner the standing rules forbid. The honest route needs no new machinery - accumulation is EMERGENT when the buy candidate outscores the marginal build, since a tick with no affordable positive candidate simply banks its cash. Whether that actually happens at the authored weights is a measurement, and BL-634 (acquisition viability) is where it is taken."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "A",
    "difficulty": 5,
@@ -1215,7 +1215,9 @@
     "docs/generation/CORPORATION_GENERATION.md",
     "docs/ui/STARTUP.md"
    ],
-   "design": "Design settled in CORPORATION_GENERATION.md § The spawn shortlist, and the seat, and STARTUP.md § The seat (Ben, 2026-08-26). THE WORK: move the 80-tick warm start ahead of seating and run it under corp_ai_params::spectating; shortlist the specialists clearing the viability floor (solvent at the end, trailing net over 8 quarters non-negative); draw one against the world seed and re-point is_player/player_entity. Remove app_screen::choosing_corp, draw_corp_choice_screen, build_corp_choices, apply_corp_choice, the Surprise me press, verify.show_corp_choice and scripts/verify/corp_choice.lua. THE COST, taken knowingly: every corp is scorer-driven through the warm start where the seated one used to be excluded, so every seed's opening moves and the goldens re-bless ONCE, in a single wave with dated provenance. player_seed_sweep --guard is re-pointed at the shortlist's properties. NOT SOLVED by this item: the shallow-opening distribution the old screen was built for - carried in the review queue. WEIGHTED DRAW (Ben, 2026-08-26, answering NR-649): 'mostly random for now, targeted towards population centres and processing, rather than extraction.' The floor filters; the draw over the shortlist is BIASED, never gated - a pure-extraction corp on thin ground stays drawable, just less often. Two weights, both off existing signals: a processor among the holdings weights up (the depth lever the viability floor cannot provide), and holdings on or near populated ground weight up. The weights are a first cut; player_seed_sweep REPORTS the resulting distribution rather than asserting it against a target."
+   "completed": "2026-08-26",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "status": "complete",
@@ -1463,7 +1465,7 @@
    "design": "OBSERVED LIVE, 2026-08-26 (BL-633's capture), and pre-existing - BL-633 changed no width and no column count. Five columns carrying 62+62+62+220 px of fixed width do not fit the shell fold-out column (380-460 px by resolution) at 1280x720: the Corporation NAME column collapses to a single letter ('F', 'E', 'C') and the Stance column's 'Declare Hostile' button clips off the right edge as 'De...'. This is BL-449's shape exactly - the surface that shipped clean on a compile AND a 36/36 harness while being unusable - still live in the same panel. THE WORK: re-budget the columns against shell_column_width(disp.x) rather than fixed pixels, and decide whether the stance presses belong in-row at this width at all or behind the row's Selection drill. Note NR-663: expect_no_clipping did NOT catch this, because ImGui SmallButton labels are not instrumented into the overflow ledger - so this needs a real look, not a green row."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "A",
    "difficulty": 4,
@@ -1485,10 +1487,12 @@
     "src/world/recipe_registry.cpp",
     "docs/economy/POPULATION.md"
    ],
-   "design": "Design in POPULATION.md section Population demand and MARKETS.md section Demand channels. THE MEASURED CAUSE: population_demand's basket names food_rations, agricultural_produce, water, clean_water, consumer_goods, medical_supplies - and three of those six are made by NO ancient recipe, so a 0 CE campaign has three household goods. Recipes have carried an era field since BL-433; the demand baskets never did. THE WORK: band the basket the same way and author the ancient rows - ceramics, cloth, leather, dressed_stone - which are exactly the terminal artisan goods the ancient roster produces and nothing currently buys. Compose with the stratum ladder POPULATION.md already calls for: era decides WHICH value chain, stratum decides how far up it. This one item resurrects four of the seven ancient dead ends. SCOPE GREW, from BL-648's measurement (2026-08-26): this item also owns chain_depth's R1b list, and R1b hides a SECOND red list of the same defect class as the one BL-648 names. Neither inject_population_demand nor inject_background_demand is era-gated, so an ancient campaign genuinely 'wants' silicon, machinery, alloys and electronics - goods only the industrial arc can make - and R1b's hand-narrowed list quietly absorbs that. Banding the baskets is what makes R1b derivable from the injector registry instead of hand-maintained, so the two halves land together: band the demand, then let R1b read the banded truth. BL-648's agent deliberately did NOT fold this in, to avoid burying the ten goods that item exists to name - the right call, and it makes this item bigger than it looked when minted. THE MAGNITUDE, measured by BL-649's census (2026-08-26): at 0 CE, inject_background_demand alone is 8,417.8 of 10,544.0 total modelled market demand - 79.8% - and FIVE OF ITS SIX GOODS cannot be produced in that band at all. Household adds 435.4 more on clean_water / consumer_goods / medical_supplies, likewise unmakeable. So 65.7% OF ALL 0 CE DEMAND NAMES GOODS THE ANCIENT BAND CANNOT MAKE. That is not a rounding error in a basket, it is most of the demand in the world pointing at nothing, and it is why the ancient economy reads as having almost no buyers. Note the corollary for the tuning passes: fixing this will move prices everywhere, so the census must be run before and after and the deltas kept. MOVED INTO SPRINT 20 (Ben, 2026-08-26): these are the two levers that actually move spawn viability, and Sprint 20 owns the viability question through BL-634. Built in the same session as the diagnosis so the census and spawn_solvency baselines are hours old rather than a sprint stale."
+   "completed": "2026-08-26",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "A",
    "difficulty": 5,
@@ -1512,7 +1516,9 @@
     "tools/verify/",
     "docs/economy/FINANCE.md"
    ],
-   "design": "Design in FINANCE.md section Upkeep is credits AND goods - for buildings too. THE LARGEST STRUCTURAL SINK AVAILABLE, and it invents nothing: a unit already pays credits plus a goods vector through run_unit_upkeep, and a building pays credits only. That asymmetry is an omission, not a design. THE WORK: a per-building-type goods vector drawn against the owner's pool on the building's own body, in a fixed order (two buildings of one corp on one body draw the same stock and the order decides which goes short). The shortfall rule is the SAME rule - an unmet draw weakens the building by the same subtraction an out-of-supply unit takes; a factory short of tools runs badly, it does not vanish. Rates authored in economy.lua per building type, era-banded, every rate authorable at 0.0 so the SHAPE can land before the numbers are settled (the BL-454 precedent). Why it matters more than the others: demand then scales with how much industry exists, with no weight for anyone to maintain. MOVED INTO SPRINT 20 (Ben, 2026-08-26): these are the two levers that actually move spawn viability, and Sprint 20 owns the viability question through BL-634. Built in the same session as the diagnosis so the census and spawn_solvency baselines are hours old rather than a sprint stale. RATES STAY 0.0 UNTIL BL-654 LANDS (Ben, 2026-08-26). The measured collapse (227 -> 19 operating firms) is a consequence of drawing without bidding, not of the rate; BL-654's buy-with-a-ceiling is what makes a non-zero rate survivable, and the rate is then measured against the census and the operating-firm count rather than chosen."
+   "completed": "2026-08-26",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "status": "designed",
@@ -1852,7 +1858,7 @@
    "short_name": "PASS6_DENSITY_RETUNE",
    "category": "Generation",
    "title": "Retune background-firm density upward against the corrected demand basis",
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "A",
    "difficulty": 3,
@@ -1872,7 +1878,9 @@
     "tools/verify/",
     "docs/generation/CORPORATION_GENERATION.md"
    ],
-   "design": "Ben's ruling on NR-679, 2026-08-26: KEEP BL-640's fix, and retune density back up toward the old world. The fix is not in question - Pass 6 was chasing ~90% of a demand that included goods the ancient band cannot produce, so it added firms against a gap that could never close, and correcting it took the world from 584 buildings / 104 corps to 261 / 64. TWO LEVERS REACH THE SAME COUNT AND THEY MEAN DIFFERENT THINGS, which is the whole of this item: (a) RAISE PASS 6'S TARGET FRACTION above 0.90 - the world then deliberately OVERPRODUCES, which means gluts, prices pinned at the floor, and thinner margins for everyone; it reaches the count without anyone wanting more. (b) RAISE THE DEMAND BASKETS - the world CONSUMES more per head, so more firms are supported at the same ~90% ratio and prices hold. TRY (b) FIRST: it preserves what BL-640 established, and POPULATION.md already names the knob as an open item - the cost of living, how much it costs a head to live, deliberately unquantified. (a) is the fallback and should be recorded as a deliberate oversupply if taken. MEASURE BOTH with demand_census against the committed baseline plus the corp and operating-building counts, and report the price consequence - a density that is right only because everything is worthless is not right."
+   "completed": "2026-08-26",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-656",
