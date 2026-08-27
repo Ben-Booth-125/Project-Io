@@ -1857,6 +1857,16 @@ std::vector<entity_id> generate_corporations(
     // an explicit is_background check — arming them is a deliberate
     // non-goal (BL-476 design notes).
     // ---------------------------------------------------------------------
+    // BL-324's opening force, now OPT-IN (`corporation_params::seed_starting_force`,
+    // default false from 2026-08-26). Gated rather than deleted: the seeding is
+    // still the only thing that knows where a muster base belongs relative to an
+    // HQ, and rival_military_seeding_harness still drives it by setting the flag.
+    //
+    // Skipping it consumes no randomness — seed_starting_military draws none, it
+    // is a nearest-valid-tile search — so a world generated with the flag off is
+    // identical to one generated with it on minus the bases and units, and every
+    // downstream RNG stream is untouched.
+    if (params.seed_starting_force)
     {
         std::unordered_set<entity_id> military_occupied_tiles;
         military_occupied_tiles.reserve(w.buildings.size());

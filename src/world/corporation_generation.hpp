@@ -25,6 +25,23 @@ struct corporation_params
     /// The prototype targets 6–10 on Kepler.
     int corporation_count = 8;
 
+    /// Whether generation hands every specialist corporation an opening military
+    /// base and a 50-head unit on it (`seed_starting_military`, BL-324).
+    ///
+    /// **Default FALSE from 2026-08-26 (Ben): a new charter does not open with a
+    /// standing army.** The seeding itself is unchanged and is NOT deleted — this
+    /// is the "shape stays, the number changes" idiom the upkeep rates already
+    /// use, so the behaviour is one flag away and `rival_military_seeding_harness`
+    /// can still exercise it by setting this true.
+    ///
+    /// Why it went off: under BL-454's standing-force upkeep a seeded unit costs
+    /// **7.5 cr/qtr** from turn one, measured 2026-08-26 as **16.5 % of the seated
+    /// corp's operating outgoings** and 19–31 % of its entire operating gap — for
+    /// a regiment a brand-new charter never asked for and cannot use. It is
+    /// symmetric: rivals lose it too, so the opening stays level, and a corp that
+    /// wants force still raises it through `hire_unit` like anything else.
+    bool seed_starting_force = false;
+
     /// Baseline starting capital before wealth variance is applied.
     ///
     /// **400 (Ben, 2026-08-26), superseding the 0 of 2026-07-06.** The zero was a

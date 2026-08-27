@@ -830,7 +830,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // Corporations: 6-10 actors registered in the generated nations, including
     // the player's (which sets w.player_entity). See CORPORATION_GENERATION.md.
     bump(11);
-    generate_corporations(w, corporation_params{ .corporation_count = gen_cfg.corporation_count },
+    generate_corporations(w, corporation_params{ .corporation_count = gen_cfg.corporation_count,
+                                                 .seed_starting_force = gen_cfg.seed_starting_force },
         /*seed=*/params.seed ^ 0x4A71012u, &kepler_settlement, progress);
 
     // Kepler markets — population-anchored but RESOURCE-CARVED (BL-096). Markets

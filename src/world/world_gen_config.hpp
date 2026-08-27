@@ -71,6 +71,14 @@ struct world_gen_config
     /// under `world_gen.corporations.count`.
     int corporation_count = 8;
 
+    /// Whether generation hands every specialist corporation an opening military
+    /// base and a 50-head unit (`seed_starting_military`, BL-324). **False from
+    /// 2026-08-26 (Ben): a new charter does not open with a standing army.**
+    /// Forwarded to `corporation_params::seed_starting_force`, which carries the
+    /// full reasoning. Kept as a knob rather than deleted so the seeding stays
+    /// exercisable - `rival_military_seeding_harness` sets it true.
+    bool seed_starting_force = false;
+
     /// Populate from scripts/world_gen.lua via the embedded Lua state (protected
     /// calls only). Any table/key missing in the script leaves the matching field
     /// at its default above, so a partial script is safe to author against.

@@ -33,6 +33,7 @@
 #include "world/components.hpp"
 #include "world/corporation_generation.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/world_gen_config.hpp"
 #include "harness_params.hpp"
 #include "world/world.hpp"
 
@@ -112,8 +113,45 @@ int main()
     // R1 — every non-background corp owns exactly one military_base and one
     // unit_component; a background firm owns neither.
     // -------------------------------------------------------------------
+    // OPT-IN FROM 2026-08-26. `seed_starting_force` defaults FALSE — a new charter
+    // does not open with a standing army (Ben; the seeded unit cost 7.5 cr/qtr from
+    // turn one, 16.5% of the seated corp's operating outgoings). The seeding itself
+    // is unchanged, so this harness's subject is unchanged too; it just has to ask
+    // for it now. R0 below pins the new default so the flag cannot flip back
+    // unnoticed.
+    world_gen_config force_on{};
+    force_on.seed_starting_force = true;
+
+    // -------------------------------------------------------------------
+    // R0 — the SHIPPED default seeds no force at all.
+    // -------------------------------------------------------------------
     {
         const world w = make_hard_coded_world(no_prehistory());
+        int bases = 0;
+        for (const auto& [bid, bc] : w.buildings)
+            if (bc.type == building_type::military_base) ++bases;
+        // CORP-owned units only. The world legitimately holds NATION garrisons
+        // (MILITARY.md § Nation garrisons, funded by the military_research budget
+        // line), and this property is about CORPORATIONS: a new charter does not
+        // open with a standing army. An earlier cut of this row asserted over
+        // w.units wholesale and went red on 287 nation soldiers — it was claiming
+        // nations have no army either, which is a different claim and a false one.
+        std::size_t corp_units = 0;
+        for (const auto& [uid, uc] : w.units)
+            if (w.corporations.count(uc.owner) != 0) ++corp_units;
+
+        std::printf("\n=== R0: shipped default — %d military base(s), %zu CORP unit(s)"
+                    " (%zu total; the rest are nation garrisons) ===\n",
+                    bases, corp_units, w.units.size());
+        check(bases == 0, "R0 the shipped default seeds NO military base");
+        check(corp_units == 0, "R0 the shipped default seeds NO corp-owned standing unit");
+        check(!w.units.empty(),
+              "R0 ANTI-VACUITY: nation garrisons still exist, so the row above is not "
+              "passing merely because the world has no units at all");
+    }
+
+    {
+        const world w = make_hard_coded_world(no_prehistory(), nullptr, force_on);
 
         const std::vector<entity_id> corp_ids = non_background_corp_ids(w);
         const std::vector<entity_id> bg_ids    = background_corp_ids(w);
@@ -183,8 +221,8 @@ int main()
     // entity id and comparing fields directly is valid here too.
     // -------------------------------------------------------------------
     {
-        const world a = make_hard_coded_world(no_prehistory());
-        const world b = make_hard_coded_world(no_prehistory());
+        const world a = make_hard_coded_world(no_prehistory(), nullptr, force_on);
+        const world b = make_hard_coded_world(no_prehistory(), nullptr, force_on);
 
         const std::vector<entity_id> ids_a = non_background_corp_ids(a);
         const std::vector<entity_id> ids_b = non_background_corp_ids(b);
