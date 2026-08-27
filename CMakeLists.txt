@@ -313,13 +313,32 @@ target_precompile_headers(ProjectIo PRIVATE
     <imgui.h>
 )
 
-# Copy scripts directory next to the executable after each build
-add_custom_command(TARGET ProjectIo POST_BUILD
+# Copy scripts directory next to the executable — ALWAYS, not only when the
+# target relinks.
+#
+# NR-686 (2026-08-26): this was a POST_BUILD side effect of building ProjectIo,
+# so a Lua-only change copied NOTHING. Nothing recompiles, the target is up to
+# date, POST_BUILD never fires, and the tree keeps yesterday's scripts while the
+# build prints BUILD_OK. Both trees shipped stale baskets that day and it was
+# caught only by grepping the OUTPUT tree. It is the worst shape of bug for a
+# tuning sprint: harnesses read scripts/ directly and are unaffected, so every
+# measurement is right while the playable build is wrong, and nothing says so.
+#
+# A custom target with no OUTPUT is always considered out of date, so this runs
+# on every build regardless of what did or did not recompile. ProjectIo depends
+# on it, so it runs before the exe is considered done rather than after.
+#
+# This is the SIMPLE fix (Ben, 2026-08-26). The thorough one — have a dev build
+# resolve scripts/ from the repo root so there is only ever one copy and it
+# cannot go stale — belongs to Sprint 21's visibility pass.
+add_custom_target(copy_scripts ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/scripts"
         "$<TARGET_FILE_DIR:ProjectIo>/scripts"
-    COMMENT "Copying scripts to output directory"
+    COMMENT "Copying scripts to output directory (always, NR-686)"
+    VERBATIM
 )
+add_dependencies(ProjectIo copy_scripts)
 
 # Copy assets directory (bundled fonts, etc.) next to the executable after each
 # build, mirroring the scripts copy so cwd-relative asset loads — e.g. the

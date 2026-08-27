@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*96 entries — 70 open, 26 resolved.*
+*96 entries — 69 open, 27 resolved.*
 
 ---
 
@@ -518,7 +518,7 @@ I wrote 'capital is exact for a public corporation, absent for a private or clos
 ### NR-663 — expect_no_clipping reported CLEAN while a genuinely clipped button was on screen
 *observation · raised 2026-08-26 · from Sprint 20 wave 2, BL-633: the agent flagged its own green row as vacuous, and separately reported the real defect.*
 
-Two findings that are only interesting together. (1) The agent's acceptance script passed expect_no_clipping with '0 failure(s), 0 record(s) total' - the overflow ledger saw NOTHING, so the pass is vacuous, and the agent said so rather than banking it. (2) In the same session it reported a real, visible layout defect in the same panel: the Corporation name column is squeezed to a SINGLE LETTER and the Stance column's 'Declare Hostile' button clips off the right edge as 'De...'. So the clipping detector returned clean on a frame that contained actual clipping. Cause: ImGui SmallButton labels are not instrumented into the overflow ledger. THIS IS THE EXACT FAILURE CLASS THE LIVE-CLICK RULE EXISTS FOR - BL-449 shipped on a compile and a 36/36 harness and was unusable for precisely this reason - and it means the automated substitute we have for a live click cannot currently see the defect that motivated the rule. Worth instrumenting SmallButton, or the ledger's clean verdict will keep meaning less than it appears to. The layout defect itself is BL-639.
+Two findings that are only interesting together. (1) The agent's acceptance script passed expect_no_clipping with '0 failure(s), 0 record(s) total' - the overflow ledger saw NOTHING, so the pass is vacuous, and the agent said so rather than banking it. (2) In the same session it reported a real, visible layout defect in the same panel: the Corporation name column is squeezed to a SINGLE LETTER and the Stance column's 'Declare Hostile' button clips off the right edge as 'De...'. So the clipping detector returned clean on a frame that contained actual clipping. Cause: ImGui SmallButton labels are not instrumented into the overflow ledger. THIS IS THE EXACT FAILURE CLASS THE LIVE-CLICK RULE EXISTS FOR - BL-449 shipped on a compile and a 36/36 harness and was unusable for precisely this reason - and it means the automated substitute we have for a live click cannot currently see the defect that motivated the rule. Worth instrumenting SmallButton, or the ledger's clean verdict will keep meaning less than it appears to. The layout defect itself is BL-639. THIRD INSTANCE, found 2026-08-26 while PROVING the NR-686 fix: the build wrapper returned EXIT CODE 0 on a run where ninja reported LNK1104 and stopped. So the family is now: a clipping check that passes vacuously, a build that copies nothing while printing BUILD_OK, and a wrapper that reports success on a failed link. All three are in the VERIFICATION LAYER rather than the game, and all three share one shape - a check whose green means less than it appears to. Worth treating as one problem in Sprint 21 rather than three notes.
 
 *Files: `src/ui/`, `scripts/verify/`, `tools/verify/`*
 
@@ -619,13 +619,6 @@ BL-640 sized the ancient household tranche to total 0.75, equal to the industria
 The retune reached 352 buildings / 88 corps against the pre-BL-640 584 / 104. It stopped there deliberately. The next two goods that would each add a tranche - `tools` and `trade_goods_misc` - are real ancient household candidates and both are in-band, but their buyers are OWNED by BL-590 (construction draw) and BL-647 (endemic luxury). Taking them would have hit 104 and quietly annexed two other items' designs, which is how a count gets reached and a roster gets confused. `peat` was the third candidate and the price instrument vetoed it - already 6.90x base, so household demand would have deepened a shortage. ENDORSED. If Ben wants 104 sooner, the honest route is to land BL-590 and BL-647 rather than to widen this basket, and the count then follows from those items rather than being borrowed against them.
 
 *Files: `scripts/economy.lua`, `docs/development/backlog.json`*
-
-### NR-686 — A Lua-only change does NOT reach the play build - the script copy is attached to the compile target
-*observation · raised 2026-08-26 · from Sprint 20 wave 5: caught while handing Ben the Release build to judge BL-655 density.*
-
-BL-655 changed scripts/economy.lua and no C++ at all. Both trees were rebuilt and both printed BUILD_OK - and BOTH SHIPPED THE OLD SCRIPTS. The CMake copy-scripts step is a side effect of building the ProjectIo target, so when nothing recompiles it does not fire, and build/scripts and build_rel/scripts keep whatever they had. Caught only because the handover was verified by grepping the OUTPUT tree for the new weights rather than trusting BUILD_OK. WHY IT MATTERS MORE THAN IT LOOKS: this session is a tuning sprint. Most of Sprint 21 is Lua - demand baskets, upkeep rates, price-band constants - so the class of change most likely to be evaluated is exactly the class that silently does not ship. Ben would have judged the old density and we would both have believed the number. A harness reading scripts/ directly is unaffected, which is why every measurement in this session was right while the playable build was wrong - the two paths disagree and nothing says so. FIX CANDIDATES: make the copy its own always-run target rather than a side effect of compiling; or have the app resolve scripts/ from the repo root in a dev build so there is one copy and it cannot go stale. The second removes the failure mode rather than making it fire more often.
-
-*Files: `CMakeLists.txt`, `build_app.bat`, `src/core/app.cpp`*
 
 ### NR-687 — The pre-game manufactures ZOMBIES - interest has no consequence attached, so a failing firm never fails
 *question · raised 2026-08-26 · from Ben, 2026-08-26, on the live build: 'still seeing a debt... mostly caused by compounding interest, but it should still not be happening.' Measured immediately after across 12 seeds.*
@@ -874,4 +867,13 @@ The implementation was owned end to end by FINANCE.md and copied cleanly from ru
 > **RESOLVED.** Ben, 2026-08-26: answered by the BL-654 ruling - a short pool BUYS, up to a reservation ceiling, and one rule covers every goods draw. The novel property stands as MARKETS.md's property 3 and now has its settled answer beneath it.
 
 *Files: `docs/economy/MARKETS.md`, `src/world/economy_system.cpp`*
+
+### NR-686 — A Lua-only change does NOT reach the play build - the script copy is attached to the compile target
+*observation · raised 2026-08-26 · from Sprint 20 wave 5: caught while handing Ben the Release build to judge BL-655 density.*
+
+BL-655 changed scripts/economy.lua and no C++ at all. Both trees were rebuilt and both printed BUILD_OK - and BOTH SHIPPED THE OLD SCRIPTS. The CMake copy-scripts step is a side effect of building the ProjectIo target, so when nothing recompiles it does not fire, and build/scripts and build_rel/scripts keep whatever they had. Caught only because the handover was verified by grepping the OUTPUT tree for the new weights rather than trusting BUILD_OK. WHY IT MATTERS MORE THAN IT LOOKS: this session is a tuning sprint. Most of Sprint 21 is Lua - demand baskets, upkeep rates, price-band constants - so the class of change most likely to be evaluated is exactly the class that silently does not ship. Ben would have judged the old density and we would both have believed the number. A harness reading scripts/ directly is unaffected, which is why every measurement in this session was right while the playable build was wrong - the two paths disagree and nothing says so. FIX CANDIDATES: make the copy its own always-run target rather than a side effect of compiling; or have the app resolve scripts/ from the repo root in a dev build so there is one copy and it cannot go stale. The second removes the failure mode rather than making it fire more often.
+
+> **RESOLVED.** FIXED 2026-08-26, the simple way on Ben call. copy_scripts is now an ALWAYS-RUN custom target that ProjectIo DEPENDS ON, not a POST_BUILD side effect firing only on relink. PROVEN rather than assumed: build_rel/scripts/economy.lua was deliberately overwritten with a stale marker and the tree rebuilt with ZERO C++ changes - the marker was gone and the real basket restored. The thorough fix (a dev build resolving scripts/ from the repo root, so there is only ever one copy) goes to Sprint 21 visibility pass, Ben call.
+
+*Files: `CMakeLists.txt`, `build_app.bat`, `src/core/app.cpp`*
 
