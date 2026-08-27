@@ -3987,6 +3987,70 @@
    "promoted_from": "backlog.json BL-655 (PASS6_DENSITY_RETUNE)",
    "resolved": "2026-08-26",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "acquisition-viability",
+   "batch": "sprint-20-wave-6",
+   "status": "open",
+   "title": "BL-634 - the acquisition loop is the sprint definition of done",
+   "promoted_from": "backlog.json BL-634 (ACQUISITION_VIABILITY)",
+   "rows": [
+    {
+     "id": "R0",
+     "status": "pending",
+     "verification": [
+      "review: gen_cfg parsed and passed",
+      "headless: the harness prints the priced-resource count"
+     ],
+     "requirement": "THE HARNESS PARSES AND PASSES world_gen_config, and says so in its own header. A run without it measures a world where a third of the ancient roster is UNPRICED and is not a measurement of the shipped spawn. This row is first because it invalidated a whole sprint of numbers on 2026-08-26.",
+     "notes": ""
+    },
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: acquisition_viability R1, measured"
+     ],
+     "requirement": "A seated corporation ACCUMULATES over the measured window rather than bleeding - balance climbing, reported per seed with the trajectory, not merely positive at one instant.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: acquisition_viability R2, measured"
+     ],
+     "requirement": "THE GATE. It reaches the price of the cheapest buyable public firm within a stated number of quarters. REPORT the number of quarters and the price; do not assert a magic target. A seed where no public firm exists to buy is reported as such, never counted as a pass.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: acquisition_viability R3"
+     ],
+     "requirement": "AFTER the acquisition its net is still positive N quarters later, with the acquired holdings and their maintenance folded in. The buy must not be a trap that looks affordable and is not.",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: acquisition_viability R4, measured"
+     ],
+     "requirement": "FIELD HEALTH. Rival solvency and holding counts are reported alongside, so the loop cannot go green by draining the background field. A player loop that only works in a dying world is not a working loop.",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: the measurement that sets it"
+     ],
+     "requirement": "k_acquisition_multiple is CALIBRATED from what this measures, or explicitly reported as leave-as-is with the reason. Never picked.",
+     "notes": ""
+    }
+   ]
   }
  ]
 }
