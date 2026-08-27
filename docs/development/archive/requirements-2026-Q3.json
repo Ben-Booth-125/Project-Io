@@ -10,6 +10,66 @@
  ],
  "bucket": "2026-Q3",
  "records": {
+  "acquisition-viability": {
+   "rows": [
+    {
+     "id": "R0",
+     "status": "complete",
+     "verification": [
+      "review: gen_cfg parsed and passed",
+      "headless: the harness prints the priced-resource count"
+     ],
+     "requirement": "THE HARNESS PARSES AND PASSES world_gen_config, and says so in its own header. A run without it measures a world where a third of the ancient roster is UNPRICED and is not a measurement of the shipped spawn. This row is first because it invalidated a whole sprint of numbers on 2026-08-26.",
+     "notes": ""
+    },
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: acquisition_viability R1, measured"
+     ],
+     "requirement": "A seated corporation ACCUMULATES over the measured window rather than bleeding - balance climbing, reported per seed with the trajectory, not merely positive at one instant.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: acquisition_viability R2, measured"
+     ],
+     "requirement": "THE GATE. It reaches the price of the cheapest buyable public firm within a stated number of quarters. REPORT the number of quarters and the price; do not assert a magic target. A seed where no public firm exists to buy is reported as such, never counted as a pass.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: acquisition_viability R3"
+     ],
+     "requirement": "AFTER the acquisition its net is still positive N quarters later, with the acquired holdings and their maintenance folded in. The buy must not be a trap that looks affordable and is not.",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: acquisition_viability R4, measured"
+     ],
+     "requirement": "FIELD HEALTH. Rival solvency and holding counts are reported alongside, so the loop cannot go green by draining the background field. A player loop that only works in a dying world is not a working loop.",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "headless: the measurement that sets it"
+     ],
+     "requirement": "k_acquisition_multiple is CALIBRATED from what this measures, or explicitly reported as leave-as-is with the reason. Never picked.",
+     "notes": ""
+    }
+   ],
+   "resolution": "COMPLETE 2026-08-26 - THE SPRINT DEFINITION OF DONE, MET. Ben criterion: a corporation CAN save up over a few economy ticks to buy another company and still be making a profit afterwards. 7/8 seeds accumulate (mean +51 cr/qtr); all 5 seeds offering an above-zero-priced public firm reached its price in 1-25 quarters (mean 8.6, about two in-game years); the buy applied through the real buy_corporation verb; 5/5 still earning 20 quarters later with the acquired maintenance folded in. R4: rival solvency 79.7 to 73.7 percent, field holdings +39.4 percent, 3356 rival units standing - the gate did not go green by draining the field. R0 held: 42 of 47 resources priced, config parsed and passed, count printed. R5: k_acquisition_multiple LEFT AT 8.0 with three reasons measured rather than asserted - the profit term is 7.4 percent of the price magnitude and NEGATIVE, so raising it makes a bad firm cheaper, and on the cheapest-firm gate the floor decides the price at any multiple. CAVEAT ON THE RECORD: 3 of 8 seeds offered no above-zero-priced public firm at all, and the one seed whose seat missed the viability floor is the one that does not accumulate. The loop closes where the world offers a solvent public firm."
+  },
   "action-dictionary": {
    "rows": [
     {

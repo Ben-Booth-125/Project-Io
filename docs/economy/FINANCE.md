@@ -317,6 +317,19 @@ price = max(0, book_value + k_acquisition_multiple x trailing_net + balance)
   ledger invents a number, and the natural invention — zero — would make every newly public firm
   free.
 
+**A FREE FIRM IS NOT A CHEAP FIRM — the floor and the transfer rule interact badly.** Measured
+2026-08-26 (BL-634): because the `balance` term is **signed**, a deeply indebted firm's negative
+cash cancels its book value, the sum falls below zero, and the floor hands it over for **nothing**.
+On five of eight seeds the cheapest buyable firm cost exactly 0 — and § Dissolution's TRANSFER rule
+then moves the debt across at face value. One seed took on **−13,358 credits for free**, and three
+of eight buyers that took the cheapest firm were sunk by it.
+
+The floor is not wrong as a *price* rule; a worthless firm is worth nothing. What is wrong is that
+**the solvency gate tests the price rather than the buyer's position after the transfer** — the same
+shape as the non-finite bug above, a check applied to the wrong quantity. The gate must read the
+post-acquisition balance, so a corporation cannot be handed a liability it could never have afforded
+to take on deliberately. Design: BL-658 (the free-firm trap).
+
 **Why the floor is zero, and why it is not book value.** There is no salvage in the prototype:
 `construction.hpp` refunds nothing on demolition and names salvage a separate design question, so
 book value is not a redemption anyone can take, and flooring there would be an invented one. Zero

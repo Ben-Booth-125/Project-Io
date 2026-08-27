@@ -13,7 +13,13 @@ void world_gen_config::load_from_lua(lua_state& lua)
 
     sol::optional<sol::table> wg = s["world_gen"];
     if (!wg)
-        return; // no world_gen table authored — keep the built-in defaults.
+        return; // no world_gen table authored — keep the built-in defaults,
+                // and stay marked `is_fallback`: nothing was parsed.
+
+    // Parsed from here on, so this is no longer the built-in fallback. Set
+    // BEFORE the field reads below so an early return from a malformed table
+    // cannot leave a half-parsed config claiming to be the fallback.
+    is_fallback = false;
 
     if (sol::optional<sol::table> ds = (*wg)["deposit_scalar"])
     {

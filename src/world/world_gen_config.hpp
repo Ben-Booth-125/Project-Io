@@ -86,4 +86,18 @@ struct world_gen_config
     /// @param lua A loaded lua_state.
     /// @throws std::runtime_error on a Lua error or malformed data.
     void load_from_lua(lua_state& lua);
+
+    /// True while this object is the C++ FALLBACK rather than the parsed
+    /// `scripts/world_gen.lua`. `load_from_lua` clears it.
+    ///
+    /// It exists because the difference is invisible and expensive (2026-08-26):
+    /// the fallback prices **10 of 47** resources where the script authors **42**,
+    /// markets are seeded from that table, and a harness that omits the argument
+    /// silently measures a world in which a third of the ancient roster cannot be
+    /// sold at any price. That defect invalidated a sprint of numbers and was
+    /// found in THREE separate harnesses in one day. A caller that legitimately
+    /// wants the fallback (the Lua-free logic harnesses, where prices are not the
+    /// subject) is unaffected — this flag only lets a caller SAY which world it
+    /// measured instead of leaving the reader to guess.
+    bool is_fallback = true;
 };

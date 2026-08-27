@@ -1469,6 +1469,33 @@
     "docs/economy/FINANCE.md",
     "docs/generation/CORPORATION_GENERATION.md"
    ]
+  },
+  {
+   "id": "NR-688",
+   "title": "The generation-config omission is now STRUCTURALLY visible - three harnesses had it",
+   "raised": "2026-08-26",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-634's R0, plus the sibling defect it found in player_seed_sweep.",
+   "what": "Three harnesses omitted world_gen_config in one day: spawn_solvency (which invalidated a sprint of viability numbers), material_floor's counterfactual, and player_seed_sweep. Fixing each by hand would have left the fourth to find. Taken on Ben's behalf: make the omission SAYABLE rather than silent. `world_gen_config::is_fallback` defaults true and load_from_lua clears it, so any harness can print which of the two worlds it measured; and `parsed_gen_config(lua)` in harness_params.hpp is the one-line correct path with the whole hazard documented above it. A Lua-free logic harness legitimately keeps the fallback - prices are not its subject - and can now SAY so instead of leaving a reader to guess. What is NOT done: player_seed_sweep still omits it at three call sites, and nothing yet FAILS on the omission. Making it loud rather than merely sayable is the obvious next step and was not taken without Ben.",
+   "files": [
+    "src/world/world_gen_config.hpp",
+    "tools/verify/harness_params.hpp",
+    "tools/verify/player_seed_sweep.cpp"
+   ]
+  },
+  {
+   "id": "NR-689",
+   "title": "FINANCE.md describes the eighth field as if it exists; BL-653 is unbuilt",
+   "raised": "2026-08-26",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-634, which read the doc and then the code.",
+   "what": "FINANCE.md section The eighth field says trailing_net is the mean of `net + other`. quarterly_return carries seven flows plus net and no `other`; corp_trailing_net averages `net` alone. This is the SANCTIONED pattern - a settled design is written the moment it is settled, and BL-653 owns the work - so the doc is not wrong so much as ahead. Recorded because BL-634 read it as current and had to check the code to find out, which is a real cost the state-independence rule pays: a reader cannot tell 'settled and built' from 'settled and owed' without querying the backlog. Worth considering whether a doc that describes an unbuilt mechanism should say which item owes it - CORPORATION_GENERATION.md's Pass 2b does exactly that and reads no worse for it.",
+   "files": [
+    "docs/economy/FINANCE.md",
+    "docs/development/DELIVERY.md"
+   ]
   }
  ]
 }

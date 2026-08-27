@@ -12,6 +12,59 @@ release.
 
 ## [Unreleased]
 
+## [0.1.21] — 2026-08-26
+
+*Sprint 20 closes with its goal **met and proved**: a corporation saves up in ~8.6 quarters, buys
+another firm through the real verb, and is still earning twenty quarters later. No AI SOTA sweep for
+this cut — one was run on 2026-08-26 for v0.1.21's predecessor and IS the recorded baseline, so a
+same-day diff over a zero-day window would be theatre. Stated rather than silently skipped.*
+
+### Added
+- **The acquisition loop is measured** (BL-634): a headless harness runs Ben's own criterion. 7/8
+  seeds accumulate; every seed offering an above-zero-priced public firm reaches its price in 1–25
+  quarters; 5/5 still earning 20 quarters later with the acquired maintenance folded in. Rival
+  solvency and holdings are reported alongside, so the loop cannot pass by draining the field.
+- **The demand baskets are era-banded** (BL-640), as recipes have been since BL-433. **65.7 % of all
+  demand at epoch 0 named goods the ancient band cannot make; it is now zero.**
+- **Industry is a demand channel** (BL-641) — a building's upkeep is credits *and* goods, the shape
+  a unit's already had. **Ships inert at 0.0** pending BL-654: turning it on collapses operating
+  firms 227 → 19, because a pool draw never reaches market demand and the sink starves itself.
+- **`world_gen_config::is_fallback`** and a shared `parsed_gen_config()` helper, so a harness can say
+  which of two very different worlds it measured.
+
+### Changed
+- **Spawn viability: 3/12 seeds solvent → 12/12, interest charged nowhere.** Opening capital
+  0 → **400** (a buffer, not a subsidy — the zero had never met compounding debt), debt interest
+  2 % → **1.5 %**, and **no standing army at spawn** (parameterised, symmetric across player and
+  rivals, consumes no randomness).
+- **The player is seated at random from a viability shortlist** (BL-630); the corporation-selection
+  screen is gone. The draw is weighted toward processors and populated ground as a bias, never a gate.
+- **Background density retuned** to 88 corps / 352 buildings via the *demand* lever, with Pass 6's
+  target ratio untouched and prices holding — no household good is floored in any market.
+- `world_save_version` **17 → 18**.
+
+### Fixed
+- **The harnesses were measuring a different world.** `make_hard_coded_world`'s `gen_cfg` defaults to
+  a fallback pricing **10 of 47** resources against the script's **42**, and three harnesses omitted
+  it — so a third of the ancient roster was unsellable at any price in every number they produced.
+  Corrected, the seated corp's operating net went **−19.13 → +17.38 cr/qtr**.
+- **A Lua-only change never reached the play build** (NR-686): the script copy was a side effect of
+  linking, so tuning changed nothing while the build printed `BUILD_OK`. Now an always-run target.
+- Five stale assertions retired, all the same shape — an assertion pinning a hand-kept mirror of the
+  data rather than the property it meant to protect.
+
+### Known — deliberately not green
+- `chain_depth` carries **one intended failure** on eight goods. The way to green it is to build the
+  channel that buys them, never to weaken the row.
+- **The free-firm trap** (BL-658): the acquisition price's cash term is signed, so the *cheapest*
+  buyable firm is the most indebted one — handed over free, with its debt transferring at face value
+  (−13,358 cr on one seed). The floor is not the bug; the solvency gate reads the price rather than
+  the buyer's position after the transfer.
+- Both spawn harnesses still omit the **`works_registry`** the app passes to generation — an
+  unquantified divergence between what we measure and what is played, named here rather than left to
+  be discovered.
+
+
 ## [0.1.20] — 2026-08-26
 
 *Sprints 20 and 21 wave 0 — the books open, and the discovery that the demand side was never

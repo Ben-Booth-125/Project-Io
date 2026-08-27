@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*96 entries — 69 open, 27 resolved.*
+*98 entries — 71 open, 27 resolved.*
 
 ---
 
@@ -626,6 +626,20 @@ The retune reached 352 buildings / 88 corps against the pre-BL-640 584 / 104. It
 BEN IS RIGHT AND THE ATTRIBUTION CONFIRMS IT. Of 12 swept seeds, 3 clear - and all three carry ZERO interest, income 68-104 cr/qtr, balance +2.1k to +3.9k. The other 9 are all marked (dip): they went negative once, and interest is then 43-60% OF THEIR ENTIRE LOSS (seed 0: op.net -40.1, net -88.5, interest 48.4; seed 7: -34.3 / -85.5 / 51.3). Their OPERATING net is only -24 to -40 cr/qtr - a modest, closeable gap. The debt is not the operating gap; it is 80 quarters of compounding on top of it, 1.02^80 = 4.9x. THE REAL DEFECT IS NOT THE RATE. 2%/qtr is a reasonable charge in play. The defect is that INTEREST HAS NO CONSEQUENCE ATTACHED: components.hpp says a balance 'may go negative (no insolvency consequence)', so a firm that would have died in year three keeps trading for twenty and is then handed to the player carrying the compounded wreckage. The pre-game is a HISTORY GENERATOR, and a history in which nothing ever fails is not a history - it is an accumulator. RECOMMENDED, and it is not 'switch interest off': KEEP the interest and ADD THE CONSEQUENCE IT IS SUPPOSED TO HAVE. A firm underwater for N consecutive quarters exits - dissolved, or absorbed through BL-628's dissolution machinery, which landed today and already knows how to move an actor's assets and cancel its promises. Three things fall out at once: the pre-game stops manufacturing zombies; the surviving field at seat time is SELF-SELECTED for viability, so BL-630's shortlist floor starts being met instead of falling through to its fallback on 23/24 seeds; and interest becomes the mechanism that identifies failure rather than a number that only accumulates. TWO WEAKER ALTERNATIVES, named so the choice is visible: suppress interest during the warm start only (cheap, but it hides the failure rather than resolving it, and a corp still enters play with an operating deficit); or raise opening capital (buys quarters, changes nothing structural - seed 1 earned 0.0 income across its whole trailing window and no starting balance survives that).
 
 *Files: `src/world/components.hpp`, `src/world/economy_system.cpp`, `src/world/corp_command.cpp`, `docs/economy/FINANCE.md`, `docs/generation/CORPORATION_GENERATION.md`*
+
+### NR-688 — The generation-config omission is now STRUCTURALLY visible - three harnesses had it
+*decision taken on your behalf · raised 2026-08-26 · from BL-634's R0, plus the sibling defect it found in player_seed_sweep.*
+
+Three harnesses omitted world_gen_config in one day: spawn_solvency (which invalidated a sprint of viability numbers), material_floor's counterfactual, and player_seed_sweep. Fixing each by hand would have left the fourth to find. Taken on Ben's behalf: make the omission SAYABLE rather than silent. `world_gen_config::is_fallback` defaults true and load_from_lua clears it, so any harness can print which of the two worlds it measured; and `parsed_gen_config(lua)` in harness_params.hpp is the one-line correct path with the whole hazard documented above it. A Lua-free logic harness legitimately keeps the fallback - prices are not its subject - and can now SAY so instead of leaving a reader to guess. What is NOT done: player_seed_sweep still omits it at three call sites, and nothing yet FAILS on the omission. Making it loud rather than merely sayable is the obvious next step and was not taken without Ben.
+
+*Files: `src/world/world_gen_config.hpp`, `tools/verify/harness_params.hpp`, `tools/verify/player_seed_sweep.cpp`*
+
+### NR-689 — FINANCE.md describes the eighth field as if it exists; BL-653 is unbuilt
+*observation · raised 2026-08-26 · from BL-634, which read the doc and then the code.*
+
+FINANCE.md section The eighth field says trailing_net is the mean of `net + other`. quarterly_return carries seven flows plus net and no `other`; corp_trailing_net averages `net` alone. This is the SANCTIONED pattern - a settled design is written the moment it is settled, and BL-653 owns the work - so the doc is not wrong so much as ahead. Recorded because BL-634 read it as current and had to check the code to find out, which is a real cost the state-independence rule pays: a reader cannot tell 'settled and built' from 'settled and owed' without querying the backlog. Worth considering whether a doc that describes an unbuilt mechanism should say which item owes it - CORPORATION_GENERATION.md's Pass 2b does exactly that and reads no worse for it.
+
+*Files: `docs/economy/FINANCE.md`, `docs/development/DELIVERY.md`*
 
 ---
 

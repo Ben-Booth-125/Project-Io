@@ -112,7 +112,9 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest releases — v0.1.17, v0.1.18, v0.1.19 and v0.1.20
+## Latest releases — v0.1.18, v0.1.19, v0.1.20 and v0.1.21
+
+**v0.1.21 — the loop closes.** A corporation now saves up over about two in-game years, buys another firm outright, and is still earning twenty quarters later — measured, not asserted. Spawn viability went from three seeds in twelve to twelve in twelve with no interest charged anywhere, and the demand baskets learned which era they are in, which removed the 65.7 % of demand that had been pointing at goods the ancient world cannot make. The release also records what it does not have: a guard deliberately red on eight goods still waiting for a buyer, and a free-firm trap where the cheapest company on the market is the one whose debt sinks you.
 
 **v0.1.20 — the books open.** Every corporation now files a quarterly return, and whether you may read it is a generated fact: a firm's ownership class decides whether it publishes at all. A public firm can be bought outright, priced from its own filed books. Retiring the old banded read means a rival's figures are exact where the firm files and absent where it does not — a dash means *this firm does not file*, never *you have not earned this*. The release also records a measured negative: spawn viability is **not** solved, because 65.7 % of all demand at epoch 0 names goods that era cannot make, and the demand side of the economy is the next sprint's work.
 

@@ -10,6 +10,88 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-08-26 — Sprint 20 closes: the loop closes, and the instruments were measuring a different world
+
+**Mode:** Full (Batch Delivery, six waves). **Cut:** v0.1.21. **Sprint 20: closed, goal met and proved.**
+
+The first half of this session is the entry below. This is the second: five more waves, the
+sprint's own definition of done actually run, and the discovery that a day of reasoning had been
+taken against a world nobody plays.
+
+### The goal, measured
+
+Ben's criterion, set when Sprint 20 opened: *a corporation can save up over a few economy ticks to
+buy another company, and still be making a profit afterwards.* **BL-634 ran it and it holds** —
+7/8 seeds accumulate (mean +51 cr/qtr), all 5 seeds offering an above-zero-priced public firm
+reached its price in 1–25 quarters (mean **8.6**, about two in-game years), the buy applied through
+the real `buy_corporation` verb, and **5/5 were still earning 20 quarters later** with the acquired
+maintenance folded in. Rival solvency 79.7 → 73.7 %, field holdings **+39.4 %** — the gate did not
+go green by draining the world.
+
+Spawn viability went **3/12 seeds solvent → 12/12, with interest charged nowhere.**
+
+### The finding that reframes the rest
+
+`make_hard_coded_world`'s `gen_cfg` defaults to a C++ fallback pricing **10 of 47** resources where
+`scripts/world_gen.lua` authors **42**. Markets are seeded from that table. `spawn_solvency` omitted
+it — so **BL-635's diagnosis, its attribution, and a day of reasoning were taken in a world where a
+third of the ancient roster could not be sold at any price.** Corrected, the seated corp's operating
+net went **−19.13 → +17.38 cr/qtr** and the "60 % of the residual is dead maintenance" figure became
+**1.0 %**.
+
+Worse: the morning's *fix* for a related defect added the **load** and not the **parse**, and was
+reported as confirming the original conclusion. Three harnesses carried the omission. It was found
+by an agent sent to test a *different* hypothesis — mine, about the maintenance floor — which it
+then disproved, and it refused to touch the constant I suspected because its own numbers did not
+support it.
+
+### The shape that appeared four times
+
+Always in the verification layer, never in the game:
+
+- a clipping check passing **vacuously** on a frame containing a clipped button;
+- a build **copying nothing** while printing `BUILD_OK` (NR-686 — a Lua-only change never reached
+  the play build);
+- a wrapper returning **exit 0** on a run where the linker failed;
+- and the config omission above.
+
+**A check whose green means less than it appears to.** Sprint 21's visibility pass now owns all four
+as one problem rather than four notes.
+
+### Measurement overruled the brief, repeatedly, and was right every time
+
+BL-630's goldens did not move though the brief asserted they would "by construction". BL-655 found
+the demand-scale lever **inert** — density is basket *breadth* × a per-resource cap, and Pass 6's
+documented 0.90 ratio **never binds**, correcting the doc that sent it. BL-641 measured a 227 → 19
+collapse in operating firms and **shipped its rates at 0.0** rather than pick a smaller number that
+would have hidden the same defect behind a slower decay — yielding MARKETS.md's property 3, *a
+channel that consumes without pricing cannot bootstrap its own supply*. BL-634 took its gate
+literally and found the **free-firm trap**: the price term is signed, so the cheapest buyable firm
+is the most indebted one, handed over free with its debt transferring at face value — −13,358 cr on
+one seed, three of eight buyers sunk. The floor is not the bug; the solvency gate reads the *price*
+rather than the position *after* the transfer. Same shape as the NaN-before-floor bug the buyout
+caught in its own code: **a check applied to the wrong quantity.**
+
+### Ben's rulings
+
+Opening capital **0 → 400** (the zero was his own earlier steer; it had never met compounding debt),
+interest **2 % → 1.5 %**, **no standing army at spawn** (parameterised, not deleted; symmetric across
+player and rivals; consumes no randomness). Each did what it was aimed at, and the measurement said
+so honestly at each step *including where it fell short*.
+
+### Left deliberately not green
+
+`chain_depth` carries **one intended failure** on eight goods — the way to green it is to build the
+channel that buys them. `building-upkeep-goods` R5 is pending behind BL-654. Both are gates, not debt.
+
+### Owed to Ben
+
+BL-627's `question_log` wording · BL-632 · BL-657 (does a failing firm exit, and can the player's own
+corp fail) · BL-656 (is the per-resource cap the design, or the ratio) · NR-678 (should an industrial
+household buy electronics) · the `works_registry` divergence both harnesses still carry.
+
+---
+
 ## 2026-08-26 — The ledger, the buyout, and the discovery that the demand side was never built
 
 **Mode:** Design → Full (Batch Delivery, three waves across two sprints).
