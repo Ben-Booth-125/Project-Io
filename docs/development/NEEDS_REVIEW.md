@@ -558,14 +558,14 @@ The NR-662 self-exemption reads `cs.is_player`, which derives from world::player
 *Files: `src/world/standing.cpp`, `docs/ui/DISCOVERY.md`*
 
 ### NR-673 — NOVEL: a check that forces PRODUCTION CODE to declare what it does
-*novel-work · raised 2026-08-26 · from Sprint 22 (demand) wave 0, BL-648: the agent raised the flag; the main session endorses the pattern and thinks it generalises.*
+*novel-work · raised 2026-08-26 · from Sprint 21 wave 0, BL-648: the agent raised the flag; the main session endorses the pattern and thinks it generalises.*
 
 BL-648's registry substantiates an exemption by reading the DATA the running pass multiplies by - four of five probes read Lua-authored vectors, so a demand channel landing in economy.lua flips a row green with no harness edit at all. The fifth could not: a convoy launch's propellant burn was a private C++ constant, and no amount of reading Lua finds it. The agent's three options were to re-type the constant into the harness (rebuilding the exact loophole the item exists to close), leave propellant falsely red, or make the PASS DECLARE ITS DRAW - exporting launch_draw_per_convoy so the gate, the debit and the registry became one object. It took the third, which is right, and it is a PATTERN no doc in the corpus owns: a verification requirement reaching back into production code and changing its shape so that what it consumes is declared rather than inferred. Worth Ben's eye because it generalises - every future 'does anything actually do X' guard faces the same three options, and the third is the only one that cannot rot. The residual risk is named in the code: deleting the draw while leaving the vector standing. Far narrower than a prose string.
 
 *Files: `tools/verify/chain_depth.cpp`, `src/world/supply_system.hpp`, `docs/development/DEVELOPMENT_PRACTICES.md`*
 
 ### NR-674 — haulage_measure's convoy baseline has moved - 1368/1014 against the noted 1055/802
-*observation · raised 2026-08-26 · from Sprint 22 (demand) wave 0, BL-648's verification sweep.*
+*observation · raised 2026-08-26 · from Sprint 21 wave 0, BL-648's verification sweep.*
 
 haulage_measure reports 0 failures at 1368 convoys dispatched, 1014 intra-body, against a previously-noted baseline of 1055/802. The agent correctly did not re-bless anything and named the gap. It matters more than an ordinary number drift because of what this harness IS: convoy traffic can collapse with every state_hash golden digit-identical, so haulage_measure against its baseline is the only real check that trade is still happening. A baseline that has silently moved by ~30% is therefore a check that has quietly stopped meaning what it meant. Sprint 19's population work (~40x centre density) and Sprint 20's road and levy changes are the obvious candidates and neither was chased. Someone should establish the current number deliberately, with provenance, rather than letting the next reader compare against a figure from a different world.
 
@@ -642,23 +642,23 @@ FINANCE.md section The eighth field says trailing_net is the mean of `net + othe
 *Files: `docs/economy/FINANCE.md`, `docs/development/DELIVERY.md`*
 
 ### NR-690 — country_lens.lua verifies a lens that no longer exists - it now captures the plain canvas under the lens name
-*observation · raised 2026-08-27 · from Sprint 21 (UI visibility) wave 0, the UI-element coverage scan.*
+*observation · raised 2026-08-27 · from Sprint 22 (UI visibility) wave 0, the UI-element coverage scan.*
 
 BL-601 retired the Country lens on 2026-08-24 and overlay_from_name deliberately maps "country"/"faction" to overlay_mode::none, with a comment saying a script naming it still captures the borders where they now live. That is true of the PICTURE and false of the CHECK. scripts/verify/country_lens.lua still opens with "Visual verification for the Country lens (overlay_mode::country)" and claims R1 (strip glyph = shield, tooltip "Countries") and R3 (identical territory tint to the prior Faction lens) - two claims about a lens that is gone. Its captures are named country_lens_full and country_lens_zoom. Six more scripts pass "country" as one leg of a sweep and so capture the plain canvas twice under two names: lens_modes, tile_texture, continents_terrain, pop_markers, stacked_tile_ring, landform_relief. Nothing fails, because nothing asserted. This is NR-663 family member five: a check whose green means less than it appears. THE CALL: retire country_lens.lua outright (the border band has its own check, border_band.lua, with 6 expects), or rewrite its header to say it captures always-on border chrome. Recommend retiring it - border_band.lua already covers the successor and asserts, which country_lens.lua never did.
 
 *Files: `scripts/verify/country_lens.lua`, `src/core/verify_api.cpp`, `scripts/verify/lens_modes.lua`, `docs/ui/LENSES.md`*
 
 ### NR-691 — The UI element catalogue is four weeks stale, and it is the spine Sprint 21 works off
-*observation · raised 2026-08-27 · from Sprint 21 (UI visibility) wave 0, the UI-element coverage scan.*
+*observation · raised 2026-08-27 · from Sprint 22 (UI visibility) wave 0, the UI-element coverage scan.*
 
 docs/ui/ui_elements.json is dated 2026-07-31 and carries 95 elements. Measured against the code and the verify scripts today: THREE listed elements are retired in code - UI-031 Country lens and UI-035 Opportunity lens and UI-036 Production lens, all removed from overlay_mode by BL-601/BL-604 on 2026-08-24 - and FOURTEEN verify scripts drive a surface the catalogue does not list at all: battle_card, contracts_ledger, decision_feed, frame_budget_hud, mercenary_slice, strategy_readout, survey_dispatch, tech_tree_panel, throughput_lens, processing_management_ux, ui_shell_fixture, v009_batch, export_mockdata, pan_perf. The Throughput lens is the sharpest instance - it is a live overlay_mode value with its own verify script and its own LENSES.md section, and the catalogue has no row for it. THE CALL: whether refreshing the catalogue is wave 0.5 of this sprint or its own item. It matters because Ben framed the sprint as "quite a few elements to change" across several sessions, and every session will scope its work off this file.
 
 *Files: `docs/ui/ui_elements.json`, `src/ui/ui_state.hpp`, `docs/ui/LENSES.md`*
 
-### NR-692 — Two senses of "visibility" now compete for the number 21 - which sprint owns the verification family
+### NR-692 — Two senses of "visibility" - which sprint owns the verification family
 *question · raised 2026-08-27 · from Sprint 21 opened 2026-08-27; the phrase was already attached to the demand sprint on 2026-08-26.*
 
-On 2026-08-26 Ben steered that "Sprint 21 is a VISIBILITY pass" and three things were parked against it: NR-663 family (four checks whose green means less than it appears), BL-639 (panel columns), and NR-686 thorough fix (a dev build resolving scripts/ from the repo root). At that moment 21 was the DEMAND sprint. On 2026-08-27 the demand sprint became 22 and a new Sprint 21 opened for a UI visibility pass. The two senses are not the same work: (a) UI visibility - the screen does not say what the model knows; (b) verification visibility - a check that passes without checking. THE CALL: does the verification family follow the NUMBER (into UI visibility, sprint 21) or the THEME it was steered onto (demand, sprint 22), or become its own item? Parked in sprint 21 planned rather than assigned, because inferring it would be a guess. Note the two senses did just meet in practice: NR-690 is a fifth member of the verification family, found by the UI scan.
+On 2026-08-26 Ben steered that "Sprint 21 is a VISIBILITY pass" and three things were parked against it: NR-663 family (four checks whose green means less than it appears), BL-639 (panel columns), and NR-686 thorough fix (a dev build resolving scripts/ from the repo root). At that moment 21 was the DEMAND sprint. On 2026-08-27 a UI visibility pass opened as Sprint 22 (briefly numbered 21, corrected the same day). The two senses are not the same work: (a) UI visibility - the screen does not say what the model knows; (b) verification visibility - a check that passes without checking. THE CALL: does the verification family follow the NUMBER (into UI visibility, sprint 22) or the THEME it was steered onto (demand, sprint 21), or become its own item? Parked in sprint 22 planned rather than assigned, because inferring it would be a guess. Note the two senses did just meet in practice: NR-690 is a fifth member of the verification family, found by the UI scan.
 
 *Files: `docs/development/sprints.json`*
 
@@ -868,7 +868,7 @@ FINANCE.md's ownership-class rules are silent on the player's own corporation. R
 *Files: `docs/economy/FINANCE.md`, `.claude/rules/io-standing-rules.md`, `src/world/corp_command.cpp`*
 
 ### NR-675 — refined_copper is UNTAGGED in recipes.lua - a copper smelter runs at 0 CE while every sibling is industrial
-*question · raised 2026-08-26 · from Sprint 22 (demand) wave 0, BL-649's census: measured, not inferred - 8,940 units produced at 0 CE on seed 0.*
+*question · raised 2026-08-26 · from Sprint 21 wave 0, BL-649's census: measured, not inferred - 8,940 units produced at 0 CE on seed 0.*
 
 scripts/recipes.lua's refined_copper recipe (~line 154) carries no `era =` field, so it defaults to `any` and is allowed in the ancient band. Every sibling refining recipe is tagged `industrial`. The census measures the consequence rather than guessing at it: 8,940 units of refined_copper produced at 0 CE, chain depth 1, and background_demand pays for it - which makes it one of the very few ancient chains with a live buyer, for what looks like an oversight. TWO READINGS and it is Ben's call: (a) it IS an oversight, tag it `industrial`, and the ancient band loses a chain it should not have had; (b) it is correct - copper smelting is genuinely ancient technology, unlike the rest of that group, and the tag was omitted on purpose. Reading (b) is historically defensible, which is exactly why it should not be decided by whoever notices it next. Nobody has touched the line.
 
@@ -877,9 +877,9 @@ scripts/recipes.lua's refined_copper recipe (~line 154) carries no `era =` field
 *Files: `scripts/recipes.lua`, `docs/economy/PRODUCTION.md`*
 
 ### NR-676 — The census invented vocabulary the tuning passes will cite - worth ratifying once
-*novel-work · raised 2026-08-26 · from Sprint 22 (demand) wave 0, BL-649: the agent raised a mild novelty flag and it is the right call.*
+*novel-work · raised 2026-08-26 · from Sprint 21 wave 0, BL-649: the agent raised a mild novelty flag and it is the right call.*
 
-MARKETS.md § Measuring it owns the task, so the work was not unowned - but the census had to coin terms no doc defines, and every Sprint 22 (demand) tuning pass will now quote them: the STRUCTURAL SINK vs OBSERVED DEMAND distinction (a good can have a sink authored and still have zero demand this tick), the REC/DEP producibility split, and the `px` priced-on-any-market axis. It also split economy_report::wants into construction vs processing, recovered from world state rather than stored, with the residual asserted non-negative. None of it is controversial and all of it is useful; it just should be ratified into MARKETS.md § Demand channels once rather than accreting as harness-local jargon three passes deep. Cheap to do, and the alternative is a report nobody outside this session can read.
+MARKETS.md § Measuring it owns the task, so the work was not unowned - but the census had to coin terms no doc defines, and every Sprint 21 tuning pass will now quote them: the STRUCTURAL SINK vs OBSERVED DEMAND distinction (a good can have a sink authored and still have zero demand this tick), the REC/DEP producibility split, and the `px` priced-on-any-market axis. It also split economy_report::wants into construction vs processing, recovered from world state rather than stored, with the residual asserted non-negative. None of it is controversial and all of it is useful; it just should be ratified into MARKETS.md § Demand channels once rather than accreting as harness-local jargon three passes deep. Cheap to do, and the alternative is a report nobody outside this session can read.
 
 > **RESOLVED.** Ben, 2026-08-26: RATIFY. The census's vocabulary is written into MARKETS.md section Measuring it as a table - structural sink vs observed demand, REC/DEP, px - with the distinction that does the work called out: a structural sink with ZERO observed demand is the signature of a dead chain, and invisible to any check looking at only one of them.
 

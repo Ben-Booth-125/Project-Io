@@ -164,7 +164,7 @@ timber and fibre idle 80/80 with unexhausted deposits under them. **Spawn viabil
 anyone can tune — the demand side was never authored.** The supply side landed 2026-08-24; its
 counterpart did not.
 
-### Sprint 22 — demand (opened 2026-08-26 as Sprint 21, renumbered 2026-08-27; wave 0 landed)
+### Sprint 21 — demand (opened, wave 0 landed)
 
 Written into MARKETS.md as **eight demand channels** rather than a list of fixes, on one rule: *a
 consumer is a mechanism, not a noun.* Three properties the register must hold — demand scales with

@@ -40,7 +40,7 @@ in `tools/verify/README.md`.
   valuable row in the report. It **reports and never asserts a magnitude**, deliberately: the moment
   it asserts a number people tune against the harness instead of reading it, so it fails only on an
   internal inconsistency. Output is byte-identical across runs so a before/after pair reads at a
-  glance — run it either side of every Sprint 22 (demand) tuning pass and keep the deltas. Build via
+  glance — run it either side of every Sprint 21 tuning pass and keep the deltas. Build via
   `build_lua_harness.bat` (it needs the real Lua baskets); `--band ancient|industrial|both`,
   `--seed`, `--ticks`, `--fast`.
 - **`ownership_class`** — BL-631, requirement group `ownership-class` R1–R6: whether a
@@ -356,7 +356,7 @@ in `tools/verify/README.md`.
   R1's exemption row fails while any resource's admission claim names a consumer that no real pass
   injects. Eleven goods are red today — tobacco, spices, coffee, furs, trade_goods_misc,
   spacecraft_components, ceramics, dressed_stone, tools, leather, rigging — and the way to turn the
-  row green is to **build the demand channel that buys them** (Sprint 22, MARKETS.md § Demand
+  row green is to **build the demand channel that buys them** (Sprint 21, MARKETS.md § Demand
   channels), never to weaken the assertion or re-point an exemption at a pass that does not move
   the good. A green row here after a harness edit alone is the loophole this item closed, reopened.
   Everything else in the harness passes; treat a SECOND failure as a real regression.

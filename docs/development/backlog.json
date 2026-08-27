@@ -2,7 +2,7 @@
  "_schema": "backlog/io-v2",
  "_note": [
   "THIRD ARCHIVE PASS, 2026-08-26 (Sprint 20 closed, v0.1.21 cut): every terminal item moved to archive/backlog-complete-2026-08-26.json. What remains here is OPEN WORK ONLY.",
-  "TWO sprints open as of 2026-08-27: Sprint 21 (UI visibility) - newly opened, worklist not yet authored below its coverage scan; and Sprint 22 (demand) - opened 2026-08-26 as Sprint 21 and renumbered, wave 0 landed. Sprint 22's remaining items plus Sprint 20's nine slipped ones are what is left; three of the nine are design-owed on Ben.",
+  "TWO sprints open as of 2026-08-27: Sprint 21 (demand), wave 0 landed; and Sprint 22 (UI visibility), wave 0 landed. Sprint 21's remaining items plus Sprint 20's nine slipped ones are what is left; three of the nine are design-owed on Ben. Sprint 23 is named for new UI elements but not yet authored.",
   "Canonical backlog for Project Io - the authoritative METADATA index of every open item.",
   "One item = one object in `items`.",
   "STATUS (authoritative; JSON wins over any prose/glyph disagreement):",
