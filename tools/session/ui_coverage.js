@@ -217,6 +217,57 @@ if (rev) {
   process.exit(0);
 }
 
+// --captures [dir]: group a capture run BY ELEMENT rather than by filename, so a
+// review pass walks surfaces instead of PNGs. Optional --since <minutes> keeps a
+// fresh run separate from the ~300 stale PNGs a repo accumulates.
+if (flag('--captures')) {
+  const dir = value('--captures') && !value('--captures').startsWith('--') ? value('--captures') : 'screenshots';
+  const sinceMin = Number(value('--since') || 0);
+  if (!fs.existsSync(P(dir))) { console.log(`ui_coverage: no capture dir ${dir}`); process.exit(0); }
+  const cutoff = sinceMin ? Date.now() - sinceMin * 60000 : 0;
+  const shots = fs.readdirSync(P(dir))
+    .filter((f) => f.endsWith('.png'))
+    .filter((f) => !cutoff || fs.statSync(path.join(P(dir), f)).mtimeMs >= cutoff)
+    .map((f) => f.replace(/\.png$/, ''));
+
+  // A capture belongs to the check whose name is the LONGEST matching prefix —
+  // longest, because `build_legibility` and `build_door_wide_roster` both prefix
+  // `build_`, and the shortest match would file them together.
+  const ownerOf = (shot) => {
+    let best = null;
+    for (const c of Object.keys(checks)) {
+      if ((shot === c || shot.startsWith(c + '_')) && (!best || c.length > best.length)) best = c;
+    }
+    return best;
+  };
+  const byCheck = {};
+  const unclaimed = [];
+  for (const s of shots) {
+    const o = ownerOf(s);
+    if (!o) { unclaimed.push(s); continue; }
+    (byCheck[o] = byCheck[o] || []).push(s);
+  }
+  const covered = rows.filter((r) => r.checks.some((c) => byCheck[c]));
+  console.log(`ui_coverage: ${shots.length} capture(s) in ${dir}${sinceMin ? ` from the last ${sinceMin}m` : ''}`);
+  console.log(`  ${covered.length} of ${rows.length} elements have a fresh capture to look at.\n`);
+  for (const r of covered) {
+    const mine = r.checks.filter((c) => byCheck[c]).flatMap((c) => byCheck[c]).sort();
+    console.log(`${r.id}  ${r.path}   [${r.cls}]`);
+    for (const m of mine) console.log(`    ${dir}/${m}.png`);
+  }
+  const dark = rows.filter((r) => !r.checks.some((c) => byCheck[c]));
+  if (dark.length) {
+    console.log(`\nNO CAPTURE THIS RUN (${dark.length}) — nothing to review, for good reasons or bad:`);
+    for (const r of dark) console.log(`  ${r.id.padEnd(8)} ${r.cls.padEnd(13)} ${r.path}`);
+  }
+  if (unclaimed.length) {
+    console.log(`\nCAPTURES MATCHING NO CHECK (${unclaimed.length}) — stale files, or a capture renamed away from its script:`);
+    for (const u of unclaimed.slice(0, 40)) console.log(`  ${u}.png`);
+    if (unclaimed.length > 40) console.log(`  ... and ${unclaimed.length - 40} more`);
+  }
+  process.exit(0);
+}
+
 if (flag('--orphans')) {
   console.log(`ui_coverage: ${orphans.length} check(s) claimed by no element`);
   for (const o of orphans) console.log(`  ${o.padEnd(28)} ${checks[o].captures} caps, ${checks[o].expect} expects — ${checks[o].header}`);
