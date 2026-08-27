@@ -1,7 +1,7 @@
 # Project Io — REFINED (active worklist)
 
 *Empty between work blocks.* Sprint 20 closed 2026-08-26 with its goal met and proved — see
-`sprints.json` "20" and the DEVLOG. Sprint 21 (demand) is open and unstarted: BL-654 gates
+`sprints.json` "20" and the DEVLOG. Sprint 22 (demand, opened as 21 and renumbered 2026-08-27) is open with wave 0 landed: BL-654 gates
 BL-641s rates and should land early; BL-648s guard is deliberately red on eight goods and turns
 green as channels land.
 
