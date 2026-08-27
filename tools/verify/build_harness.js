@@ -51,6 +51,9 @@ const NEEDS_LUA = new Map([
                               'recipe_registry::load_from_lua — it measures magnitudes, not ' +
                               'relations, so a restated registry would answer about a world ' +
                               'that does not ship (BL-635)'],
+  ['material_floor',          'loads the REAL scripts/recipes.lua + economy.lua + world_gen.lua ' +
+                              'and PARSES world_gen_config from the last of them — the market ' +
+                              'base prices it measures against exist only in that table'],
 ]);
 
 function die(msg, code = 1) { console.error('build_harness: ' + msg); process.exit(code); }
