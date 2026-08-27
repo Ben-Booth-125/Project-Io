@@ -1,1270 +1,1855 @@
 {
-  "_schema": "ui-elements/io-v1",
-  "_note": [
-    "Canonical UI-ELEMENT catalogue for Project Io — the authoritative index of WHAT EXISTS ON",
-    "SCREEN, decomposed by concrete surface (canvas / panel / ledger / element / sub-element /",
-    "control / view) rather than by player intent or by backlog feature.",
-    "",
-    "WHY THIS FILE EXISTS — the third route through the docs, alongside the other two.",
-    "  The design docs (docs/ui/*.md) describe each surface in prose, one file per region.",
-    "  user_stories.json decomposes the game by PLAYER INTENT ('what is the player trying to do?').",
-    "  backlog.json decomposes it by FEATURE ('what do we build next?').",
-    "  Neither gives a flat, queryable, hierarchical INVENTORY of the UI surfaces themselves — this",
-    "  file is that inventory. It exists so a question like 'what sub-elements does the Selection",
-    "  band have' or 'which ledgers exist and what views do they split into' has a single queryable",
-    "  answer instead of requiring a re-read of a dozen markdown files.",
-    "",
-    "SCOPE. Every canvas, ledger, panel, and chrome element that is actually built (2026-07-31),",
-    "plus the handful of designed-but-gated ones the docs describe as owed (flagged in `resolution`",
-    "where relevant). This is a surface inventory, not a coverage audit — it does not judge whether",
-    "a surface is good or needed (that is user_stories.json's job) or whether it is scheduled",
-    "(backlog.json's job). It answers 'what is this thing and how deep does it nest.'",
-    "",
-    "FIELDS.",
-    "  id                   — UI-XXX, zero-padded 3 digits, sequential, no gaps.",
-    "  name                 — short human name for the element.",
-    "  kind                 — canvas | panel | ledger | element | sub-element | control | view.",
-    "                         canvas = one of the three primary spatial views (Solar/Circum/Planetary).",
-    "                         panel = persistent chrome (header, profile, nav rail, time panel).",
-    "                         ledger = a nav-rail-hosted reference surface (Balance, Market, ...).",
-    "                         element = a named UI concept that is neither canvas nor panel nor ledger",
-    "                           (Selection band, hover card, icon vocabulary, the lens system).",
-    "                         sub-element = a nested piece of a parent surface, not independently",
-    "                           reachable from the rail or minimap.",
-    "                         control = an interactive affordance (a button, a combo, a toggle strip).",
-    "                         view = one tab/page of a multi-view ledger (Prices, Standings, Tiles...).",
-    "  parent               — id of the containing element, or null for a top-level surface.",
-    "  source               — doc path(s) and src/ui/*.{hpp,cpp} path(s) this entry is drawn from.",
-    "  summary              — 1-2 sentence description of what the element is and shows.",
-    "  interesting_question — the single most interesting/non-obvious open design tension this",
-    "                          element raises — grounded in something actually read, not generic.",
-    "  resolution            — how the current design/code actually resolves that question, with a",
-    "                          citation (doc section, standing rule, or code symbol/path); or, if",
-    "                          genuinely unresolved, 'Open — ...' stated plainly. Never a fabricated",
-    "                          BL-xxx id — only ids actually seen in the read docs are cited.",
-    "",
-    "MAINTENANCE. This file is a snapshot (dated 2026-07-31, corpus doc-truth-sweep baseline). A UI",
-    "surface that lands, splits into new sub-views, or is superseded should get a new/updated entry",
-    "in the same pass that updates its owning doc — do not let this drift the way BACKLOG.md drifted",
-    "before the drain. When a doc file this entry cites is itself marked superseded, prefer citing",
-    "the doc's own superseding note over re-deriving the current shape from code alone.",
-    "",
-    "RELATIONSHIP TO THE OTHER TWO CATALOGUES. user_stories.json traces DOWN to a `{doc, surface}`",
-    "pair per story — this file is the thing that pair ultimately points at, made walkable on its",
-    "own axis (a surface's sub-elements, not just its story). backlog.json's `file scope` per item",
-    "names the same src/ui files this catalogue's `source` field names — the two should never",
-    "disagree about which files back a given surface."
-  ],
-  "elements": [
-    {
-      "id": "UI-001",
-      "name": "Solar Canvas",
-      "kind": "canvas",
-      "parent": null,
-      "source": [
-        "docs/ui/CANVASES.md",
-        "docs/ui/SOLAR.md",
-        "src/ui/solar_system_canvas.hpp",
-        "src/ui/solar_system_canvas.cpp"
-      ],
-      "summary": "The top rung of the zoom ladder: a top-down view of the whole system, star at centre, bodies orbiting on rings derived from orbital_radius_au/orbital_angle_rad.",
-      "interesting_question": "The star has no Circumplanetary view and clicking it does nothing — is a star meaningfully a body entity at all, or a special-cased backdrop wearing body clothes?",
-      "resolution": "Resolved deliberately: MINIMAP.md 'Star as an entity' made it a real body_type::star entity specifically so it can carry a name and anchor the minimap title uniformly with every other body, accepting the click-does-nothing asymmetry as the cost."
-    },
-    {
-      "id": "UI-002",
-      "name": "Body markers (planet/moon/asteroid/station/star)",
-      "kind": "sub-element",
-      "parent": "UI-001",
-      "source": [
-        "docs/ui/SOLAR.md § Visual elements"
-      ],
-      "summary": "Filled circles per body type/size/colour, labelled (planets/asteroids always, moons only while hovered) and tracked live each frame.",
-      "interesting_question": "Moon labels only show on hover to keep the inner system readable — but does that mean a player can lose track of which moon is which mid-drag?",
-      "resolution": "Accepted trade-off, not solved further: SOLAR.md states the rule as deliberate crowding relief with no fallback (e.g. no label-on-selection override) noted."
-    },
-    {
-      "id": "UI-003",
-      "name": "Asteroid belt render",
-      "kind": "sub-element",
-      "parent": "UI-001",
-      "source": [
-        "docs/ui/SOLAR.md § Asteroid belt"
-      ],
-      "summary": "A translucent textured annulus between two radii (world.belt), with a deterministic dust-speck scatter; notable asteroids (Pallas) are separate body entities drawn over it.",
-      "interesting_question": "Why is the belt system-level data rather than a body, when it visually reads as one map object?",
-      "resolution": "Settled: SOLAR.md states the belt is 'not a body and not an entity' by design — notable asteroids inside it are ordinary body_type::asteroid entities drawn over the band, kept independently selectable/hoverable/labelled, distinct from the band's own render pass."
-    },
-    {
-      "id": "UI-004",
-      "name": "Survey badge",
-      "kind": "sub-element",
-      "parent": "UI-001",
-      "source": [
-        "docs/ui/SOLAR.md § Visual elements",
-        "docs/ui/DISCOVERY.md § Geographic fog"
-      ],
-      "summary": "Per-body glyph at upper-right showing geographic-fog survey phase: dimmed '?' (hidden), magnifying glass + k/N (in progress), none once surveyed.",
-      "interesting_question": "The survey and activity fogs are stated as deliberately independent axes — does a player actually read two separate badges correctly, or does the eye collapse them into one 'how much do I know' signal?",
-      "resolution": "Design intent is explicit separation, not solved by testing: DISCOVERY.md places the badges at opposite corners (upper-right vs lower-left) specifically 'so the two fogs read apart,' but no playtest finding is recorded confirming players actually distinguish them."
-    },
-    {
-      "id": "UI-005",
-      "name": "Activity badge",
-      "kind": "sub-element",
-      "parent": "UI-001",
-      "source": [
-        "docs/ui/SOLAR.md § Visual elements",
-        "docs/ui/DISCOVERY.md § Activity fog"
-      ],
-      "summary": "Per-body concentric-pulse glyph at lower-left, tiered by activity_vis (known / known_stale / visible), derived from body_activity_visibility (routes + convoys + ownership + tick).",
-      "interesting_question": "A proximity glimpse can light this badge at known_stale even for a body the player never traded with — does that risk reading as a false 'I have a route here'?",
-      "resolution": "Named and accepted, not hidden: DISCOVERY.md states a glimpse 'never rises above known_stale' and 'a body's own route always outranks it,' so the tier itself caps the misleading signal rather than distinguishing glimpse from stale-route visually."
-    },
-    {
-      "id": "UI-006",
-      "name": "Home halo",
-      "kind": "sub-element",
-      "parent": "UI-001",
-      "source": [
-        "docs/ui/SOLAR.md § Visual elements"
-      ],
-      "summary": "Always-on player-identity ring + glow around home_body (BL-085), distinct from selection/survey/activity chrome.",
-      "interesting_question": "n/a — straightforward always-on identity chrome.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-007",
-      "name": "Trade corridors",
-      "kind": "sub-element",
-      "parent": "UI-001",
-      "source": [
-        "docs/ui/SOLAR.md § Visual elements",
-        "docs/ui/DISCOVERY.md § Illumination (Solar canvas)"
-      ],
-      "summary": "The player's persistent trade routes (BL-088) drawn as lit lanes; fresh routes glow, stale routes fade to grey.",
-      "interesting_question": "Rival trade routes never render here (competitor-visibility rule, BL-068) — so the corridor layer only ever shows the player's own reach. Does that make an empty system look emptier than it is early game?",
-      "resolution": "Deliberate: DISCOVERY.md frames the fog as keeping 'the spotlight on the player,' explicitly rejecting a corporate-secrecy-simulator framing where rival lanes would ever surface."
-    },
-    {
-      "id": "UI-008",
-      "name": "Scale bar + zoom slider",
-      "kind": "control",
-      "parent": "UI-001",
-      "source": [
-        "docs/ui/SOLAR.md § Visual elements",
-        "src/ui/canvas_scale.hpp"
-      ],
-      "summary": "Bottom-centre overlay: AU scale bar plus a logarithmic zoom slider (right = in, left = out). Shared implementation with the Circumplanetary canvas.",
-      "interesting_question": "n/a — a shared, mechanically simple control.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-009",
-      "name": "Circumplanetary Canvas",
-      "kind": "canvas",
-      "parent": null,
-      "source": [
-        "docs/ui/CANVASES.md",
-        "docs/ui/CIRCUMPLANETARY.md",
-        "src/ui/circumplanetary_canvas.hpp",
-        "src/ui/circumplanetary_canvas.cpp"
-      ],
-      "summary": "The middle rung of the zoom ladder: a planet (the circumplanetary anchor) at centre with its moons in orbit — the deliberate stepping stone between picking a planet and dropping to its surface.",
-      "interesting_question": "A moonless planet still gets a full circumplanetary view with nothing but the anchor at the centre — is that an empty screen or a deliberate beat?",
-      "resolution": "Deliberate: CIRCUMPLANETARY.md states outright 'A planet with no moons is still a valid circumplanetary view... it always exists for any descendable body,' treating the pause as structural rather than a gap to fill."
-    },
-    {
-      "id": "UI-010",
-      "name": "Anchor + moon orbit render",
-      "kind": "sub-element",
-      "parent": "UI-009",
-      "source": [
-        "docs/ui/CIRCUMPLANETARY.md § Visual elements",
-        "docs/ui/CIRCUMPLANETARY.md § The anchor"
-      ],
-      "summary": "Draws the resolved circumplanetary_anchor (a moon's parent planet, or the body itself) at centre, moons on non-true-scale visible-offset orbits.",
-      "interesting_question": "Moon orbital radii are explicitly not true scale (real distances would render on top of the planet) — does that ever mislead a player reasoning about travel time or distance?",
-      "resolution": "Named but not mitigated further: CIRCUMPLANETARY.md flags the offset as a rendering necessity; the rung-relative distance readout (parent-referenced, not radius-derived) is the compensating fact surface — see `draw_body_summary`'s canvas-aware overload."
-    },
-    {
-      "id": "UI-011",
-      "name": "Market price strip (Circumplanetary)",
-      "kind": "sub-element",
-      "parent": "UI-009",
-      "source": [
-        "docs/ui/LENSES.md § Market lens § Rung applicability"
-      ],
-      "summary": "Compact good→price list for the anchor body's market, shown under the Market lens on this rung; the selected good is highlighted.",
-      "interesting_question": "n/a — a straightforward per-body summary.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-012",
-      "name": "Convoy-count badge",
-      "kind": "sub-element",
-      "parent": "UI-009",
-      "source": [
-        "docs/ui/LENSES.md § Supply lens (landed note)",
-        "docs/ui/CIRCUMPLANETARY.md § What is deferred"
-      ],
-      "summary": "A per-body badge beside the label under the Supply lens, summarising goods-in-transit convoy count for the focused body.",
-      "interesting_question": "n/a — landed Layer-5 badge, narrowly scoped.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-013",
-      "name": "Planetary Canvas",
-      "kind": "canvas",
-      "parent": null,
-      "source": [
-        "docs/ui/CANVASES.md",
-        "docs/ui/PLANETARY.md",
-        "src/ui/body_surface_canvas.hpp",
-        "src/ui/body_surface_canvas.cpp"
-      ],
-      "summary": "The bottom rung, always primary: the selected body's hex tile grid, wrapped east-west as a cylinder, the surface where terrain, buildings, lenses, and most vision chrome composite.",
-      "interesting_question": "Since this rung is never shown in the minimap (it is always primary), it has no 'context' view of itself the way Solar/Circumplanetary do — does the player lose their bearings on very large grids (180x84)?",
-      "resolution": "Partially addressed structurally, not by a mini-overview: CANVASES.md notes the minimap always shows the rung one step out (Circumplanetary), so the player's context comes from ascending, not from a same-rung overview; no in-rung minimap-of-the-body exists."
-    },
-    {
-      "id": "UI-014",
-      "name": "Hex tile grid render",
-      "kind": "sub-element",
-      "parent": "UI-013",
-      "source": [
-        "docs/ui/PLANETARY.md § Tile grid",
-        "docs/ui/PLANETARY.md § Cell sizing and coordinate mapping"
-      ],
-      "summary": "Pointy-top odd-r offset hex grid, 9:5-ish width:height ratio, horizontally wrapped so panning past an edge continues seamlessly from the opposite side.",
-      "interesting_question": "The east-west wrap is rendered with no seam marker at all — is 'no marker needed because the wrap is seamless' actually true for a first-time player, or does an invisible wrap read as a bug the first time it happens?",
-      "resolution": "Explicitly deferred, not built: PLANETARY.md's deferred table lists 'Seam visualisation' as post-prototype, reasoning 'the wrap itself is seamless and needs no marker' — an assertion, not a tested finding."
-    },
-    {
-      "id": "UI-015",
-      "name": "Terrain channels (composition hue + landform relief/glyph)",
-      "kind": "sub-element",
-      "parent": "UI-013",
-      "source": [
-        "docs/ui/CANVASES.md § Terrain channels",
-        "docs/ui/PLANETARY.md § Terrain types",
-        "src/ui/hex_render.hpp"
-      ],
-      "summary": "Two always-on chrome channels: composition owns hue, landform owns a subtle relief tint plus stroke-only glyphs for the four dramatic landforms (mountain/canyon/crater/rift), spanning contiguous runs as one marker.",
-      "interesting_question": "Why split landform into a near-invisible relief tint for 95% of tiles versus a loud glyph for under 1.5% of tiles, rather than one uniform treatment?",
-      "resolution": "Measured, not guessed: CANVASES.md cites world_audit § S3 — plains+valley are ~95% of land tiles while dramatic landforms are ≤1.5% each but carry ×1.3+ movement cost, so the design deliberately reserves glyph density for the rare, expensive-to-miss cases."
-    },
-    {
-      "id": "UI-016",
-      "name": "Building markers",
-      "kind": "sub-element",
-      "parent": "UI-013",
-      "source": [
-        "docs/ui/PLANETARY.md § Visual elements",
-        "docs/ui/ICONS.md § Entity markers"
-      ],
-      "summary": "A small vector glyph per building type (ore-chunk/square/triangle/hexagon/circle), fill colour encoding owning corporation, plus a corp emblem tag.",
-      "interesting_question": "The building glyph's fill encodes ownership while its silhouette encodes type — is that overloading one small mark with two independent reads, and does a hashed rival colour risk visually colliding with the player's own colour?",
-      "resolution": "The collision is explicitly ruled out, the overload accepted: ICONS.md states the rival hash is 'kept off slot 0 so a rival never collides with the player's colour' — the two-signal overload itself is treated as settled design, not flagged as a risk."
-    },
-    {
-      "id": "UI-017",
-      "name": "Road network render",
-      "kind": "sub-element",
-      "parent": "UI-013",
-      "source": [
-        "docs/ui/PLANETARY.md § Visual elements (Road network row)"
-      ],
-      "summary": "Always-on continuous, symmetric road spans (BL-172): each roaded tile draws its own half of a shared edge toward each roaded neighbour, tiered Track/Road/Highway by thickness/brightness.",
-      "interesting_question": "Each tile draws only its own half of a shared edge with no from/to concept — what happens visually at the cylinder seam, where 'east' and 'west' neighbours are the wrapped edge?",
-      "resolution": "Explicitly handled: PLANETARY.md states 'Cylinder-seam edges shift one period to stay short,' and roads are 'drawn only toward survey-revealed neighbours, so roads don't leak past the survey fog' — both the wrap and the fog interaction are named, not left implicit."
-    },
-    {
-      "id": "UI-018",
-      "name": "Settlement markers (civic chrome)",
-      "kind": "sub-element",
-      "parent": "UI-013",
-      "source": [
-        "docs/ui/PLANETARY.md § Visual elements (Settlement markers row)",
-        "docs/ui/ICONS.md § settlement glyph"
-      ],
-      "summary": "Always-on, not lens-gated: conurbations clustered from generated population centres draw a tiered skyline glyph at their highest-scale member, named only at City+ (tier ≥ 4).",
-      "interesting_question": "Colour is deliberately civic-neutral except under the Country lens — why keep tier (size) always visible but ownership colour lens-gated rather than always shown?",
-      "resolution": "Settled as a legibility choice: PLANETARY.md states colour applying only under Country is so 'tier stays carried by size, keeping colour out of ownership' — i.e. two orthogonal signals (scale vs. political ownership) are kept on separate channels deliberately."
-    },
-    {
-      "id": "UI-019",
-      "name": "Home-cluster ring + HQ star",
-      "kind": "sub-element",
-      "parent": "UI-013",
-      "source": [
-        "docs/ui/PLANETARY.md § Visual elements",
-        "docs/ui/ICONS.md § hq glyph"
-      ],
-      "summary": "Always-on player-presence chrome on home_body only (BL-085/BL-092): a translucent ring around the player's holdings cluster, an HQ star on the building nearest the centroid.",
-      "interesting_question": "n/a — narrowly-scoped, single-body chrome.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-020",
-      "name": "Corporate borders (reach rings)",
-      "kind": "sub-element",
-      "parent": "UI-013",
-      "source": [
-        "docs/ui/LENSES.md § Corporation lens § Corporate reach (BL-182)",
-        "docs/ui/PLANETARY.md § Layers"
-      ],
-      "summary": "Under the Corporation lens, each rival's HQ-projected reach ring (radius = influence_range · hex_size · zoom, persisted per corp) plus an HQ star, drawn through the same draw_corp_border path as the player's own always-on border.",
-      "interesting_question": "The ring is described explicitly as 'render-only chrome — it gates nothing' — so a rival's visible reach ring implies no mechanical range restriction exists yet. Does that visual promise a rule the game does not enforce?",
-      "resolution": "Named, not resolved: LENSES.md states the full gameplay mechanic (range that gates operations, multi-HQ via advancement) 'stays deferred in docs/development/backlog.json (BL-182)' — the render shipped ahead of the mechanic on purpose."
-    },
-    {
-      "id": "UI-021",
-      "name": "Survey region mask",
-      "kind": "sub-element",
-      "parent": "UI-013",
-      "source": [
-        "docs/ui/PLANETARY.md § Visual elements (Survey region mask row)",
-        "docs/ui/DISCOVERY.md § Geographic fog"
-      ],
-      "summary": "Unrevealed survey regions render as a flat dark locked fill with no lens tint, borders, markers, or hit-testing; regions reveal in deterministic raster order as scanning proceeds.",
-      "interesting_question": "n/a — a clean, deterministic mechanic with a direct visual rule.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-022",
-      "name": "Activity/vision fog layers (permanent pockets, corridors, convoy beam)",
-      "kind": "sub-element",
-      "parent": "UI-013",
-      "source": [
-        "docs/ui/DISCOVERY.md § Illumination (Planetary canvas)"
-      ],
-      "summary": "Three VIEW-only vision layers (never serialised): radius-2 pockets around player buildings, 3-wide corridors from corp centre to catchment markets, and a moving convoy beam that interpolates smoothly between quarterly economy ticks.",
-      "interesting_question": "This intra-body fog reads as 'where your logistics operate,' not 'unmapped terrain' — even on the player's own home planet. Is a fog-of-war metaphor the right read for territory the player already fully owns?",
-      "resolution": "Deliberately reframed, per doc: DISCOVERY.md attributes the semantics to 'Ben's call' — 'commercial reach, not unknown terrain,' explicitly rejecting the literal fog-of-war reading for home territory."
-    },
-    {
-      "id": "UI-023",
-      "name": "Placement-suitability surface",
-      "kind": "sub-element",
-      "parent": "UI-013",
-      "source": [
-        "docs/ui/LENSES.md § Placement-suitability surface (BL-010)"
-      ],
-      "summary": "While a build is armed, every other tile is tinted by how well the armed building type would do there (darkened if invalid, green-tinted if affine) — the map-wide inverse of the per-tile affordance readout.",
-      "interesting_question": "This surface used to fire on bare tile selection and was changed to fire only when a build is armed — why did selection alone feel wrong?",
-      "resolution": "Recorded as a correction from play: LENSES.md states the original trigger 're-tinting the whole map on every inspection click read as a spurious lens change and fought the active lens,' so the trigger was tightened to require an armed build (revised 2026-06-30)."
-    },
-    {
-      "id": "UI-024",
-      "name": "Construction placement ghost",
-      "kind": "sub-element",
-      "parent": "UI-013",
-      "source": [
-        "docs/ui/PLANETARY.md § Layers",
-        "docs/ui/SELECTION.md § The tile element's facts are its affordance readout"
-      ],
-      "summary": "The cursor-following placement preview during an armed build, carrying a 'why not here' reason label sourced from the same placement_rules vocabulary as the Selection panel's readout.",
-      "interesting_question": "n/a — a single-purpose interaction affordance.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-025",
-      "name": "Minimap",
-      "kind": "element",
-      "parent": null,
-      "source": [
-        "docs/ui/MINIMAP.md",
-        "docs/ui/CANVASES.md § Primary / minimap layout"
-      ],
-      "summary": "A fixed bottom-right inset showing the zoom-out neighbour of the primary canvas, framed by a title bar above and a lens mode bar below; the sole control for ascending the zoom ladder.",
-      "interesting_question": "The minimap always shows the rung one step out, never the rung the player might actually want context on two steps out (e.g. viewing Planetary with no way to glance at Solar without two clicks) — is 'one-rung context only' a real limitation?",
-      "resolution": "Open — not addressed by the doc: CANVASES.md/MINIMAP.md state the one-rung-out rule as the settled navigation model with no mention of a deeper jump affordance; the closest workaround is the [ / ] body-cycle keys or the retired Explorer's focus-jump idea."
-    },
-    {
-      "id": "UI-026",
-      "name": "Minimap title bar",
-      "kind": "sub-element",
-      "parent": "UI-025",
-      "source": [
-        "docs/ui/MINIMAP.md § Minimap chrome § Title bar"
-      ],
-      "summary": "Names what the minimap currently shows: star name (Solar shown), planet name (Circumplanetary shown), or the game name (top rung, branding placeholder).",
-      "interesting_question": "n/a — a straightforward derived label.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-027",
-      "name": "Lens mode bar",
-      "kind": "control",
-      "parent": "UI-025",
-      "source": [
-        "docs/ui/MINIMAP.md § Overlay controls (BL-093)",
-        "docs/ui/LENSES.md § Current roster",
-        "src/ui/overlay.hpp"
-      ],
-      "summary": "8-glyph single-select strip (Corp/Country/Resource/Market/Population/Opportunity/Production/Continent) drawn along the minimap's bottom edge, re-clicking the active glyph clears to plain terrain.",
-      "interesting_question": "A stale overlay_mode_count means the keyboard lens-cycle never reaches the Supply-routes lens even though it is fully built — a shipped lens is functionally unreachable except by direct code/script invocation.",
-      "resolution": "Named as an open bug, not yet fixed: LENSES.md's Access note states 'BL-226 (continent lens) inserted continent before supply_routes in the enum without bumping [overlay_mode_count]... One-line code fix owed' (2026-07-31)."
-    },
-    {
-      "id": "UI-028",
-      "name": "Lens legend fold-out",
-      "kind": "sub-element",
-      "parent": "UI-025",
-      "source": [
-        "docs/ui/MINIMAP.md § Lens legend (folds out from the minimap's left edge)"
-      ],
-      "summary": "The on-canvas swatch legend for graded lenses, anchored flush-left of the minimap; hosts the shared resource/good selector for Resource/Market/Scarcity since BL-134.",
-      "interesting_question": "n/a — a positioning/anchoring detail, settled.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-029",
-      "name": "Lens system (overlay_mode family)",
-      "kind": "element",
-      "parent": null,
-      "source": [
-        "docs/ui/LENSES.md",
-        "src/ui/ui_state.hpp",
-        "src/ui/overlay.cpp"
-      ],
-      "summary": "The full set of 13 overlay_mode data layers the player can arm over the Planetary canvas, one active at a time; the lens also decides which entity a click/hover resolves to and which ledger it routes to.",
-      "interesting_question": "The campaign deliberately opens with no lens armed ('a click only updates the Selection element and never re-skins the canvas'), reversing an earlier Corporation-default — why prefer an unskinned canvas at session start over a helpful default?",
-      "resolution": "Recorded as a reversal from playtesting, not a first design: LENSES.md notes this 'reverses BL-013's Corporation-default, 2026-06-30' with no further rationale text quoted beyond the player choosing a lens deliberately."
-    },
-    {
-      "id": "UI-030",
-      "name": "Corporation lens",
-      "kind": "sub-element",
-      "parent": "UI-029",
-      "source": [
-        "docs/ui/LENSES.md § Corporation lens"
-      ],
-      "summary": "Tints tiles by owning corporation (a tile is owned iff a corp holds a building on it); player gets a white border, rivals a hashed identity colour; rival HQ reach rings compose in.",
-      "interesting_question": "There is 'no influence radius and no nation-domination heuristic' — ownership is literally the building tile only. Does that make corporate 'territory' read thinner than the Country lens's contiguous nation fields right beside it on the same strip?",
-      "resolution": "Explicit, current-iteration scope: LENSES.md states 'only the literal building tile counts as owned' in this iteration, with no stated plan to add an influence radius beyond the separate BL-182 reach-ring layer."
-    },
-    {
-      "id": "UI-031",
-      "name": "Country lens",
-      "kind": "sub-element",
-      "parent": "UI-029",
-      "source": [
-        "docs/ui/LENSES.md § Country lens"
-      ],
-      "summary": "Tints tiles by owning nation with hard-stroke borders on ownership-change edges; the political counterpart to the Corporation lens's corporate-holdings read.",
-      "interesting_question": "n/a — a straightforward per-tile ownership read.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-032",
-      "name": "Resource lens",
-      "kind": "sub-element",
-      "parent": "UI-029",
-      "source": [
-        "docs/ui/LENSES.md § Resource lens"
-      ],
-      "summary": "Flat, uniform-opacity fill over the whole contiguous deposit of a single player-chosen resource — shape, not magnitude, is what the lens shows.",
-      "interesting_question": "Why deliberately drop the earlier 'highest-value' multi-resource mode in favour of always-single-resource, uniform-opacity fill?",
-      "resolution": "Settled by BL-019: LENSES.md states the lens is 'always single-resource... Intensity lives in tile detail, not the lens,' making magnitude a Selection/hover-card concern rather than a lens concern — a deliberate separation of 'where' from 'how much'."
-    },
-    {
-      "id": "UI-033",
-      "name": "Market lens",
-      "kind": "sub-element",
-      "parent": "UI-029",
-      "source": [
-        "docs/ui/LENSES.md § Market lens"
-      ],
-      "summary": "A body-wide catchment tint per market (superseding an earlier price wash), diverging warm/cool keyed to price relative to each good's own floor price; per-catchment tinting is owed until multiple market centres are generated per body.",
-      "interesting_question": "Today's world seeds one market per body, so the catchment tint reads as one flat colour across the whole body — is a per-catchment lens meaningfully different from a whole-body scalar right now?",
-      "resolution": "Named honestly as a current limitation: MARKETS.md-adjacent LENSES.md text says the surface 'regains a spatial per-market surface' only once generation seeds genuinely multiple centres, which is still owed."
-    },
-    {
-      "id": "UI-034",
-      "name": "Population lens",
-      "kind": "sub-element",
-      "parent": "UI-029",
-      "source": [
-        "docs/ui/LENSES.md § Population lens"
-      ],
-      "summary": "Per-tile red→green value marks (BL-135) reading workforce_efficiency(habitability), not raw habitability — shows the labour consequence including the 0.6 full-efficiency cliff.",
-      "interesting_question": "Why re-key from raw habitability to workforce_efficiency rather than showing the underlying terrain quantity directly?",
-      "resolution": "Explicit re-key rationale, BL-069: LENSES.md states the swap keeps 'the Population lens, the Selection panel, and the hover card... surface the *same* habitability→labour feedback the economy applies,' i.e. the lens must show what the sim actually consumes, not a raw input the sim then transforms."
-    },
-    {
-      "id": "UI-035",
-      "name": "Opportunity lens",
-      "kind": "sub-element",
-      "parent": "UI-029",
-      "source": [
-        "docs/ui/LENSES.md § Opportunity lens"
-      ],
-      "summary": "Per-tile red→green value marks keyed to a body-relative demand-gap rank (BL-136) — the biggest tradeable price/base ratio in the tile's catchment market, superseding an earlier per-tile net-margin siting estimate.",
-      "interesting_question": "The margin formula is flagged as 'a first-cut estimate (single workforce, no contention)' — does that make Opportunity's siting advice actively misleading once multiple buildings compete for the same catchment's workforce?",
-      "resolution": "Open, named as an owed follow-on: LENSES.md's Interaction notes state 'refine when the build-cost amortisation model lands' with no interim mitigation."
-    },
-    {
-      "id": "UI-036",
-      "name": "Production lens",
-      "kind": "sub-element",
-      "parent": "UI-029",
-      "source": [
-        "docs/ui/LENSES.md § Production lens"
-      ],
-      "summary": "Diverging warm/cool tint of each producing tile's output value relative to the body's own producing-tile geometric mean — realised output, the complement to Opportunity's potential.",
-      "interesting_question": "The colour is relative to the body's own mean, so a body of uniformly similar producers reads near-neutral even if its absolute output is high or low compared to other bodies — is that honest or is it hiding real information?",
-      "resolution": "Framed as intentional honesty, not a gap: LENSES.md states this directly — 'a body of similar producers reads near-neutral (honest — there is little intensity spread to show)' — the lens is defined as a within-body contrast tool, not a cross-body one."
-    },
-    {
-      "id": "UI-037",
-      "name": "Continent lens",
-      "kind": "sub-element",
-      "parent": "UI-029",
-      "source": [
-        "docs/ui/LENSES.md § Continent lens"
-      ],
-      "summary": "Categorical per-plate tint (from the Continents/Drift generation pass) with a white boundary lift, showing where the tectonic plates that shaped the terrain actually meet.",
-      "interesting_question": "The plate that raised a given tile is stated as 'unreadable from the finished terrain' after generation — so this lens is the only way to see causality that generation itself destroys. Was flood-filling contiguous landmasses at render time considered instead of retaining plate_id?",
-      "resolution": "Considered and rejected, with reasoning given: LENSES.md states flood-fill 'yields landmasses, not plates, so it can colour the continents but cannot explain them' — the generation report retains continent_state::plate_id specifically to preserve the causal read."
-    },
-    {
-      "id": "UI-038",
-      "name": "Scarcity lens",
-      "kind": "sub-element",
-      "parent": "UI-029",
-      "source": [
-        "docs/ui/LENSES.md § Scarcity lens"
-      ],
-      "summary": "Chunky per-market blocks (not per-tile) tinted by market supply shortfall for a chosen good — the inverse read of Resource: absence rather than concentration. Keyboard-cycle only, off the bar since BL-093.",
-      "interesting_question": "With one market per body today, the whole body reads as a single solid block regardless of tile — does a market-level field lens read as broken (or pointless) to a player who expects per-tile variation like Resource shows?",
-      "resolution": "Named honestly as a scope-of-the-day limit: LENSES.md states it 'gains spatial variation once multiple centres are seeded' — the single-block read is acknowledged as the correct current behaviour, not a bug."
-    },
-    {
-      "id": "UI-039",
-      "name": "Industry lens",
-      "kind": "sub-element",
-      "parent": "UI-029",
-      "source": [
-        "docs/ui/LENSES.md § Industry lens"
-      ],
-      "summary": "Sequential dark→amber tint of substrate_density weighted by terrain deposit richness — the nation-owned background economy's throughput field, deliberately decoupled from the Population lens's ripple pattern.",
-      "interesting_question": "Rendering raw substrate_density would read visually collinear with the Population lens (both ripple from population centres) — how was that collision avoided without changing the underlying substrate model?",
-      "resolution": "Solved by a pure-rendering reweighting: LENSES.md states the lens instead 'renders a throughput field: each tile's substrate_density weighted by its terrain deposit richness... Pure rendering: no change to substrate_density or the market arithmetic' — decoupling achieved entirely at the render layer."
-    },
-    {
-      "id": "UI-040",
-      "name": "Supply lens",
-      "kind": "sub-element",
-      "parent": "UI-029",
-      "source": [
-        "docs/ui/LENSES.md § Supply lens"
-      ],
-      "summary": "The one lens with representation on every rung: Solar per-convoy lines, Circumplanetary per-body badge, Planetary per-tile convoy glyph — logistics flow, not ownership.",
-      "interesting_question": "A throughput scale-key (line weight → goods/tick) is stated as 'part of the build when routes render' but the roster still calls it 'remains owed' — is the legend actually missing, or just deferred documentation?",
-      "resolution": "Open — the doc itself is inconsistent: the landed note says routes render today, but the throughput scale-key line is separately flagged 'remains owed,' with no code citation resolving which is true as of 2026-07-31."
-    },
-    {
-      "id": "UI-041",
-      "name": "Reach lens",
-      "kind": "sub-element",
-      "parent": "UI-029",
-      "source": [
-        "docs/ui/LENSES.md § Reach lens"
-      ],
-      "summary": "A connection-list key on the Planetary rung (body name + recency dot) reading the active body's own trade-route endpoints; the design-called-for Solar body-marker glow is owed. Keyboard-cycle only, off the bar.",
-      "interesting_question": "The lens is fundamentally about a body-level relationship (this body ↔ that body), yet its only built surface is Planetary, which can only ever show the active body's own grid — is a connection-list the right substitute for a spatial 'glow the connected bodies' read?",
-      "resolution": "Named as a stand-in, not a final answer: LENSES.md states the connection-list key 'lands here' specifically because the Planetary canvas 'only ever shows the active body's grid,' with the intended Solar-canvas glow still owed."
-    },
-    {
-      "id": "UI-042",
-      "name": "Supply-routes lens",
-      "kind": "sub-element",
-      "parent": "UI-029",
-      "source": [
-        "docs/ui/LENSES.md § Supply-routes lens"
-      ],
-      "summary": "Aggregated lane graph — one edge per body-pair, log-scaled thickness from convoy_count, recency-tier colour — the standing-lane counterpart to Supply's in-flight convoys.",
-      "interesting_question": "This is the one fully-built lens the player currently cannot reach at all — no bar glyph and the keyboard cycle skips it.",
-      "resolution": "Confirmed broken access, cited above (UI-027's finding): LENSES.md's roster explicitly flags 'Currently unreachable by the keyboard cycle — the stale overlay_mode_count.'"
-    },
-    {
-      "id": "UI-043",
-      "name": "Selection band",
-      "kind": "element",
-      "parent": null,
-      "source": [
-        "docs/ui/SELECTION.md",
-        "docs/ui/LAYOUT.md § Selection band",
-        "src/ui/selection_card.hpp",
-        "src/ui/selection_panel.cpp"
-      ],
-      "summary": "A fixed bottom band showing detail of whatever entity the player last single-clicked — an action surface ('what's my move here?'), not a reference ledger; not reachable from the nav rail.",
-      "interesting_question": "This element went through three distinct shapes (full-width bar → shell-column sidebar → click-anchored sticky card → fixed bottom band) — what forced each rewrite, and is the current shape actually final?",
-      "resolution": "Traced by the doc itself, each step motivated: LAYOUT.md/SELECTION.md record the BL-124 sidebar closed ledgers on selection (rejected as competing for the column), BL-194/195's click-anchored card was retired by Ben's 2026-07-28 call that 'doing/building' menus need a fixed screen location rather than a cursor-following widget — the current fixed band is presented as settled, not provisional."
-    },
-    {
-      "id": "UI-044",
-      "name": "Active/Focus/Selection pointer-state model",
-      "kind": "sub-element",
-      "parent": "UI-043",
-      "source": [
-        "docs/ui/SELECTION.md § The three interaction states"
-      ],
-      "summary": "Three named, independent pointer states — Active (navigation anchor), Focus (hover), Selection (last click) — each with its own lifetime and backing state, previously conflated.",
-      "interesting_question": "Selection is explicitly independent of Active — selecting a body does not move or re-anchor the canvas. Does that decoupling risk the player forgetting which body is actually 'active' (framing the lower rungs) after several selections elsewhere?",
-      "resolution": "Open — not addressed by the doc: SELECTION.md states the decoupling as a 'key consequence' of the design with no compensating always-visible 'currently active body' readout named in the doc beyond the minimap title/canvas title bar."
-    },
-    {
-      "id": "UI-045",
-      "name": "Tile selection layout",
-      "kind": "sub-element",
-      "parent": "UI-043",
-      "source": [
-        "docs/ui/SELECTION.md § The tile element's layout (BL-123, reshaped BL-213)"
-      ],
-      "summary": "A dedicated three-column layout for a selected tile (zoomed hex neighbourhood | paged metric accordion | 2x3 action grid), superseding the generic action/facts split used by every other selection kind.",
-      "interesting_question": "Atmospheric pollution and per-tile population have no accordion page at all — is that an intentional scope boundary or a gap the doc itself flags?",
-      "resolution": "Named as a real content gap: SELECTION.md states these are 'not modelled today (population lives on population centres, not arbitrary tiles) and so have no page — a real content gap, not an oversight.'"
-    },
-    {
-      "id": "UI-046",
-      "name": "Body selection action/facts",
-      "kind": "sub-element",
-      "parent": "UI-043",
-      "source": [
-        "docs/ui/SELECTION.md § The body element's action is the survey front door",
-        "docs/ui/SELECTION.md § The body element's fact is its commercial activity pulse"
-      ],
-      "summary": "A body's hero action switches on survey phase (Dispatch Survey → En route → Surveying k/N → Go to surface); its fact column shows the activity-fog commercial pulse, independent of survey state.",
-      "interesting_question": "n/a — the two fogs' independence is fully documented here already (see DISCOVERY.md entries above).",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-047",
-      "name": "Building selection action/facts",
-      "kind": "sub-element",
-      "parent": "UI-043",
-      "source": [
-        "docs/ui/SELECTION.md § The building element's fact is a profitability readout (BL-074)"
-      ],
-      "summary": "A player building's hero action opens the Construction panel's management surface; its fact column shows a four-line profitability estimate (Revenue/Inputs/Wages/Maintenance/Net); a rival building shows owner-only, production/stockpile explicitly marked private.",
-      "interesting_question": "The doc itself asks whether Manage's controls should migrate fully into this Selection element instead of routing to the Construction panel, given both currently read/write the same selected entity in the same shared column.",
-      "resolution": "Open — flagged verbatim in the ledger design Q&A: docs/ui/ledgers/construction.md § Open questions asks 'Should selecting a building auto-open Construction/Manage instead of the Selection card, or should Manage's controls migrate into the Selection element' with no resolution recorded."
-    },
-    {
-      "id": "UI-048",
-      "name": "Tile construction ledger (build-here fold-out)",
-      "kind": "sub-element",
-      "parent": "UI-045",
-      "source": [
-        "docs/ui/SELECTION.md § The tile element's layout (BL-162 blockquote)"
-      ],
-      "summary": "Opened by the tile band's 'Construct Buildings' action: a fold-out list of every buildable type for the selected tile with cost, a reason-coded validity read, and an actual Build button.",
-      "interesting_question": "The doc calls today's building images explicit placeholders and names an owed expected-profit chart per candidate — is a player choosing between building types today choosing blind on economics?",
-      "resolution": "Explicit gap, named: SELECTION.md states 'First pass — a follow-on adds the per-candidate expected-profit chart BL-162 calls for; today's images are placeholders' — economics per candidate are not yet surfaced at the point of choice."
-    },
-    {
-      "id": "UI-049",
-      "name": "Hover Card",
-      "kind": "element",
-      "parent": null,
-      "source": [
-        "docs/ui/TOOLTIP.md",
-        "src/ui/hover_card.hpp",
-        "src/ui/hover_card.cpp"
-      ],
-      "summary": "The transient Focus-state popup: a two-phase 'glance, then stick' reveal (appears after 0.5s, freezes in place after 2.5s) showing a compact lens-keyed readout of whatever is under the cursor on the Planetary surface.",
-      "interesting_question": "Solar and Circumplanetary bodies still use an ad-hoc SetTooltip instead of this shared card — does that mean hover depth/consistency differs by which canvas the player is looking at?",
-      "resolution": "Named as owed, not done: TOOLTIP.md's 'Current state' section states migrating Solar/Circumplanetary onto the card 'is owed, not landed' — the inconsistency is real and acknowledged, not accidental."
-    },
-    {
-      "id": "UI-050",
-      "name": "Hover content dispatch (lens-keyed)",
-      "kind": "sub-element",
-      "parent": "UI-049",
-      "source": [
-        "docs/ui/TOOLTIP.md § The content — draw_hover_content (lens-keyed)"
-      ],
-      "summary": "Resolves the hovered entity kind, then varies the card's content by the active lens (e.g. a tile under Resource shows deposit richness; under Population shows workforce cap; default shows terrain + movement cost).",
-      "interesting_question": "Depth is keyed on the active lens rather than a per-caller 'rich vs lightweight' hint, which the original pre-implementation design proposed instead — why was lens-keying chosen over a fixed depth-per-kind model?",
-      "resolution": "Explicitly the landed departure from the original design: TOOLTIP.md's Superseded section states depth is 'keyed on the lens rather than a caller hint' because the card 'answers the question the lens is asking' — content should match what the player is currently investigating, not just what kind of thing they're pointing at."
-    },
-    {
-      "id": "UI-051",
-      "name": "Header Panel",
-      "kind": "panel",
-      "parent": null,
-      "source": [
-        "docs/ui/HEADER.md",
-        "src/ui/header_panel.hpp",
-        "src/ui/header_panel.cpp"
-      ],
-      "summary": "Always-visible full-width strip between the identity tile and time column: balance, stockpile valuation, net+trend, runway, and a debt flag — the persistent financial dashboard.",
-      "interesting_question": "The header is a 'guaranteed-fit strip' that never wraps and never silently clips a load-bearing number, degrading in a fixed order instead — why treat this one surface as the reference case for a wider text-wrap audit rather than just wrapping like other panels?",
-      "resolution": "Explicit precedent-setting intent: HEADER.md states 'This ladder is the reference case for BL-215 (text-wrap render audit)... the audit's job is to make every other worded surface degrade this honestly rather than wrap or clip' — the header's ladder is meant to generalise, not stay a one-off."
-    },
-    {
-      "id": "UI-052",
-      "name": "Balance figure",
-      "kind": "sub-element",
-      "parent": "UI-051",
-      "source": [
-        "docs/ui/HEADER.md § Contents"
-      ],
-      "summary": "The player corporation's running treasury balance, negatives flagged red.",
-      "interesting_question": "n/a — a direct read of corporation_component.balance.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-053",
-      "name": "Stockpile valuation figure",
-      "kind": "sub-element",
-      "parent": "UI-051",
-      "source": [
-        "docs/ui/HEADER.md § Contents"
-      ],
-      "summary": "A single estimated liquid-value figure summing every player (corp, body) pool priced at that body's current market price; deliberately not a per-resource inventory.",
-      "interesting_question": "Resources on a body with no market contribute nothing to this figure — does that mean holdings on a market-less body are invisible to the header's headline valuation?",
-      "resolution": "Named plainly, not hidden: HEADER.md states this consequence directly ('Resources on a body with no market contribute nothing') as a stated property of the design, not flagged as a bug."
-    },
-    {
-      "id": "UI-054",
-      "name": "Net + trend sparkline",
-      "kind": "sub-element",
-      "parent": "UI-051",
-      "source": [
-        "docs/ui/HEADER.md § Contents",
-        "docs/ui/HEADER.md § Resolved design questions"
-      ],
-      "summary": "The last economy tick's signed net change, coloured, plus a sparkline of recent balances (ImGui::PlotLines over a capped history).",
-      "interesting_question": "n/a — a settled design choice (per-tick delta + sparkline over a raw balance figure alone).",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-055",
-      "name": "Runway readout",
-      "kind": "sub-element",
-      "parent": "UI-051",
-      "source": [
-        "docs/ui/HEADER.md § Contents (Runway row)"
-      ],
-      "summary": "Balance ÷ quarterly loss, shown only while it means something (burning cash or already in debt); urgency-coloured red under 8 quarters or when in debt.",
-      "interesting_question": "The doc calls this figure 'load-bearing, not decorative' and states it degrades through the fit ladder but 'the fact is never simply lost' — folded into the Net tooltip as the last resort. Does a tooltip-only fallback still count as the fact staying visible?",
-      "resolution": "The doc's own stance: HEADER.md treats a hover-reachable fact as sufficient to satisfy 'never simply lost' — the degradation ladder's floor is 'folded into the NET figure's tooltip,' explicitly accepted as the worst acceptable case."
-    },
-    {
-      "id": "UI-056",
-      "name": "Debt flag",
-      "kind": "sub-element",
-      "parent": "UI-051",
-      "source": [
-        "docs/ui/HEADER.md § Contents ([in debt] flag row)"
-      ],
-      "summary": "A worded flag beside a negative balance noting interest is self-accelerating; compacts from full text to '[in debt]' + tooltip under width pressure.",
-      "interesting_question": "n/a — a straightforward degradation-ladder element.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-057",
-      "name": "Profile (identity tile)",
-      "kind": "panel",
-      "parent": null,
-      "source": [
-        "docs/ui/PROFILE.md",
-        "docs/ui/LAYOUT.md § Profile",
-        "src/ui/profile_panel.cpp"
-      ],
-      "summary": "The top-left corp-identity card capping the shell column: emblem, corp name, home nation, industrial focus — a static identity readout in the prototype.",
-      "interesting_question": "The card is a static readout with no interaction beyond a hinted future 'fuller corporation screen' — is a permanently-pinned, purely-decorative panel the right use of the shell's most valuable fixed real estate (top-left)?",
-      "resolution": "Open — the doc itself only gestures at a future use: PROFILE.md states 'Later it may become the entry point to a fuller corporation screen (holdings summary, standing, history)' with no committed design or backlog id cited."
-    },
-    {
-      "id": "UI-058",
-      "name": "Corp emblem",
-      "kind": "sub-element",
-      "parent": "UI-057",
-      "source": [
-        "docs/ui/PROFILE.md § Contents",
-        "docs/ui/ICONS.md § Corp emblem"
-      ],
-      "summary": "A deterministic geometric shape (one of six primitives) + the corp's identity colour, shared across the identity card, Selection header, canvas building tags, and rival hover cards since BL-090.",
-      "interesting_question": "n/a — a clean, already-unified identity token across surfaces.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-059",
-      "name": "Navigation pane (nav rail)",
-      "kind": "panel",
-      "parent": null,
-      "source": [
-        "docs/ui/MENU.md",
-        "docs/ui/LAYOUT.md § Navigation pane",
-        "src/ui/nav_pane.cpp"
-      ],
-      "summary": "A fixed 56px-wide, full-height icon rail of nine square slots (five live, four reserved-dimmed), each toggling a fold-out ledger open/closed, accordion-style.",
-      "interesting_question": "The doc states a standalone buildings-overview ledger was dropped as a rail slot because it 'proved more good-to-know than goal-driving' — what is the actual test the doc applies to decide any future slot?",
-      "resolution": "Stated as an explicit test: MENU.md § Menus are broad ledgers gives it directly — 'is this a broad overview, or a targeted action? Broad → a ledger with a slot. Targeted → the Selection element / a popup, no slot.'"
-    },
-    {
-      "id": "UI-060",
-      "name": "Fold-out ledger column",
-      "kind": "element",
-      "parent": null,
-      "source": [
-        "docs/ui/LAYOUT.md § The shell column (BL-122)",
-        "docs/ui/LAYOUT.md § Container vocabulary",
-        "src/ui/foldout_column.hpp"
-      ],
-      "summary": "The shared chrome every rail-hosted ledger draws through (foldout_begin/foldout_end): one fixed-width rect, one border policy, stopping at the comms dock's top edge since BL-227.",
-      "interesting_question": "BL-227 (comms dock) made every ledger in this column permanently shorter by the bottom strip's height — was that height tax weighed against ledger content density, or purely a placement call?",
-      "resolution": "Named as Ben's deliberate call, not a byproduct: LAYOUT.md's Comms dock section states 'every menu and ledger in the fold-out column is permanently shorter by exactly the Selection band's height. Deliberate (Ben's call, 2026-07-30), not a regression' — with no accompanying content-density analysis cited."
-    },
-    {
-      "id": "UI-061",
-      "name": "System menu (session-control popup)",
-      "kind": "control",
-      "parent": null,
-      "source": [
-        "docs/ui/MENU.md § Application / system menu — session control (BL-070)"
-      ],
-      "summary": "A top-right corner-gear popup: Pause/Resume and Exit (with an inline 'Really quit?' confirm, since there is no save); Esc toggles it, sharing the pause hotkey's flag.",
-      "interesting_question": "Exit is destructive with no save path in the prototype, so the inline confirm is the only guard against an accidental quit — is a single inline confirm proportionate for a truly unrecoverable action?",
-      "resolution": "Accepted as the prototype minimum, not a final answer: MENU.md frames this as 'Option B... rejected [a centred pause-modal] for the prototype minimum — the centred modal is the right long-term home once a title screen lands,' i.e. the current guard is explicitly interim."
-    },
-    {
-      "id": "UI-062",
-      "name": "Options window (display settings)",
-      "kind": "control",
-      "parent": null,
-      "source": [
-        "docs/ui/MENU.md § Application / system menu — display options (BL-076)"
-      ],
-      "summary": "F10-toggled floating window: resolution preset, Fullscreen, VSync, live window-size readout; persisted to a flat options.cfg loaded only at interactive startup (never in --verify).",
-      "interesting_question": "Settings are deliberately never loaded in the --verify path so goldens stay at a fixed default — does that mean a player-set custom resolution can never be exercised by the visual-verification harness?",
-      "resolution": "Confirmed as intentional isolation: MENU.md states the cfg is 'loaded at interactive startup only (never in the --verify path, so golden captures stay at the fixed default)' — the harness's determinism is prioritised over reproducing arbitrary player display state."
-    },
-    {
-      "id": "UI-063",
-      "name": "Icon vocabulary",
-      "kind": "element",
-      "parent": null,
-      "source": [
-        "docs/ui/ICONS.md",
-        "src/ui/icons.hpp",
-        "src/ui/icons.cpp"
-      ],
-      "summary": "The hand-drawn vector glyph library (no font/atlas) used for every entity marker, UI-affordance icon, and map-lens button, sharing one positional-parameter convention across ~35 glyphs.",
-      "interesting_question": "The `resource` glyph function is genuinely overloaded — one overload draws the identity-coloured deposit pip, another (differently-typed) overload draws the Resource lens's strip glyph — is sharing a name across two visually and semantically different shapes a maintenance risk?",
-      "resolution": "Accepted, disambiguated by call-site type: ICONS.md states the two are 'same name, disambiguated by the final argument type and by context (strip vs. canvas pip)' — treated as settled, not flagged as a naming hazard to fix."
-    },
-    {
-      "id": "UI-064",
-      "name": "Comms dock",
-      "kind": "panel",
-      "parent": null,
-      "source": [
-        "docs/ui/CHAT.md",
-        "docs/ui/LAYOUT.md § Comms dock",
-        "src/ui/chat_panel.hpp",
-        "src/ui/chat_panel.cpp"
-      ],
-      "summary": "The bottom-left tile of the screen's bottom strip: a channel-based chat log (Public + player-created groups) fed by deterministic sim events and player input, the surface of the diplomacy-as-communication principle.",
-      "interesting_question": "Player messages typed into this panel currently have 'no mechanical effect yet — the AI C-route hook' — so what does a player actually gain by typing here today, versus just watching the ambient nation-voiced lines?",
-      "resolution": "Named openly as pre-wired scaffolding: CHAT.md's message-sources table marks player input as 'No mechanical effect yet — the AI C-route hook,' i.e. the surface is built ahead of the AI system (BL-202+) that will make it consequential."
-    },
-    {
-      "id": "UI-065",
-      "name": "Public channel",
-      "kind": "sub-element",
-      "parent": "UI-064",
-      "source": [
-        "docs/ui/CHAT.md § Channels"
-      ],
-      "summary": "Channel 0, always present; since BL-212 the only speakers are nations, never individual corporations, each posting at most one aggregated event per (nation, tick).",
-      "interesting_question": "Why aggregate to one heaviest event per (nation, tick) and post it in first person with no building/corp specifics, rather than the earlier per-corp/per-building reflex lines?",
-      "resolution": "Explicitly a correctness fix, not a style choice: CHAT.md states the old per-corp lines 'were a standing violation of DISCOVERY.md's competitor-visibility rule (they leaked rival internals)' — the aggregation exists specifically to stop leaking private rival state through chat."
-    },
-    {
-      "id": "UI-066",
-      "name": "Group channels",
-      "kind": "sub-element",
-      "parent": "UI-064",
-      "source": [
-        "docs/ui/CHAT.md § Channels"
-      ],
-      "summary": "Arbitrary player-created channels over any corp subset (name + member checkboxes), session-local in the shipped slice; AI-created groups unreadable by the player are a named future extension.",
-      "interesting_question": "n/a — a straightforward, already-scoped feature slice.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-067",
-      "name": "Time panel",
-      "kind": "panel",
-      "parent": null,
-      "source": [
-        "docs/ui/TIME_CONTROLS.md",
-        "docs/ui/LAYOUT.md § Time panel",
-        "src/core/app.cpp"
-      ],
-      "summary": "Top-right, minimap-width panel: four stacked rows (year/date, quarter-progress bar with countdown overlay, speed row, rate line), the player's clock and speed control.",
-      "interesting_question": "BL-178 reversed an earlier rule that suppressed the percentage overlay text on the quarter-progress bar — what did the bare fill actually fail to communicate?",
-      "resolution": "Stated directly: TIME_CONTROLS.md says 'the bare fill failed to convey how close am I to the economy resolving, which is the fact the bar exists to carry' — the reversal was a legibility fix once the missing information was identified in play."
-    },
-    {
-      "id": "UI-068",
-      "name": "Calendar block",
-      "kind": "sub-element",
-      "parent": "UI-067",
-      "source": [
-        "docs/ui/TIME_CONTROLS.md § Layout — four stacked rows"
-      ],
-      "summary": "Year+date/quarter row and the quarter-progress bar with a centred 'N d to Q2' countdown overlay and an explaining tooltip.",
-      "interesting_question": "n/a — settled, documented layout.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-069",
-      "name": "Speed controls",
-      "kind": "sub-element",
-      "parent": "UI-067",
-      "source": [
-        "docs/ui/TIME_CONTROLS.md § Layout",
-        "docs/ui/TIME_CONTROLS.md § Speed curve"
-      ],
-      "summary": "A pause slot plus five non-linear speed tiers (0.25x/0.5x/1x/4x/16x, tier 3 the normal-play reference) and an always-visible rate line naming the active tier's real-world pacing.",
-      "interesting_question": "Why deliberately non-linear (two slow-motion tiers, then a 4x jump to fast-forward) rather than a simple linear ramp?",
-      "resolution": "Stated by role, not derived: TIME_CONTROLS.md frames tiers 1-2 as 'genuine slow-motion (for watching detail)' and 4-5 as 'fast-forward aggressively (for skipping quiet quarters to the next economy tick)' — the curve serves two distinct player intents, not a single continuous speed dial."
-    },
-    {
-      "id": "UI-070",
-      "name": "Balance Ledger",
-      "kind": "ledger",
-      "parent": null,
-      "source": [
-        "docs/ui/ledgers/balance.md",
-        "docs/ui/MENU.md (slot 2 'Budget')",
-        "src/ui/balance_ledger.cpp"
-      ],
-      "summary": "Rail slot 2 ('Budget'): the player corporation's solvency surface — running balance, runway, and per-tick cashflow decomposition. Currently one flat scrolling panel, not yet split into nav_button tabs.",
-      "interesting_question": "This ledger's own design doc names a direct overlap with the Economy panel's Cashflow view (same cashflow.csv, same six lines, same player corp) — which surface should actually own the player's cashflow table?",
-      "resolution": "Open, flagged for cross-doc resolution but not settled: balance.md states 'Balance owns per-corp money detail... Economy's Cashflow view is the player-slice of that and should either defer to this table or be dropped from Economy' — the Economy doc (UI-089/090) independently reaches the same conclusion but neither doc records Ben's final ruling."
-    },
-    {
-      "id": "UI-071",
-      "name": "Treasury view",
-      "kind": "view",
-      "parent": "UI-070",
-      "source": [
-        "docs/ui/ledgers/balance.md § Sub-levels"
-      ],
-      "summary": "Default view: balance (colour-coded), debt flag, projected runway, starting capital + since-start delta.",
-      "interesting_question": "n/a — see parent entry for the ledger-level open question.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-072",
-      "name": "Cashflow view",
-      "kind": "view",
-      "parent": "UI-070",
-      "source": [
-        "docs/ui/ledgers/balance.md § Sub-levels",
-        "docs/ui/ledgers/balance.md § Data"
-      ],
-      "summary": "The signed per-tick flow table: Income, Inputs bought, Maintenance, Wages, Interest (hidden at 0), Net/tick.",
-      "interesting_question": "Interest is hidden entirely at 0 and only appears once a corp goes into debt — does that mean the table's row count silently changes shape across the solvency boundary?",
-      "resolution": "Flagged, not fixed: balance.md's Data section states this outright — 'the flow_row hides it at 0, so the Cashflow table silently gains/loses a row across the solvency boundary. Correct behaviour, worth noting for the mockup so the row-count isn't treated as fixed.'"
-    },
-    {
-      "id": "UI-073",
-      "name": "Assets view",
-      "kind": "view",
-      "parent": "UI-070",
-      "source": [
-        "docs/ui/ledgers/balance.md § Sub-levels",
-        "docs/ui/ledgers/balance.md § Open questions"
-      ],
-      "summary": "Today a bare building count (cc.assets.size()); a proposed by-type/by-body roll-up is an open question, weighed against duplicating the Corporation dashboard's asset view.",
-      "interesting_question": "n/a — see UI-070; this view's scope is itself one of the doc's open questions for Ben.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-074",
-      "name": "Construction Ledger",
-      "kind": "ledger",
-      "parent": null,
-      "source": [
-        "docs/ui/ledgers/construction.md",
-        "docs/ui/MENU.md (slot 6)",
-        "src/ui/construction_panel.cpp"
-      ],
-      "summary": "Rail slot 6: the placement/management/sales surface for buildings, split into Build / Manage / Sell Orders tabs — three genuinely different verbs (place / configure / sell).",
-      "interesting_question": "The doc's own code-level flag calls Sell Orders 'a candidate to move to the Market ledger' — does selling belong with building construction at all, or is it there only because it was built before the Market ledger existed?",
-      "resolution": "Open — an unresolved Q&A item: construction.md asks directly 'Does Sell Orders belong here at all?... Keep it in Construction (place → sell as one workflow) or move it out so Construction is purely build+manage?' with no ruling recorded."
-    },
-    {
-      "id": "UI-075",
-      "name": "Build view",
-      "kind": "view",
-      "parent": "UI-074",
-      "source": [
-        "docs/ui/ledgers/construction.md § Sub-levels"
-      ],
-      "summary": "Arm-buttons for Extraction Site / Processing Facility / Port, a target-resource picker for extraction, live cost readout, plus a Queue subsection.",
-      "interesting_question": "The Queue subsection is described as placeholder-only with no backing construction_queue, progress percentage, or ticks-left data at all — what does a player actually see when they check on a build in progress?",
-      "resolution": "Named plainly as unbuilt: construction.md states 'draw_queue_section always shows No active construction... Any queue table in the mock is owed data, not live. This is the single biggest gap' — there is no in-progress readout today."
-    },
-    {
-      "id": "UI-076",
-      "name": "Manage view",
-      "kind": "view",
-      "parent": "UI-074",
-      "source": [
-        "docs/ui/ledgers/construction.md § Sub-levels",
-        "docs/ui/SELECTION.md (Manage ▸ action)"
-      ],
-      "summary": "Resolves the selected building (by id, falling back to tile match) and exposes a live workforce slider, recipe combo, and Decommission button — the surface the Selection panel's 'Manage ▸' action routes to.",
-      "interesting_question": "See UI-047 — this is the other half of the same unresolved Manage-vs-Selection column-ownership question.",
-      "resolution": "See UI-047's resolution citation (docs/ui/ledgers/construction.md § Open questions, same finding)."
-    },
-    {
-      "id": "UI-077",
-      "name": "Sell Orders view",
-      "kind": "view",
-      "parent": "UI-074",
-      "source": [
-        "docs/ui/ledgers/construction.md § Sub-levels"
-      ],
-      "summary": "Per-body sell-order list for the player corp (resource x qty >= floor); add/remove, reading the body's market_component.",
-      "interesting_question": "n/a — see UI-074's parent-level open question about whether this view belongs here at all.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-078",
-      "name": "Corporation Ledger",
-      "kind": "ledger",
-      "parent": null,
-      "source": [
-        "docs/ui/ledgers/corporation.md",
-        "docs/ui/MENU.md (slot 1 'Corporation overview')",
-        "src/ui/corporation_panel.cpp"
-      ],
-      "summary": "Rail slot 1: a sorted, one-row-per-corp Standings table (name/focus/balance, player row tinted) — the field-of-rivals ranking, distinct from any single corp's own money detail.",
-      "interesting_question": "The doc explicitly proposes dropping the second (Profiles) view entirely in favour of a single table plus row-click-to-Selection drill-down — why keep two views if the Selection element already exists as the per-entity detail surface?",
-      "resolution": "Open, the doc's author states a lean but no ruling: corporation.md says 'If Ben prefers to keep Corporation genuinely single-question: drop Profiles and let a row-click route full detail to the Selection panel... This is the leaner option and I lean toward it' — flagged under Open questions, unresolved."
-    },
-    {
-      "id": "UI-079",
-      "name": "Standings table",
-      "kind": "view",
-      "parent": "UI-078",
-      "source": [
-        "docs/ui/ledgers/corporation.md § Sub-levels"
-      ],
-      "summary": "Corporation | Focus | Balance, sorted by entity id, player row tinted, balance coloured red/green — the default and (per the doc's lean) possibly the only view this ledger needs.",
-      "interesting_question": "n/a — see UI-078 for the parent open question.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-080",
-      "name": "Market Ledger",
-      "kind": "ledger",
-      "parent": null,
-      "source": [
-        "docs/ui/ledgers/market.md",
-        "docs/ui/MENU.md (slot 5)",
-        "src/ui/market_ledger.cpp"
-      ],
-      "summary": "Rail slot 5: per-market supply/demand/price/net board (Prices), a per-body multi-market turnover comparison (Markets), and price/supply/demand sparklines (Trends).",
-      "interesting_question": "The mock CSV exporter emits one row per market_component with no market_id/region column, so a body with 5 markets (Kepler) produces a 5x-inflated join in the Power BI mock — does that gap only affect the design mockup, or could the same ambiguity affect any future per-market export?",
-      "resolution": "Named narrowly as an export-only gap, not a live-code bug: market.md states 'the gap is export-only, for the Power BI mock... Fix: add a market_id (and human region label...) column to the exporter' — the live in-app ledger reads w.markets directly and is unaffected."
-    },
-    {
-      "id": "UI-081",
-      "name": "Prices view",
-      "kind": "view",
-      "parent": "UI-080",
-      "source": [
-        "docs/ui/ledgers/market.md § Sub-levels"
-      ],
-      "summary": "Default view: one row per traded resource for the selected market — Supply/Demand/Price/Net, colour-washed, with a turnover-this-tick footer.",
-      "interesting_question": "n/a — see UI-080.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-082",
-      "name": "Markets view",
-      "kind": "view",
-      "parent": "UI-080",
-      "source": [
-        "docs/ui/ledgers/market.md § Sub-levels"
-      ],
-      "summary": "One row per market on the selected body (Market/Supply/Demand/Turnover), selectable to re-point the Prices and Trends views to a different market.",
-      "interesting_question": "n/a — see UI-080.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-083",
-      "name": "Trends view",
-      "kind": "view",
-      "parent": "UI-080",
-      "source": [
-        "docs/ui/ledgers/market.md § Sub-levels"
-      ],
-      "summary": "Price/supply/demand sparkline trio for a picked resource in the selected market, read from market_plot_history (BL-063).",
-      "interesting_question": "n/a — see UI-080.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-084",
-      "name": "History Ledger (Story/Chain/Tiles)",
-      "kind": "ledger",
-      "parent": null,
-      "source": [
-        "docs/ui/MENU.md (slot 9 'History', BL-211)",
-        "docs/ui/ledgers/tile_ledger.md",
-        "src/ui/tile_inspector.cpp"
-      ],
-      "summary": "Rail slot 9: generation history and current-state tile inspection, split (BL-211, landed 2026-07-29) into Story (dated body biography), Chain (generation-stage charts shared with the wizard), and Tiles (per-tile/building/market tables).",
-      "interesting_question": "The old ledger design doc (tile_ledger.md) still leaves a Market section stacked inside Tiles even though it once recommended cutting it as a duplicate of the standalone Market Ledger — did the BL-211 migration act on that recommendation, or ship without touching it?",
-      "resolution": "Reconciled 2026-07-31 (this pass): tile_inspector.cpp shows the Market section (supply/demand/price/base) still present under the Tiles view, unconditionally, right where it was pre-migration — the migration split Story/Chain/Tiles but did not remove Market. tile_ledger.md is now updated to reflect this and re-opens the cut as a live open question rather than a stale caveat."
-    },
-    {
-      "id": "UI-085",
-      "name": "Story view",
-      "kind": "view",
-      "parent": "UI-084",
-      "source": [
-        "docs/ui/MENU.md (History slot note, BL-211)"
-      ],
-      "summary": "The selected body's dated biography lines — including the Continents/Drift pass's history lines, since moved here from the render report.",
-      "interesting_question": "n/a — see UI-084 for the doc-currency question this whole ledger raises.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-086",
-      "name": "Chain view",
-      "kind": "view",
-      "parent": "UI-084",
-      "source": [
-        "docs/ui/MENU.md (History slot note, BL-211)",
-        "docs/ui/STARTUP.md § New World wizard"
-      ],
-      "summary": "One collapsing accordion per generation-stage chart under the wizard's three round tabs — the same ui::generation_charts the New World wizard uses, so a decided-on world's plots stay reopenable mid-campaign.",
-      "interesting_question": "n/a — see UI-084.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-087",
-      "name": "Tiles view",
-      "kind": "view",
-      "parent": "UI-084",
-      "source": [
-        "docs/ui/ledgers/tile_ledger.md § Sub-levels (proposed target)"
-      ],
-      "summary": "Per-tile table (X, Y, composition, landform, hazard, habitability, per-resource deposit) plus built-building and market sections for the selected body.",
-      "interesting_question": "The slot is named 'History' but the doc bluntly calls the actual content 'a current-state tile inspector, not a history/timeline' with no per-tile time series captured anywhere.",
-      "resolution": "Open, named as a genuine naming mismatch: tile_ledger.md asks 'What does History actually mean for slot 9?... Rename the slot to match the current tile-inspector behaviour, or commit to building real per-tile history capture' — MENU.md's own slot-rename history (§ Menu set and ordering) confirms 'History' was a deliberate broadening from 'Tile Ledger' with the stated intent of also carrying post-generation advisory detail, which is separately marked 'still owed.'"
-    },
-    {
-      "id": "UI-088",
-      "name": "Economy Panel (aggregate)",
-      "kind": "panel",
-      "parent": null,
-      "source": [
-        "docs/ui/ledgers/economy.md",
-        "src/ui/economy_panel.cpp"
-      ],
-      "summary": "A built panel with no nav-rail slot today — reachable only via the verify harness/app default — surfacing whole-enterprise aggregate views (Standing/Cashflow/Sector/Workforce), two of which the doc finds duplicate Balance and Corporation exactly.",
-      "interesting_question": "Does this surface earn its own rail slot at all, given the doc's own audit found its Cashflow view is byte-for-byte the same data as Balance's Cashflow tab and its Standing view duplicates Corporation's Standings?",
-      "resolution": "Open, the doc's lead decision is explicitly unresolved: economy.md states 'Given how thin the residue is, (B) is now my lean' — folding the genuinely-aggregate-only residue (Sector + Workforce) into the Corporation dashboard and retiring this panel — but frames it as an open question for Ben, not a settled call, and the panel remains unslotted as of the doc's writing."
-    },
-    {
-      "id": "UI-089",
-      "name": "Sector view",
-      "kind": "view",
-      "parent": "UI-088",
-      "source": [
-        "docs/ui/ledgers/economy.md § Sub-levels"
-      ],
-      "summary": "A proposed extraction-vs-processing composition bar across all the player's holdings — the doc's candidate for 'the surface's real reason to exist,' but its aggregation helper does not exist in code yet.",
-      "interesting_question": "n/a — see UI-088 for the parent-level open question this view is central to.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-090",
-      "name": "Workforce view",
-      "kind": "view",
-      "parent": "UI-088",
-      "source": [
-        "docs/ui/ledgers/economy.md § Sub-levels",
-        "docs/ui/ledgers/economy.md § Data"
-      ],
-      "summary": "Staffing contention across (corp x body), already built (draw_workforce) and genuinely aggregate — but the doc notes the mock data shows a uniform 85.47% for every corp.",
-      "interesting_question": "If the mock data is uniform across every corporation, how would a designer judging the mockup tell whether this view actually reads well once contention genuinely varies?",
-      "resolution": "Named as a testing caveat, not fixed: economy.md states 'the view will look inert until real contention varies; verify against live sim, not the CSV' — the doc flags the mock as an unreliable stand-in for judging this specific view."
-    },
-    {
-      "id": "UI-091",
-      "name": "Main Menu",
-      "kind": "view",
-      "parent": null,
-      "source": [
-        "docs/ui/STARTUP.md § Main menu — draw_main_menu"
-      ],
-      "summary": "The app's opening screen (app_screen::menu): seed entry + Roll + Copy, a Sparse/Lean/Standard resource-abundance radio, a disabled bodies-count slider fixed at 5, New Game and Quit.",
-      "interesting_question": "The bodies-count slider is present but disabled, fixed at 5 — why ship a visible-but-inert control rather than simply omitting it until the feature lands?",
-      "resolution": "Named as a deliberate phasing choice: STARTUP.md states 'the count knob is phased to a later update,' presenting the slider now as a promise of future scope rather than an omission — though the doc does not explain why visibility-before-function was chosen over waiting to add the control."
-    },
-    {
-      "id": "UI-092",
-      "name": "New World wizard",
-      "kind": "view",
-      "parent": null,
-      "source": [
-        "docs/ui/STARTUP.md § New World wizard — draw_generation_screen (BL-167)"
-      ],
-      "summary": "Three thematic rounds over the ten-stage Planetology chain; every control move re-runs a throwaway preview (no world state touched) resolved against named preferences, not raw parameters.",
-      "interesting_question": "Rounds are stated to be causal — rerolling round A re-draws rounds B and C downstream — and Back is 'a plain revision with no per-round snapshot.' Does a player who liked round B's preview lose it irrecoverably by going back to tweak round A?",
-      "resolution": "Confirmed as the accepted cost, not mitigated: STARTUP.md states this plainly — 'Rounds are causal... so Back is a plain revision with no per-round snapshot' — no undo/snapshot mechanism is described."
-    },
-    {
-      "id": "UI-093",
-      "name": "Wizard round (one of three)",
-      "kind": "sub-element",
-      "parent": "UI-092",
-      "source": [
-        "docs/ui/STARTUP.md § New World wizard"
-      ],
-      "summary": "Each round stacks its Planetology-stage charts + explanations, then takes that round's preference inputs; charts are shared verbatim with the History ledger's Chain view.",
-      "interesting_question": "n/a — see UI-092 for the causal-rounds open question this sub-element is part of.",
-      "resolution": "n/a"
-    },
-    {
-      "id": "UI-094",
-      "name": "Zoom ladder navigation model",
-      "kind": "element",
-      "parent": null,
-      "source": [
-        "docs/ui/CANVASES.md § Navigation — the zoom ladder",
-        "docs/ui/MINIMAP.md § Navigation model — minimap is context"
-      ],
-      "summary": "The cross-cutting descend/ascend model shared by all three canvases: double-click a body descends one rung in the primary; a single click on the minimap ascends one rung, always.",
-      "interesting_question": "Single-click semantics differ by which canvas the click lands on — a canvas click selects (no view change), a minimap click ascends (a view change) — is a same-gesture-different-meaning split across two adjacent screen regions confusing in practice?",
-      "resolution": "Explicitly justified by the doc as a deliberate asymmetry, not an oversight: SELECTION.md states 'Minimap ascend stays a single click — the minimap has no selection semantics,' treating the minimap as categorically not a selectable surface, so the same gesture is argued to carry no real ambiguity."
-    },
-    {
-      "id": "UI-095",
-      "name": "Keyboard navigation bindings",
-      "kind": "sub-element",
-      "parent": "UI-094",
-      "source": [
-        "docs/ui/CANVASES.md § Keyboard navigation"
-      ],
-      "summary": "A full keyboard-only 'limited access' surface (Enter/Backspace/[/]/arrows/=/-/L/Shift+L/0/F12) driving the same canvas_command dispatch the mouse and the verify harness use.",
-      "interesting_question": "This exists explicitly to double as a machine-drivable interface for the visual-verification harness, not purely as a player accessibility feature — does that shared purpose ever constrain which bindings get added (i.e. must every new canvas action be keyboard-reachable to stay script-verifiable)?",
-      "resolution": "Open — implied but not stated as a rule: CANVASES.md notes 'the verify API's verify.command(name) routes through the same dispatch, so a verification script reads as the player's key sequence,' which strongly implies new canvas actions should get a canvas_command for verifiability, but no explicit policy requiring this is written down."
-    }
-  ]
+ "_schema": "ui-elements/io-v1",
+ "_note": [
+  "Canonical UI-ELEMENT catalogue for Project Io — the authoritative index of WHAT EXISTS ON",
+  "SCREEN, decomposed by concrete surface (canvas / panel / ledger / element / sub-element /",
+  "control / view) rather than by player intent or by backlog feature.",
+  "",
+  "WHY THIS FILE EXISTS — the third route through the docs, alongside the other two.",
+  "  The design docs (docs/ui/*.md) describe each surface in prose, one file per region.",
+  "  user_stories.json decomposes the game by PLAYER INTENT ('what is the player trying to do?').",
+  "  backlog.json decomposes it by FEATURE ('what do we build next?').",
+  "  Neither gives a flat, queryable, hierarchical INVENTORY of the UI surfaces themselves — this",
+  "  file is that inventory. It exists so a question like 'what sub-elements does the Selection",
+  "  band have' or 'which ledgers exist and what views do they split into' has a single queryable",
+  "  answer instead of requiring a re-read of a dozen markdown files.",
+  "",
+  "SCOPE. Every canvas, ledger, panel, and chrome element that is actually built (2026-07-31),",
+  "plus the handful of designed-but-gated ones the docs describe as owed (flagged in `resolution`",
+  "where relevant). This is a surface inventory, not a coverage audit — it does not judge whether",
+  "a surface is good or needed (that is user_stories.json's job) or whether it is scheduled",
+  "(backlog.json's job). It answers 'what is this thing and how deep does it nest.'",
+  "",
+  "FIELDS.",
+  "  id                   — UI-XXX, zero-padded 3 digits. STABLE, NOT DENSE (changed 2026-08-27):\n                         a retired surface leaves its number behind rather than renumbering the\n                         file, because Sprint 21 works off these ids across several sessions and a\n                         shifting id is worse than a gap. Vacant today: 031, 035, 036.",
+  "  name                 — short human name for the element.",
+  "  kind                 — canvas | panel | ledger | element | sub-element | control | view.",
+  "                         canvas = one of the three primary spatial views (Solar/Circum/Planetary).",
+  "                         panel = persistent chrome (header, profile, nav rail, time panel).",
+  "                         ledger = a nav-rail-hosted reference surface (Balance, Market, ...).",
+  "                         element = a named UI concept that is neither canvas nor panel nor ledger",
+  "                           (Selection band, hover card, icon vocabulary, the lens system).",
+  "                         sub-element = a nested piece of a parent surface, not independently",
+  "                           reachable from the rail or minimap.",
+  "                         control = an interactive affordance (a button, a combo, a toggle strip).",
+  "                         view = one tab/page of a multi-view ledger (Prices, Standings, Tiles...).",
+  "  parent               — id of the containing element, or null for a top-level surface.",
+  "  source               — doc path(s) and src/ui/*.{hpp,cpp} path(s) this entry is drawn from.",
+  "  summary              — 1-2 sentence description of what the element is and shows.",
+  "  interesting_question — the single most interesting/non-obvious open design tension this",
+  "                          element raises — grounded in something actually read, not generic.",
+  "  resolution            — how the current design/code actually resolves that question, with a\n  checks               — scripts/verify/*.lua checks that drive this element, hand-curated.\n                         `node tools/session/ui_coverage.js` reads this field and derives what a\n                         green run actually proves. An empty list is a real answer: nothing checks it.",
+  "                          citation (doc section, standing rule, or code symbol/path); or, if",
+  "                          genuinely unresolved, 'Open — ...' stated plainly. Never a fabricated",
+  "                          BL-xxx id — only ids actually seen in the read docs are cited.",
+  "",
+  "MAINTENANCE. This file is a snapshot (dated 2026-07-31, corpus doc-truth-sweep baseline). A UI",
+  "surface that lands, splits into new sub-views, or is superseded should get a new/updated entry",
+  "in the same pass that updates its owning doc — do not let this drift the way BACKLOG.md drifted",
+  "before the drain. When a doc file this entry cites is itself marked superseded, prefer citing",
+  "the doc's own superseding note over re-deriving the current shape from code alone.",
+  "",
+  "RELATIONSHIP TO THE OTHER TWO CATALOGUES. user_stories.json traces DOWN to a `{doc, surface}`",
+  "pair per story — this file is the thing that pair ultimately points at, made walkable on its",
+  "own axis (a surface's sub-elements, not just its story). backlog.json's `file scope` per item",
+  "names the same src/ui files this catalogue's `source` field names — the two should never",
+  "disagree about which files back a given surface.",
+  "REFRESHED 2026-08-27 (Sprint 21, UI visibility, wave 0), against the code rather than the docs. The 2026-07-31 snapshot had drifted four weeks. THREE elements were retired in code and still listed: UI-031 Country lens (BL-601, dissolved into the always-on border band, now UI-096) and UI-035 Opportunity / UI-036 Production (BL-604, their read already carried between Scarcity and Industry). Their numbers are left vacant per the id rule above. SIXTEEN surfaces were added (UI-096..UI-111), thirteen of which already carried a verify check the catalogue had no element for. TWO rows named the wrong rail slot: UI-078 has moved off slot 1 to slot 8, and UI-088 is no longer unreachable - it hosts slot 3. Both moves are the same deliberate idiom, a built panel standing in for an unbuilt surface under that unbuilt surface's own label."
+ ],
+ "elements": [
+  {
+   "id": "UI-001",
+   "name": "Solar Canvas",
+   "kind": "canvas",
+   "parent": null,
+   "source": [
+    "docs/ui/CANVASES.md",
+    "docs/ui/SOLAR.md",
+    "src/ui/solar_system_canvas.hpp",
+    "src/ui/solar_system_canvas.cpp"
+   ],
+   "summary": "The top rung of the zoom ladder: a top-down view of the whole system, star at centre, bodies orbiting on rings derived from orbital_radius_au/orbital_angle_rad.",
+   "interesting_question": "The star has no Circumplanetary view and clicking it does nothing — is a star meaningfully a body entity at all, or a special-cased backdrop wearing body clothes?",
+   "resolution": "Resolved deliberately: MINIMAP.md 'Star as an entity' made it a real body_type::star entity specifically so it can carry a name and anchor the minimap title uniformly with every other body, accepting the click-does-nothing asymmetry as the cost.",
+   "checks": [
+    "canvas_levels",
+    "zoom_ladder",
+    "descend_into_selection",
+    "start_framing",
+    "shell_pass"
+   ]
+  },
+  {
+   "id": "UI-002",
+   "name": "Body markers (planet/moon/asteroid/station/star)",
+   "kind": "sub-element",
+   "parent": "UI-001",
+   "source": [
+    "docs/ui/SOLAR.md § Visual elements"
+   ],
+   "summary": "Filled circles per body type/size/colour, labelled (planets/asteroids always, moons only while hovered) and tracked live each frame.",
+   "interesting_question": "Moon labels only show on hover to keep the inner system readable — but does that mean a player can lose track of which moon is which mid-drag?",
+   "resolution": "Accepted trade-off, not solved further: SOLAR.md states the rule as deliberate crowding relief with no fallback (e.g. no label-on-selection override) noted.",
+   "checks": [
+    "canvas_levels",
+    "shell_pass"
+   ]
+  },
+  {
+   "id": "UI-003",
+   "name": "Asteroid belt render",
+   "kind": "sub-element",
+   "parent": "UI-001",
+   "source": [
+    "docs/ui/SOLAR.md § Asteroid belt"
+   ],
+   "summary": "A translucent textured annulus between two radii (world.belt), with a deterministic dust-speck scatter; notable asteroids (Pallas) are separate body entities drawn over it.",
+   "interesting_question": "Why is the belt system-level data rather than a body, when it visually reads as one map object?",
+   "resolution": "Settled: SOLAR.md states the belt is 'not a body and not an entity' by design — notable asteroids inside it are ordinary body_type::asteroid entities drawn over the band, kept independently selectable/hoverable/labelled, distinct from the band's own render pass.",
+   "checks": [
+    "canvas_levels"
+   ]
+  },
+  {
+   "id": "UI-004",
+   "name": "Survey badge",
+   "kind": "sub-element",
+   "parent": "UI-001",
+   "source": [
+    "docs/ui/SOLAR.md § Visual elements",
+    "docs/ui/DISCOVERY.md § Geographic fog"
+   ],
+   "summary": "Per-body glyph at upper-right showing geographic-fog survey phase: dimmed '?' (hidden), magnifying glass + k/N (in progress), none once surveyed.",
+   "interesting_question": "The survey and activity fogs are stated as deliberately independent axes — does a player actually read two separate badges correctly, or does the eye collapse them into one 'how much do I know' signal?",
+   "resolution": "Design intent is explicit separation, not solved by testing: DISCOVERY.md places the badges at opposite corners (upper-right vs lower-left) specifically 'so the two fogs read apart,' but no playtest finding is recorded confirming players actually distinguish them.",
+   "checks": [
+    "survey"
+   ]
+  },
+  {
+   "id": "UI-005",
+   "name": "Activity badge",
+   "kind": "sub-element",
+   "parent": "UI-001",
+   "source": [
+    "docs/ui/SOLAR.md § Visual elements",
+    "docs/ui/DISCOVERY.md § Activity fog"
+   ],
+   "summary": "Per-body concentric-pulse glyph at lower-left, tiered by activity_vis (known / known_stale / visible), derived from body_activity_visibility (routes + convoys + ownership + tick).",
+   "interesting_question": "A proximity glimpse can light this badge at known_stale even for a body the player never traded with — does that risk reading as a false 'I have a route here'?",
+   "resolution": "Named and accepted, not hidden: DISCOVERY.md states a glimpse 'never rises above known_stale' and 'a body's own route always outranks it,' so the tier itself caps the misleading signal rather than distinguishing glimpse from stale-route visually.",
+   "checks": [
+    "commercial_fog"
+   ]
+  },
+  {
+   "id": "UI-006",
+   "name": "Home halo",
+   "kind": "sub-element",
+   "parent": "UI-001",
+   "source": [
+    "docs/ui/SOLAR.md § Visual elements"
+   ],
+   "summary": "Always-on player-identity ring + glow around home_body (BL-085), distinct from selection/survey/activity chrome.",
+   "interesting_question": "n/a — straightforward always-on identity chrome.",
+   "resolution": "n/a",
+   "checks": [
+    "player_presence",
+    "start_framing"
+   ]
+  },
+  {
+   "id": "UI-007",
+   "name": "Trade corridors",
+   "kind": "sub-element",
+   "parent": "UI-001",
+   "source": [
+    "docs/ui/SOLAR.md § Visual elements",
+    "docs/ui/DISCOVERY.md § Illumination (Solar canvas)"
+   ],
+   "summary": "The player's persistent trade routes (BL-088) drawn as lit lanes; fresh routes glow, stale routes fade to grey.",
+   "interesting_question": "Rival trade routes never render here (competitor-visibility rule, BL-068) — so the corridor layer only ever shows the player's own reach. Does that make an empty system look emptier than it is early game?",
+   "resolution": "Deliberate: DISCOVERY.md frames the fog as keeping 'the spotlight on the player,' explicitly rejecting a corporate-secrecy-simulator framing where rival lanes would ever surface.",
+   "checks": []
+  },
+  {
+   "id": "UI-008",
+   "name": "Scale bar + zoom slider",
+   "kind": "control",
+   "parent": "UI-001",
+   "source": [
+    "docs/ui/SOLAR.md § Visual elements",
+    "src/ui/canvas_scale.hpp"
+   ],
+   "summary": "Bottom-centre overlay: AU scale bar plus a logarithmic zoom slider (right = in, left = out). Shared implementation with the Circumplanetary canvas.",
+   "interesting_question": "n/a — a shared, mechanically simple control.",
+   "resolution": "n/a",
+   "checks": [
+    "canvas_levels",
+    "zoom_ladder"
+   ]
+  },
+  {
+   "id": "UI-009",
+   "name": "Circumplanetary Canvas",
+   "kind": "canvas",
+   "parent": null,
+   "source": [
+    "docs/ui/CANVASES.md",
+    "docs/ui/CIRCUMPLANETARY.md",
+    "src/ui/circumplanetary_canvas.hpp",
+    "src/ui/circumplanetary_canvas.cpp"
+   ],
+   "summary": "The middle rung of the zoom ladder: a planet (the circumplanetary anchor) at centre with its moons in orbit — the deliberate stepping stone between picking a planet and dropping to its surface.",
+   "interesting_question": "A moonless planet still gets a full circumplanetary view with nothing but the anchor at the centre — is that an empty screen or a deliberate beat?",
+   "resolution": "Deliberate: CIRCUMPLANETARY.md states outright 'A planet with no moons is still a valid circumplanetary view... it always exists for any descendable body,' treating the pause as structural rather than a gap to fill.",
+   "checks": [
+    "canvas_levels",
+    "survey",
+    "landform_relief",
+    "tile_texture",
+    "spectator_god_view"
+   ]
+  },
+  {
+   "id": "UI-010",
+   "name": "Anchor + moon orbit render",
+   "kind": "sub-element",
+   "parent": "UI-009",
+   "source": [
+    "docs/ui/CIRCUMPLANETARY.md § Visual elements",
+    "docs/ui/CIRCUMPLANETARY.md § The anchor"
+   ],
+   "summary": "Draws the resolved circumplanetary_anchor (a moon's parent planet, or the body itself) at centre, moons on non-true-scale visible-offset orbits.",
+   "interesting_question": "Moon orbital radii are explicitly not true scale (real distances would render on top of the planet) — does that ever mislead a player reasoning about travel time or distance?",
+   "resolution": "Named but not mitigated further: CIRCUMPLANETARY.md flags the offset as a rendering necessity; the rung-relative distance readout (parent-referenced, not radius-derived) is the compensating fact surface — see `draw_body_summary`'s canvas-aware overload.",
+   "checks": [
+    "canvas_levels"
+   ]
+  },
+  {
+   "id": "UI-011",
+   "name": "Market price strip (Circumplanetary)",
+   "kind": "sub-element",
+   "parent": "UI-009",
+   "source": [
+    "docs/ui/LENSES.md § Market lens § Rung applicability"
+   ],
+   "summary": "Compact good→price list for the anchor body's market, shown under the Market lens on this rung; the selected good is highlighted.",
+   "interesting_question": "n/a — a straightforward per-body summary.",
+   "resolution": "n/a",
+   "checks": []
+  },
+  {
+   "id": "UI-012",
+   "name": "Convoy-count badge",
+   "kind": "sub-element",
+   "parent": "UI-009",
+   "source": [
+    "docs/ui/LENSES.md § Supply lens (landed note)",
+    "docs/ui/CIRCUMPLANETARY.md § What is deferred"
+   ],
+   "summary": "A per-body badge beside the label under the Supply lens, summarising goods-in-transit convoy count for the focused body.",
+   "interesting_question": "n/a — landed Layer-5 badge, narrowly scoped.",
+   "resolution": "n/a",
+   "checks": []
+  },
+  {
+   "id": "UI-013",
+   "name": "Planetary Canvas",
+   "kind": "canvas",
+   "parent": null,
+   "source": [
+    "docs/ui/CANVASES.md",
+    "docs/ui/PLANETARY.md",
+    "src/ui/body_surface_canvas.hpp",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "summary": "The bottom rung, always primary: the selected body's hex tile grid, wrapped east-west as a cylinder, the surface where terrain, buildings, lenses, and most vision chrome composite.",
+   "interesting_question": "Since this rung is never shown in the minimap (it is always primary), it has no 'context' view of itself the way Solar/Circumplanetary do — does the player lose their bearings on very large grids (180x84)?",
+   "resolution": "Partially addressed structurally, not by a mini-overview: CANVASES.md notes the minimap always shows the rung one step out (Circumplanetary), so the player's context comes from ascending, not from a same-rung overview; no in-rung minimap-of-the-body exists.",
+   "checks": [
+    "canvas_levels",
+    "zoom_ladder",
+    "shell_pass",
+    "tile_texture"
+   ]
+  },
+  {
+   "id": "UI-014",
+   "name": "Hex tile grid render",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/PLANETARY.md § Tile grid",
+    "docs/ui/PLANETARY.md § Cell sizing and coordinate mapping"
+   ],
+   "summary": "Pointy-top odd-r offset hex grid, 9:5-ish width:height ratio, horizontally wrapped so panning past an edge continues seamlessly from the opposite side.",
+   "interesting_question": "The east-west wrap is rendered with no seam marker at all — is 'no marker needed because the wrap is seamless' actually true for a first-time player, or does an invisible wrap read as a bug the first time it happens?",
+   "resolution": "Explicitly deferred, not built: PLANETARY.md's deferred table lists 'Seam visualisation' as post-prototype, reasoning 'the wrap itself is seamless and needs no marker' — an assertion, not a tested finding.",
+   "checks": [
+    "tile_texture",
+    "province_render",
+    "zoom_ladder"
+   ]
+  },
+  {
+   "id": "UI-015",
+   "name": "Terrain channels (composition hue + landform relief/glyph)",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/CANVASES.md § Terrain channels",
+    "docs/ui/PLANETARY.md § Terrain types",
+    "src/ui/hex_render.hpp"
+   ],
+   "summary": "Two always-on chrome channels: composition owns hue, landform owns a subtle relief tint plus stroke-only glyphs for the four dramatic landforms (mountain/canyon/crater/rift), spanning contiguous runs as one marker.",
+   "interesting_question": "Why split landform into a near-invisible relief tint for 95% of tiles versus a loud glyph for under 1.5% of tiles, rather than one uniform treatment?",
+   "resolution": "Measured, not guessed: CANVASES.md cites world_audit § S3 — plains+valley are ~95% of land tiles while dramatic landforms are ≤1.5% each but carry ×1.3+ movement cost, so the design deliberately reserves glyph density for the rare, expensive-to-miss cases.",
+   "checks": [
+    "landform_relief",
+    "tile_texture",
+    "continents_terrain"
+   ]
+  },
+  {
+   "id": "UI-016",
+   "name": "Building markers",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/PLANETARY.md § Visual elements",
+    "docs/ui/ICONS.md § Entity markers"
+   ],
+   "summary": "A small vector glyph per building type (ore-chunk/square/triangle/hexagon/circle), fill colour encoding owning corporation, plus a corp emblem tag.",
+   "interesting_question": "The building glyph's fill encodes ownership while its silhouette encodes type — is that overloading one small mark with two independent reads, and does a hashed rival colour risk visually colliding with the player's own colour?",
+   "resolution": "The collision is explicitly ruled out, the overload accepted: ICONS.md states the rival hash is 'kept off slot 0 so a rival never collides with the player's colour' — the two-signal overload itself is treated as settled design, not flagged as a risk.",
+   "checks": [
+    "built_tile_render",
+    "stacked_tile_ring",
+    "icon_silhouettes"
+   ]
+  },
+  {
+   "id": "UI-017",
+   "name": "Road network render",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/PLANETARY.md § Visual elements (Road network row)"
+   ],
+   "summary": "Always-on continuous, symmetric road spans (BL-172): each roaded tile draws its own half of a shared edge toward each roaded neighbour, tiered Track/Road/Highway by thickness/brightness.",
+   "interesting_question": "Each tile draws only its own half of a shared edge with no from/to concept — what happens visually at the cylinder seam, where 'east' and 'west' neighbours are the wrapped edge?",
+   "resolution": "Explicitly handled: PLANETARY.md states 'Cylinder-seam edges shift one period to stay short,' and roads are 'drawn only toward survey-revealed neighbours, so roads don't leak past the survey fog' — both the wrap and the fog interaction are named, not left implicit.",
+   "checks": [
+    "roads"
+   ]
+  },
+  {
+   "id": "UI-018",
+   "name": "Settlement markers (civic chrome)",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/PLANETARY.md § Visual elements (Settlement markers row)",
+    "docs/ui/ICONS.md § settlement glyph"
+   ],
+   "summary": "Always-on, not lens-gated: conurbations clustered from generated population centres draw a tiered skyline glyph at their highest-scale member, named only at City+ (tier ≥ 4).",
+   "interesting_question": "Colour is deliberately civic-neutral except under the Country lens — why keep tier (size) always visible but ownership colour lens-gated rather than always shown?",
+   "resolution": "Settled as a legibility choice: PLANETARY.md states colour applying only under Country is so 'tier stays carried by size, keeping colour out of ownership' — i.e. two orthogonal signals (scale vs. political ownership) are kept on separate channels deliberately.",
+   "checks": [
+    "settlement_labels",
+    "pop_markers"
+   ]
+  },
+  {
+   "id": "UI-019",
+   "name": "Home-cluster ring + HQ star",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/PLANETARY.md § Visual elements",
+    "docs/ui/ICONS.md § hq glyph"
+   ],
+   "summary": "Always-on player-presence chrome on home_body only (BL-085/BL-092): a translucent ring around the player's holdings cluster, an HQ star on the building nearest the centroid.",
+   "interesting_question": "n/a — narrowly-scoped, single-body chrome.",
+   "resolution": "n/a",
+   "checks": [
+    "corporate_reach",
+    "player_presence"
+   ]
+  },
+  {
+   "id": "UI-020",
+   "name": "Corporate borders (reach rings)",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/LENSES.md § Corporation lens § Corporate reach (BL-182)",
+    "docs/ui/PLANETARY.md § Layers"
+   ],
+   "summary": "Under the Corporation lens, each rival's HQ-projected reach ring (radius = influence_range · hex_size · zoom, persisted per corp) plus an HQ star, drawn through the same draw_corp_border path as the player's own always-on border.",
+   "interesting_question": "The ring is described explicitly as 'render-only chrome — it gates nothing' — so a rival's visible reach ring implies no mechanical range restriction exists yet. Does that visual promise a rule the game does not enforce?",
+   "resolution": "Named, not resolved: LENSES.md states the full gameplay mechanic (range that gates operations, multi-HQ via advancement) 'stays deferred in docs/development/backlog.json (BL-182)' — the render shipped ahead of the mechanic on purpose.",
+   "checks": [
+    "corp_lens_border",
+    "corporate_reach",
+    "border_band"
+   ]
+  },
+  {
+   "id": "UI-021",
+   "name": "Survey region mask",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/PLANETARY.md § Visual elements (Survey region mask row)",
+    "docs/ui/DISCOVERY.md § Geographic fog"
+   ],
+   "summary": "Unrevealed survey regions render as a flat dark locked fill with no lens tint, borders, markers, or hit-testing; regions reveal in deterministic raster order as scanning proceeds.",
+   "interesting_question": "n/a — a clean, deterministic mechanic with a direct visual rule.",
+   "resolution": "n/a",
+   "checks": [
+    "survey",
+    "visibility",
+    "survey_dispatch"
+   ]
+  },
+  {
+   "id": "UI-022",
+   "name": "Activity/vision fog layers (permanent pockets, corridors, convoy beam)",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/DISCOVERY.md § Illumination (Planetary canvas)"
+   ],
+   "summary": "Three VIEW-only vision layers (never serialised): radius-2 pockets around player buildings, 3-wide corridors from corp centre to catchment markets, and a moving convoy beam that interpolates smoothly between quarterly economy ticks.",
+   "interesting_question": "This intra-body fog reads as 'where your logistics operate,' not 'unmapped terrain' — even on the player's own home planet. Is a fog-of-war metaphor the right read for territory the player already fully owns?",
+   "resolution": "Deliberately reframed, per doc: DISCOVERY.md attributes the semantics to 'Ben's call' — 'commercial reach, not unknown terrain,' explicitly rejecting the literal fog-of-war reading for home territory.",
+   "checks": [
+    "commercial_fog",
+    "intrabody_fog",
+    "visibility",
+    "proximity_glimpse"
+   ]
+  },
+  {
+   "id": "UI-023",
+   "name": "Placement-suitability surface",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/LENSES.md § Placement-suitability surface (BL-010)"
+   ],
+   "summary": "While a build is armed, every other tile is tinted by how well the armed building type would do there (darkened if invalid, green-tinted if affine) — the map-wide inverse of the per-tile affordance readout.",
+   "interesting_question": "This surface used to fire on bare tile selection and was changed to fire only when a build is armed — why did selection alone feel wrong?",
+   "resolution": "Recorded as a correction from play: LENSES.md states the original trigger 're-tinting the whole map on every inspection click read as a spurious lens change and fought the active lens,' so the trigger was tightened to require an armed build (revised 2026-06-30).",
+   "checks": [
+    "build_legibility",
+    "tile_build_ledger"
+   ]
+  },
+  {
+   "id": "UI-024",
+   "name": "Construction placement ghost",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/PLANETARY.md § Layers",
+    "docs/ui/SELECTION.md § The tile element's facts are its affordance readout"
+   ],
+   "summary": "The cursor-following placement preview during an armed build, carrying a 'why not here' reason label sourced from the same placement_rules vocabulary as the Selection panel's readout.",
+   "interesting_question": "n/a — a single-purpose interaction affordance.",
+   "resolution": "n/a",
+   "checks": [
+    "construction_panel",
+    "build_walkthrough"
+   ]
+  },
+  {
+   "id": "UI-025",
+   "name": "Minimap",
+   "kind": "element",
+   "parent": null,
+   "source": [
+    "docs/ui/MINIMAP.md",
+    "docs/ui/CANVASES.md § Primary / minimap layout"
+   ],
+   "summary": "A fixed bottom-right inset showing the zoom-out neighbour of the primary canvas, framed by a title bar above and a lens mode bar below; the sole control for ascending the zoom ladder.",
+   "interesting_question": "The minimap always shows the rung one step out, never the rung the player might actually want context on two steps out (e.g. viewing Planetary with no way to glance at Solar without two clicks) — is 'one-rung context only' a real limitation?",
+   "resolution": "Open — not addressed by the doc: CANVASES.md/MINIMAP.md state the one-rung-out rule as the settled navigation model with no mention of a deeper jump affordance; the closest workaround is the [ / ] body-cycle keys or the retired Explorer's focus-jump idea.",
+   "checks": [
+    "shell_pass"
+   ]
+  },
+  {
+   "id": "UI-026",
+   "name": "Minimap title bar",
+   "kind": "sub-element",
+   "parent": "UI-025",
+   "source": [
+    "docs/ui/MINIMAP.md § Minimap chrome § Title bar"
+   ],
+   "summary": "Names what the minimap currently shows: star name (Solar shown), planet name (Circumplanetary shown), or the game name (top rung, branding placeholder).",
+   "interesting_question": "n/a — a straightforward derived label.",
+   "resolution": "n/a",
+   "checks": [
+    "shell_pass"
+   ]
+  },
+  {
+   "id": "UI-027",
+   "name": "Lens mode bar",
+   "kind": "control",
+   "parent": "UI-025",
+   "source": [
+    "docs/ui/MINIMAP.md § Overlay controls (BL-093)",
+    "docs/ui/LENSES.md § Current roster",
+    "src/ui/overlay.hpp"
+   ],
+   "summary": "8-glyph single-select strip (Corp/Country/Resource/Market/Population/Opportunity/Production/Continent) drawn along the minimap's bottom edge, re-clicking the active glyph clears to plain terrain.",
+   "interesting_question": "A stale overlay_mode_count means the keyboard lens-cycle never reaches the Supply-routes lens even though it is fully built — a shipped lens is functionally unreachable except by direct code/script invocation.",
+   "resolution": "Named as an open bug, not yet fixed: LENSES.md's Access note states 'BL-226 (continent lens) inserted continent before supply_routes in the enum without bumping [overlay_mode_count]... One-line code fix owed' (2026-07-31).",
+   "checks": [
+    "lens_strip",
+    "lens_modes"
+   ]
+  },
+  {
+   "id": "UI-028",
+   "name": "Lens legend fold-out",
+   "kind": "sub-element",
+   "parent": "UI-025",
+   "source": [
+    "docs/ui/MINIMAP.md § Lens legend (folds out from the minimap's left edge)"
+   ],
+   "summary": "The on-canvas swatch legend for graded lenses, anchored flush-left of the minimap; hosts the shared resource/good selector for Resource/Market/Scarcity since BL-134.",
+   "interesting_question": "n/a — a positioning/anchoring detail, settled.",
+   "resolution": "n/a",
+   "checks": [
+    "lens_legend"
+   ]
+  },
+  {
+   "id": "UI-029",
+   "name": "Lens system (overlay_mode family)",
+   "kind": "element",
+   "parent": null,
+   "source": [
+    "docs/ui/LENSES.md",
+    "src/ui/ui_state.hpp",
+    "src/ui/overlay.cpp"
+   ],
+   "summary": "The full set of 13 overlay_mode data layers the player can arm over the Planetary canvas, one active at a time; the lens also decides which entity a click/hover resolves to and which ledger it routes to.",
+   "interesting_question": "The campaign deliberately opens with no lens armed ('a click only updates the Selection element and never re-skins the canvas'), reversing an earlier Corporation-default — why prefer an unskinned canvas at session start over a helpful default?",
+   "resolution": "Recorded as a reversal from playtesting, not a first design: LENSES.md notes this 'reverses BL-013's Corporation-default, 2026-06-30' with no further rationale text quoted beyond the player choosing a lens deliberately.",
+   "checks": [
+    "lens_modes",
+    "default_lens"
+   ]
+  },
+  {
+   "id": "UI-030",
+   "name": "Corporation lens",
+   "kind": "sub-element",
+   "parent": "UI-029",
+   "source": [
+    "docs/ui/LENSES.md § Corporation lens"
+   ],
+   "summary": "Tints tiles by owning corporation (a tile is owned iff a corp holds a building on it); player gets a white border, rivals a hashed identity colour; rival HQ reach rings compose in.",
+   "interesting_question": "There is 'no influence radius and no nation-domination heuristic' — ownership is literally the building tile only. Does that make corporate 'territory' read thinner than the Country lens's contiguous nation fields right beside it on the same strip?",
+   "resolution": "Explicit, current-iteration scope: LENSES.md states 'only the literal building tile counts as owned' in this iteration, with no stated plan to add an influence radius beyond the separate BL-182 reach-ring layer.",
+   "checks": [
+    "corporation_lens",
+    "corp_lens_border",
+    "lens_modes"
+   ]
+  },
+  {
+   "id": "UI-032",
+   "name": "Resource lens",
+   "kind": "sub-element",
+   "parent": "UI-029",
+   "source": [
+    "docs/ui/LENSES.md § Resource lens"
+   ],
+   "summary": "Flat, uniform-opacity fill over the whole contiguous deposit of a single player-chosen resource — shape, not magnitude, is what the lens shows.",
+   "interesting_question": "Why deliberately drop the earlier 'highest-value' multi-resource mode in favour of always-single-resource, uniform-opacity fill?",
+   "resolution": "Settled by BL-019: LENSES.md states the lens is 'always single-resource... Intensity lives in tile detail, not the lens,' making magnitude a Selection/hover-card concern rather than a lens concern — a deliberate separation of 'where' from 'how much'.",
+   "checks": [
+    "resource_lens",
+    "lens_modes"
+   ]
+  },
+  {
+   "id": "UI-033",
+   "name": "Market lens",
+   "kind": "sub-element",
+   "parent": "UI-029",
+   "source": [
+    "docs/ui/LENSES.md § Market lens"
+   ],
+   "summary": "A body-wide catchment tint per market (superseding an earlier price wash), diverging warm/cool keyed to price relative to each good's own floor price; per-catchment tinting is owed until multiple market centres are generated per body.",
+   "interesting_question": "Today's world seeds one market per body, so the catchment tint reads as one flat colour across the whole body — is a per-catchment lens meaningfully different from a whole-body scalar right now?",
+   "resolution": "Named honestly as a current limitation: MARKETS.md-adjacent LENSES.md text says the surface 'regains a spatial per-market surface' only once generation seeds genuinely multiple centres, which is still owed.",
+   "checks": [
+    "market_lens",
+    "lens_modes"
+   ]
+  },
+  {
+   "id": "UI-034",
+   "name": "Population lens",
+   "kind": "sub-element",
+   "parent": "UI-029",
+   "source": [
+    "docs/ui/LENSES.md § Population lens"
+   ],
+   "summary": "Per-tile red→green value marks (BL-135) reading workforce_efficiency(habitability), not raw habitability — shows the labour consequence including the 0.6 full-efficiency cliff.",
+   "interesting_question": "Why re-key from raw habitability to workforce_efficiency rather than showing the underlying terrain quantity directly?",
+   "resolution": "Explicit re-key rationale, BL-069: LENSES.md states the swap keeps 'the Population lens, the Selection panel, and the hover card... surface the *same* habitability→labour feedback the economy applies,' i.e. the lens must show what the sim actually consumes, not a raw input the sim then transforms.",
+   "checks": [
+    "population_lens",
+    "population_legibility",
+    "lens_modes"
+   ]
+  },
+  {
+   "id": "UI-037",
+   "name": "Continent lens",
+   "kind": "sub-element",
+   "parent": "UI-029",
+   "source": [
+    "docs/ui/LENSES.md § Continent lens"
+   ],
+   "summary": "Categorical per-plate tint (from the Continents/Drift generation pass) with a white boundary lift, showing where the tectonic plates that shaped the terrain actually meet.",
+   "interesting_question": "The plate that raised a given tile is stated as 'unreadable from the finished terrain' after generation — so this lens is the only way to see causality that generation itself destroys. Was flood-filling contiguous landmasses at render time considered instead of retaining plate_id?",
+   "resolution": "Considered and rejected, with reasoning given: LENSES.md states flood-fill 'yields landmasses, not plates, so it can colour the continents but cannot explain them' — the generation report retains continent_state::plate_id specifically to preserve the causal read.",
+   "checks": [
+    "continents_terrain",
+    "tile_texture",
+    "landform_relief",
+    "save_load"
+   ]
+  },
+  {
+   "id": "UI-038",
+   "name": "Scarcity lens",
+   "kind": "sub-element",
+   "parent": "UI-029",
+   "source": [
+    "docs/ui/LENSES.md § Scarcity lens"
+   ],
+   "summary": "Chunky per-market blocks (not per-tile) tinted by market supply shortfall for a chosen good — the inverse read of Resource: absence rather than concentration. Keyboard-cycle only, off the bar since BL-093.",
+   "interesting_question": "With one market per body today, the whole body reads as a single solid block regardless of tile — does a market-level field lens read as broken (or pointless) to a player who expects per-tile variation like Resource shows?",
+   "resolution": "Named honestly as a scope-of-the-day limit: LENSES.md states it 'gains spatial variation once multiple centres are seeded' — the single-block read is acknowledged as the correct current behaviour, not a bug.",
+   "checks": [
+    "scarcity_lens",
+    "lens_modes"
+   ]
+  },
+  {
+   "id": "UI-039",
+   "name": "Industry lens",
+   "kind": "sub-element",
+   "parent": "UI-029",
+   "source": [
+    "docs/ui/LENSES.md § Industry lens"
+   ],
+   "summary": "Sequential dark→amber tint of substrate_density weighted by terrain deposit richness — the nation-owned background economy's throughput field, deliberately decoupled from the Population lens's ripple pattern.",
+   "interesting_question": "Rendering raw substrate_density would read visually collinear with the Population lens (both ripple from population centres) — how was that collision avoided without changing the underlying substrate model?",
+   "resolution": "Solved by a pure-rendering reweighting: LENSES.md states the lens instead 'renders a throughput field: each tile's substrate_density weighted by its terrain deposit richness... Pure rendering: no change to substrate_density or the market arithmetic' — decoupling achieved entirely at the render layer.",
+   "checks": [
+    "industry_lens",
+    "province_render"
+   ]
+  },
+  {
+   "id": "UI-040",
+   "name": "Supply lens",
+   "kind": "sub-element",
+   "parent": "UI-029",
+   "source": [
+    "docs/ui/LENSES.md § Supply lens"
+   ],
+   "summary": "The one lens with representation on every rung: Solar per-convoy lines, Circumplanetary per-body badge, Planetary per-tile convoy glyph — logistics flow, not ownership.",
+   "interesting_question": "A throughput scale-key (line weight → goods/tick) is stated as 'part of the build when routes render' but the roster still calls it 'remains owed' — is the legend actually missing, or just deferred documentation?",
+   "resolution": "Open — the doc itself is inconsistent: the landed note says routes render today, but the throughput scale-key line is separately flagged 'remains owed,' with no code citation resolving which is true as of 2026-07-31.",
+   "checks": [
+    "supply_lens",
+    "lens_modes",
+    "icon_silhouettes"
+   ]
+  },
+  {
+   "id": "UI-041",
+   "name": "Reach lens",
+   "kind": "sub-element",
+   "parent": "UI-029",
+   "source": [
+    "docs/ui/LENSES.md § Reach lens"
+   ],
+   "summary": "A connection-list key on the Planetary rung (body name + recency dot) reading the active body's own trade-route endpoints; the design-called-for Solar body-marker glow is owed. Keyboard-cycle only, off the bar.",
+   "interesting_question": "The lens is fundamentally about a body-level relationship (this body ↔ that body), yet its only built surface is Planetary, which can only ever show the active body's own grid — is a connection-list the right substitute for a spatial 'glow the connected bodies' read?",
+   "resolution": "Named as a stand-in, not a final answer: LENSES.md states the connection-list key 'lands here' specifically because the Planetary canvas 'only ever shows the active body's grid,' with the intended Solar-canvas glow still owed.",
+   "checks": [
+    "lens_modes",
+    "lens_legend",
+    "province_render"
+   ]
+  },
+  {
+   "id": "UI-042",
+   "name": "Supply-routes lens",
+   "kind": "sub-element",
+   "parent": "UI-029",
+   "source": [
+    "docs/ui/LENSES.md § Supply-routes lens"
+   ],
+   "summary": "Aggregated lane graph — one edge per body-pair, log-scaled thickness from convoy_count, recency-tier colour — the standing-lane counterpart to Supply's in-flight convoys.",
+   "interesting_question": "This is the one fully-built lens the player currently cannot reach at all — no bar glyph and the keyboard cycle skips it.",
+   "resolution": "Confirmed broken access, cited above (UI-027's finding): LENSES.md's roster explicitly flags 'Currently unreachable by the keyboard cycle — the stale overlay_mode_count.'",
+   "checks": [
+    "lens_modes",
+    "province_render"
+   ]
+  },
+  {
+   "id": "UI-043",
+   "name": "Selection band",
+   "kind": "element",
+   "parent": null,
+   "source": [
+    "docs/ui/SELECTION.md",
+    "docs/ui/LAYOUT.md § Selection band",
+    "src/ui/selection_card.hpp",
+    "src/ui/selection_panel.cpp"
+   ],
+   "summary": "A fixed bottom band showing detail of whatever entity the player last single-clicked — an action surface ('what's my move here?'), not a reference ledger; not reachable from the nav rail.",
+   "interesting_question": "This element went through three distinct shapes (full-width bar → shell-column sidebar → click-anchored sticky card → fixed bottom band) — what forced each rewrite, and is the current shape actually final?",
+   "resolution": "Traced by the doc itself, each step motivated: LAYOUT.md/SELECTION.md record the BL-124 sidebar closed ledgers on selection (rejected as competing for the column), BL-194/195's click-anchored card was retired by Ben's 2026-07-28 call that 'doing/building' menus need a fixed screen location rather than a cursor-following widget — the current fixed band is presented as settled, not provisional.",
+   "checks": [
+    "selection_band",
+    "selection_redesign",
+    "selection_bar",
+    "shell_pass"
+   ]
+  },
+  {
+   "id": "UI-044",
+   "name": "Active/Focus/Selection pointer-state model",
+   "kind": "sub-element",
+   "parent": "UI-043",
+   "source": [
+    "docs/ui/SELECTION.md § The three interaction states"
+   ],
+   "summary": "Three named, independent pointer states — Active (navigation anchor), Focus (hover), Selection (last click) — each with its own lifetime and backing state, previously conflated.",
+   "interesting_question": "Selection is explicitly independent of Active — selecting a body does not move or re-anchor the canvas. Does that decoupling risk the player forgetting which body is actually 'active' (framing the lower rungs) after several selections elsewhere?",
+   "resolution": "Open — not addressed by the doc: SELECTION.md states the decoupling as a 'key consequence' of the design with no compensating always-visible 'currently active body' readout named in the doc beyond the minimap title/canvas title bar.",
+   "checks": [
+    "click_injection",
+    "lens_structure_pivot",
+    "hover_freeze"
+   ]
+  },
+  {
+   "id": "UI-045",
+   "name": "Tile selection layout",
+   "kind": "sub-element",
+   "parent": "UI-043",
+   "source": [
+    "docs/ui/SELECTION.md § The tile element's layout (BL-123, reshaped BL-213)"
+   ],
+   "summary": "A dedicated three-column layout for a selected tile (zoomed hex neighbourhood | paged metric accordion | 2x3 action grid), superseding the generic action/facts split used by every other selection kind.",
+   "interesting_question": "Atmospheric pollution and per-tile population have no accordion page at all — is that an intentional scope boundary or a gap the doc itself flags?",
+   "resolution": "Named as a real content gap: SELECTION.md states these are 'not modelled today (population lives on population centres, not arbitrary tiles) and so have no page — a real content gap, not an oversight.'",
+   "checks": [
+    "selection_tile_layout",
+    "selection_accordion",
+    "ui_shell_fixture"
+   ]
+  },
+  {
+   "id": "UI-046",
+   "name": "Body selection action/facts",
+   "kind": "sub-element",
+   "parent": "UI-043",
+   "source": [
+    "docs/ui/SELECTION.md § The body element's action is the survey front door",
+    "docs/ui/SELECTION.md § The body element's fact is its commercial activity pulse"
+   ],
+   "summary": "A body's hero action switches on survey phase (Dispatch Survey → En route → Surveying k/N → Go to surface); its fact column shows the activity-fog commercial pulse, independent of survey state.",
+   "interesting_question": "n/a — the two fogs' independence is fully documented here already (see DISCOVERY.md entries above).",
+   "resolution": "n/a",
+   "checks": [
+    "descend_into_selection",
+    "selection_go_to"
+   ]
+  },
+  {
+   "id": "UI-047",
+   "name": "Building selection action/facts",
+   "kind": "sub-element",
+   "parent": "UI-043",
+   "source": [
+    "docs/ui/SELECTION.md § The building element's fact is a profitability readout (BL-074)"
+   ],
+   "summary": "A player building's hero action opens the Construction panel's management surface; its fact column shows a four-line profitability estimate (Revenue/Inputs/Wages/Maintenance/Net); a rival building shows owner-only, production/stockpile explicitly marked private.",
+   "interesting_question": "The doc itself asks whether Manage's controls should migrate fully into this Selection element instead of routing to the Construction panel, given both currently read/write the same selected entity in the same shared column.",
+   "resolution": "Open — flagged verbatim in the ledger design Q&A: docs/ui/ledgers/construction.md § Open questions asks 'Should selecting a building auto-open Construction/Manage instead of the Selection card, or should Manage's controls migrate into the Selection element' with no resolution recorded.",
+   "checks": [
+    "building_element",
+    "sticky_card"
+   ]
+  },
+  {
+   "id": "UI-048",
+   "name": "Tile construction ledger (build-here fold-out)",
+   "kind": "sub-element",
+   "parent": "UI-045",
+   "source": [
+    "docs/ui/SELECTION.md § The tile element's layout (BL-162 blockquote)"
+   ],
+   "summary": "Opened by the tile band's 'Construct Buildings' action: a fold-out list of every buildable type for the selected tile with cost, a reason-coded validity read, and an actual Build button.",
+   "interesting_question": "The doc calls today's building images explicit placeholders and names an owed expected-profit chart per candidate — is a player choosing between building types today choosing blind on economics?",
+   "resolution": "Explicit gap, named: SELECTION.md states 'First pass — a follow-on adds the per-candidate expected-profit chart BL-162 calls for; today's images are placeholders' — economics per candidate are not yet surfaced at the point of choice.",
+   "checks": [
+    "tile_build_ledger",
+    "tile_build_ledger_survives",
+    "drill_through_fold"
+   ]
+  },
+  {
+   "id": "UI-049",
+   "name": "Hover Card",
+   "kind": "element",
+   "parent": null,
+   "source": [
+    "docs/ui/TOOLTIP.md",
+    "src/ui/hover_card.hpp",
+    "src/ui/hover_card.cpp"
+   ],
+   "summary": "The transient Focus-state popup: a two-phase 'glance, then stick' reveal (appears after 0.5s, freezes in place after 2.5s) showing a compact lens-keyed readout of whatever is under the cursor on the Planetary surface.",
+   "interesting_question": "Solar and Circumplanetary bodies still use an ad-hoc SetTooltip instead of this shared card — does that mean hover depth/consistency differs by which canvas the player is looking at?",
+   "resolution": "Named as owed, not done: TOOLTIP.md's 'Current state' section states migrating Solar/Circumplanetary onto the card 'is owed, not landed' — the inconsistency is real and acknowledged, not accidental.",
+   "checks": [
+    "hover_freeze",
+    "sticky_card",
+    "border_band"
+   ]
+  },
+  {
+   "id": "UI-050",
+   "name": "Hover content dispatch (lens-keyed)",
+   "kind": "sub-element",
+   "parent": "UI-049",
+   "source": [
+    "docs/ui/TOOLTIP.md § The content — draw_hover_content (lens-keyed)"
+   ],
+   "summary": "Resolves the hovered entity kind, then varies the card's content by the active lens (e.g. a tile under Resource shows deposit richness; under Population shows workforce cap; default shows terrain + movement cost).",
+   "interesting_question": "Depth is keyed on the active lens rather than a per-caller 'rich vs lightweight' hint, which the original pre-implementation design proposed instead — why was lens-keying chosen over a fixed depth-per-kind model?",
+   "resolution": "Explicitly the landed departure from the original design: TOOLTIP.md's Superseded section states depth is 'keyed on the lens rather than a caller hint' because the card 'answers the question the lens is asking' — content should match what the player is currently investigating, not just what kind of thing they're pointing at.",
+   "checks": [
+    "lens_structure_pivot"
+   ]
+  },
+  {
+   "id": "UI-051",
+   "name": "Header Panel",
+   "kind": "panel",
+   "parent": null,
+   "source": [
+    "docs/ui/HEADER.md",
+    "src/ui/header_panel.hpp",
+    "src/ui/header_panel.cpp"
+   ],
+   "summary": "Always-visible full-width strip between the identity tile and time column: balance, stockpile valuation, net+trend, runway, and a debt flag — the persistent financial dashboard.",
+   "interesting_question": "The header is a 'guaranteed-fit strip' that never wraps and never silently clips a load-bearing number, degrading in a fixed order instead — why treat this one surface as the reference case for a wider text-wrap audit rather than just wrapping like other panels?",
+   "resolution": "Explicit precedent-setting intent: HEADER.md states 'This ladder is the reference case for BL-215 (text-wrap render audit)... the audit's job is to make every other worded surface degrade this honestly rather than wrap or clip' — the header's ladder is meant to generalise, not stay a one-off.",
+   "checks": [
+    "header",
+    "shell_pass"
+   ]
+  },
+  {
+   "id": "UI-052",
+   "name": "Balance figure",
+   "kind": "sub-element",
+   "parent": "UI-051",
+   "source": [
+    "docs/ui/HEADER.md § Contents"
+   ],
+   "summary": "The player corporation's running treasury balance, negatives flagged red.",
+   "interesting_question": "n/a — a direct read of corporation_component.balance.",
+   "resolution": "n/a",
+   "checks": [
+    "header",
+    "debt_interest"
+   ]
+  },
+  {
+   "id": "UI-053",
+   "name": "Stockpile valuation figure",
+   "kind": "sub-element",
+   "parent": "UI-051",
+   "source": [
+    "docs/ui/HEADER.md § Contents"
+   ],
+   "summary": "A single estimated liquid-value figure summing every player (corp, body) pool priced at that body's current market price; deliberately not a per-resource inventory.",
+   "interesting_question": "Resources on a body with no market contribute nothing to this figure — does that mean holdings on a market-less body are invisible to the header's headline valuation?",
+   "resolution": "Named plainly, not hidden: HEADER.md states this consequence directly ('Resources on a body with no market contribute nothing') as a stated property of the design, not flagged as a bug.",
+   "checks": [
+    "header"
+   ]
+  },
+  {
+   "id": "UI-054",
+   "name": "Net + trend sparkline",
+   "kind": "sub-element",
+   "parent": "UI-051",
+   "source": [
+    "docs/ui/HEADER.md § Contents",
+    "docs/ui/HEADER.md § Resolved design questions"
+   ],
+   "summary": "The last economy tick's signed net change, coloured, plus a sparkline of recent balances (ImGui::PlotLines over a capped history).",
+   "interesting_question": "n/a — a settled design choice (per-tick delta + sparkline over a raw balance figure alone).",
+   "resolution": "n/a",
+   "checks": [
+    "header"
+   ]
+  },
+  {
+   "id": "UI-055",
+   "name": "Runway readout",
+   "kind": "sub-element",
+   "parent": "UI-051",
+   "source": [
+    "docs/ui/HEADER.md § Contents (Runway row)"
+   ],
+   "summary": "Balance ÷ quarterly loss, shown only while it means something (burning cash or already in debt); urgency-coloured red under 8 quarters or when in debt.",
+   "interesting_question": "The doc calls this figure 'load-bearing, not decorative' and states it degrades through the fit ladder but 'the fact is never simply lost' — folded into the Net tooltip as the last resort. Does a tooltip-only fallback still count as the fact staying visible?",
+   "resolution": "The doc's own stance: HEADER.md treats a hover-reachable fact as sufficient to satisfy 'never simply lost' — the degradation ladder's floor is 'folded into the NET figure's tooltip,' explicitly accepted as the worst acceptable case.",
+   "checks": []
+  },
+  {
+   "id": "UI-056",
+   "name": "Debt flag",
+   "kind": "sub-element",
+   "parent": "UI-051",
+   "source": [
+    "docs/ui/HEADER.md § Contents ([in debt] flag row)"
+   ],
+   "summary": "A worded flag beside a negative balance noting interest is self-accelerating; compacts from full text to '[in debt]' + tooltip under width pressure.",
+   "interesting_question": "n/a — a straightforward degradation-ladder element.",
+   "resolution": "n/a",
+   "checks": [
+    "debt_interest"
+   ]
+  },
+  {
+   "id": "UI-057",
+   "name": "Profile (identity tile)",
+   "kind": "panel",
+   "parent": null,
+   "source": [
+    "docs/ui/PROFILE.md",
+    "docs/ui/LAYOUT.md § Profile",
+    "src/ui/profile_panel.cpp"
+   ],
+   "summary": "The top-left corp-identity card capping the shell column: emblem, corp name, home nation, industrial focus — a static identity readout in the prototype.",
+   "interesting_question": "The card is a static readout with no interaction beyond a hinted future 'fuller corporation screen' — is a permanently-pinned, purely-decorative panel the right use of the shell's most valuable fixed real estate (top-left)?",
+   "resolution": "Open — the doc itself only gestures at a future use: PROFILE.md states 'Later it may become the entry point to a fuller corporation screen (holdings summary, standing, history)' with no committed design or backlog id cited.",
+   "checks": [
+    "shell_pass"
+   ]
+  },
+  {
+   "id": "UI-058",
+   "name": "Corp emblem",
+   "kind": "sub-element",
+   "parent": "UI-057",
+   "source": [
+    "docs/ui/PROFILE.md § Contents",
+    "docs/ui/ICONS.md § Corp emblem"
+   ],
+   "summary": "A deterministic geometric shape (one of six primitives) + the corp's identity colour, shared across the identity card, Selection header, canvas building tags, and rival hover cards since BL-090.",
+   "interesting_question": "n/a — a clean, already-unified identity token across surfaces.",
+   "resolution": "n/a",
+   "checks": [
+    "shell_pass"
+   ]
+  },
+  {
+   "id": "UI-059",
+   "name": "Navigation pane (nav rail)",
+   "kind": "panel",
+   "parent": null,
+   "source": [
+    "docs/ui/MENU.md",
+    "docs/ui/LAYOUT.md § Navigation pane",
+    "src/ui/nav_pane.cpp"
+   ],
+   "summary": "A fixed 56px-wide, full-height icon rail of nine square slots (five live, four reserved-dimmed), each toggling a fold-out ledger open/closed, accordion-style.",
+   "interesting_question": "The doc states a standalone buildings-overview ledger was dropped as a rail slot because it 'proved more good-to-know than goal-driving' — what is the actual test the doc applies to decide any future slot?",
+   "resolution": "Stated as an explicit test: MENU.md § Menus are broad ledgers gives it directly — 'is this a broad overview, or a targeted action? Broad → a ledger with a slot. Targeted → the Selection element / a popup, no slot.'",
+   "checks": [
+    "nav_rail",
+    "shell_pass"
+   ]
+  },
+  {
+   "id": "UI-060",
+   "name": "Fold-out ledger column",
+   "kind": "element",
+   "parent": null,
+   "source": [
+    "docs/ui/LAYOUT.md § The shell column (BL-122)",
+    "docs/ui/LAYOUT.md § Container vocabulary",
+    "src/ui/foldout_column.hpp"
+   ],
+   "summary": "The shared chrome every rail-hosted ledger draws through (foldout_begin/foldout_end): one fixed-width rect, one border policy, stopping at the comms dock's top edge since BL-227.",
+   "interesting_question": "BL-227 (comms dock) made every ledger in this column permanently shorter by the bottom strip's height — was that height tax weighed against ledger content density, or purely a placement call?",
+   "resolution": "Named as Ben's deliberate call, not a byproduct: LAYOUT.md's Comms dock section states 'every menu and ledger in the fold-out column is permanently shorter by exactly the Selection band's height. Deliberate (Ben's call, 2026-07-30), not a regression' — with no accompanying content-density analysis cited.",
+   "checks": [
+    "foldout_shell",
+    "drill_through_fold"
+   ]
+  },
+  {
+   "id": "UI-061",
+   "name": "System menu (session-control popup)",
+   "kind": "control",
+   "parent": null,
+   "source": [
+    "docs/ui/MENU.md § Application / system menu — session control (BL-070)"
+   ],
+   "summary": "A top-right corner-gear popup: Pause/Resume and Exit (with an inline 'Really quit?' confirm, since there is no save); Esc toggles it, sharing the pause hotkey's flag.",
+   "interesting_question": "Exit is destructive with no save path in the prototype, so the inline confirm is the only guard against an accidental quit — is a single inline confirm proportionate for a truly unrecoverable action?",
+   "resolution": "Accepted as the prototype minimum, not a final answer: MENU.md frames this as 'Option B... rejected [a centred pause-modal] for the prototype minimum — the centred modal is the right long-term home once a title screen lands,' i.e. the current guard is explicitly interim.",
+   "checks": [
+    "shell_pass"
+   ]
+  },
+  {
+   "id": "UI-062",
+   "name": "Options window (display settings)",
+   "kind": "control",
+   "parent": null,
+   "source": [
+    "docs/ui/MENU.md § Application / system menu — display options (BL-076)"
+   ],
+   "summary": "F10-toggled floating window: resolution preset, Fullscreen, VSync, live window-size readout; persisted to a flat options.cfg loaded only at interactive startup (never in --verify).",
+   "interesting_question": "Settings are deliberately never loaded in the --verify path so goldens stay at a fixed default — does that mean a player-set custom resolution can never be exercised by the visual-verification harness?",
+   "resolution": "Confirmed as intentional isolation: MENU.md states the cfg is 'loaded at interactive startup only (never in the --verify path, so golden captures stay at the fixed default)' — the harness's determinism is prioritised over reproducing arbitrary player display state.",
+   "checks": []
+  },
+  {
+   "id": "UI-063",
+   "name": "Icon vocabulary",
+   "kind": "element",
+   "parent": null,
+   "source": [
+    "docs/ui/ICONS.md",
+    "src/ui/icons.hpp",
+    "src/ui/icons.cpp"
+   ],
+   "summary": "The hand-drawn vector glyph library (no font/atlas) used for every entity marker, UI-affordance icon, and map-lens button, sharing one positional-parameter convention across ~35 glyphs.",
+   "interesting_question": "The `resource` glyph function is genuinely overloaded — one overload draws the identity-coloured deposit pip, another (differently-typed) overload draws the Resource lens's strip glyph — is sharing a name across two visually and semantically different shapes a maintenance risk?",
+   "resolution": "Accepted, disambiguated by call-site type: ICONS.md states the two are 'same name, disambiguated by the final argument type and by context (strip vs. canvas pip)' — treated as settled, not flagged as a naming hazard to fix.",
+   "checks": [
+    "icon_silhouettes"
+   ]
+  },
+  {
+   "id": "UI-064",
+   "name": "Comms dock",
+   "kind": "panel",
+   "parent": null,
+   "source": [
+    "docs/ui/CHAT.md",
+    "docs/ui/LAYOUT.md § Comms dock",
+    "src/ui/chat_panel.hpp",
+    "src/ui/chat_panel.cpp"
+   ],
+   "summary": "The bottom-left tile of the screen's bottom strip: a channel-based chat log (Public + player-created groups) fed by deterministic sim events and player input, the surface of the diplomacy-as-communication principle.",
+   "interesting_question": "Player messages typed into this panel currently have 'no mechanical effect yet — the AI C-route hook' — so what does a player actually gain by typing here today, versus just watching the ambient nation-voiced lines?",
+   "resolution": "Named openly as pre-wired scaffolding: CHAT.md's message-sources table marks player input as 'No mechanical effect yet — the AI C-route hook,' i.e. the surface is built ahead of the AI system (BL-202+) that will make it consequential.",
+   "checks": [
+    "chat_panel",
+    "history_ledger_and_comms"
+   ]
+  },
+  {
+   "id": "UI-065",
+   "name": "Public channel",
+   "kind": "sub-element",
+   "parent": "UI-064",
+   "source": [
+    "docs/ui/CHAT.md § Channels"
+   ],
+   "summary": "Channel 0, always present; since BL-212 the only speakers are nations, never individual corporations, each posting at most one aggregated event per (nation, tick).",
+   "interesting_question": "Why aggregate to one heaviest event per (nation, tick) and post it in first person with no building/corp specifics, rather than the earlier per-corp/per-building reflex lines?",
+   "resolution": "Explicitly a correctness fix, not a style choice: CHAT.md states the old per-corp lines 'were a standing violation of DISCOVERY.md's competitor-visibility rule (they leaked rival internals)' — the aggregation exists specifically to stop leaking private rival state through chat.",
+   "checks": [
+    "history_ledger_and_comms"
+   ]
+  },
+  {
+   "id": "UI-066",
+   "name": "Group channels",
+   "kind": "sub-element",
+   "parent": "UI-064",
+   "source": [
+    "docs/ui/CHAT.md § Channels"
+   ],
+   "summary": "Arbitrary player-created channels over any corp subset (name + member checkboxes), session-local in the shipped slice; AI-created groups unreadable by the player are a named future extension.",
+   "interesting_question": "n/a — a straightforward, already-scoped feature slice.",
+   "resolution": "n/a",
+   "checks": [
+    "chat_panel"
+   ]
+  },
+  {
+   "id": "UI-067",
+   "name": "Time panel",
+   "kind": "panel",
+   "parent": null,
+   "source": [
+    "docs/ui/TIME_CONTROLS.md",
+    "docs/ui/LAYOUT.md § Time panel",
+    "src/core/app.cpp"
+   ],
+   "summary": "Top-right, minimap-width panel: four stacked rows (year/date, quarter-progress bar with countdown overlay, speed row, rate line), the player's clock and speed control.",
+   "interesting_question": "BL-178 reversed an earlier rule that suppressed the percentage overlay text on the quarter-progress bar — what did the bare fill actually fail to communicate?",
+   "resolution": "Stated directly: TIME_CONTROLS.md says 'the bare fill failed to convey how close am I to the economy resolving, which is the fact the bar exists to carry' — the reversal was a legibility fix once the missing information was identified in play.",
+   "checks": [
+    "time_controls",
+    "shell_pass"
+   ]
+  },
+  {
+   "id": "UI-068",
+   "name": "Calendar block",
+   "kind": "sub-element",
+   "parent": "UI-067",
+   "source": [
+    "docs/ui/TIME_CONTROLS.md § Layout — four stacked rows"
+   ],
+   "summary": "Year+date/quarter row and the quarter-progress bar with a centred 'N d to Q2' countdown overlay and an explaining tooltip.",
+   "interesting_question": "n/a — settled, documented layout.",
+   "resolution": "n/a",
+   "checks": [
+    "time_controls"
+   ]
+  },
+  {
+   "id": "UI-069",
+   "name": "Speed controls",
+   "kind": "sub-element",
+   "parent": "UI-067",
+   "source": [
+    "docs/ui/TIME_CONTROLS.md § Layout",
+    "docs/ui/TIME_CONTROLS.md § Speed curve"
+   ],
+   "summary": "A pause slot plus five non-linear speed tiers (0.25x/0.5x/1x/4x/16x, tier 3 the normal-play reference) and an always-visible rate line naming the active tier's real-world pacing.",
+   "interesting_question": "Why deliberately non-linear (two slow-motion tiers, then a 4x jump to fast-forward) rather than a simple linear ramp?",
+   "resolution": "Stated by role, not derived: TIME_CONTROLS.md frames tiers 1-2 as 'genuine slow-motion (for watching detail)' and 4-5 as 'fast-forward aggressively (for skipping quiet quarters to the next economy tick)' — the curve serves two distinct player intents, not a single continuous speed dial.",
+   "checks": [
+    "time_controls"
+   ]
+  },
+  {
+   "id": "UI-070",
+   "name": "Balance Ledger",
+   "kind": "ledger",
+   "parent": null,
+   "source": [
+    "docs/ui/ledgers/balance.md",
+    "docs/ui/MENU.md (slot 2 'Budget')",
+    "src/ui/balance_ledger.cpp"
+   ],
+   "summary": "Rail slot 2 ('Budget'): the player corporation's solvency surface — running balance, runway, and per-tick cashflow decomposition. Currently one flat scrolling panel, not yet split into nav_button tabs.",
+   "interesting_question": "This ledger's own design doc names a direct overlap with the Economy panel's Cashflow view (same cashflow.csv, same six lines, same player corp) — which surface should actually own the player's cashflow table?",
+   "resolution": "Open, flagged for cross-doc resolution but not settled: balance.md states 'Balance owns per-corp money detail... Economy's Cashflow view is the player-slice of that and should either defer to this table or be dropped from Economy' — the Economy doc (UI-089/090) independently reaches the same conclusion but neither doc records Ben's final ruling.",
+   "checks": [
+    "balance_ledger",
+    "budget_ledger_ranked",
+    "debt_interest"
+   ]
+  },
+  {
+   "id": "UI-071",
+   "name": "Treasury view",
+   "kind": "view",
+   "parent": "UI-070",
+   "source": [
+    "docs/ui/ledgers/balance.md § Sub-levels"
+   ],
+   "summary": "Default view: balance (colour-coded), debt flag, projected runway, starting capital + since-start delta.",
+   "interesting_question": "n/a — see parent entry for the ledger-level open question.",
+   "resolution": "n/a",
+   "checks": [
+    "balance_ledger"
+   ]
+  },
+  {
+   "id": "UI-072",
+   "name": "Cashflow view",
+   "kind": "view",
+   "parent": "UI-070",
+   "source": [
+    "docs/ui/ledgers/balance.md § Sub-levels",
+    "docs/ui/ledgers/balance.md § Data"
+   ],
+   "summary": "The signed per-tick flow table: Income, Inputs bought, Maintenance, Wages, Interest (hidden at 0), Net/tick.",
+   "interesting_question": "Interest is hidden entirely at 0 and only appears once a corp goes into debt — does that mean the table's row count silently changes shape across the solvency boundary?",
+   "resolution": "Flagged, not fixed: balance.md's Data section states this outright — 'the flow_row hides it at 0, so the Cashflow table silently gains/loses a row across the solvency boundary. Correct behaviour, worth noting for the mockup so the row-count isn't treated as fixed.'",
+   "checks": [
+    "budget_ledger_ranked"
+   ]
+  },
+  {
+   "id": "UI-073",
+   "name": "Assets view",
+   "kind": "view",
+   "parent": "UI-070",
+   "source": [
+    "docs/ui/ledgers/balance.md § Sub-levels",
+    "docs/ui/ledgers/balance.md § Open questions"
+   ],
+   "summary": "Today a bare building count (cc.assets.size()); a proposed by-type/by-body roll-up is an open question, weighed against duplicating the Corporation dashboard's asset view.",
+   "interesting_question": "n/a — see UI-070; this view's scope is itself one of the doc's open questions for Ben.",
+   "resolution": "n/a",
+   "checks": []
+  },
+  {
+   "id": "UI-074",
+   "name": "Construction Ledger",
+   "kind": "ledger",
+   "parent": null,
+   "source": [
+    "docs/ui/ledgers/construction.md",
+    "docs/ui/MENU.md (slot 6)",
+    "src/ui/construction_panel.cpp"
+   ],
+   "summary": "Rail slot 6: the placement/management/sales surface for buildings, split into Build / Manage / Sell Orders tabs — three genuinely different verbs (place / configure / sell).",
+   "interesting_question": "The doc's own code-level flag calls Sell Orders 'a candidate to move to the Market ledger' — does selling belong with building construction at all, or is it there only because it was built before the Market ledger existed?",
+   "resolution": "Open — an unresolved Q&A item: construction.md asks directly 'Does Sell Orders belong here at all?... Keep it in Construction (place → sell as one workflow) or move it out so Construction is purely build+manage?' with no ruling recorded.",
+   "checks": [
+    "construction_ledger",
+    "construction_panel",
+    "build_door_wide_roster"
+   ]
+  },
+  {
+   "id": "UI-075",
+   "name": "Build view",
+   "kind": "view",
+   "parent": "UI-074",
+   "source": [
+    "docs/ui/ledgers/construction.md § Sub-levels"
+   ],
+   "summary": "Arm-buttons for Extraction Site / Processing Facility / Port, a target-resource picker for extraction, live cost readout, plus a Queue subsection.",
+   "interesting_question": "The Queue subsection is described as placeholder-only with no backing construction_queue, progress percentage, or ticks-left data at all — what does a player actually see when they check on a build in progress?",
+   "resolution": "Named plainly as unbuilt: construction.md states 'draw_queue_section always shows No active construction... Any queue table in the mock is owed data, not live. This is the single biggest gap' — there is no in-progress readout today.",
+   "checks": [
+    "tile_build_ledger",
+    "roads",
+    "build_door_wide_roster",
+    "fresh_start_build"
+   ]
+  },
+  {
+   "id": "UI-076",
+   "name": "Manage view",
+   "kind": "view",
+   "parent": "UI-074",
+   "source": [
+    "docs/ui/ledgers/construction.md § Sub-levels",
+    "docs/ui/SELECTION.md (Manage ▸ action)"
+   ],
+   "summary": "Resolves the selected building (by id, falling back to tile match) and exposes a live workforce slider, recipe combo, and Decommission button — the surface the Selection panel's 'Manage ▸' action routes to.",
+   "interesting_question": "See UI-047 — this is the other half of the same unresolved Manage-vs-Selection column-ownership question.",
+   "resolution": "See UI-047's resolution citation (docs/ui/ledgers/construction.md § Open questions, same finding).",
+   "checks": [
+    "building_management",
+    "building_management_shell",
+    "recipe_workforce",
+    "building_profit",
+    "v009_batch"
+   ]
+  },
+  {
+   "id": "UI-077",
+   "name": "Sell Orders view",
+   "kind": "view",
+   "parent": "UI-074",
+   "source": [
+    "docs/ui/ledgers/construction.md § Sub-levels"
+   ],
+   "summary": "Per-body sell-order list for the player corp (resource x qty >= floor); add/remove, reading the body's market_component.",
+   "interesting_question": "n/a — see UI-074's parent-level open question about whether this view belongs here at all.",
+   "resolution": "n/a",
+   "checks": [
+    "sell_order"
+   ]
+  },
+  {
+   "id": "UI-078",
+   "name": "Corporations table (Diplomacy slot stand-in)",
+   "kind": "ledger",
+   "parent": null,
+   "source": [
+    "docs/ui/ledgers/corporation.md",
+    "docs/ui/MENU.md",
+    "src/ui/corporation_panel.cpp",
+    "src/ui/nav_pane.cpp"
+   ],
+   "summary": "A sorted one-row-per-corp table (name/focus/balance, player row tinted) - the field-of-rivals ranking, distinct from any single corp's own money detail. It has MOVED off rail slot 1: slot 1 is now the Corporation overview dashboard, and this table hosts slot 8, which is labelled Diplomacy and reserved for a surface not yet designed.",
+   "interesting_question": "It sits in a slot named for something else. Does a table of rival balances belong under Diplomacy, or is it squatting until the real surface exists?",
+   "resolution": "Squatting, deliberately and with the label kept honest: nav_pane.cpp slot 8 says \"Diplomacy - Not yet built. For now: every corporation's balance, side by side.\" The comment states the reasoning - the table IS a rival-comparison read, which is what the slot is eventually for, and it moves when Diplomacy is designed. The slot stays labelled by its real subject rather than by its stand-in.",
+   "checks": [
+    "corp_disclosure"
+   ]
+  },
+  {
+   "id": "UI-079",
+   "name": "Standings table",
+   "kind": "view",
+   "parent": "UI-078",
+   "source": [
+    "docs/ui/ledgers/corporation.md § Sub-levels"
+   ],
+   "summary": "Corporation | Focus | Balance, sorted by entity id, player row tinted, balance coloured red/green — the default and (per the doc's lean) possibly the only view this ledger needs.",
+   "interesting_question": "n/a — see UI-078 for the parent open question.",
+   "resolution": "n/a",
+   "checks": [
+    "corp_disclosure"
+   ]
+  },
+  {
+   "id": "UI-080",
+   "name": "Market Ledger",
+   "kind": "ledger",
+   "parent": null,
+   "source": [
+    "docs/ui/ledgers/market.md",
+    "docs/ui/MENU.md (slot 5)",
+    "src/ui/market_ledger.cpp"
+   ],
+   "summary": "Rail slot 5: per-market supply/demand/price/net board (Prices), a per-body multi-market turnover comparison (Markets), and price/supply/demand sparklines (Trends).",
+   "interesting_question": "The mock CSV exporter emits one row per market_component with no market_id/region column, so a body with 5 markets (Kepler) produces a 5x-inflated join in the Power BI mock — does that gap only affect the design mockup, or could the same ambiguity affect any future per-market export?",
+   "resolution": "Named narrowly as an export-only gap, not a live-code bug: market.md states 'the gap is export-only, for the Power BI mock... Fix: add a market_id (and human region label...) column to the exporter' — the live in-app ledger reads w.markets directly and is unaffected.",
+   "checks": [
+    "market_ledger",
+    "lens_structure_pivot"
+   ]
+  },
+  {
+   "id": "UI-081",
+   "name": "Prices view",
+   "kind": "view",
+   "parent": "UI-080",
+   "source": [
+    "docs/ui/ledgers/market.md § Sub-levels"
+   ],
+   "summary": "Default view: one row per traded resource for the selected market — Supply/Demand/Price/Net, colour-washed, with a turnover-this-tick footer.",
+   "interesting_question": "n/a — see UI-080.",
+   "resolution": "n/a",
+   "checks": [
+    "market_ledger"
+   ]
+  },
+  {
+   "id": "UI-082",
+   "name": "Markets view",
+   "kind": "view",
+   "parent": "UI-080",
+   "source": [
+    "docs/ui/ledgers/market.md § Sub-levels"
+   ],
+   "summary": "One row per market on the selected body (Market/Supply/Demand/Turnover), selectable to re-point the Prices and Trends views to a different market.",
+   "interesting_question": "n/a — see UI-080.",
+   "resolution": "n/a",
+   "checks": [
+    "market_ledger"
+   ]
+  },
+  {
+   "id": "UI-083",
+   "name": "Trends view",
+   "kind": "view",
+   "parent": "UI-080",
+   "source": [
+    "docs/ui/ledgers/market.md § Sub-levels"
+   ],
+   "summary": "Price/supply/demand sparkline trio for a picked resource in the selected market, read from market_plot_history (BL-063).",
+   "interesting_question": "n/a — see UI-080.",
+   "resolution": "n/a",
+   "checks": []
+  },
+  {
+   "id": "UI-084",
+   "name": "History Ledger (Story/Chain/Tiles)",
+   "kind": "ledger",
+   "parent": null,
+   "source": [
+    "docs/ui/MENU.md (slot 9 'History', BL-211)",
+    "docs/ui/ledgers/tile_ledger.md",
+    "src/ui/tile_inspector.cpp"
+   ],
+   "summary": "Rail slot 9: generation history and current-state tile inspection, split (BL-211, landed 2026-07-29) into Story (dated body biography), Chain (generation-stage charts shared with the wizard), and Tiles (per-tile/building/market tables).",
+   "interesting_question": "The old ledger design doc (tile_ledger.md) still leaves a Market section stacked inside Tiles even though it once recommended cutting it as a duplicate of the standalone Market Ledger — did the BL-211 migration act on that recommendation, or ship without touching it?",
+   "resolution": "Reconciled 2026-07-31 (this pass): tile_inspector.cpp shows the Market section (supply/demand/price/base) still present under the Tiles view, unconditionally, right where it was pre-migration — the migration split Story/Chain/Tiles but did not remove Market. tile_ledger.md is now updated to reflect this and re-opens the cut as a live open question rather than a stale caveat.",
+   "checks": [
+    "history_ledger_and_comms",
+    "drill_through_fold",
+    "text_overflow_floor"
+   ]
+  },
+  {
+   "id": "UI-085",
+   "name": "Story view",
+   "kind": "view",
+   "parent": "UI-084",
+   "source": [
+    "docs/ui/MENU.md (History slot note, BL-211)"
+   ],
+   "summary": "The selected body's dated biography lines — including the Continents/Drift pass's history lines, since moved here from the render report.",
+   "interesting_question": "n/a — see UI-084 for the doc-currency question this whole ledger raises.",
+   "resolution": "n/a",
+   "checks": [
+    "history_ledger_and_comms"
+   ]
+  },
+  {
+   "id": "UI-086",
+   "name": "Chain view",
+   "kind": "view",
+   "parent": "UI-084",
+   "source": [
+    "docs/ui/MENU.md (History slot note, BL-211)",
+    "docs/ui/STARTUP.md § New World wizard"
+   ],
+   "summary": "One collapsing accordion per generation-stage chart under the wizard's three round tabs — the same ui::generation_charts the New World wizard uses, so a decided-on world's plots stay reopenable mid-campaign.",
+   "interesting_question": "n/a — see UI-084.",
+   "resolution": "n/a",
+   "checks": [
+    "drill_through_fold"
+   ]
+  },
+  {
+   "id": "UI-087",
+   "name": "Tiles view",
+   "kind": "view",
+   "parent": "UI-084",
+   "source": [
+    "docs/ui/ledgers/tile_ledger.md § Sub-levels (proposed target)"
+   ],
+   "summary": "Per-tile table (X, Y, composition, landform, hazard, habitability, per-resource deposit) plus built-building and market sections for the selected body.",
+   "interesting_question": "The slot is named 'History' but the doc bluntly calls the actual content 'a current-state tile inspector, not a history/timeline' with no per-tile time series captured anywhere.",
+   "resolution": "Open, named as a genuine naming mismatch: tile_ledger.md asks 'What does History actually mean for slot 9?... Rename the slot to match the current tile-inspector behaviour, or commit to building real per-tile history capture' — MENU.md's own slot-rename history (§ Menu set and ordering) confirms 'History' was a deliberate broadening from 'Tile Ledger' with the stated intent of also carrying post-generation advisory detail, which is separately marked 'still owed.'",
+   "checks": [
+    "history_ledger_and_comms",
+    "text_overflow_floor"
+   ]
+  },
+  {
+   "id": "UI-088",
+   "name": "Economy Panel (aggregate)",
+   "kind": "panel",
+   "parent": null,
+   "source": [
+    "docs/ui/ledgers/economy.md",
+    "src/ui/economy_panel.cpp",
+    "src/ui/nav_pane.cpp"
+   ],
+   "summary": "Whole-enterprise aggregate views (Standing/Cashflow/Sector/Workforce), two of which the doc finds duplicate Balance and Corporation exactly. No longer unreachable: it hosts nav slot 3, which is labelled Workforce and reserved for a surface not yet built.",
+   "interesting_question": "Does this surface earn its own rail slot at all, given the doc's own audit found its Cashflow view is byte-for-byte the same data as Balance's Cashflow tab and its Standing view duplicates Corporation's Standings?",
+   "resolution": "Resolved by the same stand-in idiom as UI-078: nav_pane.cpp slot 3 reads \"Workforce - Not yet built. For now: the Economy panel\". The comment gives the reason - this panel's Corps view already carries the labour table the slot is eventually for, and reusing a reserved slot leaves the rail's length free for BL-094's law/force slots.",
+   "checks": [
+    "economy_panel",
+    "economy_panel_refit",
+    "processing_management_ux"
+   ]
+  },
+  {
+   "id": "UI-089",
+   "name": "Sector view",
+   "kind": "view",
+   "parent": "UI-088",
+   "source": [
+    "docs/ui/ledgers/economy.md § Sub-levels"
+   ],
+   "summary": "A proposed extraction-vs-processing composition bar across all the player's holdings — the doc's candidate for 'the surface's real reason to exist,' but its aggregation helper does not exist in code yet.",
+   "interesting_question": "n/a — see UI-088 for the parent-level open question this view is central to.",
+   "resolution": "n/a",
+   "checks": [
+    "economy_panel_refit"
+   ]
+  },
+  {
+   "id": "UI-090",
+   "name": "Workforce view",
+   "kind": "view",
+   "parent": "UI-088",
+   "source": [
+    "docs/ui/ledgers/economy.md § Sub-levels",
+    "docs/ui/ledgers/economy.md § Data"
+   ],
+   "summary": "Staffing contention across (corp x body), already built (draw_workforce) and genuinely aggregate — but the doc notes the mock data shows a uniform 85.47% for every corp.",
+   "interesting_question": "If the mock data is uniform across every corporation, how would a designer judging the mockup tell whether this view actually reads well once contention genuinely varies?",
+   "resolution": "Named as a testing caveat, not fixed: economy.md states 'the view will look inert until real contention varies; verify against live sim, not the CSV' — the doc flags the mock as an unreliable stand-in for judging this specific view.",
+   "checks": []
+  },
+  {
+   "id": "UI-091",
+   "name": "Main Menu",
+   "kind": "view",
+   "parent": null,
+   "source": [
+    "docs/ui/STARTUP.md § Main menu — draw_main_menu"
+   ],
+   "summary": "The app's opening screen (app_screen::menu): seed entry + Roll + Copy, a Sparse/Lean/Standard resource-abundance radio, a disabled bodies-count slider fixed at 5, New Game and Quit.",
+   "interesting_question": "The bodies-count slider is present but disabled, fixed at 5 — why ship a visible-but-inert control rather than simply omitting it until the feature lands?",
+   "resolution": "Named as a deliberate phasing choice: STARTUP.md states 'the count knob is phased to a later update,' presenting the slider now as a promise of future scope rather than an omission — though the doc does not explain why visibility-before-function was chosen over waiting to add the control.",
+   "checks": [
+    "main_menu",
+    "planetology_generation",
+    "shell_pass"
+   ]
+  },
+  {
+   "id": "UI-092",
+   "name": "New World wizard",
+   "kind": "view",
+   "parent": null,
+   "source": [
+    "docs/ui/STARTUP.md § New World wizard — draw_generation_screen (BL-167)"
+   ],
+   "summary": "Three thematic rounds over the ten-stage Planetology chain; every control move re-runs a throwaway preview (no world state touched) resolved against named preferences, not raw parameters.",
+   "interesting_question": "Rounds are stated to be causal — rerolling round A re-draws rounds B and C downstream — and Back is 'a plain revision with no per-round snapshot.' Does a player who liked round B's preview lose it irrecoverably by going back to tweak round A?",
+   "resolution": "Confirmed as the accepted cost, not mitigated: STARTUP.md states this plainly — 'Rounds are causal... so Back is a plain revision with no per-round snapshot' — no undo/snapshot mechanism is described.",
+   "checks": [
+    "planetology_generation"
+   ]
+  },
+  {
+   "id": "UI-093",
+   "name": "Wizard round (one of three)",
+   "kind": "sub-element",
+   "parent": "UI-092",
+   "source": [
+    "docs/ui/STARTUP.md § New World wizard"
+   ],
+   "summary": "Each round stacks its Planetology-stage charts + explanations, then takes that round's preference inputs; charts are shared verbatim with the History ledger's Chain view.",
+   "interesting_question": "n/a — see UI-092 for the causal-rounds open question this sub-element is part of.",
+   "resolution": "n/a",
+   "checks": [
+    "planetology_generation"
+   ]
+  },
+  {
+   "id": "UI-094",
+   "name": "Zoom ladder navigation model",
+   "kind": "element",
+   "parent": null,
+   "source": [
+    "docs/ui/CANVASES.md § Navigation — the zoom ladder",
+    "docs/ui/MINIMAP.md § Navigation model — minimap is context"
+   ],
+   "summary": "The cross-cutting descend/ascend model shared by all three canvases: double-click a body descends one rung in the primary; a single click on the minimap ascends one rung, always.",
+   "interesting_question": "Single-click semantics differ by which canvas the click lands on — a canvas click selects (no view change), a minimap click ascends (a view change) — is a same-gesture-different-meaning split across two adjacent screen regions confusing in practice?",
+   "resolution": "Explicitly justified by the doc as a deliberate asymmetry, not an oversight: SELECTION.md states 'Minimap ascend stays a single click — the minimap has no selection semantics,' treating the minimap as categorically not a selectable surface, so the same gesture is argued to carry no real ambiguity.",
+   "checks": [
+    "zoom_ladder",
+    "canvas_levels",
+    "descend_into_selection"
+   ]
+  },
+  {
+   "id": "UI-095",
+   "name": "Keyboard navigation bindings",
+   "kind": "sub-element",
+   "parent": "UI-094",
+   "source": [
+    "docs/ui/CANVASES.md § Keyboard navigation"
+   ],
+   "summary": "A full keyboard-only 'limited access' surface (Enter/Backspace/[/]/arrows/=/-/L/Shift+L/0/F12) driving the same canvas_command dispatch the mouse and the verify harness use.",
+   "interesting_question": "This exists explicitly to double as a machine-drivable interface for the visual-verification harness, not purely as a player accessibility feature — does that shared purpose ever constrain which bindings get added (i.e. must every new canvas action be keyboard-reachable to stay script-verifiable)?",
+   "resolution": "Open — implied but not stated as a rule: CANVASES.md notes 'the verify API's verify.command(name) routes through the same dispatch, so a verification script reads as the player's key sequence,' which strongly implies new canvas actions should get a canvas_command for verifiability, but no explicit policy requiring this is written down.",
+   "checks": [
+    "descend_into_selection"
+   ]
+  },
+  {
+   "id": "UI-096",
+   "name": "National border band",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/LENSES.md",
+    "docs/politics/NATIONS.md",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "summary": "Always-on chrome: each nation's border drawn as a band extending its colour INWARDS from the frontier, rather than a territory-wide tint. Drawn like roads, and clickable - the band routes to its owning nation.",
+   "interesting_question": "This replaced a whole lens. Does always-on chrome cost less than the lens slot it freed, or does it just move the cost onto every frame?",
+   "resolution": "Settled by Ben, 2026-08-24 (BL-601): \"National borders should not diffuse together, instead they should borders extending their colour inwards. With this, we can drop the nation lens.\" The lens DISSOLVED rather than being deleted - its content became chrome and the selection route it owned (hovered tile to owning nation to Nation ledger) moved onto the band itself. ui_state.hpp keeps `country` as an explicit retired row in overlay_from_name so the retirement reads at the seam.",
+   "checks": [
+    "border_band"
+   ]
+  },
+  {
+   "id": "UI-097",
+   "name": "Province render and selection",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/generation/PROVINCES.md",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "summary": "The province as the rendered and selected unit rather than the tile: a partition of the body into the spatial unit of consequence, selectable in its own right and pivoted to under a lens.",
+   "interesting_question": "If a province is the unit of consequence, what is left for a tile to be - and which one does a click mean?",
+   "resolution": "Resolved by the structure pivot (BL-603): under a lens, hover and selection pivot to the whole STRUCTURE, and off-lens the tile stays the grain. Both routes are asserted, unusually for this catalogue - lens_structure_pivot.lua carries 11 verify.expect calls.",
+   "checks": [
+    "province_render",
+    "lens_structure_pivot"
+   ]
+  },
+  {
+   "id": "UI-098",
+   "name": "Throughput lens",
+   "kind": "sub-element",
+   "parent": "UI-029",
+   "source": [
+    "docs/ui/LENSES.md",
+    "docs/economy/LOGISTICS.md",
+    "src/ui/ui_state.hpp"
+   ],
+   "summary": "Active Logistic Points: the reach envelope (served / beyond reach) plus a per-anchor LP magnitude disc.",
+   "interesting_question": "Every lens costs a bar slot, a key, three doc rows and a selection rule permanently. Two lenses were retired the same week this one landed - what makes this one worth the slot?",
+   "resolution": "It answers a question no other lens can: whether a place is REACHABLE, not what is at it. LENSES.md gives it its own section and ui_state.hpp its own enum value (BL-598). The two retired the same week - Opportunity and Production (BL-604) - were per-tile value surfaces whose read Scarcity and Industry already carried between them, which is exactly the test this one passes.",
+   "checks": [
+    "throughput_lens"
+   ]
+  },
+  {
+   "id": "UI-099",
+   "name": "Star-map inset (Solar minimap)",
+   "kind": "sub-element",
+   "parent": "UI-025",
+   "source": [
+    "src/ui/star_map_view.cpp",
+    "docs/ui/MINIMAP.md"
+   ],
+   "summary": "The sky over the homeworld, drawn into the Solar rung's minimap rectangle - the ladder wraps, so the top rung's minimap shows the sky rather than a zoom-out that does not exist.",
+   "interesting_question": "A minimap that is not a map of anything navigable - is it chrome pretending to be an instrument?",
+   "resolution": "Deliberate: the ladder wraps because Solar is the top rung and has no zoom-out, so rather than leave the rectangle empty or duplicate the canvas, the slot carries the one view that is above Solar. Called out in star_map_view.hpp's own header comment.",
+   "checks": []
+  },
+  {
+   "id": "UI-100",
+   "name": "Corporation overview dashboard",
+   "kind": "ledger",
+   "parent": null,
+   "source": [
+    "docs/ui/ledgers/corporation.md",
+    "src/ui/corporation_dashboard.cpp",
+    "src/ui/nav_pane.cpp"
+   ],
+   "summary": "Rail slot 1: the player corporation at a glance - balance, holdings and alerts, rolled up rather than enumerated. Distinct from the Corporations table (UI-078), which ranks the field of rivals.",
+   "interesting_question": "A roll-up is a summary of surfaces that already exist. What does it add beyond a shorter walk to them?",
+   "resolution": "The roll-ups are the point (BL-248, requirements.json section corp-dashboard-rollups): the ledgers answer \"what is the number\", the dashboard answers \"is anything wrong\", which no per-ledger read gives without visiting all of them.",
+   "checks": [
+    "corp_dashboard"
+   ]
+  },
+  {
+   "id": "UI-101",
+   "name": "Contracts Ledger",
+   "kind": "ledger",
+   "parent": null,
+   "source": [
+    "docs/economy/CONTRACTS.md",
+    "src/ui/contracts_ledger.cpp",
+    "src/ui/nav_pane.cpp"
+   ],
+   "summary": "Rail slot 13: the mercenary contract end to end, split into three views by the standing button-strip idiom (LAYOUT.md, one question per view).",
+   "interesting_question": "A contract is a promise between named parties. Does a ledger of them read as a market, or as a relationship?",
+   "resolution": "As a market at the Offers end and a relationship at the History end, which is why the split is three views rather than one table - CONTRACTS.md owns the distinction and ui_state::contracts_ledger_view carries it.",
+   "checks": [
+    "contracts_ledger",
+    "mercenary_slice"
+   ]
+  },
+  {
+   "id": "UI-102",
+   "name": "Offers view",
+   "kind": "view",
+   "parent": "UI-101",
+   "source": [
+    "docs/economy/CONTRACTS.md",
+    "src/ui/contracts_ledger.cpp"
+   ],
+   "summary": "Contracts on offer and not yet taken - the market end of the ledger.",
+   "interesting_question": "An offer the player cannot service is noise. Is the list filtered by capability, or by nothing?",
+   "resolution": "Open - the view is built (BL-576) and its filtering rule is not stated in CONTRACTS.md. Worth settling before the roster of offers grows.",
+   "checks": [
+    "contracts_ledger"
+   ]
+  },
+  {
+   "id": "UI-103",
+   "name": "Active view",
+   "kind": "view",
+   "parent": "UI-101",
+   "source": [
+    "docs/economy/CONTRACTS.md",
+    "src/ui/contracts_ledger.cpp"
+   ],
+   "summary": "Contracts taken and running, with their obligations and their clock.",
+   "interesting_question": "An active contract is the one thing on this ledger that can fail while the player is not looking. Where does that failure surface?",
+   "resolution": "Partly on the Comms dock, which since 2026-08-19 gives battle traffic a standing channel of its own (chat_panel.hpp). Whether contract failure gets the same treatment is not settled.",
+   "checks": [
+    "contracts_ledger",
+    "mercenary_slice"
+   ]
+  },
+  {
+   "id": "UI-104",
+   "name": "History view",
+   "kind": "view",
+   "parent": "UI-101",
+   "source": [
+    "docs/economy/CONTRACTS.md",
+    "src/ui/contracts_ledger.cpp"
+   ],
+   "summary": "Terminal contracts - completed, failed or expired - the relationship end of the ledger.",
+   "interesting_question": "History is the only view here with no action on it. What is it for?",
+   "resolution": "Reputation: CONTRACTS.md ties terminal outcomes to standing with the counterparty, so the view is the evidence behind a number that gates future offers.",
+   "checks": [
+    "contracts_ledger"
+   ]
+  },
+  {
+   "id": "UI-105",
+   "name": "Generation Ledger",
+   "kind": "ledger",
+   "parent": null,
+   "source": [
+    "docs/generation/GENERATION_LEDGER.md",
+    "src/ui/generation_ledger.cpp",
+    "src/ui/nav_pane.cpp"
+   ],
+   "summary": "Rail slot 10: the why-did-this-tile-generate surface - the per-pass derivation for a tile and the body's own histograms.",
+   "interesting_question": "This is a developer tuning surface on a player-facing rail. Does it ship?",
+   "resolution": "Its own doc calls it the developer tuning surface, and it currently holds a permanent rail slot. Whether that survives to v1.0 is a ROADMAP question the catalogue does not answer.",
+   "checks": [
+    "save_load"
+   ]
+  },
+  {
+   "id": "UI-106",
+   "name": "AI decision feed",
+   "kind": "ledger",
+   "parent": null,
+   "source": [
+    "docs/ai/AI_OPPONENT.md",
+    "src/ui/decision_feed.cpp",
+    "src/ui/nav_pane.cpp"
+   ],
+   "summary": "Rail slot 11: what the rival corporations decided and how close the call was - a fold-out over the two stores that record every strategic decision the scorer takes.",
+   "interesting_question": "The scorer is deterministic and its reasons are legible. Showing them makes the opponent readable - does that make it beatable in a way that is boring?",
+   "resolution": "Accepted deliberately (BL-407): AI_OPPONENT.md wants a rival whose behaviour is explicable, and decision_feed.cpp's own header notes these stores existed and nothing had ever read them. The near-miss margin is shown precisely so the read is \"it nearly did X\", not a solved lookup table.",
+   "checks": [
+    "decision_feed"
+   ]
+  },
+  {
+   "id": "UI-107",
+   "name": "Strategy readout",
+   "kind": "ledger",
+   "parent": null,
+   "source": [
+    "docs/ai/AI_OPPONENT.md",
+    "docs/ai/STRATEGIES.md",
+    "src/ui/strategy_readout.cpp",
+    "src/ui/nav_pane.cpp"
+   ],
+   "summary": "Rail slot 12: what strategy is EMERGING - each corporation's decision mix, spend priorities and stated reasons over the recent run, aggregated rather than per-decision.",
+   "interesting_question": "The scorer has no strategies, only weights. Is a readout of emergent strategy a real measurement or a story told over noise?",
+   "resolution": "A measurement, and the distinction is the item's point (BL-411, requirements.json section emergent-strategy-readout): it aggregates the decision mix the feed shows one at a time, so a pattern in it is a pattern in the weights, not a narrative laid over them.",
+   "checks": [
+    "strategy_readout"
+   ]
+  },
+  {
+   "id": "UI-108",
+   "name": "Research panel (tech-tree design mock)",
+   "kind": "ledger",
+   "parent": null,
+   "source": [
+    "docs/economy/RESEARCH.md",
+    "src/ui/tech_tree_panel.cpp",
+    "src/ui/nav_pane.cpp"
+   ],
+   "summary": "Rail slot 4: an era-selector fold-out, one row per era with a real thumbnail of that era's node graph. The slot's own tooltip says design mock, not gameplay.",
+   "interesting_question": "A mock on a live rail slot is indistinguishable from a feature until the player clicks it. Is the tooltip enough?",
+   "resolution": "Judged enough for now - the slot tooltip reads \"Technology unlocks and the route to space (design mock)\", which is the same honesty idiom slots 3 and 8 use for their stand-ins. RESEARCH.md is itself a stub, so the mock is ahead of its own authority.",
+   "checks": [
+    "tech_tree_panel"
+   ]
+  },
+  {
+   "id": "UI-109",
+   "name": "Frame-budget HUD",
+   "kind": "element",
+   "parent": null,
+   "source": [
+    "docs/development/DEVELOPMENT_PRACTICES.md",
+    "src/ui/frame_stats.cpp"
+   ],
+   "summary": "One frame's timing breakdown plus the draw volume that produced it - a developer overlay, not rail-hosted.",
+   "interesting_question": "A performance HUD measures the frame it is drawn into. How much of what it reports is itself?",
+   "resolution": "Open - frame_stats.cpp reports the breakdown without subtracting its own cost. Small today; worth stating if the HUD grows.",
+   "checks": [
+    "frame_budget_hud"
+   ]
+  },
+  {
+   "id": "UI-110",
+   "name": "Battle card",
+   "kind": "sub-element",
+   "parent": "UI-043",
+   "source": [
+    "docs/military/MILITARY.md",
+    "src/ui/selection.hpp",
+    "src/ui/selection_card.cpp"
+   ],
+   "summary": "The Selection band's content for a battle in progress, plus the Field dispatch channel that narrates it.",
+   "interesting_question": "Every other thing the Selection band shows is an entity with an id. A battle is not. How does selection hold something that cannot be selected?",
+   "resolution": "By not pretending: selection.hpp states a battle \"has no entity id to select\" and lives in its own ui_state fields rather than going through selection_kind_of. The header calls this the point rather than an omission (BL-469).",
+   "checks": [
+    "battle_card"
+   ]
+  },
+  {
+   "id": "UI-111",
+   "name": "Spectator god view",
+   "kind": "element",
+   "parent": null,
+   "source": [
+    "docs/ai/AI_OPPONENT.md",
+    "src/ui/selection_panel.hpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/hover_content.cpp"
+   ],
+   "summary": "A draw-time mode that lifts the survey mask and opens the private half of a rival's readouts, so a session with no seated player can be watched.",
+   "interesting_question": "Lifting fog for a viewer changes what the viewer knows, not what the world is. Is that guaranteed anywhere, or just intended?",
+   "resolution": "Guaranteed at the draw call and asserted: body_surface_canvas.cpp notes \"the mask lifts AT THE DRAW CALL only\", and tools/verify/spectator_determinism.cpp asserts the flag defaults false so an ordinary session is byte-identical, and that admitting one more corp shifts no rival's cadence slot (BL-408/BL-409; the standing rules carry the full ruling).",
+   "checks": [
+    "spectator_god_view"
+   ]
+  }
+ ]
 }

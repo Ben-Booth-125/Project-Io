@@ -127,6 +127,8 @@ follow. Where a store has a query tool, use the tool, never load the file.
 | `docs/ui/MENU.md`, `HEADER.md`, `PROFILE.md`, `TIME_CONTROLS.md`, `CHAT.md`, `EXPLORER.md` | The shell's fixed panels, one each. |
 | `docs/ui/ledgers/*.md` | One design Q&A per fold-out ledger (`README.md` gives the five axes). |
 | `docs/ui/question_log.json` → `QUESTION_LOG.md` | Every surface's question, justification and demanding item. **Required on every surface**; regenerate with `render_question_log.js`; never build a check against it (Ben, 2026-08-01). |
+| `docs/ui/ui_elements.json` | The surface inventory — every canvas, ledger, panel and chrome element that exists, with its `checks`. The spine a UI pass scopes off. **Query, don't load.** |
+| `docs/ui/UI_COVERAGE.md` | Derived: what a green visual run actually proves, per element. `ui_coverage.js` (`--class --element --check --orphans --json`); orphan checks are the catalogue's staleness detector. |
 
 ### Development — method and state
 | Store | Owns | Tool |
