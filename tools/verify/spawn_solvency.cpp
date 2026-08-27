@@ -118,6 +118,7 @@
 
 #include "scripting/lua_state.hpp"
 
+#include "world/world_gen_config.hpp"
 #include "harness_params.hpp"
 #include "world/budget_system.hpp"
 #include "world/components.hpp"
@@ -402,7 +403,8 @@ double median_of(std::vector<double> v)
     return v[v.size() / 2];
 }
 
-seed_result run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory)
+seed_result run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory,
+                    const world_gen_config& gen_cfg)
 {
     seed_result out;
     out.seed = seed;
@@ -414,7 +416,21 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory)
 
     // app::setup_world -> load_economy -> generate_background_firms ->
     // assign_default_recipes, in that order (app.cpp § start_new_game_prelude).
-    world w = make_hard_coded_world(p);
+    //
+    // THE GENERATION CONFIG MUST BE PARSED AND PASSED (fixed 2026-08-26, found by
+    // material_floor.cpp). Omitting it does not fall back to something close: the
+    // default `world_gen_config{}` carries base prices for TEN of forty-seven
+    // resources, where scripts/world_gen.lua authors FORTY-TWO. Markets are seeded
+    // from that table, so a harness without it measures a world in which stone,
+    // timber, clay, fibre, planks and tools are UNPRICED — not cheap, unquoted —
+    // and every extraction site working them is unsellable at any workforce.
+    //
+    // Loading world_gen.lua into the Lua state is NOT sufficient and this file
+    // made exactly that mistake: the 2026-08-26 loader fix added the load and not
+    // the parse, so the numbers it produced afterwards were still of the wrong
+    // world. app.cpp:488-490 loads AND parses AND passes; a harness must do all
+    // three or it is not measuring the shipped spawn.
+    world w = make_hard_coded_world(p, nullptr, gen_cfg);
     assign_default_recipes(w, reg);
     generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
     assign_default_recipes(w, reg);
@@ -579,6 +595,12 @@ int main(int argc, char** argv)
     recipe_registry reg;
     reg.load_from_lua(lua);
 
+    // Parsed, not merely loaded — see the note in run_seed. This one line is the
+    // difference between measuring the shipped spawn and measuring a world where
+    // most of the ancient roster cannot be sold at all.
+    world_gen_config gen_cfg{};
+    gen_cfg.load_from_lua(lua);
+
     world_params probe;              // for the epoch year alone
     reg.set_era(era_band_for_epoch(probe.epoch_year));
 
@@ -601,7 +623,7 @@ int main(int argc, char** argv)
     rows.reserve(static_cast<std::size_t>(seed_count));
     for (int i = 0; i < seed_count; ++i)
     {
-        rows.push_back(run_seed(seed0 + static_cast<uint32_t>(i), reg, prehistory));
+        rows.push_back(run_seed(seed0 + static_cast<uint32_t>(i), reg, prehistory, gen_cfg));
         std::printf("  ... seed %u done\n", rows.back().seed);
         std::fflush(stdout);
     }
