@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**47 surfaces** — 5 settled, 42 awaiting Ben's wording.
+**48 surfaces** — 5 settled, 43 awaiting Ben's wording.
 
 ---
 
@@ -67,6 +67,14 @@ alphabetical order.
 **Because:** The simulation runs while the player is looking elsewhere. Without a log, events are only discoverable by noticing a changed number, which is the failure mode the alerts work (BL-261) also targets.
 
 *Demanded by BL-212, BL-216 · `src/ui/chat_panel.cpp` · id `chat_panel`*
+
+### Company ledger — the fold-out surface a Company-lens click opens (PLACEHOLDER)
+
+**Answers:** I clicked this background firm's holding — what firm is that, and is it one of the corporations I compete with?
+
+**Because:** It earns its space by being the only thing on the other end of a click that would otherwise go nowhere. Ben, 2026-08-28: "clicking will take you to a relevant ledger. (Different types for either, make a placeholder if needed)." The corporation half of that ruling already had a destination — the all-corporations table — while the company half had no surface of any kind, so the Company lens drew a population the player could look at and never open. The surface is DELIBERATELY THIN and says so on its own face: it answers none of the five axes a designed ledger answers (docs/ui/ledgers/README.md — top question, sub-views, lens on open, data sources, close semantics), prints only facts already public about any firm (name, registration, holdings, and capital where the firm files), and invents no figure where the world has none. Its justification is therefore provisional: it earns space today as the click's landing point, and must earn it properly when the ledger batch designs it.
+
+*Demanded by BL-666 · `src/ui/company_ledger.hpp`, `src/ui/company_ledger.cpp`, `src/ui/ui_state.hpp`, `src/ui/nav_pane.cpp`, `src/core/app.cpp` · id `company_ledger`*
 
 ### Construction panel
 

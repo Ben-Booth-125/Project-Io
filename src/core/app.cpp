@@ -14,6 +14,7 @@
 #include "ui/charts.hpp"
 #include "ui/circumplanetary_canvas.hpp"
 #include "ui/construction_panel.hpp"
+#include "ui/company_ledger.hpp"   // Company-lens click destination, no rail slot (BL-666)
 #include "ui/contracts_ledger.hpp" // nav slot 13, the mercenary Contracts ledger (BL-576)
 #include "ui/detail_level.hpp" // the drill-through fold idiom (BL-214)
 #include "ui/balance_ledger.hpp"
@@ -1969,6 +1970,10 @@ void app::render()
     // never disagree with what actually settles the contract.
     ui::draw_contracts_ledger(m_world, m_registry, m_contract_templates, m_ui,
                               m_ui.show_contracts_ledger);
+    // Company ledger (BL-666) — where a Company-lens click lands. Drawn with the
+    // rail ledgers because it occupies the same fold-out column, but it has no
+    // rail slot: only a canvas click opens it. A declared placeholder for now.
+    ui::draw_company_ledger(m_world, m_ui, m_ui.show_company_ledger);
     // Corporation dashboard (BL-248) — nav slot 1, MENU.md's long-named surface.
     // Replaces the all-corporations balance table that used to occupy this slot: a
     // comparison table is not "the player corporation at a glance", and the Economy
