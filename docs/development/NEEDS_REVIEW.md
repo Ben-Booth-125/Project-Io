@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*104 entries — 77 open, 27 resolved.*
+*105 entries — 77 open, 28 resolved.*
 
 ---
 
@@ -662,19 +662,20 @@ On 2026-08-26 Ben steered that "Sprint 21 is a VISIBILITY pass" and three things
 
 *Files: `docs/development/sprints.json`*
 
-### NR-693 — shell_pass produced ZERO captures in a full suite run, and nothing said so
+### NR-693 — CONFIRMED and root-caused: six verify scripts die on one fixture assertion, taking 27 assertions and 10 chrome elements with them
 *observation · raised 2026-08-28 · from Sprint 22 (UI visibility), the full --verify-all capture run of 2026-08-28.*
 
-INFERRED, NOT YET CONFIRMED - a solo run is owed before this is treated as fact. In a --verify-all run that wrote 287 captures, `shell_` matched ZERO of them while `god_view` matched 7. spectator_god_view sorts AFTER shell_pass, and the run is alphabetical (balance_ledger was first), so shell_pass was reached and produced nothing rather than not having run yet. It is the single highest-value script in the suite for a UI pass - its own header calls it "every UBIQUITOUS UI surface, captured from one staged world", 19 captures - and it is the sole covering check for the Minimap, the Minimap title bar, the Profile tile, the corp emblem, the System menu and the Main menu, plus a contributor to the Header, the nav rail, the Time panel and the Solar canvas. Those ten elements read as unreviewed in the coverage grouping purely because of this. If confirmed it is a fifth NR-663-family instance and the most consequential yet: not a check whose green means little, but a check that produced NOTHING and still ended the run at exit 0.
+CONFIRMED 2026-08-28, and it is FIVE TIMES worse than filed. The solo run's traceback: `scripts/verify/lib.lua:168: the player has no unit on the surface (BL-331 seeds one)`, thrown from stage_ui_fixture.
 
-*Files: `scripts/verify/shell_pass.lua`, `src/core/verify_api.cpp`, `docs/ui/UI_COVERAGE.md`*
+ROOT CAUSE, and it is our own recent work: commit dab470dc, 2026-08-27, 'No standing army at spawn - seed_starting_force defaults false'. corporation_params::seed_starting_force went opt-in for a well-argued reason recorded in the header - under BL-454 standing-force upkeep a seeded unit costs 7.5 cr/qtr, measured at 16.5% of the seated corp's operating outgoings and 19-31% of its entire operating gap, 'for a regiment a brand-new charter never asked for and cannot use'. Nothing is wrong with that change. What is wrong is that stage_ui_fixture still ASSERTS the unit it no longer gets, and dies before its first capture.
 
-### NR-694 — The verify harness emits nothing to a redirected stdout, so a failing script is indistinguishable from a pending one
-*observation · raised 2026-08-28 · from Sprint 22 (UI visibility), diagnosing NR-693 during the 2026-08-28 capture run.*
+BLAST RADIUS - six scripts call stage_ui_fixture and ALL SIX produced zero captures in the 2026-08-28 run: shell_pass, ui_shell_fixture, border_band, lens_structure_pivot, selection_accordion, zoom_ladder. Between them they carry 27 of the suite's 66 verify.expect assertions - border_band 6, lens_structure_pivot 11, selection_accordion 6, ui_shell_fixture 4 - so FORTY PERCENT of everything this suite actually asserts has been dead since 2026-08-27 and nothing said a word. They are also the sole covering check for the Minimap, the Minimap title bar, the Profile tile, the corp emblem, the System menu, the Main menu, the National border band, Province render and selection, the Tile selection layout, and the zoom-ladder navigation model.
 
-`./build/ProjectIo.exe --verify-all scripts/verify 2>&1 | tail` produced a 9-byte output file across a 2-hour run - and those 9 bytes were an echoed timestamp, not harness output. verify_api.cpp logs progress through SDL_Log ('verify-all: %zu script(s) under %s', the per-capture golden PASS/FAIL lines), and none of it reached the redirect. THE COST IS NOT COSMETIC: it is the reason NR-693 had to be inferred from file-name arithmetic instead of read off a log, and it means a script erroring mid-run looks exactly like a script that has not been reached yet. It also means the ONLY way to watch a long suite is to poll the filesystem for new PNGs, which is what this session had to do. Worth deciding whether SDL_Log needs an explicit stdout/stderr sink under --verify, or whether the harness should print its own progress lines independently of SDL.
+WHY THE SILENCE - NR-694. The harness emitted the error every run; nothing carried it to a redirected stdout. The fixture's own message even cites BL-331, which has not been the seeding item since BL-476.
 
-*Files: `src/core/verify_api.cpp`, `src/main.cpp`, `.claude/skills/verifier-visual/SKILL.md`*
+THE FIX IS A DESIGN FORK, NOT A TYPO - see NR-696, because what the fixture does about the missing unit changes what every one of these captures SHOWS.
+
+*Files: `scripts/verify/lib.lua`, `src/world/corporation_generation.cpp`, `src/world/corporation_generation.hpp`, `scripts/verify/shell_pass.lua`*
 
 ### NR-695 — overflow_tile_v2 hung the suite - CPU burning, memory collapsed, nine scripts starved
 *question · raised 2026-08-28 · from Sprint 22 (UI visibility), the 2026-08-28 capture run.*
@@ -682,6 +683,21 @@ INFERRED, NOT YET CONFIRMED - a solo run is owed before this is treated as fact.
 text_overflow_floor.lua sweeps every fold-out ledger by sub-view. Its `tile` panel is the History ledger, and view 2 is the TILES view - a table with a row per tile on the body (composition, landform, hazard, habitability, deposits, buildings, local market state), captured with expect_no_clipping instrumenting every string drawn into the overflow ledger. The run reached overflow_tile_v2 about 60 minutes in and was still on it 80 minutes later: CPU climbing steadily (5315 -> 6457, ~70% of a core sustained), working set peaking near 1.6 GB then settling ~1.0 GB, zero new captures. Nine scripts sit behind it unrun (throughput_lens, both tile_build_ledger checks, tile_texture, time_controls, ui_shell_fixture, v009_batch, visibility, zoom_ladder), which is ten more elements with nothing to review. THE CALL: is the Tiles view legitimately this expensive to instrument, or is the overflow ledger quadratic in rows? Either way the suite should not be serially blocked by one capture - parking it (the parked/ mechanism, with a debt item) or capping the Tiles table under verify are both cheaper than the status quo. Note the irony: UI-087 Tiles view is CLIP-ONLY class, so this capture's own assertion is the only thing checking it. UPDATED 03:42, ~2h45m in, and the reading has CHANGED: the working set COLLAPSED from ~1000 MB to 17 MB while CPU kept climbing (6457 -> 8404). A process burning CPU while touching almost no memory is not rendering a large table - it is spinning. The earlier 'slow but computing' read was defensible at 45 minutes on a rising memory curve; it is not defensible now. Treat this as a HANG with a compute loop, not an expensive capture, and note that neither state is distinguishable from the outside without NR-694 being fixed first.
 
 *Files: `scripts/verify/text_overflow_floor.lua`, `src/ui/tile_inspector.cpp`, `src/ui/text_fit.cpp`, `scripts/verify/parked/README.md`*
+
+### NR-696 — How should the UI fixture get its unit now that a spawn has no standing army?
+*question · raised 2026-08-28 · from Sprint 22 (UI visibility), fixing NR-693. Raised rather than chosen, because each option changes what every fixture-backed capture shows.*
+
+stage_ui_fixture needs a player unit for one specific purpose: it passes `units = { unit.id }` when ACCEPTING a mercenary contract offer, which is what puts content in the Contracts ledger for shell_pass and friends to capture. Since dab470dc a spawn has no unit and no military_base. hire_unit cannot rescue it directly - BL-325 S2 requires mustering onto the corp's own COMPLETED military_base, and the same disabled seeder is what used to build that base.
+
+A) FIXTURE SEEDS A FORCE. Expose seed_starting_military (currently file-local in an anonymous namespace) and add a verify.seed_player_force() binding beside the existing fixture affordances - inject_offer, set_balance, seed_convoy. Cheapest, reuses the tested placement logic, and determinism-safe because that function draws no randomness (the call site says so explicitly). COST: every fixture capture then shows a base and a regiment that a real 2026-08-27-onward spawn does NOT have, so the shell pass stops depicting the actual opening.
+
+B) FIXTURE DROPS THE MERCENARY STAGING when no unit exists, returns unit = nil, and the five scripts that only wanted a populated world carry on. Truest to the game as it now is. COST: the Contracts ledger captures go empty, and UI-101..104 lose the only content that makes them worth looking at.
+
+C) FIXTURE BUILDS A BASE AND HIRES through the real verbs - build (verb 0), econ_step until the base completes, then hire_unit (verb 8). Most faithful: the fixture reaches the state the way a player would, no fourth code path, and it exercises the muster gate as a side effect. COST: construction is durative, so it adds ticks to six scripts, and the fixture becomes sensitive to build times and the corp's cash.
+
+RECOMMENDATION: C if the added ticks are affordable, because it keeps the fixture honest about a state the player can actually reach and tests the muster path for free; A as the pragmatic fallback, with the divergence written into lib.lua so a reader of the captures knows the force is staged. B only if Ben wants the shell pass to depict the true bare opening and is content to lose the contract content.
+
+*Files: `scripts/verify/lib.lua`, `src/core/verify_api.cpp`, `src/world/corporation_generation.hpp`*
 
 ---
 
@@ -932,4 +948,13 @@ BL-655 changed scripts/economy.lua and no C++ at all. Both trees were rebuilt an
 > **RESOLVED.** FIXED 2026-08-26, the simple way on Ben call. copy_scripts is now an ALWAYS-RUN custom target that ProjectIo DEPENDS ON, not a POST_BUILD side effect firing only on relink. PROVEN rather than assumed: build_rel/scripts/economy.lua was deliberately overwritten with a stale marker and the tree rebuilt with ZERO C++ changes - the marker was gone and the real basket restored. The thorough fix (a dev build resolving scripts/ from the repo root, so there is only ever one copy) goes to Sprint 21 visibility pass, Ben call.
 
 *Files: `CMakeLists.txt`, `build_app.bat`, `src/core/app.cpp`*
+
+### NR-694 — The verify harness emits nothing to a redirected stdout, so a failing script is indistinguishable from a pending one
+*observation · raised 2026-08-28 · from Sprint 22 (UI visibility), diagnosing NR-693 during the 2026-08-28 capture run.*
+
+`./build/ProjectIo.exe --verify-all scripts/verify 2>&1 | tail` produced a 9-byte output file across a 2-hour run - and those 9 bytes were an echoed timestamp, not harness output. verify_api.cpp logs progress through SDL_Log ('verify-all: %zu script(s) under %s', the per-capture golden PASS/FAIL lines), and none of it reached the redirect. THE COST IS NOT COSMETIC: it is the reason NR-693 had to be inferred from file-name arithmetic instead of read off a log, and it means a script erroring mid-run looks exactly like a script that has not been reached yet. It also means the ONLY way to watch a long suite is to poll the filesystem for new PNGs, which is what this session had to do. Worth deciding whether SDL_Log needs an explicit stdout/stderr sink under --verify, or whether the harness should print its own progress lines independently of SDL.
+
+> **RESOLVED.** FIXED 2026-08-28. src/main.cpp installs an SDL log sink (log_to_stderr) before anything can log, mirroring SDL's stream to stderr flushed per line, and keeping OutputDebugString on Windows so a debugger's view is unchanged. Unconditional rather than gated on --verify: gating would special-case the one mode that most needs a log. PROVED BY THE NEXT RUN, which is the point - a solo shell_pass went from 0 bytes of output to 622 bytes carrying the exact Lua error and stack traceback, and that traceback diagnosed NR-693 in a single run after two hours of inference had failed to.
+
+*Files: `src/core/verify_api.cpp`, `src/main.cpp`, `.claude/skills/verifier-visual/SKILL.md`*
 
