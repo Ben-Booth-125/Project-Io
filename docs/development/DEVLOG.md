@@ -10,6 +10,97 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-08-28 — Sprint 23 closes: a lens becomes a question, and the answer stops disagreeing with itself
+
+**Mode:** Design, then Full (Batch Delivery, three waves). **Sprint 23: closed, goal met.**
+**Sprint 24 opened.**
+
+Thirteen items. The sprint began as a design session on selection and ended with every planned item
+landed, both carried review-queue entries answered, and the next batch opened with four defects
+already filed against its own surfaces.
+
+### The rule
+
+Ben opened with a principle rather than a review: *"when lenses are active, selection is only one
+tier, as opposed to the default lens, which may cycle through elements with multiple clicks."* Two
+rulings followed — *"Markers do not outrank lenses"* and *"for lenses which return none, just don't
+surface a hover, and clicks will do nothing."*
+
+Written into SELECTION.md and LENSES.md before any code, then built as **BL-664**. The interesting
+consequence was accepted rather than inferred: Population, Industry and Throughput draw a per-tile
+value field with no structure grain, so under the rule they became entirely non-interactive — two
+of the three are on-bar lenses, so it is visible.
+
+**BL-665** gained the corporation and company area resolvers. Their absence had been *measured*, not
+assumed — the first draft of that switch reported `tile` on empty ground and `building` on owned
+ground, never `corporation`, because a marker always won the press. BL-664 removed the precedence
+and the objection dissolved with it.
+
+### Where the review barrier earned its place
+
+**BL-666**'s first cut routed a corporation press to `show_corporation_panel` — which drives the
+**player's own dashboard**. That is NR-700 reproduced one commit after the item that filed it. The
+two ui_state flags are named the wrong way round (`show_corporations_table` drives
+`draw_corporation_panel`), and the check could not have caught it either: `pointer_target` had no
+name distinguishing the two corporation surfaces, so the assertion passed for both. Two independent
+guards failed to the same naming confusion (NR-704).
+
+The same pass found a **save-breaking bug the batch made reachable**: `max_overlay` was hand-kept at
+`supply_routes` while two lenses had been appended after it, so a save written under Throughput or
+Company would not reopen — the whole envelope, not one field (NR-703).
+
+### Measurement overturned the plan, twice
+
+Ben asked for a **quadratic** throughput ramp. A new census (`throughput_field_census`) said no: the
+ramp was already sqrt, quadratic is *worse* (45% of the grid in one tenth of the ramp against 32%),
+and no curve over `cost/max` could work because the input is bunched — 1917 anchors where the sqrt
+was calibrated against 57, median cost 6.75 against a max of 81.58. The denominator was the problem.
+p90 is 42.58, so the top decile of cost was eating half the ramp while holding a tenth of the tiles.
+p90 + sqrt: worst bucket 21%. **BL-669.**
+
+An assertion written to prove the convergent and divergent boundary masks are exclusive **failed**,
+and was not weakened. A tile at a junction between a closing pair and an opening pair is genuinely on
+both, and `height_bias` has always taken both terms there. The false claim was corrected in the
+header, the `.cpp` and CONTINENTS.md (NR-707).
+
+### The rest
+
+**BL-667** one hover mark under a lens; **BL-668** the workforce heatmap (it was the only lens
+answering by *adding a mark* rather than colouring the ground); **BL-670** the rung-keyed lens strip,
+which dissolved a discovery problem that a layout constraint had been deciding — the old array of six
+was chosen by what fit a 240 px bar, leaving six of twelve built lenses reachable only by a key
+nothing on screen mentions.
+
+**BL-671** gave the deposit and the plate Selection-band cards. Both channels had been *write-only*:
+the canvas set them and nothing read them, so a press showed the previous subject — not blank, which
+is the worse failure. **BL-660** landed in two halves, a Tectonics view plus the divergent boundary
+mask the generator had been classifying and discarding. **BL-673** gave each structure lens its own
+hover card, reading the resolver so the card's subject cannot disagree with the click's.
+
+**BL-672** closed NR-698 on Ben's ruling: `verify.find_deposit_tile` answers *where* a good is
+deposited — one tile, raster order, no other tile data — recorded as a scoped exception beside the
+standing rule it narrows. It bought the identity assertion, which a blind sweep could never make:
+press two goods' deposits, require two different selections. The check went 7 rows to 21.
+
+### Verification
+
+`lens_one_tier` 38/38, `lens_region_destinations` 21/21, `lens_strip_and_fields` green,
+`continents_harness` ALL PASS, `throughput_field_census` reporting. Four durable checks where batch 1
+left none — that batch was capture-only, with a human eye as the entire test. Live-clicked in the
+built app: the marker rule, the inert lens, the band clearing to resting, and the corporation
+destination.
+
+### Open for Ben
+
+- The **Company destination** has never been live-clicked, and the blocker is the world rather than
+  access — a fresh campaign carried no background firm on the home body at all. Folded into BL-636.
+  If they are genuinely absent early, the Company lens needs an empty state.
+- **31 archived backlog records** sit in an `undated` bucket. The cause is fixed (the bucketer now
+  reads all four date field names); the residue is historical and would need a full restore to move.
+- **No envelope field has save round-trip coverage**, and the save version moved to 2 (NR-708).
+
+---
+
 ## 2026-08-26 — Sprint 20 closes: the loop closes, and the instruments were measuring a different world
 
 **Mode:** Full (Batch Delivery, six waves). **Cut:** v0.1.21. **Sprint 20: closed, goal met and proved.**
