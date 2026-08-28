@@ -518,6 +518,35 @@ struct ui_state
     int selected_deposit_resource = -1; ///< resource_type index, -1 = none.
     int selected_plate            = -1; ///< continent_state::plate_id index, -1 = none.
 
+    /// What the Selection element says about the selected PLATE, cached by the
+    /// canvas at press time (BL-671).
+    ///
+    /// CACHED RATHER THAN LOOKED UP, which is the interesting half. A plate lives
+    /// in the GENERATION REPORT, not in `world` — the band's draw signature takes
+    /// a world and does not have the report, and threading one through four call
+    /// sites to read five numbers would put a presentation-only dependency into
+    /// every selection card. The canvas already holds the report's
+    /// `continent_state` for the lens it is drawing, so it fills this once, on the
+    /// press that made the selection.
+    ///
+    /// Safe to cache because plates DO NOT CHANGE after generation: the drift pass
+    /// runs once and its output is retained, so there is no later state for this
+    /// to go stale against. That is the property that makes the shortcut honest,
+    /// and it is the thing to re-check if plates ever become dynamic.
+    struct plate_summary
+    {
+        int   tiles            = 0;     ///< Tiles this plate owns on the body.
+        int   convergent_tiles = 0;     ///< Of those, tiles on a collision boundary.
+        int   divergent_tiles  = 0;     ///< Of those, tiles on a rift boundary. NOT
+                                        ///< exclusive with the above: a tile at a
+                                        ///< junction sits on both, and the height
+                                        ///< bias has always taken both terms there.
+        bool  oceanic          = false; ///< Oceanic plates bias the height field down.
+        float drift_col        = 0.0f;  ///< Per-epoch drift, grid columns.
+        float drift_row        = 0.0f;  ///< Per-epoch drift, grid rows.
+    };
+    plate_summary selected_plate_facts;
+
     /// Clear both non-entity lens selections. Called by every other selection
     /// path for the same reason `clear_battle_selection` is: the Selection
     /// element must never have two things to draw.
@@ -526,6 +555,13 @@ struct ui_state
         selected_deposit_resource = -1;
         selected_plate            = -1;
     }
+
+    /// Is a deposit / a plate the thing the Selection element should draw?
+    /// The battle and contract predicates' shape, and for the same reason: these
+    /// are not entities, so `selection_kind_of` cannot see them and the band's
+    /// dispatcher has to be told before it asks.
+    bool has_deposit_selection() const { return selected_deposit_resource >= 0; }
+    bool has_plate_selection()   const { return selected_plate >= 0; }
 
     // --- The selected mercenary contract (BL-577) ------------------------
     // A `mercenary_contract` has no entity id — it lives in

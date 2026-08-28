@@ -3320,6 +3320,116 @@ void draw_tile_selection(world& w, ui_state& ui)
 
 } // namespace
 
+/// The DEPOSIT card (BL-671). The Resource lens's structure is every tile on the
+/// body carrying the selected good, so that is what this counts and that is what
+/// it is about: not one tile's richness, but the whole showing.
+///
+/// Deliberately thin, and every figure derived. A deposit has no ledger of its
+/// own and no actions — you cannot dig a region, you site a building on one tile
+/// of it — so the card's job is to say how much is here and hand the player to
+/// the Market ledger, which the press has already opened on Prices.
+void draw_deposit_selection(const world& w, ui_state& ui)
+{
+    const int ri = ui.selected_deposit_resource;
+    if (ri < 0 || static_cast<std::size_t>(ri) >= resource_count)
+        return;
+    const auto rt = static_cast<resource_type>(ri);
+    const resource_presentation& rp = presentation_of(rt);
+
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(rp.colour), "%s", rp.name);
+    ImGui::SameLine();
+    ImGui::TextDisabled("Deposit");
+    ImGui::Separator();
+
+    // Counted over the ACTIVE BODY only, because that is the region the lens drew
+    // and the selection grain follows the drawing. A body-spanning total would be
+    // a different claim from the one the player just clicked on.
+    int   tiles = 0;
+    float total = 0.0f;
+    float best  = 0.0f;
+    for (const auto& [id, tile] : w.tiles)
+    {
+        if (tile.body != ui.active_body)
+            continue;
+        const float d = tile.resource_deposit[static_cast<std::size_t>(ri)];
+        if (d <= 0.0f)
+            continue;
+        ++tiles;
+        total += d;
+        best = std::max(best, d);
+    }
+
+    if (tiles == 0)
+    {
+        ImGui::TextDisabled("No %s on this body.", rp.name);
+        return;
+    }
+
+    ImGui::Text("%d tiles", tiles);
+    ImGui::SameLine();
+    ImGui::TextDisabled("carrying it on this body");
+    ImGui::Text("Richest tile  %.2f", best);
+    ImGui::Text("Total         %.2f", total);
+    ImGui::Spacing();
+    ImGui::TextDisabled("Prices for this good are open in the Market ledger.");
+}
+
+/// The PLATE card (BL-671, closing NR-697). Before this a plate press set its
+/// channel and the band showed the PREVIOUS selection — a card asserting
+/// something the player had not clicked, which is the exact failure NR-697
+/// recorded.
+///
+/// Every figure comes from `ui.selected_plate_facts`, cached by the canvas at
+/// press time; see that field for why it is a cache and not a lookup.
+void draw_plate_selection(ui_state& ui)
+{
+    const ui_state::plate_summary& f = ui.selected_plate_facts;
+
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                       "Plate %d", ui.selected_plate);
+    ImGui::SameLine();
+    ImGui::TextDisabled(f.oceanic ? "Oceanic" : "Continental");
+    ImGui::Separator();
+
+    if (f.tiles == 0)
+    {
+        // A stagnant-lid body has one plate owning everything and no boundaries,
+        // which is a legitimate answer rather than a degenerate one — but a plate
+        // with no tiles means the report and the press disagree, so say that
+        // instead of printing zeros as though they were measurements.
+        ImGui::TextDisabled("No plate data for this body.");
+        return;
+    }
+
+    ImGui::Text("%d tiles", f.tiles);
+    ImGui::SameLine();
+    ImGui::TextDisabled("on this body");
+
+    // The boundary is the point of the lens — a plate interior is just a region,
+    // but a boundary is where the mountains and the porphyry copper came from.
+    if (f.convergent_tiles > 0 || f.divergent_tiles > 0)
+    {
+        // Two counts, never summed. A tile at a junction between a closing pair
+        // and an opening pair sits on BOTH masks, so a single "boundary" number
+        // would double-count it — and the two say different things anyway: a
+        // collision is where the mountains and the porphyry copper came from, a
+        // rift is where the crust thinned and the basins opened.
+        if (f.convergent_tiles > 0)
+            ImGui::Text("%d on a collision boundary", f.convergent_tiles);
+        if (f.divergent_tiles > 0)
+            ImGui::Text("%d on a rift", f.divergent_tiles);
+    }
+    else
+        ImGui::TextDisabled("Interior plate - no classified boundary.");
+
+    ImGui::Text("Drift  %+.2f, %+.2f", f.drift_col, f.drift_row);
+    ImGui::SameLine();
+    ImGui::TextDisabled("cols, rows per epoch");
+
+    ImGui::Spacing();
+    ImGui::TextDisabled("Its tectonic record is open in the History ledger.");
+}
+
 void draw_selection_content(world& w, const recipe_registry& reg,
                             const economy_report& report,
                             const contract_template_registry& templates, ui_state& ui)
@@ -3358,6 +3468,26 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     if (ui.has_contract_selection() && selected_contract(w, ui) != nullptr)
     {
         draw_contract_selection(w, templates, ui);
+        return;
+    }
+
+    // BL-671: the two NON-ENTITY LENS REGIONS resolve next, for the same
+    // structural reason the battle and the contract do — a deposit is a resource
+    // index and a plate is a raster id, so neither travels in `selected_entity`
+    // and `selection_kind_of` cannot see either. Each owns its whole card and
+    // returns rather than falling through to the shared header.
+    //
+    // Both channels were WRITE-ONLY until this landed: the canvas set them and no
+    // surface read them, so a press on a deposit or a plate left the band showing
+    // whatever was selected before it (NR-697).
+    if (ui.has_deposit_selection())
+    {
+        draw_deposit_selection(w, ui);
+        return;
+    }
+    if (ui.has_plate_selection())
+    {
+        draw_plate_selection(ui);
         return;
     }
 

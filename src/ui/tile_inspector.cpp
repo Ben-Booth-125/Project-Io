@@ -88,13 +88,23 @@ void draw_tile_inspector(const world& w, ui_state& s,
     // predates rather than work it judged: two thousand years of scrubbable borders is
     // squarely the ledger's own premise, and retiring it would be destroying a feature
     // nobody asked to remove.
-    enum view_id { view_story = 0, view_chain, view_ages };
+    // BL-660 adds Tectonics as a fourth view — the destination a plate press
+    // under the Continent lens routes to. Appended rather than inserted: the index
+    // is parked in ui_state and read by verify scripts, so renumbering the
+    // existing three would silently re-point every saved and scripted view (the
+    // trap the Ages clamp below exists because of).
+    // The indices live in tile_inspector.hpp so the canvas can route to one by
+    // name; these aliases keep the branches below reading as they always have.
+    constexpr int view_story     = history_view_story;
+    constexpr int view_chain     = history_view_chain;
+    constexpr int view_ages      = history_view_ages;
+    constexpr int view_tectonics = history_view_tectonics;
     int& view = s.history_view; // in ui_state so a verify script can park a view
 
     // Clamp: retiring Tiles renumbered Ages from 3 to 2, so a stale saved index or an
     // un-updated script can still hand us an index no branch below draws. Land on Story
     // rather than on nothing.
-    if (view < view_story || view > view_ages)
+    if (view < view_story || view > view_tectonics)
         view = view_story;
 
     nav_button("Story", view_story, view, p_open);
@@ -102,6 +112,8 @@ void draw_tile_inspector(const world& w, ui_state& s,
     nav_button("Chain", view_chain, view, p_open);
     ImGui::SameLine();
     nav_button("Ages", view_ages, view, p_open);
+    ImGui::SameLine();
+    nav_button("Tectonics", view_tectonics, view, p_open);
 
     // The view-level disclosure control (BL-214, revised BL-265). Story is a single
     // block that already shows its content in the column, so there is nothing for the
@@ -121,6 +133,124 @@ void draw_tile_inspector(const world& w, ui_state& s,
     if (view == view_story)
         disclosure_controls(s, detail_surface::history_story, 0, /*in_place=*/false);
     ImGui::Separator();
+
+    // ── Tectonics (BL-660) ────────────────────────────────────────────────
+    // "click to the relevant history section, describing collisions and the
+    // opposite" (Ben, 2026-08-28). A plate press under the Continent lens opens
+    // this ledger on this view, with `ui_state::selected_plate` naming which.
+    //
+    // A DECLARED PLACEHOLDER: it lists the plate set and both boundary masks, and
+    // it does not yet tell the per-boundary STORY — which pair met, when, and what
+    // the meeting raised or opened. That narrative exists, in the body's Story
+    // view, and moving it here is the follow-on.
+    //
+    // "and the opposite" — the RIFTS — is real now. The drift pass classified both
+    // kinds all along and recorded only collisions; BL-660's data half made the
+    // divergent mask an output, so this reads it rather than inventing it.
+    //
+    // THE TWO MASKS ARE NOT EXCLUSIVE, which is the obvious reading and is wrong.
+    // The boundary walk visits each tile against two neighbours, so a tile at a
+    // junction between a closing pair and an opening pair is genuinely on both —
+    // `height_bias` has always accumulated the uplift AND the subsidence there.
+    // Measured at 1 tile in 15120 on the fixture seed. The table shows the two
+    // counts separately rather than a single "boundary" number for that reason.
+    if (view == view_tectonics)
+    {
+        const continent_state* cs = nullptr;
+        for (const auto& be : report.bodies)
+            if (be.id == selected_body) { cs = &be.continents; break; }
+
+        if (cs == nullptr || cs->plate_id.empty())
+        {
+            ImGui::TextDisabled("No tectonic record for this body.");
+            ImGui::TextDisabled("A stagnant-lid world has one plate and no boundaries.");
+            ui::foldout_end();
+            return;
+        }
+
+        // Per-plate tile and collision counts, computed here rather than cached:
+        // this view is open only when someone is looking at it, and the raster is
+        // one pass over the body.
+        const std::size_t n = cs->plate_id.size();
+        const bool have_conv = cs->convergent.size() == n;
+        const bool have_div = cs->divergent.size() == n;
+        std::vector<int> tiles(cs->plates.size(), 0);
+        std::vector<int> collide(cs->plates.size(), 0);
+        std::vector<int> rift(cs->plates.size(), 0);
+        int collide_total = 0;
+        int rift_total    = 0;
+        for (std::size_t k = 0; k < n; ++k)
+        {
+            const int pid = cs->plate_id[k];
+            if (pid < 0 || static_cast<std::size_t>(pid) >= tiles.size())
+                continue;
+            ++tiles[static_cast<std::size_t>(pid)];
+            if (have_conv && cs->convergent[k] != 0u)
+            {
+                ++collide[static_cast<std::size_t>(pid)];
+                ++collide_total;
+            }
+            if (have_div && cs->divergent[k] != 0u)
+            {
+                ++rift[static_cast<std::size_t>(pid)];
+                ++rift_total;
+            }
+        }
+
+        ImGui::SeparatorText("Plates");
+        ImGui::TextDisabled("%zu plates - %d tiles on a collision, %d on a rift",
+                            cs->plates.size(), collide_total, rift_total);
+        ImGui::Spacing();
+
+        if (ImGui::BeginTable("##tectonics", 5,
+                              ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+        {
+            ImGui::TableSetupColumn("Plate");
+            ImGui::TableSetupColumn("Kind");
+            ImGui::TableSetupColumn("Tiles");
+            ImGui::TableSetupColumn("Collision");
+            ImGui::TableSetupColumn("Rift");
+            ImGui::TableHeadersRow();
+            for (std::size_t p = 0; p < cs->plates.size(); ++p)
+            {
+                ImGui::TableNextRow();
+                // The pressed plate is highlighted, which is what makes this a
+                // DESTINATION rather than a table that happens to contain it.
+                if (s.selected_plate == static_cast<int>(p))
+                    ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0,
+                                           IM_COL32(255, 255, 255, 40));
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Text("%zu", p);
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextDisabled(cs->plates[p].oceanic ? "Oceanic" : "Continental");
+                ImGui::TableSetColumnIndex(2);
+                ImGui::Text("%d", tiles[p]);
+                ImGui::TableSetColumnIndex(3);
+                if (collide[p] > 0)
+                    ImGui::Text("%d", collide[p]);
+                else
+                    ImGui::TextDisabled("-");
+                ImGui::TableSetColumnIndex(4);
+                if (rift[p] > 0)
+                    ImGui::Text("%d", rift[p]);
+                else
+                    ImGui::TextDisabled("-");
+            }
+            ImGui::EndTable();
+        }
+
+        ImGui::Spacing();
+        ImGui::SeparatorText("Placeholder surface");
+        ImGui::TextWrapped(
+            "First cut (BL-660). What is missing is the per-boundary NARRATIVE - which "
+            "pair met, in which epoch, and what the meeting raised or opened. Those lines "
+            "exist and are readable in this body's Story view; moving them here, keyed to "
+            "the plate you pressed, is the follow-on. A tile can appear in both columns: "
+            "a junction between a closing pair and an opening pair is on both boundaries.");
+
+        ui::foldout_end();
+        return;
+    }
 
     const body_component& sel_body = w.bodies.at(selected_body);
 

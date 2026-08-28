@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*83 entries — 83 open, 0 resolved.*
+*84 entries — 84 open, 0 resolved.*
 
 ---
 
@@ -655,15 +655,6 @@ text_overflow_floor.lua sweeps every fold-out ledger by sub-view. Its `tile` pan
 
 *Files: `scripts/verify/text_overflow_floor.lua`, `src/ui/tile_inspector.cpp`, `src/ui/text_fit.cpp`, `scripts/verify/parked/README.md`*
 
-### NR-697 — A plate selection leaves the Selection band showing a stale entity
-*observation · raised 2026-08-28 · from Sprint 22 (UI visibility), verifying the BL-660 plate pivot.*
-
-The plate route WORKS — clicking a plate under the Continent lens opens the History ledger (path_continent_selected.png). But the Selection band still shows whatever was selected before, in the captured case "Genom Systems — Corporation" left over from a corporation click two lenses earlier, even though the dispatch sets selected_entity to null_entity.
-
-A plate is not an entity, so nothing knows how to DRAW one in the Selection band — the same gap the battle card filled for battles with its own element. Until a plate has Selection-band content, selecting one either shows nothing or shows something unrelated, and the second is worse. Belongs to BL-660's second half alongside the tectonic History section.
-
-*Files: `src/ui/selection_card.cpp`, `src/ui/body_surface_canvas.cpp`, `docs/ui/SELECTION.md`*
-
 ### NR-698 — The deposit pivot is unverifiable from a script while tile data stays hidden from Lua
 *question · raised 2026-08-28 · from Sprint 22 (UI visibility), trying to prove BL-659.*
 
@@ -758,6 +749,30 @@ So the Company lens - and with it BL-666's company destination - has nothing to 
 TWO READINGS, and they want different work. Either background firms are correctly absent at year 20 and grow in later, in which case the lens is fine and only its EMPTY STATE is missing (a lens that tints nothing and says nothing is indistinguishable from a broken one). Or the settle phase should be seeding them, and this is a generation gap. Worth measuring before assuming either - count background firms and their holdings at year 20 versus year 100.
 
 *Files: `src/ui/body_surface_canvas.cpp`, `docs/ui/LENSES.md`, `docs/generation/CORPORATION_GENERATION.md`*
+
+### NR-707 — The convergent and divergent boundary masks OVERLAP, and the obvious reading is wrong
+*observation · raised 2026-08-28 · from Sprint 23 wave 3, BL-660's data half; found by an assertion that failed.*
+
+The brief for the divergent mask asked for an assertion that no tile is marked both convergent and divergent. IT FAILED, and the agent did not weaken it - which is the right outcome and the reason this is filed.
+
+The cause is not a sign bug. The boundary walk visits each tile against TWO neighbours and marks per neighbour, so a tile at a junction between a closing pair and an opening pair is genuinely on both. height_bias has always accumulated the +0.12 uplift AND the -0.08 subsidence on that tile; the overlap is pre-existing and correct. Measured at 1 tile in 15120 on the fixture seed.
+
+The assertion was re-specified to the invariant that actually holds - every both-marked tile sits on two DISTINCT classified boundaries - and the false 'exclusive' claim was corrected in the header, the .cpp and CONTINENTS.md. Both UI surfaces show the two counts SEPARATELY and never sum them, for the same reason.
+
+Worth your eye because 'a tile is either colliding or rifting' is the intuitive model and the generator does not work that way.
+
+*Files: `src/world/continents.cpp`, `docs/generation/CONTINENTS.md`, `tools/verify/continents_harness.cpp`*
+
+### NR-708 — No envelope field has save round-trip coverage, and the save version just moved
+*question · raised 2026-08-28 · from Sprint 23 wave 3; reported by the agent that bumped save_game_version to 2.*
+
+The divergent mask is serialised in the ENVELOPE (w_continents / r_continents in src/core/save_game.cpp), and save_game_version went 1 -> 2. read_save_game compares the constant for STRICT EQUALITY and refuses the whole file, so every existing save is now unreadable. That follows this file's own conventions - it has no upgrade path and the agent correctly did not invent one - but it is worth knowing rather than discovering.
+
+THE GAP THAT MATTERS MORE: the round trip is not covered by any harness, and never has been. save_game.cpp's translation unit reaches ui_state.hpp and so <imgui.h>, which the headless harness builder excludes by construction. `convergent` has had no round-trip coverage either, nor has any other envelope field - this change did not create the hole, it walked into it.
+
+The fix is a CMake-declared envelope harness linking imgui, on the font_glyph_harness precedent. Worth an item: a serialisation seam with no read/write test is exactly where the asymmetry that corrupts a snapshot hides, and the max_overlay bug (NR-703) came out of this same file today.
+
+*Files: `src/core/save_game.cpp`, `src/core/save_game.hpp`, `tools/verify/build_harness.js`*
 
 ---
 

@@ -746,7 +746,8 @@
     "selection_redesign",
     "selection_bar",
     "shell_pass",
-    "lens_one_tier"
+    "lens_one_tier",
+    "lens_region_destinations"
    ]
   },
   {
@@ -766,7 +767,8 @@
     "hover_freeze",
     "lens_selection_paths",
     "lens_one_tier",
-    "lens_strip_and_fields"
+    "lens_strip_and_fields",
+    "lens_region_destinations"
    ]
   },
   {

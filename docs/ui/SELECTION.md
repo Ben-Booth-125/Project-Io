@@ -750,6 +750,26 @@ so it takes the same wash the catchment does rather than a walked boundary (Ben'
 on that question, recorded in `body_surface_canvas.cpp`: a wash is per-tile and costs one test,
 and an area statement is the truer read anyway).
 
+### A deposit and a plate are cards, not just channels
+
+The two non-entity structures get Selection-band content of their own, dispatched ahead of the
+kind resolution exactly as the battle and the contract are — none of the four is an entity, so
+`selection_kind_of` cannot see any of them. Owned by BL-671 (the two region cards).
+
+- **Deposit** — the good's showing across the **active body**: how many tiles carry it, the richest,
+  the total. Not one tile's richness: the lens draws every tile carrying the good, and the selection
+  grain follows the drawing. It has no actions — you cannot dig a region, you site a building on one
+  tile of it — so the card hands the player to the Market ledger, already open on Prices.
+- **Plate** — its kind (oceanic or continental), its tile count, its drift, and its boundary tiles
+  counted **separately as collisions and rifts**. Never summed: a tile at a junction between a
+  closing pair and an opening pair sits on both, and the two say different things — a collision is
+  where the mountains came from, a rift is where the crust thinned.
+
+**Why the band showed the wrong subject before this.** The band substitutes the player's own
+corporation whenever `selected_entity` is null (§ Always open), and both region presses deliberately
+null it. So a plate press did not leave the band blank — it confidently showed a *different*
+subject, which is the worse failure and the harder one to notice.
+
 **Corporation and Company route to DIFFERENT ledgers**, because since the 2026-08-28 split
 ([GLOSSARY.md](GLOSSARY.md)) they are different words: a corporation is a named operating firm the
 player competes with, a company is a background firm. One is a rival dossier, the other is a

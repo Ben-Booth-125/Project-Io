@@ -575,7 +575,7 @@
    "id": "BL-659",
    "short_name": "deposit selects to market ledger",
    "title": "Resource lens: a deposit is selectable, and routes to the Market ledger for that resource",
-   "status": "open",
+   "status": "complete",
    "priority": "medium",
    "created": "2026-08-28",
    "sprint": "22",
@@ -584,13 +584,14 @@
     "src/ui/body_surface_canvas.cpp",
     "src/ui/market_ledger.cpp"
    ],
-   "design": "Ben, 2026-08-28, reviewing the lens sweep: \"Resources: This looks great, but we should wire this to give deposits selectable boundaries, and on so on hover, we can select a deposit going to the market ledger for this item.\"\n\nTHIS IS A CHANGE OF DESTINATION, not new plumbing. LENSES.md's routing table already gives the Resource lens a row - \"the tile's deposit profile -> Tile Ledger (deposit detail)\" - so the lens already resolves a pointer to something. What Ben wants is (a) the whole contiguous DEPOSIT to be the structure, hovered and selected as one the way the market catchment already is under BL-603, and (b) the click to land on the MARKET LEDGER aimed at that resource, not the Tile Ledger.\n\nThe deposit already exists as a drawn structure: the lens fills \"the contiguous deposit of the selected resource\" as a flat region (LENSES.md), so the shape the player sees is the shape that must become selectable. This is the same pattern BL-603 applied to the market catchment, which is the precedent to copy rather than invent against.\n\nThe destination change is the interesting half: a deposit's question is \"what is this worth and who wants it\", and that is a market question, not a tile question. Update the routing table in the same pass - the doc is authority and currently says Tile Ledger."
+   "design": "Ben, 2026-08-28, reviewing the lens sweep: \"Resources: This looks great, but we should wire this to give deposits selectable boundaries, and on so on hover, we can select a deposit going to the market ledger for this item.\"\n\nTHIS IS A CHANGE OF DESTINATION, not new plumbing. LENSES.md's routing table already gives the Resource lens a row - \"the tile's deposit profile -> Tile Ledger (deposit detail)\" - so the lens already resolves a pointer to something. What Ben wants is (a) the whole contiguous DEPOSIT to be the structure, hovered and selected as one the way the market catchment already is under BL-603, and (b) the click to land on the MARKET LEDGER aimed at that resource, not the Tile Ledger.\n\nThe deposit already exists as a drawn structure: the lens fills \"the contiguous deposit of the selected resource\" as a flat region (LENSES.md), so the shape the player sees is the shape that must become selectable. This is the same pattern BL-603 applied to the market catchment, which is the precedent to copy rather than invent against.\n\nThe destination change is the interesting half: a deposit's question is \"what is this worth and who wants it\", and that is a market question, not a tile question. Update the routing table in the same pass - the doc is authority and currently says Tile Ledger.",
+   "completed": "2026-08-28"
   },
   {
    "id": "BL-660",
    "short_name": "tectonic hover and history route",
    "title": "Continent lens: hover-select a plate, click through to its history (collision and drift)",
-   "status": "open",
+   "status": "complete",
    "priority": "medium",
    "created": "2026-08-28",
    "sprint": "22",
@@ -600,7 +601,8 @@
     "src/ui/body_surface_canvas.cpp",
     "src/ui/tile_inspector.cpp"
    ],
-   "design": "Ben, 2026-08-28, on the tectonic capture: \"Tectonic looks perfect, I think we can wire this to hover selection and click to the relevant history section, describing collisions and the opposite (drift?). Leave this as a placeholder if it doesn't exist.\"\n\nIt does not exist. LENSES.md's routing table puts Continent in the tile-grain row - \"Population, Industry, Resource, Continent (none - tile grain) -> Tile Ledger\" - so a plate is drawn as a structure but does not resolve as one. This item gives it a structure row like Market's catchment: the PLATE is the structure, hover lifts the whole plate, and the click opens the History ledger at the section describing that plate's own past.\n\nTHE TERM BEN REACHED FOR IS WORTH SETTLING. He wrote \"collisions and the opposite (drift?)\". CONTINENTS.md owns the vocabulary - plates, drift, height_bias - so the wording of the destination section should come from there rather than be coined here, and the answer to \"what is the opposite of a collision\" (rifting? divergence? drift is the motion, not the boundary type) is a GLOSSARY question this item should resolve rather than assume.\n\nDepends on nothing built; the plate partition is already in the generation report the Continent lens reads."
+   "design": "Ben, 2026-08-28, on the tectonic capture: \"Tectonic looks perfect, I think we can wire this to hover selection and click to the relevant history section, describing collisions and the opposite (drift?). Leave this as a placeholder if it doesn't exist.\"\n\nIt does not exist. LENSES.md's routing table puts Continent in the tile-grain row - \"Population, Industry, Resource, Continent (none - tile grain) -> Tile Ledger\" - so a plate is drawn as a structure but does not resolve as one. This item gives it a structure row like Market's catchment: the PLATE is the structure, hover lifts the whole plate, and the click opens the History ledger at the section describing that plate's own past.\n\nTHE TERM BEN REACHED FOR IS WORTH SETTLING. He wrote \"collisions and the opposite (drift?)\". CONTINENTS.md owns the vocabulary - plates, drift, height_bias - so the wording of the destination section should come from there rather than be coined here, and the answer to \"what is the opposite of a collision\" (rifting? divergence? drift is the motion, not the boundary type) is a GLOSSARY question this item should resolve rather than assume.\n\nDepends on nothing built; the plate partition is already in the generation report the Continent lens reads.",
+   "completed": "2026-08-28"
   },
   {
    "id": "BL-661",
@@ -766,6 +768,24 @@
     "src/ui/overlay.cpp"
    ],
    "design": "Ben, 2026-08-28, on being told six of the twelve built lenses were off the strip: \"add any missing lenses to the strip if that lens focuses on the planetary view. We can rotate lenses for circumplanetary or solar views.\"\n\nTHE OLD ARRAY'S SELECTION CRITERION WAS SPACE, and the code said so outright: Scarcity, Industry, Reach and Supply-routes were keyboard-cycle only because \"they do not fit the 240 px minimap bar this row now lives on\". A layout accident was deciding a discovery question, and it left half the roster reachable only by a key nothing on screen mentions.\n\nKeying the strip on the rung dissolves the constraint, because no rung wants all twelve. Each row is LENSES.md's own per-rung representation table read straight off - a lens appears where it DRAWS something: Planetary gets the nine sub-body reads (Corporation, Company, Resource, Market, Scarcity, Industry, Population, Continent, Throughput), Circumplanetary gets Market, Scarcity and Supply, Solar gets Supply, Reach and Supply-routes.\n\nThe keyboard cycle still reaches every lens from every rung; the strip is the discovery surface, not the only door. ADDING A LENS NOW MEANS ADDING IT TO A RUNG ROW - a lens named in no row is keyboard-only, which is a decision rather than an oversight only if it is written down."
+  },
+  {
+   "id": "BL-671",
+   "short_name": "the two region cards",
+   "title": "A deposit and a plate each get Selection-band content, instead of leaving the previous card up",
+   "status": "complete",
+   "priority": "high",
+   "created": "2026-08-28",
+   "completed": "2026-08-28",
+   "sprint": "23",
+   "touches": [
+    "docs/ui/SELECTION.md",
+    "src/ui/selection_panel.cpp",
+    "src/ui/selection_card.cpp",
+    "src/ui/ui_state.hpp",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "design": "Closes NR-697. A deposit and a plate are the only two things the lens system can select that are NOT entities, and both channels were WRITE-ONLY: the canvas set selected_deposit_resource / selected_plate and no surface read either.\n\nWHY THAT LOOKED LIKE A STALE ENTITY, which is what NR-697 called it: the band substitutes the player's own corporation whenever selected_entity is null (BL-266's resting state), and both region presses deliberately null it. So the band did not go blank - it confidently showed a DIFFERENT SUBJECT, which is the worse failure and the harder one to notice.\n\nBoth cards dispatch ahead of selection_kind_of, on the battle and contract precedent. The deposit card counts the good's showing across the ACTIVE BODY only, because that is the region the lens drew. The plate card reads a small summary the canvas caches at press time - the band's signature has no generation report, and a plate lives in the report rather than in world; caching is safe because plates do not change after generation, which is the property to re-check if they ever become dynamic."
   }
  ]
 }

@@ -49,8 +49,8 @@ and so is the safety net.
 | `UI-039` Lens system (overlay_mode family) > Industry lens | sub-element | `industry_lens`, `province_render`, `lens_strip_and_fields` | 4 | 0 | 0 |
 | `UI-041` Lens system (overlay_mode family) > Reach lens | sub-element | `lens_modes`, `lens_legend`, `province_render`, `lens_strip_and_fields` | 4 | 0 | 5 |
 | `UI-042` Lens system (overlay_mode family) > Supply-routes lens | sub-element | `lens_modes`, `province_render`, `lens_strip_and_fields` | 4 | 0 | 2 |
-| `UI-043` Selection band | element | `selection_band`, `selection_redesign`, `selection_bar`, `shell_pass`, `lens_one_tier` | 18 | 1 | 2 |
-| `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields` | 47 | 0 | 6 |
+| `UI-043` Selection band | element | `selection_band`, `selection_redesign`, `selection_bar`, `shell_pass`, `lens_one_tier`, `lens_region_destinations` | 26 | 1 | 3 |
+| `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields`, `lens_region_destinations` | 55 | 0 | 7 |
 | `UI-045` Selection band > Tile selection layout | sub-element | `selection_tile_layout`, `selection_accordion`, `ui_shell_fixture` | 9 | 1 | 2 |
 | `UI-049` Hover Card | element | `hover_freeze`, `sticky_card`, `border_band`, `lens_one_tier`, `lens_strip_and_fields` | 28 | 0 | 4 |
 | `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields` | 35 | 0 | 3 |

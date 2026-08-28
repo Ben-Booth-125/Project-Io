@@ -7,6 +7,7 @@
 #include "hover_content.hpp"
 #include "hex_render.hpp"
 #include "icons.hpp"
+#include "tile_inspector.hpp"   // history_view_tectonics (BL-660 routing)
 #include "market_ledger.hpp" // market_city_name (Market lens catchment key, BL-015)
 #include "nav_pane.hpp"
 #include "presentation.hpp"
@@ -4415,6 +4416,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         state.selected_deposit_resource = static_cast<int>(area_id) - 1;
                         close_all_panels(state);
                         state.show_market_ledger = true;
+                        // ...ON THE PRICES VIEW (BL-659). Opening the ledger on
+                        // whichever tab was last used answers a different question
+                        // from the one the press asked: a deposit's question is
+                        // "what is this worth", and Prices is the view that says
+                        // so. The view then highlights the pressed resource's own
+                        // sparkline, which is what "aimed at that resource" means
+                        // in a view that lists every traded good.
+                        state.market_ledger_view = 0;
                     }
                     else
                     {
@@ -4424,8 +4433,44 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         // plate's own collision/rift record is BL-660's second
                         // half and is not built — see PLACEHOLDER below.
                         state.selected_plate = static_cast<int>(area_id) - 1;
+
+                        // Cache what the Selection element will say about it, here
+                        // and only here — the band cannot reach the generation
+                        // report, and this pass already holds it (BL-671; the
+                        // field's own comment carries the reasoning).
+                        state.selected_plate_facts = {};
+                        if (plates != nullptr && gw > 0)
+                        {
+                            const int pid = state.selected_plate;
+                            const std::size_t n = plates->plate_id.size();
+                            const bool have_conv = plates->convergent.size() == n;
+                            const bool have_div  = plates->divergent.size() == n;
+                            for (std::size_t k = 0; k < n; ++k)
+                            {
+                                if (plates->plate_id[k] != pid)
+                                    continue;
+                                ++state.selected_plate_facts.tiles;
+                                if (have_conv && plates->convergent[k] != 0u)
+                                    ++state.selected_plate_facts.convergent_tiles;
+                                if (have_div && plates->divergent[k] != 0u)
+                                    ++state.selected_plate_facts.divergent_tiles;
+                            }
+                            if (pid >= 0 && static_cast<std::size_t>(pid) < plates->plates.size())
+                            {
+                                const tectonic_plate& tp =
+                                    plates->plates[static_cast<std::size_t>(pid)];
+                                state.selected_plate_facts.oceanic   = tp.oceanic;
+                                state.selected_plate_facts.drift_col = tp.drift_col;
+                                state.selected_plate_facts.drift_row = tp.drift_row;
+                            }
+                        }
+
                         close_all_panels(state);
                         state.show_tile_ledger = true;
+                        // ...ON THE TECTONICS VIEW (BL-660). Opening the History
+                        // ledger on whichever view was last used answers a
+                        // different question from the one the press asked.
+                        state.history_view = history_view_tectonics;
                     }
                 }
                 else if (area_kind != structure_kind::none && area_id != null_entity)

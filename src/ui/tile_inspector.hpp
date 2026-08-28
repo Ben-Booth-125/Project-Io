@@ -6,6 +6,17 @@
 
 namespace ui {
 
+/// The History (Tile) ledger's view indices, as parked in `ui_state::history_view`.
+///
+/// PUBLIC because the canvas routes to one of them: a plate press under the
+/// Continent lens opens this ledger on Tectonics (BL-660), and a bare `3` at that
+/// call site is exactly the hand-kept literal this file's own clamp comment warns
+/// about — the Ages renumbering already broke saved indices once.
+enum history_view_id { history_view_story = 0,
+                       history_view_chain,
+                       history_view_ages,
+                       history_view_tectonics };
+
 /// Draw the Tile Ledger window — the nav rail's slot 9, "History" (MENU.md's
 /// 2026-06-15 rename). Displays a body selector, the body's ORAL-HISTORY
 /// BIOGRAPHY (BL-211 — the dated, causal lines Planetology/Continents-Drift

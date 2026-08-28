@@ -220,6 +220,13 @@ void draw_selection_band(world& w, const recipe_registry& reg,
     if (sel == null_entity || selection_kind_of(w, sel) == selection_kind::none)
         sel = w.player_entity; // the player corp exists before the first frame
 
+    // A DEPOSIT or PLATE selection reaches here with `selected_entity` null and is
+    // substituted above like any other empty selection — harmlessly, because
+    // draw_selection_content dispatches on the region fields BEFORE it looks at
+    // the entity and returns without reading `sel` (BL-671). Worth stating: this
+    // substitution is what made a plate press show the previous card, which is
+    // what NR-697 was reporting.
+
     // ── Placement (BL-213) ──
     // Fixed: fills the exact rect the caller computed (bottom band, between the
     // shell column and the right chrome column). No click-anchoring, no

@@ -100,6 +100,14 @@ THE REVIEW BARRIER EARNED ITS PLACE and that is the finding worth carrying into 
 
 STILL OWED: the live click on both items. Computer-use access to the built app was requested and denied, so two requirement rows stay pending rather than flipping on a green harness.
 
+WAVE 2 (Ben's live review): BL-667 one hover mark under a lens, BL-668 the workforce heatmap, BL-669 the throughput ramp, BL-670 the rung-keyed lens strip. BL-669 is the one worth remembering - Ben asked for a quadratic and the measurement said no. A new census (throughput_field_census) showed the ramp was already sqrt, that quadratic is WORSE than what shipped, and that no curve over cost/max could fix it because the input is bunched. The denominator was the problem; p90 tripled the spread.
+
+WAVE 3 closes the sprint's carried items. BL-671 gave the deposit and the plate Selection-band cards - both channels had been WRITE-ONLY, so a press showed the previous subject rather than nothing (NR-697, pruned). BL-659 aims the Market ledger at Prices; BL-660 landed in two halves, a Tectonics view in the History ledger and, via a worktree agent, the divergent boundary mask the generator had been classifying and discarding.
+
+TWO FINDINGS OUT OF WAVE 3, both from assertions that failed rather than from reading. The convergent and divergent masks OVERLAP at junctions and the intuitive 'either/or' model is wrong (NR-707). And no envelope field has ever had save round-trip coverage, which the save-version bump to 2 made worth saying out loud (NR-708).
+
+STILL OPEN: NR-698 alone - a script cannot ask which tiles carry a good, so the deposit checks probe and report. That needs Ben's ruling on the standing rule, not more work.
+
 ### Sprint 24 — UI visibility - batch 3: ledgers
 *Proposed · opened 2026-08-28*
 
@@ -185,7 +193,7 @@ One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's
 | 20 | The books open, and the start earns its way | Closed 2026-08-26 - GOAL MET AND PROVED. Fifteen items landed; BL-634 measured Ben's own criterion and it holds. Cuts v0.1.21. |
 | 22 | UI visibility - batch 1: lenses | Closed 2026-08-28 - the lens batch reviewed and reworked; the remaining element classes become their own sprints (23-27) |
 | 21 | The other half of the economy - demand | PAUSED 2026-08-28 with wave 0 landed - the UI batches take priority; resume at wave 1 (BL-640/641/642) |
-| 23 | UI visibility - batch 2: selection & hover | Open 2026-08-28 - wave 1 landed (BL-664, BL-665, BL-666); the carried batch-1 items remain |
+| 23 | UI visibility - batch 2: selection & hover | Open 2026-08-28 - waves 1-3 landed; only NR-698 (a ruling) stands between it and closed |
 | 24 | UI visibility - batch 3: ledgers | Proposed 2026-08-28 - one of the six UI review batches |
 | 25 | UI visibility - batch 4: shell chrome | Proposed 2026-08-28 - one of the six UI review batches |
 | 26 | UI visibility - batch 5: canvases & the zoom ladder | Proposed 2026-08-28 - one of the six UI review batches |
