@@ -76,17 +76,27 @@ and/or a version goal (v0.1.1 etc.).
 PAUSED 2026-08-28 on Ben's instruction, wave 0 complete (BL-648 guard, BL-649 census). Nothing is abandoned: the guard is deliberately red, the census is the before/after instrument, and wave 1 resumes where it stopped. Opened on Ben's instruction, 2026-08-26 ('A, and open it as sprint 21'), after the session's own measurement answered his question: the ancient band has TWO live demand sinks, and ten goods pass the orphan check by naming a 'mercantile demand' that grep says was never built (NR-671). Ceiling advanced to 21 on the same instruction. ORDERING IS LOAD-BEARING: BL-648 and BL-649 go FIRST, not last. The guard makes the gap visible and the census makes each pass measurable - without them a viability pass is a guess with a number attached. A red guard with a named list is worth more than a green one that means nothing; do not weaken it to pass while the channels are being built. SEVERAL CHANNELS ARE DESIGNED-BUT-INERT rather than missing, which is why the sprint is cheaper than it looks: `strategic_reserve` is already a goods-buying budget line no consumer claims on; `logistics_maintenance` already names network upkeep; recipes already carry the era field the demand baskets need; and `run_unit_upkeep` is already the credits-plus-goods shape BL-641 wants for buildings. RELATIONSHIP TO SPRINT 20: Sprint 20 stays open and owns the ledger, the buyout and the spawn shortlist. Its BL-634 (acquisition viability) CANNOT honestly pass until this sprint lands - a corp at -28/qtr never saves up for anything - so BL-634's measurement is the natural close-out for BOTH sprints. BL-630's shortlist gains a real mechanism to gate on once demand exists: BL-635 measured that a spawn's survival currently depends on whether the generator handed it a resource anyone wants.
 
 ### Sprint 24 — UI visibility - batch 3: ledgers
-*Proposed · opened 2026-08-28*
+*Open · opened 2026-08-28*
 
 **Goal.** Review every nav-rail ledger against live captures - Balance, Market, Construction, Corporation, Contracts, History, Generation, AI decisions, Strategy, Research. Ten of the thirteen rail slots, and the surfaces every lens is a prelude TO (Ben, 2026-08-28: "the lens is a visual prelude to whatever we design on ledgers using various charts and tables").
 
+IT OPENS WITH WORK ALREADY ON IT, which batch 2 is the reason for: selection now routes to these surfaces, so pressing them found four defects and left three declared placeholders behind. That is the batch order paying off - a ledger nobody could reach was a ledger nobody could find wrong.
+
 **Planned.**
+- NR-704 (the two corporation ui_state flags are named the wrong way round) - FIRST, and cheap. show_corporation_panel drives the PLAYER'S dashboard; show_corporations_table drives the all-corporations table. Each names the other's function, and that confusion already shipped a destination green while it opened the player's own books. Rename before the batch reviews both
+- NR-705 (the corporations table clips every firm's name to one character) - found live. Forty rows you cannot tell apart, and the row BL-666 aims cannot be read as the firm that was pressed
+- The three PLACEHOLDER surfaces batch 2 left, each owed a real design: the Company ledger (BL-666), the History ledger's Tectonics view (BL-660), and the deposit/plate Selection cards (BL-671). Each says on its face that it is a stand-in; docs/ui/ledgers/README.md's five axes are what a real design answers
 - BL-662 (Scarcity re-cut to tint markets, wired to a new Market-ledger sub-view)
 - BL-639 (panel columns), if Ben assigns it here
+- NR-708 (no envelope field has save round-trip coverage) - a CMake-declared harness linking imgui, on the font_glyph_harness precedent. Not a ledger, but it is a seam this batch will keep touching
 - UI-070..UI-090, UI-100..UI-108 in the catalogue
 - The three rail slots hosting a stand-in under another surface's label: 3 Workforce, 7 Corp. Strategy, 8 Diplomacy
 
 One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's instruction: "Let's make a sprint for each batch." The decomposition is by ELEMENT CLASS from docs/ui/ui_elements.json, because that is the spine the coverage tool already reports against - `node tools/session/ui_coverage.js --captures --since N` groups a run by element, so a batch's review list is a command rather than a judgement. Batch 1 (lenses) is sprint 22, closed. METHOD, proven in batch 1: capture the whole class first, send it to Ben in one go, take his calls, build, re-capture, and expect the re-capture to find something the code read did not.
+
+OPENED 2026-08-28 on Ben's instruction, straight out of sprint 23's close. METHOD CARRIED FORWARD, both halves proven in batch 2: capture the class first and send it to Ben in one go, and run the REVIEW BARRIER over the integrated diff before committing. The barrier is not optional here - in batch 2 it caught a destination opening the player's own dashboard one commit after the item that filed that exact bug, and caught that the check could not have found it. Ledgers are where that class of mistake hides, because a ledger that opens looks like a ledger that works.
+
+THE OTHER CARRIED LESSON: measure before reshaping. Twice in batch 2 a stated plan was overturned by a number - the throughput ramp Ben asked to make quadratic was already sqrt and quadratic was worse, and an assertion written to prove two boundary masks exclusive failed because they are not. Neither was weakened to pass. Ledgers are full of numbers presented as facts; the same discipline applies.
 
 ### Sprint 25 — UI visibility - batch 4: shell chrome
 *Proposed · opened 2026-08-28*
@@ -161,7 +171,7 @@ One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's
 | 22 | UI visibility - batch 1: lenses | Closed 2026-08-28 - the lens batch reviewed and reworked; the remaining element classes become their own sprints (23-27) |
 | 23 | UI visibility - batch 2: selection & hover | Closed 2026-08-28 - goal met. Twelve items across three waves; every planned item landed |
 | 21 | The other half of the economy - demand | PAUSED 2026-08-28 with wave 0 landed - the UI batches take priority; resume at wave 1 (BL-640/641/642) |
-| 24 | UI visibility - batch 3: ledgers | Proposed 2026-08-28 - one of the six UI review batches |
+| 24 | UI visibility - batch 3: ledgers | Open 2026-08-28 - batch 3, the ledgers; opens with four defects already filed against its own surfaces |
 | 25 | UI visibility - batch 4: shell chrome | Proposed 2026-08-28 - one of the six UI review batches |
 | 26 | UI visibility - batch 5: canvases & the zoom ladder | Proposed 2026-08-28 - one of the six UI review batches |
 | 27 | UI visibility - batch 6: startup & the wizard | Proposed 2026-08-28 - one of the six UI review batches |

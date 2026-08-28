@@ -75,6 +75,28 @@ verify.expect(h.hovered_structure_kind == "market",
               "Market lens: the pointer resolves to the catchment")
 verify.capture("hover_single_market")
 
+-- BL-673: and the card must now be ABOUT the catchment, not about the ground it
+-- covers. The assertion below is the resolver half — that hover and click agree on
+-- the subject — and the capture is the half only an eye can judge: whether the card
+-- says "Market" rather than "Forest, Habitability 79%".
+verify.expect(h.hover_card == true,
+              "Market lens: a card IS raised over a resolved structure")
+verify.capture("hover_card_market_structure")
+
+-- One capture per structure lens, because "a different hover card for each lens"
+-- is a claim about five frames, not one.
+for _, lens in ipairs({ "corporation", "company", "continent", "resource" }) do
+    verify.set_overlay(lens)
+    verify.center_tile(built_col, built_row, 8)
+    local q = verify.tile_screen(built_col, built_row)
+    if q.ok then
+        verify.mouse(q.x, q.y)
+        verify.frames(40)
+        verify.capture("hover_card_" .. lens)
+    end
+end
+verify.set_overlay("market")
+
 -- The same gesture with NO lens, where the tile ring IS the right mark and must
 -- still be drawn. The pair is the check; either frame alone proves nothing.
 verify.set_overlay("none")

@@ -184,7 +184,7 @@
     "docs/development/DELIVERY.md",
     "docs/development/NEEDS_REVIEW.json"
    ],
-   "design": "Carried from Sprint 18 and named in NEXT_SESSION.md as owed in Sprint 20's definition of done. Two visual requirements were marked complete on a scripted capture alone, which the 2026-08-19 rule says is not sufficient: a capture proves a surface renders, not that a press on it is reachable. The dispatch form and the Throughput lens both owe a live click. BLOCKED, and the blocker is environmental rather than a design gap - NR-622 records that the container cannot approve the OS-level computer-use dialog, which is why this has slipped three sprints rather than one. DESIGN-OWED on the route out: either Ben clicks them himself in one pass, or the session gets a path to drive the live app that does not need that dialog. Filing it as an item so it has an owner instead of living only in a handoff note."
+   "design": "Carried from Sprint 18 and named in NEXT_SESSION.md as owed in Sprint 20's definition of done. Two visual requirements were marked complete on a scripted capture alone, which the 2026-08-19 rule says is not sufficient: a capture proves a surface renders, not that a press on it is reachable. The dispatch form and the Throughput lens both owe a live click. BLOCKED, and the blocker is environmental rather than a design gap - NR-622 records that the container cannot approve the OS-level computer-use dialog, which is why this has slipped three sprints rather than one. DESIGN-OWED on the route out: either Ben clicks them himself in one pass, or the session gets a path to drive the live app that does not need that dialog. Filing it as an item so it has an owner instead of living only in a handoff note.\n\nSPRINT 23 ADDS ONE, and it is blocked differently from the rest (folded in from NR-706, 2026-08-28, on Ben's instruction to close that entry - the concern stays relevant, so it lives here rather than in the transient queue).\n\nBL-666's COMPANY destination has never been live-clicked. Not for want of access: the corporation half WAS clicked in the built app the same session. The blocker is the WORLD - a freshly generated campaign (seed 00000000, 20 settle years, 1960 Q1) carried no background firm holding any tile on the home body, so the Company lens tinted nothing across a fully zoomed-out view and there was nothing to press. The route is asserted green in lens_one_tier against a world that does have one.\n\nSo this row needs a world or a save with a background firm on the home body, not a permission dialog. Worth measuring while there: count background firms and their holdings at year 20 against year 100 - if they are genuinely absent early, the Company lens needs an EMPTY STATE, because a lens that tints nothing and says nothing is indistinguishable from a broken one."
   },
   {
    "id": "BL-639",
@@ -821,6 +821,22 @@
    "design": "@docs/development/archive/backlog-design-2026-Q3.json",
    "archived": "docs/development/archive/backlog-design-2026-Q3.json",
    "resolved": "2026-08-28"
+  },
+  {
+   "id": "BL-673",
+   "short_name": "per-lens hover cards",
+   "title": "Each structure lens gets its own hover card, describing what the click will select",
+   "status": "complete",
+   "priority": "medium",
+   "written": "2026-08-28",
+   "resolved": "2026-08-28",
+   "sprint": "23",
+   "touches": [
+    "docs/ui/TOOLTIP.md",
+    "src/ui/hover_content.cpp"
+   ],
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   }
  ]
 }

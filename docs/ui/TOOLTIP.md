@@ -35,6 +35,18 @@ See also: [LAYOUT.md](LAYOUT.md) (where the card sits in the shell),
   lightweight chrome tooltip. Instant identity labels on chrome, not entity
   readouts — the instant-vs-delayed split survives exactly here.
 
+**Under a lens the card is about the LENS'S STRUCTURE, not the tile.** Owned by BL-673 (per-lens
+hover cards). The card reads `hovered_structure` / `hovered_structure_kind` — what the resolver
+already decided this frame — so its subject cannot disagree with what a click at the same pixel
+would select. Corporation and Company name the owner; Market and Scarcity name the catchment and
+differ in whether it is about price or shortfall; Continent names the plate. Resource is the
+exception: its structure *is* the deposit on the hovered tile, so the tile card already answers the
+lens's question.
+
+Each is a **declared placeholder** — it names the structure and says what the press opens, and
+carries none of the reading that would make it worth dwelling on. Those are per-lens content
+designs, not a consequence of the resolution rule.
+
 **A lens can suppress the card entirely.** Under an active lens the pointer resolves to the lens's
 own structure or to nothing, and where it resolves to nothing **no card appears at all** (Ben,
 2026-08-28; [SELECTION.md](SELECTION.md) § A lens collapses selection to ONE TIER owns the rule).

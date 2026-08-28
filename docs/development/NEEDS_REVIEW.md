@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*84 entries — 84 open, 0 resolved.*
+*81 entries — 81 open, 0 resolved.*
 
 ---
 
@@ -675,17 +675,6 @@ BL-666 owns the fix (an aimable corporation destination and a company one that e
 
 *Files: `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp`*
 
-### NR-701 — Under four lenses the hover card describes the tile, not the structure the click will select
-*observation · raised 2026-08-28 · from Sprint 23, BL-664; caught again by the review barrier as its finding 10.*
-
-BL-664 made hover and click agree about the KIND of thing under the pointer, and they still disagree about its SUBJECT. Under a lens the hover card's subject is the TILE, while a press at the same pixel selects the lens's structure - so hovering a rival's plant under the Corporation lens shows terrain and movement cost, and clicking it selects the corporation.
-
-THE CAUSE IS CONTENT, NOT RESOLUTION. draw_hover_content (hover_content.cpp) branches on resource and population only; it has no branch for a corporation, a company, a catchment or a plate, so there is nothing for the card to say about any of them and it falls through to terrain. Writing those four is content work of a different kind from the resolution rule BL-664 is about, so it was left rather than smuggled in.
-
-IT IS ALSO A SMALL LOSS against the pre-BL-664 behaviour, which is the part worth Ben's eye: hovering a building under a lens used to give the building card, because the marker won. It no longer does, and nothing has replaced it. Either the four branches get written, or the card's subject under a lens should be reconsidered.
-
-*Files: `src/ui/hover_content.cpp`, `src/ui/body_surface_canvas.cpp`, `docs/ui/TOOLTIP.md`*
-
 ### NR-702 — A press on inert ground now CLOSES the Company ledger, not just the Selection band
 *decision · raised 2026-08-28 · from Sprint 23, BL-666; the review barrier's finding 7.*
 
@@ -730,17 +719,6 @@ Found by looking, not by reading - the harness asserts open_panel and the aimed 
 
 *Files: `src/ui/corporation_panel.cpp`*
 
-### NR-706 — A fresh world has no background firm holdings on the home body, so the Company lens shows nothing
-*question · raised 2026-08-28 · from Sprint 23, trying to live-click BL-666's company destination.*
-
-In a newly generated world (seed 00000000, 20 settle years, 1960 Q1) the Company lens tinted NOTHING across a fully zoomed-out view of the home body, and no background-firm HQ marker was drawn. Every visible building belonged to a corporation proper or was a settlement.
-
-So the Company lens - and with it BL-666's company destination - has nothing to point at in a fresh campaign, which is when a player is most likely to try a lens. The verify world (after econ_step) does have background firms, which is why the harness half passes.
-
-TWO READINGS, and they want different work. Either background firms are correctly absent at year 20 and grow in later, in which case the lens is fine and only its EMPTY STATE is missing (a lens that tints nothing and says nothing is indistinguishable from a broken one). Or the settle phase should be seeding them, and this is a generation gap. Worth measuring before assuming either - count background firms and their holdings at year 20 versus year 100.
-
-*Files: `src/ui/body_surface_canvas.cpp`, `docs/ui/LENSES.md`, `docs/generation/CORPORATION_GENERATION.md`*
-
 ### NR-707 — The convergent and divergent boundary masks OVERLAP, and the obvious reading is wrong
 *observation · raised 2026-08-28 · from Sprint 23 wave 3, BL-660's data half; found by an assertion that failed.*
 
@@ -764,19 +742,6 @@ THE GAP THAT MATTERS MORE: the round trip is not covered by any harness, and nev
 The fix is a CMake-declared envelope harness linking imgui, on the font_glyph_harness precedent. Worth an item: a serialisation seam with no read/write test is exactly where the asymmetry that corrupts a snapshot hides, and the max_overlay bug (NR-703) came out of this same file today.
 
 *Files: `src/core/save_game.cpp`, `src/core/save_game.hpp`, `tools/verify/build_harness.js`*
-
-### NR-709 — 31 archived backlog records sit in an 'undated' cold file because the bucketer reads a field nobody writes
-*observation · raised 2026-08-28 · from Sprint 23 close-out; noticed when this sprint's own eleven items landed in the wrong cold file.*
-
-archive_store.js buckets a landed item by `item.resolved || item.written`. Nothing in the current filing convention writes either field - this session's items carried `completed` and `created`, which is what the backlog's own shape suggested - so all eleven went to backlog-design-undated.json instead of backlog-design-2026-Q3.json.
-
-FIXED FOR MINE, and only mine: the eleven records were moved to the Q3 file, their pointers repointed, and `resolved` added to the live items so a future re-archive agrees. The archiver's own verify passes and backlog_query resolves the prose through the new pointers.
-
-THIRTY-ONE OLDER RECORDS ARE STILL THERE (BL-008, BL-031, BL-032, BL-037...), and they predate this session. Nothing is broken - `undated` is a valid bucket and every pointer resolves - but the tool's stated reason for bucketing by date is that it 'keeps the files stable', and a bucket that collects everything whose date field was named differently does not.
-
-TWO WAYS TO CLOSE IT, and it is your call which: teach bucketFor to also read `completed`/`created` (one line, retroactively correct for everything), or settle a single field name for a landed item and sweep the 31. The first is cheaper and does not touch history.
-
-*Files: `tools/session/archive_store.js`, `docs/development/archive/backlog-design-undated.json`*
 
 ---
 
