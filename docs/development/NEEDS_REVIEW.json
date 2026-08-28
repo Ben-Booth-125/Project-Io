@@ -1247,6 +1247,32 @@
     "src/core/app.cpp",
     "src/core/verify_api.cpp"
    ]
+  },
+  {
+   "id": "NR-705",
+   "title": "The corporations table's NAME column is clipped to a single character",
+   "raised": "2026-08-28",
+   "kind": "observation",
+   "status": "open",
+   "source": "Sprint 23, live-clicking BL-666's corporation destination in the built app.",
+   "what": "Opening the all-corporations table from a Corporation-lens press showed every row as a single letter followed by its figures - \"C 1 bodies 1707.5 3% Neutral\", \"T 1 bodies -3677.3 0% Neutral\". The header reads \"C Reach Capital Share Stance\", so the name column is present and squeezed to about one glyph wide.\n\nThe table is unusable as a comparison surface in that state: it is a list of forty firms you cannot tell apart, and the row BL-666 aims cannot be read as the firm the player just pressed. The Selection band names the firm correctly, so the routing is right and the presentation is not.\n\nFound by looking, not by reading - the harness asserts open_panel and the aimed id, neither of which can see a column width. Sprint 24 (ledgers) owns this surface; filing it here so the batch that reviews it starts from a known defect rather than rediscovering it.",
+   "files": [
+    "src/ui/corporation_panel.cpp"
+   ]
+  },
+  {
+   "id": "NR-706",
+   "title": "A fresh world has no background firm holdings on the home body, so the Company lens shows nothing",
+   "raised": "2026-08-28",
+   "kind": "question",
+   "status": "open",
+   "source": "Sprint 23, trying to live-click BL-666's company destination.",
+   "what": "In a newly generated world (seed 00000000, 20 settle years, 1960 Q1) the Company lens tinted NOTHING across a fully zoomed-out view of the home body, and no background-firm HQ marker was drawn. Every visible building belonged to a corporation proper or was a settlement.\n\nSo the Company lens - and with it BL-666's company destination - has nothing to point at in a fresh campaign, which is when a player is most likely to try a lens. The verify world (after econ_step) does have background firms, which is why the harness half passes.\n\nTWO READINGS, and they want different work. Either background firms are correctly absent at year 20 and grow in later, in which case the lens is fine and only its EMPTY STATE is missing (a lens that tints nothing and says nothing is indistinguishable from a broken one). Or the settle phase should be seeding them, and this is a generation gap. Worth measuring before assuming either - count background firms and their holdings at year 20 versus year 100.",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "docs/ui/LENSES.md",
+    "docs/generation/CORPORATION_GENERATION.md"
+   ]
   }
  ]
 }

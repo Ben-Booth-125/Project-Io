@@ -4043,12 +4043,12 @@
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: live click"
      ],
      "requirement": "Live click: open the built app, switch to an inert lens and to a structure lens, and confirm by eye that hover and selection behave as R1-R4 say. A capture proves the surface renders; it does not prove a press is reachable.",
-     "notes": "PENDING - NOT SKIPPED. Computer-use access to the built app was requested and DENIED by the user at 2026-08-28, so no live press could be made. The NR-622 precedent applies: the scripted half is green (38/38 in lens_one_tier, including the presses this row is about), but a capture proves a surface renders and not that a press on it is reachable, so this row must not flip on the harness alone. It needs one session with OS-level access to open the exe, switch lens, click, and look."
+     "notes": "LIVE-CLICKED 2026-08-28 in the built app (fresh world, seed 00000000, Huhaidar, 1960 Q1). Corporation lens: hovering one of Genom Systems' three holdings lit ALL THREE at once, and a press on a tile CARRYING A BUILDING GLYPH selected the CORPORATION - the marker did not win. The press opened the all-corporations table with a row highlighted, NOT the player's own dashboard, which is the defect the review barrier caught. Population lens: three seconds of dwell over the same built tile raised NO hover card, and a press returned the Selection band to its resting state (Corix Industries, the player's own corporation). Captured in the session transcript."
     }
    ]
   },
@@ -4067,7 +4067,7 @@
       "visual: lens_one_tier, capture + asserted"
      ],
      "requirement": "Under the Corporation lens, hovering ONE tile of a corporation's holdings on this body highlights EVERY tile it holds there, and hovering ground held by nobody highlights nothing (hovered_structure_kind == 'none').",
-     "notes": "Asserted green by scripts/verify/lens_one_tier.lua."
+     "notes": "Asserted green by scripts/verify/lens_one_tier.lua. LIVE-CLICKED 2026-08-28 in the built app (fresh world, seed 00000000, Huhaidar, 1960 Q1). Corporation lens: hovering one of Genom Systems' three holdings lit ALL THREE at once, and a press on a tile CARRYING A BUILDING GLYPH selected the CORPORATION - the marker did not win. The press opened the all-corporations table with a row highlighted, NOT the player's own dashboard, which is the defect the review barrier caught. Population lens: three seconds of dwell over the same built tile raised NO hover card, and a press returned the Selection band to its resting state (Corix Industries, the player's own corporation). Captured in the session transcript."
     },
     {
      "id": "R2",
@@ -4085,7 +4085,7 @@
       "visual: lens_one_tier, asserted"
      ],
      "requirement": "The hand-wired lens_through marker pivot is gone: the Corporation lens resolves its owner through the AREA resolver on owned ground, including ground whose marker would previously have won the press.",
-     "notes": "RE-SPECIFIED at the review barrier, not weakened. The original row said 'on BOTH built and unbuilt owned ground', which is false by construction: tile_to_corp is built by walking each corporation's assets to their buildings, so corp-owned UNBUILT ground has no representation anywhere in the map and the lens cannot resolve it. The real claim - the one the old marker precedence made impossible - is that a BUILT owned tile now answers with its owner instead of its building, and that is what lens_one_tier asserts. If corp territory should extend past its buildings, that is a data change and a new item, not this row."
+     "notes": "RE-SPECIFIED at the review barrier, not weakened. The original row said 'on BOTH built and unbuilt owned ground', which is false by construction: tile_to_corp is built by walking each corporation's assets to their buildings, so corp-owned UNBUILT ground has no representation anywhere in the map and the lens cannot resolve it. The real claim - the one the old marker precedence made impossible - is that a BUILT owned tile now answers with its owner instead of its building, and that is what lens_one_tier asserts. If corp territory should extend past its buildings, that is a data change and a new item, not this row. LIVE-CLICKED 2026-08-28 in the built app (fresh world, seed 00000000, Huhaidar, 1960 Q1). Corporation lens: hovering one of Genom Systems' three holdings lit ALL THREE at once, and a press on a tile CARRYING A BUILDING GLYPH selected the CORPORATION - the marker did not win. The press opened the all-corporations table with a row highlighted, NOT the player's own dashboard, which is the defect the review barrier caught. Population lens: three seconds of dwell over the same built tile raised NO hover card, and a press returned the Selection band to its resting state (Corix Industries, the player's own corporation). Captured in the session transcript."
     }
    ]
   },
@@ -4126,12 +4126,12 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "partial",
      "verification": [
       "visual: live click"
      ],
      "requirement": "Live click: open the built app, click a rival's ground under Corporation and a background firm's ground under Company, and confirm each lands on its own destination.",
-     "notes": "PENDING - NOT SKIPPED. Computer-use access to the built app was requested and DENIED by the user at 2026-08-28, so no live press could be made. The NR-622 precedent applies: the scripted half is green (38/38 in lens_one_tier, including the presses this row is about), but a capture proves a surface renders and not that a press on it is reachable, so this row must not flip on the harness alone. It needs one session with OS-level access to open the exe, switch lens, click, and look."
+     "notes": "PARTIALLY live-clicked 2026-08-28. THE CORPORATION HALF IS CONFIRMED: a press on a rival's ground under the Corporation lens opened the corporations table aimed at that firm, not the player's own books.\n\nTHE COMPANY HALF COULD NOT BE REACHED and is NOT claimed. The freshly generated world had no background firm holding any tile on the active body - the Company lens tinted nothing across a fully zoomed-out view, and the lens carries no strip glyph yet (BL-663), so it is keyboard-cycle only. The route is asserted green in lens_one_tier against a world that does have one, but a harness is not a press. Owed: one live press on a background firm's ground, in a world or a save that has one."
     }
    ]
   }

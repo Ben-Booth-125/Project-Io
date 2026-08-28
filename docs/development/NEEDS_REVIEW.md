@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*81 entries — 81 open, 0 resolved.*
+*83 entries — 83 open, 0 resolved.*
 
 ---
 
@@ -736,6 +736,28 @@ THIS IS NOT A TIDINESS COMPLAINT. BL-666's routing took the flag whose name matc
 Both halves are now fixed at the sites - the routing takes the right flag with the trap recorded beside it, and open_panel distinguishes 'corporation' from 'corporations'. The rename itself is not taken: it touches nav_pane, app.cpp, view_nav and the verify seam, which is more than this batch should carry. Worth doing before the ledger batch (sprint 24) reviews both surfaces.
 
 *Files: `src/ui/ui_state.hpp`, `src/ui/nav_pane.cpp`, `src/core/app.cpp`, `src/core/verify_api.cpp`*
+
+### NR-705 — The corporations table's NAME column is clipped to a single character
+*observation · raised 2026-08-28 · from Sprint 23, live-clicking BL-666's corporation destination in the built app.*
+
+Opening the all-corporations table from a Corporation-lens press showed every row as a single letter followed by its figures - "C 1 bodies 1707.5 3% Neutral", "T 1 bodies -3677.3 0% Neutral". The header reads "C Reach Capital Share Stance", so the name column is present and squeezed to about one glyph wide.
+
+The table is unusable as a comparison surface in that state: it is a list of forty firms you cannot tell apart, and the row BL-666 aims cannot be read as the firm the player just pressed. The Selection band names the firm correctly, so the routing is right and the presentation is not.
+
+Found by looking, not by reading - the harness asserts open_panel and the aimed id, neither of which can see a column width. Sprint 24 (ledgers) owns this surface; filing it here so the batch that reviews it starts from a known defect rather than rediscovering it.
+
+*Files: `src/ui/corporation_panel.cpp`*
+
+### NR-706 — A fresh world has no background firm holdings on the home body, so the Company lens shows nothing
+*question · raised 2026-08-28 · from Sprint 23, trying to live-click BL-666's company destination.*
+
+In a newly generated world (seed 00000000, 20 settle years, 1960 Q1) the Company lens tinted NOTHING across a fully zoomed-out view of the home body, and no background-firm HQ marker was drawn. Every visible building belonged to a corporation proper or was a settlement.
+
+So the Company lens - and with it BL-666's company destination - has nothing to point at in a fresh campaign, which is when a player is most likely to try a lens. The verify world (after econ_step) does have background firms, which is why the harness half passes.
+
+TWO READINGS, and they want different work. Either background firms are correctly absent at year 20 and grow in later, in which case the lens is fine and only its EMPTY STATE is missing (a lens that tints nothing and says nothing is indistinguishable from a broken one). Or the settle phase should be seeding them, and this is a generation gap. Worth measuring before assuming either - count background firms and their holdings at year 20 versus year 100.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `docs/ui/LENSES.md`, `docs/generation/CORPORATION_GENERATION.md`*
 
 ---
 
