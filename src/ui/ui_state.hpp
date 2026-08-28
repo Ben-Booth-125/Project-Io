@@ -97,6 +97,11 @@ enum class structure_kind : uint8_t
     nation,      ///< A generated nation, selected by its national border band.
     market,      ///< A market and its whole catchment (Market and Scarcity lenses).
     corporation, ///< A corporation's holdings on the active body (Corporation lens).
+    // A COMPANY IS ITS OWN KIND, not a corporation with a flag (BL-665). The two
+    // are different words since the 2026-08-28 split (GLOSSARY.md) and Ben ruled
+    // they reach different destinations, so the difference belongs in the answer
+    // the resolver gives rather than being re-derived by every routing site.
+    company,     ///< A background firm's holdings on the active body (Company lens).
     // The two NON-ENTITY structures (Ben, 2026-08-28, choosing option A). Both
     // are regions the lens already draws and the player could not select: a
     // deposit is every tile carrying the lens's resource, a plate is a Voronoi

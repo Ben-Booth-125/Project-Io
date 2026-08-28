@@ -774,6 +774,40 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             }
             out["selection_kind"] = std::string(k);
         }
+        // THE TWO NON-ENTITY STRUCTURE CHANNELS (BL-664). `selection_kind` above
+        // reports only what travels in `selected_entity`, and a deposit and a
+        // plate deliberately do not (BL-659/BL-660, Ben's option A) — so a check
+        // on either pivot could assert the side effect (a panel opened) and never
+        // the subject (which deposit, which plate). These close that gap.
+        //
+        // `hovered_structure_kind` is the hover half, and it is what makes the
+        // one-tier rule checkable at all: it says WHAT the active lens resolved
+        // this ground to, including the answer "nothing", which is the whole
+        // content of rule 3.
+        //
+        // THIS EXPOSES UI STATE, NOT TILE DATA. The standing rule is "do not
+        // expose individual tile data to Lua", and nothing here lets a script ask
+        // which tiles carry a resource — it can only read what the pointer it
+        // already moved resolved to. NR-698's question (a script cannot FIND a
+        // tile carrying resource X) is untouched and still open.
+        {
+            const char* k = "none";
+            switch (m_ui.hovered_structure_kind)
+            {
+            case structure_kind::nation:      k = "nation";      break;
+            case structure_kind::market:      k = "market";      break;
+            case structure_kind::corporation: k = "corporation"; break;
+            case structure_kind::company:     k = "company";     break;
+            case structure_kind::deposit:     k = "deposit";     break;
+            case structure_kind::plate:       k = "plate";       break;
+            default:                              k = "none";        break;
+            }
+            out["hovered_structure_kind"] = std::string(k);
+        }
+        out["hovered_structure"]         = static_cast<unsigned int>(m_ui.hovered_structure);
+        out["selected_deposit_resource"] = m_ui.selected_deposit_resource;
+        out["selected_plate"]            = m_ui.selected_plate;
+
         // BL-469: the battle selection is a third channel into the same element,
         // so the assertion half needs it too — without these every expect() about
         // a battle card would be a proxy for something else.

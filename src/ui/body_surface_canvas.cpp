@@ -1249,14 +1249,49 @@ structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
             *out_id = static_cast<entity_id>(pid) + 1u; // synthetic; +1 keeps 0 = none
         return structure_kind::plate;
     }
-    // The Corporation lens is DELIBERATELY absent, and finding out why is worth
-    // recording. Its structure is exactly the set of tiles carrying that corp's
-    // buildings — so every tile in it also carries a MARKER, and a marker
-    // outranks a structure by design ("a marker is a specific thing the player
-    // aimed at"). An area pivot here could therefore never fire: measured, not
-    // reasoned — the first draft of this switch included it and the check
-    // reported `tile` on empty ground and `building` on owned ground, never
-    // `corporation`. The lens resolves through the marker instead, below.
+    case overlay_mode::corporation:
+    case overlay_mode::company:
+    {
+        // THE OWNER'S TILE GROUP — every tile it holds on this body, lit and
+        // selected as one (Ben, 2026-08-28: "hovering one tile displays an
+        // outline around all company buildings for that corporation/company").
+        //
+        // THIS CASE WAS DELIBERATELY ABSENT UNTIL BL-665, and the reason it was
+        // absent is worth keeping because it was MEASURED, not reasoned: the
+        // structure is exactly the set of tiles carrying that owner's buildings,
+        // so every tile in it also carries a MARKER — and a marker outranked a
+        // structure, so an area pivot here could never fire. The first draft of
+        // this switch included it and the check reported `tile` on empty ground
+        // and `building` on owned ground, never `corporation`. The lens resolved
+        // through the marker instead, as a hand-wired special case in the click
+        // handler.
+        //
+        // BL-664 removed the marker's precedence under a lens, which dissolves
+        // the objection: the area resolver is now reachable on owned ground
+        // whether or not a glyph sits on it, and the special case is deleted.
+        //
+        // Keyed to the TINT (compute_tile_fill), because the selection grain
+        // follows the drawing: Corporation admits corporations proper — the
+        // player and its rivals — and Company admits BL-365 background firms,
+        // neither showing the other's. A tile no firm of the admitted kind holds
+        // answers none, and is inert.
+        const auto oit = tile_to_corp.find(tile);
+        if (oit == tile_to_corp.end())
+            return structure_kind::none;
+        const auto cit = w.corporations.find(oit->second);
+        if (cit == w.corporations.end())
+            return structure_kind::none;
+        const bool want_background = (state.overlay == overlay_mode::company);
+        if (cit->second.is_background != want_background)
+            return structure_kind::none;
+        if (out_id != nullptr)
+            *out_id = oit->second;
+        // Distinct KINDS for the two, not one kind and a lookup at the routing
+        // site: they are different words since the 2026-08-28 split and Ben
+        // ruled they reach different destinations, so the difference belongs in
+        // the answer rather than being re-derived by every caller.
+        return want_background ? structure_kind::company : structure_kind::corporation;
+    }
     default:
         return structure_kind::none;
     }
@@ -4048,7 +4083,27 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 tile_bld = tb->second;
 
         entity_id hover_eid = null_entity;
-        if (marker_hover != null_entity)
+        if (state.overlay != overlay_mode::none)
+        {
+            // BL-664, the hover half of the same rule. Under a lens the pointer
+            // resolves to the lens's structure or to nothing, so:
+            //
+            //  - a MARKER takes no part. The card's subject is the ground, not
+            //    the glyph standing on it, because the lens is what the player is
+            //    asking about ("markers do not outrank lenses", Ben 2026-08-28).
+            //  - where the lens has NO STRUCTURE for this ground there is NO CARD
+            //    AT ALL ("for lenses which return none, just don't surface a
+            //    hover"). Three lenses — Population, Industry, Throughput — draw a
+            //    value field with no structure grain, so the card is absent across
+            //    the whole body while one of them is active. That is deliberate: a
+            //    value field is something you read.
+            //
+            // `hovered_structure_kind` was resolved by the tile loop earlier this
+            // frame, so this costs a read rather than a second resolve.
+            hover_eid = (state.hovered_structure_kind != structure_kind::none)
+                        ? hovered_tile : null_entity;
+        }
+        else if (marker_hover != null_entity)
             hover_eid = marker_hover;
         else if (tile_bld != null_entity)
             hover_eid = tile_bld;
@@ -4179,16 +4234,40 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
         else if (!state.construction.active)
         {
+            // WHICH RULE APPLIES IS DECIDED FIRST (BL-664, Ben 2026-08-28),
+            // because these are two different resolutions rather than one with an
+            // exception. SELECTION.md § A lens collapses selection to ONE TIER is
+            // the authority.
+            //
+            //   NO LENS — the marker/tile stack, most-specific first, with the
+            //             four-rung repeat-click cycle over it.
+            //   A LENS  — the lens's structure, or NOTHING. "Markers do not
+            //             outrank lenses": inside a lens the marker is only
+            //             ground that happens to be built on, and the lens is the
+            //             question the player is asking. A lens with no answer
+            //             for this ground selects nothing at all.
+            //
+            // THE BORDER BAND IS OUTSIDE THE SPLIT. A nation is reached by
+            // clicking its border under EVERY lens (BL-601) because the band is
+            // always-on chrome rather than any lens's own structure, so the
+            // boundary resolver runs in both branches and outranks both. That is
+            // also why the boundary is asked BEFORE the lens's area: a border is
+            // a thing the player aimed at, a catchment is ground they happen to
+            // be over (the BL-603 ordering, unchanged).
+            const bool lensed = (state.overlay != overlay_mode::none);
+
             // Resolve marker hit zones in priority order (BL-031): building
             // outranks market-centre; both outrank tile. Shared with hover.
+            // Suppressed entirely under a lens by the rule above.
             const entity_id marker_hit =
-                resolve_marker_hit(state.marker_hit_zones, mouse.x, mouse.y);
+                lensed ? null_entity
+                       : resolve_marker_hit(state.marker_hit_zones, mouse.x, mouse.y);
 
             // STRUCTURE-GRAIN selection (BL-601), between the markers and the
-            // tile/province fallback. A marker is a specific thing the player
-            // aimed at and still outranks a boundary; a boundary in turn
-            // outranks the ground it runs across, because inside the corridor
-            // the border IS what the pointer is on.
+            // tile/province fallback. With no lens a marker is a specific thing
+            // the player aimed at and still outranks a boundary; a boundary in
+            // turn outranks the ground it runs across, because inside the
+            // corridor the border IS what the pointer is on.
             //
             // This is the route the retired Country lens used to own - LENSES.md
             // sent a hovered tile under that lens to its owning nation. Ben's
@@ -4207,15 +4286,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                             &struct_kind)
                     : null_entity;
 
-            // BL-603, the Corporation lens's half: a hovered/clicked BUILDING
-            // resolves THROUGH to its owning corporation. LENSES.md's routing
-            // table has said exactly this since 2026-06-15 — "beneath the
-            // Corporation lens a hovered building resolves through to its owning
-            // corporation, because the corporation is that lens's unit of
-            // meaning" — and nothing implemented it; a click gave the building.
-            //
-            // It lands here rather than in the area resolver because this lens's
-            // structure IS its marker tiles, so there is no ground to pivot from.
             // Set when the click resolved to a NON-ENTITY structure (a deposit or
             // a plate). Those take their own selection channels, so both the
             // entity-structure branch and the tile fallback must stand down —
@@ -4223,28 +4293,27 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // the pointer and overwrite the region the player just picked.
             bool non_entity_structure = false;
 
-            entity_id lens_through = null_entity;
-            if (marker_hit != null_entity && state.overlay == overlay_mode::corporation)
-            {
-                if (const auto bit = w.buildings.find(marker_hit); bit != w.buildings.end())
-                {
-                    const auto tc = tile_to_corp.find(bit->second.tile);
-                    if (tc != tile_to_corp.end())
-                        lens_through = tc->second;
-                }
-            }
+            // Set when a lens was active and had NOTHING to say about this
+            // ground — BL-664's rule 3. Distinct from `structure_hit ==
+            // null_entity`, which under no lens simply means "fall through to
+            // the tile". Here there is no falling through: the click selects
+            // nothing and the band returns to resting.
+            bool lens_answered_nothing = false;
+
+            // The hand-wired Corporation-lens pivot that used to sit here — a
+            // clicked BUILDING resolving through to its owning corporation — is
+            // GONE, folded into `lens_structure_of_tile`'s own corporation case
+            // (BL-665). It existed only because a marker outranked a structure,
+            // so the lens could not reach its owner from the ground; BL-664
+            // removed that precedence and the area resolver answers on owned
+            // ground whether or not a glyph sits on it. One resolver, not two.
 
             // BL-603: the AREA structure, if the boundary one did not answer. The
             // boundary resolver wins where both do, and that ordering is the whole
             // reason a border is still clickable under a lens: a nation's rule is a
             // thing the player AIMED at, a catchment is the ground they happen to be
             // over. Same branch, same mutual exclusion, one resolver later.
-            if (lens_through != null_entity)
-            {
-                structure_hit = lens_through;
-                struct_kind   = structure_kind::corporation;
-            }
-            else if (structure_hit == null_entity && marker_hit == null_entity)
+            if (lensed && structure_hit == null_entity)
             {
                 entity_id area_id = null_entity;
                 const structure_kind area_kind =
@@ -4260,7 +4329,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 {
                     state.clear_lens_region_selection();
                     state.clear_battle_selection();
-                state.clear_lens_region_selection();
                     state.selected_entity      = null_entity;
                     state.selected_province    = 0u;
                     state.province_sync_entity = null_entity;
@@ -4294,11 +4362,34 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     structure_hit = area_id;
                     struct_kind   = area_kind;
                 }
+                else
+                {
+                    lens_answered_nothing = true;
+                }
             }
 
             if (non_entity_structure)
             {
                 // Already dispatched into its own field above; nothing further.
+            }
+            else if (lens_answered_nothing)
+            {
+                // BL-664 rule 3: the active lens has no answer for this ground, so
+                // the click does nothing to the canvas and the Selection band
+                // CLEARS TO RESTING (Ben, 2026-08-28). It does not fall through to
+                // the tile and it does not fall through to a marker.
+                //
+                // Clearing rather than leaving the previous selection standing is
+                // the ruled half and the one worth stating: a band still showing
+                // the last thing selected asserts something the player did not
+                // just click and cannot connect to the pointer — the failure
+                // NR-697 recorded, arriving here by a different route.
+                state.selected_entity      = null_entity;
+                state.selected_province    = 0u;
+                state.province_sync_entity = null_entity;
+                state.selection_cycle_tile = null_entity;
+                state.clear_battle_selection();
+                state.clear_lens_region_selection();
             }
             else if (structure_hit != null_entity)
             {
