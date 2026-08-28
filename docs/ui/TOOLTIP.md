@@ -35,6 +35,13 @@ See also: [LAYOUT.md](LAYOUT.md) (where the card sits in the shell),
   lightweight chrome tooltip. Instant identity labels on chrome, not entity
   readouts — the instant-vs-delayed split survives exactly here.
 
+**A lens can suppress the card entirely.** Under an active lens the pointer resolves to the lens's
+own structure or to nothing, and where it resolves to nothing **no card appears at all** (Ben,
+2026-08-28; [SELECTION.md](SELECTION.md) § A lens collapses selection to ONE TIER owns the rule).
+Three lenses — Population, Industry, Throughput — draw a value field with no structure grain, so
+the card is absent across the whole body while one of them is active. The card answers the
+question the lens is asking; a lens with no question about this ground gets no answer.
+
 ---
 
 ## The model — glance, then stick

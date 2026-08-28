@@ -749,7 +749,8 @@
    "checks": [
     "click_injection",
     "lens_structure_pivot",
-    "hover_freeze"
+    "hover_freeze",
+    "lens_selection_paths"
    ]
   },
   {
@@ -850,7 +851,8 @@
    "interesting_question": "Depth is keyed on the active lens rather than a per-caller 'rich vs lightweight' hint, which the original pre-implementation design proposed instead — why was lens-keying chosen over a fixed depth-per-kind model?",
    "resolution": "Explicitly the landed departure from the original design: TOOLTIP.md's Superseded section states depth is 'keyed on the lens rather than a caller hint' because the card 'answers the question the lens is asking' — content should match what the player is currently investigating, not just what kind of thing they're pointing at.",
    "checks": [
-    "lens_structure_pivot"
+    "lens_structure_pivot",
+    "lens_selection_paths"
    ]
   },
   {

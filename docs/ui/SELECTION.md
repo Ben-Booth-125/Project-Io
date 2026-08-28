@@ -64,6 +64,10 @@ opener is ruled out (Ben, 2026-07-30).
 A single click never descends the zoom ladder. The minimap ascend gesture stays
 a single click — the minimap has no selection semantics.
 
+**Everything above describes the canvas with NO LENS active.** Under a lens the click model
+collapses to one tier and the marker precedence inverts — see § A lens collapses selection to ONE
+TIER, which supersedes this section wherever the two differ.
+
 ---
 
 ## Action + Facts — content by selection type
@@ -516,6 +520,10 @@ way every other selecting surface already does.
 
 ### Tile repeat-click selection cycle
 
+**A no-lens gesture.** The cycle walks the stack of things standing on one piece of ground, and a
+lens removes that stack (§ A lens collapses selection to ONE TIER, rule 1). Everything in this
+section applies to the plain canvas only.
+
 `body_surface_canvas.cpp`'s click handler cycles **Battle → Soldier → Building → Tile → Battle**
 on a **repeat** click at the same tile the selection already sits on, skipping any stage with
 nothing there (no unit on the tile skips straight to Building; no building skips to Tile).
@@ -668,30 +676,79 @@ building → market → unit  →  tile  →  body
 (the marker kinds first, then the tile they occupy, then the body that hosts it). "Lowest" means
 **most-specific** — earliest in that order.
 
-**Lowest *valid* entity.** Resolution walks the stack from most-specific and returns the **first
-entity the active lens deems valid**. Validity is not fixed: it is **the active lens's question**
-(§ Per-lens selection validity in LENSES.md). With **no lens** every drawn kind is valid, so
-resolution returns the literal lowest entity (a building over a tile resolves to the building; bare
-terrain resolves to the tile, whose element carries its province). Under a lens, kinds the
-lens does not care about are *skipped*, so the same pointer position can resolve to a **different
-entity per lens**.
+**The stack is the NO-LENS rule.** With no lens active every drawn kind is valid, so resolution
+returns the literal lowest entity (a building over a tile resolves to the building; bare terrain
+resolves to the tile, whose element carries its province), and a repeat click walks the four rungs
+below (§ Tile repeat-click selection cycle). Under a lens the stack does not apply at all — see
+the next section, which supersedes it.
 
-**The lens names the ledger the selection drives.** Resolving the entity and choosing its 'go to'
-ledger are the *same* decision — the lens that validates the entity also routes it:
+### A lens collapses selection to ONE TIER (Ben, 2026-08-28)
 
-| Active lens | Resolves to | 'Go to' / routes to |
+Owned by BL-664 (one tier under a lens). Three rules, and they hold for every lens without
+exception:
+
+1. **The lens's structure is the only thing under the pointer.** Resolution asks the active lens
+   what structure this ground belongs to and answers with that, or with nothing. It does not walk
+   a stack, because under a lens there is no stack — there is the lens's subject and there is
+   everything the lens is not about.
+2. **Markers do not outrank lenses.** A building glyph is not a shortcut past the lens's question.
+   Under the Market lens a click on a plant gives the catchment; under Resource it gives the
+   deposit; under Corporation it gives the owner. This inverts the no-lens precedence deliberately:
+   *outside* a lens a marker is the specific thing the player aimed at, but *inside* one the lens
+   is the question they are asking and the marker is only ground that happens to be built on.
+3. **A lens with no answer here is inert.** Where the lens resolves to nothing — a tile carrying
+   none of the selected resource, ground in no catchment, a lens with no structure grain at all —
+   **no hover card appears and a click does nothing to the canvas**. It does not fall through to
+   the tile, and it does not fall through to a marker. A lens that has nothing to say about this
+   ground says nothing.
+
+**A click on inert ground clears the band to resting.** The Selection band returns to the player's
+own corporation (§ Always open), exactly as a click on empty space does. Leaving the previous
+selection standing is the worse of the two readings: it makes the band assert something the player
+did not just click and has no way to connect to the pointer (the failure NR-697 names).
+
+**The repeat-click cycle is a no-lens gesture.** Battle → Soldier → Building → Tile requires a
+stack to walk, and rule 1 removes it. Under a lens a repeat click on the same ground re-resolves to
+the same structure, which is the honest reading: there is one tier, and it does not move.
+
+**Consequence — a lens with no structure grain is a pure read.** Population, Industry and
+Throughput draw a per-tile *value field* rather than a region: their subject is a number spread
+across the map, not a thing on it. Under rule 3 they are entirely non-interactive — no hover card,
+no selection, anywhere on the body (Ben, 2026-08-28: "for lenses which return none, just don't
+surface a hover, and clicks will do nothing"). This is a deliberate category, not a gap: a value
+field is something you *read*, and giving it a fake selectable grain would promise a pivot it has
+no destination for.
+
+### The lens names the ledger the selection drives
+
+Resolving the entity and choosing its 'go to' ledger are the *same* decision — the lens that
+validates the structure also routes it. [LENSES.md](LENSES.md) § Per-lens selection validity &
+routing owns the per-lens table; this is the shape it takes.
+
+| Active lens | Resolves to | Routes to |
 |---|---|---|
-| **none** (terrain) | the tile (or the lowest drawn marker on it) | Tile Ledger |
-| **Corporation** | the owning **corporation** of the hovered tile/building | Balance Ledger |
-| **Resource** | the hovered tile's **deposit** | Tile Ledger (deposit detail) |
-| **Market** | the body's **market** / listing | Market Ledger |
-| **Country** | the owning **nation** | Nation ledger |
-| **Supply** | the **route / stockpile** under the pointer | Supply surface |
+| **none** (terrain) | the lowest drawn entity, then the four-rung cycle | Tile Ledger |
+| **Corporation** | the corporation's **tile group** — every tile it holds on this body | that corporation's ledger |
+| **Company** | the background firm's **tile group**, same shape, different subject | that company's ledger |
+| **Resource** | the **deposit** — every tile carrying the selected resource | Market Ledger, aimed at that resource |
+| **Market** / **Scarcity** | the **market catchment** under the pointer | Market Ledger |
+| **Continent** | the **plate** | History ledger, at its tectonic record |
+| **Population** / **Industry** / **Throughput** | nothing — inert | — |
 
-This couples the Selection element's Focus state to the lens system (LENSES.md) and the ledger
-family: the 'go to' dispatch seam (`focus_on_entity`) is unchanged — the lens only changes *which
-entity id and which target* are handed to it. The same dispatch carries the non-spatial 'go to'
-routing (nation/corporation → ledger) specified above.
+**A tile group is a structure like any other.** Hovering one tile of a corporation's holdings
+lights **all** of them at once (Ben, 2026-08-28: "hovering one tile displays an outline around all
+company buildings for that corporation/company"), and clicking any of them opens that owner's
+ledger. It is the same claim the market catchment's highlight makes — *all of this is one thing* —
+so it takes the same wash the catchment does rather than a walked boundary (Ben's 2026-08-24 ruling
+on that question, recorded in `body_surface_canvas.cpp`: a wash is per-tile and costs one test,
+and an area statement is the truer read anyway).
+
+**Corporation and Company route to DIFFERENT ledgers**, because since the 2026-08-28 split
+([GLOSSARY.md](GLOSSARY.md)) they are different words: a corporation is a named operating firm the
+player competes with, a company is a background firm. One is a rival dossier, the other is a
+market participant. BL-666 (owner ledger destinations) owns what each destination is.
+
+Ground held by nobody is inert under both, by rule 3.
 
 ## Open questions
 

@@ -481,32 +481,43 @@ surface share the resolved `market_component.price`. Verified by
 prices from base before capture (and `verify.show_panel("economy", false)` to
 clear the panel `econ_step` opens).
 
-## Per-lens selection validity & routing (settled 2026-06-15, [F4])
+## Per-lens selection validity & routing (settled 2026-06-15, [F4]; recut 2026-08-28)
 
-Owned by BL-372 (lens-keyed selection). The active lens does not only re-skin the canvas: it **defines what the pointer
-resolves to**, each lens answering "what is the meaningful target under this
-pointer?" in its own terms. SELECTION.md § Lens-driven hover & selection
-resolution owns the stack-walk; this is the per-lens table it reads.
+Owned by BL-372 (lens-keyed selection) and BL-664 (one tier under a lens). The active lens does not
+only re-skin the canvas: it **defines what the pointer resolves to**, each lens answering "what is
+the meaningful target under this pointer?" in its own terms. SELECTION.md § A lens collapses
+selection to ONE TIER owns the rule; this is the per-lens table it reads.
 
-| Lens | Valid target under the pointer | Routes selection to |
+**Under a lens there is exactly one tier**, and a marker does not outrank it (Ben, 2026-08-28). A
+lens with no answer for this ground is **inert**: no hover card, and a click that clears the
+Selection band to resting rather than falling through to a tile or a building.
+
+| Lens | Structure under the pointer | Routes selection to |
 |---|---|---|
-| **none** | the lowest drawn entity (marker, else tile/province) | Tile Ledger |
-| **Corporation** | the **owning corporation** of the tile/building | Balance Ledger |
-| **Resource** | the tile's **deposit** profile | Tile Ledger (deposit detail) |
-| **Market** | the body's **market** / the listing under the pointer | Market Ledger |
-| **Scarcity** | the tile's **market** (the catchment under the pointer) | Market Ledger |
-| **Industry** | the tile (no dedicated ledger route; falls through to the tile) | Tile Ledger |
-| **Supply** | the **route segment / stockpile** under the pointer | Supply surface |
+| **none** | the lowest drawn entity (marker, else tile), then the four-rung cycle | Tile Ledger |
+| **Corporation** | the corporation's **tile group** on this body | that corporation's ledger |
+| **Company** | the background firm's **tile group** | that company's ledger |
+| **Resource** | the **deposit** — every tile carrying the selected resource | Market Ledger, at that resource |
+| **Market** | the **market catchment** | Market Ledger |
+| **Scarcity** | the **market catchment** (the catchment under the pointer) | Market Ledger |
+| **Continent** | the **plate** | History ledger, at its tectonic record |
+| **Population** | — inert | — |
+| **Industry** | — inert | — |
+| **Throughput** | — inert | — |
+| **Supply** / **Supply-routes** / **Reach** | body-to-body; no Planetary structure | — |
 
 **Country has no row because it is not a lens.** A nation is reached by its border
 band under *every* lens — see § Structure-grain selection & routing above.
 
-A lens skips kinds it does not validate: beneath the Corporation lens a hovered
-*building* resolves *through* to its owning corporation, because the corporation
-is that lens's unit of meaning. The **none** and **Industry** rows describe the
-lens-agnostic fall-through: `body_surface_canvas.cpp` hit-tests markers (building
-outranks market centre) and otherwise takes the tile — or province — under the
-pointer, with a built tile resolving to its building.
+**A tile group lights whole on hover.** Hovering one tile of a corporation's holdings highlights
+all of them (Ben, 2026-08-28: "hovering one tile displays an outline around all company buildings
+for that corporation/company"), the same claim the market catchment's highlight makes. Ground held
+by nobody is inert.
+
+**Three lenses draw a value field, not a region**, and are therefore read-only surfaces: Population
+(per-tile habitability), Industry (per-tile substrate throughput) and Throughput (the reach-cost
+field). Their subject is a number spread across the map rather than a thing standing on it, so
+there is nothing for a selection to be *of*. SELECTION.md carries the reasoning.
 
 ## Resource lens
 

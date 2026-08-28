@@ -1167,6 +1167,32 @@
     "src/core/verify_api.cpp",
     ".claude/rules/io-standing-rules.md"
    ]
+  },
+  {
+   "id": "NR-699",
+   "title": "A corporation's tile group is highlighted with a WASH, not the outline Ben asked for",
+   "raised": "2026-08-28",
+   "kind": "decision",
+   "status": "open",
+   "source": "Sprint 23 (selection), taking Ben's tile-group ruling into BL-665.",
+   "what": "Ben's words were \"hovering one tile displays an OUTLINE around all company buildings for that corporation/company\". BL-665 is written for a per-tile WASH instead, and the call is taken rather than asked because he already ruled the same question the other way three days earlier.\n\nOn 2026-08-24, for the market catchment: \"the entire market gets highlighted on mouse over\". The resolution recorded in body_surface_canvas.cpp is explicit about why it became a wash - outlining a region means walking its boundary every frame to find which edges face out, a wash is one test per tile, and \"all of THIS is one thing\" is an area claim rather than an edge one. A corporation's holdings are the same kind of region, so the same answer applies and the two highlights stay consistent with each other.\n\nWHERE THIS COULD BE WRONG: a corporation's holdings are SCATTERED where a catchment is contiguous, and a wash over scattered tiles may read as \"these tiles are lit\" rather than \"these tiles are one owner's\". If the group needs to look different from a catchment, say so and BL-665 gains a boundary walk.",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "docs/ui/LENSES.md"
+   ]
+  },
+  {
+   "id": "NR-700",
+   "title": "Under the one-tier rule the Corporation lens's current destination is the player's own books",
+   "raised": "2026-08-28",
+   "kind": "observation",
+   "status": "open",
+   "source": "Sprint 23 (selection), tracing where a corporation click lands today.",
+   "what": "Reading the click handler to size BL-665, the existing corporation route came out wrong in a way worth naming separately from the item that fixes it: a corporation structure hit calls close_all_panels then opens show_balance_ledger, and the Balance ledger is the PLAYER'S OWN accounts. So clicking a rival's ground under the Corporation lens today shows you your own books - a destination that is not empty, not broken, and not about the thing that was clicked, which is the failure mode hardest to notice in a capture.\n\nBL-666 owns the fix (an aimable corporation destination and a company one that exists). Filed here because it predates BL-665 and would have been a live defect even without the one-tier rule - worth knowing it was found by reading rather than by looking.",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/ui_state.hpp"
+   ]
   }
  ]
 }

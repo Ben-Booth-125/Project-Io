@@ -76,11 +76,14 @@ and/or a version goal (v0.1.1 etc.).
 PAUSED 2026-08-28 on Ben's instruction, wave 0 complete (BL-648 guard, BL-649 census). Nothing is abandoned: the guard is deliberately red, the census is the before/after instrument, and wave 1 resumes where it stopped. Opened on Ben's instruction, 2026-08-26 ('A, and open it as sprint 21'), after the session's own measurement answered his question: the ancient band has TWO live demand sinks, and ten goods pass the orphan check by naming a 'mercantile demand' that grep says was never built (NR-671). Ceiling advanced to 21 on the same instruction. ORDERING IS LOAD-BEARING: BL-648 and BL-649 go FIRST, not last. The guard makes the gap visible and the census makes each pass measurable - without them a viability pass is a guess with a number attached. A red guard with a named list is worth more than a green one that means nothing; do not weaken it to pass while the channels are being built. SEVERAL CHANNELS ARE DESIGNED-BUT-INERT rather than missing, which is why the sprint is cheaper than it looks: `strategic_reserve` is already a goods-buying budget line no consumer claims on; `logistics_maintenance` already names network upkeep; recipes already carry the era field the demand baskets need; and `run_unit_upkeep` is already the credits-plus-goods shape BL-641 wants for buildings. RELATIONSHIP TO SPRINT 20: Sprint 20 stays open and owns the ledger, the buyout and the spawn shortlist. Its BL-634 (acquisition viability) CANNOT honestly pass until this sprint lands - a corp at -28/qtr never saves up for anything - so BL-634's measurement is the natural close-out for BOTH sprints. BL-630's shortlist gains a real mechanism to gate on once demand exists: BL-635 measured that a spawn's survival currently depends on whether the generator handed it a resource anyone wants.
 
 ### Sprint 23 — UI visibility - batch 2: selection & hover
-*Proposed · opened 2026-08-28*
+*Open · opened 2026-08-28*
 
-**Goal.** Review the Selection band, the hover card and the click model against live captures, and act on the calls. Ben opens a coding session on selection specifically (2026-08-28) - this sprint is where its outcome lands. Carries the two half-built region selections out of batch 1: a plate has no Selection-band content at all (NR-697), and the deposit pivot cannot be proven from a script while tile data stays hidden from Lua (NR-698).
+**Goal.** Review the Selection band, the hover card and the click model against live captures, and act on the calls. THE SPRINT'S SPINE IS NOW A SETTLED RULE, not a review list: Ben, 2026-08-28 - "when lenses are active, selection is only one tier, as opposed to the default lens, which may cycle through elements with multiple clicks", then "Markers do not outrank lenses" and "for lenses which return none, just don't surface a hover, and clicks will do nothing". SELECTION.md and LENSES.md carry it. Also carries the two half-built region selections out of batch 1: a plate has no Selection-band content at all (NR-697), and the deposit pivot cannot be proven from a script while tile data stays hidden from Lua (NR-698).
 
 **Planned.**
+- BL-664 (one tier under a lens) - FIRST. The rule the rest depends on: no stack walk, no marker precedence, an inert lens surfaces nothing, and the repeat-click cycle becomes a no-lens gesture
+- BL-665 (corp and company tile groups) - the area resolver the marker precedence was blocking; hover lights the owner's whole holding
+- BL-666 (owner ledger destinations) - a corporation destination that can be aimed, and a company one that exists at all. Ben's authorised placeholder
 - NR-697 (a plate selection shows a stale entity)
 - NR-698 (deposit pivot unverifiable from a script - a narrow query, or a live-click-only requirement)
 - BL-659 (deposit -> Market ledger, Prices) - wired, unverified
@@ -88,6 +91,8 @@ PAUSED 2026-08-28 on Ben's instruction, wave 0 complete (BL-648 guard, BL-649 ce
 - UI-043..UI-050, UI-110 in the catalogue
 
 One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's instruction: "Let's make a sprint for each batch." The decomposition is by ELEMENT CLASS from docs/ui/ui_elements.json, because that is the spine the coverage tool already reports against - `node tools/session/ui_coverage.js --captures --since N` groups a run by element, so a batch's review list is a command rather than a judgement. Batch 1 (lenses) is sprint 22, closed. METHOD, proven in batch 1: capture the whole class first, send it to Ben in one go, take his calls, build, re-capture, and expect the re-capture to find something the code read did not.
+
+OPENED 2026-08-28 with the rule settled before the review, which inverts batch 1's method on purpose: Ben gave the principle first ("we will begin on honing in selection"), so the calls were taken against the docs and the code rather than against captures. The captures still matter - the fifteen path_*.png pairs from batch 1 are the before-state, one per lens, and the re-capture after BL-664 is what proves the rule landed. THE CONSEQUENCE TO WATCH: Population, Industry and Throughput have no structure grain, so under the rule they become entirely non-interactive; two of the three are on-bar lenses, so this is visible and was accepted explicitly rather than inferred.
 
 ### Sprint 24 — UI visibility - batch 3: ledgers
 *Proposed · opened 2026-08-28*
@@ -174,7 +179,7 @@ One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's
 | 20 | The books open, and the start earns its way | Closed 2026-08-26 - GOAL MET AND PROVED. Fifteen items landed; BL-634 measured Ben's own criterion and it holds. Cuts v0.1.21. |
 | 22 | UI visibility - batch 1: lenses | Closed 2026-08-28 - the lens batch reviewed and reworked; the remaining element classes become their own sprints (23-27) |
 | 21 | The other half of the economy - demand | PAUSED 2026-08-28 with wave 0 landed - the UI batches take priority; resume at wave 1 (BL-640/641/642) |
-| 23 | UI visibility - batch 2: selection & hover | Proposed 2026-08-28 - one of the six UI review batches |
+| 23 | UI visibility - batch 2: selection & hover | Open 2026-08-28 - the one-tier lens selection rule settled; three items filed |
 | 24 | UI visibility - batch 3: ledgers | Proposed 2026-08-28 - one of the six UI review batches |
 | 25 | UI visibility - batch 4: shell chrome | Proposed 2026-08-28 - one of the six UI review batches |
 | 26 | UI visibility - batch 5: canvases & the zoom ladder | Proposed 2026-08-28 - one of the six UI review batches |

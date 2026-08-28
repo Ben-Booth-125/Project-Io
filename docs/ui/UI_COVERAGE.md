@@ -38,10 +38,10 @@ and so is the safety net.
 | `UI-020` Planetary Canvas > Corporate borders (reach rings) | sub-element | `corp_lens_border`, `corporate_reach`, `border_band` | 6 | 0 | 3 |
 | `UI-021` Planetary Canvas > Survey region mask | sub-element | `survey`, `visibility`, `survey_dispatch` | 4 | 0 | 0 |
 | `UI-037` Lens system (overlay_mode family) > Continent lens | sub-element | `continents_terrain`, `tile_texture`, `landform_relief`, `save_load` | 6 | 0 | 3 |
-| `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze` | 23 | 0 | 4 |
+| `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths` | 25 | 0 | 5 |
 | `UI-045` Selection band > Tile selection layout | sub-element | `selection_tile_layout`, `selection_accordion`, `ui_shell_fixture` | 9 | 1 | 2 |
 | `UI-049` Hover Card | element | `hover_freeze`, `sticky_card`, `border_band` | 6 | 0 | 3 |
-| `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot` | 11 | 0 | 1 |
+| `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot`, `lens_selection_paths` | 13 | 0 | 2 |
 | `UI-075` Construction Ledger > Build view | view | `tile_build_ledger`, `roads`, `build_door_wide_roster`, `fresh_start_build` | 1 | 0 | 0 |
 | `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `v009_batch` | 7 | 0 | 0 |
 | `UI-077` Construction Ledger > Sell Orders view | view | `sell_order` | 3 | 0 | 0 |
@@ -160,7 +160,6 @@ and so is the safety net.
 Checks driving a surface no catalogue element claims. This is the catalogue's
 staleness detector — a non-empty list means the UI grew and the spine did not.
 
-- `country_lens` (2 captures, 0 expects) — Visual verification for the Country lens (overlay_mode::country).
 - `export_mockdata` (0 captures, 0 expects) — Export live economy data to CSV for external ledger mock-ups (e.g. Power BI).
 - `pan_perf` (0 captures, 0 expects) — Pan-cost measurement (the "stutter while panning" report, 2026-08-02).
 
