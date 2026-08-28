@@ -145,6 +145,107 @@ end
 -- picture of one.
 --
 -- Returns { corp = <player corp id>, unit = <a player unit row> }.
+-- The player's first unit, or nil. Split out because the fixture now has to ask
+-- twice: once before raising a force and once after.
+function player_unit(corp)
+    for _, u in ipairs(verify.units()) do
+        if u.owner == corp then return u end
+    end
+    return nil
+end
+
+-- Raise one unit for `corp` THE WAY A PLAYER WOULD, and return it (nil on failure).
+--
+-- WHY THIS EXISTS (NR-693/NR-696, 2026-08-28). Until 2026-08-27 every corp was
+-- seeded with a military base and a regiment, and this fixture simply asserted
+-- the unit was there. Commit dab470dc ("No standing army at spawn") made that
+-- seeding opt-in and default OFF, for a good reason: under BL-454 upkeep the
+-- seeded regiment cost 7.5 cr/qtr, ~16.5% of the seated corp's outgoings, for a
+-- force a new charter never asked for. The fixture's assert then killed all six
+-- scripts that use it — 27 of the suite's 66 verify.expect assertions — and
+-- said nothing, because the harness had no visible log until NR-694 was fixed.
+--
+-- Ben chose option C (2026-08-28): reach the state through the REAL VERBS rather
+-- than re-enable the seeder behind the game's back. Two properties this buys —
+-- the captures depict a world a player can actually reach, and the muster gate
+-- (BL-325 S2: hire onto a COMPLETED military_base of your own) gets exercised on
+-- every fixture run instead of only in its own harness.
+function raise_player_force(corp)
+    local VERB_HIRE_UNIT = 8 -- corp_verb::hire_unit
+
+    -- 1. Place the muster base through the same construct_building path a click
+    --    uses. build_first_valid picks the first placeable tile on the active
+    --    body, so no grid coordinate is hard-coded into the fixture.
+    verify.place_mode("military_base")
+    local placed = verify.build_first_valid()
+    if placed ~= "placed" then
+        error("fixture could not place a military base: " .. tostring(placed))
+    end
+
+    -- 2. Wait for it. Construction is durative and pay-as-you-build, so the tick
+    --    count is a property of the recipe and the corp's cash, not something a
+    --    script may assume. Step until the base reports complete, with a bound so
+    --    a stalled build fails loudly instead of hanging the suite (the failure
+    --    mode NR-695 cost this project two hours).
+    local base = nil
+    for _ = 1, 40 do
+        for _, b in ipairs(verify.buildings()) do
+            if b.player and b.type == "Military Base" and b.complete then base = b; break end
+        end
+        if base then break end
+        verify.econ_step(1)
+    end
+    if not base then
+        error("fixture's military base never completed within 40 ticks")
+    end
+
+    -- 3. Muster onto it. Which roster rows are available depends on the corp's
+    --    stockpile and market access (never on cash — the availability half of
+    --    the BL-324 grant), so the row that works is not knowable ahead of time:
+    --    try each and take the first the authoritative gate accepts.
+    -- 3a. Lend the corp the shortfall, and take the loan back after.
+    --
+    -- Measured 2026-08-28: with the base paid for, every AVAILABLE roster row
+    -- comes back `rejected_funds` (3 available, 13 out of band). Nothing is wrong
+    -- with the gate — a hire costs hire_base_cost + hire_cost_per_power x power,
+    -- and an opening corp genuinely cannot afford one after building a base. That
+    -- is Sprint 21's own finding arriving here: a corp running at a loss never
+    -- saves up for anything.
+    --
+    -- So the fixture lends rather than gifts. The corp pays the REAL cost through
+    -- the real verb, and the top-up is subtracted again afterwards, leaving the
+    -- balance exactly `opening - actual_spend`. Every other surface — the Header
+    -- figure, the Budget ledger's split — therefore still depicts the true opening
+    -- economy rather than a staged fortune, which is the whole reason option C was
+    -- chosen over re-enabling the seeder.
+    local opening = verify.player_balance()
+    local LOAN = 500.0
+    verify.set_balance(opening + LOAN)
+
+    local seen, order = {}, {}
+    for row = 0, 15 do
+        local r = verify.corp_command{ verb = VERB_HIRE_UNIT, tile = base.tile, unit_type = row }
+        if r == "applied" then
+            verify.set_balance(verify.player_balance() - LOAN) -- repay
+            return player_unit(corp)
+        end
+        -- Carry the REASONS into the failure. A bare "nothing worked" sent this
+        -- fixture round a second build+run cycle for want of one string, which is
+        -- the same economy NR-694 was about.
+        if not seen[r] then seen[r] = 0; order[#order + 1] = r end
+        seen[r] = seen[r] + 1
+    end
+    -- Joined by hand: the verify sandbox opens no `table` library (see
+    -- tour_buildings, which sorts by hand for the same reason).
+    local why = ""
+    for i, r in ipairs(order) do
+        why = why .. (i > 1 and ", " or "") .. r .. " x" .. seen[r]
+    end
+    verify.set_balance(opening) -- no hire happened; leave the economy untouched
+    error("fixture placed a muster base at tile " .. tostring(base.tile)
+          .. " but no roster row could be hired onto it: " .. why)
+end
+
 function stage_ui_fixture()
     local VERB_ACCEPT_OFFER = 25 -- corp_verb::accept_offer
 
@@ -161,11 +262,9 @@ function stage_ui_fixture()
     end
     assert(corp, "no player-owned building found")
 
-    local unit = nil
-    for _, u in ipairs(verify.units()) do
-        if u.owner == corp then unit = u; break end
-    end
-    assert(unit, "the player has no unit on the surface (BL-331 seeds one)")
+    local unit = player_unit(corp)
+    if not unit then unit = raise_player_force(corp) end
+    assert(unit, "the fixture could not raise a unit for the player (see raise_player_force)")
 
     local province = verify.select_province(unit.col, unit.row)
     assert(province ~= 0, "the player's own unit stands on an unpartitioned tile")

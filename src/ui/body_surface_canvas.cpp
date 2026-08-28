@@ -2144,6 +2144,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // is hoisted out of the draw loop into this lambda and run one pass ahead over
     // the visible row band plus a one-row margin. The derivation itself is
     // unchanged, line for line — only where it runs moved.
+    // A BL-365 background firm — a "company" rather than a "corporation" since
+    // Ben's 2026-08-28 terminology ruling. Looked up rather than cached because
+    // the corporation set is small and this runs only under two lenses.
+    const auto is_background_firm = [&w](entity_id corp) -> bool
+    {
+        const auto it = w.corporations.find(corp);
+        return it != w.corporations.end() && it->second.is_background;
+    };
+
     auto compute_tile_fill = [&](entity_id id, const tile_component& tile) -> ImU32
     {
         const auto   corp_it    = tile_to_corp.find(id);
@@ -2168,9 +2177,23 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // Corporation lens: tint a tile that carries a corporate building with its
         // owning corp's colour (a direct replacement of the terrain hue). Tiles
         // with no corporate building keep their terrain hue — no nation underlay.
+        //
+        // NARROWED to corporations proper (Ben, 2026-08-28): the player and its
+        // rivals, never a BL-365 background firm. The two are different words now
+        // (GLOSSARY.md), and a lens that mixed them answered neither question —
+        // "who are my rivals here" drowned in the background firms that outnumber
+        // them. Those get their own lens immediately below, drawn identically.
         if (state.overlay == overlay_mode::corporation)
         {
-            if (has_owner)
+            if (has_owner && !is_background_firm(corp_it->second))
+                fill = owner_col;
+        }
+        // Company lens: the exact mirror — background firms only, same per-corp
+        // identity tint, so the two lenses are read the same way and differ only
+        // in which population of firms they admit.
+        else if (state.overlay == overlay_mode::company)
+        {
+            if (has_owner && is_background_firm(corp_it->second))
                 fill = owner_col;
         }
         // Resource lens (BL-019): flat, uniform fill over the contiguous deposit of
@@ -2470,7 +2493,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     const int band_depth = coarse_fill ? 1 : k_border_band_tiles;
     const int band_lo    = std::max(0,      row_lo - band_depth);
     const int band_hi    = std::min(gh - 1, row_hi + band_depth);
-    if (raster_ok && !w.tile_to_nation.empty())
+    // SUPPRESSED UNDER EVERY LENS (Ben, 2026-08-28). The band is always-on chrome
+    // on the plain canvas — that is what BL-601 made it, and it is why the default
+    // view IS the country view. But a lens is a question about one subject, and a
+    // national wash over a corporate or resource read competes with the answer.
+    // Ben, on the Corporation lens: "we will not display country borders when
+    // displaying that lens. This will bring focus on to corporations" — extended
+    // to all lenses on the same instruction.
+    //
+    // Gated on the COMPUTATION, not just the wash below, so the three-ring
+    // relaxation over the visible band costs nothing while a lens is up. Every
+    // depth stays 0xFF, and the wash's `depth < band_depth` test then fails on
+    // its own without needing a second guard.
+    const bool draw_border_band = (state.overlay == overlay_mode::none);
+    if (draw_border_band && raster_ok && !w.tile_to_nation.empty())
     {
         for (int cr = band_lo; cr <= band_hi; ++cr)
         for (int cc = 0; cc < gw; ++cc)
@@ -2980,11 +3016,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // above says "this ground is near a frontier"; this pass says WHICH
             // frontier and whose, and it is what carries the hit corridor.
             //
-            // ALWAYS ON, under every lens. `overlay_mode::country` retired with
-            // this item (Ben, 2026-08-24: "with this, we can drop the nation
-            // lens") - the national read is chrome now, on the same footing as
-            // roads and rivers, and it is drawn here rather than earlier so it
-            // stays legible over a road span.
+            // ON THE PLAIN CANVAS ONLY (Ben, 2026-08-28). It was "always on,
+            // under every lens" from BL-601 until now - the national read became
+            // chrome on the same footing as roads and rivers. Ben, reviewing the
+            // lens sweep: "All: We can still see nation borders."
+            //
+            // THIS IS THE SECOND OF TWO NATION-BORDER PASSES and the reason the
+            // first suppression looked ineffective: the inward WASH (gated at
+            // `draw_border_band` above) says "this ground is near a frontier",
+            // while this pass draws the coloured rule that says WHICH frontier and
+            // whose. Suppressing only the wash left the rule drawing, so the
+            // borders were still plainly there. Both now answer to one flag.
+            //
+            // The hit corridor goes with it, deliberately: it is built inside this
+            // same loop, and a border that is invisible but still clickable is a
+            // worse outcome than either state. Under a lens the lens's own subject
+            // is what hover and selection pivot to (BL-603).
             //
             // THE STROKE IS INSET, not laid along the shared edge, and that is
             // the whole answer to "borders should not diffuse together". A
@@ -2995,6 +3042,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // side: the pair reads as two parallel coloured lines with the
             // frontier between them, and no pixel ever belongs to a colour that
             // is neither neighbour's.
+            if (draw_border_band)
             {
                 const entity_id own_nation = nation_of(id);
                 if (own_nation != null_entity)
@@ -3776,11 +3824,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // no double-draw). Each rival's marker is drawn on its OWN home body
     // (draw_corp_hq gates on the seat's body), so a rival only shows one when its
     // home body is the one on screen.
-    if (state.overlay == overlay_mode::corporation)
+    //
+    // SPLIT WITH THE TINT (Ben, 2026-08-28): the Corporation lens shows rival
+    // corporations' seats, the Company lens shows background firms' seats, and
+    // neither shows the other's. Before the split this loop drew every non-player
+    // corp — background firms included, and they outnumber the rivals — so the
+    // marker layer answered "where is everyone" when the lens was asking "where
+    // are my rivals". Same population rule as compute_tile_fill, so a seat and
+    // its tiles never appear under different lenses.
+    if (state.overlay == overlay_mode::corporation || state.overlay == overlay_mode::company)
     {
+        const bool want_background = (state.overlay == overlay_mode::company);
         for (const auto& [corp_id, cc] : w.corporations)
         {
             if (corp_id == w.player_entity)
+                continue;
+            if (cc.is_background != want_background)
                 continue;
             draw_corp_hq(corp_id, cc);
         }

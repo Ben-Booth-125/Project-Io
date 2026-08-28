@@ -55,6 +55,14 @@ enum class overlay_mode
     continent,   ///< Tectonic plates from the Continents/Drift pass: per-plate tint + boundary emphasis, read from the generation report. BL-226. See LENSES.md § Continent lens.
     supply_routes, ///< Aggregated trade_route graph: one edge per body pair, thickness from log-scaled convoy_count, colour from recency tier. BL-014. See LENSES.md § Supply-routes lens.
     throughput,    ///< Active Logistic Points: the reach envelope (served / beyond reach) plus a per-anchor LP magnitude disc. BL-598. See LENSES.md § Throughput lens.
+    // Ben, 2026-08-28: corporation and company are now DIFFERENT WORDS (GLOSSARY.md).
+    // A corporation is a named operating firm — the player and its rivals; a company
+    // is a BL-365 background firm (`corporation_component::is_background`). The
+    // Corporation lens narrowed to the former on the same ruling, so this is the
+    // only way to see the latter. Appended at the end rather than beside
+    // `corporation` because the value is serialised in the save's view bindings —
+    // inserting mid-enum would silently re-point a saved lens.
+    company,       ///< Background-firm holdings, drawn exactly as the Corporation lens draws corporations. See LENSES.md § Company lens.
     count,         ///< Sentinel — keep last. The lens-cycle wrap (canvas_command.cpp) derives its modulus from this, so a new lens above is reachable without touching a hand-kept count.
 };
 

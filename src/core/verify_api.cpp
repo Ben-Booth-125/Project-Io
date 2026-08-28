@@ -64,13 +64,23 @@ overlay_mode overlay_from_name(const std::string& s)
 {
     if (s == "supply")      return overlay_mode::supply;
     if (s == "market")      return overlay_mode::market;
-    // "country" / "faction" (the legacy alias, renamed BL-052) resolve to NONE:
-    // the Country lens retired with BL-601 and its content is always-on chrome,
-    // so a script naming it still captures national borders — on the plain
-    // canvas, which is where they now live. Kept as an explicit row rather than
-    // deleted, so the retirement reads here instead of hiding in the fallback.
-    if (s == "country" || s == "faction") return overlay_mode::none;
+    // "country" / "faction" ARE GONE (Ben, 2026-08-28), not aliased.
+    //
+    // They mapped to overlay_mode::none from BL-601 until now, on the reasoning
+    // that a script naming the retired lens still captured the borders where they
+    // had moved to. Measured on 2026-08-28, that was true of the PICTURE and false
+    // of the CHECK: country_lens.lua went on asserting "the lens is named Country,
+    // strip glyph = shield, territory tint identical to the prior Faction lens" —
+    // three claims about a lens that no longer exists — and its two captures were
+    // the plain canvas under a lens name (NR-690). Six more scripts swept
+    // "country" as one leg and so captured the default view twice under two names.
+    // An alias that silently answers a question nobody can ask any more is worse
+    // than an error, so the name now takes the unknown-name fallback like any
+    // other typo, and the scripts that used it are retired or re-pointed.
     if (s == "corporation") return overlay_mode::corporation;
+    // Background firms — a "company" as distinct from a "corporation" since Ben's
+    // 2026-08-28 terminology ruling (GLOSSARY.md).
+    if (s == "company")     return overlay_mode::company;
     if (s == "resource")    return overlay_mode::resource;
     if (s == "population")  return overlay_mode::population;
     // "opportunity" and "production" were names here until BL-604 retired both
@@ -1852,6 +1862,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         {
             const auto& corp   = m_world.corporations.at(corp_id);
             const bool  player = (corp_id == m_world.player_entity);
+            // BL-365 `is_background`: a "company" rather than a "corporation"
+            // since Ben's 2026-08-28 split. Exposed so a script can ASSERT the
+            // two lenses are disjoint, which is the property that makes the pair
+            // correct and which no single capture can show.
+            const bool  background = corp.is_background;
             for (entity_id bld_id : corp.assets)
             {
                 const auto bld_it = m_world.buildings.find(bld_id);
@@ -1863,6 +1878,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 sol::table rec = s.create_table();
                 rec["corp"]   = static_cast<unsigned>(corp_id);
                 rec["player"] = player;
+                rec["background"] = background;
                 rec["body"]   = static_cast<unsigned>(tile_it->second.body);
                 rec["x"]      = tile_it->second.grid_x;
                 rec["y"]      = tile_it->second.grid_y;
@@ -1871,6 +1887,17 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 // come first) instead of hard-coding grid coordinates that a
                 // generation change silently invalidates.
                 rec["type"]   = ui::building_type_name(bld_it->second.type);
+                // The tile ENTITY ID, and whether the building is finished.
+                //
+                // Both exist for NR-696 option C: a fixture that raises its own
+                // force the way a player does needs to name the tile its muster
+                // base stands on (hire_unit's `tile` is an entity id, and x/y
+                // above cannot be turned into one from Lua), and needs to know
+                // when that base has actually completed — BL-325 S2 refuses a
+                // muster onto a base still under construction, so a script must
+                // be able to wait for it rather than guess a tick count.
+                rec["tile"]   = static_cast<unsigned>(bld_it->second.tile);
+                rec["complete"] = (bld_it->second.ticks_remaining == 0);
                 out[++idx]    = rec;
             }
         }

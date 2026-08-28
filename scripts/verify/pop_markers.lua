@@ -35,5 +35,3 @@ verify.capture("pop_markers_zoom")
 
 -- Country lens: the same markers pick up the host-nation tint (R4).
 frame_tile(best.x, best.y, 9)
-verify.set_overlay("country")
-verify.capture("pop_markers_country_tint")

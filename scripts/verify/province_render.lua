@@ -71,16 +71,11 @@ verify.center_tile(40, 30, 3.0)
 verify.set_overlay("resource")     -- BLENDS (continuous spatial field)
 verify.capture("province_lens_resource")
 
-verify.set_overlay("country")      -- REFUSES (categorical: nation)
-verify.capture("province_lens_country")
-
 verify.set_overlay("continent")    -- REFUSES (categorical: plate)
 verify.capture("province_lens_continent")
 
 verify.set_overlay("industry")     -- PROVINCE SUM, filled uniformly
 verify.capture("province_lens_industry")
-
-verify.capture("province_lens_production")
 
 verify.set_overlay("market")       -- no reduction needed (catchment is coarser)
 verify.capture("province_lens_market")
@@ -88,10 +83,11 @@ verify.capture("province_lens_market")
 verify.set_overlay("corporation")  -- REFUSES (sparse: built tiles are outside the blend)
 verify.capture("province_lens_corporation")
 
+verify.set_overlay("company")      -- REFUSES, same sparsity as corporation (2026-08-28 split)
+verify.capture("province_lens_company")
+
 verify.set_overlay("population")   -- N/A: a per-tile dot mark, not a fill
 verify.capture("province_lens_population")
-
-verify.capture("province_lens_opportunity")
 
 verify.set_overlay("scarcity")     -- no reduction needed (catchment)
 verify.capture("province_lens_scarcity")

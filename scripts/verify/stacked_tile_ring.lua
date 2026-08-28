@@ -91,6 +91,4 @@ end
 -- Under a lens: the ground under the ring is a saturated categorical fill here, and
 -- the segments' dark under-stroke is what has to carry them over it.
 verify.center_tile(site.x, site.y, 44)
-verify.set_overlay("country")
-shot("stack_ring_lens_country")
 verify.set_overlay("none")

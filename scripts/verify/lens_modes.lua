@@ -4,8 +4,11 @@ verify.goto_surface("home")
 verify.set_overlay("corporation")
 verify.capture("lens_corporation")
 
-verify.set_overlay("country")
-verify.capture("lens_country")
+-- The Company lens (2026-08-28) is the Corporation lens's mirror: background
+-- firms only, drawn identically. Captured next to it deliberately — the pair is
+-- only right if the two pictures are DISJOINT, which one capture cannot show.
+verify.set_overlay("company")
+verify.capture("lens_company")
 
 verify.set_overlay("scarcity")
 verify.capture("lens_scarcity")
@@ -37,19 +40,19 @@ verify.capture("lens_resource_iron_ore")
 -- so the toggle does not travel when the body opens upward. Press it and capture both
 -- states -- the press is the thing a capture alone cannot prove.
 verify.window(1280, 720)
-verify.set_overlay("country")
-verify.capture("lens_chrome_country_collapsed")
+verify.set_overlay("corporation")
+verify.capture("lens_chrome_corporation_collapsed")
 
 -- The header bar is the full width of the right chrome column, its foot on the
 -- minimap's top edge. Aim at the middle of that bar rather than at the caret glyph.
 local mini = { w = 336, h = 260 }   -- minimap_rect at 1280x720; see shell_metrics.cpp
 verify.click(1280 - mini.w * 0.5, 720 - mini.h - 10)
 verify.frames(2)
-verify.capture("lens_chrome_country_expanded")
+verify.capture("lens_chrome_corporation_expanded")
 
 -- Toggle rule: a second press on the same spot closes it again.
 verify.click(1280 - mini.w * 0.5, 720 - mini.h - 10)
 verify.frames(2)
-verify.capture("lens_chrome_country_reclosed")
+verify.capture("lens_chrome_corporation_reclosed")
 
 verify.set_overlay("none")

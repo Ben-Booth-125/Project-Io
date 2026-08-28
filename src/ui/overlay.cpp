@@ -38,6 +38,12 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
         // on-screen lens carries one distinct glyph (LENSES.md) and two strip
         // neighbours sharing a mark is exactly what that rule forbids.
         case overlay_mode::throughput:    icons::throughput(dl, centre, r, colour); break;
+        // Company (BL: corporation/company split, Ben 2026-08-28) borrows the
+        // corporation glyph while it is KEYBOARD-ONLY, on the same precedent
+        // Reach and Supply-routes set above. It must earn a distinct mark before
+        // it joins the strip — two strip neighbours sharing a glyph is exactly
+        // what LENSES.md forbids, and Corp would be its neighbour.
+        case overlay_mode::company:       icons::corporation(dl, centre, r, colour); break;
         default: break;
     }
 }
@@ -59,6 +65,7 @@ const char* overlay_mode_name(overlay_mode m)
         case overlay_mode::reach:         return "Reach (commercial connectivity)";
         case overlay_mode::supply_routes: return "Supply-routes graph";
         case overlay_mode::throughput:    return "Throughput (active Logistic Points)";
+        case overlay_mode::company:       return "Company holdings (background firms)";
         default:                        return "None";
     }
 }
@@ -78,6 +85,7 @@ const char* overlay_mode_short_name(overlay_mode m)
         case overlay_mode::reach:         return "Reach";
         case overlay_mode::supply_routes: return "Supply routes";
         case overlay_mode::throughput:    return "Throughput";
+        case overlay_mode::company:       return "Company";
         default:                        return "None";
     }
 }

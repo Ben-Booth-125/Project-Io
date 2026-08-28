@@ -189,9 +189,20 @@ carries glyphs only (BL-134, lens selector in legend).
 
 **Intent.** Read the map as a *corporate landscape*: where corporations operate,
 who owns what, and how the player's footprint sits against rivals. National
-territory is the border band's job (always-on chrome, [PLANETARY.md](PLANETARY.md)
-§ The national border band) — this lens is about **corporate-owned tiles**
-first; nation context is deliberately absent from its fill.
+territory is the border band's job — and **the band is suppressed while any lens
+is up** (Ben, 2026-08-28), so nation context is absent from this lens by
+construction rather than merely absent from its fill. A lens asks one question;
+a national wash over a corporate read competes with the answer.
+
+**Population (settled 2026-08-28).** This lens admits **corporations only** — the
+player and its rivals — and never a background firm. Ben: *"The corporation lens
+narrows to player and rival, the company lens shows only background firms."*
+Before the narrowing, both the tile tint and the rival HQ-marker layer drew every
+non-player corp, and background firms outnumber the rivals — so a lens asked
+"where are my rivals" and was answered "here is everyone". Background firms have
+their own lens, drawn identically: see **Company lens** below. The two
+populations are disjoint, which is the property `lens_modes.lua` captures them
+side by side to show.
 
 **Ownership definition (settled).** A *corporate-owned tile* is any tile on which
 a corporation holds a building. The mapping is derived at draw time from
@@ -254,12 +265,37 @@ levers) is BL-182's (corporate borders). See `scripts/verify/corporate_reach.lua
 
 ---
 
+## Company lens
+
+**Intent.** The Corporation lens's mirror, for the other half of the commercial
+population: where the **background firms** operate (`corporation_component::is_background`,
+the BL-365 `generate_background_firms` pass). Ben, 2026-08-28, splitting the
+words: a *corporation* is the player and its rivals, a *company* is a background
+firm (`docs/GLOSSARY.md` § Company).
+
+**Drawn identically to the Corporation lens, deliberately.** Same per-corp
+identity tint on any tile carrying that firm's building, same HQ-marker layer for
+its seat. The two lenses differ in exactly one thing — which population they
+admit — so a player who has learned to read one has learned to read the other,
+and the pair can be flipped between to compare.
+
+**Keyboard-cycle only for now.** It carries no distinct glyph yet and borrows the
+corporation mark, which is why it stays off the on-screen strip: an on-screen
+lens carries one distinct glyph, and Corp would be its immediate neighbour. It
+earns a strip slot when it earns a mark.
+
+---
+
 ## The Country lens has retired — national borders are chrome
 
-*(`overlay_mode::country` no longer exists. `"country"` and its legacy alias
-`"faction"` still parse in the verify-script name parser, resolving to
-`overlay_mode::none` — the plain canvas, which is where national borders now
-live.)*
+*(`overlay_mode::country` no longer exists, and since 2026-08-28 neither does its
+name: `"country"` and the legacy alias `"faction"` were removed from the
+verify-script name parser, where they had resolved to `overlay_mode::none`. The
+alias was retired because it was true of the picture and false of the check — a
+script naming the retired lens captured the plain canvas while still asserting a
+shield glyph and a territory tint, and six more swept it as one leg and captured
+the default view twice under two names. **The default view is the country view**;
+there is nothing left to alias.)*
 
 Ben, 2026-08-24: *"National borders should not diffuse together, instead they
 should borders extending their colour inwards. With this, we can drop the nation
