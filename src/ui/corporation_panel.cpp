@@ -148,11 +148,24 @@ void draw_corporation_panel(const world& w, const std::vector<corp_standing>& st
             // Selectable spanning all columns via the first; selecting routes full
             // detail (incl. home nation) to the Selection panel.
             ImGui::TableSetColumnIndex(0);
-            const bool selected = (s.selected_entity == id);
+            // BL-666: the dossier field first, the live selection as the
+            // fallback. A canvas press under the Corporation lens names the firm
+            // this table is ABOUT, and that must outlive the player clicking a
+            // row here or selecting something else on the map; `selected_entity`
+            // alone could only say what is selected right now.
+            const bool selected = (s.selected_corporation_dossier != null_entity)
+                                  ? (s.selected_corporation_dossier == id)
+                                  : (s.selected_entity == id);
             if (ImGui::Selectable(cc.name.c_str(), selected,
                     ImGuiSelectableFlags_SpanAllColumns))
             {
                 s.selected_entity = id;
+                // Retarget the dossier too, or this press would be overruled by
+                // its own highlight: the expression above gives the dossier field
+                // strict priority, so a row click that moved only `selected_entity`
+                // would retarget the Selection band and leave the highlight on the
+                // firm the canvas last named.
+                s.selected_corporation_dossier = id;
             }
 
             // Reach — public for every corporation (buildings are visible on canvas).

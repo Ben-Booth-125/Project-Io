@@ -31,15 +31,21 @@ verify.show_panel("economy", false)
 -- to be owned, so it exercises the corporation group and the marker rule at once.
 -- Walked from the buildings table rather than hard-coded, so a generation change
 -- cannot quietly move the world out from under the check (the pop_markers lesson).
-local built_col, built_row = nil, nil
+-- verify.buildings() spans EVERY body and reports per-body grid coordinates, so
+-- the body must be carried and matched. Without it a probe can take a building's
+-- (x, y) from another body and dwell on an unrelated tile here, which reads as
+-- "the feature is broken" and is actually "the probe is aimed off-world".
+local built_col, built_row, home_body = nil, nil, nil
 for _, b in ipairs(verify.buildings()) do
-    if b.player then built_col, built_row = b.x, b.y; break end
+    if b.player then built_col, built_row, home_body = b.x, b.y, b.body; break end
 end
 verify.expect(built_col ~= nil, "found a player building to press")
 
 local occupied = {}
 for _, b in ipairs(verify.buildings()) do
-    occupied[tostring(b.x) .. "," .. tostring(b.y)] = true
+    if b.body == home_body then
+        occupied[tostring(b.x) .. "," .. tostring(b.y)] = true
+    end
 end
 
 -- Ground nobody has built on, near by: the inert case for the owner lenses, and
@@ -202,8 +208,13 @@ verify.expect(company_on_corp.hovered_structure_kind ~= "corporation",
 
 verify.set_overlay("corporation")
 local corp_dest = press(built_col, built_row)
-verify.expect(corp_dest.open_panel == "corporation",
-              "a corporation press opens the corporations surface, not the player's own books")
+-- "corporations" (the all-corporations table), NOT "corporation" (the player's
+-- own dashboard). The two flags are named the wrong way round in ui_state, this
+-- assertion is the thing that catches it, and the first cut of this check could
+-- not tell them apart — it asserted "corporation" and passed while the press was
+-- opening the player's own books.
+verify.expect(corp_dest.open_panel == "corporations",
+              "a corporation press opens the corporations TABLE, not the player's own dashboard")
 verify.capture("one_tier_corp_destination")
 
 -- A background firm's ground, if this world has one on this body. Companies are
@@ -213,7 +224,7 @@ verify.capture("one_tier_corp_destination")
 verify.set_overlay("company")
 local company_col, company_row = nil, nil
 for _, b in ipairs(verify.buildings()) do
-    if not b.player then
+    if not b.player and b.body == home_body then
         verify.center_tile(b.x, b.y, 8)
         local h = dwell(b.x, b.y)
         if h.hovered_structure_kind == "company" then

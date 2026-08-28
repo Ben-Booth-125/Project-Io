@@ -48,6 +48,14 @@ void close_all_panels(ui_state& state)
     state.show_generation_ledger = false;
     state.show_economy_panel     = false;
     state.show_build_ledger      = false; // tile build ledger (BL-162) is a column occupant too
+    // BL-666: the two OWNER-SURFACE SUBJECTS clear with the panels they aim.
+    // Both are "which firm is this surface about", and a subject that outlives
+    // its surface is worse than no subject at all: the dossier field takes strict
+    // priority over `selected_entity` in the corporations table's row highlight,
+    // so a stale one pins the highlight to a firm the player has moved off and
+    // makes a row click read as doing nothing.
+    state.selected_company             = null_entity;
+    state.selected_corporation_dossier = null_entity;
     state.show_company_ledger    = false; // Company ledger (BL-666) — same shape: a column
                                           // occupant reached by a canvas click, no rail slot
     state.show_decision_feed     = false; // AI decision feed (BL-407)

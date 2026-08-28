@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*77 entries — 77 open, 0 resolved.*
+*81 entries — 81 open, 0 resolved.*
 
 ---
 
@@ -692,6 +692,50 @@ Reading the click handler to size BL-665, the existing corporation route came ou
 BL-666 owns the fix (an aimable corporation destination and a company one that exists). Filed here because it predates BL-665 and would have been a live defect even without the one-tier rule - worth knowing it was found by reading rather than by looking.
 
 *Files: `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp`*
+
+### NR-701 — Under four lenses the hover card describes the tile, not the structure the click will select
+*observation · raised 2026-08-28 · from Sprint 23, BL-664; caught again by the review barrier as its finding 10.*
+
+BL-664 made hover and click agree about the KIND of thing under the pointer, and they still disagree about its SUBJECT. Under a lens the hover card's subject is the TILE, while a press at the same pixel selects the lens's structure - so hovering a rival's plant under the Corporation lens shows terrain and movement cost, and clicking it selects the corporation.
+
+THE CAUSE IS CONTENT, NOT RESOLUTION. draw_hover_content (hover_content.cpp) branches on resource and population only; it has no branch for a corporation, a company, a catchment or a plate, so there is nothing for the card to say about any of them and it falls through to terrain. Writing those four is content work of a different kind from the resolution rule BL-664 is about, so it was left rather than smuggled in.
+
+IT IS ALSO A SMALL LOSS against the pre-BL-664 behaviour, which is the part worth Ben's eye: hovering a building under a lens used to give the building card, because the marker won. It no longer does, and nothing has replaced it. Either the four branches get written, or the card's subject under a lens should be reconsidered.
+
+*Files: `src/ui/hover_content.cpp`, `src/ui/body_surface_canvas.cpp`, `docs/ui/TOOLTIP.md`*
+
+### NR-702 — A press on inert ground now CLOSES the Company ledger, not just the Selection band
+*decision · raised 2026-08-28 · from Sprint 23, BL-666; the review barrier's finding 7.*
+
+Ben ruled that a press on ground an active lens has no answer for clears the Selection band to resting. THE CALL TAKEN, which he did not rule on: the same press also clears selected_company / selected_corporation_dossier and closes the Company ledger.
+
+The reasoning: the Company ledger's whole subject is one named firm, so leaving it open on firm X after the player has cleared the band is the same failure NR-697 recorded - a surface asserting a subject the player did not just click - moved from the band into the column. The tile build ledger is the precedent and it goes further than this: app.cpp actively closes it the moment the selection stops being a tile.
+
+WHERE THIS COULD BE WRONG: a ledger normally persists until the player closes it, and this makes one ledger close as a side effect of a click somewhere else on the map. If a firm's ledger should stay up until dismissed, the three lines come out of the lens_answered_nothing branch and the ledger needs a close affordance of its own - it currently has no rail slot and no close button, so close_all_panels is its only other exit.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `src/ui/company_ledger.cpp`*
+
+### NR-703 — A save written under the Throughput or Company lens could not be loaded back
+*observation · raised 2026-08-28 · from Sprint 23; found by the review barrier (finding 3) while checking the batch's serialisation seam.*
+
+FIXED IN THIS BATCH, filed because of what it says about the class rather than the instance. save_game.cpp's `max_overlay` range bound was hand-kept at overlay_mode::supply_routes while two lenses had since been appended after it - throughput (Sprint 18) and company (2026-08-28). Saving with either active wrote a byte the loader's range check rejected, and a failed r_enum fails the WHOLE envelope, so the campaign simply would not reopen.
+
+Silent, total, and reachable by nothing more than picking a lens before saving. It predates this batch; what the batch changed is that the Company lens is now a destination a player has a reason to sit in.
+
+The fix derives the bound from overlay_mode::count rather than naming a lens. WORTH A LOOK: the same file holds several hand-kept `max_*` constants (max_atmos, max_hydro, max_geo, max_bias, max_canvas). Each is a genuine domain bound rather than 'the last value', so none is wrong today - but the failure mode is identical if any of those enums grows, and it fails the entire save rather than one field.
+
+*Files: `src/core/save_game.cpp`*
+
+### NR-704 — The two corporation ui_state flags are named the wrong way round
+*observation · raised 2026-08-28 · from Sprint 23, BL-666; the review barrier's findings 1 and 2, after the first cut shipped green on the wrong surface.*
+
+`show_corporation_panel` drives draw_corporation_dashboard - nav slot 1, THE PLAYER'S OWN corporation at a glance. `show_corporations_table` drives draw_corporation_panel - nav slot 8, the all-corporations table. Each flag names the other one's function.
+
+THIS IS NOT A TIDINESS COMPLAINT. BL-666's routing took the flag whose name matched the function it wanted and reproduced NR-700 one surface over: a press on a rival's ground opened the player's own dashboard. It got through because pointer_target's open_panel had no name for the table, so the check asserted 'corporation' and passed for either surface. Two independent guards failed to the same naming.
+
+Both halves are now fixed at the sites - the routing takes the right flag with the trap recorded beside it, and open_panel distinguishes 'corporation' from 'corporations'. The rename itself is not taken: it touches nav_pane, app.cpp, view_nav and the verify seam, which is more than this batch should carry. Worth doing before the ledger batch (sprint 24) reviews both surfaces.
+
+*Files: `src/ui/ui_state.hpp`, `src/ui/nav_pane.cpp`, `src/core/app.cpp`, `src/core/verify_api.cpp`*
 
 ---
 

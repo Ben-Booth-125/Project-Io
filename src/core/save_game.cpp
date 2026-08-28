@@ -35,7 +35,19 @@ constexpr auto max_resource    = static_cast<resource_type>(resource_count - 1);
 constexpr auto max_canvas      = canvas_level::planetary;
 // `overlay_mode::count` is a sentinel, not a lens -- the last real value is the
 // one before it. Accepting `count` would hand the canvas a lens it cannot draw.
-constexpr auto max_overlay     = overlay_mode::supply_routes;
+//
+// DERIVED, NOT HAND-KEPT, and the bug that forced the change is worth recording:
+// this read `overlay_mode::supply_routes` while TWO lenses had since been appended
+// after it (throughput, then company). A save written with either of them active
+// wrote a byte the loader's range check rejected -- and `r_enum` failing fails the
+// whole envelope, so the campaign simply would not reopen. Silent, total, and
+// reachable by nothing more than picking a lens before saving.
+//
+// The lens roster is expected to keep growing, so the constant now follows it.
+// Every sibling above is a genuine domain bound; this one was only ever "the last
+// lens", which is a fact the enum already knows.
+constexpr auto max_overlay     = static_cast<overlay_mode>(
+                                     static_cast<int>(overlay_mode::count) - 1);
 
 // ---------------------------------------------------------------------------
 // world_params / preferences

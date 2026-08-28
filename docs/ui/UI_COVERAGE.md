@@ -10,15 +10,15 @@
 
 **108 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**86 of 108 elements can be changed without any check going red.**
+**85 of 108 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
 | Class | Count | What green means |
 |---|---|---|
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
-| **ASSERTED** | 19 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
-| **CLIP-ONLY** | 15 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
+| **ASSERTED** | 20 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
+| **CLIP-ONLY** | 14 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
 | **CAPTURE-ONLY** | 62 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 9 | No verify script drives this element at all. |
 
@@ -30,7 +30,7 @@ and so is the safety net.
 | `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes` | 0 | 0 | 2 |
 | `UI-063` Icon vocabulary | element | `icon_silhouettes` | 0 | 0 | 0 |
 
-## ASSERTED (19)
+## ASSERTED (20)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -38,10 +38,11 @@ and so is the safety net.
 | `UI-020` Planetary Canvas > Corporate borders (reach rings) | sub-element | `corp_lens_border`, `corporate_reach`, `border_band` | 6 | 0 | 3 |
 | `UI-021` Planetary Canvas > Survey region mask | sub-element | `survey`, `visibility`, `survey_dispatch` | 4 | 0 | 0 |
 | `UI-037` Lens system (overlay_mode family) > Continent lens | sub-element | `continents_terrain`, `tile_texture`, `landform_relief`, `save_load` | 6 | 0 | 3 |
-| `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths` | 25 | 0 | 5 |
+| `UI-043` Selection band | element | `selection_band`, `selection_redesign`, `selection_bar`, `shell_pass`, `lens_one_tier` | 18 | 1 | 2 |
+| `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths`, `lens_one_tier` | 43 | 0 | 6 |
 | `UI-045` Selection band > Tile selection layout | sub-element | `selection_tile_layout`, `selection_accordion`, `ui_shell_fixture` | 9 | 1 | 2 |
-| `UI-049` Hover Card | element | `hover_freeze`, `sticky_card`, `border_band` | 6 | 0 | 3 |
-| `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot`, `lens_selection_paths` | 13 | 0 | 2 |
+| `UI-049` Hover Card | element | `hover_freeze`, `sticky_card`, `border_band`, `lens_one_tier` | 24 | 0 | 4 |
+| `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot`, `lens_selection_paths`, `lens_one_tier` | 31 | 0 | 3 |
 | `UI-075` Construction Ledger > Build view | view | `tile_build_ledger`, `roads`, `build_door_wide_roster`, `fresh_start_build` | 1 | 0 | 0 |
 | `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `v009_batch` | 7 | 0 | 0 |
 | `UI-077` Construction Ledger > Sell Orders view | view | `sell_order` | 3 | 0 | 0 |
@@ -54,7 +55,7 @@ and so is the safety net.
 | `UI-105` Generation Ledger | ledger | `save_load` | 6 | 0 | 3 |
 | `UI-111` Spectator god view | element | `spectator_god_view` | 1 | 0 | 0 |
 
-## CLIP-ONLY (15)
+## CLIP-ONLY (14)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -63,7 +64,6 @@ and so is the safety net.
 | `UI-013` Planetary Canvas | canvas | `canvas_levels`, `zoom_ladder`, `shell_pass`, `tile_texture` | 0 | 1 | 1 |
 | `UI-025` Minimap | element | `shell_pass` | 0 | 1 | 1 |
 | `UI-026` Minimap > Minimap title bar | sub-element | `shell_pass` | 0 | 1 | 1 |
-| `UI-043` Selection band | element | `selection_band`, `selection_redesign`, `selection_bar`, `shell_pass` | 0 | 1 | 1 |
 | `UI-051` Header Panel | panel | `header`, `shell_pass` | 0 | 1 | 1 |
 | `UI-057` Profile (identity tile) | panel | `shell_pass` | 0 | 1 | 1 |
 | `UI-058` Profile (identity tile) > Corp emblem | sub-element | `shell_pass` | 0 | 1 | 1 |

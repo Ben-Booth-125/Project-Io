@@ -804,7 +804,13 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             }
             out["hovered_structure_kind"] = std::string(k);
         }
-        out["hovered_structure"]         = static_cast<unsigned int>(m_ui.hovered_structure);
+        // The structure's IDENTITY is deliberately not published on the hover
+        // channel. `hovered_structure` under the Continent lens is
+        // `plate_id + 1` for whatever tile the pointer is over, so a script
+        // sweeping the pointer could reconstruct the plate map tile by tile --
+        // individual tile generation data crossing the Lua seam, which is the
+        // thing the standing rule forbids. The KIND is enough for every
+        // assertion this seam exists to support, and it names no tile.
         out["selected_deposit_resource"] = m_ui.selected_deposit_resource;
         out["selected_plate"]            = m_ui.selected_plate;
 
@@ -824,11 +830,19 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             const char* panel = "none";
             if (m_ui.show_market_ledger)           panel = "market";
             else if (m_ui.show_balance_ledger)     panel = "balance";
+            // TWO SURFACES, TWO NAMES. `show_corporation_panel` is the player's
+            // own dashboard and `show_corporations_table` is the all-corporations
+            // table; before BL-666 only the first had a name here, so a check
+            // asserting "corporation" passed for EITHER — which is exactly how the
+            // first cut of the corporation destination shipped green while opening
+            // the player's own books (the review barrier's finding, 2026-08-28).
             else if (m_ui.show_corporation_panel)  panel = "corporation";
+            else if (m_ui.show_corporations_table) panel = "corporations";
             else if (m_ui.show_economy_panel)      panel = "economy";
             else if (m_ui.show_construction_panel) panel = "construction";
             else if (m_ui.show_tile_ledger)        panel = "tile";
             else if (m_ui.show_contracts_ledger)   panel = "contracts";
+            else if (m_ui.show_company_ledger)     panel = "company";
             out["open_panel"] = std::string(panel);
         }
         // Which section of the tile Selection element's top nav is showing, so a

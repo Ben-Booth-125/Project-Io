@@ -4098,8 +4098,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             //    the whole body while one of them is active. That is deliberate: a
             //    value field is something you read.
             //
-            // `hovered_structure_kind` was resolved by the tile loop earlier this
-            // frame, so this costs a read rather than a second resolve.
+            // `hovered_structure_kind` was resolved by the tile loop earlier in
+            // THIS frame (it is written well above this read), so this costs a
+            // read rather than a second resolve and hover cannot disagree with the
+            // click about what the ground resolved to.
+            //
+            // WHAT THE CARD IS ABOUT IS STILL THE TILE, not the structure -- so a
+            // press and a hover at the same pixel agree on the KIND and differ on
+            // the SUBJECT. Deliberate and bounded: `draw_hover_content` has no
+            // branch for a corporation, a company, a catchment or a plate, and
+            // writing four is content work rather than the resolution rule this
+            // item is about. Recorded as owed rather than done (NR-701).
             hover_eid = (state.hovered_structure_kind != structure_kind::none)
                         ? hovered_tile : null_entity;
         }
@@ -4390,6 +4399,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 state.selection_cycle_tile = null_entity;
                 state.clear_battle_selection();
                 state.clear_lens_region_selection();
+                // AND THE OWNER SURFACES GO WITH IT. A ledger whose whole subject
+                // is one named firm cannot outlive the selection that named it:
+                // leaving the Company ledger open on firm X after the player has
+                // cleared the band is the same failure NR-697 recorded, just in
+                // the column instead of the band. The tile build ledger is the
+                // precedent -- app.cpp actively closes it once the selection stops
+                // being a tile, rather than letting it sit there.
+                state.selected_company             = null_entity;
+                state.selected_corporation_dossier = null_entity;
+                state.show_company_ledger          = false;
             }
             else if (structure_hit != null_entity)
             {
@@ -4417,8 +4436,48 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
                 else if (struct_kind == structure_kind::corporation)
                 {
+                    // BL-666. This used to open the BALANCE ledger, which is the
+                    // PLAYER'S OWN BOOKS — so clicking a rival's ground showed you
+                    // your own accounts (NR-700). Wrong in the way that is hardest
+                    // to catch in a capture: not empty, not broken, just not about
+                    // the thing that was pressed.
+                    //
+                    // The corporations table is the surface that IS about a named
+                    // firm, and it already highlights its row from the dossier
+                    // field, so this aims it rather than inventing a route.
+                    //
+                    // THE FLAG IS `show_corporations_table`, NOT
+                    // `show_corporation_panel`, and the two are named the wrong way
+                    // round: `show_corporation_panel` drives
+                    // `draw_corporation_dashboard` (nav slot 1, THE PLAYER'S OWN
+                    // corporation at a glance), while `show_corporations_table`
+                    // drives `draw_corporation_panel` (nav slot 8, the
+                    // all-corporations table). The first draft of this line took the
+                    // flag whose name matched the function it wanted and reproduced
+                    // NR-700 one surface over — a rival's ground opening the
+                    // player's own dashboard. Read app.cpp:1981-1989 before touching
+                    // either flag.
+                    state.selected_corporation_dossier = structure_hit;
+                    state.selected_company             = null_entity;
                     close_all_panels(state);
-                    state.show_balance_ledger = true;
+                    state.show_corporations_table = true;
+                }
+                else if (struct_kind == structure_kind::company)
+                {
+                    // A DIFFERENT DESTINATION, not the same one with a flag (Ben,
+                    // 2026-08-28: "Different types for either, make a placeholder
+                    // if needed"). A corporation is a rival the player competes
+                    // with; a company is a background firm. Routing both to the
+                    // corporations table would re-merge the distinction the
+                    // 2026-08-28 terminology split just drew.
+                    //
+                    // `selected_company` rather than reading `selected_entity`
+                    // back: the ledger's subject must survive the player selecting
+                    // something else, which a live-selection read would not.
+                    state.selected_company             = structure_hit;
+                    state.selected_corporation_dossier = null_entity;
+                    close_all_panels(state);
+                    state.show_company_ledger = true;
                 }
             }
             else

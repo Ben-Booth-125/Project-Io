@@ -732,7 +732,8 @@
     "selection_band",
     "selection_redesign",
     "selection_bar",
-    "shell_pass"
+    "shell_pass",
+    "lens_one_tier"
    ]
   },
   {
@@ -750,7 +751,8 @@
     "click_injection",
     "lens_structure_pivot",
     "hover_freeze",
-    "lens_selection_paths"
+    "lens_selection_paths",
+    "lens_one_tier"
    ]
   },
   {
@@ -836,7 +838,8 @@
    "checks": [
     "hover_freeze",
     "sticky_card",
-    "border_band"
+    "border_band",
+    "lens_one_tier"
    ]
   },
   {
@@ -852,7 +855,8 @@
    "resolution": "Explicitly the landed departure from the original design: TOOLTIP.md's Superseded section states depth is 'keyed on the lens rather than a caller hint' because the card 'answers the question the lens is asking' — content should match what the player is currently investigating, not just what kind of thing they're pointing at.",
    "checks": [
     "lens_structure_pivot",
-    "lens_selection_paths"
+    "lens_selection_paths",
+    "lens_one_tier"
    ]
   },
   {

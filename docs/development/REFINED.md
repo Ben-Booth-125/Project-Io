@@ -94,6 +94,18 @@ every other column occupant.
 
 ---
 
+## Closed out
+
+All five Lane A tasks and Lane B's B1 are **complete**. `lens_one_tier` runs 38/38 green.
+
+Two symbol notes against the map above, both harmless and both worth recording
+rather than quietly correcting: A1's `provides:` named a helper
+`lens_is_interactive(overlay_mode)` that was never written — the code uses an
+inline `lensed` bool instead — and A2 landed one field beyond its list,
+`pointer_target.hovered_structure`, which was then **removed** at the review
+barrier because under the Continent lens it carried a per-tile plate id across
+the Lua seam.
+
 ## Not in this batch
 
 `BL-659`, `BL-660`, `BL-661`, `BL-662`, `BL-663` carry in sprint 23 with Ben's
