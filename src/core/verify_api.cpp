@@ -1836,6 +1836,28 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // script stage a debt scenario so the BL-073 interest charge and the in-debt
     // affordances (header badge + breakdown interest line) render deterministically.
     // Non-economic — it only moves the number; the next econ tick charges interest.
+    // TEST-ONLY FIXTURE HOOK, in the same family as set_balance / inject_offer /
+    // seed_convoy: put `qty` of `res` into the player corp's pool on the home
+    // body, creating the pool if it does not exist.
+    //
+    // WHY IT EXISTS (NR-696, 2026-08-28). stage_ui_fixture must raise a unit
+    // through the real verbs, and hire_unit's second gate is not credits but
+    // GOODS: debit_hire_cost requires hire_axis_cost (5.0) of a gated resource
+    // per axis, held in the corp's own stockpile. An opening corp holds almost
+    // nothing - the measured fixture corp had a total stockpile value of Cr 34 -
+    // so every available roster row returned rejected_funds no matter how much
+    // credit it was lent. Lending goods is the same idea as lending credits, and
+    // the fixture returns them the same way.
+    v.set_function("grant_stock", [this](const std::string& res, double qty) {
+        const auto it = m_world.corporations.find(m_world.player_entity);
+        if (it == m_world.corporations.end())
+            return false;
+        auto& pool = m_world.corp_body_pools[{m_world.player_entity, m_world.home_body}];
+        pool.quantities[static_cast<std::size_t>(resource_from_name(res))] +=
+            static_cast<float>(qty);
+        return true;
+    });
+
     v.set_function("set_balance", [this](float value) {
         const auto it = m_world.corporations.find(m_world.player_entity);
         if (it != m_world.corporations.end())

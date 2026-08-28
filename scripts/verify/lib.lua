@@ -219,8 +219,27 @@ function raise_player_force(corp)
     -- economy rather than a staged fortune, which is the whole reason option C was
     -- chosen over re-enabling the seeder.
     local opening = verify.player_balance()
-    local LOAN = 500.0
+    -- Lent against a FLOOR, not against `opening`: the base is pay-as-you-build,
+    -- so by the time it completes the balance can be near zero or negative, and a
+    -- relative loan then lands short of hire_base_cost + hire_cost_per_power x
+    -- power. Measured 2026-08-28: +500 still gave rejected_funds on all six
+    -- available rows. The repayment below subtracts the same LOAN, so the corp
+    -- still ends `opening - actual_spend` however large the float is.
+    local LOAN = 5000.0
     verify.set_balance(opening + LOAN)
+
+    -- AND THE GOODS, which is the gate that actually bit. hire_unit has TWO
+    -- funds checks and they return the same string: `payer.balance < hire_cost`
+    -- (credits) and `debit_hire_cost` (goods). The first loan addressed credits
+    -- and changed nothing, because an opening corp fails the second — every
+    -- gated axis wants hire_axis_cost of one of its candidate resources held in
+    -- the corp's own pool, and the measured fixture corp's entire stockpile was
+    -- worth Cr 34. One candidate per axis is enough (ore / farm / energy,
+    -- unit_roster.hpp's hire_axis_table), and 50 is comfortably over the 5.0 a
+    -- single axis costs.
+    verify.grant_stock("iron_ore", 50)
+    verify.grant_stock("agricultural_produce", 50)
+    verify.grant_stock("coal", 50)
 
     local seen, order = {}, {}
     for row = 0, 15 do
