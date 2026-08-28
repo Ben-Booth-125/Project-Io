@@ -69,6 +69,31 @@ struct continent_state
     /// § Pass 5 and CONTINENTS.md § Outputs and contracts.
     std::vector<uint8_t> convergent;
 
+    /// [row*gw+col], 1 where the tile touches a CLASSIFIED DIVERGENT boundary
+    /// — the pairs that earned the -0.08 subsidence above. Empty on a
+    /// stagnant-lid body (no boundaries at all), exactly like `convergent`, and
+    /// written in the same loop from the same `sign` test.
+    ///
+    /// NOT the complement of `convergent`, and not disjoint from it. Most tiles
+    /// are in neither mask. A tile is walked against TWO neighbours (right and
+    /// down) and marked per neighbour, so one sitting where a closing pair meets
+    /// an opening pair carries both marks — rare (a plate junction), real, and
+    /// already true of `height_bias`, which accumulates +0.12 and -0.08 on that
+    /// same tile. What IS exclusive is the per-boundary classification: one
+    /// `sign` decides one pair, once.
+    ///
+    /// The sibling of `convergent`, and exposed for the same reason: the pass
+    /// classified every boundary BOTH ways, said so in a history line, folded
+    /// -0.08 into the heightmap and then recorded only half of what it knew.
+    /// A rift is a legible read on a body — a rift valley, crust thinned and
+    /// pulled apart, and the floor of the basin the sea eventually finds —
+    /// and none of that survives in the finished heightmap, where -0.08 is
+    /// indistinguishable from ground that was simply low to begin with. A
+    /// consumer wanting rift landforms, thinned-crust deposits, or where the
+    /// basins are has to be TOLD which tiles the rift ran through; it cannot
+    /// recover them from height. See CONTINENTS.md § Outputs and contracts.
+    std::vector<uint8_t> divergent;
+
     /// Dated lines for the body's biography (history_event::stage ==
     /// chain_stage::engine). Appended to planetology_state::history by the
     /// caller, not stored twice.

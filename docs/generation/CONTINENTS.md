@@ -88,7 +88,7 @@ it in sync with `hard_coded_world.cpp` when either changes.
 
 ## Outputs and contracts
 
-`continent_state` carries **four** consumer-facing outputs:
+`continent_state` carries **five** consumer-facing outputs:
 
 - **`height_bias`** — per-tile float, roughly [−1, 1], always sized `gw×gh`
   (all-zero on a stagnant lid). Contract into tile Pass 1: **added to the raw noise
@@ -116,6 +116,25 @@ it in sync with `hard_coded_world.cpp` when either changes.
   **Only the homeworld receives it** — `hard_coded_world.cpp` passes the homeworld's
   mask into `generate_body_tiles`; the other bodies fall through to the
   height-preference path.
+- **`divergent`** — per-tile `uint8_t` mask, 1 where the tile touches a **classified
+  divergent** boundary (the pairs that earned the −0.08 subsidence). **Empty on a
+  stagnant lid**, same as `convergent`, and written in the same loop from the same
+  `sign` test.
+
+  It exists for the reason its sibling does. The pass classifies every boundary
+  *both* ways, writes a history line for each, folds uplift or subsidence into the
+  height field — and the classification is then unrecoverable from the terrain, because
+  −0.08 in a heightmap is indistinguishable from ground that was simply low to begin
+  with. A rift is a legible read on a body — a rift valley, thinned crust, and where the
+  basins are — and a consumer wanting any of that has to be *told* which tiles the rift
+  ran through.
+
+  **The two masks are not disjoint, and neither is the complement of the other.** Most
+  tiles are in neither. A tile is walked against two neighbours (right and down) and
+  marked per neighbour, so a tile at a junction between a closing pair and an opening
+  pair carries both marks — rare, real, and already true of `height_bias`, which
+  accumulates both deltas on that same tile. What *is* exclusive is the per-boundary
+  classification: one `sign` decides one pair, once.
 - **`history`** — dated `history_event` lines tagged `chain_stage::engine`. The
   caller (`plan()` in `hard_coded_world.cpp`) moves them into the body's biography
   (`planetology_state::history`) and re-sorts; they are not stored twice. This is
