@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*149 entries — 29 gameplay · 25 canvas · 15 lens · 47 ledger · 33 chrome.*
+*150 entries — 29 gameplay · 25 canvas · 15 lens · 48 ledger · 33 chrome.*
 
 ---
 
@@ -662,8 +662,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 - The app is in-game with the Planetary surface primary.
 - The pointer rests over an entity; moving off it before ~0.5 s means no card appears.
 - No hover card is already up, and construction placement mode is not active (the placement ghost owns that moment).
+- If a lens is active, it resolves a structure for the ground under the pointer — a lens with no answer there raises no card (BL-664).
 
-**Expected output.** Glance phase: after ~0.5 s a small chrome-free card appears above the cursor and tracks it like a tooltip; leaving the entity dismisses it. Stick phase: after ~2.5 s total the card freezes in place and is dismissed only when the cursor leaves the card's rect plus a 26 px pad, so long lines can be read to the end. Content is keyed on the active lens (e.g. terrain header + habitability by default; deposit richness under Resource; price signal on a market centre under Market; rival buildings show type + owner only). The card never captures the pointer, never opens the Selection band (clicking is the only opener), and changes no selection or view state.
+**Expected output.** Glance phase: after ~0.5 s a small chrome-free card appears above the cursor and tracks it like a tooltip; leaving the entity dismisses it. Stick phase: after ~2.5 s total the card freezes in place and is dismissed only when the cursor leaves the card's rect plus a 26 px pad, so long lines can be read to the end. Content is keyed on the active lens (e.g. terrain header + habitability by default; deposit richness under Resource; price signal on a market centre under Market; rival buildings show type + owner only). The card never captures the pointer, never opens the Selection band (clicking is the only opener), and changes no selection or view state. UNDER A LENS (BL-664, Ben 2026-08-28) the card is gated by the same one-tier rule the click obeys: a marker takes no part, the card's subject is the ground, and where the active lens has NO structure for that ground NO CARD APPEARS AT ALL. Population, Industry and Throughput have no structure grain, so the card is absent across the whole body while one of them is active. Note the card's content still describes the TILE rather than the structure the click would select — draw_hover_content has no branch for a corporation, company, catchment or plate (NR-701).
 
 **Reason to select.** Read a thing before committing a click — check a tile's landform and movement cost, a deposit's richness, or a price signal, and learn the glyph vocabulary at the point of looking.
 
@@ -796,18 +797,18 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 ### `canvas.select` — The primary canvas (Solar, Circumplanetary, or Planetary rung — whichever fills the window).
 
-**Press.** Single left-click on an entity: a body on the Solar/Circumplanetary rungs, a PROVINCE or marker on the Planetary surface (BL-511, 2026-08-21 — a plain click on the Planetary ground now selects the province, not the bare tile). A LIVE BATTLE OUTRANKS ALL OF THEM (BL-469, 2026-08-21): if a fight stands in the clicked province, the click selects the battle.
+**Press.** Single left-click on an entity: a body on the Solar/Circumplanetary rungs, a TILE or marker on the Planetary surface. A LIVE BATTLE OUTRANKS ALL OF THEM (BL-469): if a fight stands in the clicked tile's province, the click selects the battle. UNDER A LENS THIS ALL CHANGES (BL-664, Ben 2026-08-28). A lens collapses selection to ONE TIER: the press resolves to the active lens's structure or to NOTHING, markers take no part ('markers do not outrank lenses'), and there is no repeat-click cycle. Corporation resolves the owner's tile group on this body, Company the same for a background firm, Resource the deposit, Market and Scarcity the catchment, Continent the plate. Population, Industry and Throughput draw a value field with no structure grain and are INERT — a press does nothing and clears the Selection band to resting, as does a press on any ground the active lens has no answer for (unowned ground under Corporation, a tile without the selected resource under Resource). The national border band is outside the rule and stays clickable under every lens (canvas.border_band_select). Everything above this sentence describes the canvas with NO lens active.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `target` | `entity` | The entity under the cursor. Overlapping candidates resolve to one entity: the stack UNIT > building > market > PROVINCE > body is walked most-specific first (BL-575, 2026-08-23, put the unit marker ahead of the building marker — a unit standing on a built tile must be reachable on the FIRST click, matching the repeat-click cycle's own precedence below, not only after cycling past the building), the active lens filters validity, and nearest-to-cursor (entity id breaking ties) picks a single stable winner. On the Planetary rung the ground itself resolves to the province containing the hovered tile (BL-511): the tile is still the data grain and the Selection card lists the province member tiles, their terrain and their summed deposits, but it is no longer what a plain click addresses. A unit marker (BL-575) is drawn once per (province, owner) GROUP at the province's anchor tile — the group's lowest-id unit is what a click on it resolves to; the Selection card is the same unit card either way. |
+| `target` | `entity` | The entity under the cursor. WITH NO LENS ACTIVE, overlapping candidates resolve to one entity: the stack UNIT > building > market > TILE > body is walked most-specific first (BL-575 put the unit marker ahead of the building marker — a unit standing on a built tile must be reachable on the FIRST click), and nearest-to-cursor (entity id breaking ties) picks a single stable winner. The ground itself resolves to the TILE, which carries its province as a set of sections in the Selection element (BL-598 dissolved the separate province rung: a rung of its own selected the same ground twice). A unit marker is drawn once per (province, owner) GROUP at the province's anchor tile — the group's lowest-id unit is what a click on it resolves to. UNDER A LENS none of this stack applies; see the press field. |
 
 **Valid when:**
 - The app is in-game (not the main menu or New World wizard).
 - The pointer is over the primary canvas, not over the minimap inset or any ImGui panel (panels capture the mouse).
 - An entity is under the cursor (empty space is a different press — see canvas.deselect).
 
-**Expected output.** selected_entity becomes the target and the Selection band (fixed strip at the bottom of the screen) appears or re-points, showing that kind's action and facts; a new selection resets any drill-down stack in the band. Nothing else changes: same rung, same pan, same zoom, active_body untouched, no lens change, the canvas is not re-skinned, and any open fold-out ledger stays open. A single click never navigates. PROVINCE GRAIN (BL-511, 2026-08-21): selecting Planetary ground shows the PROVINCE in the same Selection element every other kind uses (refolded 2026-08-21 on Ben's ruling that there should not be a second selection element) — header, then the shared three-column band: the province rendered over its mixture bar (the blend legend) on the left, a Tiles / Deposits / Buildings pager in the centre (member tiles with terrain, deposits summed across the province, the buildings standing in it), a Go to action grid on the right. The canvas outlines the province OUTER boundary. BATTLE GRAIN (BL-469, 2026-08-21): when a live battle stands in the clicked province the Selection element shows the BATTLE instead — the phase word, per-unit strength bars for both sides, and the withdrawal price with its base / per-round / pursuit terms separated, plus the 'Break off' press (see gameplay.withdraw_from_battle). Which battle, when several stand in one province: the acting corp's own first, then sorted (province, attacker, defender) order. REPEAT-CLICK CYCLE (Ben, 2026-08-21; widened to five rungs by BL-469): clicking the same spot again walks BATTLE > UNIT > PROVINCE > BUILDING > TILE, skipping any rung with nothing on it. The hit-test itself is unchanged and still resolves most-specific-first, so the FIRST click on a building selects the building, not its province.
+**Expected output.** selected_entity becomes the target and the Selection band (fixed strip at the bottom of the screen) appears or re-points, showing that kind's action and facts; a new selection resets any drill-down stack in the band. Nothing else changes: same rung, same pan, same zoom, active_body untouched, no lens change, the canvas is not re-skinned. A single click never navigates. BATTLE GRAIN (BL-469): when a live battle stands in the clicked tile's province the Selection element shows the BATTLE instead — the phase word, per-unit strength bars for both sides, and the withdrawal price with its base / per-round / pursuit terms separated, plus the 'Break off' press (see gameplay.withdraw_from_battle). Which battle, when several stand in one province: the acting corp's own first, then sorted (province, attacker, defender) order. REPEAT-CLICK CYCLE, NO LENS ONLY (Ben 2026-08-21; cut to FOUR rungs by BL-598 and confined to the plain canvas by BL-664): clicking the same spot again walks BATTLE > UNIT > BUILDING > TILE, skipping any rung with nothing on it. The hit-test itself is unchanged and still resolves most-specific-first, so the FIRST click on a building selects the building. On bare ground with no unit, no building and no battle exactly one rung is live, so a repeat click re-selects the same tile. UNDER A LENS a repeat press re-resolves to the same structure — one tier, and it does not move. A LENS PRESS MAY ALSO OPEN A LEDGER, because the lens that resolves the structure also routes it: Corporation opens the corporations table aimed at that firm, Company the Company ledger, Resource and Market and Scarcity the Market ledger, Continent the History ledger.
 
 **Reason to select.** Inspect a thing and surface its one primary move — Dispatch Survey on an unsurveyed body, Manage on your building, the construct/manage grid on a tile — without losing your current framing.
 
@@ -1482,7 +1483,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the all-corporations balance table open in the fold-out column; re-click closes; opening closes any other ledger. Open, it lists every corporation with its balance side by side (player row highlighted). Diplomacy itself is not built; this table is the slot's provisional occupant.
+**Expected output.** Toggles the all-corporations balance table open in the fold-out column; re-click closes; opening closes any other ledger. Open, it lists every corporation with its balance side by side (player row highlighted). Diplomacy itself is not built; this table is the slot's provisional occupant. Since BL-666 the table is also the destination of a Corporation-lens canvas press, which aims its highlighted row at the pressed firm via selected_corporation_dossier.
 
 **Reason to select.** Answers 'how do rivals' finances compare to mine?' - the only side-by-side rival-balance read in the game.
 
@@ -1762,6 +1763,23 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** Switches the ledger to that view. Re-clicking the CURRENTLY-ACTIVE tab closes the whole Contracts ledger (toggle rule on tab strips); clicking a different tab is an ordinary view change.
 
 **Reason to select.** Offers answers 'who wants to hire me'; Active answers 'what am I on the hook for now'; History answers 'how has it gone' — three different questions over the same mercenary-contract record.
+
+### `ledger.company_open` — The Company ledger (fold-out column). NO RAIL SLOT — it is reached only by a canvas press, the same shape as the tile construction ledger (ledger.selection_construct_open).
+
+**Press.** Activate the Company lens, then single left-click any tile held by a background firm on the Planetary surface. There is no menu route and no keyboard route.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `company` | `entity_id` | The background firm owning the pressed tile, resolved as the lens's tile-group structure (BL-665). Travels in ui_state::selected_company so the ledger keeps its subject when the selection moves on. |
+
+**Valid when:**
+- The app is in-game with the Planetary surface primary.
+- The Company lens is the active lens — under any other lens the same press resolves to something else.
+- The pressed tile is held by a corporation with is_background set. Ground held by nobody, or by a corporation proper, is INERT under this lens: no card, no selection, and the Selection band clears to resting (BL-664 rule 3).
+
+**Expected output.** The Company ledger opens in the fold-out column naming that firm, and every other ledger closes. It is a DECLARED PLACEHOLDER (BL-666) and says so on its face: the firm's name, that it is a background company rather than a corporation, its registration nation, its holdings on the active body, its reach in bodies, and capital only where the firm files a return. No rail slot and no close button — it closes when another ledger opens, or when a press on inert ground clears the selection that named it (NR-702).
+
+**Reason to select.** Answers 'who is this firm I keep seeing on the map?' for the background firms that make up most of the economy and had no surface of any kind before. A corporation is a rival and reaches the corporations table; a company is a market participant and reaches this.
 
 ---
 

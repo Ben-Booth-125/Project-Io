@@ -596,6 +596,10 @@
   [
    "canvas.border_band_select",
    "The national border band on the Planetary canvas — always-on chrome, not a lens. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths."
+  ],
+  [
+   "ledger.company_open",
+   "The Company ledger (fold-out column). NO RAIL SLOT — it is reached only by a canvas press, the same shape as the tile construction ledger (ledger.selection_construct_open)."
   ]
  ]
 }

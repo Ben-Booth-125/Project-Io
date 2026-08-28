@@ -94,6 +94,12 @@ One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's
 
 OPENED 2026-08-28 with the rule settled before the review, which inverts batch 1's method on purpose: Ben gave the principle first ("we will begin on honing in selection"), so the calls were taken against the docs and the code rather than against captures. The captures still matter - the fifteen path_*.png pairs from batch 1 are the before-state, one per lens, and the re-capture after BL-664 is what proves the rule landed. THE CONSEQUENCE TO WATCH: Population, Industry and Throughput have no structure grain, so under the rule they become entirely non-interactive; two of the three are on-bar lenses, so this is visible and was accepted explicitly rather than inferred.
 
+WAVE 1 LANDED 2026-08-28 as a Batch Delivery, two lanes: the main session took the click handler (BL-664, BL-665) and a worktree agent took the Company ledger surface (BL-666's B1). 38/38 asserted green in a new scripts/verify/lens_one_tier.lua, which is the batch's durable asset - the batch-1 lens sweep was capture-only and a human eye was the whole test.
+
+THE REVIEW BARRIER EARNED ITS PLACE and that is the finding worth carrying into waves 2+. It caught the corporation destination opening the PLAYER'S OWN dashboard - NR-700 reproduced one surface over, one commit after the item that filed it - and caught that the check could not have found it, because pointer_target had no name distinguishing the two corporation surfaces. Two independent guards failed to the same naming confusion (NR-704). It also found a pre-existing save-breaking bug the batch made reachable (NR-703: a save written under the Throughput or Company lens would not reopen).
+
+STILL OWED: the live click on both items. Computer-use access to the built app was requested and denied, so two requirement rows stay pending rather than flipping on a green harness.
+
 ### Sprint 24 — UI visibility - batch 3: ledgers
 *Proposed · opened 2026-08-28*
 
@@ -179,7 +185,7 @@ One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's
 | 20 | The books open, and the start earns its way | Closed 2026-08-26 - GOAL MET AND PROVED. Fifteen items landed; BL-634 measured Ben's own criterion and it holds. Cuts v0.1.21. |
 | 22 | UI visibility - batch 1: lenses | Closed 2026-08-28 - the lens batch reviewed and reworked; the remaining element classes become their own sprints (23-27) |
 | 21 | The other half of the economy - demand | PAUSED 2026-08-28 with wave 0 landed - the UI batches take priority; resume at wave 1 (BL-640/641/642) |
-| 23 | UI visibility - batch 2: selection & hover | Open 2026-08-28 - the one-tier lens selection rule settled; three items filed |
+| 23 | UI visibility - batch 2: selection & hover | Open 2026-08-28 - wave 1 landed (BL-664, BL-665, BL-666); the carried batch-1 items remain |
 | 24 | UI visibility - batch 3: ledgers | Proposed 2026-08-28 - one of the six UI review batches |
 | 25 | UI visibility - batch 4: shell chrome | Proposed 2026-08-28 - one of the six UI review batches |
 | 26 | UI visibility - batch 5: canvases & the zoom ladder | Proposed 2026-08-28 - one of the six UI review batches |
