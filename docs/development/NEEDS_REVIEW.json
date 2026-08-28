@@ -1537,6 +1537,49 @@
    "files": [
     "docs/development/sprints.json"
    ]
+  },
+  {
+   "id": "NR-693",
+   "title": "shell_pass produced ZERO captures in a full suite run, and nothing said so",
+   "raised": "2026-08-28",
+   "kind": "observation",
+   "status": "open",
+   "source": "Sprint 22 (UI visibility), the full --verify-all capture run of 2026-08-28.",
+   "what": "INFERRED, NOT YET CONFIRMED - a solo run is owed before this is treated as fact. In a --verify-all run that wrote 287 captures, `shell_` matched ZERO of them while `god_view` matched 7. spectator_god_view sorts AFTER shell_pass, and the run is alphabetical (balance_ledger was first), so shell_pass was reached and produced nothing rather than not having run yet. It is the single highest-value script in the suite for a UI pass - its own header calls it \"every UBIQUITOUS UI surface, captured from one staged world\", 19 captures - and it is the sole covering check for the Minimap, the Minimap title bar, the Profile tile, the corp emblem, the System menu and the Main menu, plus a contributor to the Header, the nav rail, the Time panel and the Solar canvas. Those ten elements read as unreviewed in the coverage grouping purely because of this. If confirmed it is a fifth NR-663-family instance and the most consequential yet: not a check whose green means little, but a check that produced NOTHING and still ended the run at exit 0.",
+   "files": [
+    "scripts/verify/shell_pass.lua",
+    "src/core/verify_api.cpp",
+    "docs/ui/UI_COVERAGE.md"
+   ]
+  },
+  {
+   "id": "NR-694",
+   "title": "The verify harness emits nothing to a redirected stdout, so a failing script is indistinguishable from a pending one",
+   "raised": "2026-08-28",
+   "kind": "observation",
+   "status": "open",
+   "source": "Sprint 22 (UI visibility), diagnosing NR-693 during the 2026-08-28 capture run.",
+   "what": "`./build/ProjectIo.exe --verify-all scripts/verify 2>&1 | tail` produced a 9-byte output file across a 2-hour run - and those 9 bytes were an echoed timestamp, not harness output. verify_api.cpp logs progress through SDL_Log ('verify-all: %zu script(s) under %s', the per-capture golden PASS/FAIL lines), and none of it reached the redirect. THE COST IS NOT COSMETIC: it is the reason NR-693 had to be inferred from file-name arithmetic instead of read off a log, and it means a script erroring mid-run looks exactly like a script that has not been reached yet. It also means the ONLY way to watch a long suite is to poll the filesystem for new PNGs, which is what this session had to do. Worth deciding whether SDL_Log needs an explicit stdout/stderr sink under --verify, or whether the harness should print its own progress lines independently of SDL.",
+   "files": [
+    "src/core/verify_api.cpp",
+    "src/main.cpp",
+    ".claude/skills/verifier-visual/SKILL.md"
+   ]
+  },
+  {
+   "id": "NR-695",
+   "title": "One capture, overflow_tile_v2, blocked the suite for 80+ minutes and starved nine scripts",
+   "raised": "2026-08-28",
+   "kind": "question",
+   "status": "open",
+   "source": "Sprint 22 (UI visibility), the 2026-08-28 capture run.",
+   "what": "text_overflow_floor.lua sweeps every fold-out ledger by sub-view. Its `tile` panel is the History ledger, and view 2 is the TILES view - a table with a row per tile on the body (composition, landform, hazard, habitability, deposits, buildings, local market state), captured with expect_no_clipping instrumenting every string drawn into the overflow ledger. The run reached overflow_tile_v2 about 60 minutes in and was still on it 80 minutes later: CPU climbing steadily (5315 -> 6457, ~70% of a core sustained), working set peaking near 1.6 GB then settling ~1.0 GB, zero new captures. Not a deadlock - it is computing - but nine scripts sit behind it unrun (throughput_lens, both tile_build_ledger checks, tile_texture, time_controls, ui_shell_fixture, v009_batch, visibility, zoom_ladder), which is ten more elements with nothing to review. THE CALL: is the Tiles view legitimately this expensive to instrument, or is the overflow ledger quadratic in rows? Either way the suite should not be serially blocked by one capture - parking it (the parked/ mechanism, with a debt item) or capping the Tiles table under verify are both cheaper than the status quo. Note the irony: UI-087 Tiles view is CLIP-ONLY class, so this capture's own assertion is the only thing checking it.",
+   "files": [
+    "scripts/verify/text_overflow_floor.lua",
+    "src/ui/tile_inspector.cpp",
+    "src/ui/text_fit.cpp",
+    "scripts/verify/parked/README.md"
+   ]
   }
  ]
 }

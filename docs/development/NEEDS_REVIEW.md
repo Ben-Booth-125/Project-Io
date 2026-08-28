@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*101 entries — 74 open, 27 resolved.*
+*104 entries — 77 open, 27 resolved.*
 
 ---
 
@@ -661,6 +661,27 @@ docs/ui/ui_elements.json is dated 2026-07-31 and carries 95 elements. Measured a
 On 2026-08-26 Ben steered that "Sprint 21 is a VISIBILITY pass" and three things were parked against it: NR-663 family (four checks whose green means less than it appears), BL-639 (panel columns), and NR-686 thorough fix (a dev build resolving scripts/ from the repo root). At that moment 21 was the DEMAND sprint. On 2026-08-27 a UI visibility pass opened as Sprint 22 (briefly numbered 21, corrected the same day). The two senses are not the same work: (a) UI visibility - the screen does not say what the model knows; (b) verification visibility - a check that passes without checking. THE CALL: does the verification family follow the NUMBER (into UI visibility, sprint 22) or the THEME it was steered onto (demand, sprint 21), or become its own item? Parked in sprint 22 planned rather than assigned, because inferring it would be a guess. Note the two senses did just meet in practice: NR-690 is a fifth member of the verification family, found by the UI scan.
 
 *Files: `docs/development/sprints.json`*
+
+### NR-693 — shell_pass produced ZERO captures in a full suite run, and nothing said so
+*observation · raised 2026-08-28 · from Sprint 22 (UI visibility), the full --verify-all capture run of 2026-08-28.*
+
+INFERRED, NOT YET CONFIRMED - a solo run is owed before this is treated as fact. In a --verify-all run that wrote 287 captures, `shell_` matched ZERO of them while `god_view` matched 7. spectator_god_view sorts AFTER shell_pass, and the run is alphabetical (balance_ledger was first), so shell_pass was reached and produced nothing rather than not having run yet. It is the single highest-value script in the suite for a UI pass - its own header calls it "every UBIQUITOUS UI surface, captured from one staged world", 19 captures - and it is the sole covering check for the Minimap, the Minimap title bar, the Profile tile, the corp emblem, the System menu and the Main menu, plus a contributor to the Header, the nav rail, the Time panel and the Solar canvas. Those ten elements read as unreviewed in the coverage grouping purely because of this. If confirmed it is a fifth NR-663-family instance and the most consequential yet: not a check whose green means little, but a check that produced NOTHING and still ended the run at exit 0.
+
+*Files: `scripts/verify/shell_pass.lua`, `src/core/verify_api.cpp`, `docs/ui/UI_COVERAGE.md`*
+
+### NR-694 — The verify harness emits nothing to a redirected stdout, so a failing script is indistinguishable from a pending one
+*observation · raised 2026-08-28 · from Sprint 22 (UI visibility), diagnosing NR-693 during the 2026-08-28 capture run.*
+
+`./build/ProjectIo.exe --verify-all scripts/verify 2>&1 | tail` produced a 9-byte output file across a 2-hour run - and those 9 bytes were an echoed timestamp, not harness output. verify_api.cpp logs progress through SDL_Log ('verify-all: %zu script(s) under %s', the per-capture golden PASS/FAIL lines), and none of it reached the redirect. THE COST IS NOT COSMETIC: it is the reason NR-693 had to be inferred from file-name arithmetic instead of read off a log, and it means a script erroring mid-run looks exactly like a script that has not been reached yet. It also means the ONLY way to watch a long suite is to poll the filesystem for new PNGs, which is what this session had to do. Worth deciding whether SDL_Log needs an explicit stdout/stderr sink under --verify, or whether the harness should print its own progress lines independently of SDL.
+
+*Files: `src/core/verify_api.cpp`, `src/main.cpp`, `.claude/skills/verifier-visual/SKILL.md`*
+
+### NR-695 — One capture, overflow_tile_v2, blocked the suite for 80+ minutes and starved nine scripts
+*question · raised 2026-08-28 · from Sprint 22 (UI visibility), the 2026-08-28 capture run.*
+
+text_overflow_floor.lua sweeps every fold-out ledger by sub-view. Its `tile` panel is the History ledger, and view 2 is the TILES view - a table with a row per tile on the body (composition, landform, hazard, habitability, deposits, buildings, local market state), captured with expect_no_clipping instrumenting every string drawn into the overflow ledger. The run reached overflow_tile_v2 about 60 minutes in and was still on it 80 minutes later: CPU climbing steadily (5315 -> 6457, ~70% of a core sustained), working set peaking near 1.6 GB then settling ~1.0 GB, zero new captures. Not a deadlock - it is computing - but nine scripts sit behind it unrun (throughput_lens, both tile_build_ledger checks, tile_texture, time_controls, ui_shell_fixture, v009_batch, visibility, zoom_ladder), which is ten more elements with nothing to review. THE CALL: is the Tiles view legitimately this expensive to instrument, or is the overflow ledger quadratic in rows? Either way the suite should not be serially blocked by one capture - parking it (the parked/ mechanism, with a debt item) or capping the Tiles table under verify are both cheaper than the status quo. Note the irony: UI-087 Tiles view is CLIP-ONLY class, so this capture's own assertion is the only thing checking it.
+
+*Files: `scripts/verify/text_overflow_floor.lua`, `src/ui/tile_inspector.cpp`, `src/ui/text_fit.cpp`, `scripts/verify/parked/README.md`*
 
 ---
 
