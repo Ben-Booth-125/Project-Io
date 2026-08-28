@@ -199,7 +199,17 @@ continent_state run_continents(const planetology_state& pl, int gw, int gh, uint
     // for Pass 5: 0.12 folded into a heightmap is indistinguishable afterwards
     // from terrain that was simply high to begin with, so a mountain pass reading
     // only the finished height cannot tell a collision zone from a plateau.
+    //
+    // The divergent half is recorded on exactly the same terms, from the same
+    // `sign` test, in the same walk: -0.08 folded into the heightmap is just as
+    // lost afterwards as +0.12 is, and a consumer wanting the rift — the valley,
+    // the thinned crust, where the basins are — cannot recover it from height.
+    // Same raster shape, same emptiness on a stagnant lid. The two masks are
+    // NOT disjoint: this walk visits each tile against two neighbours, so a
+    // tile at a junction between a closing pair and an opening one takes both
+    // marks, exactly as `height_bias` already takes both deltas there.
     out.convergent.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
+    out.divergent.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
     for (int row = 0; row < gh; ++row)
     {
         for (int col = 0; col < gw; ++col)
@@ -221,7 +231,11 @@ continent_state run_continents(const planetology_state& pl, int gw, int gh, uint
                     out.height_bias[static_cast<std::size_t>(idx)] += 0.12f; // convergent
                     out.convergent[static_cast<std::size_t>(idx)] = 1u;
                 }
-                else if (sign > 0) out.height_bias[static_cast<std::size_t>(idx)] -= 0.08f; // divergent
+                else if (sign > 0)
+                {
+                    out.height_bias[static_cast<std::size_t>(idx)] -= 0.08f; // divergent
+                    out.divergent[static_cast<std::size_t>(idx)] = 1u;
+                }
             }
         }
     }

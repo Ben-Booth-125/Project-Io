@@ -254,6 +254,7 @@ void w_continents(std::ostream& o, const continent_state& c)
     w_ints(o, c.plate_id);
     w_floats(o, c.height_bias);
     w_bytes(o, c.convergent);
+    w_bytes(o, c.divergent); // save_game_version 2 -- keep r_continents in step.
     // c.history is deliberately empty in a report -- those lines were merged
     // into planetology_state::history at generation, and the struct comment
     // says so. Written anyway, because "empty by convention" and "empty because
@@ -264,7 +265,8 @@ void w_continents(std::ostream& o, const continent_state& c)
 bool r_continents(std::istream& i, continent_state& c)
 {
     return r_vec(i, c.plates, r_plate) && r_ints(i, c.plate_id) && r_floats(i, c.height_bias)
-        && r_bytes(i, c.convergent) && r_vec(i, c.history, r_history_event);
+        && r_bytes(i, c.convergent) && r_bytes(i, c.divergent)
+        && r_vec(i, c.history, r_history_event);
 }
 
 // ---------------------------------------------------------------------------
