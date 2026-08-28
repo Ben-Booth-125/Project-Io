@@ -963,6 +963,467 @@
       "status": "resolved",
       "resolution": "RESOLVED 2026-08-25 — Ben: \"go with quantity-based draw\". commit_convoy now draws the leg's CARGO QUANTITY; leg.dist was removed rather than left write-only. Measured against the same instrument that found the problem (haulage_measure, real generated world): 1041 convoys dispatched / 789 intra-body, against the 1055/802 no-gate baseline — 98.7% of baseline trade restored, with ~14 legs a run still refused, so the cap is felt rather than decorative (rule 3). The same 20.0 rate needed no change; only the formula was wrong. Settled into LOGISTICS.md constraint 3 and rule 1, and into scripts/economy.lua's derivation comment with the measurement. TWO THINGS STILL OPEN, both first cuts flagged under NR-600 rather than re-filed: (a) one rate serves both halves, so a unit of goods and a march-point of movement burden an anchor equally — nothing measured says they should; (b) the anchor attribution is still corp_representative_tile, i.e. a corp's whole convoy traffic on a body draws from the anchor nearest its LOWEST-ID BUILDING regardless of where the cargo goes.",
       "resolved_on": "2026-08-25"
+    },
+    "NR-629": {
+      "id": "NR-629",
+      "title": "Wage competition written as the SETTLED labour-clearing model, superseding proportional contention",
+      "raised": "2026-08-25",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Ben, 2026-08-25 form: 'wage competition is preferred'.",
+      "what": "'Preferred' was written into POPULATION.md section Contention as the settled design (docs are state-independent; the proportional scalar remains what the code does until BL-614 lands). If 'preferred' meant 'leaning, not settled', overturn by restoring the proportional paragraph and marking BL-614 (wage competition) as a direction to evaluate instead.",
+      "files": [
+        "docs/economy/POPULATION.md"
+      ],
+      "resolution": "Ben, 2026-08-25 verdict form: SETTLED - the doc stands as written."
+    },
+    "NR-630": {
+      "id": "NR-630",
+      "title": "The centre-density recalibration is ~40x, and its downstream tunables are not re-derived",
+      "raised": "2026-08-25",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Measured while filing BL-610/BL-611: centres today 1 per ~410 land tiles, land provinces 1 per ~10.",
+      "what": "'A centre in every land province' implies roughly 40x today's centre count, mostly small strata. Self-adjusting downstream: Pass 6 background-firm calibration (a 0.90 production/demand target, not a count). NOT self-adjusting and needing re-derivation when BL-610 builds: population_demand's demand_scale, workforce supply per centre (labour units 1/3/10/30/100), the market carve's population anchoring, logistics node discounts (most tiles now near a centre), and road generation's edge count (~40x more MST nodes). Each is a measured retune, not a redesign.",
+      "files": [
+        "src/world/population_generation.cpp",
+        "scripts/economy.lua"
+      ],
+      "resolution": "Ben, 2026-08-25: keep 6.0 tiles/centre, retunes next sprint - now BL-622 (density retunes)."
+    },
+    "NR-631": {
+      "id": "NR-631",
+      "title": "BL-615 landed with five first-cut calls: radius 6, smithy exemption, era band any, no save-version bump, inclusive bound",
+      "raised": "2026-08-25",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Agent P's report, BL-615 (stratum placement gates), commit 9ea61218 on its worktree branch.",
+      "what": "Calls taken so the item could land, each overturnable: (1) centre_proximity_radius = 6 for the three industrial steel recipes (a quarter of the 24-unit reach budget; wrapped grid distance, inclusive at the bound); the ancient Smithy (steel_from_blooms) is deliberately ungated - a smithy is not a mill. (2) min_centre_scale > 0 implies requires_centre; proximity counts a centre of ANY stratum. (3) schooling/university take era band 'any' with timber/stone baskets so both bands can build them. (4) max_building widened with NO save-version bump - no serialized array is sized by building_type, reasoning recorded at the constant. (5) Rivals may propose a gated placement and be refused at apply time - deterministic, slightly wasteful.",
+      "files": [
+        "scripts/recipes.lua",
+        "scripts/economy.lua",
+        "src/world/placement_rules.cpp"
+      ],
+      "resolution": "Ben, 2026-08-25 verdict form: confirmed."
+    },
+    "NR-633": {
+      "id": "NR-633",
+      "title": "BL-613/BL-614 landed with six first-cut calls: seeding constants, jurisdiction rule, product composition, non-negative bids, WF.R3 re-spec, education rate",
+      "raised": "2026-08-25",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Agent E's report, commits 20b86c67 (BL-613) and dd283070 (BL-614) on its worktree branch.",
+      "what": "Calls taken so the items could land, each overturnable: (1) qualification seeding = first_furnace tercile base (early 0.35 / mid 0.22 / late 0.12 / never 0.05) + 0.25 x industrialised-region share, clamped [0,1] - never-industrialised nations floor at 0.05, not 0. (2) A building outside every nation is UNGATED by the qualified pool (the levy-pass precedent); a nation with no centre labour on a body has an empty pool there and its deep methods idle. (3) Qualified and ordinary grants compose by PRODUCT; qualified clears first but does not deplete the ordinary pool. (4) wage_bid is non-negative - bids raise, never undercut, in this cut; serialisation refuses negatives. (5) econ_harness WF.R3 asserted the superseded proportional model and was RE-SPECIFIED to the ruled wage contract - not weakened: output conservation and the aggregate still asserted, a differential bid row added. (6) Education raising rate 0.0005/building/tick as a local constexpr, inert until the is_education_building seam opens; move to economy.lua with the roster wiring. First-cut qualified_workforce ladder: spacecraft 0.50, heavy-route 0.40, electronics 0.35, medical 0.30, machinery/alloys/ordnance 0.25, steel_bessemer 0.15; ancient roster untouched.",
+      "files": [
+        "src/world/settlement.cpp",
+        "src/world/economy_system.cpp",
+        "scripts/recipes.lua"
+      ],
+      "resolution": "Ben, 2026-08-25 verdict form: confirmed."
+    },
+    "NR-634": {
+      "id": "NR-634",
+      "title": "spectator_determinism has a red golden row ON MAIN at dc7d0554 - pre-existing, same class as ai_skill_harness (NR-616)",
+      "raised": "2026-08-25",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Agent E, measured with baseline isolation: harness built from dc7d0554 in a scratch tree shows identical hashes and the same golden-row failure before and after its commits.",
+      "what": "played=0AF36395D78F3DAF, spectated=C890E1AF7A9A27E1 - the two match each other (the harness's two real properties hold) but differ from the stored golden 71273F6FEDE03965. World drift from some prior landing moved the constant and nobody re-blessed with dated provenance, as the standing rule expects. Not blessed by the agent (correctly). Wants a deliberate re-bless with a provenance line, or a hunt for which landing moved it.",
+      "files": [
+        "tools/verify/spectator_determinism.cpp"
+      ],
+      "resolution": "Resolved 2026-08-25 by the wave-1/wave-2 re-blesses: the golden now carries a provenance log recording BOTH the pre-existing unprovenance'd drift (0AF36395D78F3DAF at dc7d0554) and the sprint's two legitimate world moves; current constant DEC269E7941134D4, confirmed by R2's two-built-worlds row."
+    },
+    "NR-635": {
+      "id": "NR-635",
+      "title": "BL-610/BL-612 carve constants are first-cut: 10% urban share, rank-size banding, footprints 1/1/2/4/7; density landed at 6.0 tiles/centre vs the ~10 target",
+      "raised": "2026-08-25",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Agent G's report, commits 594d4e18 / 88174045.",
+      "what": "The carve model is: count = each living region's urban headcount (10% share) / 10k heads, floored at 1; scales = integer rank-size share-out banded to the nearest k_population_for_scale rung in log space; footprints 1/1/2/4/7 tiles by scale on most-livable neighbours. Measured seeds 0-2: 8.76/8.04/6.18 land tiles per centre pre-anchor, 6.04 after anchor villages; histogram s1=4928 s2=206 s3=45 s4=11 s5=1. Slightly denser than the ~10 target - k_demography_heads_per_centre is the one data knob if Ben wants it back. P5a3 over-preference share also moved 4.63% -> ~7.2% (report-only row; the 'rare' judgement is Ben's).",
+      "files": [
+        "src/world/population_generation.cpp"
+      ],
+      "resolution": "Ben, 2026-08-25: density stands at 6.0; the knob stays; retunes are BL-622 (density retunes)."
+    },
+    "NR-636": {
+      "id": "NR-636",
+      "title": "BL-611 grew twice, forced by its own assertions: the nation lock implements purged BL-563's core, and anchor foundings carry a flag + the v12 bump",
+      "raised": "2026-08-25",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Agent G's report, commit cab05f8f - flagged by the agent as its two novelty points.",
+      "what": "(1) The whole land fill is nation-locked (growth, leftovers, singleton absorption), making land provinces single-nation by construction - this is the core of purged BL-563 (province respects nation), designed but never built; the brief's anchor==tile-owner assertion is unreachable without it. (2) Centre-less pockets get a scale-1 anchor FOUNDING post-partition (relaxed habitability gate on pure-ice, counted), flagged province_anchor and excluded from partition seeding so the partition stays a pure function of the pre-anchor world - hence the second save bump. Also: hinterland seeding retained on UNSETTLED bodies' land (Selene/Cinder/Pallas have no centres); P9b retired as superseded (absorption legitimately merges centres at this density); P5d redefined to the nation lock.",
+      "files": [
+        "src/world/province.cpp",
+        "src/world/population_generation.cpp"
+      ],
+      "resolution": "Ben, 2026-08-25 verdict form: confirmed."
+    },
+    "NR-637": {
+      "id": "NR-637",
+      "title": "At the new density the Planetary canvas reads settlement-saturated at far zoom - does the marker vocabulary need a tier gate?",
+      "raised": "2026-08-25",
+      "kind": "question",
+      "status": "resolved",
+      "source": "lens_strip_population.png captured on the integrated wave-1 world (build/screenshots/).",
+      "what": "With ~1,450 centres the always-on civic chrome draws a skyline glyph for nearly every land tile cluster - the lived-in goal is unmistakably met, but at far zoom the surface reads as a uniform settlement grid rather than a hierarchy of cities over towns over villages. Candidate directions, Ben's call: (a) zoom-gate village markers (scale 1 renders only past a zoom threshold, the conurbation anchor carries the far read); (b) raise the conurbation clustering distance so villages fold into their town's glyph; (c) leave it - density IS the message. POPULATION.md § Centre rendering owns the vocabulary.",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "docs/economy/POPULATION.md"
+      ],
+      "resolution": "Ben, 2026-08-25 verdict form: leave it - density is the message. No marker change."
+    },
+    "NR-638": {
+      "id": "NR-638",
+      "title": "BL-616/BL-617 first-cut calls: raze precondition unit-on-body, stance gate latent (all-neutral), selectivity 1.5 makes brain drain bite, raze keeps urban ground",
+      "raised": "2026-08-25",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Agent W2E's report, commits be4c9588 (BL-616) and bc1ea38b (BL-617) on its worktree branch.",
+      "what": "Four calls, each overturnable: (1) raze_centre's occupation precondition = the acting corp owns a unit positioned on the centre's BODY (a stricter on-centre-tile rule is a one-line change); the verb is deliberately NOT in the corp-AI candidate list - no standing-rules grant covers a rival razing. (2) The migration stance gate reads the existing stance tables by nation entity id, but nothing DECLARES nation stance yet, so live inter-nation flows all clear at the neutral throttle (250 permille) - the gate is real but latent until a nation-stance verb exists. (3) qualified_selectivity = 1.5: migrants skew qualified, so emigration lowers the origin's FRACTION, not just its headcount - at exactly 1.0 the fraction would be invariant, contradicting the doc's 'debits the fraction' reading. (4) Razing leaves the urban land-use stamp (historied ground; extraction stays blocked) - now written into POPULATION.md. Growth/decline constants: step 10 ticks, shed/gain pop/25, promotion window 50 ticks; migration rate 10 permille, wage_weight 0.02 - all data or constexpr, first-cut-then-tune.",
+      "files": [
+        "src/world/economy_system.cpp",
+        "src/world/corp_command.hpp",
+        "scripts/economy.lua"
+      ],
+      "resolution": "Ben, 2026-08-25 verdict form: confirmed (all four calls)."
+    },
+    "NR-639": {
+      "id": "NR-639",
+      "title": "tools/mcp/server.js VERBS array is stale by 10 verbs (stops at hold_convoy) - index-is-value, so the whole tail is missing",
+      "raised": "2026-08-25",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Agent W2E, observed in passing while appending raze_centre (verb 27).",
+      "what": "The MCP server's VERBS name array has 17 entries while corp_verb now counts 28 - every verb since BL-448 is unaddressable over the wire, and because index-is-value the fix is appending the full ordered tail, not one name. Compounding: tools/session/verb_coverage.js lists raze_centre unmapped alongside the pre-existing withdraw_from_battle / accept_offer / abandon_contract. An AI-facing seam drifted silently; worth a small owned fix plus a lint that diffs the array length against corp_verb_count.",
+      "files": [
+        "tools/mcp/server.js",
+        "tools/session/verb_coverage.js"
+      ],
+      "resolution": "Fixed 2026-08-25 (Ben: 'update the MCP server's verb table'): full 11-verb tail appended in enum order (28 total); schema gains province + extended order/counterparty descriptions; verb_coverage.js gains a FAILING drift guard (length AND order vs the seam) plus subsystem rows for the four unmapped verbs. Honest gap recorded in place: agent_protocol.cpp parses no units key, so a wire accept_offer cannot commit units yet - that is seam work, not schema work."
+    },
+    "NR-640": {
+      "id": "NR-640",
+      "title": "Anchor villages are OFF the road lattice - connecting them post-partition breaks partition-recompute reproducibility; ordering question for Ben",
+      "raised": "2026-08-25",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Agent W2G's report (BL-620): road_generation_harness R3 was already red at HEAD - BL-611's ensure_province_anchor_centres founds ~1,086 villages AFTER generate_roads.",
+      "what": "Roads -> partition -> anchors is a hard ordering: roads bind provinces, so the partition must see final roads, and anchors exist only after the partition. W2G built and then REVERTED a connect-the-anchors pass because any post-partition road_level write changes the partition's input and broke P6 (partition-recompute reproducibility, a save/load contract) plus two more rows. Current contract, asserted by new R3/R3b: anchor foundings are the ONLY off-lattice centres. The open call: (a) leave anchors off-lattice as administrative foundings (current state - a pure-ice village with no road is arguably honest); (b) a partition fixpoint (roads -> partition -> anchors -> anchor spurs -> REPARTITION, iterate) - deterministic but a real algorithm change; (c) fold anchor founding INTO the pre-road centre pass somehow (loses the 'only provinces the fill left empty' definition).",
+      "files": [
+        "src/world/hard_coded_world.cpp",
+        "src/world/road_generation.cpp",
+        "src/world/province.cpp"
+      ],
+      "resolution": "Ben, 2026-08-25: option (c) with the overturn - the partition runs before roads (ruling 2's binding half superseded), every province is given its settlement before the lattice is laid, and the settlement is the capture anchor. Work: BL-623 (provinces before roads) + BL-624 (razed settlement tier, closing the razed-anchor hole). v0.1.19 recuts after."
+    },
+    "NR-641": {
+      "id": "NR-641",
+      "title": "The default campaign world is now an ALL-TRACK lattice - every nation sits at the qualification floor at epoch 0",
+      "raised": "2026-08-25",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Agent W2G's report (BL-618): qualification spreads 0.05-0.60 only at epoch >= 1700; epoch_year 0 (the campaign default, an antiquity start) leaves every nation at the never-industrialised floor 0.05.",
+      "what": "The first-cut tier mapping (Road needs qualification >= 0.10, Highway >= 0.30, redundancy loops rationed by qualification/0.40) is era-coherent - highways are industrial - but its visible consequence is that the DEFAULT generated world promotes nothing past Track: a global logistics-cost change (Track x0.67 vs Road x0.50 vs Highway x0.40) and a different-looking map. Options: (a) accept - an antiquity world with only tracks is honest, and roads arrive as qualification rises in play (BL-616's education loop now matters); (b) rebase the thresholds on the era-relative qualification distribution rather than absolute values, so antiquity keeps its Roman-road-analogue backbone; (c) keep absolute thresholds but lower them. Differential harness rows Q1-Q4 prove the lever works either way.",
+      "files": [
+        "src/world/road_generation.cpp",
+        "docs/economy/LOGISTICS.md"
+      ],
+      "resolution": "Ben, 2026-08-25: era-relative thresholds - implemented same session as BL-621 (era-relative road gates); LOGISTICS.md updated, harness re-specified."
+    },
+    "NR-644": {
+      "id": "NR-644",
+      "title": "Stale tech-tree goldens (1720x1080, blessed 2026-08-15) fail every verify run on size alone - delete or deliberately re-admit",
+      "raised": "2026-08-25",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Tech tree restyle session (wide8 verdicts, GLOBAL_STYLE_SHEET.md) - first verify run after the restyle.",
+      "what": "scripts/verify/golden/tech_tree_{tabs,era1,antiquity}.png are 1720x1080 against the harness's fixed 1280x720, so every tech_tree_panel.lua run reports 3 golden FAILs regardless of content. They were blessed the same day the golden demotion ruling landed (NR-237: curated world-independent set only, currently the icon_silhouettes pair) and these frames carry shell/world content, so they sit outside the policy anyway. Recommend deleting the three; re-admitting the surface would be a deliberate copy-in after the restyle is eyeballed.",
+      "files": [
+        "scripts/verify/golden/tech_tree_tabs.png",
+        "scripts/verify/golden/tech_tree_era1.png",
+        "scripts/verify/golden/tech_tree_antiquity.png"
+      ],
+      "resolution": "Ben, 2026-08-25: delete the three stale goldens - done same session; re-admitting the surface stays a deliberate copy-in per the NR-237 curated-set policy."
+    },
+    "NR-647": {
+      "id": "NR-647",
+      "title": "Does the OPERATIONAL fog go too, or only the financial banding?",
+      "raised": "2026-08-26",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.",
+      "what": "'We don't need company information to be invisible' was said while retiring BL-262 (the banded standing read). BL-068's competitor-visibility rule in DISCOVERY.md is a separate and wider thing: a rival hover card shows type and owner only, no production rates, no stockpiles, and the doc's stated principle is that intelligence is earned by reasoning over public signals. Narrow reading: only the financial banding goes, operational internals stay private. Wide reading: the whole competitor fog goes. The narrow reading is the one this session wrote to, because the disclosure gate would be pointless under the wide one. DISCOVERY.md has NOT been edited pending the answer.",
+      "files": [
+        "docs/ui/DISCOVERY.md"
+      ],
+      "resolution": "Ben, 2026-08-26: 'Operational fog should persist.' The NARROW reading is confirmed - only the financial banding goes. DISCOVERY.md now carries both halves: filed financials are public wherever a firm files, and a new subsection states that production rates, stockpiles, recipes and workforce dials are untouched. The line written into the doc: an open book tells you what a firm earned, never how it operates."
+    },
+    "NR-649": {
+      "id": "NR-649",
+      "title": "The spawn shortlist does NOT solve the shallow-opening problem the corp-choice screen was built for",
+      "raised": "2026-08-26",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.",
+      "what": "BL-435's selection screen existed on a MEASURED finding: over 24 seeds the generator handed the player a pure-extraction corp on 13 of them, so the chain-depth ladder had no rung to stand on, and player_seed_sweep records it. Solvency was explicitly NOT the discriminator - all 24 seeds ended positive. The replacement (BL-630, spawn shortlist) gates on VIABILITY, and a shallow pure-extraction corp is usually perfectly viable, so it will clear the floor every time. Retiring the screen therefore restores the exact distribution the screen was built to fix, unless the shortlist takes a second, DEPTH criterion alongside the viability one. Not filed as a blocker because BL-630 is buildable either way; the criterion is Ben's call.",
+      "files": [
+        "docs/generation/CORPORATION_GENERATION.md",
+        "tools/verify/player_seed_sweep.cpp"
+      ],
+      "resolution": "Ben, 2026-08-26: 'The shortlist can be mostly random for now, targeted towards population centres and processing, rather than extraction.' So the depth concern IS addressed, but as a WEIGHTED DRAW rather than a second gate - a shallow corp stays drawable, just less often. Written into CORPORATION_GENERATION.md and into BL-630; player_seed_sweep reports the resulting distribution rather than asserting a target."
+    },
+    "NR-653": {
+      "id": "NR-653",
+      "title": "Sprint 20 is not open, and its inherited debts are unchanged by this design",
+      "raised": "2026-08-26",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 20 design session, 2026-08-26: the profitability ledger, the buyout, the spawn shortlist.",
+      "what": "Ben ruled this ledger a SIBLING of the spawn-viability pass rather than its carrier, so Sprint 20's theme is unchanged and the sprint is still uncut - the design-before-cut ordering NEXT_SESSION.md names. Carried forward untouched by this session and still owed: the two live clicks (dispatch form, Throughput lens container access - three sprints running), the v0.1.18 tag Ben left uncut, and the dispatch form's remaining UX fixes awaiting an A/backlog-or-B/build-now call. Note also that BL-630 (spawn shortlist) and the viability pass BOTH move the warm start's ordering, so whichever lands second inherits the other's golden re-bless - they should share one wave, not two.",
+      "files": [
+        "docs/development/NEXT_SESSION.md",
+        "docs/development/sprints.json"
+      ],
+      "resolution": "Ben, 2026-08-26: Sprint 20 opened same day with the ledger + viability theme, so the sibling framing became one sprint in two phases rather than two sprints. The inherited debts now have owners: the live clicks are BL-636 (live-click debt), the shared golden re-bless is written into the sprint notes, and the v0.1.18 tag stays Ben’s call."
+    },
+    "NR-655": {
+      "id": "NR-655",
+      "title": "A filed return CANNOT see subsidies or contract payouts - and the buyout would undervalue every firm that earns them",
+      "raised": "2026-08-26",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Sprint 20 wave 1, BL-626 (quarterly return): the agent found it and the main session confirmed it at app.cpp:1271/1281.",
+      "what": "MEASURED, not suspected. apply_budget runs at app.cpp:1271 and run_nation_step at :1281 - ten lines later. So a return files BEFORE national transfers and mercenary-contract payouts touch the balance, and corp_budget::subsidies is always 0 in a filed record. Two consequences. (1) The retain property R2 holds exactly only where nothing outside the money loop moves a balance; on a real campaign construction, hire, survey, convoy and nation payouts all do. (2) THE ONE THAT MATTERS: BL-628 prices a buyout off trailing_net, so a firm earning through mercenary contracts - which CONTRACTS.md calls THE income loop - reads as unprofitable on its own filed returns and would be systematically undervalued. THE FORK: (A) add an eighth field, 'other' = whole-tick balance delta minus money-loop net, filed after the tick's last mover, so the seven flows still explain net AND net+other telescopes exactly; the buyout prices off the sum. (B) keep it as built and document trailing_net as money-loop profit only, accepting the undervaluation. (C) file after everything and let net be the whole delta, losing the property that the seven flows explain it. RECOMMEND (A): one extra field, nothing hidden, everything telescopes, and it is the legible answer rather than the clever one. It needs a new item that BL-628 requires, and it changes what FINANCE.md says about where the return is filed - the doc's 'at the end of apply_budget' is my wording from earlier today and it is the part that is wrong.",
+      "files": [
+        "docs/economy/FINANCE.md",
+        "src/world/budget_system.cpp",
+        "src/core/app.cpp"
+      ],
+      "resolution": "Ben, 2026-08-26: option A. A return gains an eighth field, `other`, filed after the tick's last mover. Written into FINANCE.md section The eighth field; BL-653 owns the work."
+    },
+    "NR-658": {
+      "id": "NR-658",
+      "title": "build_harness.js is unusable from an agent Bash session - second independent report",
+      "raised": "2026-08-26",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 20 wave 1, BL-626.",
+      "what": "The committed harness build route dies with \"'cl' is not recognized\" when invoked from the Bash tool: its cmd /c spawn is mangled by Git Bash. The agent worked around it by generating an equivalent .bat over the same glob-derived 53-TU source set and running that. This is the same failure the io-headless-build-invocation note already records, now hit again by a fresh agent with no memory of it - which is the signal worth acting on. Not a code defect in the harnesses themselves, but every agent that needs to build one pays this tax and some will conclude the harness is broken rather than the invocation. Worth a small fix to build_harness.js or a documented Bash-safe entry point.",
+      "files": [
+        "tools/verify/",
+        "docs/development/DEVELOPMENT_PRACTICES.md"
+      ],
+      "resolution": "FIXED, 2026-08-26, in the wave-1 integration: tools/verify/build_harness.bat is a committed Bash-safe entry point. It establishes the MSVC environment ONCE in its own shell before node runs, so the inner spawn inherits a PATH that already has cl on it instead of building one across a mangled quoting boundary. Arguments, output location and exit code are build_harness.js’s own - the wrapper adds nothing but the environment. Verified by building five harnesses through it. Three sessions hit this and each rediscovered the same workaround, which is what made it worth a committed fix rather than a fourth note."
+    },
+    "NR-664": {
+      "id": "NR-664",
+      "title": "A new verify script (corp_disclosure.lua) is written but unregistered - registration needs Ben",
+      "raised": "2026-08-26",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Sprint 20 wave 2, BL-633.",
+      "what": "The agent authored scripts/verify/corp_disclosure.lua - an acceptance script that injects a real press through ImGui's own event queue and hit-test via verify.click (BL-521), so a control rendering past the panel's edge FAILS there rather than passing on a screenshot. It correctly did not name it in verifier-visual's SKILL.md, because 'tool creation is skill creation' and registering a check needs Ben's permission. The script works (it selected Faros-YelenKalen International by clicking a row). Ben's call: register it as a named check, or leave it as an ad-hoc script. Recommend registering - an injected press is materially stronger than a capture, and it is the closest thing we have to the live click that keeps slipping.",
+      "files": [
+        "scripts/verify/corp_disclosure.lua",
+        ".claude/skills/verifier-visual/SKILL.md"
+      ],
+      "resolution": "Ben, 2026-08-26: REGISTER. corp_disclosure.lua is now a named check in verifier-visual's SKILL.md, with its strengths and its one honest limit recorded - it injects a real press, and it still is not a live click."
+    },
+    "NR-666": {
+      "id": "NR-666",
+      "title": "The INDUSTRIAL epoch now yields FEWER public firms than antiquity - measured, and it reads backwards",
+      "raised": "2026-08-26",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Sprint 20 wave 2, BL-638's R2 sweep, 8 seeds at each epoch.",
+      "what": "0 CE: public 20 of 64 corps (31.2%), floor met in 8 of 8 worlds. 1960: public 14 of 64 (21.9%), floor met in 5 of 8, three worlds standing floor-unmet. So the ANTIQUITY default now produces MORE publicly-held firms than the industrial arc, which is the opposite of what the history it models would suggest. The mechanism is legible and may be entirely fine: a 1960 world carries more regions (1550 vs 1298), the charter diffuses from a single cradle, so a bigger world dilutes its reach. But it means three modern worlds in eight have nothing to file and nothing to buy - the exact condition BL-638 was written to remove, now relocated to the other end of the timeline. TWO READINGS, and it is Ben's call which: (a) correct as-is - an unmet floor honestly stands, and a world where corporate personhood never spread is a legitimate world; (b) the reach radius should scale with the world's size or era rather than being fixed, so diffusion keeps pace with the ground it has to cover. Related dial: the agent measured that the CULTURAL carrier does most of the work (328 lived regions against 95 copied) because conquest_cost_q keeps the geometric radius near its floor - so if the map's shape should matter more than its peoples, that scaling is where to reach.",
+      "files": [
+        "src/world/settlement.cpp",
+        "docs/generation/CORPORATION_GENERATION.md"
+      ],
+      "resolution": "Ben, 2026-08-26: CORRECT AS-IS - an unmet floor honestly stands. A later epoch may yield fewer public firms than an earlier one; the dilution is legible and the result is a legitimate world. Written into CORPORATION_GENERATION.md with an explicit instruction NOT to add a size or era term to the radius to make the curve match intuition."
+    },
+    "NR-668": {
+      "id": "NR-668",
+      "title": "NR-655's exposure is now MEASURED: the buyout undervalues a contract-earning firm by 640 credits",
+      "raised": "2026-08-26",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Sprint 20 wave 2, BL-628: the harness was briefed to state the exposure rather than hide it, and it quantified it instead.",
+      "what": "NR-655 raised this as a risk; BL-628's harness turned it into a number. Two fixtures, identical except that one earns through a mercenary contract: both file a trailing_net of 10.00, because the payout arrives in run_nation_step AFTER apply_budget has filed. Loop-only firm prices at 460.00; the contract earner at 1100.00 (its balance carries the cash). Had the return SEEN the payout, trailing_net would be 90.00 and the price 1740.00. MEASURED UNDERVALUATION: 640.00 credits, exactly k(8.0) x the 80.00/quarter the record cannot see. The harness asserts that the two firms' filed trailing_nets are IDENTICAL - i.e. it pins the blindness as a known property rather than letting a future fixture hide it. This makes NR-655's fork concrete: option A (an eighth `other` field filed after the tick's last mover) closes exactly this 640. Ben's call, and BL-628 is built and correct WITHOUT it - the price is what the doc specifies; the doc's input is what is short.",
+      "files": [
+        "docs/economy/FINANCE.md",
+        "src/world/corp_command.cpp",
+        "src/world/budget_system.cpp"
+      ],
+      "resolution": "Ben, 2026-08-26: closed by the same ruling as NR-655 - the eighth field closes exactly this 640 credits. BL-653. Its harness row pinning the blindness is to be INVERTED to pin the closure, not deleted."
+    },
+    "NR-670": {
+      "id": "NR-670",
+      "title": "Should a rival ever be able to buy the PLAYER out?",
+      "raised": "2026-08-26",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Sprint 20 wave 2, BL-628: gated at the seam and flagged rather than assumed.",
+      "what": "FINANCE.md's ownership-class rules are silent on the player's own corporation. Read literally, a public player corp could be bought and ERASED, leaving world::player_entity dangling. BL-628 refuses it - gated at the command seam rather than in corp_ai.cpp, because a scorer-side guard would not bind a wire caller, which is the right place for it either way. But the underlying question is Ben's and it is not small: every widening in the standing rules concerns what may be done TO a corp a human owns, and being bought out is the furthest possible version of that. If the answer is ever yes, player_entity needs a rule of its own (does the player follow the assets? get a game-over? re-seat?). Recorded in FINANCE.md as a live question rather than left as a default fallen into. Note the spectator precedent: under corp_ai_params::spectating the prohibition has no subject, so a buy-the-player gate arguably should not apply there either.",
+      "files": [
+        "docs/economy/FINANCE.md",
+        ".claude/rules/io-standing-rules.md",
+        "src/world/corp_command.cpp"
+      ],
+      "resolution": "Ben, 2026-08-26: NEVER. The player's corporation is not buyable. Written into FINANCE.md as settled, with the reason: every other widening makes the world act ON the player, and erasing the seat is the one move that ends the conversation instead of continuing it. player_entity needs no rule of its own, since it cannot be left dangling by a verb that cannot fire."
+    },
+    "NR-675": {
+      "id": "NR-675",
+      "title": "refined_copper is UNTAGGED in recipes.lua - a copper smelter runs at 0 CE while every sibling is industrial",
+      "raised": "2026-08-26",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Sprint 21 wave 0, BL-649's census: measured, not inferred - 8,940 units produced at 0 CE on seed 0.",
+      "what": "scripts/recipes.lua's refined_copper recipe (~line 154) carries no `era =` field, so it defaults to `any` and is allowed in the ancient band. Every sibling refining recipe is tagged `industrial`. The census measures the consequence rather than guessing at it: 8,940 units of refined_copper produced at 0 CE, chain depth 1, and background_demand pays for it - which makes it one of the very few ancient chains with a live buyer, for what looks like an oversight. TWO READINGS and it is Ben's call: (a) it IS an oversight, tag it `industrial`, and the ancient band loses a chain it should not have had; (b) it is correct - copper smelting is genuinely ancient technology, unlike the rest of that group, and the tag was omitted on purpose. Reading (b) is historically defensible, which is exactly why it should not be decided by whoever notices it next. Nobody has touched the line.",
+      "files": [
+        "scripts/recipes.lua",
+        "docs/economy/PRODUCTION.md"
+      ],
+      "resolution": "Ben, 2026-08-26: OVERSIGHT - tagged `industrial`. MEASURED THROUGH THE NEW CENSUS, which is its first real use: total ancient market demand 2850.2 -> 2617.3 (-8.2%), and copper_ore JOINS THE DEAD EXTRACTABLE LIST (17,686 units dug with no ancient buyer) because the smelter was its only in-band consumer. That consequence is correct and is now visible rather than latent. Also observed in the diff: the construction channel read 35.0 before and 0.0 after purely because nothing happened to be mid-build at the sample tick - transient by nature, which is exactly BL-642's premise."
+    },
+    "NR-676": {
+      "id": "NR-676",
+      "title": "The census invented vocabulary the tuning passes will cite - worth ratifying once",
+      "raised": "2026-08-26",
+      "kind": "novel-work",
+      "status": "resolved",
+      "source": "Sprint 21 wave 0, BL-649: the agent raised a mild novelty flag and it is the right call.",
+      "what": "MARKETS.md § Measuring it owns the task, so the work was not unowned - but the census had to coin terms no doc defines, and every Sprint 21 tuning pass will now quote them: the STRUCTURAL SINK vs OBSERVED DEMAND distinction (a good can have a sink authored and still have zero demand this tick), the REC/DEP producibility split, and the `px` priced-on-any-market axis. It also split economy_report::wants into construction vs processing, recovered from world state rather than stored, with the residual asserted non-negative. None of it is controversial and all of it is useful; it just should be ratified into MARKETS.md § Demand channels once rather than accreting as harness-local jargon three passes deep. Cheap to do, and the alternative is a report nobody outside this session can read.",
+      "files": [
+        "tools/verify/demand_census.cpp",
+        "docs/economy/MARKETS.md"
+      ],
+      "resolution": "Ben, 2026-08-26: RATIFY. The census's vocabulary is written into MARKETS.md section Measuring it as a table - structural sink vs observed demand, REC/DEP, px - with the distinction that does the work called out: a structural sink with ZERO observed demand is the signature of a dead chain, and invisible to any check looking at only one of them."
+    },
+    "NR-679": {
+      "id": "NR-679",
+      "title": "Banding the baskets HALVED the generated world - 584 buildings / 104 corps -> 261 / 64",
+      "raised": "2026-08-26",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 20 wave 4, BL-640: the agent found it, named it as its own, and flagged it before merge rather than after.",
+      "what": "Pass 6 generates background firms until a body's real production reaches ~90% of its real demand. That stop condition reads the same baskets BL-640 just banded - through `body_demand` in corporation_generation.cpp, which was NOT in the brief's file list and which the agent repointed for correctness. Before the band, Pass 6 was chasing demand for silicon, machinery, alloys and electronics that the ancient band STRUCTURALLY CANNOT PRODUCE, so it kept adding firms against a gap that could never close. The behaviour is now correct and the world is half the size: 584 buildings / 104 corps -> 261 / 64. THIS IS A LARGE GENERATED-WORLD CHANGE AND EVERY DOWNSTREAM MEASUREMENT MOVES WITH IT - market saturation, prices, spawn viability, the haulage baseline (already flagged as drifted in NR-674), and the spectator golden. Worth Ben's eye on the FEEL as much as the numbers: a world with 64 corps rather than 104 is a visibly different economy, and it is the honest one. The old count was inflated by chasing an unclosable target.",
+      "files": [
+        "src/world/corporation_generation.cpp",
+        "docs/generation/CORPORATION_GENERATION.md",
+        "docs/economy/MARKETS.md"
+      ],
+      "resolution": "Ben, 2026-08-26: KEEP THE FIX, retune density upward. BL-655 owns it, and carries the distinction that matters - raising Pass 6's target fraction reaches the old count by making the world OVERPRODUCE (gluts, floored prices), while raising the demand baskets reaches it by making the world CONSUME more (prices hold). Try the demand side first; record an oversupply as deliberate if it is taken."
+    },
+    "NR-681": {
+      "id": "NR-681",
+      "title": "NOVEL: a demand channel that consumes without pricing cannot bootstrap its own supply",
+      "raised": "2026-08-26",
+      "kind": "novel-work",
+      "status": "resolved",
+      "source": "Sprint 20 wave 4, BL-641: the agent raised the flag, and the property is now written into MARKETS.md as the register's third.",
+      "what": "The implementation was owned end to end by FINANCE.md and copied cleanly from run_unit_upkeep. What is novel is what turning it on MEASURED: operating firms 227 -> 19, because a pool draw for a good the band produces at 0.0 starves the drawer and never signals the market that would supply it. That is a CROSS-CHANNEL property no doc stated, and four unbuilt channels were designed the same way this morning. It is now property 3 of MARKETS.md section Demand channels, and BL-654 owns the question it raises. Worth Ben's eye on the meta-point as much as the mechanism: the item shipped INERT rather than shipping a collapse or quietly picking a smaller rate that would have hidden the same defect behind a slower decay - which is the difference between a measurement and a number that looks acceptable.",
+      "files": [
+        "docs/economy/MARKETS.md",
+        "src/world/economy_system.cpp"
+      ],
+      "resolution": "Ben, 2026-08-26: answered by the BL-654 ruling - a short pool BUYS, up to a reservation ceiling, and one rule covers every goods draw. The novel property stands as MARKETS.md's property 3 and now has its settled answer beneath it."
+    },
+    "NR-686": {
+      "id": "NR-686",
+      "title": "A Lua-only change does NOT reach the play build - the script copy is attached to the compile target",
+      "raised": "2026-08-26",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 20 wave 5: caught while handing Ben the Release build to judge BL-655 density.",
+      "what": "BL-655 changed scripts/economy.lua and no C++ at all. Both trees were rebuilt and both printed BUILD_OK - and BOTH SHIPPED THE OLD SCRIPTS. The CMake copy-scripts step is a side effect of building the ProjectIo target, so when nothing recompiles it does not fire, and build/scripts and build_rel/scripts keep whatever they had. Caught only because the handover was verified by grepping the OUTPUT tree for the new weights rather than trusting BUILD_OK. WHY IT MATTERS MORE THAN IT LOOKS: this session is a tuning sprint. Most of Sprint 21 is Lua - demand baskets, upkeep rates, price-band constants - so the class of change most likely to be evaluated is exactly the class that silently does not ship. Ben would have judged the old density and we would both have believed the number. A harness reading scripts/ directly is unaffected, which is why every measurement in this session was right while the playable build was wrong - the two paths disagree and nothing says so. FIX CANDIDATES: make the copy its own always-run target rather than a side effect of compiling; or have the app resolve scripts/ from the repo root in a dev build so there is one copy and it cannot go stale. The second removes the failure mode rather than making it fire more often.",
+      "files": [
+        "CMakeLists.txt",
+        "build_app.bat",
+        "src/core/app.cpp"
+      ],
+      "resolution": "FIXED 2026-08-26, the simple way on Ben call. copy_scripts is now an ALWAYS-RUN custom target that ProjectIo DEPENDS ON, not a POST_BUILD side effect firing only on relink. PROVEN rather than assumed: build_rel/scripts/economy.lua was deliberately overwritten with a stale marker and the tree rebuilt with ZERO C++ changes - the marker was gone and the real basket restored. The thorough fix (a dev build resolving scripts/ from the repo root, so there is only ever one copy) goes to Sprint 21 visibility pass, Ben call."
+    },
+    "NR-690": {
+      "id": "NR-690",
+      "title": "country_lens.lua verifies a lens that no longer exists - it now captures the plain canvas under the lens name",
+      "raised": "2026-08-27",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 22 (UI visibility) wave 0, the UI-element coverage scan.",
+      "what": "BL-601 retired the Country lens on 2026-08-24 and overlay_from_name deliberately maps \"country\"/\"faction\" to overlay_mode::none, with a comment saying a script naming it still captures the borders where they now live. That is true of the PICTURE and false of the CHECK. scripts/verify/country_lens.lua still opens with \"Visual verification for the Country lens (overlay_mode::country)\" and claims R1 (strip glyph = shield, tooltip \"Countries\") and R3 (identical territory tint to the prior Faction lens) - two claims about a lens that is gone. Its captures are named country_lens_full and country_lens_zoom. Six more scripts pass \"country\" as one leg of a sweep and so capture the plain canvas twice under two names: lens_modes, tile_texture, continents_terrain, pop_markers, stacked_tile_ring, landform_relief. Nothing fails, because nothing asserted. This is NR-663 family member five: a check whose green means less than it appears. THE CALL: retire country_lens.lua outright (the border band has its own check, border_band.lua, with 6 expects), or rewrite its header to say it captures always-on border chrome. Recommend retiring it - border_band.lua already covers the successor and asserts, which country_lens.lua never did.",
+      "files": [
+        "scripts/verify/country_lens.lua",
+        "src/core/verify_api.cpp",
+        "scripts/verify/lens_modes.lua",
+        "docs/ui/LENSES.md"
+      ],
+      "resolution": "FIXED 2026-08-28 (commit 45c975a9), on Ben's instruction to remove the path entirely. country_lens.lua is deleted, the \"country\"/\"faction\" alias is gone from overlay_from_name, and the duplicate country leg was stripped from seven other scripts — each already captured a plain view, so the leg was photographing the same picture twice under two names. The default view IS the country view."
+    },
+    "NR-691": {
+      "id": "NR-691",
+      "title": "The UI element catalogue is four weeks stale, and it is the spine Sprint 21 works off",
+      "raised": "2026-08-27",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 22 (UI visibility) wave 0, the UI-element coverage scan.",
+      "what": "docs/ui/ui_elements.json is dated 2026-07-31 and carries 95 elements. Measured against the code and the verify scripts today: THREE listed elements are retired in code - UI-031 Country lens and UI-035 Opportunity lens and UI-036 Production lens, all removed from overlay_mode by BL-601/BL-604 on 2026-08-24 - and FOURTEEN verify scripts drive a surface the catalogue does not list at all: battle_card, contracts_ledger, decision_feed, frame_budget_hud, mercenary_slice, strategy_readout, survey_dispatch, tech_tree_panel, throughput_lens, processing_management_ux, ui_shell_fixture, v009_batch, export_mockdata, pan_perf. The Throughput lens is the sharpest instance - it is a live overlay_mode value with its own verify script and its own LENSES.md section, and the catalogue has no row for it. THE CALL: whether refreshing the catalogue is wave 0.5 of this sprint or its own item. It matters because Ben framed the sprint as \"quite a few elements to change\" across several sessions, and every session will scope its work off this file.",
+      "files": [
+        "docs/ui/ui_elements.json",
+        "src/ui/ui_state.hpp",
+        "docs/ui/LENSES.md"
+      ],
+      "resolution": "FIXED 2026-08-28 (commit 8f584f87). ui_elements.json refreshed against the code: three retired elements removed (UI-031/035/036), sixteen surfaces added (UI-096..UI-111), two rows corrected that named the wrong rail slot. Ids are now stable-not-dense so a retirement leaves a gap rather than renumbering a file several sessions work off. Orphan checks fell 14 -> 3. UI-112 (Company lens) still owed — added to the code 2026-08-28 but not yet catalogued."
+    },
+    "NR-693": {
+      "id": "NR-693",
+      "title": "CONFIRMED and root-caused: six verify scripts die on one fixture assertion, taking 27 assertions and 10 chrome elements with them",
+      "raised": "2026-08-28",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 22 (UI visibility), the full --verify-all capture run of 2026-08-28.",
+      "what": "CONFIRMED 2026-08-28, and it is FIVE TIMES worse than filed. The solo run's traceback: `scripts/verify/lib.lua:168: the player has no unit on the surface (BL-331 seeds one)`, thrown from stage_ui_fixture.\n\nROOT CAUSE, and it is our own recent work: commit dab470dc, 2026-08-27, 'No standing army at spawn - seed_starting_force defaults false'. corporation_params::seed_starting_force went opt-in for a well-argued reason recorded in the header - under BL-454 standing-force upkeep a seeded unit costs 7.5 cr/qtr, measured at 16.5% of the seated corp's operating outgoings and 19-31% of its entire operating gap, 'for a regiment a brand-new charter never asked for and cannot use'. Nothing is wrong with that change. What is wrong is that stage_ui_fixture still ASSERTS the unit it no longer gets, and dies before its first capture.\n\nBLAST RADIUS - six scripts call stage_ui_fixture and ALL SIX produced zero captures in the 2026-08-28 run: shell_pass, ui_shell_fixture, border_band, lens_structure_pivot, selection_accordion, zoom_ladder. Between them they carry 27 of the suite's 66 verify.expect assertions - border_band 6, lens_structure_pivot 11, selection_accordion 6, ui_shell_fixture 4 - so FORTY PERCENT of everything this suite actually asserts has been dead since 2026-08-27 and nothing said a word. They are also the sole covering check for the Minimap, the Minimap title bar, the Profile tile, the corp emblem, the System menu, the Main menu, the National border band, Province render and selection, the Tile selection layout, and the zoom-ladder navigation model.\n\nWHY THE SILENCE - NR-694. The harness emitted the error every run; nothing carried it to a redirected stdout. The fixture's own message even cites BL-331, which has not been the seeding item since BL-476.\n\nTHE FIX IS A DESIGN FORK, NOT A TYPO - see NR-696, because what the fixture does about the missing unit changes what every one of these captures SHOWS.",
+      "files": [
+        "scripts/verify/lib.lua",
+        "src/world/corporation_generation.cpp",
+        "src/world/corporation_generation.hpp",
+        "scripts/verify/shell_pass.lua"
+      ],
+      "resolution": "FIXED 2026-08-28 (commit 7ebf8f48). shell_pass went from 0 captures to 30, unblocking all six fixture-backed scripts and the ~27 verify.expect assertions they carry. Root cause confirmed as filed: dab470dc made seed_starting_force default false and stage_ui_fixture still asserted the unit. Fixed per Ben's option C — the fixture raises its own force through the real verbs (build a muster base, wait for completion, hire onto it). THREE PASSES, because hire_unit has two funds gates returning the SAME string: credits (payer.balance) and goods (debit_hire_cost). Lending credits changed nothing; granting goods widened availability 3 -> 6 rows; flooring the loan finally cleared it, the base being pay-as-you-build so the balance is near zero by completion."
+    },
+    "NR-694": {
+      "id": "NR-694",
+      "title": "The verify harness emits nothing to a redirected stdout, so a failing script is indistinguishable from a pending one",
+      "raised": "2026-08-28",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 22 (UI visibility), diagnosing NR-693 during the 2026-08-28 capture run.",
+      "what": "`./build/ProjectIo.exe --verify-all scripts/verify 2>&1 | tail` produced a 9-byte output file across a 2-hour run - and those 9 bytes were an echoed timestamp, not harness output. verify_api.cpp logs progress through SDL_Log ('verify-all: %zu script(s) under %s', the per-capture golden PASS/FAIL lines), and none of it reached the redirect. THE COST IS NOT COSMETIC: it is the reason NR-693 had to be inferred from file-name arithmetic instead of read off a log, and it means a script erroring mid-run looks exactly like a script that has not been reached yet. It also means the ONLY way to watch a long suite is to poll the filesystem for new PNGs, which is what this session had to do. Worth deciding whether SDL_Log needs an explicit stdout/stderr sink under --verify, or whether the harness should print its own progress lines independently of SDL.",
+      "files": [
+        "src/core/verify_api.cpp",
+        "src/main.cpp",
+        ".claude/skills/verifier-visual/SKILL.md"
+      ],
+      "resolution": "FIXED 2026-08-28. src/main.cpp installs an SDL log sink (log_to_stderr) before anything can log, mirroring SDL's stream to stderr flushed per line, and keeping OutputDebugString on Windows so a debugger's view is unchanged. Unconditional rather than gated on --verify: gating would special-case the one mode that most needs a log. PROVED BY THE NEXT RUN, which is the point - a solo shell_pass went from 0 bytes of output to 622 bytes carrying the exact Lua error and stack traceback, and that traceback diagnosed NR-693 in a single run after two hours of inference had failed to."
+    },
+    "NR-696": {
+      "id": "NR-696",
+      "title": "How should the UI fixture get its unit now that a spawn has no standing army?",
+      "raised": "2026-08-28",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Sprint 22 (UI visibility), fixing NR-693. Raised rather than chosen, because each option changes what every fixture-backed capture shows.",
+      "what": "stage_ui_fixture needs a player unit for one specific purpose: it passes `units = { unit.id }` when ACCEPTING a mercenary contract offer, which is what puts content in the Contracts ledger for shell_pass and friends to capture. Since dab470dc a spawn has no unit and no military_base. hire_unit cannot rescue it directly - BL-325 S2 requires mustering onto the corp's own COMPLETED military_base, and the same disabled seeder is what used to build that base.\n\nA) FIXTURE SEEDS A FORCE. Expose seed_starting_military (currently file-local in an anonymous namespace) and add a verify.seed_player_force() binding beside the existing fixture affordances - inject_offer, set_balance, seed_convoy. Cheapest, reuses the tested placement logic, and determinism-safe because that function draws no randomness (the call site says so explicitly). COST: every fixture capture then shows a base and a regiment that a real 2026-08-27-onward spawn does NOT have, so the shell pass stops depicting the actual opening.\n\nB) FIXTURE DROPS THE MERCENARY STAGING when no unit exists, returns unit = nil, and the five scripts that only wanted a populated world carry on. Truest to the game as it now is. COST: the Contracts ledger captures go empty, and UI-101..104 lose the only content that makes them worth looking at.\n\nC) FIXTURE BUILDS A BASE AND HIRES through the real verbs - build (verb 0), econ_step until the base completes, then hire_unit (verb 8). Most faithful: the fixture reaches the state the way a player would, no fourth code path, and it exercises the muster gate as a side effect. COST: construction is durative, so it adds ticks to six scripts, and the fixture becomes sensitive to build times and the corp's cash.\n\nRECOMMENDATION: C if the added ticks are affordable, because it keeps the fixture honest about a state the player can actually reach and tests the muster path for free; A as the pragmatic fallback, with the divergence written into lib.lua so a reader of the captures knows the force is staged. B only if Ben wants the shell pass to depict the true bare opening and is content to lose the contract content.",
+      "files": [
+        "scripts/verify/lib.lua",
+        "src/core/verify_api.cpp",
+        "src/world/corporation_generation.hpp"
+      ],
+      "resolution": "SETTLED 2026-08-28: Ben chose option C — the fixture reaches the state through the real verbs rather than re-enabling the seeder behind the game's back. Two properties bought: the captures depict a world a player can actually reach, and the BL-325 muster gate is exercised on every fixture run. Implemented and verified (see NR-693). The credits loan is repaid exactly, so every other surface still depicts the true opening economy; the goods grant is a new test-only hook, verify.grant_stock."
     }
   }
 }

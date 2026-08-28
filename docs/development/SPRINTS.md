@@ -47,14 +47,16 @@ and/or a version goal (v0.1.1 etc.).
 
 **Sprint-number ceiling advanced to 21 (Ben, 2026-08-26: 'A, and open it as sprint 21').** The 2026-08-24 ceiling stands in spirit - author no sprint past the one Ben opens - with 21 now the horizon. Two sprints are open (20, 21), inside the three-sprint cap.
 
-**Sprint-number ceiling advanced to 22 (Ben, 2026-08-27).** The 2026-08-24 ceiling stands in spirit - author no sprint past the one Ben opens - with 22 now the horizon. Two sprints open (21 demand, 22 UI visibility), inside the three-sprint cap. Ben has named 23 for the new UI elements he will describe once Sprint 22's improvements land, so 23 is spoken for but NOT yet authored.
+**Sprint-number ceiling advanced to 22 (Ben, 2026-08-27, corrected 2026-08-28 00:16).** The 2026-08-24 ceiling stands in spirit - author no sprint past the one Ben opens - with 22 now the horizon. Two sprints open (21 demand, 22 UI visibility), inside the three-sprint cap. Ben has named 23 for the new UI elements he will describe once Sprint 22's improvements land, so 23 is spoken for but NOT yet authored.
 
-**A sprint was renumbered and un-renumbered on 2026-08-27; both moves are recorded because neither lost anything.** The demand sprint was moved 21 -> 22 to free the number for a UI visibility pass, then moved back when Ben clarified that 'sprint 21' means the demand sprint to him. What made the round trip safe is that the demand sprint had LANDED WAVE 0 and was therefore moved WHOLE both times, never deleted under the 2026-08-24 unstarted-plans rule. The lesson worth keeping: a number is cheap to move and expensive to be wrong about, so confirm which sprint a bare number refers to before renumbering anything - the pre-move records (the DEVLOG heading, the NEEDS_REVIEW sources, the `sprint-21-wave-0` requirements batch key) all said 21, and they were right.
+**A sprint was renumbered and un-renumbered across the 2026-08-27/28 midnight; both moves are recorded because neither lost anything.** The demand sprint was moved 21 -> 22 to free the number for a UI visibility pass, then moved back at 00:16 on 2026-08-28 when Ben clarified that 'sprint 21' means the demand sprint to him. What made the round trip safe is that the demand sprint had LANDED WAVE 0 and was therefore moved WHOLE both times, never deleted under the 2026-08-24 unstarted-plans rule. The lesson worth keeping: a number is cheap to move and expensive to be wrong about, so confirm which sprint a bare number refers to before renumbering anything - the pre-move records (the DEVLOG heading, the NEEDS_REVIEW sources, the `sprint-21-wave-0` requirements batch key) all said 21, and they were right.
+
+**The active-sprint cap is deliberately exceeded, as PROPOSED not open (Ben, 2026-08-28: "Let's make a sprint for each batch").** The 3-sprint cap counts sprints being worked; 23-27 are a decomposition of one agreed body of work, authored together so the batch boundaries are settled once rather than re-argued five times. Only one is worked at a time. If that reads as cap-breaking later, close them back down to a single sprint with a batch list — the content is the value, not the numbering.
 
 ## Open now
 
 ### Sprint 21 — The other half of the economy - demand
-*Open · opened 2026-08-26*
+*Paused · opened 2026-08-26*
 
 **Goal.** Author the demand side. The roster grew a supply chain and never grew the demand for it, so the ancient economy terminates in artisan goods nobody buys and most spawns are structurally unprofitable - not mistuned, unbought. Eight demand channels (MARKETS.md § Demand channels), of which the load-bearing ones scale with the economy rather than with an authored weight. Then MEASURE, and expect to go round more than once: Ben, 2026-08-26 - 'we will get interesting data and do a few passes over viability'. The felt goal: a world where the goods a player is meant to chase are wanted by somebody, and it is legible WHO.
 
@@ -71,19 +73,67 @@ and/or a version goal (v0.1.1 etc.).
 - BL-645 (research consumes goods) - GATED on BL-619, which is a design session with Ben, not a build slice
 - VIABILITY PASSES - after each wave: census, measure spawn viability, retune, repeat. The passes are the sprint, not an epilogue
 
-Opened on Ben's instruction, 2026-08-26 ('A, and open it as sprint 21'), after the session's own measurement answered his question: the ancient band has TWO live demand sinks, and ten goods pass the orphan check by naming a 'mercantile demand' that grep says was never built (NR-671). Ceiling advanced to 21 on the same instruction. ORDERING IS LOAD-BEARING: BL-648 and BL-649 go FIRST, not last. The guard makes the gap visible and the census makes each pass measurable - without them a viability pass is a guess with a number attached. A red guard with a named list is worth more than a green one that means nothing; do not weaken it to pass while the channels are being built. SEVERAL CHANNELS ARE DESIGNED-BUT-INERT rather than missing, which is why the sprint is cheaper than it looks: `strategic_reserve` is already a goods-buying budget line no consumer claims on; `logistics_maintenance` already names network upkeep; recipes already carry the era field the demand baskets need; and `run_unit_upkeep` is already the credits-plus-goods shape BL-641 wants for buildings. RELATIONSHIP TO SPRINT 20: Sprint 20 stays open and owns the ledger, the buyout and the spawn shortlist. Its BL-634 (acquisition viability) CANNOT honestly pass until this sprint lands - a corp at -28/qtr never saves up for anything - so BL-634's measurement is the natural close-out for BOTH sprints. BL-630's shortlist gains a real mechanism to gate on once demand exists: BL-635 measured that a spawn's survival currently depends on whether the generator handed it a resource anyone wants.
+PAUSED 2026-08-28 on Ben's instruction, wave 0 complete (BL-648 guard, BL-649 census). Nothing is abandoned: the guard is deliberately red, the census is the before/after instrument, and wave 1 resumes where it stopped. Opened on Ben's instruction, 2026-08-26 ('A, and open it as sprint 21'), after the session's own measurement answered his question: the ancient band has TWO live demand sinks, and ten goods pass the orphan check by naming a 'mercantile demand' that grep says was never built (NR-671). Ceiling advanced to 21 on the same instruction. ORDERING IS LOAD-BEARING: BL-648 and BL-649 go FIRST, not last. The guard makes the gap visible and the census makes each pass measurable - without them a viability pass is a guess with a number attached. A red guard with a named list is worth more than a green one that means nothing; do not weaken it to pass while the channels are being built. SEVERAL CHANNELS ARE DESIGNED-BUT-INERT rather than missing, which is why the sprint is cheaper than it looks: `strategic_reserve` is already a goods-buying budget line no consumer claims on; `logistics_maintenance` already names network upkeep; recipes already carry the era field the demand baskets need; and `run_unit_upkeep` is already the credits-plus-goods shape BL-641 wants for buildings. RELATIONSHIP TO SPRINT 20: Sprint 20 stays open and owns the ledger, the buyout and the spawn shortlist. Its BL-634 (acquisition viability) CANNOT honestly pass until this sprint lands - a corp at -28/qtr never saves up for anything - so BL-634's measurement is the natural close-out for BOTH sprints. BL-630's shortlist gains a real mechanism to gate on once demand exists: BL-635 measured that a spawn's survival currently depends on whether the generator handed it a resource anyone wants.
 
-### Sprint 22 — UI visibility pass
-*Open · opened 2026-08-27*
+### Sprint 23 — UI visibility - batch 2: selection & hover
+*Proposed · opened 2026-08-28*
 
-**Goal.** Sweep the built UI for visibility - what the simulation knows that the screen does not say. The catalogue in docs/ui/ui_elements.json (95 elements) is the spine, not a feature list, and Ben expects MANY elements to change: 'there are quite a few elements to change, so we will be using multiple sessions' (2026-08-27). Wave 0 is the SCAN - which elements carry a visual check and which carry a committed golden - so that a session changing an element already knows what re-verification it owes and what will silently pass. The felt goal: a player can see the state the model is already tracking, without opening a ledger to find it.
+**Goal.** Review the Selection band, the hover card and the click model against live captures, and act on the calls. Ben opens a coding session on selection specifically (2026-08-28) - this sprint is where its outcome lands. Carries the two half-built region selections out of batch 1: a plate has no Selection-band content at all (NR-697), and the deposit pivot cannot be proven from a script while tile data stays hidden from Lua (NR-698).
 
 **Planned.**
-- WAVE 0 - the coverage scan: per UI element, which scripts/verify/*.lua check covers it and whether a golden exists. Run first; every later wave is scoped off it
-- WAVES 1..N - the element changes themselves, carved from the scan and from Ben's pass over it. NOT YET AUTHORED - this sprint is deliberately opened with its worklist empty (2026-08-27)
-- CARRIED, pending Ben's call: NR-663's family (four checks whose green means less than it appears), BL-639 (panel columns), NR-686 thorough fix (a dev build resolving scripts/ from the repo root). These were labelled a 'visibility pass' on 2026-08-26 while that phrase still pointed at the demand sprint, and they are VERIFICATION visibility rather than UI visibility - see notes
+- NR-697 (a plate selection shows a stale entity)
+- NR-698 (deposit pivot unverifiable from a script - a narrow query, or a live-click-only requirement)
+- BL-659 (deposit -> Market ledger, Prices) - wired, unverified
+- BL-660 (plate -> tectonic History section) - needs a divergent classification in continent_state first
+- UI-043..UI-050, UI-110 in the catalogue
 
-NUMBERED 22, NOT 21 (Ben, 2026-08-27). It opened as 21 on a misreading: the demand sprint was moved to 22 to free the number, and Ben then clarified that when he says 'sprint 21' he means the DEMAND sprint. Both moves were reverted the same day - demand is 21 again, this sprint is 22, and the new UI elements Ben will describe become 23. Nothing of either sprint's plan or landed work changed in either direction. Opened on Ben's instruction, 2026-08-27: 'Let's open sprint 21. We're going to do a visibility pass on the UI, there are quite a few elements to change, so we will be using multiple sessions. First off, do a scan for goldens on each UI element.' MULTI-SESSION BY DESIGN, which is why the scan is wave 0 and not an epilogue: several sessions need one shared, queryable answer to 'what does changing this element cost me in re-verification', and the alternative is each session rediscovering it. THE WORD 'VISIBILITY' NOW CARRIES TWO SENSES AND THEY ARE NOT THE SAME WORK - (a) UI visibility, this sprint: the screen does not say what the model knows; (b) verification visibility, the 2026-08-26 steer: a check whose green means less than it appears (NR-663 family, NR-686, BL-639). Sense (b) was attached to the number 21 while 21 was the demand sprint. It is parked in `planned` above rather than silently assigned, because which sprint owns it is Ben's call, not an inference.
+One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's instruction: "Let's make a sprint for each batch." The decomposition is by ELEMENT CLASS from docs/ui/ui_elements.json, because that is the spine the coverage tool already reports against - `node tools/session/ui_coverage.js --captures --since N` groups a run by element, so a batch's review list is a command rather than a judgement. Batch 1 (lenses) is sprint 22, closed. METHOD, proven in batch 1: capture the whole class first, send it to Ben in one go, take his calls, build, re-capture, and expect the re-capture to find something the code read did not.
+
+### Sprint 24 — UI visibility - batch 3: ledgers
+*Proposed · opened 2026-08-28*
+
+**Goal.** Review every nav-rail ledger against live captures - Balance, Market, Construction, Corporation, Contracts, History, Generation, AI decisions, Strategy, Research. Ten of the thirteen rail slots, and the surfaces every lens is a prelude TO (Ben, 2026-08-28: "the lens is a visual prelude to whatever we design on ledgers using various charts and tables").
+
+**Planned.**
+- BL-662 (Scarcity re-cut to tint markets, wired to a new Market-ledger sub-view)
+- BL-639 (panel columns), if Ben assigns it here
+- UI-070..UI-090, UI-100..UI-108 in the catalogue
+- The three rail slots hosting a stand-in under another surface's label: 3 Workforce, 7 Corp. Strategy, 8 Diplomacy
+
+One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's instruction: "Let's make a sprint for each batch." The decomposition is by ELEMENT CLASS from docs/ui/ui_elements.json, because that is the spine the coverage tool already reports against - `node tools/session/ui_coverage.js --captures --since N` groups a run by element, so a batch's review list is a command rather than a judgement. Batch 1 (lenses) is sprint 22, closed. METHOD, proven in batch 1: capture the whole class first, send it to Ben in one go, take his calls, build, re-capture, and expect the re-capture to find something the code read did not.
+
+### Sprint 25 — UI visibility - batch 4: shell chrome
+*Proposed · opened 2026-08-28*
+
+**Goal.** Review the persistent chrome - header, profile tile, nav rail, time panel, comms dock, minimap and the system/options menus. Everything on screen at all times, and therefore everything whose cost is paid on every frame the player looks at.
+
+**Planned.**
+- UI-025..UI-028, UI-051..UI-069, UI-099 in the catalogue
+- Observations already banked from batch 1: the minimap is near-empty at Planetary zoom; the Comms dock carries one line in a full column; the header shows NET +-0/qtr with no Runway readout (UI-055, NONE coverage); the nav rail glyphs read alike at rail size
+
+One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's instruction: "Let's make a sprint for each batch." The decomposition is by ELEMENT CLASS from docs/ui/ui_elements.json, because that is the spine the coverage tool already reports against - `node tools/session/ui_coverage.js --captures --since N` groups a run by element, so a batch's review list is a command rather than a judgement. Batch 1 (lenses) is sprint 22, closed. METHOD, proven in batch 1: capture the whole class first, send it to Ben in one go, take his calls, build, re-capture, and expect the re-capture to find something the code read did not.
+
+### Sprint 26 — UI visibility - batch 5: canvases & the zoom ladder
+*Proposed · opened 2026-08-28*
+
+**Goal.** Review the three canvases and the ladder between them - Solar, Circumplanetary, Planetary - plus the render layers that sit on them (tiles, terrain, roads, settlements, fog, borders, provinces) and the keyboard navigation model.
+
+**Planned.**
+- UI-001..UI-024, UI-094..UI-097 in the catalogue
+- The body-to-body lenses deferred from batch 1 (Supply, Supply-routes, Reach) - Ben, 2026-08-28: "I don't think we need body-to-body lenses yet. Keep the code but ignore for this session." They are canvas-grain, so they belong here
+
+One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's instruction: "Let's make a sprint for each batch." The decomposition is by ELEMENT CLASS from docs/ui/ui_elements.json, because that is the spine the coverage tool already reports against - `node tools/session/ui_coverage.js --captures --since N` groups a run by element, so a batch's review list is a command rather than a judgement. Batch 1 (lenses) is sprint 22, closed. METHOD, proven in batch 1: capture the whole class first, send it to Ben in one go, take his calls, build, re-capture, and expect the re-capture to find something the code read did not.
+
+### Sprint 27 — UI visibility - batch 6: startup & the wizard
+*Proposed · opened 2026-08-28*
+
+**Goal.** Review the path in - main menu, the New World wizard and its three rounds - the only surfaces a player meets before the game exists, and the only ones with no world behind them to make them look busy.
+
+**Planned.**
+- UI-091..UI-093 in the catalogue
+- STARTUP.md owns the flow
+
+One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's instruction: "Let's make a sprint for each batch." The decomposition is by ELEMENT CLASS from docs/ui/ui_elements.json, because that is the spine the coverage tool already reports against - `node tools/session/ui_coverage.js --captures --since N` groups a run by element, so a batch's review list is a command rather than a judgement. Batch 1 (lenses) is sprint 22, closed. METHOD, proven in batch 1: capture the whole class first, send it to Ben in one go, take his calls, build, re-capture, and expect the re-capture to find something the code read did not.
 
 ## Where things stand
 
@@ -122,11 +172,16 @@ NUMBERED 22, NOT 21 (Ben, 2026-08-27). It opened as 21 on a misreading: the dema
 | 26 | Re-baseline (the gate; nothing else may open first) | Subsumed — split at execution into 26a/26b, themselves deleted in the 2026-08-24 purge |
 | 19 | The world reads lived-in - population foundations | Closed 2026-08-25 - thirteen of fourteen items landed (BL-610..BL-618, BL-620, BL-621, BL-623, BL-624); v0.1.19 recut after the NR-640 verdict wave |
 | 20 | The books open, and the start earns its way | Closed 2026-08-26 - GOAL MET AND PROVED. Fifteen items landed; BL-634 measured Ben's own criterion and it holds. Cuts v0.1.21. |
-| 21 | The other half of the economy - demand | Opened 2026-08-26 - every good gets a buyer that is a mechanism, then viability is measured over repeated passes |
-| 22 | UI visibility pass | Opened 2026-08-27 as Sprint 21, renumbered to 22 the same day - scan coverage first, then change elements across several sessions |
+| 22 | UI visibility - batch 1: lenses | Closed 2026-08-28 - the lens batch reviewed and reworked; the remaining element classes become their own sprints (23-27) |
+| 21 | The other half of the economy - demand | PAUSED 2026-08-28 with wave 0 landed - the UI batches take priority; resume at wave 1 (BL-640/641/642) |
+| 23 | UI visibility - batch 2: selection & hover | Proposed 2026-08-28 - one of the six UI review batches |
+| 24 | UI visibility - batch 3: ledgers | Proposed 2026-08-28 - one of the six UI review batches |
+| 25 | UI visibility - batch 4: shell chrome | Proposed 2026-08-28 - one of the six UI review batches |
+| 26 | UI visibility - batch 5: canvases & the zoom ladder | Proposed 2026-08-28 - one of the six UI review batches |
+| 27 | UI visibility - batch 6: startup & the wizard | Proposed 2026-08-28 - one of the six UI review batches |
 
-**Next up.** TWO sprints open. Sprint 21 (demand) has wave 0 landed: BL-648's guard is RED on eleven goods by design and turns green as channels land, BL-649's census is the before/after instrument. BL-654 (a short pool buys up to a reservation ceiling) gates BL-641's rates going non-zero and should land early. Sprint 22 (UI visibility) has its wave 0 landed too - the coverage scan, `tools/session/ui_coverage.js`, and a catalogue refreshed against the code - and continues with a full capture run for Ben to hand-pick surfaces needing improvement. Sprint 23 is NAMED but unauthored: the new UI elements, which Ben will describe once Sprint 22's improvements land. The candidate pool is the 2026-08-27 sweep of live model state with no surface - the order book, stance/sentiment, nation_budget, law, procurement, tariff - plus the three nav-rail slots already labelled for surfaces that do not exist (3 Workforce, 7 Corp. Strategy, 8 Diplomacy). Sprint 20's slipped items carry forward; three are design-owed on Ben. UNRESOLVED: NR-663's family, BL-639 and NR-686 - verification visibility, which sprint owns them is Ben's call (NR-692).
+**Next up.** Sprint 22 (UI visibility, batch 1: lenses) CLOSED 2026-08-28. Sprint 21 (demand) is PAUSED with wave 0 landed. Next is sprint 23 (selection & hover), which Ben opens as a dedicated coding session - the two half-built region selections from batch 1 are its first work (NR-697, NR-698), and BL-659/BL-660 carry into it. Five items carry out of batch 1 with Ben's decisions already recorded: BL-659 deposit->Market Prices, BL-660 plate->a new tectonic History section (needs a divergent classification in continent_state, which does not exist - only `convergent` is computed), BL-661 population heatmap at scaling 2, BL-662 Scarcity re-cut keeping its name and taking the Opportunity glyph, BL-663 Company glyph as a cluster of small forms.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*33 sprints archived cold; 2 open/gated in the hot store.*
+*34 sprints archived cold; 6 open/gated in the hot store.*

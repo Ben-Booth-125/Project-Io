@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*105 entries — 77 open, 28 resolved.*
+*107 entries — 75 open, 32 resolved.*
 
 ---
 
@@ -641,41 +641,12 @@ FINANCE.md section The eighth field says trailing_net is the mean of `net + othe
 
 *Files: `docs/economy/FINANCE.md`, `docs/development/DELIVERY.md`*
 
-### NR-690 — country_lens.lua verifies a lens that no longer exists - it now captures the plain canvas under the lens name
-*observation · raised 2026-08-27 · from Sprint 22 (UI visibility) wave 0, the UI-element coverage scan.*
-
-BL-601 retired the Country lens on 2026-08-24 and overlay_from_name deliberately maps "country"/"faction" to overlay_mode::none, with a comment saying a script naming it still captures the borders where they now live. That is true of the PICTURE and false of the CHECK. scripts/verify/country_lens.lua still opens with "Visual verification for the Country lens (overlay_mode::country)" and claims R1 (strip glyph = shield, tooltip "Countries") and R3 (identical territory tint to the prior Faction lens) - two claims about a lens that is gone. Its captures are named country_lens_full and country_lens_zoom. Six more scripts pass "country" as one leg of a sweep and so capture the plain canvas twice under two names: lens_modes, tile_texture, continents_terrain, pop_markers, stacked_tile_ring, landform_relief. Nothing fails, because nothing asserted. This is NR-663 family member five: a check whose green means less than it appears. THE CALL: retire country_lens.lua outright (the border band has its own check, border_band.lua, with 6 expects), or rewrite its header to say it captures always-on border chrome. Recommend retiring it - border_band.lua already covers the successor and asserts, which country_lens.lua never did.
-
-*Files: `scripts/verify/country_lens.lua`, `src/core/verify_api.cpp`, `scripts/verify/lens_modes.lua`, `docs/ui/LENSES.md`*
-
-### NR-691 — The UI element catalogue is four weeks stale, and it is the spine Sprint 21 works off
-*observation · raised 2026-08-27 · from Sprint 22 (UI visibility) wave 0, the UI-element coverage scan.*
-
-docs/ui/ui_elements.json is dated 2026-07-31 and carries 95 elements. Measured against the code and the verify scripts today: THREE listed elements are retired in code - UI-031 Country lens and UI-035 Opportunity lens and UI-036 Production lens, all removed from overlay_mode by BL-601/BL-604 on 2026-08-24 - and FOURTEEN verify scripts drive a surface the catalogue does not list at all: battle_card, contracts_ledger, decision_feed, frame_budget_hud, mercenary_slice, strategy_readout, survey_dispatch, tech_tree_panel, throughput_lens, processing_management_ux, ui_shell_fixture, v009_batch, export_mockdata, pan_perf. The Throughput lens is the sharpest instance - it is a live overlay_mode value with its own verify script and its own LENSES.md section, and the catalogue has no row for it. THE CALL: whether refreshing the catalogue is wave 0.5 of this sprint or its own item. It matters because Ben framed the sprint as "quite a few elements to change" across several sessions, and every session will scope its work off this file.
-
-*Files: `docs/ui/ui_elements.json`, `src/ui/ui_state.hpp`, `docs/ui/LENSES.md`*
-
 ### NR-692 — Two senses of "visibility" - which sprint owns the verification family
 *question · raised 2026-08-27 · from Sprint 21 opened 2026-08-27; the phrase was already attached to the demand sprint on 2026-08-26.*
 
 On 2026-08-26 Ben steered that "Sprint 21 is a VISIBILITY pass" and three things were parked against it: NR-663 family (four checks whose green means less than it appears), BL-639 (panel columns), and NR-686 thorough fix (a dev build resolving scripts/ from the repo root). At that moment 21 was the DEMAND sprint. On 2026-08-27 a UI visibility pass opened as Sprint 22 (briefly numbered 21, corrected the same day). The two senses are not the same work: (a) UI visibility - the screen does not say what the model knows; (b) verification visibility - a check that passes without checking. THE CALL: does the verification family follow the NUMBER (into UI visibility, sprint 22) or the THEME it was steered onto (demand, sprint 21), or become its own item? Parked in sprint 22 planned rather than assigned, because inferring it would be a guess. Note the two senses did just meet in practice: NR-690 is a fifth member of the verification family, found by the UI scan.
 
 *Files: `docs/development/sprints.json`*
-
-### NR-693 — CONFIRMED and root-caused: six verify scripts die on one fixture assertion, taking 27 assertions and 10 chrome elements with them
-*observation · raised 2026-08-28 · from Sprint 22 (UI visibility), the full --verify-all capture run of 2026-08-28.*
-
-CONFIRMED 2026-08-28, and it is FIVE TIMES worse than filed. The solo run's traceback: `scripts/verify/lib.lua:168: the player has no unit on the surface (BL-331 seeds one)`, thrown from stage_ui_fixture.
-
-ROOT CAUSE, and it is our own recent work: commit dab470dc, 2026-08-27, 'No standing army at spawn - seed_starting_force defaults false'. corporation_params::seed_starting_force went opt-in for a well-argued reason recorded in the header - under BL-454 standing-force upkeep a seeded unit costs 7.5 cr/qtr, measured at 16.5% of the seated corp's operating outgoings and 19-31% of its entire operating gap, 'for a regiment a brand-new charter never asked for and cannot use'. Nothing is wrong with that change. What is wrong is that stage_ui_fixture still ASSERTS the unit it no longer gets, and dies before its first capture.
-
-BLAST RADIUS - six scripts call stage_ui_fixture and ALL SIX produced zero captures in the 2026-08-28 run: shell_pass, ui_shell_fixture, border_band, lens_structure_pivot, selection_accordion, zoom_ladder. Between them they carry 27 of the suite's 66 verify.expect assertions - border_band 6, lens_structure_pivot 11, selection_accordion 6, ui_shell_fixture 4 - so FORTY PERCENT of everything this suite actually asserts has been dead since 2026-08-27 and nothing said a word. They are also the sole covering check for the Minimap, the Minimap title bar, the Profile tile, the corp emblem, the System menu, the Main menu, the National border band, Province render and selection, the Tile selection layout, and the zoom-ladder navigation model.
-
-WHY THE SILENCE - NR-694. The harness emitted the error every run; nothing carried it to a redirected stdout. The fixture's own message even cites BL-331, which has not been the seeding item since BL-476.
-
-THE FIX IS A DESIGN FORK, NOT A TYPO - see NR-696, because what the fixture does about the missing unit changes what every one of these captures SHOWS.
-
-*Files: `scripts/verify/lib.lua`, `src/world/corporation_generation.cpp`, `src/world/corporation_generation.hpp`, `scripts/verify/shell_pass.lua`*
 
 ### NR-695 — overflow_tile_v2 hung the suite - CPU burning, memory collapsed, nine scripts starved
 *question · raised 2026-08-28 · from Sprint 22 (UI visibility), the 2026-08-28 capture run.*
@@ -684,20 +655,23 @@ text_overflow_floor.lua sweeps every fold-out ledger by sub-view. Its `tile` pan
 
 *Files: `scripts/verify/text_overflow_floor.lua`, `src/ui/tile_inspector.cpp`, `src/ui/text_fit.cpp`, `scripts/verify/parked/README.md`*
 
-### NR-696 — How should the UI fixture get its unit now that a spawn has no standing army?
-*question · raised 2026-08-28 · from Sprint 22 (UI visibility), fixing NR-693. Raised rather than chosen, because each option changes what every fixture-backed capture shows.*
+### NR-697 — A plate selection leaves the Selection band showing a stale entity
+*observation · raised 2026-08-28 · from Sprint 22 (UI visibility), verifying the BL-660 plate pivot.*
 
-stage_ui_fixture needs a player unit for one specific purpose: it passes `units = { unit.id }` when ACCEPTING a mercenary contract offer, which is what puts content in the Contracts ledger for shell_pass and friends to capture. Since dab470dc a spawn has no unit and no military_base. hire_unit cannot rescue it directly - BL-325 S2 requires mustering onto the corp's own COMPLETED military_base, and the same disabled seeder is what used to build that base.
+The plate route WORKS — clicking a plate under the Continent lens opens the History ledger (path_continent_selected.png). But the Selection band still shows whatever was selected before, in the captured case "Genom Systems — Corporation" left over from a corporation click two lenses earlier, even though the dispatch sets selected_entity to null_entity.
 
-A) FIXTURE SEEDS A FORCE. Expose seed_starting_military (currently file-local in an anonymous namespace) and add a verify.seed_player_force() binding beside the existing fixture affordances - inject_offer, set_balance, seed_convoy. Cheapest, reuses the tested placement logic, and determinism-safe because that function draws no randomness (the call site says so explicitly). COST: every fixture capture then shows a base and a regiment that a real 2026-08-27-onward spawn does NOT have, so the shell pass stops depicting the actual opening.
+A plate is not an entity, so nothing knows how to DRAW one in the Selection band — the same gap the battle card filled for battles with its own element. Until a plate has Selection-band content, selecting one either shows nothing or shows something unrelated, and the second is worse. Belongs to BL-660's second half alongside the tectonic History section.
 
-B) FIXTURE DROPS THE MERCENARY STAGING when no unit exists, returns unit = nil, and the five scripts that only wanted a populated world carry on. Truest to the game as it now is. COST: the Contracts ledger captures go empty, and UI-101..104 lose the only content that makes them worth looking at.
+*Files: `src/ui/selection_card.cpp`, `src/ui/body_surface_canvas.cpp`, `docs/ui/SELECTION.md`*
 
-C) FIXTURE BUILDS A BASE AND HIRES through the real verbs - build (verb 0), econ_step until the base completes, then hire_unit (verb 8). Most faithful: the fixture reaches the state the way a player would, no fourth code path, and it exercises the muster gate as a side effect. COST: construction is durative, so it adds ticks to six scripts, and the fixture becomes sensitive to build times and the corp's cash.
+### NR-698 — The deposit pivot is unverifiable from a script while tile data stays hidden from Lua
+*question · raised 2026-08-28 · from Sprint 22 (UI visibility), trying to prove BL-659.*
 
-RECOMMENDATION: C if the added ticks are affordable, because it keeps the fixture honest about a state the player can actually reach and tests the muster path for free; A as the pragmatic fallback, with the divergence written into lib.lua so a reader of the captures knows the force is staged. B only if Ben wants the shell pass to depict the true bare opening and is content to lose the contract content.
+lens_selection_paths.lua cannot demonstrate the deposit pivot: it needs to press a tile KNOWN to carry the lens resource, and the probe it picks carries no iron, so lens_structure_of_tile correctly returns none and the press falls through to the tile. The capture therefore shows a tile selection and the Economy panel rather than a deposit and the Market ledger — which looks like a broken feature and is actually a broken probe.
 
-*Files: `scripts/verify/lib.lua`, `src/core/verify_api.cpp`, `src/world/corporation_generation.hpp`*
+THE STANDING RULE IS WHAT BINDS: "Do not expose individual tile data to Lua". A script cannot ask which tiles hold a deposit without something that answers that question. THE CALL: add a narrow verify-only query (a 'find me a tile carrying resource X' helper, which answers a question rather than exposing the tile table), or accept that this pivot is verified by a live click only and say so in the requirement. The second is cheaper and honest; the first makes the pivot regression-checkable forever.
+
+*Files: `scripts/verify/lens_selection_paths.lua`, `src/core/verify_api.cpp`, `.claude/rules/io-standing-rules.md`*
 
 ---
 
@@ -949,6 +923,41 @@ BL-655 changed scripts/economy.lua and no C++ at all. Both trees were rebuilt an
 
 *Files: `CMakeLists.txt`, `build_app.bat`, `src/core/app.cpp`*
 
+### NR-690 — country_lens.lua verifies a lens that no longer exists - it now captures the plain canvas under the lens name
+*observation · raised 2026-08-27 · from Sprint 22 (UI visibility) wave 0, the UI-element coverage scan.*
+
+BL-601 retired the Country lens on 2026-08-24 and overlay_from_name deliberately maps "country"/"faction" to overlay_mode::none, with a comment saying a script naming it still captures the borders where they now live. That is true of the PICTURE and false of the CHECK. scripts/verify/country_lens.lua still opens with "Visual verification for the Country lens (overlay_mode::country)" and claims R1 (strip glyph = shield, tooltip "Countries") and R3 (identical territory tint to the prior Faction lens) - two claims about a lens that is gone. Its captures are named country_lens_full and country_lens_zoom. Six more scripts pass "country" as one leg of a sweep and so capture the plain canvas twice under two names: lens_modes, tile_texture, continents_terrain, pop_markers, stacked_tile_ring, landform_relief. Nothing fails, because nothing asserted. This is NR-663 family member five: a check whose green means less than it appears. THE CALL: retire country_lens.lua outright (the border band has its own check, border_band.lua, with 6 expects), or rewrite its header to say it captures always-on border chrome. Recommend retiring it - border_band.lua already covers the successor and asserts, which country_lens.lua never did.
+
+> **RESOLVED.** FIXED 2026-08-28 (commit 45c975a9), on Ben's instruction to remove the path entirely. country_lens.lua is deleted, the "country"/"faction" alias is gone from overlay_from_name, and the duplicate country leg was stripped from seven other scripts — each already captured a plain view, so the leg was photographing the same picture twice under two names. The default view IS the country view.
+
+*Files: `scripts/verify/country_lens.lua`, `src/core/verify_api.cpp`, `scripts/verify/lens_modes.lua`, `docs/ui/LENSES.md`*
+
+### NR-691 — The UI element catalogue is four weeks stale, and it is the spine Sprint 21 works off
+*observation · raised 2026-08-27 · from Sprint 22 (UI visibility) wave 0, the UI-element coverage scan.*
+
+docs/ui/ui_elements.json is dated 2026-07-31 and carries 95 elements. Measured against the code and the verify scripts today: THREE listed elements are retired in code - UI-031 Country lens and UI-035 Opportunity lens and UI-036 Production lens, all removed from overlay_mode by BL-601/BL-604 on 2026-08-24 - and FOURTEEN verify scripts drive a surface the catalogue does not list at all: battle_card, contracts_ledger, decision_feed, frame_budget_hud, mercenary_slice, strategy_readout, survey_dispatch, tech_tree_panel, throughput_lens, processing_management_ux, ui_shell_fixture, v009_batch, export_mockdata, pan_perf. The Throughput lens is the sharpest instance - it is a live overlay_mode value with its own verify script and its own LENSES.md section, and the catalogue has no row for it. THE CALL: whether refreshing the catalogue is wave 0.5 of this sprint or its own item. It matters because Ben framed the sprint as "quite a few elements to change" across several sessions, and every session will scope its work off this file.
+
+> **RESOLVED.** FIXED 2026-08-28 (commit 8f584f87). ui_elements.json refreshed against the code: three retired elements removed (UI-031/035/036), sixteen surfaces added (UI-096..UI-111), two rows corrected that named the wrong rail slot. Ids are now stable-not-dense so a retirement leaves a gap rather than renumbering a file several sessions work off. Orphan checks fell 14 -> 3. UI-112 (Company lens) still owed — added to the code 2026-08-28 but not yet catalogued.
+
+*Files: `docs/ui/ui_elements.json`, `src/ui/ui_state.hpp`, `docs/ui/LENSES.md`*
+
+### NR-693 — CONFIRMED and root-caused: six verify scripts die on one fixture assertion, taking 27 assertions and 10 chrome elements with them
+*observation · raised 2026-08-28 · from Sprint 22 (UI visibility), the full --verify-all capture run of 2026-08-28.*
+
+CONFIRMED 2026-08-28, and it is FIVE TIMES worse than filed. The solo run's traceback: `scripts/verify/lib.lua:168: the player has no unit on the surface (BL-331 seeds one)`, thrown from stage_ui_fixture.
+
+ROOT CAUSE, and it is our own recent work: commit dab470dc, 2026-08-27, 'No standing army at spawn - seed_starting_force defaults false'. corporation_params::seed_starting_force went opt-in for a well-argued reason recorded in the header - under BL-454 standing-force upkeep a seeded unit costs 7.5 cr/qtr, measured at 16.5% of the seated corp's operating outgoings and 19-31% of its entire operating gap, 'for a regiment a brand-new charter never asked for and cannot use'. Nothing is wrong with that change. What is wrong is that stage_ui_fixture still ASSERTS the unit it no longer gets, and dies before its first capture.
+
+BLAST RADIUS - six scripts call stage_ui_fixture and ALL SIX produced zero captures in the 2026-08-28 run: shell_pass, ui_shell_fixture, border_band, lens_structure_pivot, selection_accordion, zoom_ladder. Between them they carry 27 of the suite's 66 verify.expect assertions - border_band 6, lens_structure_pivot 11, selection_accordion 6, ui_shell_fixture 4 - so FORTY PERCENT of everything this suite actually asserts has been dead since 2026-08-27 and nothing said a word. They are also the sole covering check for the Minimap, the Minimap title bar, the Profile tile, the corp emblem, the System menu, the Main menu, the National border band, Province render and selection, the Tile selection layout, and the zoom-ladder navigation model.
+
+WHY THE SILENCE - NR-694. The harness emitted the error every run; nothing carried it to a redirected stdout. The fixture's own message even cites BL-331, which has not been the seeding item since BL-476.
+
+THE FIX IS A DESIGN FORK, NOT A TYPO - see NR-696, because what the fixture does about the missing unit changes what every one of these captures SHOWS.
+
+> **RESOLVED.** FIXED 2026-08-28 (commit 7ebf8f48). shell_pass went from 0 captures to 30, unblocking all six fixture-backed scripts and the ~27 verify.expect assertions they carry. Root cause confirmed as filed: dab470dc made seed_starting_force default false and stage_ui_fixture still asserted the unit. Fixed per Ben's option C — the fixture raises its own force through the real verbs (build a muster base, wait for completion, hire onto it). THREE PASSES, because hire_unit has two funds gates returning the SAME string: credits (payer.balance) and goods (debit_hire_cost). Lending credits changed nothing; granting goods widened availability 3 -> 6 rows; flooring the loan finally cleared it, the base being pay-as-you-build so the balance is near zero by completion.
+
+*Files: `scripts/verify/lib.lua`, `src/world/corporation_generation.cpp`, `src/world/corporation_generation.hpp`, `scripts/verify/shell_pass.lua`*
+
 ### NR-694 — The verify harness emits nothing to a redirected stdout, so a failing script is indistinguishable from a pending one
 *observation · raised 2026-08-28 · from Sprint 22 (UI visibility), diagnosing NR-693 during the 2026-08-28 capture run.*
 
@@ -957,4 +966,21 @@ BL-655 changed scripts/economy.lua and no C++ at all. Both trees were rebuilt an
 > **RESOLVED.** FIXED 2026-08-28. src/main.cpp installs an SDL log sink (log_to_stderr) before anything can log, mirroring SDL's stream to stderr flushed per line, and keeping OutputDebugString on Windows so a debugger's view is unchanged. Unconditional rather than gated on --verify: gating would special-case the one mode that most needs a log. PROVED BY THE NEXT RUN, which is the point - a solo shell_pass went from 0 bytes of output to 622 bytes carrying the exact Lua error and stack traceback, and that traceback diagnosed NR-693 in a single run after two hours of inference had failed to.
 
 *Files: `src/core/verify_api.cpp`, `src/main.cpp`, `.claude/skills/verifier-visual/SKILL.md`*
+
+### NR-696 — How should the UI fixture get its unit now that a spawn has no standing army?
+*question · raised 2026-08-28 · from Sprint 22 (UI visibility), fixing NR-693. Raised rather than chosen, because each option changes what every fixture-backed capture shows.*
+
+stage_ui_fixture needs a player unit for one specific purpose: it passes `units = { unit.id }` when ACCEPTING a mercenary contract offer, which is what puts content in the Contracts ledger for shell_pass and friends to capture. Since dab470dc a spawn has no unit and no military_base. hire_unit cannot rescue it directly - BL-325 S2 requires mustering onto the corp's own COMPLETED military_base, and the same disabled seeder is what used to build that base.
+
+A) FIXTURE SEEDS A FORCE. Expose seed_starting_military (currently file-local in an anonymous namespace) and add a verify.seed_player_force() binding beside the existing fixture affordances - inject_offer, set_balance, seed_convoy. Cheapest, reuses the tested placement logic, and determinism-safe because that function draws no randomness (the call site says so explicitly). COST: every fixture capture then shows a base and a regiment that a real 2026-08-27-onward spawn does NOT have, so the shell pass stops depicting the actual opening.
+
+B) FIXTURE DROPS THE MERCENARY STAGING when no unit exists, returns unit = nil, and the five scripts that only wanted a populated world carry on. Truest to the game as it now is. COST: the Contracts ledger captures go empty, and UI-101..104 lose the only content that makes them worth looking at.
+
+C) FIXTURE BUILDS A BASE AND HIRES through the real verbs - build (verb 0), econ_step until the base completes, then hire_unit (verb 8). Most faithful: the fixture reaches the state the way a player would, no fourth code path, and it exercises the muster gate as a side effect. COST: construction is durative, so it adds ticks to six scripts, and the fixture becomes sensitive to build times and the corp's cash.
+
+RECOMMENDATION: C if the added ticks are affordable, because it keeps the fixture honest about a state the player can actually reach and tests the muster path for free; A as the pragmatic fallback, with the divergence written into lib.lua so a reader of the captures knows the force is staged. B only if Ben wants the shell pass to depict the true bare opening and is content to lose the contract content.
+
+> **RESOLVED.** SETTLED 2026-08-28: Ben chose option C — the fixture reaches the state through the real verbs rather than re-enabling the seeder behind the game's back. Two properties bought: the captures depict a world a player can actually reach, and the BL-325 muster gate is exercised on every fixture run. Implemented and verified (see NR-693). The credits loan is repaid exactly, so every other surface still depicts the true opening economy; the goods grant is a new test-only hook, verify.grant_stock.
+
+*Files: `scripts/verify/lib.lua`, `src/core/verify_api.cpp`, `src/world/corporation_generation.hpp`*
 
