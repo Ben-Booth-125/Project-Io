@@ -570,6 +570,85 @@
     "docs/economy/FINANCE.md"
    ],
    "design": "MEASURED by BL-634, which found it by taking its own brief's gate literally. The acquisition price is max(0, book_value + k x trailing_net + balance) and the balance term is SIGNED, so a deeply indebted firm's negative cash cancels its book value, the sum goes below zero, and the floor hands it over FREE. On 5 of 8 seeds the cheapest buyable firm cost exactly 0 cr. The dissolution rule then transfers the debt at face value: one seed took on -13,358 cr for nothing, and 3 of 8 buyers that bought the cheapest firm were sunk by it. THE FLOOR IS NOT THE BUG - a worthless firm is worth nothing, and NR-648's reasoning stands. The bug is that the SOLVENCY GATE READS THE PRICE rather than the buyer's balance AFTER the transfer, which is the same shape as the non-finite-price bug BL-628 caught in its own code: a check applied to the wrong quantity. THE WORK: gate on the post-acquisition position, so a corp cannot be handed a liability it could never have chosen to take on. Then re-run acquisition_viability's --target cheapest sweep, where 'still earning after' should go 5/8 -> 8/8. Note the harness already measures BOTH gates and its --target flag exists for exactly this comparison."
+  },
+  {
+   "id": "BL-659",
+   "short_name": "deposit selects to market ledger",
+   "title": "Resource lens: a deposit is selectable, and routes to the Market ledger for that resource",
+   "status": "open",
+   "priority": "medium",
+   "created": "2026-08-28",
+   "sprint": "22",
+   "touches": [
+    "docs/ui/LENSES.md",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/market_ledger.cpp"
+   ],
+   "design": "Ben, 2026-08-28, reviewing the lens sweep: \"Resources: This looks great, but we should wire this to give deposits selectable boundaries, and on so on hover, we can select a deposit going to the market ledger for this item.\"\n\nTHIS IS A CHANGE OF DESTINATION, not new plumbing. LENSES.md's routing table already gives the Resource lens a row - \"the tile's deposit profile -> Tile Ledger (deposit detail)\" - so the lens already resolves a pointer to something. What Ben wants is (a) the whole contiguous DEPOSIT to be the structure, hovered and selected as one the way the market catchment already is under BL-603, and (b) the click to land on the MARKET LEDGER aimed at that resource, not the Tile Ledger.\n\nThe deposit already exists as a drawn structure: the lens fills \"the contiguous deposit of the selected resource\" as a flat region (LENSES.md), so the shape the player sees is the shape that must become selectable. This is the same pattern BL-603 applied to the market catchment, which is the precedent to copy rather than invent against.\n\nThe destination change is the interesting half: a deposit's question is \"what is this worth and who wants it\", and that is a market question, not a tile question. Update the routing table in the same pass - the doc is authority and currently says Tile Ledger."
+  },
+  {
+   "id": "BL-660",
+   "short_name": "tectonic hover and history route",
+   "title": "Continent lens: hover-select a plate, click through to its history (collision and drift)",
+   "status": "open",
+   "priority": "medium",
+   "created": "2026-08-28",
+   "sprint": "22",
+   "touches": [
+    "docs/ui/LENSES.md",
+    "docs/generation/CONTINENTS.md",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/tile_inspector.cpp"
+   ],
+   "design": "Ben, 2026-08-28, on the tectonic capture: \"Tectonic looks perfect, I think we can wire this to hover selection and click to the relevant history section, describing collisions and the opposite (drift?). Leave this as a placeholder if it doesn't exist.\"\n\nIt does not exist. LENSES.md's routing table puts Continent in the tile-grain row - \"Population, Industry, Resource, Continent (none - tile grain) -> Tile Ledger\" - so a plate is drawn as a structure but does not resolve as one. This item gives it a structure row like Market's catchment: the PLATE is the structure, hover lifts the whole plate, and the click opens the History ledger at the section describing that plate's own past.\n\nTHE TERM BEN REACHED FOR IS WORTH SETTLING. He wrote \"collisions and the opposite (drift?)\". CONTINENTS.md owns the vocabulary - plates, drift, height_bias - so the wording of the destination section should come from there rather than be coined here, and the answer to \"what is the opposite of a collision\" (rifting? divergence? drift is the motion, not the boundary type) is a GLOSSARY question this item should resolve rather than assume.\n\nDepends on nothing built; the plate partition is already in the generation report the Continent lens reads."
+  },
+  {
+   "id": "BL-661",
+   "short_name": "population regional heatmap",
+   "title": "Population lens: regional heatmap with harder scaling, not a per-tile mark",
+   "status": "open",
+   "priority": "medium",
+   "created": "2026-08-28",
+   "sprint": "22",
+   "touches": [
+    "docs/ui/LENSES.md",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "design": "Ben, 2026-08-28: \"Population: Let's see what this looks like as a heatmap with more extreme scaling. This way we should be able to see population regionally, not just on each tile.\"\n\nToday the lens draws \"per-tile value marks, workforce efficiency\" (LENSES.md routing table) - a per-tile read, which is why a region of moderate population and a region of none look similar at whole-planet zoom. Two changes: a continuous heatmap fill rather than discrete marks, and a scaling curve steep enough that regional differences separate instead of compressing into the middle of the ramp.\n\nEXPLICITLY AN EXPERIMENT, in Ben's own framing - \"let's see what this looks like\". The deliverable is a capture to rule on, not a settled design; expect a second pass on the curve. Worth measuring the actual population distribution first so the curve is fitted to the data rather than guessed - the same discipline BL-649's census brought to demand."
+  },
+  {
+   "id": "BL-662",
+   "short_name": "scarcity takes the opportunity glyph",
+   "title": "Scarcity lens: drop the dead Opportunity code, reuse its glyph, render market scarcity per resource",
+   "status": "open",
+   "priority": "medium",
+   "created": "2026-08-28",
+   "sprint": "22",
+   "touches": [
+    "src/ui/icons.cpp",
+    "src/ui/icons.hpp",
+    "src/ui/overlay.cpp",
+    "docs/ui/LENSES.md",
+    "docs/ui/ICONS.md"
+   ],
+   "design": "Ben, 2026-08-28: \"I support changing opportunity to scarcity. Drop the old code, reuse the glyph, and render market scarcity per resource.\"\n\nREAD AS: the lens KEEPS the name Scarcity - the earlier idea of renaming it to Opportunity is dropped - while the retired Opportunity lens's leftovers are deleted and its GLYPH is reused for Scarcity. Recorded explicitly because the instruction can be read in both directions, and because the session had just flagged that Opportunity is a name BL-604 retired; if this reading is wrong it is a one-line revert.\n\nWHY A GLYPH MATTERS HERE: Scarcity is keyboard-cycle only, which is why Ben listed it among the lenses needing glyphs. icons::opportunity survives in src/ui/icons.{hpp,cpp} with no caller since BL-604, so the mark exists and is unused - reusing it costs nothing and lets Scarcity earn a strip slot, since LENSES.md's rule is that an on-screen lens carries one distinct glyph.\n\nAlso dead and worth removing in the same sweep, though Ben named only Opportunity: icons::country (BL-601) and icons::production (BL-604), neither of which has a caller.\n\nThe behaviour half - \"render market scarcity per resource\" - may already hold: the lens draws \"per-market shortfall blocks + key\" keyed to the selected resource, and the 2026-08-28 sweep captured scarcity_lens_full_iron and _steel. Confirm before changing anything; the glyph may be the whole of the real work."
+  },
+  {
+   "id": "BL-663",
+   "short_name": "lens glyph roster",
+   "title": "Give every strip-eligible lens a distinct glyph (Company; Supply, Supply-routes, Reach deferred)",
+   "status": "open",
+   "priority": "low",
+   "created": "2026-08-28",
+   "sprint": "22",
+   "touches": [
+    "src/ui/icons.cpp",
+    "src/ui/icons.hpp",
+    "src/ui/overlay.cpp",
+    "docs/ui/ICONS.md",
+    "docs/ui/LENSES.md"
+   ],
+   "design": "Ben, 2026-08-28: \"It looks like we need to add glyphs for scarcity, supply, supply-routes, and reach.\"\n\nSCOPE NARROWED BY BEN THE SAME DAY: \"I don't think we need body-to-body lenses yet. Keep the code but ignore for this session.\" Supply, Supply-routes and Reach are all body-to-body, so their glyphs are deferred with them - the code stays, the work waits. Scarcity is covered by BL-662 (it inherits the Opportunity mark).\n\nWHAT REMAINS LIVE HERE IS THE COMPANY LENS, added 2026-08-28. It borrows icons::corporation while keyboard-only, on the precedent Reach and Supply-routes set. It cannot join the on-screen strip until it has its own mark, because Corp would be its immediate neighbour and LENSES.md forbids two strip neighbours sharing a glyph. A company is a background firm, so the mark wants to read as smaller/plural against the corporation's single solid form.\n\nThree glyphs are dead and free to cannibalise: icons::country, icons::opportunity (claimed by BL-662), icons::production."
   }
  ]
 }
