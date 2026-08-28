@@ -512,7 +512,8 @@
    "resolution": "Named as an open bug, not yet fixed: LENSES.md's Access note states 'BL-226 (continent lens) inserted continent before supply_routes in the enum without bumping [overlay_mode_count]... One-line code fix owed' (2026-07-31).",
    "checks": [
     "lens_strip",
-    "lens_modes"
+    "lens_modes",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -527,7 +528,8 @@
    "interesting_question": "n/a — a positioning/anchoring detail, settled.",
    "resolution": "n/a",
    "checks": [
-    "lens_legend"
+    "lens_legend",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -545,7 +547,8 @@
    "resolution": "Recorded as a reversal from playtesting, not a first design: LENSES.md notes this 'reverses BL-013's Corporation-default, 2026-06-30' with no further rationale text quoted beyond the player choosing a lens deliberately.",
    "checks": [
     "lens_modes",
-    "default_lens"
+    "default_lens",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -562,7 +565,8 @@
    "checks": [
     "corporation_lens",
     "corp_lens_border",
-    "lens_modes"
+    "lens_modes",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -578,7 +582,8 @@
    "resolution": "Settled by BL-019: LENSES.md states the lens is 'always single-resource... Intensity lives in tile detail, not the lens,' making magnitude a Selection/hover-card concern rather than a lens concern — a deliberate separation of 'where' from 'how much'.",
    "checks": [
     "resource_lens",
-    "lens_modes"
+    "lens_modes",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -594,7 +599,8 @@
    "resolution": "Named honestly as a current limitation: MARKETS.md-adjacent LENSES.md text says the surface 'regains a spatial per-market surface' only once generation seeds genuinely multiple centres, which is still owed.",
    "checks": [
     "market_lens",
-    "lens_modes"
+    "lens_modes",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -611,7 +617,8 @@
    "checks": [
     "population_lens",
     "population_legibility",
-    "lens_modes"
+    "lens_modes",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -629,7 +636,8 @@
     "continents_terrain",
     "tile_texture",
     "landform_relief",
-    "save_load"
+    "save_load",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -645,7 +653,8 @@
    "resolution": "Named honestly as a scope-of-the-day limit: LENSES.md states it 'gains spatial variation once multiple centres are seeded' — the single-block read is acknowledged as the correct current behaviour, not a bug.",
    "checks": [
     "scarcity_lens",
-    "lens_modes"
+    "lens_modes",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -661,7 +670,8 @@
    "resolution": "Solved by a pure-rendering reweighting: LENSES.md states the lens instead 'renders a throughput field: each tile's substrate_density weighted by its terrain deposit richness... Pure rendering: no change to substrate_density or the market arithmetic' — decoupling achieved entirely at the render layer.",
    "checks": [
     "industry_lens",
-    "province_render"
+    "province_render",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -678,7 +688,8 @@
    "checks": [
     "supply_lens",
     "lens_modes",
-    "icon_silhouettes"
+    "icon_silhouettes",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -695,7 +706,8 @@
    "checks": [
     "lens_modes",
     "lens_legend",
-    "province_render"
+    "province_render",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -711,7 +723,8 @@
    "resolution": "Confirmed broken access, cited above (UI-027's finding): LENSES.md's roster explicitly flags 'Currently unreachable by the keyboard cycle — the stale overlay_mode_count.'",
    "checks": [
     "lens_modes",
-    "province_render"
+    "province_render",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -752,7 +765,8 @@
     "lens_structure_pivot",
     "hover_freeze",
     "lens_selection_paths",
-    "lens_one_tier"
+    "lens_one_tier",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -839,7 +853,8 @@
     "hover_freeze",
     "sticky_card",
     "border_band",
-    "lens_one_tier"
+    "lens_one_tier",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -856,7 +871,8 @@
    "checks": [
     "lens_structure_pivot",
     "lens_selection_paths",
-    "lens_one_tier"
+    "lens_one_tier",
+    "lens_strip_and_fields"
    ]
   },
   {
@@ -1636,7 +1652,8 @@
    "interesting_question": "Every lens costs a bar slot, a key, three doc rows and a selection rule permanently. Two lenses were retired the same week this one landed - what makes this one worth the slot?",
    "resolution": "It answers a question no other lens can: whether a place is REACHABLE, not what is at it. LENSES.md gives it its own section and ui_state.hpp its own enum value (BL-598). The two retired the same week - Opportunity and Production (BL-604) - were per-tile value surfaces whose read Scarcity and Industry already carried between them, which is exactly the test this one passes.",
    "checks": [
-    "throughput_lens"
+    "throughput_lens",
+    "lens_strip_and_fields"
    ]
   },
   {

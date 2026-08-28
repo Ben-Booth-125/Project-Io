@@ -97,34 +97,52 @@ void toggle_overlay(ui_state& ui, overlay_mode m)
 
 void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
 {
-    // The on-screen lenses, in settled order (BL-013, trimmed BL-093, then twice
-    // more in one sprint — BL-604 retired Opportunity and Production, BL-601
-    // retired Country):
-    // Corp → Resource → Market → Population → Continent.
-    // Scarcity and Industry are keyboard-cycle only (like Supply); Reach and
-    // Supply-routes (BL-011/BL-014) join them off-strip too — they do not fit
-    // the 240 px minimap bar this row now lives on. Single-select with a null state:
-    // clicking the active lens clears to overlay_mode::none (toggle_overlay).
-    // Continent earns a strip slot rather than the keyboard-only shelf because it
-    // answers a question the player asks at first sight of a body ("why is the land
-    // shaped like that?"), which is exactly the moment they are looking at the strip.
+    // THE STRIP IS KEYED ON THE RUNG (Ben, 2026-08-28: "add any missing lenses to
+    // the strip if that lens focuses on the planetary view. We can rotate lenses
+    // for circumplanetary or solar views").
     //
-    // Three retirements in one sprint, and the array extent is DEDUCED rather than
-    // written — which is what keeps a trim from leaving a stale literal behind.
-    // BL-604 dropped Opportunity and Production (per-tile value surfaces Ben cut);
-    // BL-601 dropped Country, whose content is always-on border chrome now, so the
-    // lens had nothing left to toggle. The strip re-numbers itself; no slot is held
-    // open for a retired lens.
-    // Throughput takes the sixth slot (BL-605, Ben 2026-08-25: "the only thing now
-    // is to add the glyph for our throughput lens"). It had been on the
-    // keyboard-only shelf because the eight-lens strip had no room — and then the
-    // three retirements above freed three slots, so the reason expired before the
-    // lens did. Logistics is one of the two things the whole design is rate-limited
-    // by (LOGISTICS.md), which is a poor thing to leave undiscoverable.
-    constexpr overlay_mode modes[] = {
-        overlay_mode::corporation, overlay_mode::resource,
-        overlay_mode::market, overlay_mode::population, overlay_mode::continent,
+    // It used to be one hand-kept array of six, and the six were chosen by what
+    // FIT — the header here said outright that Scarcity, Industry, Reach and
+    // Supply-routes were keyboard-only because "they do not fit the 240 px minimap
+    // bar this row now lives on". That is a layout accident deciding a discovery
+    // question, and it left six of the twelve built lenses reachable only by a key
+    // nothing on screen mentions.
+    //
+    // Keying on the rung dissolves it, because no rung wants all twelve. Each row
+    // below is LENSES.md's own per-rung representation table, read straight off:
+    // a lens appears where it draws something. Supply, Reach and Supply-routes are
+    // body-to-body reads whose home is Solar; Market and Scarcity carry a
+    // per-body mark at Circumplanetary; the sub-body lenses are Planetary-only
+    // because their unit of meaning is a tile, a deposit or a plate.
+    //
+    // A lens absent from every row would be unreachable except by keyboard, so
+    // adding one here is part of adding a lens — the same duty ACTIONS.json
+    // carries for its press.
+    static constexpr overlay_mode planetary_modes[] = {
+        overlay_mode::corporation, overlay_mode::company,
+        overlay_mode::resource,    overlay_mode::market,
+        overlay_mode::scarcity,    overlay_mode::industry,
+        overlay_mode::population,  overlay_mode::continent,
         overlay_mode::throughput };
+
+    static constexpr overlay_mode circumplanetary_modes[] = {
+        overlay_mode::market, overlay_mode::scarcity, overlay_mode::supply };
+
+    static constexpr overlay_mode solar_modes[] = {
+        overlay_mode::supply, overlay_mode::reach, overlay_mode::supply_routes };
+
+    const overlay_mode* modes_begin = planetary_modes;
+    std::size_t         modes_count = std::size(planetary_modes);
+    switch (ui.primary_level)
+    {
+    case canvas_level::solar:
+        modes_begin = solar_modes;   modes_count = std::size(solar_modes);   break;
+    case canvas_level::circumplanetary:
+        modes_begin = circumplanetary_modes;
+        modes_count = std::size(circumplanetary_modes);                      break;
+    default:
+        break; // planetary — the full sub-body set above
+    }
 
     const float bar_h = ImGui::GetFrameHeight() + 6.0f;
     ImGui::SetNextWindowPos({x, top_y}, ImGuiCond_Always);
@@ -151,8 +169,9 @@ void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
     const float cursor_y = top_y + 3.0f;
 
     int idx = 0;
-    for (overlay_mode m : modes)
+    for (std::size_t mi = 0; mi < modes_count; ++mi)
     {
+        const overlay_mode m = modes_begin[mi];
         ImGui::SetCursorScreenPos({cursor_x, cursor_y});
         const bool active = (ui.overlay == m);
 

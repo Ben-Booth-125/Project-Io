@@ -1332,6 +1332,7 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     state.lp_anchor_total = 0.0f;
     state.lp_anchor_max   = 0.0f;
     state.lp_reach_max    = 0.0f;
+    state.lp_reach_p90    = 0.0f;
 
     // Off by default in every sense: no lens, no work. The lens is the only reader,
     // and the pools must not be built when nobody is looking at them — LP is a rate,
@@ -1373,9 +1374,27 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     // Max over a vector is order-independent, so it is deterministic where a
     // float sum over a hash map would not be.
     const std::vector<float>& reach = body_reach_field(w, state.active_body);
+    std::vector<float> finite;
+    finite.reserve(reach.size());
     for (const float c : reach)
         if (c >= 0.0f && !std::isinf(c))
+        {
             state.lp_reach_max = std::max(state.lp_reach_max, c);
+            finite.push_back(c);
+        }
+
+    // The 90th percentile, which is what the field ramp actually divides by.
+    // nth_element rather than a full sort: this runs once per lens-active frame
+    // over ~31k values, and the ramp needs one order statistic, not an ordering.
+    // Deterministic despite nth_element's unspecified partial order, because only
+    // the value AT the position is read — and equal values are equal.
+    if (!finite.empty())
+    {
+        const std::size_t k = (finite.size() * 9) / 10;
+        std::nth_element(finite.begin(), finite.begin() + static_cast<std::ptrdiff_t>(k),
+                         finite.end());
+        state.lp_reach_p90 = finite[k];
+    }
 }
 
 void update_body_vision(world& w, ui_state& state, double now_days)
@@ -2305,9 +2324,27 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (col_it != market_catchment_colour.end())
                 fill = lerp_colour(fill, col_it->second, 0.55f);
         }
-        // Population (Workforce) lens (BL-135): not a full-tile tint — it reads as
-        // a per-tile red→green dot mark, drawn below in place of the building glyph
-        // (workforce_efficiency). Tiles keep their terrain hue here.
+        // Population (Workforce) lens (BL-135, recut to a HEATMAP 2026-08-28 on
+        // Ben's instruction: "rework the workforce efficiency lens to be a
+        // heatmap, akin to throughput").
+        //
+        // It was a per-tile red→green DOT drawn in place of the building glyph,
+        // which made it the only lens in the roster that answered by adding a mark
+        // rather than by colouring the ground — so it read at one tile at a time
+        // and never as a field, which is the whole reason to have a lens. Now it
+        // tints like every other value lens and the tile keeps its glyphs.
+        //
+        // WATER IS LEFT ALONE rather than tinted at its floor value. Workforce
+        // efficiency is undefined on ocean, not zero, and painting it the ramp's
+        // red end would assert "bad ground here" about ground that is not ground.
+        // Terrain hue is the honest answer, and it also keeps the coastline
+        // legible, which a wall-to-wall wash destroys.
+        else if (state.overlay == overlay_mode::population
+                 && !placement_rules::is_water_tile(tile.substrate))
+        {
+            const float eff = workforce_efficiency(std::clamp(tile.habitability, 0.0f, 1.0f));
+            fill = lerp_colour(fill, ryg_colour(eff), 0.72f);
+        }
         // Scarcity lens (BL-018): a market-level shortfall field. Every tile in a
         // market's catchment reads as one chunky block tinted by that market's
         // supply shortfall of the selected good (demand outran supply last tick),
@@ -2374,15 +2411,38 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const float rc = tile_reach_cost(w, id);
             if (rc >= 0.0f)
             {
-                // SQUARE-ROOT COMPRESSION, measured rather than guessed. With 57
-                // anchors on the home body the cost distribution is heavily
-                // left-skewed — median 20.8 against a maximum of 101.8 — so a
-                // linear ramp puts four fifths of the grid in its top fifth and
-                // the map reads as one flat cyan wash. Compressing the ratio
-                // spreads the NEAR field, which is the half the player sites in.
+                // NORMALISED AGAINST THE 90th PERCENTILE, then square-root
+                // compressed. Both halves are measured — `throughput_field_census`
+                // is the harness, re-run it whenever the anchor set moves.
+                //
+                // The sqrt was calibrated in Sprint 18 against 57 anchors. The home
+                // body now carries 1917, and the census says why that broke the
+                // read: median cost 6.75 against a max of 81.58, so HALF the grid
+                // sits in the bottom 8% of the range the ramp is spread over.
+                //
+                // WHAT THE MEASUREMENT OVERTURNED. The obvious fix is a steeper
+                // curve, and it does not work — every curve over cost/max rescales
+                // the same bunched input. Share of the grid landing in the single
+                // most crowded tenth of the ramp: linear 52%, sqrt 32%, quadratic
+                // 45%, quartic 35%, 1-d² 75%, cube-root 28%. Quadratic is WORSE
+                // than the sqrt it would replace.
+                //
+                // The problem is the DENOMINATOR, not the curve. p90 is 42.58
+                // against a max of 81.58 — the top decile of cost is 48% of the
+                // range and holds a tenth of the tiles, so normalising against the
+                // max spends half the ramp on ground almost nothing sits on.
+                // Normalising against p90 instead and clamping drops the worst
+                // bucket to 21%: the same curve, three times the spread.
+                //
+                // Ground beyond p90 saturates at the cold end rather than being
+                // given its own gradient. That is the honest trade and it is the
+                // point: the far tenth is all equally out of reach, and the near
+                // ground is where a player sites.
+                const float denom = (state.lp_reach_p90 > 0.0f) ? state.lp_reach_p90
+                                                                : state.lp_reach_max;
                 const float t = std::isinf(rc)
                     ? 0.0f
-                    : 1.0f - std::sqrt(std::clamp(rc / state.lp_reach_max, 0.0f, 1.0f));
+                    : 1.0f - std::sqrt(std::clamp(rc / denom, 0.0f, 1.0f));
                 fill = lerp_colour(fill, throughput_field_colour(t), 0.72f);
             }
         }
@@ -3281,10 +3341,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     }
                 }
 
-                // The Workforce (Population) lens replaces the building silhouette
-                // with the per-tile value mark drawn below (BL-135) — the mark reads
-                // the tile's rank, not its installation.
-                if (state.overlay != overlay_mode::population)
                 {
                     // Stacked-tile ring (BL-596). Drawn BEFORE the centre glyph so
                     // the silhouette stays the loudest thing on the tile, and before
@@ -3295,11 +3351,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     // which of them leads (the lowest-id representative, the same one
                     // tile_to_bld picks); the "+N" badge still names how many
                     // buildings in total. Three different questions, three marks.
-                    //
-                    // Suppressed under the two value lenses for the same reason the
-                    // silhouette is: those lenses replace the tile's installation
-                    // read with a per-tile value mark, and a ring with no centre
-                    // glyph would be a ring with nothing to be dominant.
                     if (draw_r > kStackRingLodRadiusPx)
                     {
                         const auto kinds_it = tile_bld_kinds.find(id);
@@ -3415,7 +3466,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // is a blob, not a line. The all-four-neighbours "filled interior" case that
             // was designed alongside this was CANCELLED on the same measurement: not one
             // tile in the system has four, so it would have been dead code on every seed.
-            if (!built && state.overlay != overlay_mode::population)
+            if (!built)
             {
                 const ImU32 ink = contrast_ink(fill);
                 bool        spanned = false;
@@ -3464,20 +3515,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                     tile.landform, ink);
             }
 
-            // Value-lens tile marks (BL-135): the Workforce (Population) lens draws
-            // a per-tile red→green dot on every BUILDABLE tile (valid terrain for
-            // activity — ocean excluded), not just occupied ones, reading
-            // workforce_efficiency(habitability). Drawn instead of, not blended with,
-            // the building glyph on occupied tiles (suppressed above). Opportunity
-            // shared this idiom until BL-604 retired it; the shape stays keyed on one
-            // lens rather than pretending to a family of one.
-            if (state.overlay == overlay_mode::population &&
-                !placement_rules::is_water_tile(tile.substrate))
-            {
-                const float t = workforce_efficiency(std::clamp(tile.habitability, 0.0f, 1.0f));
-                const float mr = std::max(2.0f, draw_r * 0.22f);
-                icons::value_mark(dl, {cx, cy}, mr, ryg_colour(t));
-            }
+            // The Workforce (Population) lens's per-tile DOT used to be drawn here
+            // (BL-135's value mark). It is gone: the lens tints the tile itself now
+            // (see compute_tile_fill), so the mark it drew "instead of the building
+            // glyph" has nothing left to stand in for. With it go the two
+            // suppressions it needed — the stack ring and the landform glyph both
+            // draw under this lens exactly as they do under every other one.
 
             // Throughput lens (BL-606): the MAGNITUDE half. LP is generated at
             // anchors — cities, built-and-active ports and inland hubs — and
@@ -3642,7 +3685,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (revealed && prov_id != 0)
             {
                 const bool prov_selected = (prov_id == state.selected_province);
-                const bool prov_hovered  = (prov_id == state.hovered_province);
+                // Hover only with NO lens, for the reason recorded at the tile
+                // ring below (Ben's "stop dual hover", 2026-08-28): under a lens
+                // the resolved thing is the lens's structure, and a province edge
+                // lighting inside it is a second answer to a question that has one.
+                // SELECTION is untouched — `selected_province` is non-zero only on
+                // the tile rung, which a lens cannot reach anyway, so it needs no
+                // guard of its own.
+                const bool prov_hovered  = (prov_id == state.hovered_province)
+                                           && state.overlay == overlay_mode::none;
                 const highlight ph = resolve_highlight(prov_selected,
                                                        prov_hovered, /*pinned=*/false);
                 if (ph != highlight::none)
@@ -3696,7 +3747,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
     // Hover outline for the single resolved copy. Skipped when the hovered tile is
     // also the selection — selection outranks hover, and its ring is already drawn.
-    if (have_hover && !hovered_selected)
+    //
+    // AND SKIPPED UNDER A LENS (Ben, 2026-08-28: "we want to stop dual hover —
+    // right now if I hover a market, the province/tile also gets highlighted").
+    // Three hover marks could fire on one pointer position: this tile ring, the
+    // province edge below, and the lens structure's own wash. Under a lens the
+    // structure is the ONLY thing the pointer resolves to (BL-664), so it is the
+    // only thing that may light — a tile ring inside a lit catchment says the
+    // pointer is on two things at once, and one of them is not selectable.
+    //
+    // With no lens the tile IS the resolved thing, so the ring is the right mark
+    // and is unchanged.
+    if (have_hover && !hovered_selected && state.overlay == overlay_mode::none)
         draw_hex_highlight(dl, hover_verts, highlight::hovered);
 
     // BL-511: the hovered PROVINCE, for the outline the tile loop draws. Written

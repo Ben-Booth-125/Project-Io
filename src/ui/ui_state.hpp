@@ -874,6 +874,14 @@ struct ui_state
     /// calibrated to an absolute cost nobody can read. 0 when no field exists.
     float lp_reach_max = 0.0f;
 
+    /// The 90th percentile of the same field, and the ramp's actual denominator
+    /// (`throughput_field_census`, 2026-08-28). `lp_reach_max` stays because the
+    /// legend still reports the body's true worst case — but normalising the
+    /// COLOUR against it spends half the ramp on the far decile, which holds a
+    /// tenth of the tiles. Zero when the field is absent; the ramp falls back to
+    /// the max, which is the pre-2026-08-28 behaviour rather than a blank map.
+    float lp_reach_p90 = 0.0f;
+
     double sim_now_days = 0.0; ///< Latest continuous sim time (elapsed days); the beam-motion clock.
 
     // --- hover-card state (BL-060) ---

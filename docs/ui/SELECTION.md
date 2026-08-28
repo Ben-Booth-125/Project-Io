@@ -702,6 +702,13 @@ exception:
    the tile, and it does not fall through to a marker. A lens that has nothing to say about this
    ground says nothing.
 
+**One hover mark, not three (Ben, 2026-08-28: "we want to stop dual hover").** A pointer position
+could light three things at once — the tile's own ring, its province edge, and the lens structure's
+wash — so hovering a market lit the catchment *and* the tile inside it. Under a lens the structure
+is the only thing that lights, because it is the only thing the pointer resolves to; the tile ring
+and the province edge are **no-lens marks**. Selection is a different question and keeps its
+outlines under every lens.
+
 **A click on inert ground clears the band to resting.** The Selection band returns to the player's
 own corporation (§ Always open), exactly as a click on empty space does. Leaving the previous
 selection standing is the worse of the two readings: it makes the band assert something the player

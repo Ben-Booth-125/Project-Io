@@ -79,7 +79,7 @@ representation intended.
 | **Corporation** | — | — | tile tint + player/rival HQ markers |
 | **Resource** | — | — | contiguous-deposit flat fill + key |
 | **Market** | — | per-body price strip | catchment tint + city-name key |
-| **Population** | — | — | per-tile value marks, workforce efficiency |
+| **Population** | — | — | per-tile workforce-efficiency **heatmap** |
 | **Scarcity** *(keyboard-cycle only)* | — | per-body shortfall badge | per-market shortfall blocks + key |
 | **Industry** *(keyboard-cycle only)* | — | — | background-firm plant amber tint + key |
 | **Continent** | — | — | plate tint + boundary lift + key |
@@ -514,6 +514,27 @@ all of them (Ben, 2026-08-28: "hovering one tile displays an outline around all 
 for that corporation/company"), the same claim the market catchment's highlight makes. Ground held
 by nobody is inert.
 
+## The strip rotates with the rung (Ben, 2026-08-28)
+
+The lens strip on the minimap shows **the lenses that draw something at the current canvas rung**,
+not a fixed set. Owned by BL-670 (rung-keyed lens strip).
+
+| Rung | On the strip |
+|---|---|
+| **Planetary** | Corporation, Company, Resource, Market, Scarcity, Industry, Population, Continent, Throughput |
+| **Circumplanetary** | Market, Scarcity, Supply |
+| **Solar** | Supply, Reach, Supply-routes |
+
+Each row is this document's own per-rung representation table read straight off: a lens appears
+where it draws something. Before this the strip was one hand-kept array of six, and the six were
+chosen by **what fit the 240 px bar** — a layout accident deciding a discovery question, which left
+six of the twelve built lenses reachable only by the `L` / `Shift+L` cycle that nothing on screen
+mentions. The keyboard cycle still reaches every lens from every rung; the strip is the discovery
+surface, not the only door.
+
+**Adding a lens means adding it to a rung row.** A lens named in no row is keyboard-only, which is
+a decision rather than an oversight only if it is written down.
+
 **Three lenses draw a value field, not a region**, and are therefore read-only surfaces: Population
 (per-tile habitability), Industry (per-tile substrate throughput) and Throughput (the reach-cost
 field). Their subject is a number spread across the map rather than a thing standing on it, so
@@ -585,11 +606,20 @@ the population-centre markers, not this lens.
 **Rung.** Planetary only — workforce efficiency is per-tile and has no inter-body surface. Guarded
 behind `overlay_mode::population` in [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
 
-**Surface.** A per-tile red→green **value mark** (`icons::value_mark`, BL-135, value-lens tile
-marks) on every **buildable** tile (valid terrain for activity — ocean excluded), coloured by
-`ryg_colour(workforce_efficiency)`; tiles keep their terrain hue so terrain still reads. Drawn
-instead of, not blended with, the building glyph on occupied tiles. It is the **only** lens
-drawing the value mark: Opportunity shared the idiom until BL-604 retired it.
+**Surface.** A **heatmap** — the tile itself takes `ryg_colour(workforce_efficiency)` composited
+over its terrain hue at `0.72`, on every tile except water. Owned by BL-668 (workforce heatmap),
+Ben 2026-08-28: *"rework the workforce efficiency lens to be a heatmap, akin to throughput"*.
+
+It was a per-tile red→green **dot** drawn in place of the building glyph, and that shape was the
+reason to change it: this was the only lens in the roster that answered by **adding a mark** rather
+than by colouring the ground, so it read one tile at a time and never as a field — which is the
+whole reason to have a lens. The dot also had to suppress the stack ring and the landform glyph to
+avoid competing with them; a tint competes with nothing, so both are back and the tile reads
+normally under this lens.
+
+**Water is left alone** rather than tinted at the ramp's floor. Workforce efficiency is *undefined*
+on ocean, not zero, and painting it red would assert "bad ground" about ground that is not ground —
+it also keeps the coastline legible, which a wall-to-wall wash destroys.
 
 **Glyph.** A small figure — round head over a tapered torso (`icons::population`); reads as
 "people / workforce", distinct from the other lens glyphs.
@@ -831,11 +861,29 @@ behind `overlay_mode::throughput` in
 two things and one ramp cannot separate them.
 
 - **Field:** deep navy (furthest) → the logistics cyan (at an anchor), composited
-  at `0.72`. The cost ratio is **square-root compressed** before the ramp: the
-  distribution is heavily left-skewed (measured on the home body: median `20.8`
-  against a maximum of `101.8`, over 57 anchors), so a linear ramp puts four
-  fifths of the grid in its top fifth and the map reads as one flat wash.
-  Unreachable ground takes the cold end.
+  at `0.72`. The cost is normalised against the field's **90th percentile** and
+  then **square-root compressed**. Unreachable ground, and everything past p90,
+  takes the cold end. Owned by BL-669 (throughput ramp).
+
+  **Both halves are measured** — `tools/verify/throughput_field_census.cpp` is the
+  instrument, and it should be re-run whenever the anchor set moves, because this
+  ramp has now been wrong once for exactly that reason. The sqrt alone was
+  calibrated against 57 anchors; the home body carries **1917**, with median cost
+  `6.75` against a max of `81.58`, so half the grid sits in the bottom 8% of the
+  range the ramp was spread over.
+
+  **A steeper curve does not fix that, which is the part worth keeping.** Share of
+  the grid landing in the single most crowded tenth of the ramp: linear 52%, sqrt
+  32%, quadratic 45%, quartic 35%, `1-d²` 75%, cube-root 28% — every one of them
+  rescales the same bunched input, and quadratic is *worse* than the sqrt it would
+  replace. The denominator was the problem: p90 is `42.58` against a max of
+  `81.58`, so the top decile of cost is 48% of the range and holds a tenth of the
+  tiles. Normalising against p90 drops the worst bucket to **21%** — same curve,
+  three times the spread.
+
+  The trade is deliberate: ground beyond p90 saturates instead of getting its own
+  gradient. The far tenth is all equally out of reach; the near ground is where a
+  player sites.
 - **Anchor:** a **ring** on the anchor tile, its thickness carrying that anchor's
   share of the body's largest pool, in a hotter near-white cyan over a dark
   backing. A ring rather than a disc because every anchor tile already carries a

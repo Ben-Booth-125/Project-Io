@@ -779,6 +779,28 @@ target_link_libraries(substrate_census PRIVATE io_world_obj lua54)
 target_compile_features(substrate_census PRIVATE cxx_std_20)
 target_compile_options(substrate_census PRIVATE ${IO_WARNING_FLAGS})
 
+# throughput_field_census (2026-08-28) — live-Lua for substrate_census's reason:
+# it censuses the REACH FIELD of the really generated world, and the anchor set
+# that field is seeded from is generated content. Reports only; gates nothing.
+# Written because the Throughput lens's ramp was calibrated against 57 anchors
+# and the world now carries orders of magnitude more, so the curve is being
+# chosen against a distribution nobody had measured since.
+add_executable(throughput_field_census
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/throughput_field_census.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(throughput_field_census PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(throughput_field_census PRIVATE io_world_obj lua54)
+target_compile_features(throughput_field_census PRIVATE cxx_std_20)
+target_compile_options(throughput_field_census PRIVATE ${IO_WARNING_FLAGS})
+
 # province_capacity_probe (2026-08-20) — live-Lua for exactly substrate_census's
 # reason above: it measures the world AFTER generate_background_firms, so every
 # authored input must be the real one or it reports a world the game never builds.

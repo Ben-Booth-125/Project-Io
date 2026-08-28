@@ -704,6 +704,68 @@
    "design": "Ben, 2026-08-28, on where a corporation/company tile-group click lands: \"clicking will take you to a relevant ledger. (Different types for either, make a placeholder if needed).\"\n\nTWO DESTINATIONS, because since the 2026-08-28 split (GLOSSARY.md) corporation and company are different words: a corporation is a named operating firm the player competes with, a company is a BL-365 background firm. One is a rival dossier, the other is a market participant. Routing both to one surface would re-merge the distinction the split just drew.\n\nNEITHER DESTINATION IS AIMABLE TODAY. The Corporation lens currently opens the BALANCE ledger, which is the PLAYER'S OWN BOOKS - so clicking a rival's ground opens your own accounts, which is wrong in the way that reads as a feature. The Corporation Overview Dashboard is a nav-rail bool (show_corporation_panel) with no per-corp target field at all. And there is no company surface of any kind.\n\nSO THIS IS THE PLACEHOLDER ITEM Ben's parenthesis authorises: a corporation destination that can be AIMED at a named corporation, and a company destination that exists. Both are stand-ins to be designed properly in the ledger batch (sprint 24) - what they owe now is a real target field and an honest empty state, not content. The routing seam is the same one BL-659 and BL-603 use: set the target, close_all_panels, open the surface.\n\nThe ledger family's five axes (docs/ui/ledgers/README.md) are what a real design must answer; a placeholder answers none of them and should say so on its face.",
    "completed": "2026-08-28",
    "summary": "A corporation and a company each need their own ledger destination; the company one does not exist [Landed 2026-08-28, Sprint 23 wave 1. scripts/verify/lens_one_tier.lua 38/38. The LIVE-CLICK requirement row is still PENDING: computer-use access to the built app was requested and denied this session, and a harness does not prove a press is reachable.]"
+  },
+  {
+   "id": "BL-667",
+   "short_name": "one hover mark under a lens",
+   "title": "Under a lens only the lens's structure lights on hover - not the tile and its province too",
+   "status": "complete",
+   "priority": "medium",
+   "created": "2026-08-28",
+   "completed": "2026-08-28",
+   "sprint": "23",
+   "touches": [
+    "docs/ui/SELECTION.md",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "design": "Ben, 2026-08-28: \"We want to stop dual hover though. Right now if I hover a market, the province/tile also gets highlighted.\"\n\nTHREE MARKS COULD FIRE ON ONE POINTER POSITION: the tile's own hex ring, its province edge, and the lens structure's wash. Under a lens that says the pointer is on two things at once, and one of them is not selectable - which is the same confusion BL-664's one-tier rule removed from the CLICK and left in the hover.\n\nThe fix is the rule already written: under a lens the structure is the only thing the pointer resolves to, so it is the only thing that may light. The tile ring and the province edge are no-lens marks. SELECTION is untouched and keeps its outlines under every lens - it answers a different question, and a capture that confused the two is how this was nearly mis-verified (the first check frame still had a tile selected)."
+  },
+  {
+   "id": "BL-668",
+   "short_name": "workforce heatmap",
+   "title": "The Population lens becomes a heatmap instead of a field of per-tile dots",
+   "status": "complete",
+   "priority": "medium",
+   "created": "2026-08-28",
+   "completed": "2026-08-28",
+   "sprint": "23",
+   "touches": [
+    "docs/ui/LENSES.md",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "design": "Ben, 2026-08-28: \"rework the workforce efficiency lens to be a heatmap, akin to throughput\".\n\nIt drew a per-tile red-green DOT in place of the building glyph, which made it the only lens in the roster that answered by ADDING A MARK rather than by colouring the ground. That reads one tile at a time and never as a field, which is the whole reason to have a lens.\n\nNow the tile takes ryg_colour(workforce_efficiency) over its terrain hue at 0.72, like every other value lens. TWO SUPPRESSIONS GO WITH THE DOT: it had to hide the stack ring and the landform glyph to avoid competing with them, and a tint competes with nothing - so both are back and the tile reads normally under this lens.\n\nWATER IS LEFT ALONE rather than tinted at the ramp's floor. Efficiency is undefined on ocean, not zero; painting it red would assert 'bad ground' about ground that is not ground, and it keeps the coastline legible."
+  },
+  {
+   "id": "BL-669",
+   "short_name": "throughput ramp",
+   "title": "The Throughput field normalises against the 90th percentile, not the maximum",
+   "status": "complete",
+   "priority": "medium",
+   "created": "2026-08-28",
+   "completed": "2026-08-28",
+   "sprint": "23",
+   "touches": [
+    "docs/ui/LENSES.md",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/ui_state.hpp",
+    "tools/verify/throughput_field_census.cpp"
+   ],
+   "design": "Ben, 2026-08-28: \"throughput needs to be severely scaled. Perhaps we can use a quadratic rather than linear scaling.\"\n\nMEASURED FIRST, AND THE MEASUREMENT REDIRECTED THE FIX - which is the whole value of the item. A new harness (tools/verify/throughput_field_census.cpp) censuses the reach field the ramp spreads. The home body carries 1917 anchors; the sqrt compression shipping today was calibrated against 57. Median cost 6.75 against a max of 81.58, so HALF the grid sits in the bottom 8% of the range.\n\nTWO THINGS THE NUMBERS OVERTURNED. It was not linear - it was already sqrt. And quadratic is WORSE than what shipped: share of the grid in the single most crowded tenth of the ramp is linear 52%, sqrt 32%, quadratic 45%, quartic 35%, 1-d^2 75%, cube-root 28%. Every curve rescales the same bunched input, so none of them could have fixed it.\n\nTHE DENOMINATOR WAS THE PROBLEM. p90 is 42.58 against a max of 81.58 - the top decile of cost is 48% of the range and holds a tenth of the tiles, so normalising against the max spent half the ramp on ground almost nothing sits on. Normalising against p90 and keeping the sqrt drops the worst bucket to 21%: same curve, three times the spread. Ben chose this over rank equalisation (a perfect 10%, but it makes every map look equally varied whether or not it is).\n\np90 is computed once per lens-active frame by nth_element over the finite field and carried in ui_state::lp_reach_p90; lp_reach_max stays because the legend still reports the body's true worst case. Ground past p90 saturates at the cold end - deliberate, and the point: the far tenth is all equally out of reach."
+  },
+  {
+   "id": "BL-670",
+   "short_name": "rung-keyed lens strip",
+   "title": "The lens strip shows the lenses that draw at the current rung, instead of a hand-kept six",
+   "status": "complete",
+   "priority": "medium",
+   "created": "2026-08-28",
+   "completed": "2026-08-28",
+   "sprint": "23",
+   "touches": [
+    "docs/ui/LENSES.md",
+    "src/ui/overlay.cpp"
+   ],
+   "design": "Ben, 2026-08-28, on being told six of the twelve built lenses were off the strip: \"add any missing lenses to the strip if that lens focuses on the planetary view. We can rotate lenses for circumplanetary or solar views.\"\n\nTHE OLD ARRAY'S SELECTION CRITERION WAS SPACE, and the code said so outright: Scarcity, Industry, Reach and Supply-routes were keyboard-cycle only because \"they do not fit the 240 px minimap bar this row now lives on\". A layout accident was deciding a discovery question, and it left half the roster reachable only by a key nothing on screen mentions.\n\nKeying the strip on the rung dissolves the constraint, because no rung wants all twelve. Each row is LENSES.md's own per-rung representation table read straight off - a lens appears where it DRAWS something: Planetary gets the nine sub-body reads (Corporation, Company, Resource, Market, Scarcity, Industry, Population, Continent, Throughput), Circumplanetary gets Market, Scarcity and Supply, Solar gets Supply, Reach and Supply-routes.\n\nThe keyboard cycle still reaches every lens from every rung; the strip is the discovery surface, not the only door. ADDING A LENS NOW MEANS ADDING IT TO A RUNG ROW - a lens named in no row is keyboard-only, which is a decision rather than an oversight only if it is written down."
   }
  ]
 }
