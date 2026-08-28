@@ -655,15 +655,6 @@ text_overflow_floor.lua sweeps every fold-out ledger by sub-view. Its `tile` pan
 
 *Files: `scripts/verify/text_overflow_floor.lua`, `src/ui/tile_inspector.cpp`, `src/ui/text_fit.cpp`, `scripts/verify/parked/README.md`*
 
-### NR-698 — The deposit pivot is unverifiable from a script while tile data stays hidden from Lua
-*question · raised 2026-08-28 · from Sprint 22 (UI visibility), trying to prove BL-659.*
-
-lens_selection_paths.lua cannot demonstrate the deposit pivot: it needs to press a tile KNOWN to carry the lens resource, and the probe it picks carries no iron, so lens_structure_of_tile correctly returns none and the press falls through to the tile. The capture therefore shows a tile selection and the Economy panel rather than a deposit and the Market ledger — which looks like a broken feature and is actually a broken probe.
-
-THE STANDING RULE IS WHAT BINDS: "Do not expose individual tile data to Lua". A script cannot ask which tiles hold a deposit without something that answers that question. THE CALL: add a narrow verify-only query (a 'find me a tile carrying resource X' helper, which answers a question rather than exposing the tile table), or accept that this pivot is verified by a live click only and say so in the requirement. The second is cheaper and honest; the first makes the pivot regression-checkable forever.
-
-*Files: `scripts/verify/lens_selection_paths.lua`, `src/core/verify_api.cpp`, `.claude/rules/io-standing-rules.md`*
-
 ### NR-699 — A corporation's tile group is highlighted with a WASH, not the outline Ben asked for
 *decision · raised 2026-08-28 · from Sprint 23 (selection), taking Ben's tile-group ruling into BL-665.*
 
@@ -773,6 +764,19 @@ THE GAP THAT MATTERS MORE: the round trip is not covered by any harness, and nev
 The fix is a CMake-declared envelope harness linking imgui, on the font_glyph_harness precedent. Worth an item: a serialisation seam with no read/write test is exactly where the asymmetry that corrupts a snapshot hides, and the max_overlay bug (NR-703) came out of this same file today.
 
 *Files: `src/core/save_game.cpp`, `src/core/save_game.hpp`, `tools/verify/build_harness.js`*
+
+### NR-709 — 31 archived backlog records sit in an 'undated' cold file because the bucketer reads a field nobody writes
+*observation · raised 2026-08-28 · from Sprint 23 close-out; noticed when this sprint's own eleven items landed in the wrong cold file.*
+
+archive_store.js buckets a landed item by `item.resolved || item.written`. Nothing in the current filing convention writes either field - this session's items carried `completed` and `created`, which is what the backlog's own shape suggested - so all eleven went to backlog-design-undated.json instead of backlog-design-2026-Q3.json.
+
+FIXED FOR MINE, and only mine: the eleven records were moved to the Q3 file, their pointers repointed, and `resolved` added to the live items so a future re-archive agrees. The archiver's own verify passes and backlog_query resolves the prose through the new pointers.
+
+THIRTY-ONE OLDER RECORDS ARE STILL THERE (BL-008, BL-031, BL-032, BL-037...), and they predate this session. Nothing is broken - `undated` is a valid bucket and every pointer resolves - but the tool's stated reason for bucketing by date is that it 'keeps the files stable', and a bucket that collects everything whose date field was named differently does not.
+
+TWO WAYS TO CLOSE IT, and it is your call which: teach bucketFor to also read `completed`/`created` (one line, retroactively correct for everything), or settle a single field name for a landed item and sweep the 31. The first is cheaper and does not touch history.
+
+*Files: `tools/session/archive_store.js`, `docs/development/archive/backlog-design-undated.json`*
 
 ---
 

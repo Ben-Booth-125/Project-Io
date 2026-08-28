@@ -742,6 +742,70 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // WHERE a good is deposited on the active body — one tile, as coordinates.
+    //
+    // A DELIBERATE, RULED NARROWING of "do not expose individual tile data to
+    // Lua" (Ben, 2026-08-28, answering NR-698). The rule stands; this is the one
+    // hole cut in it, and the shape of the hole is the whole point:
+    //
+    //   * It returns a POSITION and nothing else. Not the deposit's magnitude,
+    //     not terrain, not habitability, not ownership — a script learns where to
+    //     put the cursor and learns nothing about what is there.
+    //   * It returns ONE tile, the first in raster order. There is no enumeration
+    //     and no count, so it cannot be walked into a map of the resource field.
+    //   * It is scoped to the ACTIVE BODY, which the script already chose.
+    //
+    // WHY IT HAD TO EXIST. The Resource lens's deposit pivot is only reachable by
+    // pressing ground that carries the selected good, and a script had no way to
+    // find such ground — so the deposit half of every lens check either swept
+    // blindly and reported a miss, or asserted nothing. NR-698 sat open through
+    // three waves for exactly this. A check that cannot aim is not a check.
+    //
+    // Verify-only by construction: this whole API is bound behind --verify.
+    v.set_function("find_deposit_tile", [this](const std::string& name) {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        out["ok"] = false;
+
+        const resource_type rt = resource_from_name(name);
+        const auto ri = static_cast<std::size_t>(rt);
+
+        // RASTER ORDER, not w.tiles iteration order: the tile map is unordered, so
+        // "the first tile carrying iron" would otherwise depend on hash layout and
+        // the check would aim somewhere new on an unrelated change.
+        const auto bit = m_world.bodies.find(m_ui.active_body);
+        if (bit == m_world.bodies.end())
+            return out;
+        const body_component& body = bit->second;
+
+        int best_col = -1, best_row = -1;
+        std::size_t best_key = static_cast<std::size_t>(-1);
+        for (const auto& [id, tile] : m_world.tiles)
+        {
+            if (tile.body != m_ui.active_body)
+                continue;
+            if (ri >= std::size(tile.resource_deposit)
+                || tile.resource_deposit[ri] <= 0.0f)
+                continue;
+            const std::size_t key =
+                static_cast<std::size_t>(tile.grid_y) * static_cast<std::size_t>(body.grid_width)
+                + static_cast<std::size_t>(tile.grid_x);
+            if (key < best_key)
+            {
+                best_key = key;
+                best_col = tile.grid_x;
+                best_row = tile.grid_y;
+            }
+        }
+        if (best_col < 0)
+            return out;   // the body carries none — the caller must say so, not pass
+
+        out["ok"]  = true;
+        out["x"]   = best_col;
+        out["y"]   = best_row;
+        return out;
+    });
+
     // What the canvas's own hit-test currently resolves under the synthetic
     // cursor, as ids only — the province the last click would land on, and
     // whether anything is selected. The ASSERTION half of a live check: a capture

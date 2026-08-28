@@ -18,7 +18,15 @@ rule has a fuller authority, it is cited — this file does not redefine it.
 
 - The simulation is **deterministic**: seeded world generation (`make_hard_coded_world`), a
   fixed Tick model. Do not introduce non-determinism into the `world/*` logic.
-- Do **not** expose individual tile data to Lua.
+- Do **not** expose individual tile data to Lua. **Scoped exception (Ben, 2026-08-28, ruling on
+  NR-698):** the verify API may answer *where* a good is deposited —
+  `verify.find_deposit_tile(good)` returns the grid position of ONE tile on the active body and
+  nothing else. Not the magnitude, not terrain, not ownership; one tile in raster order, so it
+  cannot be walked into a map of the resource field. The rule is otherwise unchanged. Reason for
+  the grant: the Resource lens's deposit pivot is reachable only by pressing ground that carries
+  the selected good, and a script had no way to find such ground — so that half of every lens check
+  swept blindly or asserted nothing, and a check that cannot aim is not a check. Verify-only by
+  construction (`src/core/verify_api.cpp`, bound behind `--verify`).
 - Do **not** use unprotected sol2 calls where errors can occur.
 - Do **not** add SQLite — flat binary serialisation is correct for the prototype.
 - Do **not** build AI faction behaviour beyond the data-model minimum stub. **Scoped

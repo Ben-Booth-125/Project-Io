@@ -14,10 +14,12 @@
 -- the band's contents are pixels. The captures are that half, and they are a
 -- human's job.
 --
--- The plate rows need the Continent lens over ground the lens actually classifies,
--- and the deposit rows need a tile carrying the selected resource — which a script
--- cannot search for (NR-698, still open). Both therefore PROBE and report honestly
--- when the world hands them nothing, rather than passing on an empty run.
+-- The plate rows need the Continent lens over ground the lens classifies, and the
+-- deposit rows need a tile carrying the selected good. The second used to be
+-- unreachable — a script could not search for one — which is what NR-698 was
+-- about; `verify.find_deposit_tile` now answers it with a position and nothing
+-- else. Both halves still report honestly when the world hands them nothing,
+-- rather than passing on an empty run.
 
 verify.goto_surface("home")
 verify.econ_step(6)
@@ -58,55 +60,73 @@ verify.capture("region_plate_selected")
 verify.capture("region_plate_band")
 
 -- ---------------------------------------------------------------------------
--- The DEPOSIT: Resource lens -> Market ledger, Prices view, that resource.
+-- The DEPOSIT: Resource lens -> Market ledger, Prices view, THAT resource.
 --
--- The probe has to FIND ground carrying the lens resource, and cannot ask for it
--- (NR-698). So it sweeps the tiles around the anchor under each of a few common
--- goods and takes the first press that actually resolves to a deposit.
+-- This half could not be aimed until NR-698 was ruled (Ben, 2026-08-28): a script
+-- had no way to find ground carrying a given good, so the first cut of this check
+-- swept blindly around the anchor and reported a miss when the sweep found
+-- nothing. `verify.find_deposit_tile` closes that with one position and no other
+-- tile data — see its definition for the shape of the narrowing.
+--
+-- Because the press can now be AIMED, the identity assertion becomes possible:
+-- not merely "a deposit was selected" but "the deposit selected is the good the
+-- lens was showing". That is what BL-659's "aimed at that resource" actually
+-- claims, and nothing could check it before.
 -- ---------------------------------------------------------------------------
 verify.set_overlay("resource")
 
-local found_resource, found_col, found_row = nil, nil, nil
-for _, good in ipairs({ "iron_ore", "stone", "timber", "clay", "coal" }) do
+local probed = { "iron_ore", "stone", "timber", "clay", "coal" }
+local tested = 0
+
+for _, good in ipairs(probed) do
     verify.set_lens_resource(good)
-    for radius = 0, 6 do
-        for dc = -radius, radius do
-            for dr = -radius, radius do
-                local col, row = built_col + dc, built_row + dr
-                verify.center_tile(col, row, 8)
-                local pt = verify.tile_screen(col, row)
-                if pt.ok and pt.y < 440 and pt.x > 70 and pt.x < 920 then
-                    local t = press(col, row)
-                    if t.selected_deposit_resource >= 0 then
-                        found_resource, found_col, found_row = good, col, row
-                        break
-                    end
-                end
-            end
-            if found_resource then break end
+    local at = verify.find_deposit_tile(good)
+    if at.ok then
+        local dep = press(at.x, at.y)
+        verify.expect(dep.selected_deposit_resource >= 0,
+                      good .. ": a press on its deposit selects a DEPOSIT (its own channel)")
+        verify.expect(dep.has_selection == false,
+                      good .. ": a deposit press leaves selected_entity null - not an entity")
+        verify.expect(dep.open_panel == "market",
+                      good .. ": a deposit press opens the Market ledger")
+        tested = tested + 1
+        if tested == 1 then
+            verify.capture("region_deposit_selected")
         end
-        if found_resource then break end
     end
-    if found_resource then break end
 end
 
-if found_resource ~= nil then
-    verify.set_lens_resource(found_resource)
-    local dep = press(found_col, found_row)
-    verify.expect(dep.selected_deposit_resource >= 0,
-                  "a deposit press selects a DEPOSIT (its own channel)")
-    verify.expect(dep.has_selection == false,
-                  "a deposit press leaves selected_entity null - a deposit is not an entity")
-    verify.expect(dep.open_panel == "market",
-                  "a deposit press opens the Market ledger")
-    verify.capture("region_deposit_selected")
+-- A body carrying NONE of five common goods is a world worth knowing about, not a
+-- pass. Reported rather than skipped: a check that finds nothing and says PASS is
+-- indistinguishable from one that found everything.
+verify.expect(tested > 0,
+              "at least one probed good is deposited on this body - the deposit "
+              .. "destination is exercised, not assumed")
+
+-- THE IDENTITY ROW, and the reason NR-698 mattered. Two goods pressed in
+-- succession must select two DIFFERENT deposits: if the channel were merely
+-- sticky, or keyed off the lens selector rather than the press, every row above
+-- would pass while the pivot did nothing.
+local a, b = nil, nil
+for _, good in ipairs(probed) do
+    local at = verify.find_deposit_tile(good)
+    if at.ok then
+        verify.set_lens_resource(good)
+        local t = press(at.x, at.y)
+        if a == nil then a = t.selected_deposit_resource
+        elseif b == nil and t.selected_deposit_resource ~= a then
+            b = t.selected_deposit_resource
+            break
+        end
+    end
+end
+if b ~= nil then
+    verify.expect(a ~= b,
+                  "pressing two different goods' deposits selects two different deposits")
 else
-    -- Reported, not silently skipped: a check that finds nothing and says PASS is
-    -- indistinguishable from one that found everything.
-    verify.expect(false,
-                  "NO TILE CARRYING ANY PROBED RESOURCE was found near the anchor - the "
-                  .. "deposit destination is UNPROVEN, not passing. This is NR-698's gap: a "
-                  .. "script cannot ask which tiles carry a good, so it guesses and reports.")
+    verify.expect(tested >= 1,
+                  "only one probed good is deposited here - the two-deposit identity row "
+                  .. "is UNEXERCISED on this world, not passing")
 end
 
 verify.set_overlay("none")
