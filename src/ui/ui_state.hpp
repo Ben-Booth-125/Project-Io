@@ -312,6 +312,38 @@ struct ui_state
     bool show_construction_panel = false; ///< Whether the Layer 4 construction / building-management panel is open. Toggled by the nav pane tab and the window's close button.
     bool show_build_ledger = false;       ///< Whether the tile-contextual construction ledger is open (BL-162). Opened by the tile Selection element's "Construct Buildings" button; reads selected_entity as the target tile. Not a nav-rail ledger — closed by close_all_panels and by selecting a new entity. The Selection element itself lives in the bottom band (BL-213), not the fold-out column.
     bool show_market_ledger = false; ///< Whether the Market Ledger is open.
+
+    /// Whether the Company ledger is open (BL-666). A column occupant with NO
+    /// nav-rail slot, following the tile build ledger's precedent
+    /// (`show_build_ledger` above): a company is not a population the player
+    /// browses, it is the thing under the cursor when a Company-lens holding is
+    /// clicked, so the only way in is that click. Closed by close_all_panels
+    /// like every other tenant of the fold-out column.
+    ///
+    /// The surface it opens is a declared PLACEHOLDER — it answers none of the
+    /// five axes a real ledger design answers (docs/ui/ledgers/README.md) and
+    /// says so on its face. It exists because Ben's 2026-08-28 ruling on the
+    /// corporation/company split requires the two lenses to land somewhere
+    /// DIFFERENT on click, and the company half had no destination at all.
+    bool show_company_ledger = false;
+
+    /// Which background firm the Company ledger is about — the click's payload,
+    /// held apart from `selected_entity` because the two answer different
+    /// questions: `selected_entity` stays the clicked HOLDING (a building, what
+    /// the Selection band inspects), while this names the FIRM behind it.
+    /// Collapsing them would make the ledger reinterpret a building id as a corp
+    /// id every frame. null_entity => the ledger draws its empty state rather
+    /// than vanishing, so a stale click reads as "nothing here", not as a bug.
+    entity_id selected_company = null_entity;
+
+    /// Which corporation the all-corporations table should aim its row at
+    /// (BL-666, the Corporation-lens half of the same ruling). Kept distinct
+    /// from `selected_company` for the same reason the two lenses are distinct
+    /// words: a corporation is the player or a rival, a company is a background
+    /// firm, and the two never share a destination. Written by the canvas click,
+    /// read by the corporations table; null_entity => the table aims at no row
+    /// in particular and lists as it always has.
+    entity_id selected_corporation_dossier = null_entity;
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
 
     /// Whether the Contracts ledger is open (BL-576). Nav-rail slot 13 —

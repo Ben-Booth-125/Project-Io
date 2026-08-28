@@ -48,6 +48,8 @@ void close_all_panels(ui_state& state)
     state.show_generation_ledger = false;
     state.show_economy_panel     = false;
     state.show_build_ledger      = false; // tile build ledger (BL-162) is a column occupant too
+    state.show_company_ledger    = false; // Company ledger (BL-666) — same shape: a column
+                                          // occupant reached by a canvas click, no rail slot
     state.show_decision_feed     = false; // AI decision feed (BL-407)
     state.show_strategy_readout  = false; // Strategy readout (BL-411)
     state.show_contracts_ledger  = false; // Contracts ledger (BL-576)
@@ -65,7 +67,12 @@ bool any_panel_open(const ui_state& state)
            state.show_tile_ledger       || state.show_economy_panel ||
            state.show_generation_ledger || state.show_tech_tree ||
            state.show_decision_feed     || state.show_strategy_readout ||
-           state.show_contracts_ledger;
+           state.show_contracts_ledger  ||
+           // Company ledger (BL-666). Counted here even though it has no rail
+           // slot, because its only consumer asks "does something already own
+           // the fold-out column?" — and it does. Leaving it out would let the
+           // tile build ledger draw over it.
+           state.show_company_ledger;
 }
 
 void draw_nav_pane(ui_state& state, float top_offset)
