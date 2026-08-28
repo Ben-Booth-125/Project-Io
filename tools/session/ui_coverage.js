@@ -230,15 +230,39 @@ if (flag('--captures')) {
     .filter((f) => !cutoff || fs.statSync(path.join(P(dir), f)).mtimeMs >= cutoff)
     .map((f) => f.replace(/\.png$/, ''));
 
-  // A capture belongs to the check whose name is the LONGEST matching prefix —
-  // longest, because `build_legibility` and `build_door_wide_roster` both prefix
-  // `build_`, and the shortest match would file them together.
-  const ownerOf = (shot) => {
-    let best = null;
-    for (const c of Object.keys(checks)) {
-      if ((shot === c || shot.startsWith(c + '_')) && (!best || c.length > best.length)) best = c;
+  // Ownership is decided by what each script actually NAMES, not by the filename's
+  // prefix. Prefix matching alone mis-files every capture produced by a lib.lua
+  // helper (tour_buildings, sweep_overlays), whose names owe nothing to the script
+  // that called it — that was 155 of 285 on the first run.
+  //   1. exact literal   verify.capture("x") / shot("x")   -> x belongs to that script
+  //   2. literal prefix  verify.capture("x" .. i)          -> x* belongs to that script
+  //   3. script-name prefix, longest wins, as the last resort
+  const literal = {};   // capture name -> check
+  const prefixes = [];  // {prefix, check}, longest first
+  for (const [name, c] of Object.entries(checks)) {
+    const src = fs.readFileSync(path.join(P(SCRIPTS), name + '.lua'), 'utf8');
+    for (const m of src.matchAll(/(?:verify\.capture|shot)\(\s*"([^"]*)"/g)) {
+      if (!literal[m[1]]) literal[m[1]] = c.name;
     }
-    return best;
+    // a concatenated or formatted name contributes its literal head as a prefix
+    for (const m of src.matchAll(/(?:verify\.capture|shot)\(\s*(?:string\.format\(\s*)?"([^"]*)"\s*(?:\.\.|,|%)/g)) {
+      // a format literal contributes only the part before its first specifier:
+      // "history_chain_round%d" matches the file history_chain_round0, "…%d" does not.
+      const head = m[1].split('%')[0];
+      if (head.length >= 3) prefixes.push({ prefix: head, check: c.name });
+    }
+    // lib.lua helpers that mint names with no reference to the caller's own name.
+    // sweep_overlays(p) -> "<p>_<NN>_<lens>"; tour_buildings() -> "building_<owner>_<type>".
+    for (const m of src.matchAll(/sweep_overlays\(\s*"([^"]+)"/g)) prefixes.push({ prefix: m[1], check: c.name });
+    if (/\btour_buildings\(/.test(src)) prefixes.push({ prefix: 'building_', check: c.name });
+    prefixes.push({ prefix: name + '_', check: c.name });
+    prefixes.push({ prefix: name, check: c.name });
+  }
+  prefixes.sort((a, b) => b.prefix.length - a.prefix.length);
+  const ownerOf = (shot) => {
+    if (literal[shot]) return literal[shot];
+    const hit = prefixes.find((p) => shot.startsWith(p.prefix));
+    return hit ? hit.check : null;
   };
   const byCheck = {};
   const unclaimed = [];
