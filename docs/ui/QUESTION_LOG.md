@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**45 surfaces** — 4 settled, 41 awaiting Ben's wording.
+**47 surfaces** — 5 settled, 42 awaiting Ben's wording.
 
 ---
 
@@ -212,6 +212,14 @@ alphabetical order.
 
 *Demanded by BL-602 · `src/ui/shell_metrics.cpp`, `src/ui/shell_metrics.hpp`, `src/ui/body_surface_canvas.cpp` · id `lens_chrome_region`*
 
+### Deposit and plate selection — the Resource and Continent lenses' hover highlight and click-through
+
+**Answers:** This region the lens has drawn — what is it, and where do I go to find out more about it?
+
+**Because:** A lens is a visual prelude to a ledger (Ben, 2026-08-28: "the lens is a visual prelude to whatever we design on ledgers using various charts and tables"), and until now two lenses drew a region that led nowhere. The Market lens had pivoted to its whole catchment since BL-603, but the Resource lens's deposit and the Continent lens's plate were explicitly excluded — lens_structure_of_tile recorded the reason, that a selection must be an entity and neither region is one, and that half-supporting them would "promise a pivot that does not arrive". This surface is that promise finally kept: hovering lights the whole region, and the click opens the ledger that can say something about it — Market (Prices, aimed at the resource) for a deposit, History for a plate. It costs no new screen space at all, which is the strongest form of earning it: the highlight reuses the catchment wash and the destinations are ledgers that already exist.
+
+*Demanded by BL-659 · `src/ui/ui_state.hpp`, `src/ui/body_surface_canvas.cpp`, `scripts/verify/lens_selection_paths.lua` · id `lens_region_selection`*
+
 ### Market Ledger
 
 **Answers:** What is this good worth here, and who is willing to trade it?
@@ -351,6 +359,14 @@ alphabetical order.
 ---
 
 ## Settled
+
+### Company lens — background-firm holdings on the Planetary canvas
+
+**Answers:** Who else is operating on this ground, besides the rivals I actually compete with?
+
+**Because:** It earns its space by taking a question OFF another surface rather than adding one. Until 2026-08-28 the Corporation lens drew every non-player firm, so it answered two questions at once and therefore neither: measured on the home body, 373 background-firm buildings across 80 companies against 33 rival buildings across 7 corporations, an 11:1 ratio in which the rivals were invisible inside their own lens. Splitting the population gives each lens one question. The pair is also the cheapest possible addition to learn — drawn identically, differing only in which firms they admit, so a player who can read one can read the other with no new vocabulary. Ben settled the words on the same day: a corporation is the player and its rivals, a company is a background firm (GLOSSARY.md).
+
+*Demanded by BL-663 · `src/ui/ui_state.hpp`, `src/ui/overlay.cpp`, `src/ui/body_surface_canvas.cpp` · id `company_lens`*
 
 ### Corporation dashboard
 

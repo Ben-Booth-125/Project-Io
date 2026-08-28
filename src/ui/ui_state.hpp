@@ -97,6 +97,17 @@ enum class structure_kind : uint8_t
     nation,      ///< A generated nation, selected by its national border band.
     market,      ///< A market and its whole catchment (Market and Scarcity lenses).
     corporation, ///< A corporation's holdings on the active body (Corporation lens).
+    // The two NON-ENTITY structures (Ben, 2026-08-28, choosing option A). Both
+    // are regions the lens already draws and the player could not select: a
+    // deposit is every tile carrying the lens's resource, a plate is a Voronoi
+    // region of `continent_state::plate_id`. Neither has an entity id, so
+    // neither travels in `selected_entity` — they get their own fields below, on
+    // the precedent BL-511 set with `selected_province` and BL-469 with the
+    // battle triple. `structure_hit_zone::id` carries a SYNTHETIC key for these
+    // (resource index / plate index, both +1 so 0 stays "none"), which is safe
+    // because every comparison also tests the kind.
+    deposit,     ///< A resource deposit — every tile carrying the lens's resource (Resource lens).
+    plate,       ///< A tectonic plate (Continent lens).
 };
 
 /// One segment of a structure's boundary, registered by the draw pass so the
@@ -451,6 +462,32 @@ struct ui_state
         selected_battle_province = 0;
         selected_battle_attacker = null_entity;
         selected_battle_defender = null_entity;
+    }
+
+    // --- The selected deposit and plate (BL-659 / BL-660) -----------------
+    // Ben, 2026-08-28, choosing option A: follow the battle precedent rather
+    // than give deposits and plates entity ids in world/. Both are regions the
+    // lens DRAWS and the player could not previously select, and
+    // `lens_structure_of_tile` recorded why — "a structure must be an ENTITY
+    // here, because that is what a selection is ... highlighting a region the
+    // player then cannot select would promise a pivot that does not arrive."
+    // These two fields are what make the pivot arrive.
+    //
+    // A deposit is keyed by its RESOURCE, not by a region id, because that is
+    // what the lens draws: the Resource lens fills every tile whose deposit of
+    // the selected resource is non-zero, contiguous or not. Keying it any finer
+    // than the drawing would break the rule the routing table is built on — the
+    // selection grain follows the drawing.
+    int selected_deposit_resource = -1; ///< resource_type index, -1 = none.
+    int selected_plate            = -1; ///< continent_state::plate_id index, -1 = none.
+
+    /// Clear both non-entity lens selections. Called by every other selection
+    /// path for the same reason `clear_battle_selection` is: the Selection
+    /// element must never have two things to draw.
+    void clear_lens_region_selection()
+    {
+        selected_deposit_resource = -1;
+        selected_plate            = -1;
     }
 
     // --- The selected mercenary contract (BL-577) ------------------------

@@ -1163,18 +1163,29 @@ entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx
 /// tile itself (Population, Industry) returns none and keeps tile grain — the
 /// selection grain follows the drawing, which is the whole rule.
 ///
-/// A structure must be an ENTITY here, because that is what a selection is. The
-/// Resource lens's contiguous deposit and the Continent lens's plate are regions
-/// with no entity id, so they are absent rather than half-supported: highlighting
-/// a region the player then cannot select would promise a pivot that does not
-/// arrive.
+/// A structure USED TO have to be an entity here, because that is what a selection
+/// is, and the Resource lens's deposit and the Continent lens's plate are regions
+/// with no entity id — so both were absent rather than half-supported, on the
+/// grounds that highlighting a region the player then cannot select promises a
+/// pivot that does not arrive.
+///
+/// BOTH NOW RESOLVE (Ben, 2026-08-28, choosing option A over giving them real
+/// entity ids in world/). They travel in `ui_state::selected_deposit_resource`
+/// and `selected_plate` rather than in `selected_entity`, exactly as the battle
+/// triple (BL-469) and `selected_province` (BL-511) do — the sanctioned shape in
+/// this codebase for a selection whose subject is not an entity. `out_id` carries
+/// a synthetic key for them (index + 1), which no caller may treat as an entity:
+/// every comparison pairs it with the kind, and the click path dispatches on the
+/// kind before it ever reaches `selected_entity`.
 ///
 /// @param tile_to_corp This frame's tile→owning-corp index, already built by the
 ///                     caller for the Corporation lens's own tint.
 structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
                                       entity_id tile,
                                       const std::unordered_map<entity_id, entity_id>& tile_to_corp,
-                                      entity_id* out_id)
+                                      entity_id* out_id,
+                                      const continent_state* plates = nullptr,
+                                      int grid_w = 0)
 {
     if (out_id != nullptr)
         *out_id = null_entity;
@@ -1196,6 +1207,47 @@ structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
         if (out_id != nullptr)
             *out_id = m;
         return structure_kind::market;
+    }
+    case overlay_mode::resource:
+    {
+        // The deposit as DRAWN: every tile whose selected-resource deposit is
+        // non-zero. Not a flood fill — the lens itself does not do one ("any tile
+        // carrying the resource is part of the deposit", LENSES.md), and the
+        // selection grain must follow the drawing or the highlight would disagree
+        // with the wash under it. So the whole resource on this body is one
+        // structure, and its key is the resource index.
+        const auto tit = w.tiles.find(tile);
+        if (tit == w.tiles.end())
+            return structure_kind::none;
+        const std::size_t sel = static_cast<std::size_t>(state.lens_resource);
+        if (sel >= std::size(tit->second.resource_deposit)
+            || tit->second.resource_deposit[sel] <= 0.0f)
+            return structure_kind::none;
+        if (out_id != nullptr)
+            *out_id = static_cast<entity_id>(sel) + 1u; // synthetic; +1 keeps 0 = none
+        return structure_kind::deposit;
+    }
+    case overlay_mode::continent:
+    {
+        // The plate as drawn: the Voronoi region of `plate_id`. A stagnant-lid
+        // body has one plate owning everything, which is a legitimate answer
+        // rather than a degenerate one — the key is still stable.
+        if (plates == nullptr || plates->plate_id.empty() || grid_w <= 0)
+            return structure_kind::none;
+        const auto tit = w.tiles.find(tile);
+        if (tit == w.tiles.end())
+            return structure_kind::none;
+        const std::size_t idx =
+            static_cast<std::size_t>(tit->second.grid_y) * static_cast<std::size_t>(grid_w)
+            + static_cast<std::size_t>(tit->second.grid_x);
+        if (idx >= plates->plate_id.size())
+            return structure_kind::none;
+        const int pid = plates->plate_id[idx];
+        if (pid < 0)
+            return structure_kind::none;
+        if (out_id != nullptr)
+            *out_id = static_cast<entity_id>(pid) + 1u; // synthetic; +1 keeps 0 = none
+        return structure_kind::plate;
     }
     // The Corporation lens is DELIBERATELY absent, and finding out why is worth
     // recording. Its structure is exactly the set of tiles carrying that corp's
@@ -1554,6 +1606,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // province_sync_entity witness exists to prevent, one selection kind
         // later.
         state.clear_battle_selection();
+                state.clear_lens_region_selection();
         state.province_sync_entity = state.selected_entity;
     }
 
@@ -2850,7 +2903,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             {
                 entity_id            tile_struct = null_entity;
                 const structure_kind sk = lens_structure_of_tile(w, state, id,
-                                                                 tile_to_corp, &tile_struct);
+                                                                 tile_to_corp, &tile_struct,
+                                                                 plates, gw);
                 if (sk == state.hovered_structure_kind && tile_struct == state.hovered_structure)
                 {
                     constexpr ImU32 lit = IM_COL32(255, 255, 255, 34);
@@ -3623,7 +3677,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     {
         entity_id sid = null_entity;
         const structure_kind sk =
-            lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &sid);
+            lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &sid, plates, gw);
         state.hovered_structure      = sid;
         state.hovered_structure_kind = sk;
     }
@@ -4162,6 +4216,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             //
             // It lands here rather than in the area resolver because this lens's
             // structure IS its marker tiles, so there is no ground to pivot from.
+            // Set when the click resolved to a NON-ENTITY structure (a deposit or
+            // a plate). Those take their own selection channels, so both the
+            // entity-structure branch and the tile fallback must stand down —
+            // without this the fallback would immediately select the tile under
+            // the pointer and overwrite the region the player just picked.
+            bool non_entity_structure = false;
+
             entity_id lens_through = null_entity;
             if (marker_hit != null_entity && state.overlay == overlay_mode::corporation)
             {
@@ -4187,15 +4248,59 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             {
                 entity_id area_id = null_entity;
                 const structure_kind area_kind =
-                    lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &area_id);
-                if (area_kind != structure_kind::none && area_id != null_entity)
+                    lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &area_id,
+                                           plates, gw);
+                // A DEPOSIT AND A PLATE ARE NOT ENTITIES, so they never reach
+                // `structure_hit` — that variable feeds `selected_entity` a few
+                // lines down, and a synthetic key landing there would read as a
+                // real entity to every surface that later resolves it. They are
+                // dispatched here instead, into their own fields (BL-659/BL-660,
+                // Ben's option A), and the entity path is skipped entirely.
+                if (area_kind == structure_kind::deposit || area_kind == structure_kind::plate)
+                {
+                    state.clear_lens_region_selection();
+                    state.clear_battle_selection();
+                state.clear_lens_region_selection();
+                    state.selected_entity      = null_entity;
+                    state.selected_province    = 0u;
+                    state.province_sync_entity = null_entity;
+                    state.selection_cycle_tile = null_entity;
+                    non_entity_structure = true;
+
+                    if (area_kind == structure_kind::deposit)
+                    {
+                        // "select a deposit going to the market ledger for this
+                        // item" (Ben, 2026-08-28). The resource is the key, and
+                        // the Market ledger already follows a selected resource,
+                        // so this opens the panel and the existing route aims it.
+                        state.selected_deposit_resource = static_cast<int>(area_id) - 1;
+                        close_all_panels(state);
+                        state.show_market_ledger = true;
+                    }
+                    else
+                    {
+                        // "click to the relevant history section, describing
+                        // collisions and the opposite" (Ben, 2026-08-28). The
+                        // History ledger is the destination; aiming it AT the
+                        // plate's own collision/rift record is BL-660's second
+                        // half and is not built — see PLACEHOLDER below.
+                        state.selected_plate = static_cast<int>(area_id) - 1;
+                        close_all_panels(state);
+                        state.show_tile_ledger = true;
+                    }
+                }
+                else if (area_kind != structure_kind::none && area_id != null_entity)
                 {
                     structure_hit = area_id;
                     struct_kind   = area_kind;
                 }
             }
 
-            if (structure_hit != null_entity)
+            if (non_entity_structure)
+            {
+                // Already dispatched into its own field above; nothing further.
+            }
+            else if (structure_hit != null_entity)
             {
                 // A structure is an ENTITY selection, so it takes the same
                 // mutual exclusion every marker hit does: the province clears,
@@ -4207,6 +4312,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 state.province_sync_entity = structure_hit;
                 state.selection_cycle_tile = null_entity;
                 state.clear_battle_selection();
+                state.clear_lens_region_selection();
 
                 // "Clicking opens up our market ledger for THAT market" (Ben,
                 // 2026-08-24). The ledger already follows the selection - BL-159
@@ -4333,6 +4439,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 else
                 {
                     state.clear_battle_selection();
+                state.clear_lens_region_selection();
                 }
             }
             else
