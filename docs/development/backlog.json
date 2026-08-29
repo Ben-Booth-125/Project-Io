@@ -84,7 +84,7 @@
       "design": "Ruled 2026-08-25 (Ben, Sprint 19 verdict form): keep 6.0 land tiles per centre; the retunes wait for the next (surfacing) sprint. The measured list from NR-630/NR-635, each a re-derivation against the live world, not a redesign: population_demand's demand_scale; workforce labour units per scale (1/3/10/30/100); the market carve's population anchoring; logistics node discounts (most tiles now near a centre); haulage_measure re-run for the price-band ceiling (its re-derive rule names map/scale changes). Measure first, then move constants - never clamp outcomes."
     },
     {
-      "status": "designed",
+      "status": "complete",
       "glyph": "~",
       "priority": "A",
       "difficulty": 4,
@@ -109,7 +109,10 @@
         "docs/ui/question_log.json",
         "docs/ui/ledgers/"
       ],
-      "design": "The surface for BL-626 (quarterly return) and the host of the buyout press. DESIGN-OWED BY CONSTRUCTION, not by omission: its question_log.json pair - the question it answers, why it earns its space, the item that demanded it - is required on every surface and its wording is Ben's. What is already settled: a table, one row per corporation, refreshed each quarter; exact figures where the firm files and a dash where it does not (FINANCE.md § Disclosure); no bands anywhere. Open: which rail slot it takes, and whether it absorbs the financial half of the slot-8 Corporations table (docs/ui/ledgers/corporation.md carries that as its own open question).\n\nBEN ANSWERED BOTH OPEN QUESTIONS, 2026-08-29, describing the new acquisitions ledger: \"This ledger should have a fold out option which displays a full table, sortable by type, end resource, input resource, profit... And any other useful fields.\"\n\nSO: (1) it takes NO rail slot of its own - it is the FOLD-OUT of BL-675 (acquisitions ledger), reached by the BL-214 full-canvas disclosure control the Corporation dashboard already uses. (2) It DOES absorb the financial half of the slot-8 Corporations table: BL-674 strips Reach and Share from that surface, and this table is where the per-firm financial read now lives. docs/ui/ledgers/corporation.md carried both as its own open questions; both are now closed and the doc should say so.\n\nCOLUMNS, from Ben's list plus what the feed already holds: type, end resource (the recipe's output), input resource, profit (the filed net - BL-626's quarterly return, and the trailing mean the price is read off), price, and ownership class. Sortable on each. Exact where the firm files, a dash where it does not, no bands (FINANCE.md § Disclosure).\n\nSTILL OWED AND STILL BEN'S: the question_log.json pair. Every surface carries the question it answers and why it earns its space, and that wording is his - the item cannot close without it."
+      "design": "The surface for BL-626 (quarterly return) and the host of the buyout press. DESIGN-OWED BY CONSTRUCTION, not by omission: its question_log.json pair - the question it answers, why it earns its space, the item that demanded it - is required on every surface and its wording is Ben's. What is already settled: a table, one row per corporation, refreshed each quarter; exact figures where the firm files and a dash where it does not (FINANCE.md § Disclosure); no bands anywhere. Open: which rail slot it takes, and whether it absorbs the financial half of the slot-8 Corporations table (docs/ui/ledgers/corporation.md carries that as its own open question).\n\nBEN ANSWERED BOTH OPEN QUESTIONS, 2026-08-29, describing the new acquisitions ledger: \"This ledger should have a fold out option which displays a full table, sortable by type, end resource, input resource, profit... And any other useful fields.\"\n\nSO: (1) it takes NO rail slot of its own - it is the FOLD-OUT of BL-675 (acquisitions ledger), reached by the BL-214 full-canvas disclosure control the Corporation dashboard already uses. (2) It DOES absorb the financial half of the slot-8 Corporations table: BL-674 strips Reach and Share from that surface, and this table is where the per-firm financial read now lives. docs/ui/ledgers/corporation.md carried both as its own open questions; both are now closed and the doc should say so.\n\nCOLUMNS, from Ben's list plus what the feed already holds: type, end resource (the recipe's output), input resource, profit (the filed net - BL-626's quarterly return, and the trailing mean the price is read off), price, and ownership class. Sortable on each. Exact where the firm files, a dash where it does not, no bands (FINANCE.md § Disclosure).\n\nSTILL OWED AND STILL BEN'S: the question_log.json pair. Every surface carries the question it answers and why it earns its space, and that wording is his - the item cannot close without it.",
+      "completed": "2026-08-29",
+      "resolved": "2026-08-29",
+      "summary": "Closed 2026-08-29, Sprint 24, and folded into BL-675 (acquisitions ledger) on Ben's own reading: \"In my mind, BL-627 is the Acquisitions ledger.\" It is - BL-675 is the two-group buy list and this was the sortable table behind its Profitability fold-out. One surface, two items only because this one predated Ben's 2026-08-29 instruction by three days. The table is built and merged at 9bd2c551. THE BLOCKER IS CLEARED: the question_log pair was design-owed BY CONSTRUCTION - the wording is Ben's by rule and he could not rule on it blind - and he settled both through an elicitation form: the ledger answers \"What can I buy now, and what am I saving for?\", the fold-out answers \"Who is making money, and what would owning them cost?\". Both entries are now status settled rather than drafted. Remaining work on the table is carried by BL-679 (binary fog listing) and BL-680 (profitability filters), not here."
     },
     {
       "status": "designed",
@@ -967,6 +970,82 @@
         "docs/ui/question_log.json"
       ],
       "design": "FILED SO A FINDING IS NOT DELETED ALONG WITH THE SURFACE THAT DISPLAYED IT WRONGLY. BL-676 retires the Economy panel on Ben's 2026-08-29 call. Two of its three views were duplicates and one was a visibility breach, but the Workforce view was answering a real question badly rather than answering a redundant one - and after the deletion nothing answers it at all.\n\nWHAT THE CAPTURE PASS MEASURED. The workforce table drew eighteen rows and every single one read \"82% (labour short)\". The panel's own doc had warned the mock fixture was uniform at 85% and said explicitly: verify against the live sim, not the CSV. Verified against the live sim - it is uniform there too.\n\nAND IT IS NOT A BUG. `report.workforce_contention` is the POOL-LEVEL min(1, supply/demand) keyed (corp, body), and every corp in the fixture holds on one body, so one pool yields one number correctly repeated eighteen times. The view is not broken; it is showing a quantity that cannot vary in the situation it is shown in.\n\nTHE ACTUAL FINDING: BL-614 (wage competition) SUPERSEDED that scalar and nothing surfaces what replaced it. economy_system.cpp says so in terms - when a pool is contended the uniform proportional scalar no longer applies; scarce labour allocates building by building, offered wage descending (base_wage x (1 + wage_bid)), building id ascending on a tie, each granted up to its demand until the pool is spent. The marginal building takes a partial grant and those below it get nothing. The factor a building actually runs at is `report.building_labour[id]`, and the pool aggregate survives only as a reporting figure.\n\nSo there is a real mechanic here - bidding for scarce labour, and losing a building's shift to a rival who bid higher - and the only surface that ever mentioned labour rendered it as one number eighteen times. `building_labour[id]` is per building and varies; it is the quantity a player would act on.\n\nDESIGN-OWED, AND DELIBERATELY NOT SCOPED HERE. Where this lives is open and is Ben's: a section on the building Selection card (per-building, where the number's grain actually is), a view on the Corporation dashboard beside the existing Workforce roll-up card, or a surface of its own. What is settled is only that it has no home today and that the Budget ledger's Wages tier currently has no visible consequence anywhere."
+    },
+    {
+      "id": "BL-678",
+      "short_name": "COMPANIES_ARE_OPEN",
+      "category": "Economy",
+      "title": "Retire ownership closure for companies - every background firm is transparent and buyable",
+      "status": "designed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.1.22",
+      "sprint": "24",
+      "written": "2026-08-29",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/economy/FINANCE.md",
+      "files": [
+        "src/world/corporation_generation.cpp",
+        "docs/economy/FINANCE.md",
+        "docs/GLOSSARY.md",
+        "docs/generation/CORPORATION_GENERATION.md",
+        "tools/verify/acquisition_viability.cpp",
+        "docs/ui/question_log.json"
+      ],
+      "design": "Ben, 2026-08-29, ruling through the design form: retire closure for COMPANIES ONLY - every background firm is transparent and buyable. CORPORATIONS KEEP THEIR CLASS. He raised it while reading the profitability table: \"Can you describe what closed means... closed seems to give no information. I might ask to retire closure, and ensure that all companies are 100% for sale and transparent. (But not corporations).\"\n\nWHAT PROMPTED IT, and it is worse than the column looked. `ownership_class` has three values and every consumer in the tree tests `!= publicly_held` - verify_api.cpp, acquisitions_ledger.cpp twice, corp_command.cpp's buy gate. NOTHING anywhere distinguishes `privately_held` from `closed`. It is a three-value enum doing a two-value job, and the third value exists only as a label in a column. Ben was offered the collapse to two values and DECLINED it, so the redundancy stays for now and is recorded rather than fixed - the enum is a serialised uint8_t and collapsing it is the one option in that form that touches the save envelope.\n\nTHE CHANGE. A background firm (`is_background`) is `publicly_held`, always. A corporation keeps the derivation it has - home region industrialisation timing and nation ideology, CORPORATION_GENERATION.md § Pass 2b.\n\nDETERMINISM IS THE BINDING CONSTRAINT. Apply the override AFTER the existing derivation rather than branching inside it, so the RNG stream is untouched and no downstream generation shifts. A background firm still consumes exactly the randomness it consumed before; only the stored value changes. If that cannot be done without moving the stream, stop and report rather than accepting the drift.\n\nMEASURE THE CONSEQUENCE BEFORE CALLING IT DONE, because it is large and it is not a UI number. The buyable field goes from a mean of 1.6 firms per seed to roughly 85 (measured pre-change: 1.6 public, 1.6 private, 84.8 closed, of 88). AND RIVALS BUY TOO - `buy_corporation` is scored in corp_ai.cpp's candidate list under the solvency gate (FINANCE.md § Rivals buy too). Making 85 firms acquirable could let a rival snowball through acquisition in a way the economy has never been exercised against. Re-run `tools/verify/acquisition_viability.cpp` across its twelve seeds and report: how many acquisitions actually occur over a run, rival solvency before and after, and whether field holdings concentrate. If the economy degenerates, that is a finding for Ben, not something to tune away.\n\nTHE FICTION HAS TO FOLLOW. GLOSSARY § Ownership class currently says the class does two jobs and no others, for corporations generally. FINANCE.md § Disclosure and § Who may be bought both read as universal rules. All three need to say that the class applies to CORPORATIONS and that companies are open by construction - a background firm is part of the commercial population the player trades with, not a rival whose books are its own.\n\nONE KNOCK-ON TO FIX WHILE HERE: the `acquisitions_ledger_field` question_log entry's justification cites the measured field size (\"one to three firms... because ownership class is overwhelmingly closed\"). That becomes false the moment this lands. Re-measure and rewrite that clause; do not leave a settled entry citing a stale number, which is precisely the failure docs/ui/ledgers/_critic_notes.md exists to warn about."
+    },
+    {
+      "id": "BL-679",
+      "short_name": "BINARY_FOG_LISTING",
+      "category": "UI",
+      "title": "A firm the player knows nothing about is not listed at all",
+      "status": "designed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 2,
+      "version_goal": "v0.1.22",
+      "sprint": "24",
+      "written": "2026-08-29",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/economy/FINANCE.md",
+      "files": [
+        "src/ui/acquisitions_ledger.cpp",
+        "docs/economy/FINANCE.md",
+        "docs/ui/ledgers/acquisitions.md"
+      ],
+      "design": "Ben, 2026-08-29: \"operational fog should hide details. But that should be binary. If we don't know what a company does, then we don't know anything about it. If we do know, then we get all information.\" Ruling through the form: known = every field; unknown = THE ROW IS NOT LISTED AT ALL.\n\nTHE PROBLEM IT FIXES. The profitability table draws every corporation in the world and gates three operational columns (type, end resource, input resource) on disclosure, so 85 of 88 rows render as a name, the word \"closed\", and five dashes. The table is correct and almost entirely empty; the two readable rows are lost in it.\n\nIT IS SMALLER THAN IT SOUNDS, and the reason is worth knowing before starting. There is NO fog term in this code at all. `discloses()` in acquisitions_ledger.cpp is already binary and reads ownership class alone - the graded band was retired in 2026-08-26. The per-column gate was an implementation choice layered on top of it, not a rule from any doc. So Ben's ruling is a FILTER, not a new predicate: list a row only where `discloses()` is true, and inside a listed row show every field unconditionally.\n\nWHAT GOES: the whole dash apparatus on this surface - `disclosure_dash`, the absent-sorts-last comparators that exist only so a dashed cell sorts sanely, and the ownership column's reason-on-hover. None of it has a subject once undisclosed rows are gone. Delete it rather than leaving it unreachable.\n\nWHAT STAYS, and do not conflate the two surfaces: the DIPLOMACY ledger (BL-674) still lists every corporation with a dash for Capital where the firm does not file. That is correct and unchanged - it is the relational read, and a rival you cannot price is still a rival you have a stance toward. This ruling is about the financial table only.\n\nCOMPOSES WITH BL-678 (companies are open), and the pair is the point. With closure retired for companies, every company discloses and is listed in full; a private or closed CORPORATION is simply absent from this table while still appearing under Diplomacy. Neither item needs the other to land, but the table only stops looking sparse when both have."
+    },
+    {
+      "id": "BL-680",
+      "short_name": "PROFITABILITY_FILTERS",
+      "category": "UI",
+      "title": "Filter the profitability table by end resource, input resource and body",
+      "status": "designed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 3,
+      "version_goal": "v0.1.22",
+      "sprint": "24",
+      "written": "2026-08-29",
+      "author": "Ben",
+      "requires": [
+        "BL-679"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/ui/ledgers/acquisitions.md",
+      "files": [
+        "src/ui/acquisitions_ledger.cpp",
+        "docs/ui/ledgers/acquisitions.md"
+      ],
+      "design": "Ben, 2026-08-29: \"Perhaps we should add filtering to the table, since closed seems to give no information.\" Ruling through the form, he chose THREE filters and declined four others: BY END RESOURCE, BY INPUT RESOURCE, BY BODY.\n\nWHAT HE DECLINED, and why the omissions are coherent rather than arbitrary. \"Affordable only\" and \"Profitable only\" were offered and not taken - the Purchasable / Possible split in the ledger above already answers affordability, and a profit sort answers the other. \"Hide the unknown\" was offered and not taken because his fog ruling (BL-679) removes unknown rows entirely, so the filter would have no subject. \"Name search\" was not taken. Do not add any of the four back.\n\nALL THREE FILTERS ARE SUPPLY-CHAIN QUESTIONS, which is the reading that should drive the implementation. End resource and input resource together let a player ask \"who makes the thing I need\" and \"who competes with me for the input I buy\" - the two questions that make buying a firm a strategic act rather than a purchase. Body scopes it to where the player can actually reach.\n\nThe filters are CROSS-CUTTING SELECTORS, not views, so they are exempt from the toggle rule (io-standing-rules.md § Toggle rule) exactly as the Market ledger's Body and Market combos are.\n\nPopulate each filter from the rows actually present rather than from the full resource registry - a filter offering forty goods where the visible field holds four is a worse surface than no filter. Combine as AND across the three, and say so on the surface when a combination yields nothing, rather than drawing an empty table."
     }
   ]
 }
