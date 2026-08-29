@@ -107,11 +107,7 @@ ledger releases whichever other ledger held the column, exactly as a rail press 
 band is independent of the column and stays where it is.
 
 ## Open questions for Ben
-- **Sort order of the type rows.** They are alphabetical — a neutral, deterministic order that
-  asserts nothing. Ranking them by total profit would be more useful and is defensible (they are
-  buildings the player already owns, so it is not the declined build-opportunity surface), but it
-  is still an ordering the ledger chooses. Alphabetical is the conservative reading of the line
-  drawn in `CONCEPT.md`.
+- ~~Sort order of the type rows.~~ **Answered** (Ben, 2026-08-29): *"I'm fine with alphabetical, we will probably reconsider it for a later version anyhow."* Alphabetical stands — a neutral, deterministic order that asserts nothing. The case for ranking by total profit is recorded rather than lost: it is defensible under `CONCEPT.md`'s line, since these are buildings the player already owns and ordering them is navigation rather than the declined build-opportunity surface. Revisit with the version that reconsiders it.
 - **Should the roster narrow to the SELECTION?** The design says "group all selected buildings, or
   all of them if none". Selection is single-entity today, so grouping over it collapses the roster
   to one row — and collapses it *under the press that selected the building*, destroying the
