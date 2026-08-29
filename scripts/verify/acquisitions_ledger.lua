@@ -32,6 +32,16 @@
 --       the buyable ones.
 --   A6  The Company lens's click lands HERE, and the Corporation lens's does not.
 --       The tile is read off verify.buildings(), never guessed.
+--   A7  BINARY FOG (BL-679). No undisclosed firm appears in the profitability
+--       table at all, and every row that IS listed carries every operational
+--       field — no fog dash survives anywhere in a listed row.
+--   A8  THE THREE FILTERS (BL-680) actually narrow. For each of end resource,
+--       input resource and body: pick a value PRESENT IN THE DATA, apply it,
+--       and assert every surviving row matches it. Swept over every option, not
+--       just the first.
+--   A9  The filter combos are REACHABLE — driven with verify.click on the real
+--       published control (open the combo, then press a real option), not only
+--       captured. The two presses are the two a player makes.
 
 verify.goto_surface("home")
 verify.window(1720, 980)
@@ -158,16 +168,196 @@ verify.expect(seen_possible or dearest.price == cheapest.price,
     "A3 the Possible group was non-empty at some point (or the field has one price)")
 
 -- ---------------------------------------------------------------------------
--- A5 — the profitability fold-out. Every corporation, not only the buyable
--- ones: that is the whole reason it earns a full-canvas takeover, and it is the
--- inversion the measurement found (a mean of 1.6 buyable firms against 88 rows
--- of filed returns).
+-- A5 / A7 — the profitability fold-out, under BINARY FOG (BL-679).
+--
+-- THE RULE CHANGED HERE, and the old assertion would now be wrong. This table
+-- used to list every corporation and dash out the cells it could not disclose.
+-- Ben's 2026-08-29 ruling made fog binary: a firm the player knows nothing
+-- about is not listed AT ALL, and a firm that discloses discloses everything.
+-- So what is asserted is the new rule, not the old one — listed == disclosed,
+-- and no fog dash anywhere inside a listed row.
+--
+-- EXPECT THIS TABLE TO BE SPARSE. On the shipped spawn a mean of 1.6 of 88
+-- corporations are publicly held, so ~3 rows is the CORRECT outcome of the rule
+-- on today's data, not a defect. The script therefore asserts the rule and
+-- prints the count, and does not assert a row count.
 -- ---------------------------------------------------------------------------
 verify.set_balance(dearest.price + 1000.0)
 verify.fold("acquisitions_profit", 0)
 verify.frames(2)
 verify.capture("acquisitions_ledger_profitability")
 verify.expect_no_clipping("acquisitions_profitability") -- VACUOUS here (NR-663); recorded, not relied on
+
+local pt = verify.acquisitions_profit()
+print(string.format("profit table: %d corps, %d listed, %d undisclosed and excluded",
+    pt.corps, pt.listed, pt.undisclosed))
+
+verify.expect(pt.listed + pt.undisclosed == pt.corps, string.format(
+    "A7 every corporation is either listed or excluded: %d + %d vs %d",
+    pt.listed, pt.undisclosed, pt.corps))
+verify.expect(pt.listed > 0,
+    "A7 at least one firm discloses - otherwise nothing below can be checked")
+verify.expect(pt.undisclosed > 0,
+    "A7 at least one firm is EXCLUDED - otherwise the exclusion is vacuous")
+
+-- Every listed row is disclosed by the surface's own predicate: the player's own
+-- corp, or a publicly held one. A private or closed firm reaching this table
+-- would be the exact defect BL-679 removes.
+local n_full, n_genuine = 0, 0
+for _, row in ipairs(pt.rows) do
+    verify.expect(row.is_player or row.class == "public", string.format(
+        "A7 no undisclosed firm is listed: '%s' is %s", row.name, row.class))
+    -- A listed row carries its operational fields. `has_input` false is a
+    -- GENUINE absence (an extractor consumes nothing), never fog, so it is
+    -- counted and reported rather than asserted away.
+    verify.expect(row.has_end, string.format(
+        "A7 a listed row names its end resource: '%s'", row.name))
+    verify.expect(row.has_profit or row.is_player, string.format(
+        "A7 a listed non-player row carries its filed profit: '%s'", row.name))
+    if row.has_end and row.has_input and row.has_profit and row.has_price then
+        n_full = n_full + 1
+    else
+        n_genuine = n_genuine + 1
+    end
+end
+print(string.format("  %d rows fully populated, %d carry a genuine absence "
+    .. "(extractor with no input, or the player's own unpriceable row)",
+    n_full, n_genuine))
+
+-- ---------------------------------------------------------------------------
+-- A8 — the three filters narrow, swept over EVERY option present in the data.
+--
+-- The option values are taken from the rows themselves, never from the resource
+-- registry: a filter is only meaningful on a value some row actually holds, and
+-- asserting against a registry value no row carries would assert on an empty
+-- set and pass vacuously.
+-- ---------------------------------------------------------------------------
+-- The rows keyed by corp id, so a `shown` id can be resolved back to the row it
+-- drew and checked against the filter that was set.
+local by_corp = {}
+for _, row in ipairs(pt.rows) do by_corp[row.corp] = row end
+
+local function sweep(slot, label, values, matches)
+    local n, narrowed = 0, 0
+    for _, v in ipairs(values) do
+        verify.set_acquisitions_filter(slot, v)
+        verify.frames(2)
+        local g = verify.acquisitions_profit()
+
+        -- ASSERTED AGAINST WHAT THE SURFACE DREW (`shown`), never against a
+        -- filter re-applied here. A script that re-derived the rule would grade
+        -- its own arithmetic and would keep passing if the table stopped
+        -- filtering entirely.
+        verify.expect(g.shown_count > 0, string.format(
+            "A8 %s = %d is present in the data, so the table keeps a row", label, v))
+        verify.expect(g.shown_count <= pt.listed, string.format(
+            "A8 %s filter never widens the set: %d shown of %d listed",
+            label, g.shown_count, pt.listed))
+        for _, corp in ipairs(g.shown) do
+            local row = by_corp[corp]
+            verify.expect(row ~= nil, string.format(
+                "A8 %s: a shown row is one of the disclosed set (corp %d)", label, corp))
+            if row then
+                verify.expect(matches(row, v), string.format(
+                    "A8 %s = %d: every surviving row matches - '%s' does not",
+                    label, v, row.name))
+            end
+        end
+        if g.shown_count < pt.listed then narrowed = narrowed + 1 end
+        n = n + 1
+    end
+    verify.set_acquisitions_filter(slot, -1)
+    verify.frames(2)
+    local g = verify.acquisitions_profit()
+    verify.expect(g.shown_count == pt.listed, string.format(
+        "A8 %s cleared to 'every' restores the full set: %d vs %d",
+        label, g.shown_count, pt.listed))
+    print(string.format("  %s: swept %d option(s); %d of them strictly narrowed the table",
+        label, n, narrowed))
+    return n, narrowed
+end
+
+-- Collect the option sets exactly as the surface does — from the listed rows.
+local function distinct(fn)
+    local seen, out = {}, {}
+    for _, row in ipairs(pt.rows) do
+        for _, v in ipairs(fn(row)) do
+            if not seen[v] then seen[v] = true; out[#out + 1] = v end
+        end
+    end
+    table.sort(out)
+    return out
+end
+
+local end_opts   = distinct(function(r) return r.has_end   and { r.end_res }   or {} end)
+local input_opts = distinct(function(r) return r.has_input and { r.input_res } or {} end)
+local body_opts  = distinct(function(r) return r.bodies end)
+
+verify.expect(#end_opts > 0, "A8 the end-resource filter has at least one option")
+verify.expect(#body_opts > 0, "A8 the body filter has at least one option")
+
+sweep(1, "end resource", end_opts,
+      function(row, v) return row.has_end and row.end_res == v end)
+sweep(2, "input resource", input_opts,
+      function(row, v) return row.has_input and row.input_res == v end)
+sweep(3, "body", body_opts, function(row, v)
+    for _, b in ipairs(row.bodies) do if b == v then return true end end
+    return false
+end)
+
+-- The AND combination, and the surface's own words when it yields nothing. Two
+-- filters that no single row satisfies together must produce the stated message
+-- rather than an empty table with headers.
+if #end_opts > 1 then
+    verify.set_acquisitions_filter(1, end_opts[1])
+    verify.set_acquisitions_filter(2, input_opts[1] or -1)
+    verify.frames(2)
+    verify.capture("acquisitions_ledger_filtered_and")
+    verify.set_acquisitions_filter(1, -1)
+    verify.set_acquisitions_filter(2, -1)
+    verify.frames(2)
+end
+
+-- ---------------------------------------------------------------------------
+-- A9 — the filter controls are REACHABLE, driven through verify.click on the
+-- real published positions. Two presses, the two a player makes: the first
+-- opens the combo (a popup has no position until it is on screen), the second
+-- lands on a real option. Asserted by reading the filter state back.
+-- ---------------------------------------------------------------------------
+for slot, label in ipairs({ "end resource", "input resource", "body" }) do
+    verify.set_acquisitions_filter(slot, -1)
+    verify.frames(2)
+
+    local c = verify.acquisitions_filter_control(slot)
+    verify.expect(c.ok, string.format(
+        "A9 the %s combo is drawn and published", label))
+    if c.ok then
+        verify.click(c.x, c.y)          -- press 1: open the popup
+        verify.frames(2)
+        verify.capture("acquisitions_ledger_filter_open_" .. slot)
+
+        local o = verify.acquisitions_filter_control(slot)
+        verify.expect(o.opt_ok, string.format(
+            "A9 the %s combo's first real option is published once open", label))
+        if o.opt_ok then
+            verify.click(o.opt_x, o.opt_y)   -- press 2: choose it
+            verify.frames(2)
+            local g = verify.acquisitions_profit()
+            local live = (slot == 1) and g.filter_end
+                      or (slot == 2) and g.filter_input
+                      or g.filter_body
+            local unset = (slot == 3) and 0 or -1
+            verify.expect(live ~= unset, string.format(
+                "A9 clicking the %s option actually SET the filter: now %s",
+                label, tostring(live)))
+            print(string.format("  %s: click set the filter to %s", label, tostring(live)))
+        end
+    end
+    verify.set_acquisitions_filter(slot, -1)
+    verify.frames(2)
+end
+
+verify.capture("acquisitions_ledger_filters")
 verify.fold()
 verify.frames(2)
 

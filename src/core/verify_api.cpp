@@ -1687,6 +1687,209 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // The PROFITABILITY table's row set, as the fold-out lists it (BL-679).
+    //
+    // Separate from `acquisitions_field` because the two answer different
+    // questions and now hold different populations: the field is what may be
+    // BOUGHT (public, filed, priceable), the profitability table is what may be
+    // READ (`discloses()` — the firm's own books, or a public firm's). A script
+    // that asserted one against the other would be checking a coincidence.
+    //
+    // The listing rule mirrors the ledger's own and nothing more: a row exists
+    // iff `discloses()`. Every field comes back populated or flagged absent, so
+    // a script can assert the whole of Ben's 2026-08-29 ruling — that a listed
+    // row carries every figure and an unlisted firm carries none — without
+    // reading pixels, which `expect_no_clipping` has already proved it cannot do
+    // on this class of surface (NR-663).
+    //
+    // `undisclosed` is the count deliberately NOT listed, so the exclusion can be
+    // asserted as a positive number rather than inferred from a short list.
+    v.set_function("acquisitions_profit", [this]() {
+        sol::table out = m_lua.state().create_table();
+
+        std::vector<entity_id> ids;
+        ids.reserve(m_world.corporations.size());
+        for (const auto& kv : m_world.corporations)
+            ids.push_back(kv.first);
+        std::sort(ids.begin(), ids.end());
+
+        const float k = m_registry.acquisition().multiple;
+        int corps = 0, listed = 0, undisclosed = 0;
+
+        sol::table rows = m_lua.state().create_table();
+        for (const entity_id id : ids)
+        {
+            const corporation_component& cc = m_world.corporations.at(id);
+            ++corps;
+
+            const bool is_player = cc.is_player || id == m_world.player_entity;
+            const bool discloses =
+                is_player || cc.ownership_class == ownership_class::publicly_held;
+            if (!discloses)
+            {
+                ++undisclosed;
+                continue;
+            }
+
+            // The holdings walk, in the same shape the ledger's own uses: the
+            // modal output, the modal processing input, and the body set.
+            std::array<int, resource_count> out_tally{};
+            std::array<int, resource_count> in_tally{};
+            std::vector<entity_id> bodies;
+            std::vector<entity_id> assets = cc.assets;
+            std::sort(assets.begin(), assets.end());
+            for (const entity_id bid : assets)
+            {
+                const auto bit = m_world.buildings.find(bid);
+                if (bit == m_world.buildings.end())
+                    continue;
+                const building_component& b = bit->second;
+                if (const auto tit = m_world.tiles.find(b.tile); tit != m_world.tiles.end())
+                    bodies.push_back(tit->second.body);
+
+                if (b.type == building_type::extraction_site)
+                {
+                    ++out_tally[static_cast<std::size_t>(b.target_resource)];
+                }
+                else if (b.type == building_type::processing_facility)
+                {
+                    if (b.recipe == no_recipe)
+                        continue;
+                    const recipe* rc = m_registry.get_recipe(b.recipe);
+                    if (rc == nullptr)
+                        continue;
+                    ++out_tally[static_cast<std::size_t>(primary_output_resource(*rc))];
+                    std::size_t best = resource_count;
+                    float best_v = 0.0f;
+                    for (std::size_t i = 0; i < resource_count; ++i)
+                        if (rc->inputs[i] > best_v) { best_v = rc->inputs[i]; best = i; }
+                    if (best < resource_count)
+                        ++in_tally[best];
+                }
+            }
+            std::sort(bodies.begin(), bodies.end());
+            bodies.erase(std::unique(bodies.begin(), bodies.end()), bodies.end());
+
+            const auto modal = [](const std::array<int, resource_count>& t,
+                                  bool& found, int& out_idx)
+            {
+                int best_n = 0;
+                std::size_t best_i = 0;
+                for (std::size_t i = 0; i < resource_count; ++i)
+                    if (t[i] > best_n) { best_n = t[i]; best_i = i; }
+                found = best_n > 0;
+                out_idx = found ? static_cast<int>(best_i) : -1;
+            };
+            bool has_end = false, has_input = false;
+            int  end_i = -1, in_i = -1;
+            modal(out_tally, has_end,   end_i);
+            modal(in_tally,  has_input, in_i);
+
+            sol::table row = m_lua.state().create_table();
+            row["corp"]      = static_cast<unsigned int>(id);
+            row["name"]      = cc.name;
+            row["is_player"] = is_player;
+            row["class"]     = std::string(
+                cc.ownership_class == ownership_class::publicly_held  ? "public"
+              : cc.ownership_class == ownership_class::privately_held ? "private"
+                                                                      : "closed");
+            row["has_end"]   = has_end;
+            row["has_input"] = has_input;
+            // -1 where absent, so a script never confuses "no input" with
+            // resource index 0, which is a good like any other.
+            row["end_res"]   = end_i;
+            row["input_res"] = in_i;
+            row["end_name"]   = std::string(
+                has_end ? ui::resource_name(static_cast<resource_type>(end_i)) : "");
+            row["input_name"] = std::string(
+                has_input ? ui::resource_name(static_cast<resource_type>(in_i)) : "");
+
+            sol::table bt = m_lua.state().create_table();
+            for (std::size_t i = 0; i < bodies.size(); ++i)
+                bt[i + 1] = static_cast<unsigned int>(bodies[i]);
+            row["bodies"] = bt;
+
+            row["has_profit"] = !cc.returns.empty();
+            row["profit"]     = cc.returns.empty() ? 0.0f : cc.returns.back().net;
+
+            bool  has_price = false;
+            float price     = 0.0f;
+            if (!is_player && cc.ownership_class == ownership_class::publicly_held
+                && !cc.returns.empty())
+            {
+                const float p = corp_acquisition_price(cc, k);
+                if (std::isfinite(p)) { price = p; has_price = true; }
+            }
+            row["has_price"] = has_price;
+            row["price"]     = price;
+
+            rows[++listed] = row;
+        }
+
+        // The live filter state, so a script asserts against what the surface is
+        // ACTUALLY showing rather than against what it asked for two frames ago.
+        out["filter_end"]   = m_ui.acquisitions_filter_end;
+        out["filter_input"] = m_ui.acquisitions_filter_input;
+        out["filter_body"]  = static_cast<unsigned int>(m_ui.acquisitions_filter_body);
+
+        // WHAT THE TABLE ACTUALLY DREW last frame, after the listing rule and
+        // all three filters — the surface's own output, not a restatement of
+        // its rules. `rows` above is the unfiltered disclosed set, so a script
+        // can compare the two and see exactly what the filter removed.
+        sol::table shown = m_lua.state().create_table();
+        for (std::size_t i = 0; i < m_ui.acquisitions_profit_shown.size(); ++i)
+            shown[i + 1] = static_cast<unsigned int>(m_ui.acquisitions_profit_shown[i]);
+        out["shown"]       = shown;
+        out["shown_count"] = static_cast<int>(m_ui.acquisitions_profit_shown.size());
+        out["corps"]        = corps;
+        out["listed"]       = listed;
+        out["undisclosed"]  = undisclosed;
+        out["rows"]         = rows;
+        return out;
+    });
+
+    // Where the profitability fold-out's three filter combos are, and where each
+    // one's first real option lands once open. Index 1 = end resource, 2 = input
+    // resource, 3 = body (Lua's 1-based, matching the script that reads it).
+    //
+    // Same reasoning as `acquisitions_buy_button`: the surface that drew the
+    // control is the only honest source for where it landed. `opt_ok` is false
+    // until the combo has been clicked open, because a popup that is not on
+    // screen has no position — so the two-press sequence a script must run
+    // (click the combo, re-read, click the option) is the one a player runs.
+    v.set_function("acquisitions_filter_control", [this](int slot) {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        const int i = slot - 1;
+        if (i < 0 || i > 2)
+        {
+            out["ok"] = false;
+            out["opt_ok"] = false;
+            return out;
+        }
+        out["ok"]     = (m_ui.acquisitions_filter_x[i] >= 0.0f);
+        out["x"]      = m_ui.acquisitions_filter_x[i];
+        out["y"]      = m_ui.acquisitions_filter_y[i];
+        out["opt_ok"] = (m_ui.acquisitions_filter_opt_x[i] >= 0.0f);
+        out["opt_x"]  = m_ui.acquisitions_filter_opt_x[i];
+        out["opt_y"]  = m_ui.acquisitions_filter_opt_y[i];
+        return out;
+    });
+
+    // Set one profitability filter directly, so a script can sweep EVERY option
+    // exhaustively rather than only the one the popup happens to draw first.
+    //
+    // This does not replace the click path and is not allowed to: the two-press
+    // click above is what proves the control is reachable, and this only proves
+    // the filtering rule holds across the whole option set. `slot` as above;
+    // `value` is a resource index, a body entity id, or -1 for "every".
+    v.set_function("set_acquisitions_filter", [this](int slot, int value) {
+        if (slot == 1)      m_ui.acquisitions_filter_end   = value;
+        else if (slot == 2) m_ui.acquisitions_filter_input = value;
+        else if (slot == 3) m_ui.acquisitions_filter_body  =
+            (value < 0) ? null_entity : static_cast<entity_id>(value);
+    });
+
     // BL-576: read every open mercenary offer — the id/client/target/fee/escrow
     // a script needs to drive `corp_command{verb=accept_offer, order=..., ...}`
     // against an offer it (or the live nation AI) produced, mirroring the

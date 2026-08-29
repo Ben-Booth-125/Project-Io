@@ -49,15 +49,20 @@ const char* ownership_class_label(ownership_class oc)
     return "?";
 }
 
-/// The dash, with its reason on hover. Drawn through one function everywhere so
-/// a dash can never mean two different things on two cells of the same row.
-void disclosure_dash(ownership_class oc)
-{
-    ImGui::TextDisabled("-");
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Does not file - %s corporations publish no return.",
-                          ownership_class_label(oc));
-}
+// THE DISCLOSURE DASH IS GONE, and its absence is the whole of BL-679.
+//
+// Ben, 2026-08-29: "operational fog should hide details. But that should be
+// binary. If we don't know what a company does, then we don't know anything
+// about it. If we do know, then we get all information." So an undisclosed firm
+// is not a row of dashes on the financial table — it is NOT LISTED. Once the
+// rows are gone the dash has no subject, and the reason-on-hover that explained
+// it has nothing left to explain, so both are deleted rather than left
+// unreachable.
+//
+// The DIPLOMACY ledger (corporation_panel.cpp) is a different surface and keeps
+// its own dash for Capital: a rival you cannot price is still a rival you hold a
+// stance toward, so there the row must stay and the figure must not. Do not
+// conflate the two — this ruling is about the financial table only.
 
 // ---------------------------------------------------------------------------
 // What a firm makes — derived from its holdings, never from a stored summary
@@ -73,6 +78,14 @@ struct operation
     bool has_input  = false;
     resource_type end_res   = resource_type::iron_ore;
     resource_type input_res = resource_type::iron_ore;
+
+    /// Every body this firm holds a building on, ascending and deduplicated.
+    ///
+    /// A SET, not a modal value, and that is the honest shape: a firm with sites
+    /// on two bodies is genuinely on both, and collapsing it to whichever it
+    /// holds more of would make the Body filter hide a firm the player can
+    /// actually reach. The filter therefore tests MEMBERSHIP.
+    std::vector<entity_id> bodies;
 };
 
 /// Walk @p cc's holdings and report the MODAL end resource and modal input
@@ -105,6 +118,12 @@ operation summarise_operation(const world& w, const recipe_registry& reg,
         if (bit == w.buildings.end())
             continue;
         const building_component& b = bit->second;
+
+        // Building -> tile -> body. Derived at draw time from the holdings, the
+        // same walk everything else on this row comes from, so the Body filter
+        // can never disagree with the buildings on canvas.
+        if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end())
+            op.bodies.push_back(tit->second.body);
 
         if (b.type == building_type::extraction_site)
         {
@@ -148,6 +167,9 @@ operation summarise_operation(const world& w, const recipe_registry& reg,
     };
     modal(out_tally, op.has_end,   op.end_res);
     modal(in_tally,  op.has_input, op.input_res);
+
+    std::sort(op.bodies.begin(), op.bodies.end());
+    op.bodies.erase(std::unique(op.bodies.begin(), op.bodies.end()), op.bodies.end());
     return op;
 }
 
@@ -360,18 +382,23 @@ void draw_group(const world& w, ui_state& s, const std::vector<offer_row>& rows,
 // The profitability fold-out (BL-627)
 // ---------------------------------------------------------------------------
 
-/// One row of the profitability table — every corporation, disclosed or not.
+/// One row of the profitability table — one DISCLOSED corporation.
+///
+/// There is no `disclosed` flag, and its absence is deliberate rather than an
+/// oversight: after BL-679 an undisclosed firm never becomes a row at all, so a
+/// flag that would read `true` on every row of every frame would be dead weight
+/// that invited a future cell to gate on it again.
 struct profit_row
 {
     entity_id   corp = null_entity;
     std::string name;
-    bool        disclosed = false;
     bool        is_player = false;
     ownership_class oc = ownership_class::closed;
     const char* type = "-";
     bool        has_end = false, has_input = false;
     resource_type end_res = resource_type::iron_ore;
     resource_type input_res = resource_type::iron_ore;
+    std::vector<entity_id> bodies;
     float       profit = 0.0f;   ///< the filed net of the most recent quarter
     bool        has_profit = false;
     float       price = 0.0f;
@@ -384,6 +411,14 @@ enum profit_col : int
     profit_col_count
 };
 
+/// The resource cell's word, or the GENUINE-ABSENCE dash.
+///
+/// The only dash left on this table, and it never means fog. An extraction site
+/// consumes no resource, so a pure extractor's input cell is a real absence
+/// rather than a withheld figure — the firm discloses fully and there is simply
+/// nothing to disclose. Kept distinct from the retired disclosure dash by
+/// construction: that one had a reason-on-hover explaining what was being
+/// withheld, and nothing is being withheld here.
 const char* res_or_dash(bool has, resource_type r)
 {
     return has ? resource_name(r) : "-";
@@ -397,24 +432,22 @@ void sort_profit_rows(std::vector<profit_row>& rows, int column, bool ascending)
     {
         switch (column)
         {
-            // The three OPERATIONAL columns are disclosure-gated, so an
-            // undisclosed cell sorts as ABSENT — the same rule the two money
-            // columns take below. A dash is not a value, and letting the dashes
-            // sort among the real words would make the ordering lie.
+            // THE ABSENT-SORTS-LAST TIE-BREAKS ARE GONE from the three
+            // operational columns (BL-679). They existed only so a dashed cell
+            // sorted sanely against a real word, and every listed row now
+            // carries a real word: a plain comparison is the whole rule.
             case col_type:
-                if (a.disclosed != b.disclosed) return a.disclosed;
                 return std::string(a.type) < std::string(b.type);
             case col_end:
-                if (a.disclosed != b.disclosed) return a.disclosed;
                 return std::string(res_or_dash(a.has_end, a.end_res))
                      < std::string(res_or_dash(b.has_end, b.end_res));
             case col_input:
-                if (a.disclosed != b.disclosed) return a.disclosed;
                 return std::string(res_or_dash(a.has_input, a.input_res))
                      < std::string(res_or_dash(b.has_input, b.input_res));
-            // An undisclosed figure sorts as ABSENT, not as zero: a dash is not
-            // a small number, and letting it sort among the real ones would
-            // make the ordering lie. Absent rows go last in either direction.
+            // The two money columns keep theirs, and the reason is different in
+            // kind: a listed firm may genuinely not have filed a quarter yet,
+            // and the player's own row has no price because it is not for sale.
+            // Neither absence is fog, and neither is a small number.
             case col_profit:
                 if (a.has_profit != b.has_profit) return a.has_profit;
                 return a.profit < b.profit;
@@ -432,6 +465,110 @@ void sort_profit_rows(std::vector<profit_row>& rows, int column, bool ascending)
                      { return ascending ? cmp(a, b) : cmp(b, a); });
 }
 
+const char* body_name(const world& w, entity_id id)
+{
+    const auto it = w.bodies.find(id);
+    return (it == w.bodies.end()) ? "?" : it->second.name.c_str();
+}
+
+/// One filter combo, drawn and published.
+///
+/// @param slot   0 = end resource, 1 = input resource, 2 = body — the index the
+///               published position arrays use.
+/// @param value  the live filter field, edited in place. @p none is "every".
+///
+/// Returns nothing; the press writes straight through. All three are CROSS-
+/// CUTTING SELECTORS and therefore exempt from the toggle rule (they switch a
+/// target rather than express an active state), exactly as the Market ledger's
+/// Body and Market combos are — so re-picking the current value is a no-op and
+/// deliberately not an undo.
+template <typename T, typename LabelFn>
+void filter_combo(ui_state& s, int slot, const char* label, const char* every_label,
+                  const std::vector<T>& opts, T& value, T none, LabelFn label_of)
+{
+    const char* preview = (value == none) ? every_label : label_of(value);
+
+    ImGui::SetNextItemWidth(ImGui::CalcTextSize(every_label).x + 90.0f);
+    const bool open = ImGui::BeginCombo(label, preview);
+
+    // Published AFTER the combo so the rect is this frame's, exactly as the Buy
+    // button's centre is.
+    const ImVec2 cmn = ImGui::GetItemRectMin();
+    const ImVec2 cmx = ImGui::GetItemRectMax();
+    s.acquisitions_filter_x[slot] = (cmn.x + cmx.x) * 0.5f;
+    s.acquisitions_filter_y[slot] = (cmn.y + cmx.y) * 0.5f;
+
+    if (open)
+    {
+        if (ImGui::Selectable(every_label, value == none))
+            value = none;
+
+        bool first = true;
+        for (const T& o : opts)
+        {
+            const bool sel = (o == value);
+            if (ImGui::Selectable(label_of(o), sel))
+                value = o;
+            // The first REAL option's centre — the one a verify script clicks to
+            // prove the selector actually narrows the table. "Every" is not it:
+            // selecting "every" changes nothing and would check nothing.
+            if (first)
+            {
+                const ImVec2 mn = ImGui::GetItemRectMin();
+                const ImVec2 mx = ImGui::GetItemRectMax();
+                s.acquisitions_filter_opt_x[slot] = (mn.x + mx.x) * 0.5f;
+                s.acquisitions_filter_opt_y[slot] = (mn.y + mx.y) * 0.5f;
+                first = false;
+            }
+            if (sel)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+}
+
+/// The three filters, on one line above the table.
+///
+/// COLUMN BUDGET: this row lives in the FULL-CANVAS fold-out, never in the
+/// ~358 px shell column — the profitability table has no in-column rung at all
+/// (`in_place = false` on its disclosure control, because 88 rows over seven
+/// columns do not fit a column at any font size). So the vertical cost of a
+/// filter row is charged against the canvas, which has it, and not against the
+/// column, which does not.
+void draw_filter_row(const world& w, ui_state& s,
+                     const std::vector<resource_type>& end_opts,
+                     const std::vector<resource_type>& input_opts,
+                     const std::vector<entity_id>&     body_opts)
+{
+    const auto res_label  = [](resource_type r) { return resource_name(r); };
+    const auto body_label = [&w](entity_id b)   { return body_name(w, b); };
+
+    auto end_v   = static_cast<resource_type>(std::max(s.acquisitions_filter_end, 0));
+    auto input_v = static_cast<resource_type>(std::max(s.acquisitions_filter_input, 0));
+
+    // A sentinel outside the enum's range, so "every" can never collide with a
+    // real resource — resource index 0 is a good like any other.
+    constexpr auto res_none = static_cast<resource_type>(resource_count);
+    if (s.acquisitions_filter_end   < 0) end_v   = res_none;
+    if (s.acquisitions_filter_input < 0) input_v = res_none;
+
+    filter_combo(s, 0, "End resource##acq_f_end", "Every end resource",
+                 end_opts, end_v, res_none, res_label);
+    ImGui::SameLine();
+    filter_combo(s, 1, "Input resource##acq_f_in", "Every input resource",
+                 input_opts, input_v, res_none, res_label);
+    ImGui::SameLine();
+    entity_id body_v = s.acquisitions_filter_body;
+    filter_combo(s, 2, "Body##acq_f_body", "Every body",
+                 body_opts, body_v, null_entity, body_label);
+
+    s.acquisitions_filter_end =
+        (end_v == res_none) ? -1 : static_cast<int>(end_v);
+    s.acquisitions_filter_input =
+        (input_v == res_none) ? -1 : static_cast<int>(input_v);
+    s.acquisitions_filter_body = body_v;
+}
+
 void draw_profit_table(const world& w, const recipe_registry& reg, ui_state& s)
 {
     std::vector<entity_id> ids;
@@ -447,67 +584,155 @@ void draw_profit_table(const world& w, const recipe_registry& reg, ui_state& s)
     for (const entity_id id : ids)
     {
         const corporation_component& cc = w.corporations.at(id);
+
+        // BL-679, AND IT IS THE WHOLE OF IT. A firm the player knows nothing
+        // about is not listed at all — the row is never built, rather than
+        // built and then dashed out cell by cell.
+        //
+        // This is a FILTER, not a new predicate. `discloses()` was already
+        // binary and already read ownership class alone; the per-column gate
+        // that used to sit on type / end resource / input resource was an
+        // implementation choice layered on top of it, never a rule any doc
+        // stated. Ben, 2026-08-29: "If we don't know what a company does, then
+        // we don't know anything about it. If we do know, then we get all
+        // information." So the gate moves from the CELL to the ROW, and inside
+        // a listed row every field prints unconditionally.
+        if (!discloses(w, id, cc))
+            continue;
+
         profit_row r;
         r.corp      = id;
         r.name      = cc.name;
         r.oc        = cc.ownership_class;
         r.is_player = cc.is_player || id == w.player_entity;
-        r.disclosed = discloses(w, id, cc);
 
         const operation op = summarise_operation(w, reg, cc);
-        r.type = operation_type_label(op);
+        r.type      = operation_type_label(op);
+        r.has_end   = op.has_end;
+        r.end_res   = op.end_res;
+        r.has_input = op.has_input;
+        r.input_res = op.input_res;
+        r.bodies    = op.bodies;
 
-        if (r.disclosed)
+        if (!cc.returns.empty())
         {
-            // TYPE, END RESOURCE AND INPUT RESOURCE ARE ALL DISCLOSURE-GATED,
-            // and that is a call rather than an oversight — flagged for Ben.
-            //
-            // BL-633's own note on this class of surface is explicit that "no
-            // production rate, stockpile quantity, RECIPE or workforce dial is
-            // readable here", and a firm's end and input resources ARE its
-            // recipe, read out. Printing them for every firm would widen the
-            // operational fog through a financial surface, which is not this
-            // surface's to widen.
-            //
-            // `type` was UNGATED in the first pass, on the argument that the
-            // building mix is visible on canvas (the same public fact the
-            // Corporation table's Reach column rests on). The capture pass
-            // overturned it on two counts: it is derived from the identical
-            // holdings walk as the two resource cells, so gating one and not
-            // the other made a single row report the same private fact twice
-            // at two different sensitivities; and it read "Mixed" on all
-            // eighty-eight rows, so ungating it bought no information to weigh
-            // against that. Consistency won.
-            r.has_end   = op.has_end;
-            r.end_res   = op.end_res;
-            r.has_input = op.has_input;
-            r.input_res = op.input_res;
-
-            if (!cc.returns.empty())
+            r.profit     = cc.returns.back().net;
+            r.has_profit = true;
+        }
+        // A price exists only where the VERB would price it: public, filed, and
+        // not the player's own corp. The player's own row is listed (a firm
+        // reads its own books) but has no price, because it cannot be bought
+        // through this seam.
+        if (!r.is_player && cc.ownership_class == ownership_class::publicly_held
+            && !cc.returns.empty())
+        {
+            const float p = corp_acquisition_price(cc, k);
+            if (std::isfinite(p))
             {
-                r.profit     = cc.returns.back().net;
-                r.has_profit = true;
-            }
-            // A price exists only where the VERB would price it: public, filed,
-            // and not the player's own corp. The player's own row is disclosed
-            // (a firm reads its own books) but has no price, because it cannot
-            // be bought through this seam.
-            if (!r.is_player && cc.ownership_class == ownership_class::publicly_held
-                && !cc.returns.empty())
-            {
-                const float p = corp_acquisition_price(cc, k);
-                if (std::isfinite(p))
-                {
-                    r.price     = p;
-                    r.has_price = true;
-                }
+                r.price     = p;
+                r.has_price = true;
             }
         }
         rows.push_back(r);
     }
 
+    // -----------------------------------------------------------------------
+    // BL-680 — the three cross-cutting selectors
+    //
+    // POPULATED FROM THE ROWS ACTUALLY PRESENT, never from the resource
+    // registry. A filter offering forty goods where the listed field holds four
+    // is a worse surface than no filter at all: every empty option is a
+    // question the table cannot answer, and the player has to press each one to
+    // find that out.
+    //
+    // The option sets are built from the LISTED set, before the filters narrow
+    // it — not from the post-filter set. Cascading them would let one choice
+    // empty another combo out from under its own current value, stranding the
+    // player in a state they could not see their way out of.
+    // -----------------------------------------------------------------------
+    std::vector<resource_type> end_opts, input_opts;
+    std::vector<entity_id>     body_opts;
+    for (const profit_row& r : rows)
+    {
+        if (r.has_end)   end_opts.push_back(r.end_res);
+        if (r.has_input) input_opts.push_back(r.input_res);
+        body_opts.insert(body_opts.end(), r.bodies.begin(), r.bodies.end());
+    }
+    const auto dedupe = [](auto& v)
+    {
+        std::sort(v.begin(), v.end());
+        v.erase(std::unique(v.begin(), v.end()), v.end());
+    };
+    dedupe(end_opts);
+    dedupe(input_opts);
+    dedupe(body_opts);
+
+    // A filter holding a value the world no longer offers (the firm was bought,
+    // the last site on a body closed) silently narrows to nothing and looks
+    // like a broken table. Drop it back to "every" instead.
+    const auto still_offered = [](const auto& opts, auto v)
+    { return std::find(opts.begin(), opts.end(), v) != opts.end(); };
+    if (s.acquisitions_filter_end >= 0 &&
+        !still_offered(end_opts, static_cast<resource_type>(s.acquisitions_filter_end)))
+        s.acquisitions_filter_end = -1;
+    if (s.acquisitions_filter_input >= 0 &&
+        !still_offered(input_opts, static_cast<resource_type>(s.acquisitions_filter_input)))
+        s.acquisitions_filter_input = -1;
+    if (s.acquisitions_filter_body != null_entity &&
+        !still_offered(body_opts, s.acquisitions_filter_body))
+        s.acquisitions_filter_body = null_entity;
+
+    draw_filter_row(w, s, end_opts, input_opts, body_opts);
+
+    const std::size_t listed_total = rows.size();
+
+    // AND across the three, which is the reading the three questions share: a
+    // player asking "who makes X, from Y, within reach of Z" is asking one
+    // question, not three.
+    const auto excluded = [&s](const profit_row& r)
+    {
+        if (s.acquisitions_filter_end >= 0 &&
+            !(r.has_end && static_cast<int>(r.end_res) == s.acquisitions_filter_end))
+            return true;
+        if (s.acquisitions_filter_input >= 0 &&
+            !(r.has_input && static_cast<int>(r.input_res) == s.acquisitions_filter_input))
+            return true;
+        if (s.acquisitions_filter_body != null_entity &&
+            std::find(r.bodies.begin(), r.bodies.end(), s.acquisitions_filter_body)
+                == r.bodies.end())
+            return true;
+        return false;
+    };
+    rows.erase(std::remove_if(rows.begin(), rows.end(), excluded), rows.end());
+
+    // SAID, NOT DRAWN EMPTY. A table with headers and no rows reads as a defect;
+    // the combination that produced it is the actual answer, so it is stated.
+    if (rows.empty())
+    {
+        ImGui::Spacing();
+        if (listed_total == 0)
+        {
+            ImGui::TextDisabled("No corporation discloses its return.");
+        }
+        else
+        {
+            ImGui::TextDisabled("No firm matches all three filters.");
+            ImGui::TextDisabled("  %zu firms disclose; this combination excludes every one.",
+                                listed_total);
+        }
+        return;
+    }
+
     if (s.acquisitions_sort_column >= 0)
         sort_profit_rows(rows, s.acquisitions_sort_column, s.acquisitions_sort_ascending);
+
+    // What this table is about to draw, in draw order. Published so a check can
+    // assert against the surface's own output rather than re-deriving the
+    // listing and filter rules and grading its own work.
+    s.acquisitions_profit_shown.clear();
+    s.acquisitions_profit_shown.reserve(rows.size());
+    for (const profit_row& r : rows)
+        s.acquisitions_profit_shown.push_back(r.corp);
 
     constexpr ImGuiTableFlags flags =
         ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Sortable |
@@ -585,18 +810,44 @@ void draw_profit_table(const world& w, const recipe_registry& reg, ui_state& s)
 
         ImGui::TableSetColumnIndex(col_firm);
         ImGui::TextUnformatted(r.name.c_str());
+        if (ImGui::IsItemHovered())
+        {
+            // WHERE the firm operates, on hover rather than in an eighth
+            // column. The Body filter needs to be legible — a player who
+            // narrows to a body must be able to see why a row survived — but a
+            // body column would cost width on a table already carrying two
+            // resource names, and this row is the only place the answer is
+            // wanted. The full name comes with it, for a cell that clipped.
+            std::string tip = r.name;
+            if (r.bodies.empty())
+            {
+                tip += "\nNo holdings on any body.";
+            }
+            else
+            {
+                tip += "\nOperates on: ";
+                for (std::size_t i = 0; i < r.bodies.size(); ++i)
+                {
+                    if (i > 0) tip += ", ";
+                    tip += body_name(w, r.bodies[i]);
+                }
+            }
+            ImGui::SetTooltip("%s", tip.c_str());
+        }
 
+        // THE THREE OPERATIONAL CELLS PRINT UNCONDITIONALLY (BL-679). Every row
+        // that reached here discloses, and a disclosing firm discloses
+        // everything — there is no per-column gate left to consult.
         ImGui::TableSetColumnIndex(col_type);
-        if (r.disclosed) ImGui::TextUnformatted(r.type);
-        else             disclosure_dash(r.oc);
+        ImGui::TextUnformatted(r.type);
 
         ImGui::TableSetColumnIndex(col_end);
-        if (r.disclosed) ImGui::TextUnformatted(res_or_dash(r.has_end, r.end_res));
-        else             disclosure_dash(r.oc);
+        ImGui::TextUnformatted(res_or_dash(r.has_end, r.end_res));
 
         ImGui::TableSetColumnIndex(col_input);
-        if (r.disclosed) ImGui::TextUnformatted(res_or_dash(r.has_input, r.input_res));
-        else             disclosure_dash(r.oc);
+        ImGui::TextUnformatted(res_or_dash(r.has_input, r.input_res));
+        if (!r.has_input && ImGui::IsItemHovered())
+            ImGui::SetTooltip("Consumes no resource - this firm only extracts.");
 
         ImGui::TableSetColumnIndex(col_profit);
         if (r.has_profit)
@@ -605,17 +856,13 @@ void draw_profit_table(const world& w, const recipe_registry& reg, ui_state& s)
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%s",
                                fmt::credits(r.profit).c_str());
         }
-        else if (r.disclosed)
+        else
         {
-            // Discloses, but has not filed a quarter yet. A different absence
-            // from a withheld one, and worded differently so the two never blur.
+            // Discloses, but has not filed a quarter yet. A GENUINE absence,
+            // and the only reason a Profit cell can now be empty.
             ImGui::TextDisabled("-");
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("Has not filed a return yet.");
-        }
-        else
-        {
-            disclosure_dash(r.oc);
         }
 
         ImGui::TableSetColumnIndex(col_price);
@@ -623,15 +870,13 @@ void draw_profit_table(const world& w, const recipe_registry& reg, ui_state& s)
         {
             ImGui::TextUnformatted(fmt::credits(r.price).c_str());
         }
-        else if (r.is_player)
+        else
         {
             ImGui::TextDisabled("-");
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Your own corporation. It is not for sale.");
-        }
-        else
-        {
-            disclosure_dash(r.oc);
+                ImGui::SetTooltip(r.is_player
+                    ? "Your own corporation. It is not for sale."
+                    : "Not priceable: this firm has not filed a return.");
         }
 
         ImGui::TableSetColumnIndex(col_class);
@@ -649,16 +894,28 @@ void draw_acquisitions_ledger(const world& w, const recipe_registry& reg,
     if (!open)
         return;
 
+    // Cleared BEFORE the fold-out draws, so a filter combo's position is
+    // published as absent in the frames the takeover is closed rather than
+    // lingering as a stale point a script would click into empty canvas.
+    for (int i = 0; i < 3; ++i)
+    {
+        s.acquisitions_filter_x[i]     = -1.0f;
+        s.acquisitions_filter_y[i]     = -1.0f;
+        s.acquisitions_filter_opt_x[i] = -1.0f;
+        s.acquisitions_filter_opt_y[i] = -1.0f;
+    }
+    s.acquisitions_profit_shown.clear();
+
     // The full-canvas profitability takeover. Drawn BEFORE the column so it is
     // reachable even in the frame the column has been clipped away, and because
     // the two coexist by design (BL-265): the row that opened the takeover stays
     // visible in the column beside it.
     if (fold_overlay_begin(s, detail_surface::acquisitions_profit, 0,
-                           "Profitability - every corporation's filed return"))
+                           "Profitability - every firm that files"))
     {
         ImGui::TextDisabled(
-            "One row per corporation. Exact figures where the firm files; a dash "
-            "where it does not. Sort on any column.");
+            "One row per firm that files. A firm that does not file is not listed - "
+            "if it discloses, every figure is here. Sort on any column.");
         ImGui::Separator();
         draw_profit_table(w, reg, s);
         fold_overlay_end(s);
@@ -740,7 +997,7 @@ void draw_acquisitions_ledger(const world& w, const recipe_registry& reg,
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                        "Profitability");
     disclosure_controls(s, detail_surface::acquisitions_profit, 0, /*in_place=*/false);
-    ImGui::TextDisabled("Every corporation's filed return, side by side.");
+    ImGui::TextDisabled("Every disclosing firm's return, side by side.");
 
     ui::foldout_end();
 }

@@ -290,6 +290,23 @@ set(IO_WARNING_FLAGS
     $<$<CXX_COMPILER_ID:MSVC>:/W4>)
 target_compile_options(ProjectIo PRIVATE ${IO_WARNING_FLAGS})
 
+# verify_api.cpp needs /bigobj on MSVC.
+#
+# It is one translation unit holding the WHOLE verify surface — every
+# `v.set_function(...)` binding, each of which instantiates a pile of sol2
+# templates — and it reached the COFF section limit (fatal error C1128) on the
+# addition of three more readers. The limit is 65,535 sections per object file;
+# /bigobj raises it to 2^32. Nothing about the code is wrong, and splitting the
+# file to dodge it would be a large refactor bought for no design reason.
+#
+# Scoped to the ONE file that needs it rather than the target, so a future TU
+# that quietly grows past the limit still reports it here instead of being
+# absorbed silently.
+if(MSVC)
+    set_source_files_properties(src/core/verify_api.cpp
+        PROPERTIES COMPILE_OPTIONS "/bigobj")
+endif()
+
 # ---------------------------------------------------------------------------
 # Precompiled header
 # Covers headers present in 5+ TUs. Excluded: sol2 (3 TUs, very slow to
