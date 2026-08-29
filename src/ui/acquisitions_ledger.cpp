@@ -960,10 +960,31 @@ void draw_acquisitions_ledger(const world& w, const recipe_registry& reg,
     ImGui::Separator();
     ImGui::Spacing();
 
-    // Two collapsing groups. Both open at rest — with a field this small, a
-    // collapsed group hides the whole answer. `CollapsingHeader` is a toggle by
-    // construction, which is the standing rule for any control whose active
-    // state is visible.
+    // THE FOLD-OUT'S DOOR SITS ABOVE THE GROUPS, and it moved here (Ben,
+    // 2026-08-29) because retiring closure for background firms moved the world
+    // under it. It was drawn last, beneath both groups, when the whole field was
+    // three rows and everything fitted at once. The field is now a mean of 81.6
+    // firms — Purchasable ~36, Possible ~46 — so a door drawn after them is a
+    // door below several screens of scroll, on the one surface whose full answer
+    // lives behind it.
+    //
+    // `in_place = false`: ~88 rows over seven columns do not fit a 380 px column
+    // at any font size, so only the `›` full-canvas control is drawn, and it
+    // keeps the same rightmost gutter as every other disclosure control in the
+    // app.
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                       "Profitability");
+    disclosure_controls(s, detail_surface::acquisitions_profit, 0, /*in_place=*/false);
+    ImGui::TextDisabled("Every disclosing firm's return, side by side.");
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // Two collapsing groups. Both open at rest — a collapsed group hides half
+    // the answer, and the two exist precisely to be read against each other.
+    // `CollapsingHeader` is a toggle by construction, which is the standing rule
+    // for any control whose active state is visible.
     char hdr[64];
     std::snprintf(hdr, sizeof hdr, "Purchasable (%zu)###acq_purch", purchasable.size());
     ImGui::SetNextItemOpen(s.acquisitions_purchasable_open, ImGuiCond_Always);
@@ -986,18 +1007,6 @@ void draw_acquisitions_ledger(const world& w, const recipe_registry& reg,
         // disabled button would say "refused" where the truth is "not yet".
         draw_group(w, s, possible, /*with_press=*/false, "##acq_poss_tbl");
     }
-
-    ImGui::Spacing();
-    ImGui::Separator();
-
-    // The fold-out's door. `in_place = false`: ~88 rows over seven columns do
-    // not fit a 380 px column at any font size, so only the `›` full-canvas
-    // control is drawn and it keeps the same rightmost gutter as every other
-    // disclosure control in the app.
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
-                       "Profitability");
-    disclosure_controls(s, detail_surface::acquisitions_profit, 0, /*in_place=*/false);
-    ImGui::TextDisabled("Every disclosing firm's return, side by side.");
 
     ui::foldout_end();
 }
