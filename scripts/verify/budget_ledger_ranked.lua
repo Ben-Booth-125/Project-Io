@@ -20,7 +20,6 @@ verify.build_first_valid()
 -- Run the economy long enough for construction to complete and buildings to report
 -- (well past the rank-change window of 4 econ ticks).
 verify.econ_step(24)
-verify.show_panel("economy", false)
 
 -- The last build left a building selected; capture once to settle that selection
 -- (a new selection closes any column panel), then open the Budget ledger — otherwise

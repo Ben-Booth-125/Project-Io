@@ -2,7 +2,7 @@
 
 **⚠ THIS CERTIFICATION IS VOID — the mock data was re-blessed after it was written (2026-08-04).**
 Every figure below is stale, and because this note *certified* them, it launders the same stale
-numbers into `balance.md`, `market.md`, `economy.md` and `tile_ledger.md`. Do not cite it.
+numbers into `balance.md`, `market.md` and `tile_ledger.md`. Do not cite it.
 
 What actually changed, spot-checked 2026-08-04: `markets.csv` now carries a **`market_id` column**
 (the gap the Market doc filed as a fix has shipped) and holds **4 markets over 68 rows**, not the

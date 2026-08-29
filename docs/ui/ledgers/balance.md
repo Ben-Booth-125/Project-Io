@@ -34,7 +34,7 @@ The surface is **one flat panel** — `SeparatorText` sections stacked in a sing
 - Runway → a smoothed trailing net over `balance_history` plus `cc.balance`, read in the header.
 - Laws → `world::laws` (`law::name`, `enacting_nation`, `rate`, `enacted`, `conditions`).
 
-**Scope boundary — do NOT duplicate Economy's Cashflow:** the Cashflow tab proposed here and the Economy panel's Cashflow view read the same `corp_budget` feed, and at the player level are the *identical* table. **Balance owns per-corp money detail** — solvency, cashflow, runway; Economy's Cashflow view is the player-slice of that and defers to this surface.
+**Scope boundary — this ledger owns the cashflow table.** **Balance owns per-corp money detail** — solvency, cashflow, runway, all off the `corp_budget` feed. Any other surface wanting the player's cashflow is asking for the identical table and defers here; a second view of the same six lines is a duplicate, not a summary.
 
 **Mock-data notes:**
 - **`starting_capital` is a placeholder in mock** (`corporations.csv` carries starting_capital=0, since_start=balance dup), so the "Since start" line reads as the full balance in mock data — live `corporation_component` has the real figure; don't tune off the CSV here.

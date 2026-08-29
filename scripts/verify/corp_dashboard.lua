@@ -1,6 +1,6 @@
 -- BL-248 (Corporation dashboard roll-ups) — requirements.json § corp-dashboard-rollups.
 -- Supersedes this script's BL-022 content: slot 1 no longer draws an
--- all-corporations balance table (that lives in the Economy panel's Corps view).
+-- all-corporations balance table (that lives on the Diplomacy slot).
 --
 --   R1  four roll-ups — Production / Trade / Workforce / Finance — each resting as
 --       ONE verdict line, each expanding through BL-214's shared chevron
@@ -11,7 +11,6 @@
 -- Ticks first: the roll-ups report a measured tick, and the Finance card says so
 -- explicitly rather than drawing five zeroes when no tick has been recorded.
 verify.econ_step(6)
-verify.show_panel("economy", false)
 verify.show_panel("corporation", true)
 
 -- ── R1: the resting dashboard. Four lines, four verdicts, no charts. ──

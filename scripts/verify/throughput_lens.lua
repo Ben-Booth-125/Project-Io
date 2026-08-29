@@ -19,7 +19,6 @@
 --
 -- Run with: ProjectIo --verify scripts/verify/throughput_lens.lua
 
-verify.show_panel("economy", false)
 verify.goto_surface("home")
 verify.set_overlay("throughput")
 

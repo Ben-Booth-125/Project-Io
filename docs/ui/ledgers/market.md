@@ -1,7 +1,7 @@
 # Market — design Q&A
 
 > **Working design doc** for the ledger-mockup pass (Power BI). Strawman answers — Ben revises.
-> Menu slot: `nav rail slot 5 "Market Ledger"` · Source: `src/ui/market_ledger.cpp` · Mock table(s): `markets.csv`, `stockpiles.csv` · Owning items: `BL-453` (convoys ledger), `BL-037` (sell-order routing)
+> Menu slot: `nav rail slot 6 "Market Ledger"` · Source: `src/ui/market_ledger.cpp` · Mock table(s): `markets.csv`, `stockpiles.csv` · Owning items: `BL-453` (convoys ledger), `BL-037` (sell-order routing)
 > Host: shell fold-out column, ~380px @1720 (derived — `shell_column_width(disp.x)`, 380–460 by resolution).
 
 ## 1. Top question — the one thing this answers at first glance

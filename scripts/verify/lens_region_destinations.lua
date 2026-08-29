@@ -23,7 +23,6 @@
 
 verify.goto_surface("home")
 verify.econ_step(6)
-verify.show_panel("economy", false)
 
 local built_col, built_row, home_body = nil, nil, nil
 for _, b in ipairs(verify.buildings()) do

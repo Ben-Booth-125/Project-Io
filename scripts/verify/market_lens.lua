@@ -13,10 +13,8 @@
 
 verify.goto_surface("home")
 
--- Diverge the per-body market prices from base, then clear the economy panel that
--- econ_step opens so it does not obscure the canvas capture.
+-- Diverge the per-body market prices from base before the canvas capture.
 verify.econ_step(12)
-verify.show_panel("economy", false)
 
 verify.set_overlay("market")
 

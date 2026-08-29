@@ -12,14 +12,12 @@ verify.goto_surface("home")
 
 -- Live data everywhere: balances, markets, sparkline, chat epoch lines.
 verify.econ_step(4)
-verify.show_panel("economy", false)
 
 -- Header + bare shell (comms dock included in every frame).
 verify.capture("overflow_shell")
 
 -- Every fold-out ledger, walking each button-strip sub-view.
 local panels = {
-    { name = "economy",      views = { "economy", 0, 2 } },
     { name = "construction", views = nil },
     { name = "tile",         views = { "history", 0, 2 } },
     { name = "market",       views = { "market", 0, 2 } },

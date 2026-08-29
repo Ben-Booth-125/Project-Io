@@ -25,7 +25,6 @@
 
 verify.goto_surface("home")
 verify.econ_step(6)
-verify.show_panel("economy", false)
 
 -- A tile the PLAYER has built on: guaranteed to carry a marker, and guaranteed
 -- to be owned, so it exercises the corporation group and the marker rule at once.

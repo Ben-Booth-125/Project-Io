@@ -3984,8 +3984,8 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     ImGui::BeginChild("##build_list", {0.0f, 0.0f}, false,
                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysVerticalScrollbar);
     // BL-326: candidates are pre-sorted category-then-name, so each category's rows are
-    // contiguous — walk the list opening a TreeNodeEx (this file's existing fold idiom,
-    // e.g. economy_panel.cpp) whenever the category changes, and close it once its rows
+    // contiguous — walk the list opening a TreeNodeEx (this file's existing fold idiom)
+    // whenever the category changes, and close it once its rows
     // are drawn. Defaulted open, matching the fold usage elsewhere in the UI.
     std::string open_category;
     bool        category_open = false;

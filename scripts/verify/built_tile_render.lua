@@ -33,7 +33,6 @@
 
 verify.econ_step(4)
 verify.goto_surface("home")
-verify.show_panel("economy", false)
 
 -- A RIVAL's building by preference: the owner tint on a rival differs from the player's,
 -- so this frame also carries the identity read. Falls back to any building rather than

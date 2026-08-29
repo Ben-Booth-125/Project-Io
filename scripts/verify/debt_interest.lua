@@ -9,6 +9,5 @@
 verify.econ_step(4)          -- warm the economy and accumulate some balance history
 verify.set_balance(-5000)    -- push the player corp underwater (BL-073 verify hook)
 verify.econ_step(1)          -- one tick: operating flows + interest on the debt
-verify.show_panel("economy", false)
 verify.show_panel("balance", true)
 verify.capture("debt_interest_ledger")

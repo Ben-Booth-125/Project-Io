@@ -41,12 +41,10 @@ verify.clear_selection()
 local offer_id = verify.inject_offer{ province = target_province, fee = 400, deadline_in = 1 }
 assert(offer_id ~= 0, "inject_offer could not resolve a client nation for that province")
 
--- econ_step (below, for the deadline) opens the Economy panel as a side
--- effect; show_panel writes ui_state DIRECTLY rather than routing through
+-- show_panel writes ui_state DIRECTLY rather than routing through
 -- close_all_panels (decision_feed.lua's own R5 note explains why), so the
 -- column can otherwise hold two open windows at once. Close it explicitly —
 -- the same fix decision_feed.lua applies to itself.
-verify.show_panel("economy", false)
 verify.show_panel("contracts", true)
 verify.panel_view("contracts", 0) -- Offers
 
@@ -96,9 +94,6 @@ for _ = 1, 5 do
 end
 assert(settled, "the contract did not reach a terminal state within 5 ticks of its deadline")
 
--- Each econ_step call above re-opens the Economy panel (its own side effect);
--- close it again before the History capture for the same reason as above.
-verify.show_panel("economy", false)
 verify.panel_view("contracts", 2) -- History
 verify.capture("contracts_ledger_history")
 

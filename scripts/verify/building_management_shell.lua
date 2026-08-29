@@ -11,7 +11,6 @@
 --
 -- Run: ProjectIo --verify scripts/verify/building_management_shell.lua
 verify.econ_step(6)                       -- populate run states + market prices
-verify.show_panel("economy", false)
 verify.goto_surface("home")               -- Kepler: player buildings visible
 
 -- Prefer a PROCESSING building: the Method page is the one surface here that has

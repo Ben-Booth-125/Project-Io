@@ -11,7 +11,6 @@
 -- Run with: ProjectIo --verify scripts/verify/roads.lua
 
 verify.econ_step(4)                     -- populate market state (build-cost context)
-verify.show_panel("economy", false)
 verify.goto_surface("home")             -- Kepler surface: the generated road lattice
 verify.capture("roads_surface")
 

@@ -81,7 +81,6 @@ verify.clear_selection()
 local offer_id = verify.inject_offer{ province = target_province, fee = 600, deadline_in = 25 }
 assert(offer_id ~= 0, "mercenary_slice: inject_offer could not resolve a client nation")
 
-verify.show_panel("economy", false)
 verify.show_panel("contracts", true)
 verify.panel_view("contracts", 0) -- Offers
 verify.capture("mercenary_slice_01_offer")
@@ -115,7 +114,6 @@ verify.show_panel("contracts", false)
 verify.corp_command{ verb = VERB_MARCH_UNIT, corp = player_corp,
                      subject = contract_unit.id, province = target_province }
 verify.econ_step(1)
-verify.show_panel("economy", false) -- econ_step's own side effect (contracts_ledger.lua's own note)
 local at_col, at_row = contract_unit.col, contract_unit.row
 for _, u in ipairs(verify.units()) do
     if u.id == contract_unit.id then at_col, at_row = u.col, u.row end
@@ -141,7 +139,6 @@ for i = 1, 30 do
     if contact_tick then break end
 end
 assert(contact_tick, "mercenary_slice: the garrison took no casualties within 30 ticks of contact")
-verify.show_panel("economy", false)
 verify.center_tile(garrison.col, garrison.row, 8.0)
 verify.frames(2)
 verify.capture("mercenary_slice_04_battle_card")
@@ -170,7 +167,6 @@ assert(settled.state == "completed",
        "mercenary_slice: the contract's terminal state was '" .. settled.state ..
        "', not 'completed' -- see the capture for evidence")
 
-verify.show_panel("economy", false)
 verify.show_panel("contracts", true)
 verify.panel_view("contracts", 2) -- History
 verify.capture("mercenary_slice_05_completed_contract")

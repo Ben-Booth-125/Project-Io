@@ -582,9 +582,8 @@ the pull reads one of them). Deliberately asserts only the structural half —
 which market gets picked is not stable across standard libraries, so the varying
 numbers are printed rather than asserted.
 
-Each exits non-zero on a failed assertion. The economy *panel* (the visual class)
-is verified separately via `ProjectIo --verify scripts/verify/economy_panel.lua`
-(the `verifier-visual` skill).
+Each exits non-zero on a failed assertion. The visual class is verified separately,
+through `ProjectIo --verify scripts/verify/<name>.lua` (the `verifier-visual` skill).
 
 ## nation_wiring (Sprint N3 slice 1)
 

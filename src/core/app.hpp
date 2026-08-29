@@ -288,7 +288,7 @@ private:
     void ensure_works_loaded();
 
     /// Run one economy tick: production → market clearing → budget, storing the
-    /// per-building report for the economy panel. Driven by the econ-tick boundary
+    /// per-building report the ledgers read. Driven by the econ-tick boundary
     /// in run() and by the verify API.
     void step_economy();
 
@@ -468,7 +468,7 @@ private:
     contract_template_registry m_contract_templates; ///< BL-573: mercenary-contract kinds, loaded from scripts/contracts.lua at startup, threaded into run_nation_step exactly like m_registry.
     works_registry  m_works;             ///< BL-321 Era -1 works table, loaded from scripts/works.lua at startup.
     tech_tree_registry m_tech_tree;      ///< BL-087 mock tech/quest tree, loaded from Lua at startup; F9 viewer only.
-    economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the economy panel.
+    economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the ledgers.
     std::vector<corp_standing> m_last_corp_standings; ///< Per-corp standing profile (BL-262 first slice), recomputed each econ tick from m_last_econ_report's cash flow; read by the Corporations panel. Transient runtime cache — NOT serialised, same as m_last_econ_report.
     ui::chat_state  m_chat;              ///< Comms log state (BL-205): channels, messages, drafts.
     std::vector<persona::pack> m_persona_bench; ///< Seated mountain bench (BL-207 slice 1); empty if load_bench() failed.
@@ -480,8 +480,8 @@ private:
     /// econ_tick, so a loaded campaign rotates exactly as an unsaved one.
     uint64_t        m_econ_steps = 0;
     std::vector<float> m_balance_history;      ///< Recent player balances (one per econ tick, capped); feeds the header net + sparkline.
-    std::vector<float> m_income_history;      ///< Recent player income per econ tick (market sales); feeds economy panel graph.
-    std::vector<float> m_expenditure_history; ///< Recent player expenditure per econ tick (auto-buys + wages + maintenance); feeds economy panel graph.
+    std::vector<float> m_income_history;      ///< Recent player income per econ tick (market sales); feeds the Budget ledger's profit chart.
+    std::vector<float> m_expenditure_history; ///< Recent player expenditure per econ tick (auto-buys + wages + maintenance); feeds the Budget ledger's profit chart.
     ui::market_plot_history m_market_history; ///< Price / supply / demand history per market, per resource; feeds market ledger graphs.
     std::deque<std::unordered_map<entity_id, int>> m_building_rank_hist; ///< Player-building profit rankings (entity→rank), one snapshot per econ tick, last 5 kept; the oldest is ~4 ticks (a year) back, feeding the Budget ledger's rank-change column (BL-171).
 

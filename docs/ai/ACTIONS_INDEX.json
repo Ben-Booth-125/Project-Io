@@ -287,11 +287,11 @@
   ],
   [
    "ledger.corps_table_row_select",
-   "All-corporations balance table (nav slot 9)"
+   "All-corporations balance table (nav slot 8)"
   ],
   [
    "ledger.nav_generation",
-   "Nav rail, slot 11 (plate/continent glyph)"
+   "Nav rail, slot 10 (plate/continent glyph)"
   ],
   [
    "ledger.generation_view_tab",
@@ -335,7 +335,7 @@
   ],
   [
    "ledger.nav_construction",
-   "Nav rail, slot 7 (Construction icon)"
+   "Nav rail, slot 3 (Construction icon)"
   ],
   [
    "ledger.nav_corporation",
@@ -343,15 +343,11 @@
   ],
   [
    "ledger.nav_corporations_table",
-   "Nav rail, slot 9 (Diplomacy icon - provisionally hosts the corporations table)"
-  ],
-  [
-   "ledger.nav_economy",
-   "Nav rail, slot 3 (Workforce icon - provisionally hosts the Economy panel)"
+   "Nav rail, slot 8 (Diplomacy icon - provisionally hosts the corporations table)"
   ],
   [
    "ledger.nav_history",
-   "Nav rail, slot 10 (History icon)"
+   "Nav rail, slot 9 (History icon)"
   ],
   [
    "ledger.nav_market",
@@ -527,7 +523,7 @@
   ],
   [
    "ledger.decision_feed_open",
-   "Navigation rail slot 12, \"AI decisions\""
+   "Navigation rail slot 11, \"AI decisions\""
   ],
   [
    "ledger.decision_feed_filter_corp",
@@ -567,7 +563,7 @@
   ],
   [
    "ledger.strategy_readout_open",
-   "Navigation rail slot 13, \"Strategy readout\""
+   "Navigation rail slot 12, \"Strategy readout\""
   ],
   [
    "ledger.strategy_readout_select_corp",
@@ -607,7 +603,7 @@
   ],
   [
    "ledger.nav_contracts",
-   "Nav rail, slot 14 (Contracts icon — a page with a signed check mark)"
+   "Nav rail, slot 13 (Contracts icon — a page with a signed check mark)"
   ],
   [
    "ledger.contracts_view_tab",

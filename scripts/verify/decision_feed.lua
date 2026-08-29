@@ -17,8 +17,6 @@ verify.spectate(true)
 -- appear rather than only the opening build rush.
 verify.econ_step(24)
 
--- econ_step opens the economy panel; the column holds ONE occupant, so close it
--- explicitly.
 --
 -- R5 IS NOT CHECKED HERE, and saying so is the point. `show_panel` writes the
 -- ui_state flag DIRECTLY — it never routes through `close_all_panels`, and there
@@ -29,7 +27,6 @@ verify.econ_step(24)
 -- come out byte-identical. R5 is verified by INSPECTION only. Claiming
 -- otherwise is the vacuous-green failure this project already paid for once
 -- (BL-404, and interbody_pull_harness's own first run).
-verify.show_panel("economy", false)
 verify.show_panel("decisions", true)
 
 -- R1: rows newest-first with date, corp, verb + target, reason, and the score

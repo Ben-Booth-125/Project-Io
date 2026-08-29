@@ -3,7 +3,6 @@
 -- Acceptance check: a selected land tile shows the affordance grouping; a
 -- selected ocean tile shows a specific rejection reason, not a bare string.
 verify.econ_step(2)                    -- give the world some deposits/markets to read
-verify.show_panel("economy", false)    -- econ_step force-opens it; close for a clean read
 verify.goto_surface("home")
 
 -- A land tile with deposits: affordance readout should list Extraction (thrives/

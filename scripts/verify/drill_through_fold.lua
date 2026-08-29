@@ -13,10 +13,7 @@
 -- Read the pairs side by side: `*_folded` then `*_expanded` for each surface.
 
 -- ── R5: the Selection band at rest. A tile selection, nothing expanded. ──
--- The harness opens the Economy panel by default; close it, or it occupies the
--- shell column the History captures below need.
 verify.econ_step(4)
-verify.show_panel("economy", false)
 verify.goto_surface("home")
 -- A tile with a real deposit, so the metric pages are drillable resources rather
 -- than the habitability/hazard fallback (which has no time series to drill into).

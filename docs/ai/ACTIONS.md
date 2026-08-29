@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*155 entries — 29 gameplay · 25 canvas · 15 lens · 53 ledger · 33 chrome.*
+*154 entries — 29 gameplay · 25 canvas · 15 lens · 52 ledger · 33 chrome.*
 
 ---
 
@@ -1345,7 +1345,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Moves from 'production is down' to 'THIS building is the one dragging it' - the subject-level answer a decision needs.
 
-### `ledger.corps_table_row_select` — All-corporations balance table (nav slot 9)
+### `ledger.corps_table_row_select` — All-corporations balance table (nav slot 8)
 
 **Press.** Click a corporation's row
 
@@ -1360,7 +1360,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The table gives one number per rival; selecting a row is how to ask 'tell me more about this one'.
 
-### `ledger.nav_generation` — Nav rail, slot 11 (plate/continent glyph)
+### `ledger.nav_generation` — Nav rail, slot 10 (plate/continent glyph)
 
 **Press.** Click the plate glyph in the developer tail of the left icon rail
 
@@ -1518,7 +1518,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Answers 'am I making or losing money, and which flow or building is responsible?' - feeds every spend/expand/cut decision.
 
-### `ledger.nav_construction` — Nav rail, slot 7 (Construction icon)
+### `ledger.nav_construction` — Nav rail, slot 3 (Construction icon)
 
 **Press.** Click the industry/factory glyph on the left icon rail
 
@@ -1540,7 +1540,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Answers 'how is my corporation doing overall, and where is the weak card?' - the top-level health check that decides which subsystem to drill into next.
 
-### `ledger.nav_corporations_table` — Nav rail, slot 9 (Diplomacy icon - provisionally hosts the corporations table)
+### `ledger.nav_corporations_table` — Nav rail, slot 8 (Diplomacy icon - provisionally hosts the corporations table)
 
 **Press.** Click the diplomacy glyph on the left icon rail
 
@@ -1551,18 +1551,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Answers 'how do rivals' finances compare to mine?' - the only side-by-side rival-balance read in the game.
 
-### `ledger.nav_economy` — Nav rail, slot 3 (Workforce icon - provisionally hosts the Economy panel)
-
-**Press.** Click the workforce (population) glyph on the left icon rail
-
-**Valid when:**
-- In-game
-
-**Expected output.** Toggles the Economy panel open in the fold-out column; re-click closes; opening closes any other ledger. Open, it splits across three views - Corps (the player's balance trend, every corporation's balance, and the workforce table), Holdings (stockpile pools by body) and Markets (supply, demand and price per body). Workforce itself is not built; this panel is the slot's provisional occupant.
-
-**Reason to select.** Answers 'what is the whole economy doing?' in one surface - balances, labour, stock on hand and market state side by side, rather than one body or one corporation at a time.
-
-### `ledger.nav_history` — Nav rail, slot 10 (History icon)
+### `ledger.nav_history` — Nav rail, slot 9 (History icon)
 
 **Press.** Click the history glyph on the left icon rail
 
@@ -1735,9 +1724,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The pager hid the LIST of questions the surface can answer behind a press, so a player had to already know a reading existed to go and find it. An accordion shows all five and opens the one you ask for. The order is the other half (Ben, 2026-08-24): it runs from what the player can act on to what the ground merely is, where the pager ran the other way and put the least actionable reading in the default slot.
 
-### `ledger.decision_feed_open` — Navigation rail slot 12, "AI decisions"
+### `ledger.decision_feed_open` — Navigation rail slot 11, "AI decisions"
 
-**Press.** Click nav rail slot 12 to open the AI decision feed; click it again to close
+**Press.** Click nav rail slot 11 to open the AI decision feed; click it again to close
 
 **Valid when:**
 - In game (not the menu or the generation screen)
@@ -1776,9 +1765,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** To ask a specific question of the run rather than scroll it. 'Every solvency-defence idle' and 'every build' are different questions, and the reason code is what separates them.
 
-### `ledger.strategy_readout_open` — Navigation rail slot 13, "Strategy readout"
+### `ledger.strategy_readout_open` — Navigation rail slot 12, "Strategy readout"
 
-**Press.** Click nav rail slot 13 to open the Strategy readout; click it again to close
+**Press.** Click nav rail slot 12 to open the Strategy readout; click it again to close
 
 **Valid when:**
 - In game (not the menu or the generation screen)
@@ -1802,7 +1791,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The comparison answers 'who is winning the run and how'; the single-corp profile answers 'what is this corp's strategy made of'. Two different questions over the same window.
 
-### `ledger.nav_contracts` — Nav rail, slot 14 (Contracts icon — a page with a signed check mark)
+### `ledger.nav_contracts` — Nav rail, slot 13 (Contracts icon — a page with a signed check mark)
 
 **Press.** Click the contract glyph on the left icon rail
 

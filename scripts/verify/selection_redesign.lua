@@ -11,7 +11,6 @@
 -- Run with: ProjectIo --verify scripts/verify/selection_redesign.lua
 
 verify.econ_step(4)                    -- populate live building run states / profit
-verify.show_panel("economy", false)    -- keep the capture clear of the auto-opened panel
 verify.goto_surface("home")            -- Kepler: fully surveyed, buildings visible
 
 -- A tile: the Build front door is the hero (left), the Thrives/Valid affordance

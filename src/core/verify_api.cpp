@@ -904,7 +904,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             // the player's own books (the review barrier's finding, 2026-08-28).
             else if (m_ui.show_corporation_panel)  panel = "corporation";
             else if (m_ui.show_corporations_table) panel = "corporations";
-            else if (m_ui.show_economy_panel)      panel = "economy";
             else if (m_ui.show_construction_panel) panel = "construction";
             else if (m_ui.show_tile_ledger)        panel = "tile";
             else if (m_ui.show_contracts_ledger)   panel = "contracts";
@@ -923,8 +922,13 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
 
     // Drive the economy headlessly: run N economy ticks (production → market →
-    // budget) and open the economy panel so a capture shows live, populated data.
-    // The durable verification method for the Layer 3 economy panel's visual rows.
+    // budget) so a capture shows live, populated data. The durable way to reach
+    // a world with goods produced, orders cleared and budgets settled.
+    //
+    // It opens NOTHING. It once force-opened a panel as a side effect, which
+    // every calling script then had to close again on its next line; the panel
+    // is gone and so is the side effect. A script that wants a surface on screen
+    // opens it itself with show_panel.
     v.set_function("econ_step", [this](sol::optional<int> n) {
         const int steps = n.value_or(1);
         for (int i = 0; i < steps; ++i)
@@ -941,12 +945,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             // window is hang-declared mid-script (see the run header above).
             SDL_PumpEvents();
         }
-        m_ui.show_economy_panel = true;
     });
 
-    // Open/close a ledger panel by name — lets a lens check run econ ticks (which
-    // open the economy panel) and then clear it so the panel does not obscure the
-    // canvas capture. Unknown names are ignored.
+    // Open/close a ledger panel by name, so a script can put a surface on screen
+    // without a click, or clear the column before a canvas capture. Unknown names
+    // are ignored.
     // Re-enter (or leave) the main menu so a verify script can capture the launch
     // screen — the harness otherwise starts past it, in-game.
     v.set_function("show_menu", [this](bool on) {
@@ -993,8 +996,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
 
     v.set_function("show_panel", [this](const std::string& name, bool open) {
-        if (name == "economy")           m_ui.show_economy_panel = open;
-        else if (name == "construction") m_ui.show_construction_panel = open;
+        if (name == "construction")      m_ui.show_construction_panel = open;
         else if (name == "tile")         m_ui.show_tile_ledger = open;
         else if (name == "market")       m_ui.show_market_ledger = open;
         else if (name == "balance")      m_ui.show_balance_ledger = open;
@@ -1155,7 +1157,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // needs to park — parking only the view would pin every shot to year 0,
         // the one frame where no history has happened yet (BL-277).
         else if (name == "ages_year")     m_ui.ages_year = view;
-        else if (name == "economy")       m_ui.economy_view = view;
         else if (name == "market")        m_ui.market_ledger_view = view;
         else if (name == "tech_tree")     m_ui.tech_tree_view = view;
         else if (name == "contracts")     m_ui.contracts_ledger_view = view; // BL-576: 0 Offers, 1 Active, 2 History
@@ -1176,7 +1177,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         const char* window = "";
         if (name == "tile" || name == "history") window = "Tile Ledger";
         else if (name == "market")               window = "Market Ledger";
-        else if (name == "economy")              window = "Economy";
         else if (name == "balance")              window = "Balance Ledger";
         else if (name == "corporation")          window = "Corporations";
         else if (name == "construction")         window = "Building";
@@ -2360,7 +2360,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                   << (br.exhausted ? 1 : 0) << "\n";
         }
         // player_timeseries.csv — the player corp's balance / income / expenditure per
-        // econ tick (the trend series the header + economy panel already accumulate).
+        // econ tick (the trend series the header + Budget ledger already accumulate).
         {
             std::ofstream f(path("player_timeseries.csv"));
             f << "tick,balance,income,expenditure\n";

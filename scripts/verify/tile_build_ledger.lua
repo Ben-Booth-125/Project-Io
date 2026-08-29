@@ -9,7 +9,6 @@
 -- frame, so we capture once to settle the selection, then open the ledger + capture.
 
 verify.econ_step(4)                    -- populate market state (build-cost context)
-verify.show_panel("economy", false)
 verify.goto_surface("home")            -- Kepler surface, surveyed
 
 -- A land tile with deposits: extraction options per deposited resource, plus the

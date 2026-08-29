@@ -16,12 +16,11 @@
 #include "ui/construction_panel.hpp"
 #include "ui/acquisitions_ledger.hpp" // nav slot 5, the Acquisitions ledger + its profitability fold-out
 #include "ui/company_ledger.hpp"   // Company-lens click destination, no rail slot (BL-666)
-#include "ui/contracts_ledger.hpp" // nav slot 14, the mercenary Contracts ledger (BL-576)
+#include "ui/contracts_ledger.hpp" // nav slot 13, the mercenary Contracts ledger (BL-576)
 #include "ui/detail_level.hpp" // the drill-through fold idiom (BL-214)
 #include "ui/balance_ledger.hpp"
 #include "ui/corporation_dashboard.hpp" // nav slot 1, the four roll-ups (BL-248)
 #include "ui/corporation_panel.hpp"     // all-corporations table, restored to slot 8 (NR-012)
-#include "ui/economy_panel.hpp"
 #include "ui/market_ledger.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/fonts.hpp"
@@ -1946,10 +1945,6 @@ void app::render()
     // score/margin fields are deliberately absent from it (NR-226 fence).
     ui::draw_strategy_readout(m_world, m_strategy_readout, m_ui,
                               &m_ui.show_strategy_readout);
-    {
-        const ui::player_plot_history phist{m_balance_history, m_income_history, m_expenditure_history};
-        ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, phist, m_ui, &m_ui.show_economy_panel);
-    }
     // Construction panel — an ordinary fold-out tab in the shell column (BL-122),
     // one of the mutually-exclusive column occupants (ledgers + Selection).
     ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
@@ -1971,7 +1966,7 @@ void app::render()
     // ledger here is guarded by its own open flag and at most one is set.
     ui::draw_acquisitions_ledger(m_world, m_registry, m_ui,
                                  m_ui.show_acquisitions_ledger);
-    // Contracts ledger (BL-576) — nav slot 14: offers, active contracts and
+    // Contracts ledger (BL-576) — nav slot 13: offers, active contracts and
     // terminal history for the mercenary contract (CONTRACTS.md). Reads the
     // same m_contract_templates run_nation_step already threads through for
     // the tick-evaluation pass, so the Active view's predicate wording can
@@ -1990,7 +1985,7 @@ void app::render()
                                    m_ui.show_corporation_panel);
 
     // The displaced table itself, restored (NR-012). BL-248 deleted it as a duplicate
-    // of the Economy panel's Corps view; Ben did not intend a deletion, so it is back
+    // of a second aggregate view; Ben did not intend a deletion, so it is back
     // and reachable from nav slot 8 until its real home is chosen. Deleting a file
     // because a similar view exists is the call that was wrong here — dormant beats
     // deleted, since intent is not recoverable from a diff.

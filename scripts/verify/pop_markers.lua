@@ -8,7 +8,6 @@
 --   ProjectIo --verify scripts/verify/pop_markers.lua
 
 verify.econ_step(2)                     -- settle
-verify.show_panel("economy", false)     -- clear the auto-opened panel off the capture
 verify.goto_surface("home")
 
 -- Always-on: markers show at the plain default lens (no lens armed).
