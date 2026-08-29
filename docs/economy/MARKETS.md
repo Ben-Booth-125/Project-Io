@@ -524,8 +524,45 @@ the clearing loop never computed would be inventing a number, and the honest-pla
 (NR-249) is not licence to do it on a figure a player would act on.
 
 Making history real means the clearing loop retaining a per-exchange record, which is a change to
-the money loop and not to a ledger. Until that is designed, the surface shows positions and
-potentials, and says which is which.
+the money loop and not to a ledger. **Ben, 2026-08-29: add it.**
+
+### The exchange record
+
+One row per exchange, appended by the clearing tick, ring-capped the way the plot histories are:
+
+| Field | Why |
+|---|---|
+| `tick` | The econ tick it cleared on. A tick is a quarter, so this is the date. |
+| `market` | Which board. The surface is per-market. |
+| `resource` | What moved. |
+| `quantity` | How much. |
+| `unit_price` | The price clearing resolved, not the floor the order carried — an order is honoured *at clearing*, so what the seller asked and what they got are different numbers and only one of them is the trade. |
+| `seller`, `buyer` | The two corps. Either may be a background firm. |
+
+**It records REVENUE, not profit, and that limit is structural rather than an omission.**
+`stockpile_component` is `quantities[]` and nothing else — **there is no cost basis anywhere in
+the model**. A unit of iron ore in a pool does not know what it cost to extract or to buy, so the
+margin on selling it cannot be derived from the sale. `quantity * unit_price` is honest;
+`profit` is not available at this grain and must not be printed as though it were.
+
+Two routes to a real margin, both larger than this record and neither taken here:
+
+- **Carry a cost basis on the pool** — a weighted average acquisition cost per resource per corp,
+  updated on every inflow. That is inventory accounting, and it makes every producer and every
+  buyer write a second number on every tick.
+- **Answer margin at the building instead**, where `building_profit.hpp` already nets revenue
+  against input cost, maintenance and wages. This is where margin currently lives and it is a
+  *per-building* answer, not a per-trade one.
+
+So the surface reads: **what moved, at what price, between whom** — and the Trades tab must
+label that column **revenue**. The cost-basis question is the follow-on, and it is an economy
+decision rather than a UI one.
+
+**Serialisation.** The record is world state, so it is in the save envelope and
+`save_game_version` moves. NR-708 records that **no envelope field has round-trip coverage** and
+that `read_save_game` refuses the whole file on a version mismatch — so this is the change that
+should finally bring an envelope round-trip assertion with it, rather than adding one more
+untested field to a seam that has never been tested.
 
 **Ranking is permitted here**, and this is the one surface where that has been ruled on
 explicitly. `CONCEPT.md` § Player identity holds the rule and its qualification: a surface may

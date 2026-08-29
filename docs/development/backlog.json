@@ -1181,6 +1181,155 @@
       "completed": "2026-08-29",
       "resolved": "2026-08-29",
       "summary": "Landed 2026-08-29, Sprint 24, in the same batch that created the gap it closes. `glyph_roster` — a panel outline with one row picked out, sharing no silhouette. Aimed: expands the type group, keeps the building selected, levers on screen in one press. A door, not a toggle. ABSENT on a rival card, falling back to `glyph_reserved` with no reflow — asserted (C6) rather than left for a player to discover."
+    },
+    {
+      "glyph": "~",
+      "status": "designed",
+      "version_goal": "v0.1.22",
+      "sprint": "24",
+      "written": "2026-08-29",
+      "author": "Ben",
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-685",
+      "short_name": "EXCHANGE_RECORD",
+      "category": "Economy",
+      "title": "The clearing tick retains a per-exchange record",
+      "priority": "A",
+      "difficulty": 4,
+      "requires": [],
+      "authority_doc": "docs/economy/MARKETS.md",
+      "files": [
+        "src/world/market_system.cpp",
+        "src/world/components.hpp",
+        "src/core/save_game.cpp",
+        "tools/verify/",
+        "docs/economy/MARKETS.md"
+      ],
+      "design": "Ben, 2026-08-29, choosing it over shipping Trades without history: add a per-exchange record to the clearing loop in this batch.\n\nTHE SHAPE IS DEFINED IN `MARKETS.md` § The exchange record and both agents build to it: tick, market, resource, quantity, unit_price, seller, buyer. Ring-capped the way the plot histories are.\n\nIT RECORDS REVENUE, NOT PROFIT, AND THAT IS STRUCTURAL. `stockpile_component` is `quantities[]` and nothing else — there is NO cost basis anywhere in the model. A unit of ore in a pool does not know what it cost to extract or buy, so the margin on selling it cannot be derived from the sale. `quantity * unit_price` is honest; profit is not available at this grain and MUST NOT be printed as though it were. The two routes to a real margin (a weighted-average cost basis on the pool, or answering margin at the building where `building_profit.hpp` already nets it) are both larger than this record and neither is in scope.\n\n`unit_price` is the price CLEARING RESOLVED, not the floor the order carried. An order is honoured at clearing, so what a seller asked and what they got are different numbers and only one of them is the trade.\n\nSERIALISATION IS THE RISK. The record is world state, so it enters the save envelope and `save_game_version` moves. NR-708 records that NO envelope field has round-trip coverage and that `read_save_game` refuses the whole file on a version mismatch — every existing save becomes unreadable, which follows the file's own conventions but is worth knowing rather than discovering. THIS IS THE CHANGE THAT SHOULD BRING AN ENVELOPE ROUND-TRIP ASSERTION WITH IT, on the font_glyph_harness precedent, rather than adding one more untested field to a seam that has never been tested.\n\nDeterminism: the append order must be a total order over the clearing walk, not whatever the market map iterates in. A record whose row order varies by platform is a record that cannot be asserted against."
+    },
+    {
+      "glyph": "~",
+      "status": "designed",
+      "version_goal": "v0.1.22",
+      "sprint": "24",
+      "written": "2026-08-29",
+      "author": "Ben",
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-686",
+      "short_name": "GOODS_TABLE",
+      "category": "UI",
+      "title": "The Goods table - one row per good, graph flattened into the row",
+      "priority": "A",
+      "difficulty": 4,
+      "requires": [],
+      "authority_doc": "docs/ui/ledgers/market.md",
+      "files": [
+        "src/ui/market_ledger.cpp",
+        "docs/ui/ledgers/market.md",
+        "docs/ui/question_log.json"
+      ],
+      "design": "Ben, 2026-08-29: \"we will flatten graphs for each good. They can fit into the same row as the header... With item_glyph; name; price; body_average_price; price_relative_to_base_price; six_month_price_graph.\"\n\nTHE GRAPH WINDOW IS **8 QUARTERS**, not six months — Ben's answer once the arithmetic was put to him. `record_histories` samples ONCE PER ECON TICK and a tick is a calendar quarter, so six months is two data points. The ring caps at 64, so 8 of 64 is a recent-window read.\n\nCOLUMNS: item glyph, name, price, body average price, price vs base, 8-quarter graph. `price vs base` is `price[r] / base_price[r]`, already to hand. `body_average_price` is the one new derivation — mean `price[r]` across the markets on the selected body — and is the first column to drop IF the row will not fit. Measure before dropping it: at 384 px the pressure is on the graph's width, not the column count, so dropping a text column buys the graph very little. Show both if it is close.\n\nTHE ITEM GLYPH IS A PLACEHOLDER (Ben, 2026-08-29 — flags and glyphs are a later sprint). The settled design is four value-track silhouettes, `ICONS.md` § 2b. Two conditions: the placeholder must LOOK provisional rather than be learned as meaningful, and the column must reserve the REAL glyph's width so the table is not laid out twice.\n\nROW HEIGHT IS THE OPEN MEASUREMENT. Ben: \"let's compare this at 8 rows, 10 rows, and 12 rows.\" Build all three and capture at **1920x1080** — a density judgement at 720p is taken against half the content height, which is how every such number this sprint was got wrong before 2026-08-29.\n\nWHAT THIS REPLACES AND WHY IT IS NOT ONLY DENSITY: the stacked sparklines gave every good its own implicit scale, so goods could not be compared — the one thing a price board is for — and gave no direction at all. Fix the scale and the direction, not just the row count.\n\nAND NOTHING HAS EVER SEEN PAST GOOD 4 (NR-719). The scroll hook aimed at the outer window while the sparklines sat in an inner child scroller, so the \"foot\" capture was byte-identical to the head. Whatever is wrong below the fold is unexamined; fix `scroll_panel` to reach the real scroller (and to REJECT an unknown name loudly rather than silently clearing the request) as part of this."
+    },
+    {
+      "glyph": "~",
+      "status": "designed",
+      "version_goal": "v0.1.22",
+      "sprint": "24",
+      "written": "2026-08-29",
+      "author": "Ben",
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-687",
+      "short_name": "TRADES_TAB",
+      "category": "UI",
+      "title": "The Trades tab - my positions, the market's positions, and what I could be doing",
+      "priority": "A",
+      "difficulty": 5,
+      "requires": [
+        "BL-685"
+      ],
+      "authority_doc": "docs/economy/MARKETS.md",
+      "files": [
+        "src/ui/market_ledger.cpp",
+        "docs/ui/ledgers/market.md",
+        "docs/ui/question_log.json"
+      ],
+      "design": "Ben, 2026-08-29, reworking Sell Orders: \"we should rework this into persistent trades... What we really want to see is a list of trades, and their profits. We also want to see potential trades and their profits.\"\n\nTHREE READS, KEPT VISIBLY DISTINCT (`MARKETS.md` § Trades). They are not equally cheap and the surface must not present them as one table:\n  1. MY STANDING TRADES — every order the player's corp holds here. Exists today; this is the old Sell Orders view with the buy side admitted.\n  2. THE MARKET'S STANDING TRADES — every order here, whoever owns it. **THE GATE IS: the player owns a building on that body** (Ben, 2026-08-29, choosing it over \"an order here\", \"either\", and \"any discovered market\"). Orders are world state and are the deliberate public signal, so this is a reading question, not a disclosure one — but the gate is real and must be enforced, not assumed.\n  3. POTENTIAL TRADES — a derivation, not a record: buy price here against sell price there, less the haulage the route would cost.\n\nTHE HISTORY HALF READS BL-685's EXCHANGE RECORD, and the column is **revenue**, never profit. There is no cost basis in the model — `stockpile_component` is `quantities[]` — so margin is not derivable from a sale. Printing a \"profit\" the clearing loop never computed would be inventing a number a player would act on, which the honest-placeholder idiom does not licence.\n\nRANKING IS PERMITTED HERE and this is the one surface where that has been ruled on explicitly. `CONCEPT.md` § Player identity: rank where the top row is one input among several, not where it IS the move. Ben: \"Market prices is a vital pillar of gameplay, but the strategy 'just build the most profitable' is a red herring.\" So potential trades may be sorted by margin.\n\nBen on the tab as a whole: \"Since this doesn't exist, just give a go, and I can refine later.\" Build the derivable halves properly, wire history to the new record, and show him before going further."
+    },
+    {
+      "glyph": "~",
+      "status": "designed",
+      "version_goal": "v0.1.22",
+      "sprint": "24",
+      "written": "2026-08-29",
+      "author": "Ben",
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-688",
+      "short_name": "MARKET_NATION_ROW",
+      "category": "UI",
+      "title": "The nation presence row - who operates in this market",
+      "priority": "B",
+      "difficulty": 2,
+      "requires": [],
+      "authority_doc": "docs/ui/ledgers/market.md",
+      "files": [
+        "src/ui/market_ledger.cpp",
+        "docs/ui/ledgers/market.md"
+      ],
+      "design": "Ben, 2026-08-29: \"a list of nations who operate in that market. This can be a wrapped row of flags for each nation, wrapping to 2 or 3 rows if needed... And this should sit between body/market selection and our tabs.\"\n\nPOSITION IS PART OF THE SPEC: below the Body and Market combos, above the Goods / Trades tab strip.\n\nTHERE ARE NO FLAGS. `nation_colour(entity_id)` is a palette colour and is all that exists — corps carry an emblem tag, nations do not. The row is COLOURED CHIPS with the nation's initials, named on hover (`ICONS.md` § 2b). Real per-nation emblem artwork would be a generated identity system, a feature of its own; do not stub one glyph and call it a flag. Ben, same day: flags and glyphs are a later sprint, use placeholders.\n\nWrap to two or three rows if it must, though the doc notes that is unlikely at the current nation count."
+    },
+    {
+      "glyph": "~",
+      "status": "designed",
+      "version_goal": "v0.1.22",
+      "sprint": "24",
+      "written": "2026-08-29",
+      "author": "Ben",
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-689",
+      "short_name": "CONVOYS_LEDGER",
+      "category": "UI",
+      "title": "Convoys becomes its own ledger at rail slot 7",
+      "priority": "A",
+      "difficulty": 4,
+      "requires": [],
+      "authority_doc": "docs/ui/ledgers/convoys.md",
+      "files": [
+        "src/ui/",
+        "src/ui/nav_pane.cpp",
+        "src/ui/ui_state.hpp",
+        "docs/ui/MENU.md",
+        "docs/ui/ledgers/convoys.md"
+      ],
+      "design": "Ben, 2026-08-29: \"I think we can make convoys into a ledger of its own\", then \"give convoys a slot, put it after market\", then — asked whether it lands in this batch — yes, same batch.\n\nIT MUST BE THIS BATCH, and that is the reason rather than a preference: the Market flattening DELETES the third tab. Without a home, Convoys is either a regression or a tab the design says should not exist. The docs for it are already written (`convoys.md`).\n\nRAIL SLOT 7, directly after Market, taking the rail to FOURTEEN. Everything from Corp. Strategy down shifts one: Corp. Strategy 8, Diplomacy 9, History 10, developer tail 11-13, Contracts 14. `tab_count` 13 -> 14. MENU.md is already updated to describe this; the code has to catch up.\n\nIt draws `icons::convoy` — the marker the canvas already uses for cargo in transit, so slot and canvas share a silhouette. No new glyph. Arms `supply_routes` on open, which is the pairing a tab strip could never give it: opening the Market ledger armed the price wash instead.\n\nONE FLAT VIEW. No Body/Market selectors — a convoy is a route between two places and is not scoped by the market you are looking at, which is part of why the tab sat oddly there.\n\nTWO INHERITED DEFECTS, both in `convoys.md`. Destinations clip (NR-709's family, four surfaces now). And a row reads `Agricultural Produce x0` — a zero-quantity convoy in flight with a haul cost paid and a progress bar running. MEASURE THAT BEFORE REBUILDING AROUND IT: it is not a display bug, the display is reporting what it was given. If dispatch can legitimately commit an empty convoy the row must say why; if it cannot, this is a supply-layer bug the ledger merely revealed. Report the finding either way."
+    },
+    {
+      "glyph": "~",
+      "status": "designed",
+      "version_goal": "v0.1.22",
+      "sprint": "24",
+      "written": "2026-08-29",
+      "author": "Ben",
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-690",
+      "short_name": "NO_BL_IDS_ON_SCREEN",
+      "category": "UI",
+      "title": "Four backlog ids are printed to the player",
+      "priority": "B",
+      "difficulty": 1,
+      "requires": [],
+      "authority_doc": "docs/ui/ICONS.md",
+      "files": [
+        "src/ui/balance_ledger.cpp",
+        "src/ui/tech_tree_panel.cpp",
+        "src/ui/tile_inspector.cpp"
+      ],
+      "design": "Ben, 2026-08-29: \"sweep the BL ids while you're in there.\"\n\nFOUR SITES, THREE SURFACES, verified by grep rather than remembered:\n  - `balance_ledger.cpp:258` — \"Policy levers - not yet wired (BL-155)\"\n  - `balance_ledger.cpp:146` — the same id inside a tooltip\n  - `tech_tree_panel.cpp:599` — \"BL-087 design mock - read-only.\"\n  - `tile_inspector.cpp:245` — \"First cut (BL-660)…\" on the Tectonics view\n\nTHE LAST ONE LANDED THE DAY BEFORE THIS SWEEP, which is the argument for doing it now: this is a pattern still being copied, not a legacy to tidy. A backlog id is internal bookkeeping and means nothing to a player; what the line is actually trying to say — that a control is not yet wired, or a surface is a mock — is worth saying in words.\n\nKeep the honesty, drop the reference. \"Not yet wired to the economy\" says everything \"(BL-155)\" was doing and says it to someone who can read it."
     }
   ]
 }
