@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*154 entries — 29 gameplay · 25 canvas · 15 lens · 52 ledger · 33 chrome.*
+*157 entries — 29 gameplay · 25 canvas · 15 lens · 55 ledger · 33 chrome.*
 
 ---
 
@@ -241,9 +241,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The idled asset now reads profitable again — prices recovered or inputs cheapened — so resuming captures margin with zero capex. The AI's own dial_resume fires on exactly this signal.
 
-### `gameplay.set_recipe` — The Method comparison section on the Selection panel's building Facts column (BL-431, `draw_production_method_section` — Compare toggle, each alternate's basket/wage/rate plus a Switch button); the same seam also drives the 'Production Methods' combo in the Building panel's Buildings-tab inline detail.
+### `gameplay.set_recipe` — The Method grid in the Construction ledger's Buildings view (`draw_production_method_section`): one row per era-allowed recipe in the building's own group, each with its expected profit and a Switch glyph.
 
-**Press.** Select the owned building, press Compare, then Switch on the desired alternate row (Selection panel); or open the production-method combo and click a recipe row (Buildings-tab detail — each row carries a resource pip for its primary output).
+**Press.** Open the Construction ledger (nav rail slot 3, or the building card's 'Open in ledger' button), expand the building's type group, press the building, then press Switch on the desired method row. Selecting the building on the MAP drives the same levers - the two selectors compose.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -253,17 +253,17 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Valid when:**
 - The acting corporation exists (rejected_no_corp otherwise).
 - The corporation owns the building (rejected_not_owner otherwise).
-- The recipe is valid for the building's type (rejected_invalid otherwise).
-- Construction is complete — the UI hides all controls while ticks_remaining > 0.
-- The building produces output (infrastructure has no recipe section at all).
+- The recipe is valid for the building's type, and in the ACTIVE recipe's own group - a cross-group retool is refused outright, so it is never offered (rejected_invalid otherwise).
+- Construction is complete - the ledger draws 'Under construction.' instead of the levers while ticks_remaining > 0.
+- The building is a processing facility (nothing else has a method to choose; the section draws nothing for other types).
 
 **Expected output.** On success, an immediate component write gated by economy.recipe_switch (BL-430): a one-off credit cost debited from the corp and a cooldown before the SAME building may switch again through this seam (both configurable, default free/instant). From the next economy tick the building consumes the new recipe's inputs and produces its outputs; its profit readout, its input demand on the local market, and what it contributes to the pool all change with it. Re-selecting the recipe already active, switching on cooldown, or switching without enough credit all reject (rejected_state / on_cooldown / insufficient_funds at the command seam) and change nothing.
 
 **Reason to select.** The first lever on a processor's profitability, free of capex: per-recipe margins genuinely diverge with local prices (steel can lose money on a tile where food rations clear well), so switching chases the better-clearing output with the plant already paid for. Every new processor defaults to the steel recipe, so this is typically the first press after building one.
 
-### `gameplay.set_workforce` — The workforce slider on the Selection band's building layout (0–200% of nominal); the Building panel's inline detail offers a coarser 0/20/40/60/80/100 tier button grid instead.
+### `gameplay.set_workforce` — The workforce slider in the Construction ledger's Buildings view (`draw_building_workforce_page`), below a placeholder trend graph. The slider reaches 0-100%; the command seam reaches 200.
 
-**Press.** Band: select the owned building, untick 'Auto' (the slider is disabled while Auto holds the dial), drag the slider. Panel: click a tier button directly — this pins even while Auto is active.
+**Press.** Open the Construction ledger (nav rail slot 3, or the building card's 'Open in ledger' button), expand the building's type group, press the building, then drag the slider. Selecting the building on the MAP drives the same lever. 'Auto' lives on the building card's action grid, and a manual drag here is what clears it.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -274,7 +274,8 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 - The acting corporation exists (rejected_no_corp otherwise).
 - The corporation owns the building (rejected_not_owner otherwise).
 - The value is inside [0, 200] (rejected_invalid otherwise).
-- The building is not ALREADY at that target AND already pinned (rejected_state otherwise). Setting the value the auto-solver happens to be holding is NOT a no-op — it takes control away from the solver, which is a real change.
+- Construction is complete - the ledger draws 'Under construction.' instead of the levers while ticks_remaining > 0.
+- The building is not ALREADY at that target AND already pinned (rejected_state otherwise). Setting the value the auto-solver happens to be holding is NOT a no-op - it takes control away from the solver, which is a real change.
 
 **Expected output.** workforce_target is set AND workforce_auto is cleared — a manual move pins the dial, so the per-tick profit-max auto-solver stops adjusting this building until Auto is re-enabled. This IS the workforce-auto opt-out. Actual staffing is the target mediated by body-level labour contention: when the corp's demand on the body exceeds the habitability-sized pool, every building is throttled by the same fraction and the band prints 'Body allows N%'. Wages scale with assigned workforce; output scales with effective workforce. Since BL-293 the command seam clears workforce_auto exactly as the press does — before that it set the target and left the flag, so an agent's target was silently re-solved on the next tick. Setting a value already held on an already-pinned dial is a no-op (rejected_state).
 
@@ -1229,17 +1230,6 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Will eventually set corporate wage policy; today it is display-only.
 
-### `ledger.build_ledger_close` — Tile construction ledger (the 'Construct · [x, y]' fold-out, BL-162), header
-
-**Press.** Click the 'x' button at the right of the header
-
-**Valid when:**
-- Tile construction ledger is open (opened from the tile Selection band's Construct button)
-
-**Expected output.** Closes the ledger, returning attention to the tile Selection band. The ledger also closes itself automatically if the selection stops being a tile.
-
-**Reason to select.** Done browsing build candidates (or deciding not to build) - exits without building anything.
-
 ### `ledger.chat_channel_tab` — Comms dock (bottom-left), channel button row
 
 **Press.** Click a channel's name button (e.g. 'Public' or a created group)
@@ -1288,20 +1278,20 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Sets up a scoped conversation with specific rivals - the substrate the future AI communication route (diplomacy-as-communication) will read.
 
-### `ledger.construction_view_tab` — Construction panel, view tab strip
+### `ledger.construction_view_tab` — Construction ledger, view tab strip
 
-**Press.** Click the 'Construction' or 'Buildings' tab button
+**Press.** Click the 'Buildings' or 'Construction' tab button
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `view` | `enum` | 'Construction' (in-progress builds) or 'Buildings' (owned buildings; the default) |
+| `view` | `enum` | 'Buildings' (the estate by type; the default) or 'Construction' (the build queue plus the tile build bar) |
 
 **Valid when:**
-- Construction panel is open
+- Construction ledger is open
 
-**Expected output.** Switches the view. Re-clicking the currently-active tab closes the whole Construction panel (toggle rule); switching tabs is an ordinary view change. Buildings lists owned buildings with their management surface; Construction lists what is currently being built.
+**Expected output.** Switches the view. Re-clicking the currently-active tab CLOSES the whole ledger (toggle rule) rather than collapsing to an overview; switching to the other tab is an ordinary view change.
 
-**Reason to select.** Buildings answers 'what do I operate and how is each doing?'; Construction answers 'what is on the way and when does it land?'
+**Reason to select.** Buildings answers 'what do I operate and how is each doing?'; Construction answers 'what is on the way, what does it cost, and what could I put on this tile?'
 
 ### `ledger.corp_card_expand` — Corporation dashboard, one of the four roll-up cards (Production / Trade / Workforce / Finance)
 
@@ -1525,9 +1515,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the Construction panel open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows the Construction / Buildings split (defaults to Buildings): what is being built now, and the buildings the player owns with their management controls.
+**Expected output.** Toggles the Construction ledger open in the fold-out column; re-click closes; opening closes any other ledger. It opens on BUILDINGS - the player's estate grouped by building type, one row per type with a count and a total profit - because the queue is empty most of the time and the player always owns buildings. The other tab, Construction, holds the build queue and the tile build bar.
 
-**Reason to select.** Answers 'what do I own and what is under way?' - the broad building overview; per-building operations (recipe, workforce, demolish) are reached from here but are separate presses.
+**Reason to select.** Answers 'what do I own, and what is each kind of it earning me?' - the broad estate overview, and the route to a single building's levers (expand its type, press the building).
 
 ### `ledger.nav_corporation` — Nav rail, slot 1 (Corporation overview icon)
 
@@ -1604,7 +1594,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 - A tile is selected
 - Something is actually placeable on the tile (otherwise the button disables with 'Nothing can be built on this tile')
 
-**Expected output.** Opens the tile construction ledger (BL-162) in the fold-out column: every building type placeable on THIS tile, with full cost, expected-profit bar, and reason-coded validity. Opening it is non-mutating; the Build presses inside it belong to the construction action family. The button carries an accent ring ('primed') when the player has nothing under construction anywhere.
+**Expected output.** Opens the Construction ledger on its CONSTRUCTION view - the collapsible queue above the build bar for THIS tile: every building type placeable here, with full cost, expected-profit bar, and reason-coded validity. The same view the nav rail's slot 3 opens, so the two doors cannot show two different build bars. Opening it is non-mutating; the Build presses inside it belong to the construction action family. The button carries an accent ring ('primed') when the player has nothing under construction anywhere.
 
 **Reason to select.** The front door to building on a specific tile - answers 'what could I put here and what would it earn?' before committing.
 
@@ -1833,6 +1823,61 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** The Company ledger opens in the fold-out column naming that firm, and every other ledger closes. It is a DECLARED PLACEHOLDER (BL-666) and says so on its face: the firm's name, that it is a background company rather than a corporation, its registration nation, its holdings on the active body, its reach in bodies, and capital only where the firm files a return. No rail slot and no close button — it closes when another ledger opens, or when a press on inert ground clears the selection that named it (NR-702).
 
 **Reason to select.** Answers 'who is this firm I keep seeing on the map?' for the background firms that make up most of the economy and had no surface of any kind before. A corporation is a rival and reaches the corporations table; a company is a market participant and reaches this.
+
+### `ledger.construction_queue_toggle` — Construction ledger, Construction view, the 'Queue - N cr / qtr' collapsing header
+
+**Press.** Click the header
+
+**Valid when:**
+- Construction ledger is open on the Construction view
+
+**Expected output.** Expands or collapses the build queue. Collapsed (the default) it is one line carrying the estimated per-quarter cost of everything in progress, and the tile build bar sits directly below it; expanded it lists each in-progress build with its rate, ETA in quarters and paused status. A toggle by construction - the same press undoes it.
+
+**Reason to select.** The queue is empty most of the time, so it stays out of the way; open it when something is actually building and the question is when it lands.
+
+### `ledger.construction_buildings_group` — Construction ledger, Buildings view, a type-group header row (name, count, total profit)
+
+**Press.** Click the group header
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `group` | `string` | The building type's display name - the same words the build door offers ('Quarry', 'Metal Foundry', 'Port') |
+
+**Valid when:**
+- Construction ledger is open on the Buildings view
+- The player owns at least one building of that type (a type with none has no row)
+
+**Expected output.** Expands the group to list its own buildings, one line each carrying the tile and that building's own net per quarter - visibly summing to the total on the header. One group is open at a time (an accordion), and re-pressing the open header closes it. Nothing in the world changes.
+
+**Reason to select.** The step from 'which part of my estate pays' to 'which building in it' - and the only route to a specific building's levers that does not go via the map.
+
+### `ledger.construction_buildings_select` — Construction ledger, Buildings view, a building row inside an expanded type group
+
+**Press.** Click the row
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `building` | `entity_id` | Implicit - the building the row names |
+
+**Valid when:**
+- Construction ledger is open on the Buildings view
+- A type group is expanded
+
+**Expected output.** Selects that building (the shared selection, so the Selection band follows it too) and draws its LEVERS below the roster: the production-method grid for a processing facility, and the workforce slider for any building. Pure re-selection - the levers themselves are separate presses (gameplay.set_recipe, gameplay.set_workforce).
+
+**Reason to select.** Reaches a building's operating controls by name rather than by hunting it on the map.
+
+### `ledger.selection_open_in_buildings` — Selection band, building card's right-hand 2x3 action grid, 'Open in ledger' button (a panel outline with one row picked out)
+
+**Press.** Click the icon button
+
+**Valid when:**
+- A building is selected
+- The building is the PLAYER'S - the button is absent on a rival's card, because the Buildings view is the player's estate and aiming a rival building at it would open an empty aim
+
+**Expected output.** Opens the Construction ledger on its Buildings view AIMED at this building: its type group expanded and the building selected, so its levers (production method, workforce) are on screen in one press. A DOOR, not a toggle - a second press does not close it, because the button carries no visible active state. Nothing in the world changes.
+
+**Reason to select.** The route from a building found on the MAP to its operating controls. The card's centre presents data and never holds levers, so this is how a map selection reaches them.
 
 ---
 

@@ -57,7 +57,16 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
 /// input-basket content folded into Profitability as a chart; Depth was cut
 /// outright; Lifecycle's Mothball/Dismantle controls moved onto the building
 /// card's action grid (see draw_building_selection_body) instead of a page.
-enum class building_page_kind { profitability, method, workforce, status };
+///
+/// **Method and Workforce are gone too** (Ben, 2026-08-29 — SELECTION.md § The centre
+/// presents; it does not operate). Both pages' whole content was a control, and the
+/// card's centre presents data and never operates: they are drawn by the Construction
+/// ledger's Buildings view instead (`draw_production_method_section` /
+/// `draw_building_workforce_page`, declared below and called from
+/// `construction_panel.cpp` — the same bodies, relocated, never a second set of
+/// controls writing `workforce_target` and `try_switch_recipe`). What is left here
+/// REPORTS: Profitability, and Status.
+enum class building_page_kind { profitability, status };
 
 /// A titled accordion page — the pager label plus which content to dispatch.
 struct building_page
@@ -135,10 +144,10 @@ void draw_unit_page(const world& w, const recipe_registry& reg,
 /// never lets that happen: with no valid selection it substitutes the player's
 /// own corporation (the BL-266 resting state) before calling here.
 ///
-/// For a selected **tile** the layout's "Construct Buildings" button opens the tile
-/// construction ledger (ui_state::show_build_ledger) in the shell column — the
-/// contextual, per-tile entry to construction, distinct from the broad buildings
-/// overview which earns a menu.
+/// For a selected **tile** the layout's "Construct Buildings" button opens the
+/// Construction ledger on its Construction view — the contextual, per-tile entry to
+/// construction, and the SAME view the nav rail's slot 3 opens, so the two doors
+/// cannot show two different build bars.
 ///
 /// @param w        World state (the content source). Mutable because the building
 ///                 layout operates its building directly — production method,
@@ -180,13 +189,17 @@ void draw_building_page_expanded(world& w, const recipe_registry& reg,
 /// re-deriving the same name a second time and letting the two drift.
 std::string unit_roster_display_name(std::uint16_t type);
 
-/// Draw the **tile construction ledger** (BL-162) — the tile-contextual surface that
-/// actually lets the player build. Opened by the tile Selection element's "Construct
-/// Buildings" button (which sets ui_state::show_build_ledger); reads
-/// ui_state::selected_entity as the target tile. Fills the shell fold-out column
-/// (foldout_column_rect), mutually exclusive with the Selection element and the
-/// nav-rail ledgers — the app draws it in place of the Selection panel while its flag
-/// is set and no nav ledger owns the column.
+/// Draw the **tile construction ledger** — the tile-contextual build bar that actually
+/// lets the player build, INLINE into whatever window is current. It is a section of
+/// the Construction ledger's Construction view (`construction_panel.cpp`), which is the
+/// one place it is drawn: the nav rail's slot 3 and the tile Selection element's
+/// Construct button are two doors onto that single view, so neither door can show a
+/// build bar the other does not.
+///
+/// Reads `ui_state::selected_entity` as the target tile. With no tile selected it draws
+/// **"Select a tile"** and nothing else — deliberately, not as a placeholder: a richer
+/// empty state would have to list the tiles the player COULD build on, and any ordering
+/// of that list is a recommendation (CONCEPT.md § the interface does not decide).
 ///
 /// Lists every building type placeable on the tile (via placement_rules) with its
 /// full construction cost as one credit total (build cost plus materials priced at
@@ -199,8 +212,25 @@ std::string unit_roster_display_name(std::uint16_t type);
 ///
 /// @param w    Read-only world (tile + deposits + player balance).
 /// @param reg  Loaded registry — per-type build costs.
-/// @param ui   UI state; read for the selected tile, written by the close button and
-///             the Build action (enqueue).
-void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_state& ui);
+/// @param ui   UI state; read for the selected tile, written by the Build action
+///             (enqueue).
+void draw_construction_ledger_body(const world& w, const recipe_registry& reg, ui_state& ui);
+
+/// The **Method** lever — the tiled recipe grid whose Switch buttons call
+/// `try_switch_recipe`. Only meaningful for a `processing_facility`; draws nothing
+/// for any other type, so a caller may call it unconditionally.
+///
+/// Lived on the building Selection card's accordion until Ben's 2026-08-29 ruling that
+/// the card's centre presents and never operates. Declared here so the Construction
+/// ledger's Buildings view can call THE SAME BODY rather than grow a second recipe
+/// switcher: two sets of controls writing the same field is how two surfaces come to
+/// disagree.
+void draw_production_method_section(world& w, const recipe_registry& reg, entity_id id);
+
+/// The **Workforce** lever — the placeholder trend graph plus the 0-100 slider that
+/// writes `workforce_target` and clears `workforce_auto` (a manual edit pins the
+/// target). Relocated off the Selection card by the same 2026-08-29 ruling as
+/// `draw_production_method_section`, and shared for the same reason.
+void draw_building_workforce_page(building_component& b);
 
 } // namespace ui

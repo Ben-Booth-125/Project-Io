@@ -2021,20 +2021,11 @@ void app::render()
                                 rhist, m_ui, band_origin, band_size);
     }
 
-    // The shell fold-out column is ledgers-only (BL-195). The one contextual, per-
-    // tile surface it still hosts is the tile construction ledger (BL-162), opened
-    // from the card's "Construct Buildings" button; it draws only when no nav ledger
-    // owns the column and the selection is a tile.
-    if (!ui::any_panel_open(m_ui))
-    {
-        const entity_id sel         = m_ui.selected_entity;
-        const bool      sel_is_tile = sel != null_entity && m_world.tiles.count(sel) > 0;
-
-        if (m_ui.show_build_ledger && sel_is_tile)
-            ui::draw_construction_ledger(m_world, m_registry, m_ui);
-        else
-            m_ui.show_build_ledger = false; // not a tile → no build ledger
-    }
+    // The shell fold-out column is ledgers-only (BL-195), and it now really is: the
+    // tile-contextual build bar used to be a second, non-ledger tenant drawn here, and
+    // is a SECTION of the Construction ledger's Construction view since 2026-08-29.
+    // The card's Construct button opens that ledger on that view; nothing is drawn
+    // beside the ledgers any more.
 
     // Execute any construction request queued this frame by the build front door
     // (tile Selection element) or a placement-mode canvas click. Centralised here
@@ -2055,15 +2046,20 @@ void app::render()
                 // it is done — the Selection card carries the live rate / ETA / paused
                 // status from here on.
                 m_ui.construction.last_message    = "Construction started.";
-                // BL-162: the construction ledger must SURVIVE the build it initiated.
-                // Reselecting the new building makes the selection non-tile, which forces
-                // show_build_ledger false above — the ledger vanishes and the player has to
-                // reselect the tile to place a second building on it (a rich tile stacks up
-                // to 4 extraction sites). It also hid "Construction started.", which is drawn
-                // inside the ledger. So reselect only when some OTHER surface (a placement-mode
-                // canvas click) initiated the build.
-                if (!m_ui.show_build_ledger)
-                    m_ui.selected_entity = built;             // inspect the new building
+                // BL-162: the build bar must SURVIVE the build it initiated. It reads
+                // `selected_entity` as its target tile, so reselecting the new BUILDING
+                // makes the selection non-tile and the bar falls back to "Select a tile" —
+                // the player would have to reselect the tile to place a second building
+                // on it (a rich tile stacks up to 4 extraction sites), and would lose
+                // "Construction started.", which is drawn inside the bar. So reselect
+                // only when some OTHER surface (a placement-mode canvas click) initiated
+                // the build, i.e. when the build bar is not the surface on screen.
+                {
+                    const bool bar_showing = m_ui.show_construction_panel &&
+                                             m_ui.construction.panel_view == 0;
+                    if (!bar_showing)
+                        m_ui.selected_entity = built;         // inspect the new building
+                }
                 break;
             case construction_result::invalid_tile:
                 m_ui.construction.last_message = "Can't build there."; break;

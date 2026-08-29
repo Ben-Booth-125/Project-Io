@@ -22,6 +22,8 @@
 #endif
 
 #include "ui/canvas_command.hpp"
+#include "ui/construction_panel.hpp"
+#include "ui/selection_panel.hpp"
 #include "ui/corporation_panel.hpp"
 #include "ui/detail_level.hpp"
 #include "ui/foldout_column.hpp"
@@ -1001,7 +1003,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "market")       m_ui.show_market_ledger = open;
         else if (name == "balance")      m_ui.show_balance_ledger = open;
         else if (name == "corporation")  m_ui.show_corporation_panel = open;
-        else if (name == "build")        m_ui.show_build_ledger = open; // tile construction ledger (BL-162)
+        // "build" is the tile-selection BUILD BAR, which is a section of the
+        // Construction ledger's Construction view since 2026-08-29 rather than a
+        // column tenant of its own. The name is kept because it is what a script
+        // means, and it now opens the one surface that actually draws that bar.
+        else if (name == "build")
+        {
+            m_ui.show_construction_panel = open;
+            if (open)
+                m_ui.construction.panel_view = 0; // Construction — the queue + the build bar
+        }
         else if (name == "frame_hud")    m_ui.show_frame_hud = open;    // frame-budget HUD (BL-249)
         else if (name == "tech_tree")    m_ui.show_tech_tree = open;    // F9 mock viewer (BL-087)
         else if (name == "decisions")    m_ui.show_decision_feed = open; // AI decision feed (BL-407)
@@ -1684,6 +1695,103 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["x"]    = m_ui.acquisitions_buy_x;
         out["y"]    = m_ui.acquisitions_buy_y;
         out["corp"] = static_cast<unsigned int>(m_ui.acquisitions_buy_corp);
+        return out;
+    });
+
+    // The Buildings view's ROSTER, exactly as the surface computes it: one row per
+    // named building type the player owns at least one of, with its count, its summed
+    // per-quarter net, whether it is the expanded group, and its members' entity ids.
+    //
+    // Read from `player_building_groups` — the same function the view draws from — so
+    // a check compares the SURFACE's arithmetic against a sum it does itself from
+    // `verify.buildings()` (which carries each building's own profit and group). The
+    // aggregation is what is under test; asking the surface to confirm itself would
+    // test nothing.
+    v.set_function("building_groups", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        sol::table  rows = st.create_table();
+        int n = 0;
+        for (const ui::building_group& g :
+             ui::player_building_groups(m_world, m_registry, m_last_econ_report))
+        {
+            sol::table row = st.create_table();
+            row["name"]     = g.name;
+            row["count"]    = g.count;
+            row["total"]    = g.total;
+            row["expanded"] = (m_ui.construction.buildings_expanded == g.name);
+            sol::table mem = st.create_table();
+            int m = 0;
+            for (const entity_id id : g.members)
+                mem[++m] = static_cast<unsigned>(id);
+            row["members"] = mem;
+            rows[++n] = row;
+        }
+        out["rows"]     = rows;
+        out["groups"]   = n;
+        out["view"]     = m_ui.construction.panel_view;
+        out["expanded"] = m_ui.construction.buildings_expanded;
+        out["selected"] = static_cast<unsigned>(m_ui.selected_entity);
+        return out;
+    });
+
+    // Where the Construction ledger's own controls landed this frame, so a check can
+    // press the REAL control. Same reasoning as `acquisitions_buy_button`; the fields
+    // are documented on `ui_state::construction_controls`. `open_ledger_ok` being
+    // FALSE on a rival building's card is an assertion in its own right — the
+    // Buildings view is the player's estate, so the button must not be there.
+    v.set_function("construction_controls", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        const auto& c   = m_ui.construction_ui;
+        out["tab_ok"]         = (c.tab_x[0] >= 0.0f && c.tab_x[1] >= 0.0f);
+        out["construction_x"] = c.tab_x[0];
+        out["construction_y"] = c.tab_y[0];
+        out["buildings_x"]    = c.tab_x[1];
+        out["buildings_y"]    = c.tab_y[1];
+        out["group_ok"]       = (c.group_x >= 0.0f);
+        out["group_x"]        = c.group_x;
+        out["group_y"]        = c.group_y;
+        out["member_ok"]      = (c.member_x >= 0.0f);
+        out["member_x"]       = c.member_x;
+        out["member_y"]       = c.member_y;
+        out["member"]         = static_cast<unsigned>(c.member);
+        out["construct_ok"]   = (c.construct_x >= 0.0f);
+        out["construct_x"]    = c.construct_x;
+        out["construct_y"]    = c.construct_y;
+        out["open_ledger_ok"] = (c.open_ledger_x >= 0.0f);
+        out["open_ledger_x"]  = c.open_ledger_x;
+        out["open_ledger_y"]  = c.open_ledger_y;
+        out["levers_ok"]      = (c.levers_for != null_entity);
+        out["levers_for"]     = static_cast<unsigned>(c.levers_for);
+        return out;
+    });
+
+    // The building Selection card's accordion PAGE LABELS for the current selection,
+    // read from `building_pages` — the one list both the in-band accordion and the
+    // full-canvas takeover dispatch on.
+    //
+    // It exists to make two properties assertable rather than eyeballed. First, that a
+    // RIVAL building gets Status and nothing else: `building_pages` short-circuits for
+    // a non-player building without testing any player page's guard, and that
+    // short-circuit is a competitor-visibility guarantee, not a convenience. Second,
+    // that the two pages whose whole content was a control are GONE from the card
+    // (2026-08-29) — an absence a capture cannot prove, since a missing page just
+    // renumbers the pager.
+    v.set_function("building_pages", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        sol::table  labels = st.create_table();
+        int n = 0;
+        for (const ui::building_page& bp :
+             ui::building_pages(m_world, m_registry, m_last_econ_report, m_ui.selected_entity,
+                                m_ui.spectating && m_ui.god_view))
+            labels[++n] = bp.label;
+        out["labels"] = labels;
+        out["count"]  = n;
+        out["player"] = (m_ui.selected_entity != null_entity &&
+                         m_world.buildings.count(m_ui.selected_entity) > 0 &&
+                         is_player_owned(m_world, m_ui.selected_entity));
         return out;
     });
 
@@ -2405,6 +2513,20 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 // be able to wait for it rather than guess a tick count.
                 rec["tile"]   = static_cast<unsigned>(bld_it->second.tile);
                 rec["complete"] = (bld_it->second.ticks_remaining == 0);
+                // The building's own net per quarter, and the NAME the Buildings
+                // roster files it under. Both exist so a script can rebuild the
+                // roster's arithmetic FROM THE BUILDINGS and compare, rather than
+                // asking the roster to confirm itself: `building_groups` below
+                // reports what the surface computed, these report what it should
+                // have. `profit_known` distinguishes a real zero from an estimate
+                // the report cannot yet make (a site still under construction).
+                {
+                    const building_profit bp =
+                        estimate_building_profit(m_world, m_registry, m_last_econ_report, bld_id);
+                    rec["profit"]       = bp.has_data ? bp.net() : 0.0f;
+                    rec["profit_known"] = bp.has_data;
+                    rec["group"]        = ui::building_group_name(m_registry, bld_it->second);
+                }
                 out[++idx]    = rec;
             }
         }

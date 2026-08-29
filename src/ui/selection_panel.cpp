@@ -4,6 +4,7 @@
 #include "world/battle_system.hpp"      // active_battle, quote_withdrawal, read_battle_phase (BL-469)
 
 #include "charts.hpp"
+#include "construction_panel.hpp" // building_group_name - the aim of the open-in-ledger button
 
 #include "detail_level.hpp"   // disclosure_controls — the drill-through idiom (BL-214/BL-265)
 #include "foldout_column.hpp" // shell fold-out column host (shared with the ledgers)
@@ -11,6 +12,7 @@
 #include "hex_render.hpp"      // draw_tile_neighbourhood — the card's zoomed tile view
 #include "icons.hpp"
 #include "market_ledger.hpp"   // market_city_name — the dispatch form's destination identity (BL-607)
+#include "nav_pane.hpp"        // close_all_panels — the card's doors onto the fold-out column
 #include "presentation.hpp"
 #include "selection.hpp"
 #include "text_fit.hpp"
@@ -31,7 +33,7 @@
 #include "world/tech_gate.hpp"       // BL-593: recipe_unlocked — the door filters what the gate would refuse
 #include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324); also the Soldier card's Roster page name lookup
 
-#include <map> // BL-434: group -> representative-candidate lookup in draw_construction_ledger
+#include <map> // BL-434: group -> representative-candidate lookup in draw_construction_ledger_body
 
 #include <imgui.h>
 
@@ -1043,6 +1045,16 @@ bool tile_icon_button(const char* id, ImVec2 sz, bool enabled, const char* tip,
                       void (*glyph)(ImDrawList*, ImVec2, float, ImU32), ImU32 glyph_col_override = 0);
 void glyph_swap(ImDrawList* dl, ImVec2 c, float r, ImU32 col);
 
+} // namespace
+
+// Drawn at namespace scope rather than file-local since Ben's 2026-08-29 ruling that
+// the Selection card's centre presents and never operates: this page's whole content
+// is a control, so its CALLER is now the Construction ledger's Buildings view
+// (construction_panel.cpp) and it needs external linkage. The body is untouched — the
+// point of relocating rather than reimplementing is that there stays exactly one
+// recipe switcher writing try_switch_recipe. The file-local helpers it calls
+// (tile_icon_button, glyph_swap) stay in the anonymous namespace above; unqualified
+// lookup still finds them from here.
 void draw_production_method_section(world& w, const recipe_registry& reg, entity_id id)
 {
     const auto bit = w.buildings.find(id);
@@ -1249,6 +1261,8 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
         ImGui::PopID();
     }
 }
+
+namespace {
 
 // BL-408 spectator god view: the full internals readout for a selected
 // corporation — the readout BL-068 exists to withhold, drawn ONLY when the
@@ -1501,6 +1515,21 @@ void glyph_dismantle(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
     dl->AddLine({c.x + r * 0.55f, c.y - r * 0.55f}, {c.x - r * 0.55f, c.y + r * 0.55f}, col, 2.4f);
 }
 
+// A panel outline with one row picked out — the building card's "open this
+// building in the Buildings ledger" glyph. Its own silhouette, deliberately: it
+// sits inches from Mothball (a boxed line-through), Dismantle (an X) and Auto (an
+// arc), and two lit controls sharing a shape is the confusion BL-174 named. Nothing
+// else in this vocabulary draws STACKED HORIZONTAL rows, and the longer middle rule
+// is the "this one" the button aims at.
+void glyph_roster(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    dl->AddRect({c.x - r * 0.68f, c.y - r * 0.62f}, {c.x + r * 0.68f, c.y + r * 0.62f},
+                col, 2.0f, 0, 1.6f);
+    dl->AddLine({c.x - r * 0.40f, c.y - r * 0.30f}, {c.x + r * 0.18f, c.y - r * 0.30f}, col, 1.8f);
+    dl->AddLine({c.x - r * 0.40f, c.y},             {c.x + r * 0.42f, c.y},             col, 2.6f);
+    dl->AddLine({c.x - r * 0.40f, c.y + r * 0.30f}, {c.x + r * 0.18f, c.y + r * 0.30f}, col, 1.8f);
+}
+
 // A shafted arrow pointing right — the unit card's March glyph (BL-575).
 // Distinct from glyph_goto's bare chevron (which moves the CAMERA to the
 // entity, not the entity itself) by carrying a full shaft behind the head —
@@ -1593,9 +1622,12 @@ std::vector<building_page> building_pages(const world& w, const recipe_registry&
     // Rivals: intel only (BL-068) — a single read-only Status page, nothing
     // that would reveal recipe choice or internals. Under spectator god view
     // (BL-408) the Status page opens its internals AND the read-only
-    // Profitability page joins it; Method and Workforce stay off the rival
-    // card even then, deliberately — they carry CONTROLS (recipe switch,
-    // workforce slider), and god view grants sight, never hands.
+    // Profitability page joins it.
+    //
+    // THE SHORT-CIRCUIT IS THE GUARANTEE, not a convenience: this returns a rival's
+    // whole page list without ever testing a player page's own guard, so a page added
+    // above cannot leak onto a rival card by forgetting one. It survived the
+    // 2026-08-29 lever move untouched and must keep surviving.
     if (!is_player_owned(w, id))
     {
         pages.push_back({"Status", building_page_kind::status});
@@ -1619,18 +1651,20 @@ std::vector<building_page> building_pages(const world& w, const recipe_registry&
             pages.push_back({"Profitability", building_page_kind::profitability});
     }
 
-    if (b.type == building_type::processing_facility)
-        pages.push_back({"Method", building_page_kind::method});
-
     // Chain and Depth are gone (2026-08-15 playtest rework — see
-    // building_page_kind's doc comment). Lifecycle is gone as a PAGE too: its
-    // Mothball/Dismantle controls moved onto the action grid
-    // (draw_building_selection_body), so Workforce is the only page left
-    // beyond Profitability/Method/Status.
-    pages.push_back({"Workforce", building_page_kind::workforce});
-
-    // Nothing applied (e.g. a freshly-placed infra building with no owner
-    // resolved yet) — an honest fallback rather than an empty accordion.
+    // building_page_kind's doc comment); Lifecycle is gone as a page too, its
+    // Mothball/Dismantle controls having moved onto the action grid
+    // (draw_building_selection_body).
+    //
+    // Method and Workforce are gone as of 2026-08-29 (Ben: the centre presents; it
+    // does not operate). Both were pages whose whole content was a control, and they
+    // are drawn by the Construction ledger's Buildings view now — the same two
+    // function bodies, one caller. What remains on the card REPORTS.
+    //
+    // Status is therefore the fallback for a player building with no profit data
+    // yet — a still-building site, or one the report has not touched. Before the
+    // lever move Workforce always applied, so this list was never empty; now it can
+    // be, and an empty accordion is not an honest surface.
     if (pages.empty())
         pages.push_back({"Status", building_page_kind::status});
 
@@ -1725,13 +1759,8 @@ void draw_building_page(world& w, const recipe_registry& reg, const economy_repo
     switch (kind)
     {
         case building_page_kind::profitability: draw_building_profit(w, reg, report, id); break;
-        case building_page_kind::method:        draw_production_method_section(w, reg, id); break;
         case building_page_kind::status:
             draw_building_status_page(w, reg, id, ui.spectating && ui.god_view); break;
-        case building_page_kind::workforce:
-            if (const auto bit = w.buildings.find(id); bit != w.buildings.end())
-                draw_building_workforce_page(bit->second);
-            break;
     }
 }
 
@@ -2232,7 +2261,49 @@ void draw_building_selection_body(world& w, const recipe_registry& reg,
                 building.workforce_auto = true;
         }
         ImGui::SameLine();
-        tile_icon_button("##bld_reserved3", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+
+        // Open in ledger — the fourth action, and the one this card's own lever move
+        // created the need for (Ben, 2026-08-29: "wire in the fourth grid button").
+        // With Method and Workforce off the centre, a building selected on the MAP had
+        // no route to its own levers at all; this is that route, in one press.
+        //
+        // AIMED, not merely opened: it expands this building's TYPE GROUP and leaves
+        // the building selected, so the levers are on screen rather than a roster of
+        // every type with the player left to find what they already had selected.
+        // `selected_entity` is already this building — the card's whole subject — so
+        // the aim is routing plus the group.
+        //
+        // A DOOR, not a toggle: its active state is not visible here, so a second
+        // press must not close what it opened (the standing Toggle rule binds controls
+        // whose active state shows).
+        //
+        // ABSENT on a rival's card, not merely disabled. The Buildings view is the
+        // PLAYER'S estate; a rival building has no row in it, so a button aiming at
+        // one would open an empty aim. Same discipline as the card's own
+        // rival short-circuit — the cell falls back to Reserved, so the grid keeps
+        // its shape and nothing reflows.
+        if (owned)
+        {
+            const ImVec2 p_open = ImGui::GetCursorScreenPos();
+            ui.construction_ui.open_ledger_x = p_open.x + bsz.x * 0.5f;
+            ui.construction_ui.open_ledger_y = p_open.y + bsz.y * 0.5f;
+            if (tile_icon_button("##bld_open_ledger", bsz, true,
+                                 "Open this building in the Buildings ledger",
+                                 glyph_roster))
+            {
+                close_all_panels(ui);
+                ui.show_construction_panel = true;
+                ui.construction.panel_view = 1; // Buildings
+                ui.construction.buildings_expanded = building_group_name(reg, building);
+                ui.selected_entity = sel; // already true; stated because the aim depends on it
+            }
+        }
+        else
+        {
+            ui.construction_ui.open_ledger_x = -1.0f;
+            ui.construction_ui.open_ledger_y = -1.0f;
+            tile_icon_button("##bld_reserved3", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+        }
 
         tile_icon_button("##bld_reserved4", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
         ImGui::SameLine();
@@ -3273,13 +3344,27 @@ void draw_tile_selection(world& w, ui_state& ui)
                 {pmin.x - 2.0f, pmin.y - 2.0f}, {pmin.x + bsz.x + 2.0f, pmin.y + bsz.y + 2.0f},
                 palette::selection, 4.0f, 0, 2.0f);
         }
+        {
+            const ImVec2 cp = ImGui::GetCursorScreenPos();
+            ui.construction_ui.construct_x = any_placeable ? cp.x + bsz.x * 0.5f : -1.0f;
+            ui.construction_ui.construct_y = any_placeable ? cp.y + bsz.y * 0.5f : -1.0f;
+        }
         if (tile_icon_button("##act_construct", bsz, any_placeable,
                              any_placeable
                                  ? (primed ? "Construct buildings - nothing under way"
                                            : "Construct buildings")
                                  : "Nothing can be built on this tile",
                              glyph_hammer))
-            ui.show_build_ledger = true;
+        {
+            // DOOR TWO onto the one construction element: open the slot-3
+            // Construction ledger aimed at its Construction view, which draws the
+            // queue and then this same build bar (draw_construction_ledger_body).
+            // It is a DOOR, not a toggle — the control's own active state is not
+            // visible on the card, so a second press must not close what it opened.
+            close_all_panels(ui);
+            ui.show_construction_panel   = true;
+            ui.construction.panel_view   = 0;
+        }
         ImGui::SameLine();
 
         // Manage — enabled only when a building occupies this tile; selecting it
@@ -3434,6 +3519,15 @@ void draw_selection_content(world& w, const recipe_registry& reg,
                             const economy_report& report,
                             const contract_template_registry& templates, ui_state& ui)
 {
+    // The building card's open-in-ledger button describes THIS frame. Cleared here,
+    // at the dispatcher, so it reads absent for every selection that is not a
+    // player-owned building — including the frames where no building card draws at
+    // all. A probe left standing after its control is gone is a click into nothing.
+    ui.construction_ui.open_ledger_x = -1.0f;
+    ui.construction_ui.open_ledger_y = -1.0f;
+    ui.construction_ui.construct_x   = -1.0f;
+    ui.construction_ui.construct_y   = -1.0f;
+
     // BL-598 removed the PROVINCE branch that stood here. BL-511 gave a province
     // its own resolution ahead of `selection_kind_of` — it is not an entity, so
     // the kind resolution cannot see it — and BL-534 gave it its own body. Ben
@@ -3620,34 +3714,6 @@ void draw_building_page_expanded(world& w, const recipe_registry& reg,
     draw_building_page(w, reg, report, ui.selected_entity, pages[static_cast<std::size_t>(page)].kind, ui);
 }
 
-namespace {
-
-/// BL-429: the named building an extraction_site targeting @p r reads as in the
-/// Build door — "Quarry" rather than "Extraction: Stone". Falls back to the
-/// resource's own display name for anything not given a bespoke identity
-/// (space/background raws outside this item's ancient-arc scope).
-const char* extraction_building_name(resource_type r)
-{
-    switch (r)
-    {
-        case resource_type::iron_ore:       return "Iron Mine";
-        case resource_type::coal:           return "Coal Mine";
-        case resource_type::petroleum:      return "Oil Field";
-        case resource_type::silica:         return "Silica Quarry";
-        case resource_type::copper_ore:     return "Copper Mine";
-        case resource_type::rare_earth_ore: return "Rare-Earth Mine";
-        case resource_type::water:          return "Water Extractor";
-        case resource_type::stone:          return "Quarry";
-        case resource_type::timber:         return "Woodcutter's Camp";
-        case resource_type::sand:           return "Sand Pit";
-        case resource_type::clay:           return "Clay Pit";
-        case resource_type::peat:           return "Peat Cutting";
-        default:                            return resource_name(r);
-    }
-}
-
-} // namespace
-
 // The tile construction ledger (BL-162): the tile-contextual surface that actually
 // lets the player build. Lists every building type placeable on the selected tile —
 // each in a bordered container (name + full credit cost + payback + an expected-profit
@@ -3655,47 +3721,42 @@ const char* extraction_building_name(resource_type r)
 // chosen build on the tile via the construction.pending_tile seam app executes.
 // Candidates sort by expected net descending on a ceiling shared across the list, so
 // the best options are the ones on screen without scrolling.
-void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_state& ui)
+void draw_construction_ledger_body(const world& w, const recipe_registry& reg, ui_state& ui)
 {
+    const ImGuiStyle& style = ImGui::GetStyle();
+
+    // Measured, not assumed: the build bar is now a SECTION of a host ledger rather
+    // than a window of its own, so its width budget is whatever the host gives it.
+    // (NR-709: a surface that hard-codes a width loses its name column the first
+    // time the column narrows.)
+    const float bar_w = ImGui::GetContentRegionAvail().x;
+
     const entity_id tile_id = ui.selected_entity;
     const auto tit = w.tiles.find(tile_id);
     if (tit == w.tiles.end())
     {
-        ui.show_build_ledger = false; // selection is not a tile — nothing to build on
+        // THE EMPTY STATE IS THE ANSWER, not a placeholder (Ben, 2026-08-29).
+        // Building is a TARGETED act, so with no target there is nothing to price.
+        // The tempting richer state — a list of tiles the player could build on —
+        // cannot be written without ordering it, and any ordering of that list is a
+        // recommendation, which is the surface Ben declined ("it enters the territory
+        // of telling the player what to do", CONCEPT.md). So this stays one line.
+        // Contrast the Buildings view, whose empty state CAN be improved: listing
+        // buildings the player already owns is navigation, not recommendation.
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Construct");
+        ImGui::Spacing();
+        ImGui::TextDisabled("Select a tile");
         return;
     }
     const tile_component& tile = tit->second;
 
-    const foldout_rect r       = foldout_column_rect();
-    const float        bar_w   = r.w;
-    const float        frame_h = ImGui::GetFrameHeight();
-    const ImGuiStyle&  style   = ImGui::GetStyle();
-
-    ImGui::SetNextWindowPos({r.x, r.y}, ImGuiCond_Always);
-    ImGui::SetNextWindowSize({r.w, r.h}, ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.90f);
-    constexpr ImGuiWindowFlags flags =
-        ImGuiWindowFlags_NoTitleBar            |
-        ImGuiWindowFlags_NoResize              |
-        ImGuiWindowFlags_NoMove                |
-        ImGuiWindowFlags_NoCollapse            |
-        ImGuiWindowFlags_NoNav                 |
-        ImGuiWindowFlags_NoBringToFrontOnFocus |
-        ImGuiWindowFlags_NoScrollbar           |
-        ImGuiWindowFlags_NoScrollWithMouse     |
-        ImGuiWindowFlags_NoSavedSettings;
-    ImGui::Begin("##build_ledger", nullptr, flags);
-
-    // ── Header: Construct · [x, y] ............................... [x] ──
+    // ── Header: Construct · [x, y] ──
+    // No close 'x': the host ledger's nav rail slot and its tab strip own closing
+    // now, and a second closer on a section inside it would close something the
+    // player did not point at.
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Construct");
     ImGui::SameLine();
     ImGui::TextDisabled("[%d, %d]", tile.grid_x, tile.grid_y);
-    const float btn = frame_h;
-    ImGui::SameLine(bar_w - style.WindowPadding.x - btn);
-    if (ImGui::Button("x", {btn, btn}))
-        ui.show_build_ledger = false; // back to the tile Selection element
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Close");
 
     ImGui::Separator();
 
@@ -4243,8 +4304,6 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     }
 
     ImGui::EndChild();
-
-    ImGui::End();
 }
 
 } // namespace ui
