@@ -226,6 +226,26 @@
    "Lens strip slot 6, on the minimap (draw_overlay_controls, src/ui/overlay.cpp). Its glyph is a TRUCK in profile (icons::throughput) — its own mark since BL-605, no longer the borrowed convoy chevron, because an on-screen lens carries one distinct glyph."
   ],
   [
+   "ledger.nav_acquisitions",
+   "Nav rail, slot 5 (Acquisitions icon - two outlined squares with an arrow driven from the small one into the large one)"
+  ],
+  [
+   "ledger.acquisitions_buy",
+   "Acquisitions ledger, a Purchasable row's 'Buy' press"
+  ],
+  [
+   "ledger.acquisitions_group",
+   "Acquisitions ledger, the 'Purchasable' and 'Possible' group headers"
+  ],
+  [
+   "ledger.acquisitions_profitability",
+   "Acquisitions ledger, the 'Profitability' row's full-canvas control"
+  ],
+  [
+   "ledger.acquisitions_profitability_sort",
+   "Acquisitions ledger, Profitability fold-out, the table's column headers"
+  ],
+  [
    "ledger.budget_tax_tier",
    "Balance Ledger (Budget), 'Taxes' tier control"
   ],
@@ -267,11 +287,11 @@
   ],
   [
    "ledger.corps_table_row_select",
-   "All-corporations balance table (nav slot 8)"
+   "All-corporations balance table (nav slot 9)"
   ],
   [
    "ledger.nav_generation",
-   "Nav rail, slot 10 (plate/continent glyph)"
+   "Nav rail, slot 11 (plate/continent glyph)"
   ],
   [
    "ledger.generation_view_tab",
@@ -315,7 +335,7 @@
   ],
   [
    "ledger.nav_construction",
-   "Nav rail, slot 6 (Construction icon)"
+   "Nav rail, slot 7 (Construction icon)"
   ],
   [
    "ledger.nav_corporation",
@@ -323,7 +343,7 @@
   ],
   [
    "ledger.nav_corporations_table",
-   "Nav rail, slot 8 (Diplomacy icon - provisionally hosts the corporations table)"
+   "Nav rail, slot 9 (Diplomacy icon - provisionally hosts the corporations table)"
   ],
   [
    "ledger.nav_economy",
@@ -331,11 +351,11 @@
   ],
   [
    "ledger.nav_history",
-   "Nav rail, slot 9 (History icon)"
+   "Nav rail, slot 10 (History icon)"
   ],
   [
    "ledger.nav_market",
-   "Nav rail, slot 5 (Market Ledger icon)"
+   "Nav rail, slot 6 (Market Ledger icon)"
   ],
   [
    "ledger.selection_body_goto_surface",
@@ -507,7 +527,7 @@
   ],
   [
    "ledger.decision_feed_open",
-   "Navigation rail slot 11, \"AI decisions\""
+   "Navigation rail slot 12, \"AI decisions\""
   ],
   [
    "ledger.decision_feed_filter_corp",
@@ -547,7 +567,7 @@
   ],
   [
    "ledger.strategy_readout_open",
-   "Navigation rail slot 12, \"Strategy readout\""
+   "Navigation rail slot 13, \"Strategy readout\""
   ],
   [
    "ledger.strategy_readout_select_corp",
@@ -571,7 +591,7 @@
   ],
   [
    "gameplay.buy_corporation",
-   "Seam-only for now (BL-628, whole-firm acquisition): a corp_verb issued against the corp-command seam (ProjectIo --serve, COMMAND opcode). The press that will host it is the Profitability ledger's buyout control (BL-627, profitability ledger) — the only surface that reads another corporation's filed return, and therefore the only one that can show the price before it is paid."
+   "The Acquisitions ledger (nav rail slot 5, and the Company lens's click destination): the Buy press on a PURCHASABLE row. The two groups are the whole affordance — Purchasable rows carry the press, Possible rows show the price and carry none, because a price you cannot meet is something to save toward rather than something refused. Also still a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger. NOTE FOR A PLANNER: the field is SMALL and that is generated, not a bug — measured over twelve seeds of the shipped spawn (tools/verify/acquisition_viability.cpp section C), 88 corporations yield only 1 to 3 buyable firms, mean 1.6, because ownership class is overwhelmingly closed and a non-public firm cannot be priced at all."
   ],
   [
    "chrome.quick_save_key",
@@ -587,7 +607,7 @@
   ],
   [
    "ledger.nav_contracts",
-   "Nav rail, slot 13 (Contracts icon — a page with a signed check mark)"
+   "Nav rail, slot 14 (Contracts icon — a page with a signed check mark)"
   ],
   [
    "ledger.contracts_view_tab",

@@ -4224,7 +4224,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             bool non_entity_structure = false;
 
             entity_id lens_through = null_entity;
-            if (marker_hit != null_entity && state.overlay == overlay_mode::corporation)
+            // The COMPANY lens resolves through exactly as the Corporation lens
+            // does — same population rule as `compute_tile_fill` and the HQ
+            // marker pass, so a click cannot resolve to something the lens is
+            // not drawing. The two lenses differ only in WHERE the click lands
+            // (below): a rival's seat opens its books, a background firm's seat
+            // opens the ledger that says whether it can be bought.
+            if (marker_hit != null_entity && (state.overlay == overlay_mode::corporation
+                                              || state.overlay == overlay_mode::company))
             {
                 if (const auto bit = w.buildings.find(marker_hit); bit != w.buildings.end())
                 {
@@ -4327,7 +4334,37 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 else if (struct_kind == structure_kind::corporation)
                 {
                     close_all_panels(state);
-                    state.show_balance_ledger = true;
+                    if (state.overlay == overlay_mode::company)
+                    {
+                        // THE COMPANY LENS'S DESTINATION. The Corporation lens
+                        // asks "how are my rivals doing" and lands on the books;
+                        // the Company lens draws BACKGROUND firms, and the
+                        // question a player has about a background firm is
+                        // whether they can buy it. So this lands on the
+                        // Acquisitions ledger, replacing the balance-ledger
+                        // placeholder both lenses used to share.
+                        //
+                        // The firm is carried across as the ledger's focus so
+                        // the click lands somewhere VISIBLE — a highlighted row
+                        // — rather than merely opening a list and leaving the
+                        // player to find what they clicked. It is never a
+                        // filter: the buyable field is one to three firms
+                        // (measured, `acquisition_viability` § C) and filtering
+                        // it to one would answer a question nobody asked.
+                        //
+                        // A clicked firm may well NOT be in the field at all —
+                        // most background firms are `closed` and cannot be
+                        // priced. That is the honest outcome and the ledger says
+                        // so on its own face ("N of M firms file and can be
+                        // priced"); inventing a row for an unpriceable firm
+                        // would be worse than an unmatched highlight.
+                        state.acquisitions_focus_corp   = structure_hit;
+                        state.show_acquisitions_ledger  = true;
+                    }
+                    else
+                    {
+                        state.show_balance_ledger = true;
+                    }
                 }
             }
             else

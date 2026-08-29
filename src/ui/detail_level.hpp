@@ -79,6 +79,14 @@ enum class detail_surface : std::uint8_t
     generation_stage,  ///< The New World wizard's chain stages (key = chain_stage).
     corp_rollup,       ///< The Corporation dashboard's roll-up cards (key = card index, BL-248).
     building_section,  ///< Building management in the Buildings tab (key = building_view_section, BL-229).
+    /// The Acquisitions ledger's profitability table (BL-627) — the whole
+    /// field's filed returns, one row per corporation. It is a TAKEOVER and
+    /// never an in-place expansion, and the reason is the measurement: the
+    /// column shows a buyable field of ~2 firms while this table shows ~88
+    /// rows over six columns. That does not fit a 380 px column at any font
+    /// size, so its `disclosure_controls` pass `in_place = false` and only the
+    /// `›` control is drawn. key = 0; there is one such table.
+    acquisitions_profit,
 };
 
 /// What is disclosed right now — the takeover target, and the in-place set.

@@ -51,6 +51,7 @@ void close_all_panels(ui_state& state)
     state.show_decision_feed     = false; // AI decision feed (BL-407)
     state.show_strategy_readout  = false; // Strategy readout (BL-411)
     state.show_contracts_ledger  = false; // Contracts ledger (BL-576)
+    state.show_acquisitions_ledger = false; // Acquisitions ledger (slot 5)
     // BL-310 round 4: the tech-tree era-selector menu is now a real shell-
     // column occupant (draw_tech_tree_menu), so it must yield to every other
     // ledger the same way they yield to it — its canvas takeover closes with it.
@@ -65,7 +66,7 @@ bool any_panel_open(const ui_state& state)
            state.show_tile_ledger       || state.show_economy_panel ||
            state.show_generation_ledger || state.show_tech_tree ||
            state.show_decision_feed     || state.show_strategy_readout ||
-           state.show_contracts_ledger;
+           state.show_contracts_ledger || state.show_acquisitions_ledger;
 }
 
 void draw_nav_pane(ui_state& state, float top_offset)
@@ -88,40 +89,55 @@ void draw_nav_pane(ui_state& state, float top_offset)
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{6.0f, 8.0f});
     ImGui::Begin("##nav_pane", nullptr, flags);
 
-    // Nine slots from MENU.md § Menu set and ordering. Slots 1–9 match the
-    // MENU.md curated sequence; live slots toggle their panel. Corp. Strategy is
-    // the one still-disabled slot, and it carries its OWN glyph so the rail
+    // TEN curated slots from MENU.md § Menu set and ordering (nine before the
+    // Acquisitions insertion below). Slots 1–10 match the MENU.md sequence;
+    // live slots toggle their panel. Corp. Strategy is the one still-disabled slot, and it carries its OWN glyph so the rail
     // teaches the shape of the game rather than showing a row of identical
     // blanks (BL-174). Workforce, Research and Diplomacy are unbuilt subjects
     // whose slots provisionally host a homeless surface — the Economy panel
     // (BL-292), the tech-tree mock (BL-310) and the corporations table (NR-012)
     // — keeping their real subject's name and glyph.
     //
-    // BL-174 dropped the former slot 10 — a disabled placeholder with no glyph
+    // BL-174 dropped the former slot 10 (now 11) — a disabled placeholder with no glyph
     // and no tooltip, so it was pure noise a new player could not interpret.
     //
-    // Slot 10 is BACK, but as the opposite of what BL-174 removed: a LIVE slot
+    // Slot 11 (numbered 10 before the Acquisitions insertion) is BACK,
+    // but as the opposite of what BL-174 removed: a LIVE slot
     // with its own glyph and tooltip, hosting the Generation Ledger (BL-303).
     // It sits last deliberately — it is a developer tuning surface rather than a
     // player system, so it takes the tail of the rail instead of displacing any
-    // of MENU.md's curated nine.
+    // of MENU.md's curated player slots.
     //
-    // Slot 11 (BL-407, the AI decision feed) follows the same precedent: an
+    // Slot 12 (BL-407, the AI decision feed) follows the same precedent: an
     // observability surface, not a player system, so it takes the tail rather
-    // than displacing any of the curated nine. The tail is now where the
+    // than displacing any of the curated player slots. The tail is now where the
     // developer/observability surfaces live, which is a legible rule — keep new
     // ones going there rather than interleaving them.
     //
-    // Slot 12 (BL-411, the Strategy readout) is the third tail occupant under
+    // Slot 13 (BL-411, the Strategy readout) is the third tail occupant under
     // that rule: the feed's aggregate companion — verb mix, spend buckets and
     // reason tally per corp, the SHAPE of a run where the feed lists the moves.
-    // Slot 13 (BL-576, the Contracts ledger) is appended after the developer
-    // tail: the curated nine (MENU.md § Menu set and ordering) and the tail
-    // (slots 10-12) were both already full when this landed, and unlike the
+    // Slot 14 (BL-576, the Contracts ledger) is appended after the developer
+    // tail: the curated player slots (MENU.md § Menu set and ordering) and the tail
+    // (slots 11-13) were both already full when this landed, and unlike the
     // tail's own occupants Contracts IS a player system — offers, active
     // contracts, terminal history — so it does not belong inside a tail whose
-    // stated character is "not a player system". See MENU.md § Slot 13.
-    constexpr int tab_count = 13;
+    // stated character is "not a player system". See MENU.md's slot table.
+    //
+    // ── THE ACQUISITIONS INSERTION (Ben, 2026-08-29) ──────────────────────
+    // Acquisitions is INSERTED at slot 5, above Market, and everything from
+    // Market down shifts by one. That is an insertion rather than another
+    // append, and Ben's call, because the ledger is a *curated player system*
+    // and appending it would have put it after the developer/observability
+    // tail — teaching the rail that a player system sits below the tuning
+    // surfaces. Above Market is where it belongs on its own terms too: buying
+    // a firm is the largest single thing a player's money does, and it reads
+    // before the market it is priced from.
+    //
+    // The shape MENU.md states survives: the curated player slots become TEN
+    // (1-10), the developer/observability tail moves to 11-13, and Contracts
+    // stays the appended player-system slot, now 14.
+    constexpr int tab_count = 14;
 
     // Square slots; Selectable treats a nonzero size as literal, so derive the
     // rail width explicitly rather than passing -1.
@@ -159,7 +175,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
         // not reach it at all (BL-292). Slot 3 is the least-wrong host because the
         // panel's Corps view already carries the labour table this slot is eventually
         // for, and because reusing a reserved slot leaves the rail's length free for
-        // BL-094's law/force slots. Same idiom as slot 8: the slot keeps its real
+        // BL-094's law/force slots. Same idiom as slot 9: the slot keeps its real
         // subject's name and glyph so the rail does not start teaching
         // "Workforce = the economy tables".
         case 3: // Workforce — provisional host for the Economy panel (BL-292)
@@ -181,7 +197,16 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("Research", "Technology unlocks and the route to space (design mock).", false);
             break;
-        case 5: // Market Ledger (BL-027)
+        case 5: // Acquisitions ledger — inserted above Market (Ben, 2026-08-29)
+            if (ImGui::Selectable(id, state.show_acquisitions_ledger, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_acquisitions_ledger;
+                close_all_panels(state);
+                state.show_acquisitions_ledger = !was_open;
+            }
+            slot_tooltip("Acquisitions",
+                         "Which firms you can buy outright, and what they cost.", false);
+            break;
+        case 6: // Market Ledger (BL-027)
             if (ImGui::Selectable(id, state.show_market_ledger, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_market_ledger;
                 close_all_panels(state);
@@ -189,7 +214,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("Market Ledger", "Prices, supply and demand on the bodies you trade on.", false);
             break;
-        case 6: // Building (BL-029, renamed BL-143)
+        case 7: // Building (BL-029, renamed BL-143)
             if (ImGui::Selectable(id, state.show_construction_panel, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_construction_panel;
                 close_all_panels(state);
@@ -197,7 +222,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("Construction", "What you are building now, and the buildings you own.", false);
             break;
-        case 7: // Corp. Strategy — placeholder
+        case 8: // Corp. Strategy — placeholder
             ImGui::BeginDisabled();
             ImGui::Selectable(id, false, 0, {slot_size, slot_size});
             ImGui::EndDisabled();
@@ -206,11 +231,11 @@ void draw_nav_pane(ui_state& state, float top_offset)
         // Diplomacy is still unbuilt, but the slot is no longer empty: it hosts the
         // all-corporations balance table, provisionally. That table was BL-248's one
         // deletion and Ben restored it (NR-012) — it needs a door, and every other
-        // slot is spoken for. Slot 8 is the least-wrong host because the table IS a
+        // slot is spoken for. Slot 9 is the least-wrong host because the table IS a
         // rival-comparison read, which is what this slot is eventually for. It moves
         // when Diplomacy is designed; the slot stays labelled by its real subject so
         // the rail does not start teaching "Diplomacy = a balance table".
-        case 8: // Diplomacy — provisional host for the corporations table (NR-012)
+        case 9: // Diplomacy — provisional host for the corporations table (NR-012)
             if (ImGui::Selectable(id, state.show_corporations_table, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_corporations_table;
                 close_all_panels(state);
@@ -218,7 +243,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("Diplomacy", "Not yet built. For now: every corporation's balance, side by side.", false);
             break;
-        case 9: // History (Tile Ledger lives here per MENU.md renaming)
+        case 10: // History (Tile Ledger lives here per MENU.md renaming)
             if (ImGui::Selectable(id, state.show_tile_ledger, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_tile_ledger;
                 close_all_panels(state);
@@ -226,7 +251,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("History", "How this world was generated - its biography and its numbers.", false);
             break;
-        case 10: // Generation Ledger (BL-303) — the developer tuning surface
+        case 11: // Generation Ledger (BL-303) — the developer tuning surface
             if (ImGui::Selectable(id, state.show_generation_ledger, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_generation_ledger;
                 close_all_panels(state);
@@ -234,7 +259,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("Generation Ledger", "Why a tile generated as it did - the per-pass derivation and the body's histograms.", false);
             break;
-        case 11: // AI decisions (BL-407) — the scorer's rationale, finally readable
+        case 12: // AI decisions (BL-407) — the scorer's rationale, finally readable
             if (ImGui::Selectable(id, state.show_decision_feed, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_decision_feed;
                 close_all_panels(state);
@@ -242,7 +267,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("AI decisions", "What the rival corporations decided, and how close the call was.", false);
             break;
-        case 12: // Strategy readout (BL-411) — the shape of each corp's run
+        case 13: // Strategy readout (BL-411) — the shape of each corp's run
             if (ImGui::Selectable(id, state.show_strategy_readout, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_strategy_readout;
                 close_all_panels(state);
@@ -250,7 +275,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("Strategy readout", "What strategy is emerging - each corporation's decision mix, spend priorities and reasons over the recent run.", false);
             break;
-        case 13: // Contracts ledger (BL-576) — offers, active contracts, history
+        case 14: // Contracts ledger (BL-576) — offers, active contracts, history
             if (ImGui::Selectable(id, state.show_contracts_ledger, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_contracts_ledger;
                 close_all_panels(state);
@@ -258,7 +283,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("Contracts", "Offers, active contracts and terminal history for the mercenary contract.", false);
             break;
-        default: // Unreachable — tab_count is 13 and every slot is handled above.
+        default: // Unreachable — tab_count is 14 and every slot is handled above.
             break;
         }
 
@@ -285,37 +310,44 @@ void draw_nav_pane(ui_state& state, float top_offset)
         case 2: icons::ledger(dl, centre, r, lit(state.show_balance_ledger));          break;
         // Slot 3 is live only because it provisionally hosts the Economy panel
         // (BL-292); the subject it is NAMED for is still unbuilt, so the glyph lights
-        // like any other live slot rather than staying dim — same as slot 8.
+        // like any other live slot rather than staying dim — same as slot 9.
         case 3: icons::population(dl, centre, r, lit(state.show_economy_panel));        break;
         case 4: icons::research(dl, centre, r, lit(state.show_tech_tree)); break;  // Research (BL-310)
-        case 5: icons::market(dl, centre, r, lit(state.show_market_ledger));           break;
-        // Slot 6 draws the factory, NOT building(processing_facility): that glyph
+        // Slot 5's own glyph: two outlined squares with an arrow from the small
+        // into the large — "a firm absorbed whole". A pair is a silhouette no
+        // other rail slot draws, which is what BL-174 requires of two LIT slots;
+        // it deliberately does NOT clone slot 1's solid corporation seal or
+        // slot 6's market bars, the two it sits between and would be confused
+        // with at rail radius.
+        case 5: icons::acquisition(dl, centre, r, lit(state.show_acquisitions_ledger)); break;
+        case 6: icons::market(dl, centre, r, lit(state.show_market_ledger));           break;
+        // Slot 7 draws the factory, NOT building(processing_facility): that glyph
         // is a plain filled square, and slot 1's corporation seal is the same
         // square with a ~4.6 px dot — at the rail's radius the two were one
         // silhouette, which is exactly the collision BL-174 exists to fix.
-        case 6: icons::industry(dl, centre, r, lit(state.show_construction_panel));    break;
-        case 7: icons::strategy(dl, centre, r, dim);     break;  // Corp. Strategy (reserved)
-        // Slot 8 is live only because it provisionally hosts the corporations table
+        case 7: icons::industry(dl, centre, r, lit(state.show_construction_panel));    break;
+        case 8: icons::strategy(dl, centre, r, dim);     break;  // Corp. Strategy (reserved)
+        // Slot 9 is live only because it provisionally hosts the corporations table
         // (NR-012); the subject it is NAMED for is still unbuilt, so the glyph lights
         // like any other live slot rather than staying dim.
-        case 8: icons::diplomacy(dl, centre, r, lit(state.show_corporations_table)); break;
-        case 9: icons::history(dl, centre, r, lit(state.show_tile_ledger));            break;
+        case 9: icons::diplomacy(dl, centre, r, lit(state.show_corporations_table)); break;
+        case 10: icons::history(dl, centre, r, lit(state.show_tile_ledger));            break;
         // The plate glyph: this ledger's subject is the generated ground itself,
         // and the Continent lens already teaches that shape as "how the surface
         // came to be" rather than as a live economic read.
-        case 10: icons::continent(dl, centre, r, lit(state.show_generation_ledger));   break;
-        // Slot 11 borrows the strategy glyph, which slot 7 draws DIM as its
+        case 11: icons::continent(dl, centre, r, lit(state.show_generation_ledger));   break;
+        // Slot 12 borrows the strategy glyph, which slot 8 draws DIM as its
         // reserved Corp. Strategy placeholder. The two never collide visually —
         // one is always dim, one lights — and the shape is right: this ledger's
         // subject is exactly the strategic decision that slot is reserved for,
-        // read rather than set. Revisit if slot 7 is ever built.
-        case 11: icons::strategy(dl, centre, r, lit(state.show_decision_feed));        break;
+        // read rather than set. Revisit if slot 8 is ever built.
+        case 12: icons::strategy(dl, centre, r, lit(state.show_decision_feed));        break;
         // The readout gets its OWN glyph (the axis-and-tally-bars readout mark)
-        // rather than a third borrow of `strategy` — slot 11 already lights that
+        // rather than a third borrow of `strategy` — slot 12 already lights that
         // pennant, and two lit slots sharing a silhouette is exactly the
         // collision BL-174 exists to prevent.
-        case 12: icons::readout(dl, centre, r, lit(state.show_strategy_readout));      break;
-        case 13: icons::contract(dl, centre, r, lit(state.show_contracts_ledger));     break;
+        case 13: icons::readout(dl, centre, r, lit(state.show_strategy_readout));      break;
+        case 14: icons::contract(dl, centre, r, lit(state.show_contracts_ledger));     break;
         default: icons::placeholder(dl, centre, r, dim); break;
         }
     }

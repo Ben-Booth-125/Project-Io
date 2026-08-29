@@ -1070,6 +1070,79 @@
    "reason_to_select": "Select to answer 'how much can move through here, and how far is this ground from the capacity that would move it?' — before ordering a march that active LP could refuse, before siting a building whose supply has to come from somewhere, or when deciding where a new port or inland hub would actually widen the network. It is the surface half of the Logistic Points cap (LOGISTICS.md): a refused march is legible only if the player can see where throughput is thin, and a cap nobody can see is silent interdiction. It extends the Reach lens rather than replacing it — Reach spends the same field as a yes/no placement predicate, this spends the quantity that predicate throws away. It does NOT mean LP is priced by distance (it is not): the shading says how far this ground is from a generator, never that the points thin out on the way."
   },
   {
+   "id": "ledger.nav_acquisitions",
+   "family": "ledger",
+   "surface": "Nav rail, slot 5 (Acquisitions icon - two outlined squares with an arrow driven from the small one into the large one)",
+   "press": "Click the paired-squares glyph in the left icon rail, above the Market Ledger",
+   "args": [],
+   "preconditions": [
+    "In-game"
+   ],
+   "expected_output": "Toggles the Acquisitions ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows the player's balance, the size of the buyable field ('N of M firms file and can be priced'), and two collapsing groups over that field: Purchasable (priced at or below the balance, each row carrying a Buy press) and Possible (priced, beyond the balance today, no press). Beneath them sits the Profitability fold-out's door.",
+   "reason_to_select": "The only surface that prices another corporation, and therefore the only place a whole-firm buyout can be planned rather than merely issued. Expect a SHORT list: measured over twelve seeds, one to three firms are buyable out of eighty-eight, because ownership class is generated and most firms are closed. A short list here is the world, not a failure to load."
+  },
+  {
+   "id": "ledger.acquisitions_buy",
+   "family": "ledger",
+   "surface": "Acquisitions ledger, a Purchasable row's 'Buy' press",
+   "press": "Click 'Buy' on a row in the Purchasable group",
+   "args": [],
+   "preconditions": [
+    "The Acquisitions ledger is open",
+    "The row is in the PURCHASABLE group - i.e. its price is at or below the player corporation's balance. A Possible row carries no press at all, rather than a disabled one"
+   ],
+   "expected_output": "Enqueues gameplay.buy_corporation against that firm onto the deferred command queue, drained on the next frame through the same apply_corp_command seam an agent's COMMAND uses - so the press and the wire are one code path. On success the firm is DISSOLVED and its holdings, stock, cash and filed returns transfer; the field line and both groups redraw one firm shorter. See gameplay.buy_corporation for the price formula and the full transfer/cancel/drop disposition.",
+   "reason_to_select": "Take a whole competitor in one step at a price read off a record it published itself. WATCH THE ZERO PRICE: because the price's cash term is signed, a deeply indebted firm's negative balance cancels its book value and the floor hands it over for nothing - and the dissolution rule then moves that debt to you at face value. Five of twelve measured seeds priced their one buyable firm at exactly 0 for this reason. The row says so on hover; a free firm is not a cheap firm."
+  },
+  {
+   "id": "ledger.acquisitions_group",
+   "family": "ledger",
+   "surface": "Acquisitions ledger, the 'Purchasable' and 'Possible' group headers",
+   "press": "Click a group header to collapse it; click again to expand",
+   "args": [
+    {
+     "name": "group",
+     "type": "enum",
+     "meaning": "'Purchasable' (priced within the balance, carries the Buy presses) or 'Possible' (priced, beyond the balance today, no press)"
+    }
+   ],
+   "preconditions": [
+    "The Acquisitions ledger is open"
+   ],
+   "expected_output": "Collapses or expands that group. Both are EXPANDED at rest, against the usual instinct, because the whole field averages under two rows - a collapsed group would hide the entire answer. Each header carries its own row count, so an empty group reads as '(0)' rather than as a surface that failed to populate.",
+   "reason_to_select": "Purely a reading convenience; it changes nothing about the world. There is rarely enough content here to need it."
+  },
+  {
+   "id": "ledger.acquisitions_profitability",
+   "family": "ledger",
+   "surface": "Acquisitions ledger, the 'Profitability' row's full-canvas control",
+   "press": "Click the chevron in the Profitability row's right-hand gutter",
+   "args": [],
+   "preconditions": [
+    "The Acquisitions ledger is open"
+   ],
+   "expected_output": "Opens a full-canvas takeover over the canvas region (the nav rail, header, clock, comms dock and Selection band all survive it, and the Acquisitions column stays visible beside it) holding ONE ROW PER CORPORATION with seven columns: Firm, Type, End resource, Input resource, Profit/qtr, Price, Ownership. Exact figures where the firm files and a DASH where it does not, with no bands anywhere - a dash always means 'this firm does not file', never 'you have not earned this'. Closed by the return control top-left, or by Esc.",
+   "reason_to_select": "The widest financial read in the game and the one an acquisition should be planned from: it is where a firm that prices below what it is worth becomes visible. Note the shape of the data before reading it - roughly 85 of 88 firms per seed file a return in world state that they do NOT disclose, so most rows carry a name, an ownership class and five dashes. Sorting by Ownership brings the readable firms to the top and is the fastest way through it."
+  },
+  {
+   "id": "ledger.acquisitions_profitability_sort",
+   "family": "ledger",
+   "surface": "Acquisitions ledger, Profitability fold-out, the table's column headers",
+   "press": "Click a column header to sort ascending; click again to reverse",
+   "args": [
+    {
+     "name": "column",
+     "type": "enum",
+     "meaning": "'Firm', 'Type', 'End resource', 'Input resource', 'Profit/qtr', 'Price' or 'Ownership'"
+    }
+   ],
+   "preconditions": [
+    "The Profitability fold-out is open"
+   ],
+   "expected_output": "Re-sorts every row. An UNDISCLOSED cell sorts as ABSENT rather than as zero, in either direction - a dash is not a small number, and letting dashes sort among the real values would make the ordering lie. Ties keep the resting order, which is ascending corporation id (the same sorted walk apply_budget files returns in), so the sort is deterministic rather than an unordered map's layout. The choice survives closing and reopening the fold-out.",
+   "reason_to_select": "Sort by Price to find the cheapest firm, by Profit/qtr to find the one whose filed return understates it, or by Ownership to collapse the ~85 undisclosed rows out of the way in one press."
+  },
+  {
    "id": "ledger.budget_tax_tier",
    "family": "ledger",
    "surface": "Balance Ledger (Budget), 'Taxes' tier control",
@@ -1248,7 +1321,7 @@
   {
    "id": "ledger.corps_table_row_select",
    "family": "ledger",
-   "surface": "All-corporations balance table (nav slot 8)",
+   "surface": "All-corporations balance table (nav slot 9)",
    "press": "Click a corporation's row",
    "args": [
     {
@@ -1266,8 +1339,8 @@
   {
    "id": "ledger.nav_generation",
    "family": "ledger",
-   "surface": "Nav rail, slot 10 (plate/continent glyph)",
-   "press": "Click the plate glyph at the bottom of the left icon rail",
+   "surface": "Nav rail, slot 11 (plate/continent glyph)",
+   "press": "Click the plate glyph in the developer tail of the left icon rail",
    "args": [],
    "preconditions": [
     "In-game"
@@ -1451,7 +1524,7 @@
   {
    "id": "ledger.nav_construction",
    "family": "ledger",
-   "surface": "Nav rail, slot 6 (Construction icon)",
+   "surface": "Nav rail, slot 7 (Construction icon)",
    "press": "Click the industry/factory glyph on the left icon rail",
    "args": [],
    "preconditions": [
@@ -1475,7 +1548,7 @@
   {
    "id": "ledger.nav_corporations_table",
    "family": "ledger",
-   "surface": "Nav rail, slot 8 (Diplomacy icon - provisionally hosts the corporations table)",
+   "surface": "Nav rail, slot 9 (Diplomacy icon - provisionally hosts the corporations table)",
    "press": "Click the diplomacy glyph on the left icon rail",
    "args": [],
    "preconditions": [
@@ -1499,7 +1572,7 @@
   {
    "id": "ledger.nav_history",
    "family": "ledger",
-   "surface": "Nav rail, slot 9 (History icon)",
+   "surface": "Nav rail, slot 10 (History icon)",
    "press": "Click the history glyph on the left icon rail",
    "args": [],
    "preconditions": [
@@ -1511,7 +1584,7 @@
   {
    "id": "ledger.nav_market",
    "family": "ledger",
-   "surface": "Nav rail, slot 5 (Market Ledger icon)",
+   "surface": "Nav rail, slot 6 (Market Ledger icon)",
    "press": "Click the market glyph on the left icon rail",
    "args": [],
    "preconditions": [
@@ -2115,8 +2188,8 @@
   {
    "id": "ledger.decision_feed_open",
    "family": "ledger",
-   "surface": "Navigation rail slot 11, \"AI decisions\"",
-   "press": "Click nav rail slot 11 to open the AI decision feed; click it again to close",
+   "surface": "Navigation rail slot 12, \"AI decisions\"",
+   "press": "Click nav rail slot 12 to open the AI decision feed; click it again to close",
    "args": [],
    "preconditions": [
     "In game (not the menu or the generation screen)"
@@ -2310,8 +2383,8 @@
   {
    "id": "ledger.strategy_readout_open",
    "family": "ledger",
-   "surface": "Navigation rail slot 12, \"Strategy readout\"",
-   "press": "Click nav rail slot 12 to open the Strategy readout; click it again to close",
+   "surface": "Navigation rail slot 13, \"Strategy readout\"",
+   "press": "Click nav rail slot 13 to open the Strategy readout; click it again to close",
    "args": [],
    "preconditions": [
     "In game (not the menu or the generation screen)"
@@ -2439,8 +2512,8 @@
   {
    "id": "gameplay.buy_corporation",
    "family": "gameplay",
-   "surface": "Seam-only for now (BL-628, whole-firm acquisition): a corp_verb issued against the corp-command seam (ProjectIo --serve, COMMAND opcode). The press that will host it is the Profitability ledger's buyout control (BL-627, profitability ledger) — the only surface that reads another corporation's filed return, and therefore the only one that can show the price before it is paid.",
-   "press": "Over the seam: COMMAND corp=<id> verb=28 counterparty=<target corp id>. No other field is read.",
+   "surface": "The Acquisitions ledger (nav rail slot 5, and the Company lens's click destination): the Buy press on a PURCHASABLE row. The two groups are the whole affordance — Purchasable rows carry the press, Possible rows show the price and carry none, because a price you cannot meet is something to save toward rather than something refused. Also still a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger. NOTE FOR A PLANNER: the field is SMALL and that is generated, not a bug — measured over twelve seeds of the shipped spawn (tools/verify/acquisition_viability.cpp section C), 88 corporations yield only 1 to 3 buyable firms, mean 1.6, because ownership class is overwhelmingly closed and a non-public firm cannot be priced at all.",
+   "press": "Open the Acquisitions ledger (nav rail slot 5, or click a background firm's holdings under the Company lens) and press 'Buy' on a row in the Purchasable group. Over the seam: COMMAND corp=<id> verb=28 counterparty=<target corp id>. No other field is read.",
    "args": [
     {
      "name": "counterparty",
@@ -2504,7 +2577,7 @@
   {
    "id": "ledger.nav_contracts",
    "family": "ledger",
-   "surface": "Nav rail, slot 13 (Contracts icon — a page with a signed check mark)",
+   "surface": "Nav rail, slot 14 (Contracts icon — a page with a signed check mark)",
    "press": "Click the contract glyph on the left icon rail",
    "args": [],
    "preconditions": [

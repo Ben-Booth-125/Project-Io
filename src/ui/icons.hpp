@@ -403,6 +403,29 @@ void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour of the page outline and the check mark.
 void contract(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the Acquisitions nav-rail glyph — a large outlined square on the left
+/// and a smaller outlined square on the right, with a short arrow running from
+/// the small one INTO the large one: "one firm absorbed whole into another",
+/// which is exactly what `buy_corporation` does and the only thing it does.
+///
+/// TWO BOXES IS THE SILHOUETTE, and it is deliberately unlike every other lit
+/// slot (BL-174 — two lit slots must never share a shape). `corporation` is ONE
+/// filled square with a centred dot; `ledger` is ONE ruled box; `industry` is
+/// the factory; `contract` is a dog-eared page. Nothing else in the rail draws
+/// a pair, so the pair is the mark. The squares are OUTLINED rather than
+/// filled, which keeps the seal (a solid square) unmistakable beside it at rail
+/// radius, and the arrow gives the pair a direction — a takeover has a buyer
+/// and a target, and a symmetric pair would say "merger", which the model does
+/// not have.
+///
+/// Nav rail slot 5, the Acquisitions ledger. See ICONS.md § Nav-rail affordances.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour of both squares and the arrow.
+void acquisition(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw a unit marker — a humanoid silhouette (a filled circle "head" over a
 /// triangle "body") in @p fill, with the standard dark outline — in @p fill.
 /// Echoes `glyph_soldier`, the unit card's left-column placeholder
