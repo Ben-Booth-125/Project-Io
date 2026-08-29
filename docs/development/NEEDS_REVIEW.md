@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*90 entries — 90 open, 0 resolved.*
+*91 entries — 91 open, 0 resolved.*
 
 ---
 
@@ -859,6 +859,23 @@ WHY THIS IS WORTH YOUR EYE RATHER THAN JUST A FIX. The state-independence rule (
 THE CONSEQUENCE IS ALSO STILL LIVE. The snowball risk I raised is real but LATENT: it arrives with BL-629, and it will arrive against a field of ~82 buyable firms rather than the 1.6 that existed when BL-629 was designed. Worth knowing before that item is scheduled.
 
 *Files: `docs/economy/FINANCE.md`, `src/world/corp_ai.cpp`, `.claude/rules/io-standing-rules.md`*
+
+### NR-718 — BL-176's empty-room fix was deleted with the tab it lived on, and the problem came back unnoticed
+*observation · raised 2026-08-29 · from Sprint 24, opening the Construction ledger review after Ben moved it to rail slot 3.*
+
+The Construction panel draws two lines: "Estimated cost: 0.0 / quarter" and "No active construction." That is the whole surface, and it now sits at slot 3.
+
+IT WAS DIAGNOSED AND FIXED ONCE ALREADY. `ui_state::construction::panel_view` still carries the comment: "Defaults to Buildings (BL-176): the queue is empty most of the time, so opening on it made the panel's front door an empty room, while the player always owns buildings." BL-176 found this exact problem and solved it by opening on a Buildings roster instead of the queue.
+
+THE 2026-08-15 REWORK DELETED THE FIX ALONG WITH THE TAB. construction_panel.cpp says so plainly: the Buildings tab and its inline detail moved onto the building Selection card, "so the tab switcher and its selection-driven auto-focus are both gone with it; there is nothing left to switch between." That is a defensible move on its own terms — per-building configuration IS targeted, and the menus-are-broad-ledgers rule puts it on a Selection card. But it left the panel opening on the queue, which is the empty room BL-176 named, and nothing recorded that the fix had been undone.
+
+IT WENT UNNOTICED BECAUSE OF WHERE THE SLOT SAT. The panel was slot 6, then 7 after the Acquisitions insert. Ben moved it to 3 on 2026-08-29, which is why it is being read now. The rework was two weeks earlier.
+
+DEAD STATE LEFT BEHIND, and this is the part with a cheap fix. `construction.panel_view` is now WRITE-ONLY: verify_api.cpp:2241 sets it and nothing in src/ reads it. `construction.panel_focus_building` is referenced nowhere outside its own declaration. Both are fields describing a two-view panel that has one view, and the panel_view comment is a detailed description of a feature that does not exist — the kind of comment that is worse than none, because it reads as current.
+
+WHAT I WOULD NOT DO: quietly restore the Buildings tab. The rework moved that content for a reason and the doc (docs/ui/ledgers/construction.md) still carries "does a Buildings roster earn a tab?" as an open question for Ben. The question this raises is not "put it back" but "what should the third slot on the rail show when nothing is building?" — and that is a design call, not a defect fix.
+
+*Files: `src/ui/construction_panel.cpp`, `src/ui/ui_state.hpp`, `src/core/verify_api.cpp`, `docs/ui/ledgers/construction.md`*
 
 ---
 
