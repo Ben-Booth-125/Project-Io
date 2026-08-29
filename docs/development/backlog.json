@@ -1055,6 +1055,61 @@
       "resolved": "2026-08-29",
       "design": "@docs/development/archive/backlog-design-2026-Q3.json",
       "archived": "docs/development/archive/backlog-design-2026-Q3.json"
+    },
+    {
+      "id": "BL-681",
+      "short_name": "CONSTRUCTION_TWO_DOORS",
+      "category": "UI",
+      "title": "The Construction ledger gets two tabs, and one construction element with two doors",
+      "status": "designed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.1.22",
+      "sprint": "24",
+      "written": "2026-08-29",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/ui/ledgers/construction.md",
+      "files": [
+        "src/ui/construction_panel.cpp",
+        "src/ui/selection_panel.cpp",
+        "src/ui/ui_state.hpp",
+        "docs/ui/ledgers/construction.md",
+        "docs/ui/SELECTION.md",
+        "docs/ui/question_log.json"
+      ],
+      "design": "Ben, 2026-08-29, designing slot 3 after moving Construction there: \"This ledger should hold two tabs. First a list of all building types where the player owns one building (Buildings). And a second tab for construction, our presently pre-existing empty queue (Construction).\"\n\nAND THE RECONCILIATION, which is the load-bearing half: \"We want to reconcile our tile-selection construction ledger with the queue. For this, we can make sure the construction queue is collapsible, and place it above the existing tile-selection construction ledger, wiring both clicks to the same element. (slot 3, and construction button on that tile).\"\n\nSO: ONE construction element, TWO doors. The Construction tab draws a COLLAPSIBLE queue, then `draw_construction_ledger` (selection_panel.cpp:3658 — the tile-selection build front door, whose function name is already the phrase Ben used). The nav-rail slot-3 press and the tile Selection card's construction button both open that same tab. No second code path, no duplicated build bar.\n\nTHE GENERALISATION PROBLEM IS BEN'S OWN, RAISED WITH THE DESIGN: the construction element now has to render with a tile selected and with none. His recommendation, and it is ACCEPTED here: an explicit \"Select a tile\" response where the build bar would be.\n\nIT IS ACCEPTED FOR A PRINCIPLED REASON RATHER THAN FOR WANT OF A BETTER IDEA, and the reason is the ruling Ben gave in the same message. A richer empty state would have to list tiles the player COULD build on — and any ordering of that list is a recommendation, which is precisely what he rejected the build-opportunity surface for (\"it enters the territory of telling the player what to do\"). There is no way to fill this empty state that is not the thing we just declined. \"Select a tile\" is therefore correct, not a placeholder. Contrast BL-682 (buildings by type), where the equivalent empty state CAN be improved, because navigating buildings the player already owns is not a recommendation. The two empty states differ for that reason and should not be made uniform.\n\nWHY THE QUEUE IS COLLAPSIBLE: it is empty most of the time (NR-718 — BL-176 diagnosed exactly this and its fix was deleted with the Buildings tab in the 2026-08-15 rework). Collapsed, an empty queue costs one line instead of owning the surface; the build bar below it is then what a player meets.\n\nCLEAR THE DEAD STATE WHILE HERE (NR-718): `construction.panel_view` is write-only — verify_api.cpp:2241 sets it, nothing in src/ reads it — and it carries a long comment describing the two-view panel that was removed. `construction.panel_focus_building` is referenced nowhere. The two tabs give `panel_view` a real subject again, so it is revived rather than deleted; its comment must be rewritten to describe THESE two views, and `panel_focus_building` deleted unless BL-682 gives it one.\n\nThe tab strip follows the standing toggle rule: re-clicking the ACTIVE tab closes the ledger, switching between tabs is an ordinary view change. Default tab is Buildings, for NR-718's reason — the player always owns buildings and usually has nothing building."
+    },
+    {
+      "id": "BL-682",
+      "short_name": "BUILDINGS_BY_TYPE",
+      "category": "UI",
+      "title": "The Buildings tab - the player's estate grouped by type, with count and total profit",
+      "status": "designed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.1.22",
+      "sprint": "24",
+      "written": "2026-08-29",
+      "author": "Ben",
+      "requires": [
+        "BL-681"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/ui/ledgers/construction.md",
+      "files": [
+        "src/ui/construction_panel.cpp",
+        "src/ui/selection_panel.cpp",
+        "src/ui/ui_state.hpp",
+        "docs/ui/ledgers/construction.md",
+        "docs/ui/question_log.json"
+      ],
+      "design": "Ben, 2026-08-29: \"the general form building screen can group all selected (if no selection then all) buildings by type, and then display roughly 9 buildings with a vertical scroll. Each should have a count and total profit. When expanded, we should see 'Select a tile'. If a tile is selected, we should see production methods, workforce, and any other building levers.\"\n\nTHE ROSTER: one row per building TYPE the player owns at least one of. Each row carries a COUNT and a TOTAL PROFIT (the type's buildings summed — `rank_player_buildings_by_profit` / `building_profit.hpp` already compute the per-building figure the Balance ledger ranks on). About nine rows visible with a vertical scroll. Grouped over the SELECTED buildings where there is a selection, over all of them where there is not.\n\nEXPANDING A ROW shows the per-building levers — production method, workforce, and the rest of what the building Selection card carries. Those levers need ONE building, so with no tile selected there is nothing to draw them for.\n\nPROPOSED IMPROVEMENT ON THE EMPTY STATE, and it needs Ben's nod. Rather than \"Select a tile\", have an expanded type row LIST ITS OWN BUILDINGS — one line each, tile and individual profit, summing visibly to the total on the group header — and let a press select one, which then draws the levers. The chain becomes type -> building -> levers without leaving the ledger.\n\nWHY THIS IS NOT THE THING BEN JUST REJECTED. It ranks nothing and recommends nothing: it lists what the player already owns so they can reach one of them. That is navigation. The build-opportunity surface was declined because ordering tiles by expected return decides the question the player is there to answer; a list of your own four extraction sites decides nothing. The distinction is now written into CONCEPT.md § Player identity.\n\nIt also removes a dead end. \"Select a tile\" is an instruction with no affordance attached — the player must leave the ledger, find the building on the map, and come back. Since the group header already asserts a count, the buildings behind it are exactly the set the ledger has in hand.\n\nFALL BACK TO BEN'S ORIGINAL if he prefers: an expanded row with no selection reads \"Select a tile\" and nothing else. That is one function either way.\n\nDEFERRED BY BEN, explicitly: \"For the buildings tab in this ledger, we will want to wire a button into the tile selection element, however we can leave that for now.\" Do not build that button.\n\nTHE LEVERS MUST NOT BE A SECOND IMPLEMENTATION. Production method, workforce and lifecycle already live as accordion pages on the building Selection card (selection_panel.cpp, moved there by the 2026-08-15 rework). Call into that, or share it; a second set of controls writing the same fields is how two surfaces come to disagree."
     }
   ]
 }
