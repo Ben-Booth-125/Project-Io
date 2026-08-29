@@ -1139,6 +1139,36 @@
         "docs/ui/question_log.json"
       ],
       "design": "Ben, 2026-08-29: \"I prefer if our selection card's centre element always holds/presents data, and never levers. So therefore I'd recommend moving levers to our buildings ledger.\"\n\nIT REVERSES A DATED RULING OF HIS OWN, and that is recorded rather than quietly applied. SELECTION.md carried \"There is no Manage link - every control it would route to lives on this card (Ben, NR-245)\", and the 2026-08-15 rework moved Method, Workforce and Lifecycle ONTO the card on that basis. Newest-dated wins. What NR-245 was actually avoiding still holds: there is no Manage link and no round trip through a second surface, because the ledger that now holds the levers is reachable from the card's own action grid.\n\nWHAT MOVES - the two centre pages whose whole content is a control:\n  - Method (`building_page_kind::method`, `draw_production_method_section`) - the tiled recipe grid with its Switch buttons, calling `try_switch_recipe`.\n  - Workforce (`building_page_kind::workforce`, `draw_building_workforce_page`) - the 0-100 slider writing `workforce_target` and clearing `workforce_auto`.\n\nWHAT STAYS - the pages that report:\n  - Profitability (charts: revenue vs segmented expenses, the net line, the input basket).\n  - Status (construction rate/ETA, or \"Operating.\"). It is also the ONLY page a rival building gets, and that short-circuit must survive the move untouched.\n\nTHE BOUNDARY RUNS AROUND THE CENTRE, NOT AROUND THE ELEMENT. The right-hand 2x3 ACTION GRID keeps its buttons - Mothball, Dismantle and the workforce Auto toggle are in the designated action area, not the centre, so Ben's rule does not touch them. Do not \"finish the job\" by moving the grid; that would leave the card with no way to act at all and is not what was ruled.\n\nONE IMPLEMENTATION, NOT TWO. The moved pages must be RELOCATED, not reimplemented: the same `draw_production_method_section` and `draw_building_workforce_page` bodies, called from the ledger. Two sets of controls writing `workforce_target` and `try_switch_recipe` is how two surfaces come to disagree, and this project has already paid for that shape once.\n\nTHE FULL-CANVAS TAKEOVER FOLLOWS THE PAGES. `draw_building_page_expanded` (selection_card.cpp) reads the same `building_pages()` / `draw_building_page()` list+dispatch pair as the in-band accordion, so removing two entries changes both surfaces at once - which is correct, and worth knowing before the diff looks larger than expected.\n\nCONSEQUENCE WORTH RAISING WITH BEN RATHER THAN SOLVING SILENTLY: with the levers gone, a building the player selects on the MAP no longer offers any way to act on it from the card. The route becomes select-then-open-the-ledger. Whether the action grid should therefore carry a fourth button that opens the Buildings ledger aimed at this building is the obvious follow-on - and is exactly the button Ben deferred in BL-682 (\"we will want to wire a button into the tile selection element, however we can leave that for now\"). Deferred, not forgotten."
+    },
+    {
+      "id": "BL-684",
+      "short_name": "GRID_DOOR_TO_LEVERS",
+      "category": "UI",
+      "title": "A fourth action-grid button opens the Buildings tab aimed at this building",
+      "status": "designed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 2,
+      "version_goal": "v0.1.22",
+      "sprint": "24",
+      "written": "2026-08-29",
+      "author": "Ben",
+      "requires": [
+        "BL-682",
+        "BL-683"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/ui/SELECTION.md",
+      "files": [
+        "src/ui/selection_panel.cpp",
+        "src/ui/construction_panel.cpp",
+        "src/ui/icons.cpp",
+        "src/ui/icons.hpp",
+        "docs/ui/SELECTION.md",
+        "docs/ui/ICONS.md"
+      ],
+      "design": "DEFERRED, THEN UN-DEFERRED THE SAME DAY. Ben, 2026-08-29, filing BL-682: \"we will want to wire a button into the tile selection element, however we can leave that for now.\" Then, after the levers-move ruling made the gap concrete: \"And wire in the fourth grid button, you're right that now is a fine time to do so.\"\n\nWHAT CHANGED IN BETWEEN, and it is the whole justification: BL-683 (levers leave selection) takes Method and Workforce off the building Selection card. Deferring this button cost nothing while the levers were still on the card. The moment they leave, a building selected on the MAP has no route to its own levers at all — select it, notice they are gone, open the ledger, find it again. The batch that creates the gap should close it.\n\nA fourth button in the building Selection card's right-hand 2x3 action grid, opening the Buildings tab of the slot-3 ledger AIMED at the building whose card it sits on. Three of the six cells are used (Mothball, Dismantle, Auto), so there is room without a layout change.\n\nAIMED, NOT MERELY OPENED. Landing the player on a roster of every type, having pressed a button on a specific building, would leave them finding what they already had selected. It opens with that building's TYPE GROUP expanded and the building selected, so its levers are on screen in one press. `selected_entity` is already the card's subject, so this is routing plus expanding the right group.\n\nIT IS A DOOR, NOT A TOGGLE. The standing toggle rule binds controls whose active state is visible; this one has none. It opens the ledger and does not close it on a second press.\n\nITS OWN GLYPH. Two lit controls must not share a silhouette (BL-174, nav-rail legibility), and this sits inches from Mothball and Dismantle.\n\nABSENT ON A RIVAL BUILDING. The Buildings tab is the player's own estate. The rival card already short-circuits to a single Status page under the competitor-visibility rule; the grid must keep the same discipline rather than offering a door to a surface that would have nothing to show. That absence is the assertion most worth writing, because the alternative is a player discovering it."
     }
   ]
 }
