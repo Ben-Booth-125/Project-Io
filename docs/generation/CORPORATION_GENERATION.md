@@ -172,13 +172,27 @@ curve read the way intuition expects it to.
 
 A corporation with no home region — the rung-3 case where the settlement pass never reached the
 nation — takes its class from the national character, the same fallback its focus takes.
-Background firms (Pass 6) are classed by the same read; nothing about the class branches on
-`is_background`.
+**COMPANIES ARE OPEN, and this pass is about CORPORATIONS** (Ben, 2026-08-29). Everything above
+derives the class for a **corporation**. A **company** — a background firm (Pass 6) — is `public`
+by construction: it discloses, and it can be bought, always. The reasoning is what the two words
+already mean here. A corporation is a rival with a seat at the table, and whether its books are its
+own is a fact about it worth generating. A company is part of the **commercial population the
+player trades with** — the field the acquisitions ledger reads and the market clears against — and a
+firm the player can neither price nor read is not part of a population, it is a blank. Closure on a
+company bought nothing: it hid the great majority of the world's firms behind a label carrying no
+other consequence. Design: BL-678 (companies are open).
+
+The mechanism follows the rule rather than leading it. Pass 6 still evaluates the
+national-character read for every company it authors — the derivation is pure and draws nothing, so
+the generation stream is identical either way — and then **overrides** the result with `public`.
+Nothing about the class branches on `is_background` *inside* the derivation; the override is applied
+after it, which is what keeps the world byte-for-byte the world it was.
 
 **The class does two jobs, and both are load-bearing.** It decides whether the corporation files
 a quarterly return the player may read, and it decides whether the corporation may be bought
 outright. Both are [`FINANCE.md`](../economy/FINANCE.md)'s — § Disclosure and § Whole-firm
-acquisition. Generation's part is only to derive the field.
+acquisition. Generation's part is only to derive the field — and for a company there is nothing to
+derive, because both answers are yes.
 
 **The floor rides the existing reroll.** If *no* specialist comes out `public`, nothing in the
 world files and nothing is buyable, so the world-level reject-and-reroll of Pass 2 takes a second

@@ -10,30 +10,40 @@
 **The field was measured before a pixel of it was laid out, and the number shaped it.**
 `tools/verify/acquisition_viability.cpp` § C, twelve seeds of the shipped spawn:
 
-| | per seed |
-|---|---|
-| corporations | 88 |
-| `publicly_held` (the player's own excluded) | **1–3, mean 1.6** |
-| public **and** filed — *the buyable field* | **1–3, mean 1.6** |
-| public but never filed | **0 on every seed** |
-| `closed` | mean 84.8 |
-| Purchasable / Possible | mean **1.0** / **0.6** |
-| seeds where one group is empty | **8 of 12** |
-| seeds whose cheapest firm is priced at exactly 0 | 5 of 12 |
-| non-public firms that nevertheless *file* in world state | mean 85.4 |
+| | per seed, before BL-678 | per seed, now |
+|---|---|---|
+| corporations | 88 | 88 |
+| `publicly_held` (the player's own excluded) | **1–3, mean 1.6** | **81–83, mean 81.6** |
+| public **and** filed — *the buyable field* | **1–3, mean 1.6** | **81–83, mean 81.6** |
+| public but never filed | **0 on every seed** | **0 on every seed** |
+| `closed` | mean 84.8 | mean 4.8 |
+| Purchasable / Possible | mean **1.0** / **0.6** | mean **35.8** / **45.8** |
+| seeds where one group is empty | **8 of 12** | **0 of 12** |
+| seeds whose cheapest firm is priced at exactly 0 | 5 of 12 | 12 of 12 (mean 10.6 such firms) |
+| non-public firms that nevertheless *file* in world state | mean 85.4 | mean 5.4 |
 
-Three consequences fall out and all three are designed for rather than hidden:
+**The right-hand column is BL-678 (companies are open), 2026-08-29**, and it inverts the premise
+this section was written on. Ben retired closure for **companies**; corporations keep the derivation
+they had. So the two columns are the same twelve seeds of the same spawn, read either side of one
+rule change. **The design prose below was authored against the left-hand column and is owed a
+re-read** — the surface is no longer explaining a short list, it is ranking a long one.
 
-1. **Filing is never the binding gate — ownership class is.** Gate (4) of
-   `buy_corporation` ("must have filed") did not exclude a single firm on any seed. What
-   excludes 84.8 firms per seed is that they are `closed`. A surface built to explain "why
-   can't I buy this" must therefore explain **class**, not filing history.
-2. **The column is a one-to-three-row surface.** It says so on its own face — "N of M firms
-   file and can be priced" — because a player who opens a ledger and sees one row must be
-   able to tell that is the world and not a bug.
-3. **The substance is in the fold-out, not the groups.** 85.4 firms per seed file a return in
-   world state that they do not *disclose*. That inversion is why the profitability table
-   earns a full-canvas takeover while the buyable field fits in a column.
+Three consequences fell out of the original measurement. The first survives, the second is
+overturned, the third has changed shape:
+
+1. **Filing is never the binding gate — ownership class is.** *Still true, and now nearly moot.*
+   Gate (4) of `buy_corporation` ("must have filed") excludes no firm on any seed, either side of
+   the change. What used to exclude 84.8 firms per seed was that they were `closed`; that number is
+   now 4.8, and every one of them is a **corporation**. A surface explaining "why can't I buy this"
+   is now explaining a rare case rather than the normal one.
+2. ~~**The column is a one-to-three-row surface.**~~ **Overturned.** It is a thirty-six-row
+   Purchasable group over a forty-six-row Possible one. The count on its face still earns its place,
+   but it is now telling the player *how much of the field is in reach today*, not reassuring them
+   that a short list is the world.
+3. **The substance is in the fold-out, not the groups.** *Changed shape, same conclusion.* The
+   85.4-firms-file-but-do-not-disclose inversion is gone — the number is 5.4 — but the fold-out
+   still earns its takeover, now because the buyable field is too large to read whole and wants
+   ranking rather than because it was too small to fill a column.
 
 ## 1. Top question — the one thing this answers at first glance
 

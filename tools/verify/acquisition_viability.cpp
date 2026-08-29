@@ -270,6 +270,19 @@ struct field_snapshot
     int holdings = 0;
     int units    = 0;
     double net_sum = 0.0;   ///< summed last-filed net over the rivals
+
+    // BL-678 (companies are open) — CONSOLIDATION. Opening the whole company
+    // population to acquisition makes ~85 firms per seed buyable where 1.6 were,
+    // and `buy_corporation` is scored in corp_ai.cpp's candidate list, so a rival
+    // can now snowball through acquisition in a way this economy has never been
+    // exercised against. These four fields are what tells you whether it did.
+    int    corps        = 0;   ///< every corporation alive, PLAYER INCLUDED
+    int    holders      = 0;   ///< corporations holding at least one building
+    int    max_holdings = 0;   ///< the largest single holding count in the field
+    /// Herfindahl index over holding SHARES, 0..1. 1/holders when every holder is
+    /// the same size; 1.0 when one firm owns the world. The number that answers
+    /// "did the field concentrate into fewer hands" without needing a threshold.
+    double hhi          = 0.0;
 };
 
 field_snapshot survey_field(const world& w)
@@ -278,7 +291,13 @@ field_snapshot survey_field(const world& w)
     for (const entity_id id : sorted_corp_ids(w))
     {
         const corporation_component& cc = w.corporations.at(id);
-        f.holdings += static_cast<int>(cc.assets.size());
+        const int hold = static_cast<int>(cc.assets.size());
+        f.holdings += hold;
+        ++f.corps;
+        if (hold > 0)
+            ++f.holders;
+        if (hold > f.max_holdings)
+            f.max_holdings = hold;
         if (id == w.player_entity || cc.is_player)
             continue;
         ++f.rivals;
@@ -286,6 +305,17 @@ field_snapshot survey_field(const world& w)
             ++f.solvent;
         if (!cc.returns.empty())
             f.net_sum += static_cast<double>(cc.returns.back().net);
+    }
+    if (f.holdings > 0)
+    {
+        // Second walk, same sorted order: the shares need the total, which the
+        // first walk is still accumulating.
+        for (const entity_id id : sorted_corp_ids(w))
+        {
+            const double share = static_cast<double>(w.corporations.at(id).assets.size())
+                               / static_cast<double>(f.holdings);
+            f.hhi += share * share;
+        }
     }
     // Ascending unit id, so the walk over the unordered `w.units` cannot inherit
     // its layout — the count is order-independent, but the walk must not be.
@@ -1135,6 +1165,66 @@ int main(int argc, char** argv)
                 tot_hold_gen, tot_hold_close,
                 tot_hold_gen > 0 ? 100.0 * (tot_hold_close - tot_hold_gen) / tot_hold_gen : 0.0);
     std::printf("  rival standing force %d units\n", tot_units);
+
+    // --- CONSOLIDATION (BL-678, companies are open) -----------------------
+    // REPORTED, never asserted. A pinned concentration figure would be an
+    // instrument to tune the economy against, which is the failure this file's
+    // C section already refuses for the field size. What it must do is make the
+    // snowball VISIBLE if there is one.
+    //
+    // `buy_corporation` is the ONLY path that erases a corporation (corp_command
+    // .cpp is the sole `w.corporations.erase`), so the fall in the corp count
+    // between the seat and the close IS the acquisition count over the run,
+    // exactly. One of them is the player's when the seed bought; the rest are
+    // rivals acting through the scorer.
+    std::printf("\n  --- CONSOLIDATION: acquisitions over the run, and where the "
+                "holdings ended up ---\n");
+    std::printf("  Corps only ever disappear by acquisition, so the count delta IS "
+                "the acquisition count.\n");
+    std::printf("  seed | corps seat -> close | acq total | player | RIVAL | holders "
+                "seat -> close | largest holding | HHI seat -> close\n");
+    std::printf("  -----+---------------------+-----------+--------+-------+--------"
+                "--------------+-----------------+-------------------\n");
+    int tot_acq = 0, tot_acq_player = 0, tot_acq_rival = 0, consol_seeds = 0;
+    double hhi_seat_sum = 0.0, hhi_close_sum = 0.0;
+    for (const seed_row& r : rows)
+    {
+        if (r.seated == null_entity)
+            continue;
+        const int acq        = r.field_seat.corps - r.field_close.corps;
+        const int acq_player = r.bought ? 1 : 0;
+        const int acq_rival  = acq - acq_player;
+        tot_acq        += acq;
+        tot_acq_player += acq_player;
+        tot_acq_rival  += acq_rival;
+        hhi_seat_sum   += r.field_seat.hhi;
+        hhi_close_sum  += r.field_close.hhi;
+        ++consol_seeds;
+        std::printf("  %4u |     %4d -> %-4d    |    %4d   |   %2d   |  %4d |    "
+                    "%4d -> %-4d      |      %4d       |  %.4f -> %.4f\n",
+                    r.seed, r.field_seat.corps, r.field_close.corps,
+                    acq, acq_player, acq_rival,
+                    r.field_seat.holders, r.field_close.holders,
+                    r.field_close.max_holdings,
+                    r.field_seat.hhi, r.field_close.hhi);
+    }
+    if (consol_seeds > 0)
+    {
+        const double n = static_cast<double>(consol_seeds);
+        std::printf("\n  acquisitions per seed: %.2f total = %.2f player + %.2f RIVAL\n",
+                    tot_acq / n, tot_acq_player / n, tot_acq_rival / n);
+        std::printf("  mean HHI over holdings: %.4f at the seat -> %.4f at the close "
+                    "(%+.1f%%)\n",
+                    hhi_seat_sum / n, hhi_close_sum / n,
+                    hhi_seat_sum > 0.0
+                        ? 100.0 * (hhi_close_sum - hhi_seat_sum) / hhi_seat_sum : 0.0);
+        std::printf("  READ IT LIKE THIS: HHI rising sharply with a falling holder "
+                    "count is a snowball;\n"
+                    "                     a flat HHI with the holder count intact is "
+                    "an open field that\n"
+                    "                     nobody consolidated.\n");
+    }
+
     check(tot_hold_close > tot_hold_gen, "R4",
           "the field is still ACTING — its holding count grew over the run");
     check(tot_rivals > 0 && tot_solv_close > 0, "R4",

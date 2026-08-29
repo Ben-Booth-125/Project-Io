@@ -163,9 +163,15 @@ ownership_class ownership_from_region(const struct region& p,
 
 /// The no-home-region fallback: the same read one grain up, taken from the
 /// national character alone. Used by the rung-3 case (a nation the settlement
-/// pass never reached), by the whole no-settlement path, and by every BL-365
-/// background firm — which has a home nation but never a home region. Nothing
-/// here branches on `is_background`; the flag is not an input.
+/// pass never reached) and by the whole no-settlement path. Nothing here
+/// branches on `is_background`; the flag is not an input to this function.
+///
+/// BL-678 (companies are open): `generate_background_firms` still EVALUATES this
+/// for every company it authors — the derivation is pure and draws nothing, so
+/// the RNG stream is identical either way — and then OVERRIDES the result with
+/// `publicly_held`. A company is open by construction; the class is a
+/// CORPORATION's property. The override lives at that call site, not in here,
+/// so this mapping stays the one thing it has always been.
 ///
 /// The nation's `politics` IS its industrialisation-timing tercile
 /// (settlement.cpp: never -> isolationist, early -> mercantile, mid ->

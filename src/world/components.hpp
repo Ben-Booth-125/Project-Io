@@ -1162,6 +1162,11 @@ enum class industrial_focus : uint8_t
 /// a quarterly return the player may read (§ Disclosure), and whether the corp
 /// may be bought outright (§ Whole-firm acquisition). Generation's part is only
 /// to derive the field.
+///
+/// IT IS A CORPORATION'S PROPERTY (BL-678, companies are open). A company — a
+/// background firm — is `publicly_held` always, so both jobs answer yes for it
+/// by construction and neither is a question generation asks. Only a corporation
+/// carries a derived class.
 enum class ownership_class : uint8_t
 {
     publicly_held  = 0, ///< *public* — early industrialiser, enforceable-promise institutions. Files; buyable.
@@ -1269,9 +1274,15 @@ struct corporation_component
     /// region's industrialisation timing — the same read Pass 2 makes for
     /// `focus` — with the home nation's `politics` supplying the
     /// enforceable-promise term. A corporation with no home region (the rung-3
-    /// case, and every BL-365 background firm) takes it from the national
-    /// character instead, exactly as its focus does; nothing about the class
-    /// branches on `is_background`.
+    /// case) takes it from the national character instead, exactly as its focus
+    /// does.
+    ///
+    /// A COMPANY IS ALWAYS `publicly_held` (BL-678, companies are open). The
+    /// class is a corporation's property; a background firm is part of the
+    /// commercial population the player trades with, so it discloses and it is
+    /// buyable by construction. `generate_background_firms` still evaluates the
+    /// national-character derivation — pure, drawing nothing — and then
+    /// overrides it, so the generation RNG stream is unmoved by the rule.
     ///
     /// SERIALISED (world_save.cpp's corp record, immediately after `focus`) —
     /// `world_save_version` moved with it.
