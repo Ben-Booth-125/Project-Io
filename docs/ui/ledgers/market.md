@@ -2,36 +2,66 @@
 
 > **Working design doc** for the ledger-mockup pass (Power BI). Strawman answers — Ben revises.
 > Menu slot: `nav rail slot 6 "Market Ledger"` · Source: `src/ui/market_ledger.cpp` · Mock table(s): `markets.csv`, `stockpiles.csv` · Owning items: `BL-453` (convoys ledger), `BL-037` (sell-order routing)
-> Host: shell fold-out column, ~380px @1720 (derived — `shell_column_width(disp.x)`, 380–460 by resolution).
+> Host: shell fold-out column — **380 px at 1280, 384 px at 1920** (`shell_column_width` is `0.20 * disp_x` clamped to [380, 460], so it is effectively fixed across the common range; what resolution changes is the column's HEIGHT, and all of it).
 
 ## 1. Top question — the one thing this answers at first glance
-**"For the market I'm looking at, how is each good priced, and which way is it moving?"** The default lands on a single market's per-good board: one price sparkline per traded good (`base_price[r] > 0`), stacked in a scroll region under **Price over time**, each with its identity swatch and a `now X.XX` readout from `market_plot_history`. The secondary questions that earn the other views: **what am I offering here, and at what floor** (the player's standing sell orders), and **what is on its way to me** (in-flight convoys). Proposed beyond those: **where does trade concentrate** across a body's several markets (a turnover table), and a **supply/demand/net board** per good colour-keyed by scarcity. Each is a distinct question, so each is its own view rather than one stacked scroll.
+**"What is each good worth here, and which way is it moving?"** The default lands on the **Goods**
+table: one ROW per traded good, with its price, how that price stands against the body and against
+its own base, and a mini six-month graph inline in the row.
+
+**The stacked-sparkline layout it replaces is retired** (Ben, 2026-08-29). Each good took a name
+line plus a 44 px chart — about 72 px of column — so the view showed 3.5 goods at 1280x720 and 9 at
+1920x1080 against a roster of ~42. Three things were wrong with it and only one was density:
+
+- **No shared scale.** Every sparkline was drawn to its own range, so Iron Ore's decay and Coal's
+  flat line looked alike. The one thing a price board is for — comparing goods — was the one thing
+  it could not do.
+- **No direction.** `now 0.63` says nothing about which way it is going without reading a curve
+  that has no axis.
+- **Nothing had ever seen past the fourth good.** The scroll hook aimed at the outer window while
+  the sparklines sat in an inner child scroller, so the "foot" capture was byte-identical to the
+  head and goods 4–42 had never been looked at by any capture, golden or human (NR-719).
 
 ## 2. Sub-levels — views & default
 
-Three `nav_button` views on `s.market_ledger_view`, above which sit the two cross-cutting selectors.
+Two `nav_button` views, and **Convoys leaves entirely** for a ledger of its own
+([convoys.md](convoys.md)) — it was never a market question; a convoy is cargo in transit and
+belongs to `SUPPLY.md`.
 
 | View | Answers (one question) | Content |
 |---|---|---|
-| **Prices** *(default)* | How has each good's price moved here? | `SeparatorText("Price over time")`, then per traded good: name in its resource colour, `now` price, a `draw_plot` price sparkline (44 px, blue) from `market_plot_history[market][r].price`, or *(no history yet)* before the first tick |
-| **Sell Orders** | What am I offering here, and at what floor? | The player's standing sell orders on the selected body — `resource x qty >= floor` with a **Remove** press — then an add form (resource among the market's `base_price > 0` goods, quantity, floor). Every press issues a `corp_command` (`remove_sell_order` / `place_sell_order`) through `state.pending_order_commands`, never a direct write. Orders are honoured at clearing ahead of the anonymous auto-sell path (`MARKETS.md` § preferred-seller routing) |
-| **Convoys** | What is on its way to me? | One row per in-flight convoy: origin → destination (resource), a progress bar whose overlay reads `held`, `N%  (stalled)`, or `N%  M qtr(s)`, and *Haul cost paid*; *Nothing in flight* when empty. A market question, so it lives beside the other two rather than in a ledger of its own |
-| **Markets** *(proposed)* | Where does trade concentrate on this body? | One row per market on the selected body (Market / Supply / Demand / **Turnover** = Σ min(supply, demand)), selectable to re-point Prices |
-| **Board** *(proposed)* | What's tight here right now? | Resource / Supply / Demand / Price / **Net** per traded good with a positive/negative/neutral colour wash; "Turnover this tick" footer |
+| **Goods** *(default)* | What is each good worth here, and which way is it moving? | A table, one row per traded good: **item glyph · name · price · body average price · price vs base · six-month graph**. The graph is flattened INTO the row rather than stacked under it. `body_average_price` is the first column to drop if the row will not fit — the pressure at 384 px is on the graph's width, not the column count, so dropping it buys little and it should be tried before it is cut |
+| **Trades** | What positions do I hold, what else is standing here, and what could I be doing? | Three reads, kept visibly distinct (`MARKETS.md` § Trades): **my standing trades**; **the market's standing trades** in markets the player operates in; and **potential trades** with their margins — a derivation, not a record |
 
-**Default on open:** **Prices**.
-**Cross-cutting selectors (NOT views, toggle-exempt):** the **Body** combo (bodies that have a market; defaults to `w.home_body`, else the first) and the **Market** combo (the selected body's markets by city name, defaulting to the first by ascending entity id; `pending_focus_market` lets a canvas press land the ledger on a given market). Both re-point every view.
+**Above the tabs, below the selectors: the nation presence row.** A wrapped row of one chip per
+nation operating in the selected market, wrapping to two or three rows if it must. **These are
+colour chips with initials, not flags** — `nation_colour` is all that exists; there is no
+per-nation emblem artwork and inventing one is a generated-identity feature, not a row
+(`ICONS.md` § 2b).
+
+**Default on open:** **Goods**.
+**Cross-cutting selectors (NOT views, toggle-exempt):** the **Body** combo and the **Market**
+combo, above the presence row. Both re-point every view.
+
+**Row height is the open measurement.** Ben, 2026-08-29: *"since we are rendering rows, let's
+compare this at 8 rows, 10 rows, and 12 rows."* Build all three and look at them at **1920x1080**,
+which is the screen being reviewed — a density judgement taken at 720p is taken against half the
+content height (NR-719's sibling finding).
 
 ## 3. Lens on open
-Proposal: arm **`market`** — the per-body price wash keyed to the currently selected resource — **fixed** for Prices, Sell Orders and Convoys (all single-market reads the price lens reinforces). **Open option:** a **Markets** sub-view swaps the lens to **`scarcity`**, since that view is about *where clearing is tight across markets*, not price level. So: lens fixed `market` by default, following the sub-view only to the extent that Markets flips it to `scarcity`. Consistent with Ben's "opening a menu usually arms a lens". The ledger arms no lens on open; this is the proposal.
+Arm **`market`** — the per-body price wash keyed to the selected resource — **fixed** across both views. Goods and Trades are both single-market reads that the price wash reinforces, so there is nothing for the lens to follow. The Convoys view that would have wanted `supply_routes` has left for its own ledger, which is where that pairing now lives ([convoys.md](convoys.md) § 3) — one of the quieter arguments for the split, since a tab strip cannot arm two lenses and the old third tab always got the wrong one.
 
 ## 4. Data sources
-Everything the ledger draws is in `w.markets` (`market_component`: `supply[]`, `demand[]`, `price[]`, `base_price[]`, `body`, `centre_tile`), `market_plot_history` for the sparklines, `w.sell_orders` for the player's orders, and the convoy list for Convoys — no new world plumbing for the surface itself.
+Most of it is in `w.markets` (`market_component`: `supply[]`, `demand[]`, `price[]`, `base_price[]`, `body`, `centre_tile`) and `market_plot_history` for the six-month series. `price vs base` is `price[r] / base_price[r]`, already to hand. **`body_average_price` is the one new derivation** — mean `price[r]` across the markets on the selected body, which is a walk the surface can do itself.
+
+**Trades needs more than the surface can derive, and the doc says which half.** `w.sell_orders` and `w.buy_orders` are world state and carry both the player's positions and everyone else's, so reads 1 and 2 exist. Potential trades (read 3) derive from prices, reach and haulage. What does **not** exist is a REALISED trade: clearing is an aggregate that resolves a price and moves quantity without pairing a buyer to a seller, so no per-exchange profit is recorded anywhere. See `MARKETS.md` § Trades — positions and potentials are answerable now, history is not, and a realised margin must not be invented to fill the column.
+
+The nation presence row reads `nation_colour(entity_id)` and the set of nations with activity in the market. No convoy data — that left with the view.
 
 `markets.csv` leads with `market_id, market_label, body_id, …`, so each market row is distinct and a Power BI join on body does not fan out. Read the fixture for its row and market counts rather than pasting a figure (see `_critic_notes.md` for why a pasted fixture figure is a liability). `stockpiles.csv` is near-empty by design — the economy drains pools to market each tick — so it is not a market-ledger input, just noted so it isn't mistaken for one.
 
 ## 5. Close / toggle semantics
-Nav-rail slot-5 icon toggles the ledger open/closed. Re-clicking the **currently-active sub-view tab** (Prices / Sell Orders / Convoys) **closes the ledger** — `nav_button` takes `&open`; it does not collapse to an overview. Switching *between* tabs just changes view. The Body / Market selectors are cross-cutting and **never** trigger the close (toggle-exempt); Remove and the add form are in-view presses. Opening the ledger closes whichever other ledger held the column (accordion, `close_all_panels`).
+Nav-rail slot-6 icon toggles the ledger open/closed. Re-clicking the **currently-active sub-view tab** (Goods / Trades) **closes the ledger** — `nav_button` takes `&open`; it does not collapse to an overview. Switching *between* tabs just changes view. The Body / Market selectors are cross-cutting and **never** trigger the close (toggle-exempt); Remove and the add form are in-view presses. Opening the ledger closes whichever other ledger held the column (accordion, `close_all_panels`).
 
 ## Open questions for Ben
 - **Default market when none picked.** The ledger falls back to `home_body`'s **first market by ascending entity id**. On a multi-market body, is "first market" the right default landing, or should Prices open on the **highest-turnover** market (more informative first glance)?

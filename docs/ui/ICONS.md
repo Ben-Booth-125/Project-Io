@@ -218,6 +218,45 @@ The rail's other slots borrow lens and marker glyphs: slot 1 (Corporation overvi
 `corporation`, slot 3 (Construction) `industry`, slot 6 (Market Ledger) `market`,
 slot 10 (Generation Ledger) `continent` — see MENU.md.
 
+**A Convoys ledger draws `convoy`, which already exists** (§ 1, entity markers). Convoys leaving
+the Market ledger for a surface of their own (Ben, 2026-08-29) therefore needs no new rail glyph —
+the marker the canvas already draws for cargo in transit is the slot's silhouette, which is the
+pairing this catalogue prefers wherever a slot has a canvas twin. Its rail position is a MENU.md
+curation question and not an icon one.
+
+### 2b. The item glyph — a value-track silhouette, not one shape per good
+
+The Market ledger's Goods table takes an **item glyph** column (Ben, 2026-08-29:
+*"item_glyph; name; price; body_average_price; price_relative_to_base_price;
+six_month_price_graph"*). What exists today is `resource(…, resource_type)` — a small filled
+**diamond in the resource's identity colour**, one shape for every good. Drawn as a table column
+across ~42 rows that is forty-two identical diamonds, discriminating by hue alone, immediately
+beside the resource's own name in that same hue. It would be decoration duplicating the column
+next to it.
+
+**Author four silhouettes keyed to the VALUE TRACK, not one per good.** `RESOURCES.md`
+§ Resource categories already divides the roster into **Industrial / Ambient / Habitability /
+Mercantile**, and that division is a real thing a player acts on — it says what a good is *for*.
+Four shapes in the resource's identity colour give a glyph that discriminates at row height and
+teaches a distinction the game already has, where forty-two would be a bank of art nobody can
+hold in mind and a colour-only pip would say nothing the name does not.
+
+**Production tier is the shading, if anything.** The three tiers (raw / refined / product) are an
+ordered axis, so they belong on an ordered channel — fill weight, not silhouette. Optional; the
+track alone is the load-bearing half.
+
+The existing `resource` pip is **not** replaced: it stays the deposit-marker and resource-strip
+mark, where one small colour-keyed dot is exactly right and no track distinction is wanted. The
+item glyph is a table-column glyph and a second entry, on the same rule that gave `readout` its
+own shape rather than a second borrow of `strategy`.
+
+**No nation flags exist, and the presence row must not imply otherwise.** A "list of nations who
+operate in that market" (Ben, same day) has `nation_colour(entity_id)` behind it — a per-nation
+palette colour — and nothing else. Corps carry an emblem tag; nations carry a colour. The row is
+therefore **coloured chips** with the nation's initials, named on hover. Real per-nation emblem
+artwork would be a generated identity system, which is a feature of its own and not a row on a
+ledger; do not stub one glyph and call it a flag.
+
 **Nav-rail legibility rule (BL-174, nav-rail legibility).** Every rail slot draws its **own**
 glyph — the shape says *which system the slot is for*, and **colour alone** carries availability
 (the bright stroke for a live slot, the dim stroke for a reserved one). A column of identical

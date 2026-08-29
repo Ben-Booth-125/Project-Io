@@ -27,8 +27,8 @@ authority; `backlog.json` is authority once items are minted, and the subject's 
 |---|---|---|---|
 | [corporation.md](corporation.md) | Standings | one table + Selection drill (Profiles proposed) | `corporation`, fixed (proposed) |
 | [balance.md](balance.md) | Treasury | Treasury / Cashflow / Assets (proposed) | **none** (money has no map field) |
-| [market.md](market.md) | Prices | Prices / Sell Orders / Convoys; Markets, Trends proposed | `market`, Markets→`scarcity` (proposed) |
-| [construction.md](construction.md) | Construction | Construction (queue); Buildings proposed | `opportunity`, follows view (proposed) |
+| [market.md](market.md) | Goods | Goods (the flattened price table) / Trades | `market`, fixed |
+| [construction.md](construction.md) | Buildings | Buildings (estate by type) / Construction (queue + build bar) | **none** — `opportunity` is refused, see below |
 | [selection.md](selection.md) | — (polymorphic by kind) | tile / province / body / building / unit / battle / market / corp / nation | contextual (none) |
 | [tile_ledger.md](tile_ledger.md) | last-left view | Story / Chain / Ages | none |
 
@@ -40,5 +40,11 @@ authority; `backlog.json` is authority once items are minted, and the subject's 
   ledger of its own.
 - **`overlay_mode::industry` is not a sector lens**: it paints the AI-owned nation substrate, not the
   player's sector mix, so it is the wrong pairing for any surface asking "what am I in".
-- Clean, well-surfaced overlaps: sell orders belong to the Market ledger (where they live), not
-  Construction; the History ledger carries no market section.
+- **`overlay_mode::opportunity` is refused as a ledger pairing** (Ben, 2026-08-29). A per-tile
+  best-margin field answers "where should I build next" outright, and a player who follows it has
+  stopped choosing. `CONCEPT.md` § Player identity holds the rule and the qualification that
+  followed it the same day: rank where the top row is one input among several, never where the top
+  row simply IS the move. Market prices rank; build sites do not.
+- Clean, well-surfaced overlaps: standing orders belong to the Market ledger (where they live), not
+  Construction; the History ledger carries no market section. **Convoys belonged to neither** — it
+  is cargo in transit, `SUPPLY.md`'s subject rather than `MARKETS.md`'s, and now has its own doc.

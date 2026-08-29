@@ -485,6 +485,56 @@ BL-160 (auto-exchange policy), whose buy band is the player buy surface and whos
 2026-07-31). Whether the dormant side should instead be removed is BL-383 (remove dormant buy
 side).
 
+## Trades — the standing order read as a position
+
+Ben, 2026-08-29, redesigning the Market ledger: *"Sell orders are complicated, and we should
+rework this into persistent trades. A sell order can be made automatically by companies and rival
+corps, but we get to see both our orders and all orders in markets where we operate. What we
+really want to see is a list of trades, and their profits. We also want to see potential trades
+and their profits."*
+
+A **trade** is a standing position in a market: a good, a direction, a quantity, a floor or
+ceiling, and an owner. It is not a new mechanism — it is the order book (§ Where the order book
+lives) read as something a player holds rather than something they submit. `world::sell_orders`
+and `world::buy_orders` are already world state and already written by rivals and background
+firms through the same verbs the player presses, so the population this surface reads exists.
+
+**Three reads, and they are not equally cheap. Say which is which rather than presenting them as
+one table.**
+
+1. **My standing trades.** Every order the player's corp holds, per market. Exists today; this is
+   the existing Sell Orders view under a better name and with the buy side admitted.
+2. **The market's standing trades.** Every order in a market the player **operates in**, whoever
+   owns it. The book is world state and orders are the deliberate public signal (§ Real market
+   inventory), so this is a reading question rather than a disclosure one — but *operates in* is
+   the gate, and it must be a real predicate rather than "every market": a player reads the books
+   of markets they trade at, not of the whole system.
+3. **Potential trades.** Not a record at all — a **derivation**: for each good the player can
+   reach, buy price here against sell price there, less the haulage the route would cost
+   (`LOGISTICS.md` traversal cost, `SUPPLY.md` convoy pricing). This is the read that makes the
+   surface worth opening, and it is the one with no existing store behind it.
+
+**What does NOT exist, and must not be faked.** A **realised** trade — a buy matched to a sell at
+a price, with a profit — is not recorded anywhere. Clearing is an aggregate over supply and demand
+(§ The clearing tick); it resolves a price and moves quantity, and it does not pair a seller with
+a buyer or retain what any single exchange earned. So "a list of trades and their profits" is
+answerable for **positions** (what I am offering, at what floor, against what the market pays) and
+not yet for **history** (what I sold, to whom, for what margin). Reporting a realised profit that
+the clearing loop never computed would be inventing a number, and the honest-placeholder idiom
+(NR-249) is not licence to do it on a figure a player would act on.
+
+Making history real means the clearing loop retaining a per-exchange record, which is a change to
+the money loop and not to a ledger. Until that is designed, the surface shows positions and
+potentials, and says which is which.
+
+**Ranking is permitted here**, and this is the one surface where that has been ruled on
+explicitly. `CONCEPT.md` § Player identity holds the rule and its qualification: a surface may
+rank where the top row is one input among several. Ben, same day: *"Market prices is a vital
+pillar of gameplay, but the strategy 'just build the most profitable' is a red herring."* A
+potential trade sorted by margin is information the player must still weigh against reach, stock,
+competition and what the price does next — so ordering it does not decide the game. Ordering
+*tiles to build on* by margin does, and is refused.
+
 ## Procurement — a layer over the market, not a second market
 
 > **[`CONTRACTS.md`](CONTRACTS.md) is the authority for contracting** — both the buy side
