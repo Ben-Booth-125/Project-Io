@@ -285,7 +285,20 @@ local function distinct(fn)
             if not seen[v] then seen[v] = true; out[#out + 1] = v end
         end
     end
-    table.sort(out)
+    -- Sorted BY HAND. The verify Lua sandbox opens no `table` library, so
+    -- `table.sort` is a nil index rather than a sort — lib.lua's tour_buildings
+    -- carries the same insertion sort for the same reason and says so. The sort
+    -- is for determinism, not tidiness: `distinct` walks the drawn rows, and the
+    -- sweep below reports per-option, so an unstable option order would make the
+    -- log differ run to run on identical data.
+    for i = 2, #out do
+        local k, j = out[i], i - 1
+        while j >= 1 and out[j] > k do
+            out[j + 1] = out[j]
+            j = j - 1
+        end
+        out[j + 1] = k
+    end
     return out
 end
 
