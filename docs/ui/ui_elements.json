@@ -1320,34 +1320,38 @@
   },
   {
    "id": "UI-078",
-   "name": "Corporations table (Diplomacy slot stand-in)",
+   "name": "Corporation ledger (rail slot 8, Diplomacy)",
    "kind": "ledger",
    "parent": null,
    "source": [
     "docs/ui/ledgers/corporation.md",
     "docs/ui/MENU.md",
+    "docs/politics/RELATIONS.md § 1 Stance",
     "src/ui/corporation_panel.cpp",
     "src/ui/nav_pane.cpp"
    ],
-   "summary": "A sorted one-row-per-corp table (name/focus/balance, player row tinted) - the field-of-rivals ranking, distinct from any single corp's own money detail. It has MOVED off rail slot 1: slot 1 is now the Corporation overview dashboard, and this table hosts slot 8, which is labelled Diplomacy and reserved for a surface not yet designed.",
-   "interesting_question": "It sits in a slot named for something else. Does a table of rival balances belong under Diplomacy, or is it squatting until the real surface exists?",
-   "resolution": "Squatting, deliberately and with the label kept honest: nav_pane.cpp slot 8 says \"Diplomacy - Not yet built. For now: every corporation's balance, side by side.\" The comment states the reasoning - the table IS a rival-comparison read, which is what the slot is eventually for, and it moves when Diplomacy is designed. The slot stays labelled by its real subject rather than by its stand-in.",
+   "summary": "Rail slot 8. The named corporate field grouped by stance - three collapsing groups (Friends / Hostile / Neutral), each with a count and an explicit empty state. Rows carry the firm's name and its Capital figure; a hostile row also says which direction the hostility runs. Background firms are excluded, so the list is the parties the player can actually stand toward. The four stance verbs live in each row's action strip, opened by a disclosure arrow.",
+   "interesting_question": "The slot is named Diplomacy and the surface is one list. Is a stance-grouped roster the whole of diplomacy, or the corp-grain half of a surface that also has a nation-grain half?",
+   "resolution": "Open. What is settled is the corp grain: this ledger is the only host for the corp stance verbs, and grouping by stance is what makes it a diplomacy read rather than a ranking. Nation-grain relations (stance, treaties, lobbying) have no surface here and are not claimed by it.",
    "checks": [
+    "diplomacy_groups",
     "corp_disclosure"
    ]
   },
   {
    "id": "UI-079",
-   "name": "Standings table",
+   "name": "Stance groups and the row action strip",
    "kind": "view",
    "parent": "UI-078",
    "source": [
-    "docs/ui/ledgers/corporation.md § Sub-levels"
+    "docs/ui/ledgers/corporation.md § Sub-levels",
+    "docs/politics/RELATIONS.md § 1 Stance"
    ],
-   "summary": "Corporation | Focus | Balance, sorted by entity id, player row tinted, balance coloured red/green — the default and (per the doc's lean) possibly the only view this ledger needs.",
+   "summary": "The ledger's single view: rows filed under Friends / Hostile / Neutral by the stance tables, in a sorted entity-id walk within each group. A row expands to its action strip, which carries Declare Hostile (with an inline confirm), Offer / Accept Friendship and Return to Neutral at the strip's full width. A press that changes stance moves the row between groups on the next frame.",
    "interesting_question": "n/a — see UI-078 for the parent open question.",
    "resolution": "n/a",
    "checks": [
+    "diplomacy_groups",
     "corp_disclosure"
    ]
   },

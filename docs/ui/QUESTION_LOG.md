@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**48 surfaces** — 5 settled, 43 awaiting Ben's wording.
+**48 surfaces** — 4 settled, 44 awaiting Ben's wording.
 
 ---
 
@@ -124,13 +124,21 @@ alphabetical order.
 
 *Demanded by BL-576 · `src/ui/contracts_ledger.cpp` · id `contracts_ledger_offers`*
 
-### Corporation panel — the standing columns (Reach / Capital / Share)
+### Corporation ledger — the stance groups and the row action strip
 
-**Answers:** How large is each corporation, how much of the market does it hold, and what is it worth?
+**Answers:** Who am I standing with, who am I standing against, and which way does the hostility run?
 
-**Because:** The columns used to read as five bands — negligible / minor / notable / major / dominant — for every row but the player's own, on the premise that a rival's figures were private. Ben retired that premise on 2026-08-26: "We don't need company information to be invisible." Two of the three axes were never hidden by anything except the banding — reach is a count of bodies the player can already see buildings on, and market share is derived from the supply/demand aggregates DISCOVERY.md names as the deliberate public signal — so the band was destroying information the world was already giving away, and buying no privacy for it. They print exactly, for every corporation. Capital is the one axis that is genuinely a FILED figure, so it follows the firm's ownership class instead: exact where the firm files, a dash where it does not (FINANCE.md § Disclosure), with the reason on hover. That is what earns the space — the column now carries a fact about the FIRM that nothing else on screen carries, and the dash reads as 'this firm does not file', never as 'you have not earned this'. What it deliberately does NOT gain is any operational quantity: production rates, stockpile levels, recipes and workforce dials stay private, and the rival hover card still shows type and owner only. An open book tells you what a firm earned, never how it operates.
+**Because:** BL-448 (corp stance) landed a stance data model with zero UI — the BL-350 lesson (a complete seam with no press) this surface exists to avoid — and this ledger is still its only host. The shape is three collapsing groups, Friends / Hostile / Neutral, each carrying its count and each stating its emptiness in words when it has no rows: Friends is normally empty at campaign start, and a section that simply vanished would read as a missing feature rather than as an answered question. A hostile row also says WHICH DIRECTION the hostility runs, because hostility is directed (RELATIONS.md § 1 Stance) and a row that only says 'hostile' has thrown away the half of the fact the player acts on — whether they declared, or are the one being interdicted. `is_hostile` is asked once per direction and never collapsed with `are_friends`, per that section's third invariant. The four transition presses (Declare Hostile with its confirm, Offer / Accept Friendship, Return to Neutral) live in the row's own action strip, opened by a disclosure arrow, and draw at the strip's full width — the arrangement that lets them exist at all in a ~324 px column, where a fixed 220 px in-row column clipped 'Declare Hostile' to 'De...'. There is no discovery gate: RELATIONS.md § 1 Stance overturns NR-350 — 'A declaration against the player is SIGNALLED' (Ben, 2026-08-22) — so a declaration groups and reads immediately rather than waiting on contact.
 
-*Demanded by BL-633, BL-262, BL-631 · `src/ui/corporation_panel.cpp`, `src/world/standing.cpp` · id `corporation_panel_standing`*
+*Demanded by BL-639, BL-449, BL-448 · `src/ui/corporation_panel.cpp` · id `corporation_panel`*
+
+### Corporation ledger — the firm's name and its Capital figure
+
+**Answers:** Which firm is this, and what is it worth?
+
+**Because:** The row carries two fields, and the first of them is the one this surface had never managed to show. NAME: the population is the named corporate field — corporations, plus the player's own row — and background firms (BL-365, background firms) are excluded, because a background firm exists to fill a body's production gap and is not a party anyone can stand toward. Listing them put eighty-odd rows in front of the handful that are, and left the firm's name so little width it collapsed to a single letter. A diplomacy surface whose rows cannot be told apart answers nothing, so the name gets every pixel the other field does not need. CAPITAL: exact where the firm files, a dash where it does not (FINANCE.md § Disclosure), exact always for the player's own row — a corporation always reads its own books. The dash means 'this firm does not file', never 'you have not earned this', and says so on hover. The bands are retired and are not reintroduced. REACH AND SHARE ARE GONE. Both were public and both printed exactly, but at this column width they cost the name, and neither is a stance fact: reach is a count of bodies and share is a clearing-income ratio, both of them standing figures that belong with the profitability read (BL-627, profitability ledger). What the row deliberately still does NOT carry is any operational quantity — production rates, stockpile levels, recipes and workforce dials stay private. An open book tells you what a firm earned, never how it operates.
+
+*Demanded by BL-639, BL-633, BL-262, BL-631 · `src/ui/corporation_panel.cpp`, `src/world/standing.cpp` · id `corporation_panel_standing`*
 
 ### AI decision feed
 
@@ -383,14 +391,6 @@ alphabetical order.
 **Because:** Roll-up cards over holdings, balance and production, so the player has a whole-corp read without assembling it from four ledgers. Pairs existed on these cards before BL-247's log was removed. BL-343 added the sixth Finance bar, Levies: a law the player cannot see working is indistinguishable from an unimplemented one, so the levy is its own number rather than folded into maintenance. BL-591 (2026-08-24) added a fifth line to Production: the growth track (reached chain depth, the good that set it, what the next rung opens, what is missing to get there) — a corp-grain fact (corp_reached_depth) the 2026-08-15 playtest rework had cut from the building card without giving it a new home, so "how is my production going" had no answer to the growth-track half of the question until this item.
 
 *Demanded by BL-081, BL-214, BL-343, BL-591 · `src/ui/corporation_dashboard.cpp` · id `corporation_dashboard`*
-
-### Corporation panel — stance column
-
-**Answers:** What is my stance toward this rival, and can I change it?
-
-**Because:** BL-448 landed a corp stance data model (friend/neutral/hostile) with zero UI — the exact BL-350 lesson (a complete seam with no press, unnoticed for weeks) this item exists to avoid. The column shows the current stance label and the legal transition presses (Declare Hostile, Offer/Accept Friendship, Return to Neutral), gated on ordinary BL-068 competitor-visibility per NR-350 (a hostile declaration stays silent, discovered on contact rather than announced).
-
-*Demanded by BL-449, BL-448 · `src/ui/corporation_panel.cpp` · id `corporation_panel`*
 
 ### Generation charts
 

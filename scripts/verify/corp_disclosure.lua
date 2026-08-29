@@ -1,9 +1,19 @@
 -- The Corporations panel after the standing bands were retired
 -- (BL-633 / retire-standing-bands R2).
 --
---   R2  every row prints an EXACT reach and an EXACT market share, player and
---       rival alike; Capital prints exactly only where the firm files
---       (ownership_class == public) and shows a dash otherwise.
+--   R2  Capital prints exactly only where the firm files (ownership_class ==
+--       public) and shows a dash otherwise, and a row click routes the corp to
+--       the Selection element.
+--
+-- REACH AND SHARE ARE NO LONGER ON THIS SURFACE. R2 originally covered them too —
+-- "every row prints an EXACT reach and an EXACT market share" — but the ledger was
+-- regrouped by stance and both columns came off it: at the fold-out column's width
+-- they cost the firm's NAME, and neither is a stance fact. They are still computed
+-- on `corp_standing`, and the per-firm financial comparison they were reaching for
+-- belongs to BL-627 (profitability ledger). Capital is the axis that stayed,
+-- because the DISCLOSURE GATE is the part with a rule behind it, and that gate is
+-- what this script exists to check. The grouped shape itself is covered by
+-- scripts/verify/diplomacy_groups.lua.
 --
 -- It is an ACCEPTANCE script, not a golden gate: the verdict is verify.expect
 -- and the captures are evidence. The presses are injected through ImGui's own
@@ -18,9 +28,9 @@
 -- WHAT TO LOOK FOR IN THE CAPTURE, because a green run proves nothing here:
 --   * NO row anywhere says Negligible / Minor / Notable / Major / Dominant.
 --     Those five words are the retired bands; one of them on screen is a fail.
---   * Reach reads "N bodies" and Share reads "N%" on EVERY row, not just the
---     player's tinted one.
---   * The Capital column. A DEFAULT world cannot exercise both halves of the
+--   * Every firm's NAME is legible in full. A name cut to one or two letters is
+--     the defect this surface's width budget exists to prevent.
+--   * The Capital figure. A DEFAULT world cannot exercise both halves of the
 --     gate and it is important to know why before reading the picture: the
 --     default campaign is an ANTIQUITY world, settlement lights no furnace, so
 --     every region is never-industrialised and corporation_generation waives
@@ -47,13 +57,24 @@ verify.frames(2)
 
 verify.capture("corp_disclosure_table")
 
--- R2, the press half. The row Selectable spans all columns and routes the corp
--- to the Selection element; a click on the table body must therefore land a
--- CORPORATION selection. Coordinates are the first data row of the table in the
--- fold-out column at 1280x720.
+-- R2, the press half. The row's name Selectable routes the corp to the Selection
+-- element; a click on it must therefore land a CORPORATION selection.
+--
+-- IT AIMS AT THE ROW THE PANEL REPORTS, not at a literal. This used to be
+-- `verify.click(150, 130)` — the first data row of the old five-column table at
+-- 1280x720 — and that coordinate silently stopped being a row when the ledger was
+-- regrouped by stance: it landed on the Friends group's empty-state line, selected
+-- nothing, and the failure said "a click selects something" rather than "the row
+-- moved". A coordinate literal cannot survive a layout change, so it does not get
+-- to be the thing under test here.
 verify.clear_selection()
 verify.frames(1)
-verify.click(150, 130)
+
+local first_row = verify.corp_panel_rows()[1]
+verify.expect(first_row ~= nil, "R2: the ledger drew a row to click")
+if first_row ~= nil then
+    verify.click(first_row.x, first_row.y)
+end
 verify.frames(2)
 
 local t = verify.pointer_target()

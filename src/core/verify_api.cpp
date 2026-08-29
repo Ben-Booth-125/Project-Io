@@ -22,6 +22,7 @@
 #endif
 
 #include "ui/canvas_command.hpp"
+#include "ui/corporation_panel.hpp"
 #include "ui/detail_level.hpp"
 #include "ui/foldout_column.hpp"
 #include "ui/fonts.hpp"
@@ -35,6 +36,7 @@
 #include "world/corporation_generation.hpp"
 #include "world/logistics.hpp"
 #include "world/placement_rules.hpp"
+#include "world/stance.hpp"
 #include "world/survey_system.hpp"
 
 #include <algorithm>
@@ -1037,6 +1039,84 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("select_corp", [this](unsigned id) {
         if (m_world.corporations.count(static_cast<entity_id>(id)))
             m_ui.selected_entity = static_cast<entity_id>(id);
+    });
+
+    // Every corporation in the world, with the two flags that decide whether the
+    // Corporations ledger is allowed to list it. This is the population half of that
+    // ledger's check: "no background firm appears in the list" is an assertion about
+    // the SET the panel drew from, and a capture can only ever show what happened to
+    // fit on screen.
+    v.set_function("corps", [this]() {
+        sol::table out = m_lua.state().create_table();
+        std::vector<entity_id> ids;
+        ids.reserve(m_world.corporations.size());
+        for (const auto& kv : m_world.corporations)
+            ids.push_back(kv.first);
+        std::sort(ids.begin(), ids.end()); // never expose an unordered_map's walk order
+        int i = 1;
+        for (entity_id id : ids)
+        {
+            const corporation_component& cc = m_world.corporations.at(id);
+            sol::table row = m_lua.state().create_table();
+            row["id"]            = static_cast<unsigned int>(id);
+            row["name"]          = cc.name;
+            row["is_player"]     = cc.is_player;
+            row["is_background"] = cc.is_background;
+            out[i++] = row;
+        }
+        return out;
+    });
+
+    // The rows the Corporations ledger actually DREW last frame, in draw order, with
+    // each control's screen position and a FRESH read of the stance tables.
+    //
+    // The stance fields are re-read here from `stance.hpp` rather than copied out of
+    // the panel's own decision, so a script comparing `group` against them is
+    // cross-checking two independent reads and not restating one. `is_hostile` is
+    // asked once per direction and `are_friends` separately — the two are never
+    // collapsed (RELATIONS.md § 1 Stance, invariant 3).
+    //
+    // The positions are what make a press-based assertion honest: a control laid out
+    // past the fold-out column's clip rect is invisible to `expect_no_clipping`
+    // (NR-663), so a script aims `verify.click` at the rect the panel reported and
+    // requires the world to change. ImGui's hit-test rejects a press outside the clip
+    // rect, so a clipped control fails the assertion instead of passing a screenshot.
+    v.set_function("corp_panel_rows", [this]() {
+        sol::table out = m_lua.state().create_table();
+        const entity_id player = m_world.player_entity;
+        int i = 1;
+        for (const ui::corp_panel_row& r : ui::corporation_panel_last_rows())
+        {
+            sol::table row = m_lua.state().create_table();
+            row["corp"]          = static_cast<unsigned int>(r.corp);
+            row["name"]          = r.name;
+            row["is_player"]     = r.is_player;
+            row["is_background"] = r.is_background;
+            row["expanded"]      = r.expanded;
+
+            switch (r.group)
+            {
+                case ui::corp_stance_group::friends: row["group"] = std::string("friends"); break;
+                case ui::corp_stance_group::hostile: row["group"] = std::string("hostile"); break;
+                case ui::corp_stance_group::neutral: row["group"] = std::string("neutral"); break;
+            }
+
+            const bool self = (r.corp == player) || (player == null_entity);
+            row["hostile_out"] = self ? false : is_hostile(m_world, player, r.corp);
+            row["hostile_in"]  = self ? false : is_hostile(m_world, r.corp, player);
+            row["friends"]     = self ? false : are_friends(m_world, player, r.corp);
+
+            row["x"] = r.x;                 row["y"] = r.y;
+            row["caret_x"] = r.caret_x;     row["caret_y"] = r.caret_y;
+            row["declare_x"] = r.declare_x; row["declare_y"] = r.declare_y;
+            row["confirm_x"] = r.confirm_x; row["confirm_y"] = r.confirm_y;
+            row["offer_x"] = r.offer_x;     row["offer_y"] = r.offer_y;
+            row["accept_x"] = r.accept_x;   row["accept_y"] = r.accept_y;
+            row["neutral_x"] = r.neutral_x; row["neutral_y"] = r.neutral_y;
+
+            out[i++] = row;
+        }
+        return out;
     });
 
     // Park the AI decision feed's filters (BL-407 R2) so a capture can show a
