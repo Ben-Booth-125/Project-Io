@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*91 entries — 91 open, 0 resolved.*
+*92 entries — 92 open, 0 resolved.*
 
 ---
 
@@ -876,6 +876,28 @@ DEAD STATE LEFT BEHIND, and this is the part with a cheap fix. `construction.pan
 WHAT I WOULD NOT DO: quietly restore the Buildings tab. The rework moved that content for a reason and the doc (docs/ui/ledgers/construction.md) still carries "does a Buildings roster earn a tab?" as an open question for Ben. The question this raises is not "put it back" but "what should the third slot on the rail show when nothing is building?" — and that is a design call, not a defect fix.
 
 *Files: `src/ui/construction_panel.cpp`, `src/ui/ui_state.hpp`, `src/core/verify_api.cpp`, `docs/ui/ledgers/construction.md`*
+
+### NR-719 — Two of four scrolled captures are the unscrolled frame, for two different reasons
+*observation · raised 2026-08-29 · from Sprint 24, gathering Market captures for its redesign. Found by hashing two captures rather than by looking at them.*
+
+`ledger_05_market_0_prices.png` and `ledger_05_market_0_prices_foot.png` are BYTE-IDENTICAL — same md5. The one named for the foot of the list is the head of the list. The Budget pair from the same run differ correctly, so the harness works; this surface defeats it.
+
+THE CAUSE: `verify.scroll_panel("market", …)` requests scroll on the window named "Market Ledger" (verify_api.cpp § scroll_panel), but the price sparklines are stacked inside an INNER child scroll region under "Price over time". The outer window scrolls and the inner child does not, so the request lands on the wrong scroller and silently does nothing.
+
+THE CONSEQUENCE, and it is the reason this is filed rather than just fixed: the Market ledger prices roughly 42 goods, of which about 3.5 fit the column. NOTHING HAS EVER LOOKED AT GOODS 4 THROUGH 42 — not a capture, not a golden, not a human. Whatever is wrong down there has never been visible. That is a live blind spot going into the surface's redesign, and it is the single most useful thing to fix first.
+
+AND I WROTE THE CHECK THAT LIED. `ledger_pass.lua` is mine, from this session; its whole justification is that shell_pass only sees default views and misses what is below the fold. It produced a capture named `_foot` containing the head, and I did not notice until I hashed the pair — I had LOOKED at both images and read them as the same surface without registering that they were the same PIXELS. Exactly the shape Sprint 21 collected four instances of: a check whose green means less than it appears. The scroll helper needs to assert that the frame actually moved, which is one comparison and would have caught this on the run that introduced it.
+
+The same doubt applies to every other `foot()` call in that script. The Budget pair is verified different; the corps-table, generation and history feet are not, and should be hashed before any of them is cited as evidence.
+
+HASHED ALL FOUR PAIRS AFTER FINDING THE FIRST. Two are false and the causes differ:
+  - MARKET prices: identical. scroll_panel knows the name and aims at the window "Market Ledger", but the sparklines live in an INNER child scroller, so the request lands on the outer window and moves nothing.
+  - GENERATION ledger: identical, and worse in kind. scroll_panel handles only tile/history, market, balance, corporation and construction - there is NO generation_ledger case at all. Its own comment says an unknown name CLEARS the request, so the call is a silent no-op by design. A caller cannot tell "scrolled to the foot" from "this panel has no scroll hook".
+  - Corps table and History story: verified genuinely different. Those two are sound.
+
+SO THE FIX HAS TWO HALVES. scroll_panel should REJECT an unknown name loudly rather than clearing the request - a silent no-op on a typo or an unhandled panel is how a capture comes to be named for content it does not contain. And the market case needs the request to reach the child scroller, not the window.
+
+*Files: `scripts/verify/ledger_pass.lua`, `src/core/verify_api.cpp`, `src/ui/market_ledger.cpp`*
 
 ---
 
