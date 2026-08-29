@@ -84,6 +84,29 @@ render through the same two-column split:
   `draw_selection_facts`. Everything encyclopedic (orbit, composition,
   deposits, prices) lives in the ledgers.
 
+### The centre presents; it does not operate
+
+**The Selection element's centre presents DATA and never holds levers** (Ben, 2026-08-29). A
+dial that changes the world belongs to a ledger; the centre says what the selected thing *is*
+and what it is *doing*. The element is a **reading** surface with one designated place to act.
+
+**This REVERSES NR-245** — *"There is no Manage link — every control it would route to lives on
+this card"* — for the centre specifically, and the reversal is recorded rather than quietly
+applied, newest-dated winning. What NR-245 was avoiding remains avoided: there is still no
+Manage link and no round trip through a second surface, because the ledger that now holds the
+levers is reachable from the card's own action grid.
+
+The boundary runs **around the centre, not around the element**. The right-hand **action grid**
+is the designated action area and keeps its buttons; the centre's paged accordion keeps only
+pages that report. Where a page's whole content is a control — a recipe switcher, a workforce
+slider — that page moves to the ledger for its kind.
+
+The rule composes with the **menus-are-broad-ledgers** test in `MENU.md` rather than fighting it.
+That test asks whether a *surface* earns a rail slot; this one asks where a *control* lives once
+the surface exists. A ledger may be entered by a targeted press without becoming a targeted
+surface: the Buildings ledger is a broad roster of the whole estate, and selecting one building
+is how you aim it.
+
 Each kind routes its 'go to' to the right place:
 
 | Selection kind | Action (hero) | Facts (muted) | 'Go to' target |
