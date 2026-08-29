@@ -128,17 +128,20 @@
       "status": "drafted"
     },
     "construction_panel": {
-      "surface": "Construction panel",
-      "answers": "Can I build here, what will it cost me, and why was I refused?",
-      "because": "Placement carries terrain, deposit, slot and now logistics-reach rules (BL-323). A refusal the player cannot read is indistinguishable from a broken build, so the panel must state the reason, not merely deny.",
+      "surface": "Construction ledger - Construction view (queue + build bar)",
+      "answers": "What is under way, what is it costing me, and can I build on the tile I have selected - and if not, why was I refused?",
+      "because": "One construction element, reached by two doors. The nav rail's slot 3 and the tile Selection element's Construct button used to open two different surfaces - a queue that was empty most of the time, and a separate column tenant holding the build bar - so a player met one or the other by accident of which control they pressed. They are one view now: the queue COLLAPSED to a single line above the build bar, because the queue is empty most of the time and an empty queue that owns the surface is the front-door-as-empty-room BL-176 diagnosed. Placement carries terrain, deposit, slot and logistics-reach rules, and a refusal the player cannot read is indistinguishable from a broken build, so the bar states the reason rather than merely denying. With NO tile selected it says 'Select a tile' and nothing more - deliberately, not for want of a better idea: a richer empty state would have to list the tiles the player COULD build on, and any ordering of that list is a recommendation, which is the surface Ben declined in the same message (CONCEPT.md).",
       "backlog_item": [
+        "BL-681",
         "BL-029",
-        "BL-082",
         "BL-095",
+        "BL-162",
         "BL-367"
       ],
       "files": [
-        "src/ui/construction_panel.cpp"
+        "src/ui/construction_panel.cpp",
+        "src/ui/selection_panel.cpp",
+        "src/ui/ui_state.hpp"
       ],
       "status": "drafted"
     },
@@ -505,12 +508,13 @@
     },
     "selection_building_card": {
       "surface": "Selection band - Building card (3-column band)",
-      "answers": "What's the state of this building, how much workforce does it have, can I close or dismantle it, and what can I do about it?",
-      "because": "The building card previously split action|facts like every other selection kind, with three MORE independently-toggled sections stacked below the facts column (Method/Chain/Depth, BL-431) - a tall, scrolling stack that read nothing like the tile card sitting one selection away. Moving the building onto the SAME 3-column band shape (zoomed tile render / paged accordion / action grid) makes 'select a thing, get its picture + a pager + its actions' one shape across the two entity kinds that actually get selected in play, rather than two competing layouts a player has to relearn. The former toggles become PAGES for the same reason the tile card's resource graphs are pages, not accordions: a page IS the opened state, so there is nothing left inside it to fold. 2026-08-15: Workforce (graph/Auto/tier grid) and Lifecycle (Close-Reopen/Dismantle) joined the accordion as two more pages, absorbed from the construction panel's deleted Buildings tab - this card is now the single home for a building's full detail, not a duplicate of it.",
+      "answers": "What is this building, what is it earning me, and what can I do about it?",
+      "because": "The building card takes the SAME 3-column band shape as the tile card (zoomed tile render / paged accordion / action grid), so 'select a thing, get its picture, a pager and its actions' is one shape across the two entity kinds that actually get selected in play. Its CENTRE presents data and never holds levers (Ben, 2026-08-29): a dial that changes the world belongs to a ledger, so Method and Workforce - two pages whose whole content was a control - moved to the Construction ledger's Buildings view, and what remains reports (Profitability, Status). The boundary runs around the CENTRE, not the element: the right-hand action grid is the designated place to act and keeps Mothball, Dismantle and Auto. The move would have left a building selected on the MAP with no route to its own levers, so the grid gained a fourth button that opens the Buildings view AIMED at this building - its type group expanded, the building selected, the levers on screen in one press. That button is a door rather than a toggle (its active state is not visible here), and it is ABSENT on a rival's card, because the Buildings view is the player's estate and aiming a rival building at it would open an empty aim. A rival card is Status only, by a short-circuit in building_pages that never tests a player page's own guard - a competitor-visibility guarantee rather than a convenience.",
       "backlog_item": [
+        "BL-683",
+        "BL-682",
         "BL-431",
         "BL-430",
-        "BL-428",
         "BL-074"
       ],
       "files": [
@@ -713,6 +717,21 @@
         "src/ui/nav_pane.cpp",
         "src/core/app.cpp"
       ]
+    },
+    "construction_buildings_view": {
+      "surface": "Construction ledger - Buildings view (the estate by type)",
+      "answers": "What do I own, how much is each kind of it making me, and where do I go to tune one?",
+      "because": "It is the ledger's DEFAULT view, and it earns that over the queue by the plainest fact about the two: the player always owns buildings and usually has nothing building. Grouping by type rather than listing every building is what makes it an overview - a count and a summed profit per named type answers 'which part of my estate pays' in one glance, at the ~9 rows the shell column affords. Expanding a type row lists its own buildings, and a press selects one and draws its levers, so the chain runs type -> building -> lever without leaving the ledger. That is NAVIGATION, not recommendation: it lists what the player already owns, in a group whose count has already asserted they exist, and it ranks nothing they have not built. It also removes a dead end - 'Select a tile' is an instruction with no affordance attached, and the buildings behind a count are exactly the set the ledger has in hand. It is the destination for Method and Workforce, which left the Selection card's centre when Ben ruled that the centre presents data and never operates; the same function bodies are called from here, never a second set of controls writing the same fields.",
+      "backlog_item": [
+        "BL-682",
+        "BL-683"
+      ],
+      "files": [
+        "src/ui/construction_panel.cpp",
+        "src/ui/construction_panel.hpp",
+        "src/ui/ui_state.hpp"
+      ],
+      "status": "drafted"
     }
   }
 }

@@ -24,8 +24,7 @@ namespace ui {
 /// already public about any firm. It invents no figure — where a number is not
 /// derivable from the live world it is absent, never a zero that reads as real.
 ///
-/// A column occupant with **no nav-rail slot**, on the tile build ledger's
-/// precedent (`ui_state::show_build_ledger`): nothing but a canvas click opens
+/// A column occupant with **no nav-rail slot**: nothing but a canvas click opens
 /// it, and `close_all_panels` closes it like every other tenant of the fold-out
 /// column.
 ///

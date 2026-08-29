@@ -47,11 +47,11 @@
   ],
   [
    "gameplay.set_recipe",
-   "The Method comparison section on the Selection panel's building Facts column (BL-431, `draw_production_method_section` — Compare toggle, each alternate's basket/wage/rate plus a Switch button); the same seam also drives the 'Production Methods' combo in the Building panel's Buildings-tab inline detail."
+   "The Method grid in the Construction ledger's Buildings view (`draw_production_method_section`): one row per era-allowed recipe in the building's own group, each with its expected profit and a Switch glyph."
   ],
   [
    "gameplay.set_workforce",
-   "The workforce slider on the Selection band's building layout (0–200% of nominal); the Building panel's inline detail offers a coarser 0/20/40/60/80/100 tier button grid instead."
+   "The workforce slider in the Construction ledger's Buildings view (`draw_building_workforce_page`), below a placeholder trend graph. The slider reaches 0-100%; the command seam reaches 200."
   ],
   [
    "gameplay.set_workforce_auto",
@@ -254,10 +254,6 @@
    "Balance Ledger (Budget), 'Wages' tier control"
   ],
   [
-   "ledger.build_ledger_close",
-   "Tile construction ledger (the 'Construct · [x, y]' fold-out, BL-162), header"
-  ],
-  [
    "ledger.chat_channel_tab",
    "Comms dock (bottom-left), channel button row"
   ],
@@ -271,7 +267,7 @@
   ],
   [
    "ledger.construction_view_tab",
-   "Construction panel, view tab strip"
+   "Construction ledger, view tab strip"
   ],
   [
    "ledger.corp_card_expand",
@@ -616,6 +612,22 @@
   [
    "ledger.company_open",
    "The Company ledger (fold-out column). NO RAIL SLOT — it is reached only by a canvas press, the same shape as the tile construction ledger (ledger.selection_construct_open)."
+  ],
+  [
+   "ledger.construction_queue_toggle",
+   "Construction ledger, Construction view, the 'Queue - N cr / qtr' collapsing header"
+  ],
+  [
+   "ledger.construction_buildings_group",
+   "Construction ledger, Buildings view, a type-group header row (name, count, total profit)"
+  ],
+  [
+   "ledger.construction_buildings_select",
+   "Construction ledger, Buildings view, a building row inside an expanded type group"
+  ],
+  [
+   "ledger.selection_open_in_buildings",
+   "Selection band, building card's right-hand 2x3 action grid, 'Open in ledger' button (a panel outline with one row picked out)"
   ]
  ]
 }

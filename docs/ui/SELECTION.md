@@ -320,27 +320,6 @@ header):
      Included only once the building is complete (`ticks_remaining <= 0`) **and**
      `estimate_building_profit` reports `has_data`; a still-building building has nothing here
      (its **Status** page covers it).
-   - **Method** (`building_page_kind::method`, `draw_production_method_section`) — "Which way
-     should this building make its output?" Only for `processing_facility`. A **tiled grid**
-     (2 columns): each era-allowed recipe gets its own bordered tile with the recipe name and
-     its expected profit (`estimate_prospective_profit`, priced at the building's real staffing)
-     in a **larger font**, and, for every recipe but the active one, a **big glyph Switch
-     button** (`glyph_swap`, a two-arrow swap icon) sized as the tile's dominant visual element.
-     Calls `try_switch_recipe` exactly as `construction_panel.cpp`'s management dropdown does. A
-     single-recipe building still gets the page ("Only one method available.").
-
-     **No group label here, by design.** The grid lists every era-allowed recipe regardless of
-     `group` — the cheap intra-group switch and the pricier cross-group retool both go through
-     `try_switch_recipe`, which refuses (or prices) whichever the corp cannot afford. The
-     construction ledger is where GROUP membership is the organising axis (PRODUCTION.md § Sub-
-     facility groups); on an existing building the axis is "every method this building could
-     run". If a player is surprised by a cross-group switch's cost, the fix is pricing the
-     Switch button, not adding a group tag.
-   - **Workforce** (`building_page_kind::workforce`, `draw_building_workforce_page`) — "How much
-     workforce, and by whose hand?" A placeholder trend graph (no per-building history —
-     NR-249) and a single **horizontal 1% slider** (`ImGui::SliderInt`, 0–100): editing it sets
-     `workforce_target` directly and clears `workforce_auto` — a manual edit pins the target.
-     Any player-owned building, regardless of type. The Auto control lives on the action grid.
    - **Status** (`building_page_kind::status`) — the fallback: construction rate/ETA for a
      still-building building, "Operating." otherwise. **Rival buildings get ONLY this page** —
      the public building type plus (via `draw_rival_building_summary`) owner name, tile, and
@@ -348,12 +327,21 @@ header):
      single Status page for any non-player-owned building rather than testing each page's
      guard against data it must not show.
 
+   **Method and Workforce are NOT pages of this accordion.** Their whole content was a control,
+   and the centre presents data (§ The centre presents; it does not operate). They are drawn by
+   the **Construction ledger's Buildings view** — the same `draw_production_method_section` and
+   `draw_building_workforce_page` bodies, called from `construction_panel.cpp`, never a second
+   set of controls writing `workforce_target` and `try_switch_recipe`. The Buildings view reads
+   `ui_state::selected_entity`, so a building selected on the map and a building selected from
+   that view's own roster reach the same levers: the two selectors compose.
+
    `building_pages()` / `draw_building_page()` are the shared list+dispatch pair the in-band
    accordion and the full-canvas takeover (`draw_building_page_expanded`, `selection_card.cpp`)
    both read — the same precedent as the tile element's `tile_metrics` / `draw_tile_metric_chart`.
-3. **Right quarter — a 2×3 action grid**, mirroring the tile element's grid. There is no
-   Manage link — every control it would route to lives on this card (Ben, NR-245). Three
-   building-level actions:
+   Removing a page changes both surfaces at once, which is the point of the pair.
+3. **Right quarter — a 2×3 action grid**, mirroring the tile element's grid. This is the
+   element's designated place to ACT; the centre is where it presents. Four building-level
+   actions:
    - **Mothball** (`glyph_mothball`, a box with a line through it) — flips `decommissioned`
      (reversible — no output, no wages while closed) and invalidates the logistics anchor
      cache. A **toggle button** per the standing Toggle rule — its own active state
@@ -370,9 +358,20 @@ header):
      baked into the label text: the button's id (`"##bld_auto"`) is **stable** — a label that
      carried the live percentage would change every tick while `solve_workforce_target`
      re-solves, churning the ImGui ID and corrupting hover/active/focus state. The percentage
-     is read on the Workforce page, not here.
+     is read beside the workforce slider in the Buildings view, not here.
+   - **Open in ledger** (`glyph_roster`, a panel outline with one row picked out), beside Auto —
+     opens the Construction ledger's **Buildings** view **aimed** at this building: its type
+     group expanded and the building selected, so the levers that left the centre are on screen
+     in one press. It exists because the lever move would otherwise leave a building selected on
+     the MAP with no route to its own controls at all. It is a **door, not a toggle** — its
+     active state is not visible on the card, so a second press must not close what it opened —
+     and it takes its own glyph rather than sharing a silhouette with the lit controls inches
+     away (BL-174).
    Mothball, Dismantle and Auto are all disabled with "Competitor building - intel only" for a
-   rival. **Three slots are reserved** (`glyph_reserved`).
+   rival. **Open in ledger is ABSENT on a rival's card**, not merely disabled: the Buildings view
+   is the player's estate, so a rival building has no row for the button to aim at. Its cell
+   falls back to `glyph_reserved`, so the grid keeps its shape and nothing reflows. **Two slots
+   are reserved** (`glyph_reserved`).
 
 `ui_state::selection_building_page` is the pager index, reset to 0 alongside
 `card_resource_page` on every new selection (`app.cpp`).

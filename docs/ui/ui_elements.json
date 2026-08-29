@@ -819,7 +819,8 @@
    "resolution": "Open — flagged verbatim in the ledger design Q&A: docs/ui/ledgers/construction.md § Open questions asks 'Should selecting a building auto-open Construction/Manage instead of the Selection card, or should Manage's controls migrate into the Selection element' with no resolution recorded.",
    "checks": [
     "building_element",
-    "sticky_card"
+    "sticky_card",
+    "construction_ledger_tabs"
    ]
   },
   {
@@ -836,7 +837,8 @@
    "checks": [
     "tile_build_ledger",
     "tile_build_ledger_survives",
-    "drill_through_fold"
+    "drill_through_fold",
+    "construction_ledger_tabs"
    ]
   },
   {
@@ -1263,7 +1265,8 @@
    "checks": [
     "construction_ledger",
     "construction_panel",
-    "build_door_wide_roster"
+    "build_door_wide_roster",
+    "construction_ledger_tabs"
    ]
   },
   {

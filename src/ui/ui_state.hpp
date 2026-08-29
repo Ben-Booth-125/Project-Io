@@ -232,26 +232,79 @@ struct construction_state
     /// human string shown by the build UI ("Built.", "Can't afford it.", …).
     std::string   last_message;
 
-    /// Which bounded sub-view the Building window shows (2026-07-06 tabbed
-    /// redesign; slimmed to two by BL-143 when the Build front door moved to the
-    /// tile Selection element and Sell Orders moved to the Market Ledger).
-    /// **0 = Construction** (the queue: "what's building?"),
-    /// **1 = Buildings** ("what do I own?", plus the inline recipe/workforce
-    /// detail for the selected row).
+    /// Which bounded sub-view the nav-rail slot-3 **Construction ledger** shows.
     ///
-    /// Defaults to **Buildings** (BL-176): the queue is empty most of the time,
-    /// so opening on it made the panel's front door an empty room, while the
-    /// player always owns buildings. The old default of 0 predates the BL-143
-    /// slim, when view 0 was the Build front door rather than a queue.
+    /// **0 = Construction** — the collapsible build QUEUE ("what is under way, and
+    /// what is it costing?") sitting above the tile-selection build bar
+    /// (`draw_construction_ledger_body`, selection_panel.cpp). ONE construction
+    /// element with TWO DOORS: the rail slot and the tile Selection element's
+    /// Construct button both open this view, so there is a single build bar
+    /// implementation rather than a panel copy and a card copy.
+    /// **1 = Buildings** — the player's estate grouped by building type, one row
+    /// per type with a count and a total profit; expanding a row lists that
+    /// type's own buildings, and pressing one selects it and draws its levers.
+    ///
+    /// Defaults to **Buildings**: the queue is empty most of the time, so opening
+    /// on it makes the ledger's front door an empty room, while the player always
+    /// owns buildings.
     int           panel_view = 1;
 
-    /// Last building the panel auto-focused on (BL-176). The Buildings tab keys
-    /// its selected row off the shared `ui_state::selected_entity`, so selecting
-    /// a building anywhere already selects its row here; this field only tracks
-    /// the EDGE, so newly selecting a building snaps the panel to the Buildings
-    /// view once, without pinning it there every frame (which would stop the
-    /// player ever reaching the queue).
-    entity_id     panel_focus_building = null_entity;
+    /// Which type group the Buildings view has expanded — the group's display
+    /// name, empty for none. Held here rather than left to ImGui's own
+    /// `CollapsingHeader` storage so it is one-at-a-time (an accordion), stable
+    /// across a re-layout, and drivable/readable by a verify script. Re-pressing
+    /// the open header closes it, which is the Toggle rule a header obeys by
+    /// construction. VIEW state, not serialised.
+    std::string   buildings_expanded;
+
+    /// Whether the Construction view's queue section is expanded. Collapsed by
+    /// default and collapsed most of the time, because the queue is usually
+    /// empty: closed it costs one line, and the build bar below it is then what
+    /// the player meets. VIEW state, not serialised.
+    bool          queue_open = false;
+};
+
+/// Where the Construction ledger's own controls landed on screen this frame, so a
+/// verify script can press the REAL control rather than a computed guess.
+///
+/// PUBLISHED RATHER THAN RE-DERIVED, for the same reason `acquisitions_buy_x` is:
+/// the surface that drew the thing is the only honest source for where it landed,
+/// and a script re-deriving a row's y from `shell_column_width` plus a guessed line
+/// count would be asserting against its own arithmetic. Every field is rewritten
+/// each frame the surface draws and reset to "absent" (`x < 0`) when it does not.
+/// VIEW state, not serialised.
+struct construction_controls
+{
+    float     tab_x[2]      = {-1.0f, -1.0f}; ///< The two tab buttons; index = panel_view (0 Construction, 1 Buildings).
+    float     tab_y[2]      = {-1.0f, -1.0f};
+
+    float     group_x       = -1.0f; ///< First type-group header row on the Buildings view.
+    float     group_y       = -1.0f;
+
+    float     member_x      = -1.0f; ///< First building row inside the EXPANDED group; absent when nothing is expanded.
+    float     member_y      = -1.0f;
+    entity_id member        = null_entity; ///< Which building that row selects.
+
+    /// The TILE Selection card's Construct button — door two onto the same
+    /// Construction view the rail slot opens. Published so a check can press the
+    /// real control and assert that both doors land on one surface, which is the
+    /// load-bearing half of the reconciliation. Absent (`x < 0`) when no tile card
+    /// draws, or when nothing is placeable on the tile (the button disables).
+    float     construct_x   = -1.0f;
+    float     construct_y   = -1.0f;
+
+    /// The building Selection card's fourth action-grid button — "open this
+    /// building in the Buildings ledger". Absent (`x < 0`) on a rival's card,
+    /// which is the property a check asserts as a positive absence.
+    float     open_ledger_x = -1.0f;
+    float     open_ledger_y = -1.0f;
+
+    /// Which building the Buildings view actually DREW LEVERS FOR this frame,
+    /// `null_entity` for none. The surface reporting what it drew, so "the levers
+    /// appeared" is an assertion rather than an inference from a capture — the
+    /// harness's clipping check is vacuous on this class of surface (NR-663), so a
+    /// green picture proves nothing on its own.
+    entity_id levers_for = null_entity;
 };
 
 /// Shared selection and view state for the three primary canvases.
@@ -308,13 +361,17 @@ struct ui_state
     // Policy: all ledgers start closed. The player opens them deliberately from
     // the navigation pane; none are shown on a fresh session.
     bool show_tile_ledger = false; ///< Whether the Tile Ledger window is open. Toggled by the nav pane tab and the window's close button.
-    bool show_construction_panel = false; ///< Whether the Layer 4 construction / building-management panel is open. Toggled by the nav pane tab and the window's close button.
-    bool show_build_ledger = false;       ///< Whether the tile-contextual construction ledger is open (BL-162). Opened by the tile Selection element's "Construct Buildings" button; reads selected_entity as the target tile. Not a nav-rail ledger — closed by close_all_panels and by selecting a new entity. The Selection element itself lives in the bottom band (BL-213), not the fold-out column.
+    /// Whether the nav-rail slot-3 **Construction ledger** is open. Toggled by the
+    /// rail slot, and opened by the tile Selection element's Construct button —
+    /// which aims it at `construction.panel_view == 0`, the build bar's own view.
+    /// There is no separate `show_build_ledger`: the tile-contextual build bar is
+    /// a SECTION of this ledger's Construction view, not a second column tenant,
+    /// so the two doors cannot show two different build bars.
+    bool show_construction_panel = false;
     bool show_market_ledger = false; ///< Whether the Market Ledger is open.
 
     /// Whether the Company ledger is open (BL-666). A column occupant with NO
-    /// nav-rail slot, following the tile build ledger's precedent
-    /// (`show_build_ledger` above): a company is not a population the player
+    /// nav-rail slot: a company is not a population the player
     /// browses, it is the thing under the cursor when a Company-lens holding is
     /// clicked, so the only way in is that click. Closed by close_all_panels
     /// like every other tenant of the fold-out column.
@@ -395,6 +452,11 @@ struct ui_state
     float     acquisitions_buy_x    = -1.0f;
     float     acquisitions_buy_y    = -1.0f;
     entity_id acquisitions_buy_corp = null_entity;
+
+    /// Where the Construction ledger's tabs, type-group headers, building rows and
+    /// the building card's open-in-ledger button landed this frame. Same reasoning
+    /// as `acquisitions_buy_x` above; see `construction_controls`.
+    construction_controls construction_ui;
 
     /// The profitability fold-out's sort: column index, and direction. VIEW
     /// state, not serialised. -1 is "unsorted" — filed order, which is the

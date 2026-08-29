@@ -46,7 +46,6 @@ void close_all_panels(ui_state& state)
     state.show_construction_panel = false;
     state.show_tile_ledger       = false;
     state.show_generation_ledger = false;
-    state.show_build_ledger      = false; // tile build ledger (BL-162) is a column occupant too
     // BL-666: the two OWNER-SURFACE SUBJECTS clear with the panels they aim.
     // Both are "which firm is this surface about", and a subject that outlives
     // its surface is worse than no subject at all: the dossier field takes strict
