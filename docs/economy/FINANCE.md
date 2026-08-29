@@ -268,8 +268,15 @@ that two of them disagree.
 
 Every corporation writes a return. **What may be read is decided by the target's ownership class**,
 not by the fog: `public` corporations file, `private` and `closed` corporations do not. The class
-is generated from the home region's industrialisation timing —
+is generated from how far the enforceable promise reached the home region —
 [`CORPORATION_GENERATION.md`](../generation/CORPORATION_GENERATION.md) owns that derivation.
+
+**The class governs CORPORATIONS. A company always files** (Ben, 2026-08-29; BL-678, companies are
+open). A background firm is `public` by construction, so disclosure is not a question asked of it:
+it is part of the commercial population the player trades with, and a firm whose figures are a dash
+is not a member of a population. What follows in this section is therefore a rule about the
+handful of named rivals, not about the field — and the field is the great majority of the firms in
+any world.
 
 **A corporation always reads its own books.** Disclosure governs what one firm may learn about
 **another** — it is a competitor rule, and turning it on its author would be nonsense: a firm that
@@ -391,6 +398,13 @@ left to answer with — so it sits outside the series rather than at its end.
 above, with no consent — its books are open, so it can be priced. A **private** or **closed** one
 may not: there is no filed return to price it from and no negotiation verb yet. That is the second
 job the ownership class does, and it is why the class is worth generating rather than authoring.
+
+**Every company is buyable** (Ben, 2026-08-29; BL-678, companies are open). A background firm is
+`public` by construction, so the gate above never refuses one. This is what makes the acquisitions
+ledger a market rather than a curiosity: the field it lists is the commercial population of the
+world, not the two or three named rivals that happened to class `public`. The corollary is that
+**closure is a rival's property alone** — the question "are this firm's books its own" is asked of
+the actors the player competes with, and answered `yes` for the population the player trades with.
 
 **What it costs politically.** Nothing new is needed. `equity_taken` already exists as a sentiment
 factor ([`RELATIONS.md`](../politics/RELATIONS.md) § The factors) — *"the observer wanted a firm

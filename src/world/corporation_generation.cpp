@@ -2107,12 +2107,26 @@ std::vector<entity_id> generate_background_firms(
             cc.name          = make_corp_name(nit->second.name, name_rng);
             cc.home_nation   = home_nid;
             cc.focus         = focus;
-            // BL-631 Pass 2b. A background firm has a home NATION but never a
-            // home region, so it lands on the SAME no-home-region fallback the
-            // rung-3 case takes in generate_corporations. `is_background` is not
-            // an input to the class and no path here branches on it - the flag is
-            // set below purely to record what kind of firm this is.
-            cc.ownership_class = ownership_from_character(nit->second.politics);
+            // BL-678 (companies are open) — A COMPANY IS `publicly_held`,
+            // ALWAYS. Ownership class keeps its whole Pass 2b derivation for
+            // CORPORATIONS; a company is part of the commercial population the
+            // player trades with, not a rival whose books are its own, so it
+            // files its return and it can be bought.
+            //
+            // THE OVERRIDE IS APPLIED AFTER THE DERIVATION, NOT INSIDE IT, and
+            // that shape is the point rather than a stylistic choice.
+            // `ownership_from_character` is pure — it reads one ideology, holds
+            // no state and draws nothing — so evaluating it and then discarding
+            // its result consumes exactly the randomness the pre-BL-678 path
+            // consumed: none. The RNG stream through this loop is untouched and
+            // no downstream generation shifts; only the stored value changes.
+            // The derived class is kept named because it is still the honest
+            // answer to "what would a CORPORATION seated in this nation carry",
+            // which is the question Pass 2b answers and this override does not
+            // retire.
+            [[maybe_unused]] const ownership_class corporation_class =
+                ownership_from_character(nit->second.politics);
+            cc.ownership_class = ownership_class::publicly_held;
             cc.starting_capital = 0.0f;
             cc.balance          = 0.0f;
             cc.is_player     = false;

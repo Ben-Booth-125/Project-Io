@@ -174,10 +174,11 @@
     "acquisitions_ledger_field": {
       "surface": "Acquisitions ledger - the Purchasable / Possible groups",
       "answers": "What can I buy now, and what am I saving for?",
-      "because": "Ben's wording, 2026-08-29, and it settles the surface rather than describing it: the question names BOTH groups, which is what makes the Possible group a goal rather than a tease. FINANCE.md gives ownership a price and a verb, and until this surface existed neither was readable anywhere - buy_corporation could be issued by the scorer and by the wire, and by no press a player could find. It earns its space on the menus-are-broad-ledgers test: an overview across the whole field of firms, never a targeted action on one. The two groups are the load-bearing part and were kept after measurement rather than assumed - Purchasable carries the Buy press, Possible carries a price and deliberately NO press, and that contrast is the only way a player sees what the next rung costs. The surface states the size of the field it draws rather than letting a short list read as a defect.",
+      "because": "Ben's wording, 2026-08-29, and it settles the surface rather than describing it: the question names BOTH groups, which is what makes the Possible group a goal rather than a tease. FINANCE.md gives ownership a price and a verb, and until this surface existed neither was readable anywhere - buy_corporation could be issued by the scorer and by the wire, and by no press a player could find. It earns its space on the menus-are-broad-ledgers test: an overview across the whole field of firms, never a targeted action on one. The two groups are the load-bearing part and were kept after measurement rather than assumed - Purchasable carries the Buy press, Possible carries a price and deliberately NO press, and that contrast is the only way a player sees what the next rung costs. The surface states the size of the field it draws, which is the clause that had to be re-measured: at the time this was settled the buyable field was one to three firms of eighty-eight, because ownership class was overwhelmingly closed. BL-678 (companies are open) retired closure for companies, and the same twelve-seed sweep now reads 81.6 public firms per seed - 35.8 Purchasable and 45.8 Possible, with 4.8 still closed. So the count on the face stops excusing a short list and starts doing the work the question asks of it: telling the player how much of the world is in reach today against how much is worth saving for.",
       "backlog_item": [
         "BL-628",
-        "BL-658"
+        "BL-658",
+        "BL-678"
       ],
       "files": [
         "src/ui/acquisitions_ledger.cpp",

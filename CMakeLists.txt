@@ -801,6 +801,33 @@ target_link_libraries(throughput_field_census PRIVATE io_world_obj lua54)
 target_compile_features(throughput_field_census PRIVATE cxx_std_20)
 target_compile_options(throughput_field_census PRIVATE ${IO_WARNING_FLAGS})
 
+# acquisition_viability (BL-634) — live-Lua, and it was reaching the generic glob
+# loop below instead, which links io_world_obj alone. That target cannot compile
+# it at all: the harness includes scripting/lua_state.hpp, so it dies on
+# `fatal error C1083: Cannot open include file: 'sol/sol.hpp'` before it ever gets
+# to a link. Declared here for the same reason spawn_solvency is, and its R0 row
+# says why in its own header: it LOADS AND PARSES the shipped scripts/world_gen.lua
+# into a world_gen_config, because the C++ fallback prices ten resources against
+# that table's forty-two and a sweep run on the fallback measures a world where a
+# third of the roster cannot be sold at all. So recipe_registry.cpp and
+# world_gen_config.cpp both come back, plus contract_template.cpp for the empty
+# template registry run_nation_step takes.
+add_executable(acquisition_viability
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/acquisition_viability.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/contract_template.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(acquisition_viability PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(acquisition_viability PRIVATE io_world_obj lua54)
+target_compile_features(acquisition_viability PRIVATE cxx_std_20)
+target_compile_options(acquisition_viability PRIVATE ${IO_WARNING_FLAGS})
+
 # province_capacity_probe (2026-08-20) — live-Lua for exactly substrate_census's
 # reason above: it measures the world AFTER generate_background_firms, so every
 # authored input must be the real one or it reports a world the game never builds.
