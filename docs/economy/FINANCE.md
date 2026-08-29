@@ -411,11 +411,18 @@ factor ([`RELATIONS.md`](../politics/RELATIONS.md) § The factors) — *"the obs
 and the subject took it"*. An acquisition's political cost lands there, on the rivals who wanted
 the same firm.
 
-**Rivals buy too.** `buy_corporation` joins the `corp_command` seam and is scored in
-`corp_ai.cpp`'s existing deterministic candidate list, capped at one acquisition per evaluation and
-carried in the candidate's `spend` under the solvency gate — the shape every widening in
+**Rivals should buy too.** The design: `buy_corporation` is scored on `corp_ai.cpp`'s existing
+deterministic candidate list, capped at one acquisition per evaluation and carried in the
+candidate's `spend` under the solvency gate — the shape every widening in
 `.claude/rules/io-standing-rules.md` takes, a legal verb on the scorer and never a planner.
-Design: BL-629 (rival acquisition).
+Owner: BL-629 (rival acquisition).
+
+*The paragraph above is a design, and it is phrased in the conditional deliberately.* It read as
+present-tense fact — "`buy_corporation` **joins** the seam and **is scored** in `corp_ai.cpp`'s
+existing candidate list" — which is a sentence a reader cannot distinguish from a description of
+shipped code, and at least one did not. A doc says what is true of the **design**; whether a piece
+is built is a backlog fact (`.claude/rules/io-standing-rules.md` § Terms & docs). Where a design
+paragraph names the file it will live in, the conditional is what keeps the two readings apart.
 
 ## Surfaces
 

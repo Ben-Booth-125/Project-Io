@@ -1,37 +1,153 @@
 building_id,corp_id,corp_name,body_name,type,output,active,exhausted
-46778,46799,"Exoar-Exoex Enterprises","Huhaidar",Extraction Site,1746.89,1,0
-46779,46799,"Exoar-Exoex Enterprises","Huhaidar",Extraction Site,2151.42,1,0
-46780,46799,"Exoar-Exoex Enterprises","Huhaidar",Extraction Site,3078.05,1,0
-46781,46800,"Corix Industries","Huhaidar",Extraction Site,2931.29,1,0
-46782,46800,"Corix Industries","Huhaidar",Extraction Site,2201.24,1,0
-46783,46800,"Corix Industries","Huhaidar",Extraction Site,3265.94,1,0
-46784,46801,"Calyx Industries","Huhaidar",Extraction Site,792.055,1,0
-46786,46801,"Calyx Industries","Huhaidar",Extraction Site,1342.98,1,0
-51097,46801,"Calyx Industries","Huhaidar",Extraction Site,16936.1,1,0
-46787,46802,"FararAthar Holdings","Huhaidar",Extraction Site,1358.66,1,0
-46788,46802,"FararAthar Holdings","Huhaidar",Extraction Site,751.022,1,0
-46789,46802,"FararAthar Holdings","Huhaidar",Extraction Site,3382.82,1,0
-46791,46803,"CalonIntus-PaxisAthen Ventures","Huhaidar",Extraction Site,1920.08,1,0
-46792,46803,"CalonIntus-PaxisAthen Ventures","Huhaidar",Extraction Site,1065.3,1,0
-46793,46803,"CalonIntus-PaxisAthen Ventures","Huhaidar",Extraction Site,3121.8,1,0
-46794,46804,"Genom Systems","Huhaidar",Processing Facility,0,0,0
-46795,46804,"Genom Systems","Huhaidar",Processing Facility,0,0,0
-51098,46805,"Terel-Coron Holdings","Huhaidar",Extraction Site,13548.8,1,0
-51092,51028,"YelorCalur Operations","Huhaidar",Extraction Site,51684.7,1,0
-51032,51035,"HexyxCorix-CalosFaran Enterprises","Huhaidar",Extraction Site,4353.96,1,0
-51033,51035,"HexyxCorix-CalosFaran Enterprises","Huhaidar",Extraction Site,637.903,1,0
-51034,51035,"HexyxCorix-CalosFaran Enterprises","Huhaidar",Extraction Site,41.013,1,0
-51041,51042,"Ruzumz Enterprises","Huhaidar",Extraction Site,1184.48,1,0
-51093,51042,"Ruzumz Enterprises","Huhaidar",Extraction Site,41347.8,1,0
-51045,51046,"BorosGenan-Zenom Industries","Huhaidar",Extraction Site,56582.6,1,0
-51052,51053,"CoraxCoros Operations","Huhaidar",Extraction Site,1143.64,1,0
-51056,51057,"Maikka Processing Group","Huhaidar",Extraction Site,3384.38,1,0
-51094,51057,"Maikka Processing Group","Huhaidar",Extraction Site,33078.2,1,0
-51060,51061,"Tei Extraction Co.","Huhaidar",Extraction Site,2065.86,1,0
-51064,51065,"Dynan Resources","Huhaidar",Extraction Site,2017.98,1,0
-51095,51071,"JorenRexax Enterprises","Huhaidar",Extraction Site,26462.6,1,0
-51074,51075,"Rexar Dynamics","Huhaidar",Extraction Site,2980.47,1,0
-51081,51082,"Zenus-Orbon Operations","Huhaidar",Extraction Site,1019.46,1,0
-51085,51086,"Roteit Logistics","Huhaidar",Extraction Site,2960.75,1,0
-51096,51086,"Roteit Logistics","Huhaidar",Extraction Site,21170.1,1,0
-51089,51090,"He Holdings","Huhaidar",Extraction Site,1424.65,1,0
+48667,48690,"Faros-YelenKalen International","Huhaidar",Extraction Site,27.2608,1,0
+48668,48690,"Faros-YelenKalen International","Huhaidar",Extraction Site,28.4804,1,0
+48669,48690,"Faros-YelenKalen International","Huhaidar",Processing Facility,1.2,1,0
+48670,48691,"Exoar-Exoex Enterprises","Huhaidar",Extraction Site,32.6151,1,0
+48671,48691,"Exoar-Exoex Enterprises","Huhaidar",Extraction Site,26.1484,1,0
+48672,48691,"Exoar-Exoex Enterprises","Huhaidar",Processing Facility,8,1,0
+48673,48692,"Corix Industries","Huhaidar",Extraction Site,20.8983,1,0
+48674,48692,"Corix Industries","Huhaidar",Extraction Site,19.4824,1,0
+48675,48692,"Corix Industries","Huhaidar",Processing Facility,1.2,1,0
+53616,48693,"Calyx Industries","Huhaidar",Extraction Site,14.8282,1,0
+48678,48694,"FararAthar Holdings","Huhaidar",Extraction Site,5.11254,1,0
+48679,48694,"FararAthar Holdings","Huhaidar",Extraction Site,5.38187,1,0
+48680,48694,"FararAthar Holdings","Huhaidar",Processing Facility,1.2,1,0
+48681,48694,"FararAthar Holdings","Huhaidar",Extraction Site,25.0634,1,0
+53619,48694,"FararAthar Holdings","Huhaidar",Processing Facility,4,1,0
+53765,48694,"FararAthar Holdings","Huhaidar",Processing Facility,4,1,0
+48682,48695,"CalonIntus-PaxisAthen Ventures","Huhaidar",Extraction Site,28.5006,1,0
+48683,48695,"CalonIntus-PaxisAthen Ventures","Huhaidar",Extraction Site,5.03704,1,0
+48684,48695,"CalonIntus-PaxisAthen Ventures","Huhaidar",Processing Facility,8,1,0
+53641,48695,"CalonIntus-PaxisAthen Ventures","Huhaidar",Processing Facility,4,1,0
+53728,48695,"CalonIntus-PaxisAthen Ventures","Huhaidar",Processing Facility,1.40366,1,0
+48685,48696,"Genom Systems","Huhaidar",Extraction Site,5.67889,1,0
+48686,48696,"Genom Systems","Huhaidar",Extraction Site,3.84585,1,0
+48687,48696,"Genom Systems","Huhaidar",Processing Facility,2,1,0
+48689,48697,"Terel-Coron Holdings","Huhaidar",Extraction Site,26.0439,1,0
+53617,48697,"Terel-Coron Holdings","Huhaidar",Extraction Site,11.8625,1,0
+53321,53323,"Nexis Logistics","Huhaidar",Processing Facility,1.2,1,0
+53322,53323,"Nexis Logistics","Huhaidar",Processing Facility,1.2,1,0
+53324,53326,"Lukuk Resources","Huhaidar",Processing Facility,8,1,0
+53325,53326,"Lukuk Resources","Huhaidar",Processing Facility,8,1,0
+53327,53329,"YelorCalur Operations","Huhaidar",Processing Facility,8,1,0
+53328,53329,"YelorCalur Operations","Huhaidar",Processing Facility,8,1,0
+53748,53329,"YelorCalur Operations","Huhaidar",Extraction Site,0.10815,1,0
+53333,53335,"HexyxCorix-CalosFaran Enterprises","Huhaidar",Processing Facility,1.2,1,0
+53334,53335,"HexyxCorix-CalosFaran Enterprises","Huhaidar",Processing Facility,1.2,1,0
+53336,53338,"Nexos-Calel Logistics","Huhaidar",Processing Facility,1.2,1,0
+53337,53338,"Nexos-Calel Logistics","Huhaidar",Processing Facility,1.2,1,0
+53341,53342,"Veirai Enterprises","Huhaidar",Extraction Site,27.2308,1,0
+53345,53346,"BorosGenan-Zenom Industries","Huhaidar",Extraction Site,27.4074,1,0
+53348,53350,"Kemhin Systems","Huhaidar",Extraction Site,32.5117,1,0
+53622,53350,"Kemhin Systems","Huhaidar",Processing Facility,4,1,0
+53709,53350,"Kemhin Systems","Huhaidar",Extraction Site,14.6571,1,0
+53351,53355,"CoraxCoros Operations","Huhaidar",Extraction Site,27.5403,1,0
+53352,53355,"CoraxCoros Operations","Huhaidar",Extraction Site,31.1753,1,0
+53354,53355,"CoraxCoros Operations","Huhaidar",Extraction Site,26.7505,1,0
+53356,53360,"Zumzum Processing Group","Huhaidar",Extraction Site,29.3149,1,0
+53357,53360,"Zumzum Processing Group","Huhaidar",Extraction Site,24.9804,1,0
+53359,53360,"Zumzum Processing Group","Huhaidar",Extraction Site,29.3015,1,0
+53361,53365,"Kua Extraction Co.","Huhaidar",Extraction Site,28.3057,1,0
+53364,53365,"Kua Extraction Co.","Huhaidar",Extraction Site,32.5331,1,0
+53687,53365,"Kua Extraction Co.","Huhaidar",Processing Facility,4,1,0
+53761,53365,"Kua Extraction Co.","Huhaidar",Processing Facility,1.64012,1,0
+53366,53370,"Dynan Resources","Huhaidar",Extraction Site,35.4462,1,0
+53367,53370,"Dynan Resources","Huhaidar",Extraction Site,33.222,1,0
+53369,53370,"Dynan Resources","Huhaidar",Extraction Site,32.0504,1,0
+53623,53370,"Dynan Resources","Huhaidar",Processing Facility,4,1,0
+53371,53374,"Luxan Industries","Huhaidar",Extraction Site,25.8719,1,0
+53372,53374,"Luxan Industries","Huhaidar",Extraction Site,2.88926,1,0
+53375,53378,"JorenRexax Enterprises","Huhaidar",Extraction Site,31.8701,1,0
+53376,53378,"JorenRexax Enterprises","Huhaidar",Extraction Site,29.4485,1,0
+53666,53378,"JorenRexax Enterprises","Huhaidar",Processing Facility,4,1,0
+53379,53383,"Rexar Dynamics","Huhaidar",Extraction Site,32.4581,1,0
+53380,53383,"Rexar Dynamics","Huhaidar",Extraction Site,25.1348,1,0
+53382,53383,"Rexar Dynamics","Huhaidar",Extraction Site,25.3145,1,0
+53389,53390,"Zenus-Orbon Operations","Huhaidar",Extraction Site,6.83534,1,0
+53393,53394,"Lidu Logistics","Huhaidar",Extraction Site,15.6189,1,0
+53667,53394,"Lidu Logistics","Huhaidar",Processing Facility,4,1,0
+53395,53399,"Daini Holdings","Huhaidar",Extraction Site,31.0553,1,0
+53396,53399,"Daini Holdings","Huhaidar",Extraction Site,33.6396,1,0
+53398,53399,"Daini Holdings","Huhaidar",Extraction Site,28.4899,1,0
+53689,53399,"Daini Holdings","Huhaidar",Processing Facility,4,1,0
+53400,53403,"XeronBryis-Paxyx Industries","Huhaidar",Extraction Site,23.8753,1,0
+53401,53403,"XeronBryis-Paxyx Industries","Huhaidar",Extraction Site,28.0661,1,0
+53404,53407,"DelelCalyx-Orbix Enterprises","Huhaidar",Extraction Site,23.9927,1,0
+53405,53407,"DelelCalyx-Orbix Enterprises","Huhaidar",Extraction Site,21.6422,1,0
+53408,53410,"ExoorOrbus Systems","Huhaidar",Processing Facility,0.8,1,0
+53416,53417,"Calon Enterprises","Huhaidar",Extraction Site,3.08076,1,0
+53421,53425,"Bryur Dynamics","Huhaidar",Extraction Site,25.3559,1,0
+53424,53425,"Bryur Dynamics","Huhaidar",Extraction Site,21.6347,1,0
+53427,53429,"Thathd Dynamics","Huhaidar",Extraction Site,23.1897,1,0
+53430,53433,"Teron Enterprises","Huhaidar",Extraction Site,20.488,1,0
+53431,53433,"Teron Enterprises","Huhaidar",Extraction Site,21.9299,1,0
+53436,53437,"Kathra Holdings","Huhaidar",Extraction Site,25.3258,1,0
+53649,53437,"Kathra Holdings","Huhaidar",Processing Facility,4,1,0
+53439,53442,"Ruthme Logistics","Huhaidar",Extraction Site,27.4988,1,0
+53441,53442,"Ruthme Logistics","Huhaidar",Extraction Site,27.5873,1,0
+53443,53446,"Muamtu Extraction Co.","Huhaidar",Extraction Site,27.5444,1,0
+53444,53446,"Muamtu Extraction Co.","Huhaidar",Extraction Site,25.2136,1,0
+53449,53450,"Intar-WenaxIntyx Industries","Huhaidar",Extraction Site,25.2271,1,0
+53715,53450,"Intar-WenaxIntyx Industries","Huhaidar",Extraction Site,11.7257,1,0
+53451,53453,"DelexOrbex-Jorom Dynamics","Huhaidar",Processing Facility,1.2,1,0
+53452,53453,"DelexOrbex-Jorom Dynamics","Huhaidar",Processing Facility,1.2,1,0
+53456,53457,"Terar Systems","Huhaidar",Extraction Site,34.5884,1,0
+53458,53461,"Vecos Resources","Huhaidar",Processing Facility,1.2,1,0
+53460,53461,"Vecos Resources","Huhaidar",Extraction Site,11.7914,1,0
+53462,53465,"BryyxUlvom-Hexyx Industries","Huhaidar",Processing Facility,0,0,0
+53464,53465,"BryyxUlvom-Hexyx Industries","Huhaidar",Extraction Site,5.20302,1,0
+53629,53465,"BryyxUlvom-Hexyx Industries","Huhaidar",Processing Facility,4,1,0
+53468,53469,"Hexel Systems","Huhaidar",Extraction Site,3.29652,1,0
+53753,53472,"UlvaxIntax Systems","Huhaidar",Extraction Site,9.10424,1,0
+53473,53476,"SolonSolus Industries","Huhaidar",Processing Facility,1.2,1,0
+53475,53476,"SolonSolus Industries","Huhaidar",Extraction Site,4.85229,1,0
+53486,53489,"QuaurXeren-UlvosExoel Operations","Huhaidar",Processing Facility,1.2,1,0
+53487,53489,"QuaurXeren-UlvosExoel Operations","Huhaidar",Processing Facility,1.2,1,0
+53488,53489,"QuaurXeren-UlvosExoel Operations","Huhaidar",Extraction Site,6.36497,1,0
+53493,53495,"Nexor Ventures","Huhaidar",Processing Facility,8,1,0
+53494,53495,"Nexor Ventures","Huhaidar",Processing Facility,8,1,0
+53754,53498,"Tukait Operations","Huhaidar",Extraction Site,7.28339,1,0
+53499,53502,"Das Logistics","Huhaidar",Processing Facility,1.2,1,0
+53500,53502,"Das Logistics","Huhaidar",Processing Facility,1.2,1,0
+53501,53502,"Das Logistics","Huhaidar",Extraction Site,34.3463,1,0
+53696,53502,"Das Logistics","Huhaidar",Processing Facility,4,1,0
+53505,53506,"Hexel-ExoarUlvom Processing Group","Huhaidar",Extraction Site,8.31183,1,0
+53632,53506,"Hexel-ExoarUlvom Processing Group","Huhaidar",Processing Facility,2.35803,1,0
+53755,53512,"Intel International","Huhaidar",Extraction Site,5.82671,1,0
+53513,53516,"Zenix Ventures","Huhaidar",Processing Facility,1.2,1,0
+53522,53523,"BororOrbar-Teror Processing Group","Huhaidar",Extraction Site,8.80369,1,0
+53526,53527,"Genis-Wenix International","Huhaidar",Extraction Site,32.4089,1,0
+53676,53527,"Genis-Wenix International","Huhaidar",Processing Facility,4,1,0
+53531,53534,"Borel-Quaus Holdings","Huhaidar",Extraction Site,26.6043,1,0
+53532,53534,"Borel-Quaus Holdings","Huhaidar",Extraction Site,28.5129,1,0
+53634,53534,"Borel-Quaus Holdings","Huhaidar",Processing Facility,4,1,0
+53535,53538,"Dikha International","Huhaidar",Extraction Site,30.6924,1,0
+53536,53538,"Dikha International","Huhaidar",Extraction Site,28.1169,1,0
+53539,53542,"AthanVecom Extraction Co.","Huhaidar",Extraction Site,23.0369,1,0
+53540,53542,"AthanVecom Extraction Co.","Huhaidar",Extraction Site,33.3897,1,0
+53677,53542,"AthanVecom Extraction Co.","Huhaidar",Processing Facility,4,1,0
+53543,53547,"Muashu Ventures","Huhaidar",Extraction Site,13.087,1,0
+53544,53547,"Muashu Ventures","Huhaidar",Extraction Site,26.1395,1,0
+53546,53547,"Muashu Ventures","Huhaidar",Extraction Site,5.3911,1,0
+53548,53552,"AthurOrbix International","Huhaidar",Extraction Site,4.82305,1,0
+53549,53552,"AthurOrbix International","Huhaidar",Extraction Site,32.6023,1,0
+53551,53552,"AthurOrbix International","Huhaidar",Extraction Site,34.4595,1,0
+53553,53556,"Lidu Extraction Co.","Huhaidar",Extraction Site,30.0531,1,0
+53554,53556,"Lidu Extraction Co.","Huhaidar",Extraction Site,35.5951,1,0
+53657,53556,"Lidu Extraction Co.","Huhaidar",Processing Facility,4,1,0
+53743,53556,"Lidu Extraction Co.","Huhaidar",Processing Facility,4,1,0
+53557,53559,"ExourZenyx-Solos International","Huhaidar",Processing Facility,4,1,0
+53558,53559,"ExourZenyx-Solos International","Huhaidar",Processing Facility,4,1,0
+53756,53559,"ExourZenyx-Solos International","Huhaidar",Extraction Site,4.66137,1,0
+53563,53566,"Kalen Extraction Co.","Huhaidar",Extraction Site,3.86442,1,0
+53564,53566,"Kalen Extraction Co.","Huhaidar",Extraction Site,3.41521,1,0
+53636,53566,"Kalen Extraction Co.","Huhaidar",Processing Facility,4,1,0
+53567,53570,"Hishem Enterprises","Huhaidar",Extraction Site,6.28401,1,0
+53568,53570,"Hishem Enterprises","Huhaidar",Extraction Site,24.3104,1,0
+53573,53574,"Reheth Enterprises","Huhaidar",Extraction Site,0.428674,1,0
+53584,53586,"Marur Industries","Huhaidar",Processing Facility,0.8,1,0
+53758,53586,"Marur Industries","Huhaidar",Extraction Site,3.7291,1,0
+53590,53592,"CalorVecar Systems","Huhaidar",Processing Facility,1.66343,1,0
+53596,53598,"Muamtu Dynamics","Huhaidar",Processing Facility,1.2,1,0
+53597,53598,"Muamtu Dynamics","Huhaidar",Processing Facility,1.2,1,0
+53611,53612,"ExoonSolor-Luxor Operations","Huhaidar",Extraction Site,5.94299,1,0

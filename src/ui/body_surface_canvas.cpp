@@ -4591,7 +4591,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     // background firm lands on the Acquisitions ledger.
                     //
                     // The firm is carried across as the ledger's FOCUS, never a
-                    // filter. The buyable field is one to three firms on the
+                    // filter. The buyable field is a mean of 81.6 firms on the
                     // shipped spawn (measured, acquisition_viability § C), and
                     // filtering it to one would answer a question nobody asked.
                     // A clicked firm may well not be in the field at all — most

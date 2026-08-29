@@ -9,12 +9,18 @@
 -- LAYOUT is checked by looking at the captures, and the CONTENT is checked by
 -- asserting on the set the ledger computes (`verify.acquisitions_field`).
 --
--- THE FIELD IS SMALL, AND THAT IS MEASURED, NOT ASSUMED.
+-- THE FIELD SIZE IS MEASURED, NOT ASSUMED — AND IT HAS MOVED BY FIFTY TIMES.
 -- `tools/verify/acquisition_viability.cpp` § C, twelve seeds of the shipped
--- spawn: 88 corporations per seed, of which one to three are buyable — mean
--- 1.6, seven of twelve at exactly one. So this script does NOT assert a field
--- size; it asserts the RULES the field obeys, and it manufactures the two-group
--- case it needs with `verify.set_balance` rather than hoping a seed supplies it.
+-- spawn: 88 corporations per seed, of which a mean of 81.6 are buyable. It was
+-- 1.6 when this script was written, before closure was retired for background
+-- firms.
+--
+-- THAT IS EXACTLY WHY THIS SCRIPT ASSERTS NO FIELD SIZE. It asserts the RULES
+-- the field obeys, and it manufactures the two-group case it needs with
+-- `verify.set_balance` rather than hoping a seed supplies it — so a fifty-fold
+-- change in the world it runs against cost it no edits and produced no false
+-- red. A check pinned to the measured number would have failed here and been
+-- read as a regression.
 --
 -- Assertions, in order:
 --   A1  No unfiled and no non-public firm is listed. The listed set is exactly
@@ -78,10 +84,12 @@ print(string.format("field: %d corps, %d public, %d public+filed, %d listed, bal
     f.corps, f.public_held, f.public_filed, f.listed, f.balance))
 
 if f.listed == 0 then
-    -- A REAL OUTCOME, REPORTED AS ONE. Every seed measured so far carried at
-    -- least one buyable firm, but the field is one to three firms wide and
-    -- nothing guarantees it. Fail loudly rather than passing on an empty set —
-    -- a check that cannot see its subject has not checked it.
+    -- A REAL OUTCOME, REPORTED AS ONE. Every seed measured carries buyable
+    -- firms — a mean of 81.6 since closure was retired for background firms —
+    -- but nothing GUARANTEES it, and this guard was written when the mean was
+    -- 1.6 and an empty seed was a live possibility. Keep it: fail loudly rather
+    -- than passing on an empty set, because a check that cannot see its subject
+    -- has not checked it.
     verify.expect(false, "FIELD EMPTY on this seed - nothing below can be checked")
     return
 end
@@ -177,10 +185,12 @@ verify.expect(seen_possible or dearest.price == cheapest.price,
 -- So what is asserted is the new rule, not the old one — listed == disclosed,
 -- and no fog dash anywhere inside a listed row.
 --
--- EXPECT THIS TABLE TO BE SPARSE. On the shipped spawn a mean of 1.6 of 88
--- corporations are publicly held, so ~3 rows is the CORRECT outcome of the rule
--- on today's data, not a defect. The script therefore asserts the rule and
--- prints the count, and does not assert a row count.
+-- THE TABLE IS NO LONGER SPARSE, AND THE SCRIPT DID NOT HAVE TO CHANGE. When
+-- this was written a mean of 1.6 of 88 corporations disclosed, so ~3 rows was
+-- the correct outcome of the rule and the note here said so. Retiring closure
+-- for background firms took that to a mean of 81.6. Both are correct outcomes
+-- of the SAME rule on different data, which is why the script asserts the rule
+-- and prints the count rather than asserting a row count.
 -- ---------------------------------------------------------------------------
 verify.set_balance(dearest.price + 1000.0)
 verify.fold("acquisitions_profit", 0)

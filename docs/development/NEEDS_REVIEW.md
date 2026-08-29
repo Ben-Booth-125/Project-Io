@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*89 entries — 89 open, 0 resolved.*
+*90 entries — 90 open, 0 resolved.*
 
 ---
 
@@ -844,6 +844,21 @@ I verified the mapping by READING the switch instead, case by case, and it is co
 Same shape as the four instances Sprint 21 collected: a check whose green means less than it appears. The fix is small - a check that clicks each rail slot at its known screen position and asserts pointer_target().open_panel is the expected surface, which verify.click and the existing open_panel field already support. Worth doing because the rail has now been renumbered twice in one session and will move again when Corp. Strategy is built.
 
 *Files: `scripts/verify/shell_pass.lua`, `src/ui/nav_pane.cpp`*
+
+### NR-717 — A design paragraph written in the present tense was read as shipped code, by me and then by an agent
+*observation · raised 2026-08-29 · from Sprint 24, BL-678 (companies are open). Found by the agent measuring what the brief asserted.*
+
+I briefed an agent that retiring closure was risky because "rivals buy too — `buy_corporation` is scored in `corp_ai.cpp`'s candidate list under the solvency gate", and told Ben the same thing in the same words. I took it from FINANCE.md § Whole-firm acquisition, which said exactly that in the present tense.
+
+IT IS NOT BUILT. `buy_corporation` appears NOWHERE in `src/world/corp_ai.cpp`, and BL-629 (rival acquisition) is status `designed`. The agent found it by measuring rather than assuming: rival acquisitions came back 0.00 per run on all twelve seeds both before AND after its change, and it went looking for why instead of reporting a clean result. I confirmed it myself with a grep before merging.
+
+THE DOC WAS NOT WRONG, IT WAS UNREADABLE IN ONE PARTICULAR WAY. It ended with "Design: BL-629 (rival acquisition)", so a careful reader had the signal. But the body said `buy_corporation` "JOINS the corp_command seam and IS SCORED in corp_ai.cpp's EXISTING deterministic candidate list" — present tense, naming the real file, calling the list existing. That sentence is indistinguishable from a description of shipped code. Fixed at the site by moving the paragraph to the conditional and recording why.
+
+WHY THIS IS WORTH YOUR EYE RATHER THAN JUST A FIX. The state-independence rule (io-standing-rules.md § Terms & docs) says a doc must never record whether a thing is built. This paragraph obeyed the LETTER of that — it recorded no build status — and still misled two readers into believing something was built, because present-tense prose about a named file reads as a report. The rule may want its positive half stated: a design paragraph that names its implementation site should be written in the conditional. I have NOT made that edit to the standing rules, because widening a standing rule is yours.
+
+THE CONSEQUENCE IS ALSO STILL LIVE. The snowball risk I raised is real but LATENT: it arrives with BL-629, and it will arrive against a field of ~82 buyable firms rather than the 1.6 that existed when BL-629 was designed. Worth knowing before that item is scheduled.
+
+*Files: `docs/economy/FINANCE.md`, `src/world/corp_ai.cpp`, `.claude/rules/io-standing-rules.md`*
 
 ---
 

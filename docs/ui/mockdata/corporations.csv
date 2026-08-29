@@ -1,29 +1,89 @@
 corp_id,name,focus,home_nation,balance,starting_capital,since_start,buildings
-46798,"Faros-YelenKalen International",Trade,"Tei Kuamei",1829.99,0,1829.99,5
-46799,"Exoar-Exoex Enterprises",Extraction,"Maithlai",25124.5,0,25124.5,6
-46800,"Corix Industries",Extraction,"Sikhaiskhis Sidi",25452.4,0,25452.4,7
-46801,"Calyx Industries",Extraction,"Sheime Mezei",145139,0,145139,7
-46802,"FararAthar Holdings",Extraction,"Sikhaiskhis Sidi",27058.8,0,27058.8,8
-46803,"CalonIntus-PaxisAthen Ventures",Extraction,"Lisu Sidi",21052.5,0,21052.5,6
-46804,"Genom Systems",Processing,"Sualak",1601.89,0,1601.89,3
-46805,"Terel-Coron Holdings",Processing,"Linuslas",83348.8,0,83348.8,6
-51086,"Roteit Logistics",Processing,"Roteitei Meimei",10602,0,10602,7
-51022,"Nexis Logistics",Processing,"Kokei Reitei",1542.31,0,1542.31,6
-51025,"Lukuk Resources",Processing,"Lukuk Thuaruakruak",1512.46,0,1512.46,5
-51028,"YelorCalur Operations",Processing,"Lisu Sidi",292698,0,292698,6
-51031,"Orban-GenenOrbos Resources",Processing,"Saidaiskhais",1276.88,0,1276.88,6
-51035,"HexyxCorix-CalosFaran Enterprises",Extraction,"Mama Reka",11921.8,0,11921.8,7
-51038,"Nexos-Calel Logistics",Processing,"Ka Memokua",1518.98,0,1518.98,5
-51042,"Ruzumz Enterprises",Processing,"Ruzumzei Veivu",307647,0,307647,7
-51046,"BorosGenan-Zenom Industries",Processing,"Vumeizaim Veivu",197108,0,197108,7
-51049,"Sualak Systems",Processing,"Sualak",1767.59,0,1767.59,6
-51053,"CoraxCoros Operations",Processing,"Mi Kososon",5064.83,0,5064.83,6
-51057,"Maikka Processing Group",Processing,"Maikka Daimaith",11956.5,0,11956.5,7
-51061,"Tei Extraction Co.",Processing,"Tei Kuamei",6357.76,0,6357.76,7
-51065,"Dynan Resources",Processing,"Muvaimzei",10532.3,0,10532.3,7
-51068,"Luxan Industries",Processing,"Sikhaiskhis Sidi",1457.43,0,1457.43,5
-51071,"JorenRexax Enterprises",Processing,"Linuslas",177115,0,177115,6
-51075,"Rexar Dynamics",Processing,"Das Laisnakhi",15530.9,0,15530.9,7
-51078,"PaxonNexen Enterprises",Processing,"Mi Sonre",1240.31,0,1240.31,6
-51082,"Zenus-Orbon Operations",Processing,"Kuaroshuam Huamson",4698.66,0,4698.66,6
-51090,"He Holdings",Processing,"He Seithhe",8064.47,0,8064.47,7
+48690,"Faros-YelenKalen International",Extraction,"Rimere",1239.81,322.394,917.414,5
+48691,"Exoar-Exoex Enterprises",Extraction,"Dikha",1865.88,274.486,1591.39,5
+53530,"Henshi Logistics",Processing,"Henshim Kikhom",1058.27,0,1058.27,3
+53338,"Nexos-Calel Logistics",Processing,"Teta",673.503,0,673.503,4
+48692,"Corix Industries",Extraction,"Thathdailuth",1816.34,259.172,1557.17,5
+48693,"Calyx Industries",Processing,"Kua Meho",599.418,598.093,1.32483,4
+48694,"FararAthar Holdings",Extraction,"Henshim Kikhom",1061.75,387.515,674.233,7
+53574,"Reheth Enterprises",Processing,"Reheth",-1076.07,0,-1076.07,5
+53453,"DelexOrbex-Jorom Dynamics",Processing,"Shilmemel",654.971,0,654.971,4
+48695,"CalonIntus-PaxisAthen Ventures",Extraction,"Kero",1845.67,357.494,1488.17,5
+48696,"Genom Systems",Extraction,"Kemhinsom",2718.18,486.73,2231.45,3
+48697,"Terel-Coron Holdings",Trade,"Muamtuakme Kemei",2142.1,623.37,1518.73,4
+53516,"Zenix Ventures",Processing,"Kemhinsom",1215.76,0,1215.76,4
+53323,"Nexis Logistics",Processing,"Rakkhua Ruzu",1770.41,0,1770.41,4
+53390,"Zenus-Orbon Operations",Processing,"Sa Ruakthuk",847.194,0,847.194,6
+53326,"Lukuk Resources",Processing,"Lukuk Shakasa",1347.98,0,1347.98,4
+53457,"Terar Systems",Processing,"Mei Kokomo",170.444,0,170.444,4
+53329,"YelorCalur Operations",Processing,"He Bereth",922.217,0,922.217,4
+53523,"BororOrbar-Teror Processing Group",Processing,"Zumzummu",903.153,0,903.153,6
+53332,"Orban-GenenOrbos Resources",Processing,"Tukaitai",1261.47,0,1261.47,3
+53399,"Daini Holdings",Extraction,"Daini Sidi",-649.886,0,-649.886,5
+53512,"Intel International",Processing,"Zeim Veimaimvei",709.145,0,709.145,5
+53335,"HexyxCorix-CalosFaran Enterprises",Processing,"Das Dusdai",1898.93,0,1898.93,4
+53342,"Veirai Enterprises",Processing,"Veiraimu Veivu",920.442,0,920.442,6
+53410,"ExoorOrbus Systems",Processing,"Hishem Kikhom",1150.67,0,1150.67,3
+53346,"BorosGenan-Zenom Industries",Processing,"Zeim Veimaimvei",1806.21,0,1806.21,4
+53350,"Kemhin Systems",Extraction,"Kemhinsom",608.829,0,608.829,5
+53355,"CoraxCoros Operations",Extraction,"Toro Motei",379.892,0,379.892,5
+53360,"Zumzum Processing Group",Extraction,"Zumzummu",1345.19,0,1345.19,7
+53429,"Thathd Dynamics",Extraction,"Thathdailuth",1139.32,0,1139.32,5
+53365,"Kua Extraction Co.",Extraction,"Kua Meho",1677.73,0,1677.73,6
+53498,"Tukait Operations",Processing,"Tukaitai",557.591,0,557.591,5
+53370,"Dynan Resources",Extraction,"Henshim Kikhom",2006.15,0,2006.15,7
+53509,"RexelYelor Systems",Processing,"Veiraimu Veivu",1013.42,0,1013.42,4
+53502,"Das Logistics",Processing,"Das Dusdai",182.25,0,182.25,4
+53374,"Luxan Industries",Extraction,"Lislaisai Sidi",1189.27,0,1189.27,5
+53442,"Ruthme Logistics",Extraction,"Ruthme Kaithta",952.681,0,952.681,5
+53378,"JorenRexax Enterprises",Extraction,"Dikha",-832.116,0,-832.116,4
+53383,"Rexar Dynamics",Extraction,"Kero",2413.15,0,2413.15,7
+53450,"Intar-WenaxIntyx Industries",Processing,"Ruari",425.358,0,425.358,5
+53386,"PaxonNexen Enterprises",Processing,"Muashua",1606.09,0,1606.09,4
+53394,"Lidu Logistics",Processing,"Lidu Khakhulu",876.535,0,876.535,6
+53403,"XeronBryis-Paxyx Industries",Extraction,"Simmuam Kikhom",1400.95,0,1400.95,5
+53407,"DelelCalyx-Orbix Enterprises",Extraction,"Keshuamuan",1963.28,0,1963.28,5
+53413,"Luxyx Holdings",Processing,"Reheth",1058.12,0,1058.12,3
+53538,"Dikha International",Extraction,"Dikha",1312.95,0,1312.95,5
+53417,"Calon Enterprises",Processing,"Kenhon Kimokua",749.703,0,749.703,6
+53420,"Bryos Logistics",Processing,"Rimere",976.694,0,976.694,4
+53489,"QuaurXeren-UlvosExoel Operations",Processing,"Rakkhua Ruzu",2357.11,0,2357.11,4
+53425,"Bryur Dynamics",Extraction,"Teireimo Reitei",1063.7,0,1063.7,7
+53433,"Teron Enterprises",Extraction,"Zeiketh Zeka",2039.47,0,2039.47,5
+53437,"Kathra Holdings",Processing,"Kathrai Daimaith",1347.96,0,1347.96,5
+53446,"Muamtu Extraction Co.",Extraction,"Muamtuakme Kemei",845.878,0,845.878,4
+53461,"Vecos Resources",Processing,"Neinehei",1276.51,0,1276.51,4
+53586,"Marur Industries",Processing,"Thathdailuth",385.55,0,385.55,5
+53465,"BryyxUlvom-Hexyx Industries",Processing,"Heithhe Reineith",-1170.23,0,-1170.23,6
+53469,"Hexel Systems",Processing,"Lathlu Kailuth",1084.6,0,1084.6,6
+53472,"UlvaxIntax Systems",Processing,"Shuathmo Zeka",679.751,0,679.751,5
+53476,"SolonSolus Industries",Processing,"Kuksu Kusak",2347.02,0,2347.02,4
+53479,"MarelGenel Enterprises",Processing,"Toko Keimo",1658.92,0,1658.92,4
+53482,"BryixFaros-Borom Ventures",Processing,"Luthai Muruk",616.344,0,616.344,4
+53485,"KalusOrbom Ventures",Processing,"Mokeirei Meitei",1053.8,0,1053.8,3
+53492,"Farel International",Processing,"Lukuk Shakasa",1717.67,0,1717.67,4
+53608,"NexonGenor Operations",Processing,"Mei Kokomo",-1316.9,0,-1316.9,4
+53495,"Nexor Ventures",Processing,"He Bereth",1388.4,0,1388.4,4
+53506,"Hexel-ExoarUlvom Processing Group",Processing,"Teta",659.755,0,659.755,6
+53519,"DelelJoris-Zenom Holdings",Processing,"Toro Motei",624.822,0,624.822,4
+53527,"Genis-Wenix International",Processing,"Kua Meho",638.98,0,638.98,4
+53534,"Borel-Quaus Holdings",Extraction,"Lislaisai Sidi",1533.33,0,1533.33,5
+53542,"AthanVecom Extraction Co.",Extraction,"Kero",330.31,0,330.31,5
+53547,"Muashu Ventures",Extraction,"Muashua",1525.59,0,1525.59,7
+53552,"AthurOrbix International",Extraction,"Sa Ruakthuk",1801.93,0,1801.93,8
+53556,"Lidu Extraction Co.",Extraction,"Lidu Khakhulu",2253.13,0,2253.13,5
+53559,"ExourZenyx-Solos International",Processing,"Daini Sidi",772.723,0,772.723,5
+53562,"AexarMarar-MarisCorus Processing Group",Processing,"Simmuam Kikhom",1014.64,0,1014.64,3
+53566,"Kalen Extraction Co.",Extraction,"Keshuamuan",910.948,0,910.948,5
+53570,"Hishem Enterprises",Extraction,"Hishem Kikhom",519.397,0,519.397,5
+53577,"Kenhon Systems",Processing,"Kenhon Kimokua",1111.67,0,1111.67,3
+53580,"Rimere Processing Group",Processing,"Rimere",1050.65,0,1050.65,4
+53583,"SolisFarex Industries",Processing,"Teireimo Reitei",579.475,0,579.475,4
+53589,"UlvelSolos Industries",Processing,"Zeiketh Zeka",1393.67,0,1393.67,3
+53592,"CalorVecar Systems",Processing,"Kathrai Daimaith",1022.57,0,1022.57,4
+53595,"Ruthme Enterprises",Processing,"Ruthme Kaithta",398.647,0,398.647,4
+53598,"Muamtu Dynamics",Processing,"Muamtuakme Kemei",1071.22,0,1071.22,5
+53601,"Ruari Extraction Co.",Processing,"Ruari",1266.47,0,1266.47,3
+53604,"Aexix Resources",Processing,"Shilmemel",991.012,0,991.012,4
+53612,"ExoonSolor-Luxor Operations",Processing,"Neinehei",1774.18,0,1774.18,6
+53615,"Nexyx Ventures",Processing,"Heithhe Reineith",1285.27,0,1285.27,3

@@ -9,15 +9,23 @@ namespace ui {
 /// Draw the Acquisitions ledger — nav-rail slot 5, and the Company lens's click
 /// destination. One question: **which firms can I buy, and what do they cost?**
 ///
-/// ── THE FIELD WAS MEASURED BEFORE THIS WAS LAID OUT ──────────────────────
+/// ── THE FIELD WAS MEASURED BEFORE THIS WAS LAID OUT, THEN IT MOVED ───────
 /// `tools/verify/acquisition_viability.cpp` § C, twelve seeds of the shipped
-/// spawn, 88 corporations each. The buyable field is **one to three firms,
-/// mean 1.6** — seven of the twelve seeds carry exactly one.
+/// spawn, 88 corporations each. The buyable field is **a mean of 81.6 firms**
+/// (Purchasable 35.8, Possible 45.8), and one of the two groups is empty on no
+/// seed at all.
 ///
-/// The binding constraint is NOT filing. Public-but-unfiled was **zero on every
-/// seed**, so gate (4) never bound: the constraint is **ownership class**, at a
-/// mean of 84.8 `closed` firms per seed. And on **eight of twelve seeds one of
-/// the two groups below is empty** (Purchasable mean 1.0, Possible mean 0.6).
+/// It was **1.6** when this surface was first laid out, and the layout still
+/// carries that inheritance: the field size is printed on the surface's own
+/// face, and the two groups were kept rather than collapsed. Both decisions
+/// were made for a one-row list and both survive a long one, which is the
+/// argument for having measured rather than assumed.
+///
+/// The binding constraint was never filing — public-but-unfiled is **zero on
+/// every seed**, so `buy_corporation`'s gate (4) has never bound. It was
+/// ownership class, and companies stopped carrying one: closure is retired for
+/// background firms (`FINANCE.md` § Who may be bought), so the mean `closed`
+/// count fell 84.8 → 4.8 and only corporations withhold now.
 ///
 /// This surface is therefore small by construction, and it is deliberately NOT
 /// padded to look otherwise. Two consequences are designed for rather than

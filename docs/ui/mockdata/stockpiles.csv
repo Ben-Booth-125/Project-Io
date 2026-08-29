@@ -1,35 +1,58 @@
 corp_id,corp_name,body_id,body_name,resource,quantity
-46799,"Exoar-Exoex Enterprises",15124,"Huhaidar",Iron Ore,48807.6
-46799,"Exoar-Exoex Enterprises",15124,"Huhaidar",Copper Ore,15148.6
-46800,"Corix Industries",15124,"Huhaidar",Iron Ore,90658.6
-46801,"Calyx Industries",15124,"Huhaidar",Iron Ore,104795
-46801,"Calyx Industries",15124,"Huhaidar",Agricultural Produce,21697.3
-46801,"Calyx Industries",15124,"Huhaidar",Timber,860.581
-46802,"FararAthar Holdings",15124,"Huhaidar",Iron Ore,31572.1
-46802,"FararAthar Holdings",15124,"Huhaidar",Silica,6338.99
-46802,"FararAthar Holdings",15124,"Huhaidar",Agricultural Produce,1998.4
-46803,"CalonIntus-PaxisAthen Ventures",15124,"Huhaidar",Iron Ore,47018.1
-46803,"CalonIntus-PaxisAthen Ventures",15124,"Huhaidar",Agricultural Produce,9350.92
-46804,"Genom Systems",15124,"Huhaidar",Iron Ore,16
-46805,"Terel-Coron Holdings",15124,"Huhaidar",Iron Ore,83886.4
-51028,"YelorCalur Operations",15124,"Huhaidar",Iron Ore,354519
-51031,"Orban-GenenOrbos Resources",15124,"Huhaidar",Water,0.793356
-51035,"HexyxCorix-CalosFaran Enterprises",15124,"Huhaidar",Water,46864.7
-51042,"Ruzumz Enterprises",15124,"Huhaidar",Iron Ore,283671
-51042,"Ruzumz Enterprises",15124,"Huhaidar",Agricultural Produce,13100.4
-51046,"BorosGenan-Zenom Industries",15124,"Huhaidar",Iron Ore,566176
-51046,"BorosGenan-Zenom Industries",15124,"Huhaidar",Water,0.831952
-51053,"CoraxCoros Operations",15124,"Huhaidar",Iron Ore,10574.2
-51057,"Maikka Processing Group",15124,"Huhaidar",Iron Ore,601364
-51061,"Tei Extraction Co.",15124,"Huhaidar",Petroleum,21008.6
-51061,"Tei Extraction Co.",15124,"Huhaidar",Steel,8
-51065,"Dynan Resources",15124,"Huhaidar",Copper Ore,18991.3
-51065,"Dynan Resources",15124,"Huhaidar",Steel,8
-51071,"JorenRexax Enterprises",15124,"Huhaidar",Iron Ore,181648
-51071,"JorenRexax Enterprises",15124,"Huhaidar",Agricultural Produce,0.528904
-51071,"JorenRexax Enterprises",15124,"Huhaidar",Water,0.793356
-51075,"Rexar Dynamics",15124,"Huhaidar",Petroleum,30154.7
-51075,"Rexar Dynamics",15124,"Huhaidar",Food Rations,1.58671
-51082,"Zenus-Orbon Operations",15124,"Huhaidar",Iron Ore,9398.97
-51086,"Roteit Logistics",15124,"Huhaidar",Iron Ore,393552
-51090,"He Holdings",15124,"Huhaidar",Petroleum,14596.5
+48690,"Faros-YelenKalen International",15124,"Huhaidar",Iron Ore,367.613
+48691,"Exoar-Exoex Enterprises",15124,"Huhaidar",Agricultural Produce,13.622
+48691,"Exoar-Exoex Enterprises",15124,"Huhaidar",Fibre,8
+48692,"Corix Industries",15124,"Huhaidar",Agricultural Produce,8
+48693,"Calyx Industries",15124,"Huhaidar",Agricultural Produce,6.61289
+48694,"FararAthar Holdings",15124,"Huhaidar",Agricultural Produce,23.0377
+48694,"FararAthar Holdings",15124,"Huhaidar",Fibre,8
+48695,"CalonIntus-PaxisAthen Ventures",15124,"Huhaidar",Agricultural Produce,2.34573
+48695,"CalonIntus-PaxisAthen Ventures",15124,"Huhaidar",Fibre,8
+48696,"Genom Systems",15124,"Huhaidar",Agricultural Produce,9.0331
+53323,"Nexis Logistics",15124,"Huhaidar",Agricultural Produce,15.4
+53342,"Veirai Enterprises",15124,"Huhaidar",Peat,0.293064
+53346,"BorosGenan-Zenom Industries",15124,"Huhaidar",Agricultural Produce,15.3294
+53350,"Kemhin Systems",15124,"Huhaidar",Fibre,8
+53355,"CoraxCoros Operations",15124,"Huhaidar",Agricultural Produce,12.321
+53360,"Zumzum Processing Group",15124,"Huhaidar",Stone,19.7416
+53365,"Kua Extraction Co.",15124,"Huhaidar",Timber,14.415
+53370,"Dynan Resources",15124,"Huhaidar",Stone,8
+53370,"Dynan Resources",15124,"Huhaidar",Fibre,580.985
+53374,"Luxan Industries",15124,"Huhaidar",Fibre,8
+53383,"Rexar Dynamics",15124,"Huhaidar",Timber,29.8333
+53390,"Zenus-Orbon Operations",15124,"Huhaidar",Stone,4.02046
+53399,"Daini Holdings",15124,"Huhaidar",Agricultural Produce,8
+53403,"XeronBryis-Paxyx Industries",15124,"Huhaidar",Peat,3.05313
+53457,"Terar Systems",15124,"Huhaidar",Agricultural Produce,8.65516
+53461,"Vecos Resources",15124,"Huhaidar",Steel,10
+53469,"Hexel Systems",15124,"Huhaidar",Fibre,16
+53472,"UlvaxIntax Systems",15124,"Huhaidar",Peat,0.0662331
+53476,"SolonSolus Industries",15124,"Huhaidar",Timber,7.98446
+53476,"SolonSolus Industries",15124,"Huhaidar",Fibre,16
+53489,"QuaurXeren-UlvosExoel Operations",15124,"Huhaidar",Stone,0.874698
+53498,"Tukait Operations",15124,"Huhaidar",Peat,0.0212087
+53502,"Das Logistics",15124,"Huhaidar",Agricultural Produce,5.93128
+53502,"Das Logistics",15124,"Huhaidar",Fibre,16
+53506,"Hexel-ExoarUlvom Processing Group",15124,"Huhaidar",Peat,0.0325208
+53512,"Intel International",15124,"Huhaidar",Peat,0.0423835
+53523,"BororOrbar-Teror Processing Group",15124,"Huhaidar",Stone,5.79705
+53527,"Genis-Wenix International",15124,"Huhaidar",Agricultural Produce,9.15339
+53534,"Borel-Quaus Holdings",15124,"Huhaidar",Fibre,8
+53538,"Dikha International",15124,"Huhaidar",Sand,8
+53542,"AthanVecom Extraction Co.",15124,"Huhaidar",Agricultural Produce,12.5844
+53542,"AthanVecom Extraction Co.",15124,"Huhaidar",Stone,4.90846
+53547,"Muashu Ventures",15124,"Huhaidar",Fibre,16
+53552,"AthurOrbix International",15124,"Huhaidar",Stone,23.3669
+53552,"AthurOrbix International",15124,"Huhaidar",Fibre,293.351
+53556,"Lidu Extraction Co.",15124,"Huhaidar",Timber,35.0138
+53556,"Lidu Extraction Co.",15124,"Huhaidar",Fibre,8
+53559,"ExourZenyx-Solos International",15124,"Huhaidar",Stone,0.0188553
+53559,"ExourZenyx-Solos International",15124,"Huhaidar",Peat,0.0339068
+53574,"Reheth Enterprises",15124,"Huhaidar",Stone,0.000208719
+53580,"Rimere Processing Group",15124,"Huhaidar",Stone,0.0706584
+53586,"Marur Industries",15124,"Huhaidar",Stone,0.0151677
+53586,"Marur Industries",15124,"Huhaidar",Peat,0.00542219
+53592,"CalorVecar Systems",15124,"Huhaidar",Stone,0.00706584
+53604,"Aexix Resources",15124,"Huhaidar",Stone,0.0113053
+53612,"ExoonSolor-Luxor Operations",15124,"Huhaidar",Stone,4.12849
+53612,"ExoonSolor-Luxor Operations",15124,"Huhaidar",Sand,5.05989

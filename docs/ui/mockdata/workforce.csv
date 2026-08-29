@@ -1,28 +1,89 @@
 corp_id,corp_name,body_id,body_name,staffing_pct
-46799,"Exoar-Exoex Enterprises",15124,"Huhaidar",74.8904
-46800,"Corix Industries",15124,"Huhaidar",74.8904
-46801,"Calyx Industries",15124,"Huhaidar",74.8904
-46802,"FararAthar Holdings",15124,"Huhaidar",74.8904
-46803,"CalonIntus-PaxisAthen Ventures",15124,"Huhaidar",74.8904
-46804,"Genom Systems",15124,"Huhaidar",74.8904
-46805,"Terel-Coron Holdings",15124,"Huhaidar",74.8904
-51022,"Nexis Logistics",15124,"Huhaidar",74.8904
-51025,"Lukuk Resources",15124,"Huhaidar",74.8904
-51028,"YelorCalur Operations",15124,"Huhaidar",74.8904
-51031,"Orban-GenenOrbos Resources",15124,"Huhaidar",74.8904
-51035,"HexyxCorix-CalosFaran Enterprises",15124,"Huhaidar",74.8904
-51038,"Nexos-Calel Logistics",15124,"Huhaidar",74.8904
-51042,"Ruzumz Enterprises",15124,"Huhaidar",74.8904
-51046,"BorosGenan-Zenom Industries",15124,"Huhaidar",74.8904
-51049,"Sualak Systems",15124,"Huhaidar",74.8904
-51053,"CoraxCoros Operations",15124,"Huhaidar",74.8904
-51057,"Maikka Processing Group",15124,"Huhaidar",74.8904
-51061,"Tei Extraction Co.",15124,"Huhaidar",74.8904
-51065,"Dynan Resources",15124,"Huhaidar",74.8904
-51068,"Luxan Industries",15124,"Huhaidar",74.8904
-51071,"JorenRexax Enterprises",15124,"Huhaidar",74.8904
-51075,"Rexar Dynamics",15124,"Huhaidar",74.8904
-51078,"PaxonNexen Enterprises",15124,"Huhaidar",74.8904
-51082,"Zenus-Orbon Operations",15124,"Huhaidar",74.8904
-51086,"Roteit Logistics",15124,"Huhaidar",74.8904
-51090,"He Holdings",15124,"Huhaidar",74.8904
+48690,"Faros-YelenKalen International",15124,"Huhaidar",81.8357
+48691,"Exoar-Exoex Enterprises",15124,"Huhaidar",81.8357
+48692,"Corix Industries",15124,"Huhaidar",81.8357
+48693,"Calyx Industries",15124,"Huhaidar",81.8357
+48694,"FararAthar Holdings",15124,"Huhaidar",81.8357
+48695,"CalonIntus-PaxisAthen Ventures",15124,"Huhaidar",81.8357
+48696,"Genom Systems",15124,"Huhaidar",81.8357
+48697,"Terel-Coron Holdings",15124,"Huhaidar",81.8357
+53323,"Nexis Logistics",15124,"Huhaidar",81.8357
+53326,"Lukuk Resources",15124,"Huhaidar",81.8357
+53329,"YelorCalur Operations",15124,"Huhaidar",81.8357
+53332,"Orban-GenenOrbos Resources",15124,"Huhaidar",81.8357
+53335,"HexyxCorix-CalosFaran Enterprises",15124,"Huhaidar",81.8357
+53338,"Nexos-Calel Logistics",15124,"Huhaidar",81.8357
+53342,"Veirai Enterprises",15124,"Huhaidar",81.8357
+53346,"BorosGenan-Zenom Industries",15124,"Huhaidar",81.8357
+53350,"Kemhin Systems",15124,"Huhaidar",81.8357
+53355,"CoraxCoros Operations",15124,"Huhaidar",81.8357
+53360,"Zumzum Processing Group",15124,"Huhaidar",81.8357
+53365,"Kua Extraction Co.",15124,"Huhaidar",81.8357
+53370,"Dynan Resources",15124,"Huhaidar",81.8357
+53374,"Luxan Industries",15124,"Huhaidar",81.8357
+53378,"JorenRexax Enterprises",15124,"Huhaidar",81.8357
+53383,"Rexar Dynamics",15124,"Huhaidar",81.8357
+53386,"PaxonNexen Enterprises",15124,"Huhaidar",81.8357
+53390,"Zenus-Orbon Operations",15124,"Huhaidar",81.8357
+53394,"Lidu Logistics",15124,"Huhaidar",81.8357
+53399,"Daini Holdings",15124,"Huhaidar",81.8357
+53403,"XeronBryis-Paxyx Industries",15124,"Huhaidar",81.8357
+53407,"DelelCalyx-Orbix Enterprises",15124,"Huhaidar",81.8357
+53410,"ExoorOrbus Systems",15124,"Huhaidar",81.8357
+53413,"Luxyx Holdings",15124,"Huhaidar",81.8357
+53417,"Calon Enterprises",15124,"Huhaidar",81.8357
+53420,"Bryos Logistics",15124,"Huhaidar",81.8357
+53425,"Bryur Dynamics",15124,"Huhaidar",81.8357
+53429,"Thathd Dynamics",15124,"Huhaidar",81.8357
+53433,"Teron Enterprises",15124,"Huhaidar",81.8357
+53437,"Kathra Holdings",15124,"Huhaidar",81.8357
+53442,"Ruthme Logistics",15124,"Huhaidar",81.8357
+53446,"Muamtu Extraction Co.",15124,"Huhaidar",81.8357
+53450,"Intar-WenaxIntyx Industries",15124,"Huhaidar",81.8357
+53453,"DelexOrbex-Jorom Dynamics",15124,"Huhaidar",81.8357
+53457,"Terar Systems",15124,"Huhaidar",81.8357
+53461,"Vecos Resources",15124,"Huhaidar",81.8357
+53465,"BryyxUlvom-Hexyx Industries",15124,"Huhaidar",81.8357
+53469,"Hexel Systems",15124,"Huhaidar",81.8357
+53472,"UlvaxIntax Systems",15124,"Huhaidar",81.8357
+53476,"SolonSolus Industries",15124,"Huhaidar",81.8357
+53479,"MarelGenel Enterprises",15124,"Huhaidar",81.8357
+53482,"BryixFaros-Borom Ventures",15124,"Huhaidar",81.8357
+53485,"KalusOrbom Ventures",15124,"Huhaidar",81.8357
+53489,"QuaurXeren-UlvosExoel Operations",15124,"Huhaidar",81.8357
+53492,"Farel International",15124,"Huhaidar",81.8357
+53495,"Nexor Ventures",15124,"Huhaidar",81.8357
+53498,"Tukait Operations",15124,"Huhaidar",81.8357
+53502,"Das Logistics",15124,"Huhaidar",81.8357
+53506,"Hexel-ExoarUlvom Processing Group",15124,"Huhaidar",81.8357
+53509,"RexelYelor Systems",15124,"Huhaidar",81.8357
+53512,"Intel International",15124,"Huhaidar",81.8357
+53516,"Zenix Ventures",15124,"Huhaidar",81.8357
+53519,"DelelJoris-Zenom Holdings",15124,"Huhaidar",81.8357
+53523,"BororOrbar-Teror Processing Group",15124,"Huhaidar",81.8357
+53527,"Genis-Wenix International",15124,"Huhaidar",81.8357
+53530,"Henshi Logistics",15124,"Huhaidar",81.8357
+53534,"Borel-Quaus Holdings",15124,"Huhaidar",81.8357
+53538,"Dikha International",15124,"Huhaidar",81.8357
+53542,"AthanVecom Extraction Co.",15124,"Huhaidar",81.8357
+53547,"Muashu Ventures",15124,"Huhaidar",81.8357
+53552,"AthurOrbix International",15124,"Huhaidar",81.8357
+53556,"Lidu Extraction Co.",15124,"Huhaidar",81.8357
+53559,"ExourZenyx-Solos International",15124,"Huhaidar",81.8357
+53562,"AexarMarar-MarisCorus Processing Group",15124,"Huhaidar",81.8357
+53566,"Kalen Extraction Co.",15124,"Huhaidar",81.8357
+53570,"Hishem Enterprises",15124,"Huhaidar",81.8357
+53574,"Reheth Enterprises",15124,"Huhaidar",81.8357
+53577,"Kenhon Systems",15124,"Huhaidar",81.8357
+53580,"Rimere Processing Group",15124,"Huhaidar",81.8357
+53583,"SolisFarex Industries",15124,"Huhaidar",81.8357
+53586,"Marur Industries",15124,"Huhaidar",81.8357
+53589,"UlvelSolos Industries",15124,"Huhaidar",81.8357
+53592,"CalorVecar Systems",15124,"Huhaidar",81.8357
+53595,"Ruthme Enterprises",15124,"Huhaidar",81.8357
+53598,"Muamtu Dynamics",15124,"Huhaidar",81.8357
+53601,"Ruari Extraction Co.",15124,"Huhaidar",81.8357
+53604,"Aexix Resources",15124,"Huhaidar",81.8357
+53608,"NexonGenor Operations",15124,"Huhaidar",81.8357
+53612,"ExoonSolor-Luxor Operations",15124,"Huhaidar",81.8357
+53615,"Nexyx Ventures",15124,"Huhaidar",81.8357

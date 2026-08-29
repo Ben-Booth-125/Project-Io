@@ -353,15 +353,19 @@ struct ui_state
     // firm's holdings resolve through to the firm, and the firm's question is
     // "can I buy it").
     //
-    // MEASURED BEFORE IT WAS LAID OUT, and the number is the reason it looks
-    // the way it does. Over a TWELVE-seed sweep of the shipped spawn
+    // MEASURED BEFORE IT WAS LAID OUT, AND THE NUMBER HAS SINCE MOVED BY FIFTY
+    // TIMES. Over a TWELVE-seed sweep of the shipped spawn
     // (`tools/verify/acquisition_viability.cpp` § C), 88 corporations per seed
-    // yield a BUYABLE FIELD of one to three firms — mean 1.6, with seven of the
-    // twelve at exactly one. Not because firms fail to file (public-but-unfiled
-    // was zero on every seed) but because ownership class is overwhelmingly
-    // `closed`: a mean of 84.8 per seed. On eight of twelve seeds one of the two
-    // groups is EMPTY. So this surface is small by construction, and it is
-    // deliberately NOT padded to look busier.
+    // now yield a BUYABLE FIELD of a mean 81.6 firms — Purchasable 35.8,
+    // Possible 45.8, neither group empty on any seed. It was 1.6 when this
+    // surface was designed, because ownership class was overwhelmingly `closed`
+    // at a mean of 84.8 per seed; retiring closure for background firms took
+    // that to 4.8. Filing has never been the binding gate — public-but-unfiled
+    // is zero on every seed.
+    //
+    // The layout was built for the one-row case and was NOT padded to look
+    // busier. It needed no change to hold eighty, which is the payoff for
+    // having measured the field rather than assumed it.
     /// Whether the Acquisitions ledger is open. Toggled by nav-rail slot 5 and
     /// opened by a Company-lens click.
     bool show_acquisitions_ledger = false;
