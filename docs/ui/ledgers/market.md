@@ -34,8 +34,9 @@ belongs to `SUPPLY.md`.
 | **Trades** | What positions do I hold, what else is standing here, and what could I be doing? | Three reads, kept visibly distinct (`MARKETS.md` § Trades): **my standing trades**; **the market's standing trades** in markets the player operates in; and **potential trades** with their margins — a derivation, not a record |
 
 **Above the tabs, below the selectors: the nation presence row.** A wrapped row of one chip per
-nation operating in the selected market, wrapping to two or three rows if it must. **These are
-colour chips with initials, not flags** — `nation_colour` is all that exists; there is no
+nation operating in the selected market, wrapping to two or three rows if it must. **These are colour chips with initials, not flags**, and for now **placeholder chips at that**
+(Ben, 2026-08-29 — flags and glyphs are a later sprint; reserve the real width, do not size the
+column to the stand-in). — `nation_colour` is all that exists; there is no
 per-nation emblem artwork and inventing one is a generated-identity feature, not a row
 (`ICONS.md` § 2b).
 

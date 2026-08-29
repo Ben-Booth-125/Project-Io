@@ -226,6 +226,16 @@ curation question and not an icon one.
 
 ### 2b. The item glyph — a value-track silhouette, not one shape per good
 
+> **PLACEHOLDERS UNTIL A LATER SPRINT** (Ben, 2026-08-29: *"For flags and glyphs, use
+> placeholders. We will come to that in a different sprint later."*). The four track silhouettes
+> and the nation chips below are the **settled design**; the Market rework ships against
+> placeholders and does not wait on the art. Two conditions on that, both from the
+> honest-placeholder idiom (NR-249): a placeholder must be *visibly* provisional rather than a
+> shape a player would learn as meaning something, and the column must not be sized to the
+> placeholder — reserve the width the real glyph will need, or the table gets re-laid out twice.
+> The existing `resource` pip is the natural stand-in for the item glyph, since it is already
+> colour-keyed and already means "a resource"; it simply does not yet discriminate.
+
 The Market ledger's Goods table takes an **item glyph** column (Ben, 2026-08-29:
 *"item_glyph; name; price; body_average_price; price_relative_to_base_price;
 six_month_price_graph"*). What exists today is `resource(…, resource_type)` — a small filled

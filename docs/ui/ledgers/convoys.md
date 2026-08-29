@@ -2,6 +2,7 @@
 
 > **Working design doc** for the ledger pass. Ben, 2026-08-29: *"I think we can make convoys into
 > a ledger of its own."* · Source: currently `src/ui/market_ledger.cpp` (the Convoys view) ·
+> Menu slot: `rail slot 7 "Convoys"`, directly after Market (Ben, 2026-08-29) ·
 > Host: shell fold-out column, ~380 px at 1280 and 384 px at 1920 (`shell_column_width`).
 > Authority for the mechanism: [`SUPPLY.md`](../../economy/SUPPLY.md). This doc is the surface.
 
@@ -55,10 +56,11 @@ the column.
   before the surface is rebuilt around it.
 
 ## Open questions for Ben
-- **Does it earn a rail slot, and where?** The rail is thirteen slots and this would be a
-  fourteenth. It has a glyph and a lens already; what it does not have is Ben's call on the
-  curation. The alternative is reaching it from the Market ledger's own surface, which keeps the
-  rail as it is at the cost of the separation this doc argues for.
+- ~~Does it earn a rail slot, and where?~~ **Answered** (Ben, 2026-08-29): *"give convoys a slot,
+  put it after market."* Slot **7**, directly after Market, taking the rail to fourteen and
+  shifting Corp. Strategy down to 8. That placement keeps the commercial run of the rail together
+  — Acquisitions, Market, Convoys — while giving the logistics read its own door and its own
+  lens. See `MENU.md` § Scope-widening names.
 - **Is `x0` a defect?** See above. If dispatch can legitimately commit an empty convoy, the row
   needs to say why; if it cannot, this is a supply-layer bug the ledger merely revealed.
 - **Do Routes and History earn views**, and does History need the per-arrival record that
