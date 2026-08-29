@@ -399,6 +399,61 @@ struct ui_state
     int  acquisitions_sort_column    = -1;
     bool acquisitions_sort_ascending = true;
 
+    /// The profitability fold-out's three CROSS-CUTTING SELECTORS (BL-680,
+    /// profitability filters): end resource, input resource, body. All three
+    /// are supply-chain questions — "who makes the thing I need", "who competes
+    /// with me for the input I buy", "who is within reach" — and they combine
+    /// as AND.
+    ///
+    /// They are SELECTORS, NOT VIEWS, so the toggle rule does not bind them,
+    /// exactly as it does not bind the Market ledger's Body and Market combos:
+    /// a selector switches a target rather than expressing an active state, and
+    /// re-picking the current value is a no-op rather than an undo.
+    ///
+    /// Held here rather than in a function-local static for the same reason the
+    /// sort above is: the shell's windows carry `NoSavedSettings`, so ImGui
+    /// forgets everything the moment the takeover closes, and a filter that
+    /// silently reset on every close would read as the surface losing the
+    /// player's question. VIEW state, not serialised.
+    ///
+    /// `-1` / `null_entity` is "every" in each case — the absence of a filter,
+    /// never a value that could be confused with resource index 0.
+    int       acquisitions_filter_end   = -1;
+    int       acquisitions_filter_input = -1;
+    entity_id acquisitions_filter_body  = null_entity;
+
+    /// Where the three filter combos are drawn, and where each one's first real
+    /// option lands once its popup is open, in screen pixels. Index 0 = end
+    /// resource, 1 = input resource, 2 = body. `x < 0` means not drawn this
+    /// frame (the fold-out is closed, or the table had no rows to filter).
+    ///
+    /// PUBLISHED RATHER THAN RE-DERIVED, for the same reason
+    /// `acquisitions_buy_x` is: the surface that drew the control is the only
+    /// honest source for where it landed. A verify script that computed a combo
+    /// centre from the canvas rect plus a guessed line count would be asserting
+    /// against its own arithmetic, and would start clicking empty canvas the
+    /// first time a line of prose moved above it. The OPTION position is
+    /// published separately because a combo popup is its own window: clicking
+    /// the combo only opens it, and selecting a value needs a second real
+    /// press on a real item. VIEW state, rewritten every frame.
+    float acquisitions_filter_x[3]     = { -1.0f, -1.0f, -1.0f };
+    float acquisitions_filter_y[3]     = { -1.0f, -1.0f, -1.0f };
+    float acquisitions_filter_opt_x[3] = { -1.0f, -1.0f, -1.0f };
+    float acquisitions_filter_opt_y[3] = { -1.0f, -1.0f, -1.0f };
+
+    /// The corporations the profitability table ACTUALLY DREW this frame, in
+    /// draw order — after the disclosure listing rule and after all three
+    /// filters.
+    ///
+    /// Published because the alternative is worse: a verify script that
+    /// re-applied the filter rule to an unfiltered row set would be asserting
+    /// against its own arithmetic, and would keep passing if the surface stopped
+    /// filtering altogether. This is the surface reporting what it put on
+    /// screen, which is the only thing worth checking. Empty when the fold-out
+    /// is closed, or when a filter combination excluded every row. VIEW state,
+    /// not serialised, rewritten every frame.
+    std::vector<entity_id> acquisitions_profit_shown;
+
     /// Whether the Contracts ledger is open (BL-576). Nav-rail slot 13 —
     /// the curated nine and the developer/observability tail (slots 1-12,
     /// MENU.md) were already full when this landed, so Contracts is a new
