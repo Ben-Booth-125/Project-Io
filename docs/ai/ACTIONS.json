@@ -2164,8 +2164,8 @@
   {
    "id": "gameplay.declare_hostile",
    "family": "gameplay",
-   "surface": "Corporation panel, Stance column. Confirm popup on press (demolish precedent — not literally irreversible, but not unilaterally reversible by the target either).",
-   "press": "Open the Corporation panel, find the rival's row (only shown once the corp is otherwise BL-068-discovered), click 'Declare Hostile', confirm 'Declare' in the popup ('Cancel' backs out).",
+   "surface": "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Declare Hostile keeps an INLINE confirm inside the strip (demolish precedent — not literally irreversible, but not unilaterally reversible by the target either).",
+   "press": "Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Declare Hostile'. The strip then asks to confirm: click 'Declare' to apply, 'Cancel' to back out. There is NO discovery gate — every named corporation is listed and actionable (RELATIONS.md § 1 Stance: a declaration against the player is signalled).",
    "args": [
     {
      "name": "counterparty",
@@ -2183,8 +2183,8 @@
   {
    "id": "gameplay.offer_friendship",
    "family": "gameplay",
-   "surface": "Corporation panel, Stance column.",
-   "press": "Open the Corporation panel, find the rival's row, click 'Offer Friendship'. Shows 'Offer sent' afterward until the target accepts, declines, or either party moves to hostile.",
+   "surface": "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group.",
+   "press": "Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Offer Friendship'. The strip then reads 'Offer sent' until the target accepts, declines, or either party moves to hostile.",
    "args": [
     {
      "name": "counterparty",
@@ -2204,8 +2204,8 @@
   {
    "id": "gameplay.accept_friendship",
    "family": "gameplay",
-   "surface": "Corporation panel, Stance column. Shown only on a rival row carrying a pending offer FROM that rival TO the player.",
-   "press": "Open the Corporation panel; a row with an incoming offer shows 'Accept Friendship' instead of 'Offer Friendship'. Click it.",
+   "surface": "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Shown only in the strip of a row carrying a pending offer FROM that firm TO the player.",
+   "press": "Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Accept Friendship' — a row with an incoming offer shows it in place of 'Offer Friendship'. The row moves into the Friends group.",
    "args": [
     {
      "name": "counterparty",
@@ -2223,8 +2223,8 @@
   {
    "id": "gameplay.return_to_neutral",
    "family": "gameplay",
-   "surface": "Corporation panel, Stance column. Shown whenever the row is currently Hostile or Friend.",
-   "press": "Open the Corporation panel, find the rival's row, click 'Return to Neutral'.",
+   "surface": "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Shown in the strip whenever the row is currently in the Hostile or Friends group.",
+   "press": "Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Return to Neutral'. The row moves back into the Neutral group.",
    "args": [
     {
      "name": "counterparty",

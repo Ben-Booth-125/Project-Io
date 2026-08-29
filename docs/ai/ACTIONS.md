@@ -359,9 +359,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Stop a delivery that has stopped being the right one — the destination market's price collapsed, the stock turns out to be wanted at the source, a better destination appeared — without losing the cargo. The honest limit, and the thing to weigh before dispatching rather than after: holding does NOT bring the goods back. The stock is out of the pool either way; hold only stops it arriving somewhere you no longer want it, and buys time to decide. Release when the reason passes.
 
-### `gameplay.declare_hostile` — Corporation panel, Stance column. Confirm popup on press (demolish precedent — not literally irreversible, but not unilaterally reversible by the target either).
+### `gameplay.declare_hostile` — Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Declare Hostile keeps an INLINE confirm inside the strip (demolish precedent — not literally irreversible, but not unilaterally reversible by the target either).
 
-**Press.** Open the Corporation panel, find the rival's row (only shown once the corp is otherwise BL-068-discovered), click 'Declare Hostile', confirm 'Declare' in the popup ('Cancel' backs out).
+**Press.** Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Declare Hostile'. The strip then asks to confirm: click 'Declare' to apply, 'Cancel' to back out. There is NO discovery gate — every named corporation is listed and actionable (RELATIONS.md § 1 Stance: a declaration against the player is signalled).
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -375,9 +375,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The predicate everything military-adjacent waits on (BL-315). Declaring hostile does not itself trigger any engagement — it only makes one legal later — but it also dissolves friendship on contact, so it is the one press that can undo a standing relationship as a side effect.
 
-### `gameplay.offer_friendship` — Corporation panel, Stance column.
+### `gameplay.offer_friendship` — Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group.
 
-**Press.** Open the Corporation panel, find the rival's row, click 'Offer Friendship'. Shows 'Offer sent' afterward until the target accepts, declines, or either party moves to hostile.
+**Press.** Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Offer Friendship'. The strip then reads 'Offer sent' until the target accepts, declines, or either party moves to hostile.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -393,9 +393,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Friendship is deliberately the one stance that cannot be imposed — it requires both a genuine offer and a genuine accept, so a friendly row is always evidence both corps chose it, unlike hostility which is unilateral.
 
-### `gameplay.accept_friendship` — Corporation panel, Stance column. Shown only on a rival row carrying a pending offer FROM that rival TO the player.
+### `gameplay.accept_friendship` — Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Shown only in the strip of a row carrying a pending offer FROM that firm TO the player.
 
-**Press.** Open the Corporation panel; a row with an incoming offer shows 'Accept Friendship' instead of 'Offer Friendship'. Click it.
+**Press.** Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Accept Friendship' — a row with an incoming offer shows it in place of 'Offer Friendship'. The row moves into the Friends group.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -409,9 +409,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The only way friendship becomes real. An offer alone (offer_friendship) is not a stance change by itself; this verb is the second half of the two-party handshake the model requires.
 
-### `gameplay.return_to_neutral` — Corporation panel, Stance column. Shown whenever the row is currently Hostile or Friend.
+### `gameplay.return_to_neutral` — Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Shown in the strip whenever the row is currently in the Hostile or Friends group.
 
-**Press.** Open the Corporation panel, find the rival's row, click 'Return to Neutral'.
+**Press.** Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Return to Neutral'. The row moves back into the Neutral group.
 
 | Arg | Type | Meaning |
 |---|---|---|
