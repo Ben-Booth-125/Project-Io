@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*88 entries — 88 open, 0 resolved.*
+*89 entries — 89 open, 0 resolved.*
 
 ---
 
@@ -831,6 +831,19 @@ Flagged because the standing rule says a check without a tool should become one,
 It also deliberately does NOT capture the Ages view (NR-710) and records why in its own footer, which is the second thing worth your eye: a capture instrument that documents what it cannot reach, rather than quietly covering twelve of thirteen and reading as if it covered all of them.
 
 *Files: `scripts/verify/ledger_pass.lua`*
+
+### NR-716 — shell_pass walks every rail slot by NAME, so it cannot see a renumbered rail
+*observation · raised 2026-08-29 · from Sprint 24, verifying BL-676 (retire economy panel) after the rail was renumbered twice in one session.*
+
+BL-676 moved Construction to slot 3, BL-675 had inserted Acquisitions at 5, and everything between shifted. The failure mode of a renumber is a rail that compiles and silently opens the WRONG SURFACE from a slot. shell_pass.lua is the check that looks like it would catch that - it is described as walking the thirteen nav-rail ledgers - and it CANNOT.
+
+It reaches every ledger through verify.show_panel("construction", true), which writes the ui_state flag directly. It never presses a rail slot, so nav_pane.cpp's switch is not on its path at all. Its green says every ledger DRAWS; it says nothing about which door opens which one. The capture filenames carry slot numbers, which makes it read as stronger evidence than it is - shell_22_slot03_construction.png is named by the script author, not measured.
+
+I verified the mapping by READING the switch instead, case by case, and it is correct. That is not a check and it will not survive the next renumber.
+
+Same shape as the four instances Sprint 21 collected: a check whose green means less than it appears. The fix is small - a check that clicks each rail slot at its known screen position and asserts pointer_target().open_panel is the expected surface, which verify.click and the existing open_panel field already support. Worth doing because the rail has now been renumbered twice in one session and will move again when Corp. Strategy is built.
+
+*Files: `scripts/verify/shell_pass.lua`, `src/ui/nav_pane.cpp`*
 
 ---
 

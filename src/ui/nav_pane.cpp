@@ -232,20 +232,22 @@ void draw_nav_pane(ui_state& state, float top_offset)
             ImGui::EndDisabled();
             slot_tooltip("Corp. Strategy", "Standing policy - wage levels, military posture.", true);
             break;
-        // Diplomacy is still unbuilt, but the slot is no longer empty: it hosts the
-        // all-corporations balance table, provisionally. That table was BL-248's one
-        // deletion and Ben restored it (NR-012) — it needs a door, and every other
-        // slot is spoken for. Slot 8 is the least-wrong host because the table IS a
-        // rival-comparison read, which is what this slot is eventually for. It moves
-        // when Diplomacy is designed; the slot stays labelled by its real subject so
-        // the rail does not start teaching "Diplomacy = a balance table".
-        case 8: // Diplomacy — provisional host for the corporations table (NR-012)
+        // Slot 8 STOPPED BEING PROVISIONAL on 2026-08-29. It used to host the
+        // all-corporations balance table as a stand-in, and the note here said the
+        // slot kept its real subject's name so the rail would not start teaching
+        // "Diplomacy = a balance table". BL-674 (diplomacy by stance) made the
+        // surface match the label instead: the list is filtered to corporations,
+        // grouped Friends / Hostile / Neutral, and each row carries the stance
+        // verbs. The financial half it used to carry moved to the Acquisitions
+        // ledger's profitability fold-out, which is why this could stop being a
+        // balance table at all.
+        case 8: // Diplomacy — the stance-grouped corporations list (BL-674)
             if (ImGui::Selectable(id, state.show_corporations_table, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_corporations_table;
                 close_all_panels(state);
                 state.show_corporations_table = !was_open;
             }
-            slot_tooltip("Diplomacy", "Not yet built. For now: every corporation's balance, side by side.", false);
+            slot_tooltip("Diplomacy", "Where you stand with each corporation - friends, hostiles, and the rest.", false);
             break;
         case 9: // History (Tile Ledger lives here per MENU.md renaming)
             if (ImGui::Selectable(id, state.show_tile_ledger, 0, {slot_size, slot_size})) {
