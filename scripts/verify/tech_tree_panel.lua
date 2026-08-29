@@ -5,7 +5,6 @@
 -- wedges/edges; view 2 (Era 1) proves the keystone/branch-exclusion rendering
 -- on the richer, deed-gated sectors; view 0 proves an unauthored era holds a
 -- placeholder (Era -1 Antiquity, pointing at the ladder data store).
-verify.show_panel("economy", false) -- econ_step force-opens it; keep the shot clean
 verify.show_panel("tech_tree", true)
 verify.capture("tech_tree_tabs")
 verify.panel_view("tech_tree", 2)

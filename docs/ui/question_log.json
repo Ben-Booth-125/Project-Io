@@ -292,20 +292,6 @@
    ],
    "status": "drafted"
   },
-  "economy_panel": {
-   "surface": "Economy panel (Corps / Holdings / Markets)",
-   "answers": "How do the corporations, their holdings and the markets compare against each other?",
-   "because": "The cross-corp comparison view. Ben ruled 2026-08-09 that it earns a nav-rail door rather than retirement (BL-292), so it must now justify the slot it occupies.",
-   "backlog_item": [
-    "BL-063",
-    "BL-117",
-    "BL-292"
-   ],
-   "files": [
-    "src/ui/economy_panel.cpp"
-   ],
-   "status": "drafted"
-  },
   "entity_summary": {
    "surface": "Entity summary",
    "answers": "What is this entity, in one line?",
@@ -478,7 +464,7 @@
   "nav_pane": {
    "surface": "Nav rail",
    "answers": "What can I open from here?",
-   "because": "Every ledger and panel needs exactly one discoverable door. BL-292 is the standing proof of the cost when a surface lacks one: the Economy panel was drawn every frame and reachable by nobody.",
+   "because": "Every ledger and panel needs exactly one discoverable door, and the rail is where that door is. A surface with no slot is drawn every frame and reachable by nobody; a slot with no surface teaches a system the game does not have.",
    "backlog_item": [
     "BL-022",
     "BL-027",

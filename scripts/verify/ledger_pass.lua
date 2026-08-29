@@ -8,7 +8,7 @@
 --   * the Balance ledger's Assets block and its top-buildings ranking sit BELOW THE
 --     FOLD at 720p and were captured by nothing (`budget_ledger_ranked` is named for
 --     the ranking and its two frames do not contain it);
---   * Economy, Market, History and Contracts each carry three or four views, of which
+--   * Market, History and Contracts each carry three or four views, of which
 --     shell_pass sees one;
 --   * the Research mock carries one era per tab and the campaign's era is not the
 --     first.
@@ -31,9 +31,9 @@ local staged = stage_ui_fixture()
 print("LEDGER state_hash=" .. verify.state_hash())
 
 local PANELS = {
-    "corporation", "balance", "economy", "tech_tree", "market", "construction",
-    "corporations_table", "tile", "generation_ledger", "decisions", "strategy",
-    "contracts", "build",
+    "corporation", "balance", "construction", "tech_tree", "acquisitions",
+    "market", "corporations_table", "tile", "generation_ledger", "decisions",
+    "strategy", "contracts", "build",
 }
 
 local function close_all()
@@ -90,12 +90,9 @@ ledger("balance", "ledger_02_budget_head")
 foot("balance", "balance", "ledger_02_budget_foot")
 
 -- ===========================================================================
--- Slot 3 — Economy panel (UI-088..090)
+-- Slot 3 — Construction (UI-074..077)
 -- ===========================================================================
-for i, v in ipairs({ "corps", "holdings", "markets" }) do
-    ledger("economy", string.format("ledger_03_economy_%d_%s", i - 1, v), "economy", i - 1)
-end
-foot("economy", "economy", "ledger_03_economy_0_corps_foot", "economy", 0)
+ledger("construction", "ledger_03_construction")
 
 -- ===========================================================================
 -- Slot 4 — Research / tech-tree mock (UI-108)
@@ -108,17 +105,17 @@ for v = 0, 3 do
 end
 
 -- ===========================================================================
--- Slot 5 — Market ledger (UI-080..083)
+-- Slot 5 — Acquisitions ledger
 -- ===========================================================================
-for i, v in ipairs({ "prices", "sell_orders", "convoys" }) do
-    ledger("market", string.format("ledger_05_market_%d_%s", i - 1, v), "market", i - 1)
-end
-foot("market", "market", "ledger_05_market_0_prices_foot", "market", 0)
+ledger("acquisitions", "ledger_05_acquisitions")
 
 -- ===========================================================================
--- Slot 6 — Construction (UI-074..077)
+-- Slot 6 — Market ledger (UI-080..083)
 -- ===========================================================================
-ledger("construction", "ledger_06_construction")
+for i, v in ipairs({ "prices", "sell_orders", "convoys" }) do
+    ledger("market", string.format("ledger_06_market_%d_%s", i - 1, v), "market", i - 1)
+end
+foot("market", "market", "ledger_06_market_0_prices_foot", "market", 0)
 
 -- ===========================================================================
 -- Slot 8 — the all-corporations table (UI-078/079)

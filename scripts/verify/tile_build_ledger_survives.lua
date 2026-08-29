@@ -15,7 +15,6 @@
 -- Run with: ProjectIo --verify scripts/verify/tile_build_ledger_survives.lua
 
 verify.econ_step(4)                    -- populate market state (prices the bars + capex)
-verify.show_panel("economy", false)
 verify.goto_surface("home")
 verify.set_balance(500000.0)           -- afford every candidate, so no row is gated
 

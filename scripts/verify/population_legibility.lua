@@ -11,7 +11,6 @@
 -- Run with: ProjectIo --verify scripts/verify/population_legibility.lua
 
 verify.econ_step(4)            -- compute body_habitability so the cap reads live
-verify.show_panel("economy", false)   -- clear the auto-opened panel off the capture
 verify.goto_surface("home")
 
 -- Re-keyed Population lens: tiles tint by workforce efficiency, so the cliff at

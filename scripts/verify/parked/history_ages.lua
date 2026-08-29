@@ -7,7 +7,6 @@
 -- antiquity start renders as scattered independent powers, that the map has
 -- actually changed by the midpoint (borders moved), and that the epoch frame
 -- shows a settled political map with the run's own counters under it.
-verify.show_panel("economy", false) -- econ_step force-opens it; keep the shot clean
 verify.show_panel("tile", true)
 verify.panel_view("history", 2)     -- 2 = Ages (was 3 before BL-281 retired Tiles)
 

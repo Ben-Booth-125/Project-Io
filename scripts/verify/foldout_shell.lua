@@ -12,7 +12,7 @@
 --                                  begin at the column edge; no fold-out open (canvas
 --                                  shows through the [rail, W] body).
 --   - foldout_shell_construction : Construction folded out into the column.
---   - foldout_shell_economy      : Economy folded out, Construction closed (accordion).
+--   - foldout_shell_market       : Market folded out, Construction closed (accordion).
 --
 -- Captured at the harness window size (1280x720 -> W = clamp(round(0.17*1280),300,360) =
 -- 300). The 1920x1080 case shares the shell_column_width() code path (W ~ 326) and is
@@ -28,15 +28,14 @@ verify.econ_step(4)
 verify.select_tile(70, 38)
 verify.center_tile(70, 38, 8)
 
--- 1) Bare shell: no fold-out open. econ_step force-opens Economy; close it for a clean read.
-verify.show_panel("economy", false)
+-- 1) Bare shell: no fold-out open.
 verify.capture("foldout_shell_bare")
 
 -- 2) Construction folded out into the shell column.
 verify.show_panel("construction", true)
 verify.capture("foldout_shell_construction")
 
--- 3) Economy folded out; Construction closed (accordion — one panel at a time).
+-- 3) Market folded out; Construction closed (accordion — one panel at a time).
 verify.show_panel("construction", false)
-verify.show_panel("economy", true)
-verify.capture("foldout_shell_economy")
+verify.show_panel("market", true)
+verify.capture("foldout_shell_market")

@@ -7,7 +7,6 @@
 -- Run with: ProjectIo --verify scripts/verify/building_profit.lua
 
 verify.econ_step(6)            -- populate building run states and market prices
-verify.show_panel("economy", false)
 verify.goto_surface("home")    -- Kepler: fully surveyed, player buildings visible
 
 -- A player building: the Selection bar shows the BL-074 profitability breakdown.

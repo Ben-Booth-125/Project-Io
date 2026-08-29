@@ -1322,7 +1322,7 @@
   {
    "id": "ledger.corps_table_row_select",
    "family": "ledger",
-   "surface": "All-corporations balance table (nav slot 9)",
+   "surface": "All-corporations balance table (nav slot 8)",
    "press": "Click a corporation's row",
    "args": [
     {
@@ -1340,7 +1340,7 @@
   {
    "id": "ledger.nav_generation",
    "family": "ledger",
-   "surface": "Nav rail, slot 11 (plate/continent glyph)",
+   "surface": "Nav rail, slot 10 (plate/continent glyph)",
    "press": "Click the plate glyph in the developer tail of the left icon rail",
    "args": [],
    "preconditions": [
@@ -1525,7 +1525,7 @@
   {
    "id": "ledger.nav_construction",
    "family": "ledger",
-   "surface": "Nav rail, slot 7 (Construction icon)",
+   "surface": "Nav rail, slot 3 (Construction icon)",
    "press": "Click the industry/factory glyph on the left icon rail",
    "args": [],
    "preconditions": [
@@ -1549,7 +1549,7 @@
   {
    "id": "ledger.nav_corporations_table",
    "family": "ledger",
-   "surface": "Nav rail, slot 9 (Diplomacy icon - provisionally hosts the corporations table)",
+   "surface": "Nav rail, slot 8 (Diplomacy icon - provisionally hosts the corporations table)",
    "press": "Click the diplomacy glyph on the left icon rail",
    "args": [],
    "preconditions": [
@@ -1559,21 +1559,9 @@
    "reason_to_select": "Answers 'how do rivals' finances compare to mine?' - the only side-by-side rival-balance read in the game."
   },
   {
-   "id": "ledger.nav_economy",
-   "family": "ledger",
-   "surface": "Nav rail, slot 3 (Workforce icon - provisionally hosts the Economy panel)",
-   "press": "Click the workforce (population) glyph on the left icon rail",
-   "args": [],
-   "preconditions": [
-    "In-game"
-   ],
-   "expected_output": "Toggles the Economy panel open in the fold-out column; re-click closes; opening closes any other ledger. Open, it splits across three views - Corps (the player's balance trend, every corporation's balance, and the workforce table), Holdings (stockpile pools by body) and Markets (supply, demand and price per body). Workforce itself is not built; this panel is the slot's provisional occupant.",
-   "reason_to_select": "Answers 'what is the whole economy doing?' in one surface - balances, labour, stock on hand and market state side by side, rather than one body or one corporation at a time."
-  },
-  {
    "id": "ledger.nav_history",
    "family": "ledger",
-   "surface": "Nav rail, slot 10 (History icon)",
+   "surface": "Nav rail, slot 9 (History icon)",
    "press": "Click the history glyph on the left icon rail",
    "args": [],
    "preconditions": [
@@ -2189,8 +2177,8 @@
   {
    "id": "ledger.decision_feed_open",
    "family": "ledger",
-   "surface": "Navigation rail slot 12, \"AI decisions\"",
-   "press": "Click nav rail slot 12 to open the AI decision feed; click it again to close",
+   "surface": "Navigation rail slot 11, \"AI decisions\"",
+   "press": "Click nav rail slot 11 to open the AI decision feed; click it again to close",
    "args": [],
    "preconditions": [
     "In game (not the menu or the generation screen)"
@@ -2384,8 +2372,8 @@
   {
    "id": "ledger.strategy_readout_open",
    "family": "ledger",
-   "surface": "Navigation rail slot 13, \"Strategy readout\"",
-   "press": "Click nav rail slot 13 to open the Strategy readout; click it again to close",
+   "surface": "Navigation rail slot 12, \"Strategy readout\"",
+   "press": "Click nav rail slot 12 to open the Strategy readout; click it again to close",
    "args": [],
    "preconditions": [
     "In game (not the menu or the generation screen)"
@@ -2578,7 +2566,7 @@
   {
    "id": "ledger.nav_contracts",
    "family": "ledger",
-   "surface": "Nav rail, slot 14 (Contracts icon — a page with a signed check mark)",
+   "surface": "Nav rail, slot 13 (Contracts icon — a page with a signed check mark)",
    "press": "Click the contract glyph on the left icon rail",
    "args": [],
    "preconditions": [

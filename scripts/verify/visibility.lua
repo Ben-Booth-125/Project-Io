@@ -17,7 +17,6 @@
 -- Run with: ProjectIo --verify scripts/verify/visibility.lua
 
 verify.econ_step(4)            -- populate live building run states
-verify.show_panel("economy", false)   -- clear the auto-opened panel off the capture
 verify.goto_surface("home")    -- Kepler: fully surveyed, all markers visible
 
 local rival, player

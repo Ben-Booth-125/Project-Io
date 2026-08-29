@@ -281,7 +281,7 @@ void record_histories(const world& w, const recipe_registry& reg,
                       ui_state& st, history_stores& h)
 {
     // Record player balance, income, and expenditure for the header sparkline and
-    // economy panel graphs (BL-063).  All three are capped at plot_history_cap.
+    // the Budget ledger's profit chart (BL-063).  All three are capped at plot_history_cap.
     {
         const auto cit = w.corporations.find(w.player_entity);
         ui::push_capped(h.balance,

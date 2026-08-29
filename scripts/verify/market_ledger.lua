@@ -3,6 +3,5 @@
 -- Runs 16 ticks so the price series have curves to plot.
 verify.goto_surface("home")
 verify.econ_step(16)
-verify.show_panel("economy", false)  -- hide economy panel opened by econ_step
 verify.show_panel("market", true)
 verify.capture("market_ledger")

@@ -49,9 +49,6 @@ verify.window(1280, 720)
 -- while telling you nothing about whether the axis prints at all.
 verify.econ_step(6)
 
--- econ_step opens the economy panel and the fold-out column holds ONE occupant,
--- so close it explicitly before opening the corporations table.
-verify.show_panel("economy", false)
 verify.show_panel("corporations_table", true)
 verify.frames(2)
 

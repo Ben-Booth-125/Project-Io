@@ -317,10 +317,6 @@ function stage_ui_fixture()
     verify.inject_offer{ province = province, fee = 650,  deadline_in = 240 }
     verify.inject_offer{ province = province, fee = 1250, deadline_in = 90 }
 
-    -- econ_step opens the Economy panel as a side effect, and show_panel writes
-    -- ui_state directly rather than through close_all_panels, so the column would
-    -- otherwise carry one open ledger into every capture below.
-    verify.show_panel("economy", false)
     verify.clear_selection()
     verify.set_overlay("none")
     verify.frames(3)

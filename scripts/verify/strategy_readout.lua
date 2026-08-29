@@ -20,11 +20,10 @@ verify.spectate(true)
 -- staggered cadence and for a spread of reasons beyond the opening build rush.
 verify.econ_step(24)
 
--- econ_step opens the economy panel; the fold-out column holds ONE occupant.
+-- The fold-out column holds ONE occupant.
 -- As with the feed's script, the mutual exclusion is ARRANGED here, not
 -- demonstrated — show_panel writes the flag directly and never routes through
 -- close_all_panels, so the rail's one-occupant rule stays an eyeball item.
-verify.show_panel("economy", false)
 verify.show_panel("strategy", true)
 
 -- R1, all-corporations view: one bucket-split share bar per corp with window

@@ -8,7 +8,6 @@
 -- are not re-checked here. Run with:
 --   ProjectIo --verify scripts/verify/player_presence.lua
 
-verify.show_panel("economy", false)
 
 -- Planetary: home-cluster ring + HQ star, plain lens (always-on chrome). No
 -- goto_surface — keep the HQ framing setup_world queued, so the holdings cluster

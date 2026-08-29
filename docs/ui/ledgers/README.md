@@ -14,8 +14,8 @@ authority; `backlog.json` is authority once items are minted, and the subject's 
 - **Column host** — every ledger draws into the shell fold-out column (`foldout_begin`,
   `src/ui/foldout_column.hpp`), whose width is derived by `shell_column_width(disp.x)` — 380–460 px by
   resolution, ~380 px at 1720 wide; sub-views are one-question-per-view tabs (`ui::nav_button`).
-- **Economy = aggregate-only** — Corporation and Market are the drill-downs; no two surfaces answer the
-  same question.
+- **No two surfaces answer the same question** — an aggregate read belongs on exactly one ledger, and
+  Corporation and Market are the drill-downs beneath it.
 - **Toggle rule** — the rail icon toggles the ledger; re-clicking the **active tab closes the ledger**;
   cross-cutting selectors are exempt.
 - **Selection** — the Selection element is a band of its own, always open, with no rail slot
@@ -29,16 +29,16 @@ authority; `backlog.json` is authority once items are minted, and the subject's 
 | [balance.md](balance.md) | Treasury | Treasury / Cashflow / Assets (proposed) | **none** (money has no map field) |
 | [market.md](market.md) | Prices | Prices / Sell Orders / Convoys; Markets, Trends proposed | `market`, Markets→`scarcity` (proposed) |
 | [construction.md](construction.md) | Construction | Construction (queue); Buildings proposed | `opportunity`, follows view (proposed) |
-| [economy.md](economy.md) | Corps | Corps / Holdings / Markets; Sector + Workforce proposed | **none** — *not* Industry |
 | [selection.md](selection.md) | — (polymorphic by kind) | tile / province / body / building / unit / battle / market / corp / nation | contextual (none) |
 | [tile_ledger.md](tile_ledger.md) | last-left view | Story / Chain / Ages | none |
 
 ## Cross-doc findings (see [_critic_notes.md](_critic_notes.md))
-- **Economy substantially duplicates Balance + Corporation.** Its Cashflow view *is* Balance's Cashflow
-  tab; its Standing rank *is* Corporation's Standings. The genuinely aggregate-only residue (Sector +
-  Workforce) is thin — so the lead question is whether Economy earns its own rail slot or folds into
-  Corporation. See economy.md.
-- **The Economy → Industry lens pairing is wrong**: `overlay_mode::industry` paints the AI-owned nation
-  substrate, not the player's sector mix.
+- **A whole-enterprise aggregate ledger does not survive the duplication test.** Its cashflow view is
+  Balance's cashflow tab and its standing rank is Corporation's Standings, both to the same figures; the
+  residue that is genuinely aggregate-only is thin, and the parts of it that name rivals disclose more
+  than competitor visibility allows (`DISCOVERY.md`). Aggregation is a view on an owning ledger, not a
+  ledger of its own.
+- **`overlay_mode::industry` is not a sector lens**: it paints the AI-owned nation substrate, not the
+  player's sector mix, so it is the wrong pairing for any surface asking "what am I in".
 - Clean, well-surfaced overlaps: sell orders belong to the Market ledger (where they live), not
   Construction; the History ledger carries no market section.

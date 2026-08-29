@@ -165,7 +165,7 @@ buyable field to read the wider table.
    acquisition names this, design BL-658). The ledger warns on hover; whether a zero-priced firm
    should be listed as *Purchasable* at all, or in a third state, is a design question this surface
    raises rather than settles.
-4. **Should the fold-out absorb the Corporations table** (rail slot 9, Diplomacy's provisional
+4. **Should the fold-out absorb the Corporations table** (rail slot 8, Diplomacy's provisional
    occupant)? Both are one-row-per-corporation comparisons over financial figures, and BL-627's own
    design named this as its open question. They differ today in axis — Reach/Capital/Share and a
    stance press there, operations and price here — but that may be one table.

@@ -1,7 +1,7 @@
 # Construction — design Q&A
 
 > **Working design doc** for the ledger-mockup pass (Power BI). Strawman answers — Ben revises.
-> Menu slot: `rail slot 6 "Construction"` · Source: `src/ui/construction_panel.cpp` · Mock table(s): `buildings.csv`
+> Menu slot: `rail slot 3 "Construction"` · Source: `src/ui/construction_panel.cpp` · Mock table(s): `buildings.csv`
 > Host: shell fold-out column, ~380px @1720 (derived — `shell_column_width(disp.x)`, 380–460 by resolution).
 
 ## 1. Top question — the one thing this answers at first glance
@@ -38,7 +38,7 @@ The panel arms no lens on open; the mapping above is the proposal.
 **Maps to mock `buildings.csv`:** `type`, `output`, `active`, `exhausted`, `corp` / `body` — enough to mock a built-inventory roster (filter to player corp = 30310 Genom Systems). The CSV rows are the *built* estate, not a queue; it carries no `workforce_target` / `recipe` / `decommissioned` / `maintenance` column and no progress or ticks-left, so neither the live queue nor a Buildings roster can be reproduced from it without extending the exporter. There is no per-tile margin or output export for an `opportunity` / `production` mock either.
 
 ## 5. Close / toggle semantics
-Rail slot 6 icon toggles the whole Construction ledger open/closed. With a single view the toggle is the icon alone; once a second tab exists, re-clicking the **currently-active tab closes the ledger entirely** (releases the column), per the universal toggle rule — not "collapse to Construction". Switching to a *different* tab just changes view. In-row selectors (recipe, workforce) are exempt. Opening Construction closes whichever other ledger held the column (accordion, `close_all_panels`); the Selection band is independent of the column and stays where it is.
+Rail slot 3 icon toggles the whole Construction ledger open/closed. With a single view the toggle is the icon alone; once a second tab exists, re-clicking the **currently-active tab closes the ledger entirely** (releases the column), per the universal toggle rule — not "collapse to Construction". Switching to a *different* tab just changes view. In-row selectors (recipe, workforce) are exempt. Opening Construction closes whichever other ledger held the column (accordion, `close_all_panels`); the Selection band is independent of the column and stays where it is.
 
 ## Open questions for Ben
 - **Does a Buildings roster earn a tab?** Configuration lives per building on the Selection card. Is an all-buildings roster (sortable, with the same controls inline) a broad overview that earns a second view here, or does it duplicate the card and belong nowhere?

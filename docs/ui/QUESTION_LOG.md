@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**50 surfaces** — 4 settled, 46 awaiting Ben's wording.
+**49 surfaces** — 4 settled, 45 awaiting Ben's wording.
 
 ---
 
@@ -164,14 +164,6 @@ alphabetical order.
 
 *Demanded by BL-407 · `src/ui/decision_feed.cpp` · id `decision_feed`*
 
-### Economy panel (Corps / Holdings / Markets)
-
-**Answers:** How do the corporations, their holdings and the markets compare against each other?
-
-**Because:** The cross-corp comparison view. Ben ruled 2026-08-09 that it earns a nav-rail door rather than retirement (BL-292), so it must now justify the slot it occupies.
-
-*Demanded by BL-063, BL-117, BL-292 · `src/ui/economy_panel.cpp` · id `economy_panel`*
-
 ### Entity summary
 
 **Answers:** What is this entity, in one line?
@@ -280,7 +272,7 @@ alphabetical order.
 
 **Answers:** What can I open from here?
 
-**Because:** Every ledger and panel needs exactly one discoverable door. BL-292 is the standing proof of the cost when a surface lacks one: the Economy panel was drawn every frame and reachable by nobody.
+**Because:** Every ledger and panel needs exactly one discoverable door, and the rail is where that door is. A surface with no slot is drawn every frame and reachable by nobody; a slot with no surface teaches a system the game does not have.
 
 *Demanded by BL-022, BL-027, BL-028 · `src/ui/nav_pane.cpp` · id `nav_pane`*
 

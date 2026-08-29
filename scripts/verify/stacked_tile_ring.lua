@@ -25,7 +25,6 @@
 verify.window(1280, 720)
 verify.goto_surface("home")
 verify.econ_step(4)
-verify.show_panel("economy", false)
 
 -- Placement is cash-gated and this check is about the RENDER, not about whether the
 -- player could afford four buildings on day four.

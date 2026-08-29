@@ -12,7 +12,6 @@
 -- Ascend to the Solar canvas, close the ledger, and zoom onto the inner system (Helios/Cinder).
 verify.command("ascend")
 verify.command("ascend")
-verify.show_panel("economy", false)
 verify.command("zoom_in")
 verify.command("zoom_in")
 verify.command("zoom_in")
@@ -29,5 +28,4 @@ verify.capture("proximity_glimpse_before")
 -- faint known_stale tier -- lit without a route of its own.
 verify.seed_convoy("home", "asteroid", "iron_ore", 20, 0.98)
 verify.econ_step(1)
-verify.show_panel("economy", false)
 verify.capture("proximity_glimpse_after")

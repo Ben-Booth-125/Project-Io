@@ -308,7 +308,6 @@ struct ui_state
     // Policy: all ledgers start closed. The player opens them deliberately from
     // the navigation pane; none are shown on a fresh session.
     bool show_tile_ledger = false; ///< Whether the Tile Ledger window is open. Toggled by the nav pane tab and the window's close button.
-    bool show_economy_panel = false; ///< Whether the Layer 3 economy panel is open. Toggled by the nav pane tab and the window's close button.
     bool show_construction_panel = false; ///< Whether the Layer 4 construction / building-management panel is open. Toggled by the nav pane tab and the window's close button.
     bool show_build_ledger = false;       ///< Whether the tile-contextual construction ledger is open (BL-162). Opened by the tile Selection element's "Construct Buildings" button; reads selected_entity as the target tile. Not a nav-rail ledger — closed by close_all_panels and by selecting a new entity. The Selection element itself lives in the bottom band (BL-213), not the fold-out column.
     bool show_market_ledger = false; ///< Whether the Market Ledger is open.
@@ -734,10 +733,10 @@ struct ui_state
     /// Whether the all-corporations balance table is open (corporation_panel.cpp).
     ///
     /// PROVISIONAL HOME. This table used to occupy nav slot 1, and was deleted by
-    /// BL-248 as a duplicate of the Economy panel's Corps view. Ben restored it
+    /// BL-248 as a duplicate of a second aggregate view. Ben restored it
     /// (NEEDS_REVIEW NR-012, 2026-08-01) — the deletion was not intended — and parked
-    /// it on slot 8 (Diplomacy) so it is reachable and can be compared against the
-    /// Corps view before its real home is chosen. Slot 8 is otherwise unbuilt, so
+    /// it on slot 8 (Diplomacy) so it is reachable while its real home is chosen.
+    /// Slot 8 is otherwise unbuilt, so
     /// nothing is displaced; when Diplomacy is actually designed this occupant moves.
     bool show_corporations_table = false;
 
@@ -752,8 +751,6 @@ struct ui_state
     // button-strip views (ui::nav_button_strip); this is the selected view per panel,
     // persisted so a panel reopens where the player left it. See the Construction
     // panel's construction.panel_view for the template.
-    int  economy_view = 0; ///< Economy panel: 0=Corps, 1=Holdings, 2=Markets (BL-117).
-
     /// Market Ledger: 0=Prices, 1=Sell Orders (BL-159 — sell-order management
     /// relocated here from the Construction/Building panel), 2=Convoys (BL-453 —
     /// the player's cargo in flight, with its ticks-to-arrival; drawn on three

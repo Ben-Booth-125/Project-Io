@@ -41,9 +41,6 @@ verify.window(1280, 720)
 -- Tick first, so the world is a running one rather than the generation instant.
 verify.econ_step(6)
 
--- econ_step opens the economy panel and the fold-out column holds ONE occupant, so
--- close it before opening the corporations ledger.
-verify.show_panel("economy", false)
 verify.show_panel("corporations_table", true)
 verify.frames(2)
 

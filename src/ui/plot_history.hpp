@@ -38,6 +38,15 @@ inline void push_capped(std::vector<std::uint64_t>& series, std::uint64_t v)
         series.erase(series.begin());
 }
 
+/// Player economy trend data handed to a ledger for graph rendering.
+/// All series are oldest→newest, capped at plot_history_cap ticks.
+struct player_plot_history
+{
+    const std::vector<float>& balance;      ///< Running balance after each tick.
+    const std::vector<float>& income;       ///< Market sales income each tick.
+    const std::vector<float>& expenditure;  ///< Auto-buys + wages + maintenance each tick.
+};
+
 /// Per-resource price / supply / demand time series for one market.
 struct resource_plot_series
 {
