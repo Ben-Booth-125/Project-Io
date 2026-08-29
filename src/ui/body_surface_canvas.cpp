@@ -4584,7 +4584,24 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     state.selected_company             = structure_hit;
                     state.selected_corporation_dossier = null_entity;
                     close_all_panels(state);
-                    state.show_company_ledger = true;
+                    // THE COMPANY LENS'S DESTINATION, since BL-675. The
+                    // placeholder this replaces was BL-666's, and it was always
+                    // meant to be replaced: a corporation press asks "how is this
+                    // rival doing", a company press asks "can I buy this". So a
+                    // background firm lands on the Acquisitions ledger.
+                    //
+                    // The firm is carried across as the ledger's FOCUS, never a
+                    // filter. The buyable field is one to three firms on the
+                    // shipped spawn (measured, acquisition_viability § C), and
+                    // filtering it to one would answer a question nobody asked.
+                    // A clicked firm may well not be in the field at all — most
+                    // background firms are `closed` and cannot be priced — so the
+                    // highlight can go unmatched, and the ledger says on its own
+                    // face how many of the world's firms file. An unmatched
+                    // highlight is the honest outcome; inventing a row for an
+                    // unpriceable firm would be worse.
+                    state.acquisitions_focus_corp  = structure_hit;
+                    state.show_acquisitions_ledger = true;
                 }
             }
             else

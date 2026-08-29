@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*150 entries — 29 gameplay · 25 canvas · 15 lens · 48 ledger · 33 chrome.*
+*155 entries — 29 gameplay · 25 canvas · 15 lens · 53 ledger · 33 chrome.*
 
 ---
 
@@ -556,9 +556,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The strongest act against a settlement: passive decline only shrinks (scale floors at 1), and razing knocks it to the razed tier. An occupier razes to null the centre's economy without deleting the province's capture anchor — rare by design, because occupying is almost always worth more than ash, and the ruin re-settles cheaply if conditions return.
 
-### `gameplay.buy_corporation` — Seam-only for now (BL-628, whole-firm acquisition): a corp_verb issued against the corp-command seam (ProjectIo --serve, COMMAND opcode). The press that will host it is the Profitability ledger's buyout control (BL-627, profitability ledger) — the only surface that reads another corporation's filed return, and therefore the only one that can show the price before it is paid.
+### `gameplay.buy_corporation` — The Acquisitions ledger (nav rail slot 5, and the Company lens's click destination): the Buy press on a PURCHASABLE row. The two groups are the whole affordance — Purchasable rows carry the press, Possible rows show the price and carry none, because a price you cannot meet is something to save toward rather than something refused. Also still a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger. NOTE FOR A PLANNER: the field is SMALL and that is generated, not a bug — measured over twelve seeds of the shipped spawn (tools/verify/acquisition_viability.cpp section C), 88 corporations yield only 1 to 3 buyable firms, mean 1.6, because ownership class is overwhelmingly closed and a non-public firm cannot be priced at all.
 
-**Press.** Over the seam: COMMAND corp=<id> verb=28 counterparty=<target corp id>. No other field is read.
+**Press.** Open the Acquisitions ledger (nav rail slot 5, or click a background firm's holdings under the Company lens) and press 'Buy' on a row in the Purchasable group. Over the seam: COMMAND corp=<id> verb=28 counterparty=<target corp id>. No other field is read.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -1135,6 +1135,70 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 ## Ledgers & panels — opening and steering the information surfaces
 
+### `ledger.nav_acquisitions` — Nav rail, slot 5 (Acquisitions icon - two outlined squares with an arrow driven from the small one into the large one)
+
+**Press.** Click the paired-squares glyph in the left icon rail, above the Market Ledger
+
+**Valid when:**
+- In-game
+
+**Expected output.** Toggles the Acquisitions ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows the player's balance, the size of the buyable field ('N of M firms file and can be priced'), and two collapsing groups over that field: Purchasable (priced at or below the balance, each row carrying a Buy press) and Possible (priced, beyond the balance today, no press). Beneath them sits the Profitability fold-out's door.
+
+**Reason to select.** The only surface that prices another corporation, and therefore the only place a whole-firm buyout can be planned rather than merely issued. Expect a SHORT list: measured over twelve seeds, one to three firms are buyable out of eighty-eight, because ownership class is generated and most firms are closed. A short list here is the world, not a failure to load.
+
+### `ledger.acquisitions_buy` — Acquisitions ledger, a Purchasable row's 'Buy' press
+
+**Press.** Click 'Buy' on a row in the Purchasable group
+
+**Valid when:**
+- The Acquisitions ledger is open
+- The row is in the PURCHASABLE group - i.e. its price is at or below the player corporation's balance. A Possible row carries no press at all, rather than a disabled one
+
+**Expected output.** Enqueues gameplay.buy_corporation against that firm onto the deferred command queue, drained on the next frame through the same apply_corp_command seam an agent's COMMAND uses - so the press and the wire are one code path. On success the firm is DISSOLVED and its holdings, stock, cash and filed returns transfer; the field line and both groups redraw one firm shorter. See gameplay.buy_corporation for the price formula and the full transfer/cancel/drop disposition.
+
+**Reason to select.** Take a whole competitor in one step at a price read off a record it published itself. WATCH THE ZERO PRICE: because the price's cash term is signed, a deeply indebted firm's negative balance cancels its book value and the floor hands it over for nothing - and the dissolution rule then moves that debt to you at face value. Five of twelve measured seeds priced their one buyable firm at exactly 0 for this reason. The row says so on hover; a free firm is not a cheap firm.
+
+### `ledger.acquisitions_group` — Acquisitions ledger, the 'Purchasable' and 'Possible' group headers
+
+**Press.** Click a group header to collapse it; click again to expand
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `group` | `enum` | 'Purchasable' (priced within the balance, carries the Buy presses) or 'Possible' (priced, beyond the balance today, no press) |
+
+**Valid when:**
+- The Acquisitions ledger is open
+
+**Expected output.** Collapses or expands that group. Both are EXPANDED at rest, against the usual instinct, because the whole field averages under two rows - a collapsed group would hide the entire answer. Each header carries its own row count, so an empty group reads as '(0)' rather than as a surface that failed to populate.
+
+**Reason to select.** Purely a reading convenience; it changes nothing about the world. There is rarely enough content here to need it.
+
+### `ledger.acquisitions_profitability` — Acquisitions ledger, the 'Profitability' row's full-canvas control
+
+**Press.** Click the chevron in the Profitability row's right-hand gutter
+
+**Valid when:**
+- The Acquisitions ledger is open
+
+**Expected output.** Opens a full-canvas takeover over the canvas region (the nav rail, header, clock, comms dock and Selection band all survive it, and the Acquisitions column stays visible beside it) holding ONE ROW PER CORPORATION with seven columns: Firm, Type, End resource, Input resource, Profit/qtr, Price, Ownership. Exact figures where the firm files and a DASH where it does not, with no bands anywhere - a dash always means 'this firm does not file', never 'you have not earned this'. Closed by the return control top-left, or by Esc.
+
+**Reason to select.** The widest financial read in the game and the one an acquisition should be planned from: it is where a firm that prices below what it is worth becomes visible. Note the shape of the data before reading it - roughly 85 of 88 firms per seed file a return in world state that they do NOT disclose, so most rows carry a name, an ownership class and five dashes. Sorting by Ownership brings the readable firms to the top and is the fastest way through it.
+
+### `ledger.acquisitions_profitability_sort` — Acquisitions ledger, Profitability fold-out, the table's column headers
+
+**Press.** Click a column header to sort ascending; click again to reverse
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `column` | `enum` | 'Firm', 'Type', 'End resource', 'Input resource', 'Profit/qtr', 'Price' or 'Ownership' |
+
+**Valid when:**
+- The Profitability fold-out is open
+
+**Expected output.** Re-sorts every row. An UNDISCLOSED cell sorts as ABSENT rather than as zero, in either direction - a dash is not a small number, and letting dashes sort among the real values would make the ordering lie. Ties keep the resting order, which is ascending corporation id (the same sorted walk apply_budget files returns in), so the sort is deterministic rather than an unordered map's layout. The choice survives closing and reopening the fold-out.
+
+**Reason to select.** Sort by Price to find the cheapest firm, by Profit/qtr to find the one whose filed return understates it, or by Ownership to collapse the ~85 undisclosed rows out of the way in one press.
+
 ### `ledger.budget_tax_tier` — Balance Ledger (Budget), 'Taxes' tier control
 
 **Press.** Click '-' / '+' to step, or a Roman numeral I-V to set, the tax tier
@@ -1281,7 +1345,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Moves from 'production is down' to 'THIS building is the one dragging it' - the subject-level answer a decision needs.
 
-### `ledger.corps_table_row_select` — All-corporations balance table (nav slot 8)
+### `ledger.corps_table_row_select` — All-corporations balance table (nav slot 9)
 
 **Press.** Click a corporation's row
 
@@ -1296,9 +1360,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The table gives one number per rival; selecting a row is how to ask 'tell me more about this one'.
 
-### `ledger.nav_generation` — Nav rail, slot 10 (plate/continent glyph)
+### `ledger.nav_generation` — Nav rail, slot 11 (plate/continent glyph)
 
-**Press.** Click the plate glyph at the bottom of the left icon rail
+**Press.** Click the plate glyph in the developer tail of the left icon rail
 
 **Valid when:**
 - In-game
@@ -1454,7 +1518,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Answers 'am I making or losing money, and which flow or building is responsible?' - feeds every spend/expand/cut decision.
 
-### `ledger.nav_construction` — Nav rail, slot 6 (Construction icon)
+### `ledger.nav_construction` — Nav rail, slot 7 (Construction icon)
 
 **Press.** Click the industry/factory glyph on the left icon rail
 
@@ -1476,7 +1540,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Answers 'how is my corporation doing overall, and where is the weak card?' - the top-level health check that decides which subsystem to drill into next.
 
-### `ledger.nav_corporations_table` — Nav rail, slot 8 (Diplomacy icon - provisionally hosts the corporations table)
+### `ledger.nav_corporations_table` — Nav rail, slot 9 (Diplomacy icon - provisionally hosts the corporations table)
 
 **Press.** Click the diplomacy glyph on the left icon rail
 
@@ -1498,7 +1562,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Answers 'what is the whole economy doing?' in one surface - balances, labour, stock on hand and market state side by side, rather than one body or one corporation at a time.
 
-### `ledger.nav_history` — Nav rail, slot 9 (History icon)
+### `ledger.nav_history` — Nav rail, slot 10 (History icon)
 
 **Press.** Click the history glyph on the left icon rail
 
@@ -1509,7 +1573,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Answers 'why is this world the way it is?' - the body's biography and the generation chain behind it; feeds site-selection and understanding of deposit placement.
 
-### `ledger.nav_market` — Nav rail, slot 5 (Market Ledger icon)
+### `ledger.nav_market` — Nav rail, slot 6 (Market Ledger icon)
 
 **Press.** Click the market glyph on the left icon rail
 
@@ -1671,9 +1735,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The pager hid the LIST of questions the surface can answer behind a press, so a player had to already know a reading existed to go and find it. An accordion shows all five and opens the one you ask for. The order is the other half (Ben, 2026-08-24): it runs from what the player can act on to what the ground merely is, where the pager ran the other way and put the least actionable reading in the default slot.
 
-### `ledger.decision_feed_open` — Navigation rail slot 11, "AI decisions"
+### `ledger.decision_feed_open` — Navigation rail slot 12, "AI decisions"
 
-**Press.** Click nav rail slot 11 to open the AI decision feed; click it again to close
+**Press.** Click nav rail slot 12 to open the AI decision feed; click it again to close
 
 **Valid when:**
 - In game (not the menu or the generation screen)
@@ -1712,9 +1776,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** To ask a specific question of the run rather than scroll it. 'Every solvency-defence idle' and 'every build' are different questions, and the reason code is what separates them.
 
-### `ledger.strategy_readout_open` — Navigation rail slot 12, "Strategy readout"
+### `ledger.strategy_readout_open` — Navigation rail slot 13, "Strategy readout"
 
-**Press.** Click nav rail slot 12 to open the Strategy readout; click it again to close
+**Press.** Click nav rail slot 13 to open the Strategy readout; click it again to close
 
 **Valid when:**
 - In game (not the menu or the generation screen)
@@ -1738,7 +1802,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The comparison answers 'who is winning the run and how'; the single-corp profile answers 'what is this corp's strategy made of'. Two different questions over the same window.
 
-### `ledger.nav_contracts` — Nav rail, slot 13 (Contracts icon — a page with a signed check mark)
+### `ledger.nav_contracts` — Nav rail, slot 14 (Contracts icon — a page with a signed check mark)
 
 **Press.** Click the contract glyph on the left icon rail
 

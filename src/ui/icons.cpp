@@ -1045,6 +1045,45 @@ void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddCircle({ centre.x + off, centre.y }, cr, colour, 0, 1.5f);
 }
 
+void acquisition(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Two OUTLINED squares of different sizes with a short arrow running from
+    // the small one into the large one: "a firm absorbed whole". The pair is
+    // the silhouette — nothing else in the rail draws two boxes — and the
+    // outline (not a fill) is what keeps it clear of `corporation`'s solid
+    // seal at rail radius. The arrow gives the pair a direction: a buyout has
+    // a buyer and a target, and a symmetric pair would read as a merger, which
+    // this model does not have.
+    // THE ARROW MUST END INSIDE THE LARGE SQUARE, not at its edge. The first
+    // draft put the two boxes 0.08r apart and landed the head exactly on the
+    // acquirer's outline; at rail radius the head was swallowed by that stroke
+    // and the glyph read as two boxes touching — one blob, and close enough to
+    // slot 1's solid seal to be the very collision BL-174 forbids. Caught by
+    // looking at the capture, not by any check. The squares are pushed apart and
+    // the head is driven THROUGH the acquirer's right edge, so "absorbed" is
+    // carried by the picture rather than by the caption.
+    const float big  = r * 0.58f;   // half-extent of the acquirer
+    const float smal = r * 0.30f;   // half-extent of the target
+    const ImVec2 bc{ centre.x - r * 0.45f, centre.y };
+    const ImVec2 sc{ centre.x + r * 0.72f, centre.y };
+
+    dl->AddRect({ bc.x - big,  bc.y - big  }, { bc.x + big,  bc.y + big  }, colour,
+                0.0f, 0, 1.5f);
+    dl->AddRect({ sc.x - smal, sc.y - smal }, { sc.x + smal, sc.y + smal }, colour,
+                0.0f, 0, 1.5f);
+
+    // Shaft: the target's left edge to a point INSIDE the acquirer, crossing its
+    // outline on the way.
+    const float x_from = sc.x - smal;
+    const float x_to   = bc.x + big - r * 0.30f;
+    dl->AddLine({ x_from, centre.y }, { x_to, centre.y }, colour, 1.5f);
+    const float head = r * 0.26f;
+    const ImVec2 arrow[3] = { { x_to,        centre.y },
+                              { x_to + head, centre.y - head * 0.80f },
+                              { x_to + head, centre.y + head * 0.80f } };
+    dl->AddConvexPolyFilled(arrow, 3, colour);
+}
+
 void contract(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // A page with the top-right corner cut off for a dog-ear fold, plus a

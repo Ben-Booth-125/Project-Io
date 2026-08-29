@@ -236,8 +236,19 @@ end
 
 if company_col ~= nil then
     local company_dest = press(company_col, company_row)
-    verify.expect(company_dest.open_panel == "company",
-                  "a company press opens the company surface, not the corporations table")
+    -- The expected destination MOVED, and this assertion is updated rather than
+    -- relaxed. BL-666 routed a company press to a placeholder that said on its
+    -- face it was a stand-in for the ledger batch to design; BL-675 designed it,
+    -- and a background firm now lands on the Acquisitions ledger — "can I buy
+    -- this" being the question a player actually has about one.
+    --
+    -- Still asserted against a NAMED surface, not against "anything but the
+    -- corporations table". The original point of the check was that a company
+    -- and a corporation reach DIFFERENT destinations (the 2026-08-28
+    -- terminology split), and a negative assertion would pass on any wrong
+    -- surface at all, including the placeholder this replaces.
+    verify.expect(company_dest.open_panel == "acquisitions",
+                  "a company press opens the Acquisitions ledger, not the corporations table")
     verify.capture("one_tier_company_destination")
 else
     verify.log_buildings()

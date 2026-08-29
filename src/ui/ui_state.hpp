@@ -346,6 +346,60 @@ struct ui_state
     entity_id selected_corporation_dossier = null_entity;
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
 
+    // ── The Acquisitions ledger ───────────────────────────────────────────
+    //
+    // Nav-rail slot 5, inserted ABOVE Market (Ben, 2026-08-29), which pushes
+    // every slot from Market down by one. Two doors reach the same surface:
+    // this rail slot, and the Company lens's click destination (a background
+    // firm's holdings resolve through to the firm, and the firm's question is
+    // "can I buy it").
+    //
+    // MEASURED BEFORE IT WAS LAID OUT, and the number is the reason it looks
+    // the way it does. Over a TWELVE-seed sweep of the shipped spawn
+    // (`tools/verify/acquisition_viability.cpp` § C), 88 corporations per seed
+    // yield a BUYABLE FIELD of one to three firms — mean 1.6, with seven of the
+    // twelve at exactly one. Not because firms fail to file (public-but-unfiled
+    // was zero on every seed) but because ownership class is overwhelmingly
+    // `closed`: a mean of 84.8 per seed. On eight of twelve seeds one of the two
+    // groups is EMPTY. So this surface is small by construction, and it is
+    // deliberately NOT padded to look busier.
+    /// Whether the Acquisitions ledger is open. Toggled by nav-rail slot 5 and
+    /// opened by a Company-lens click.
+    bool show_acquisitions_ledger = false;
+
+    /// Which of the two groups are expanded. Both open at rest: with a mean of
+    /// two rows in the whole field, a collapsed group hides the entire answer.
+    bool acquisitions_purchasable_open = true;
+    bool acquisitions_possible_open    = true;
+
+    /// The corporation a Company-lens click aimed at, or `null_entity`. The
+    /// ledger highlights its row so the click lands somewhere visible rather
+    /// than merely opening a list. Never a filter — the field is two rows long
+    /// and filtering it to one would answer a question nobody asked.
+    entity_id acquisitions_focus_corp = null_entity;
+
+    /// Where the FIRST Purchasable row's Buy button actually is, in screen
+    /// pixels, published by the ledger each frame it draws one; `x < 0` means
+    /// there is none. `acquisitions_buy_corp` names the firm that button buys.
+    ///
+    /// PUBLISHED RATHER THAN RE-DERIVED, for the same reason
+    /// `planetary_center_screen` is: the ledger is the only honest source for
+    /// "the screen point that is this press". A verify script computing it from
+    /// `shell_column_width` plus a guessed line count would be asserting against
+    /// its own arithmetic, and would silently start clicking empty column the
+    /// first time a line of prose was added above the table. VIEW state, not
+    /// serialised, rewritten every frame.
+    float     acquisitions_buy_x    = -1.0f;
+    float     acquisitions_buy_y    = -1.0f;
+    entity_id acquisitions_buy_corp = null_entity;
+
+    /// The profitability fold-out's sort: column index, and direction. VIEW
+    /// state, not serialised. -1 is "unsorted" — filed order, which is the
+    /// sorted-`entity_id` walk `apply_budget` itself writes in, so the resting
+    /// order is deterministic rather than an unordered map's layout.
+    int  acquisitions_sort_column    = -1;
+    bool acquisitions_sort_ascending = true;
+
     /// Whether the Contracts ledger is open (BL-576). Nav-rail slot 13 —
     /// the curated nine and the developer/observability tail (slots 1-12,
     /// MENU.md) were already full when this landed, so Contracts is a new

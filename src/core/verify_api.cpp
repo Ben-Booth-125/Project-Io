@@ -908,7 +908,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             else if (m_ui.show_construction_panel) panel = "construction";
             else if (m_ui.show_tile_ledger)        panel = "tile";
             else if (m_ui.show_contracts_ledger)   panel = "contracts";
-            else if (m_ui.show_company_ledger)     panel = "company";
+            else if (m_ui.show_company_ledger)      panel = "company";
+            else if (m_ui.show_acquisitions_ledger) panel = "acquisitions";
             out["open_panel"] = std::string(panel);
         }
         // Which section of the tile Selection element's top nav is showing, so a
@@ -1004,6 +1005,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "decisions")    m_ui.show_decision_feed = open; // AI decision feed (BL-407)
         else if (name == "strategy")     m_ui.show_strategy_readout = open; // Strategy readout (BL-411)
         else if (name == "contracts")    m_ui.show_contracts_ledger = open; // Contracts ledger (BL-576)
+        else if (name == "acquisitions") m_ui.show_acquisitions_ledger = open; // Acquisitions ledger, nav slot 5
         // Nav slot 8's all-corporations table. It had no name here, so the one
         // rail slot whose panel a script could not open was also the only one
         // with no capture — green-but-blind by omission rather than by design.
@@ -1200,6 +1202,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (n == "history_chain")    s = detail_surface::history_chain;
         else if (n == "generation_stage") s = detail_surface::generation_stage;
         else if (n == "corp_rollup")      s = detail_surface::corp_rollup;
+        else if (n == "acquisitions_profit") s = detail_surface::acquisitions_profit;
         if (s == detail_surface::none) ui::fold(m_ui);
         else                           ui::expand(m_ui, s, key.value_or(0));
     });
@@ -1595,6 +1598,93 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         o.offer_escrow     = t.get_or("escrow", o.fee);
         m_world.mercenary_offers.push_back(o);
         return o.id;
+    });
+
+    // The Acquisitions ledger's buyable field, as the LEDGER COMPUTES IT.
+    //
+    // Why a reader rather than pixel assertions: `expect_no_clipping` is vacuous
+    // on this class of surface (NR-663 — table cells and `SmallButton` labels are
+    // not instrumented, so it reported zero records over frames carrying six
+    // visibly clipped strings), and a capture cannot say whether an unfiled firm
+    // was excluded or merely scrolled past. So the script asserts the SET, and
+    // looks at the capture for the layout.
+    //
+    // Every gate here mirrors `apply_corp_command`'s own, in its order, and the
+    // price comes from `corp_acquisition_price` — the same construction the
+    // ledger uses, so the two cannot report different fields. Read-only: it
+    // mutates nothing and exists only behind `--verify`.
+    //
+    // `firms`/`public_filed` come back on every row so a script can assert the
+    // EXCLUSION (no unfiled firm listed) without needing a second call.
+    v.set_function("acquisitions_field", [this]() {
+        sol::table out = m_lua.state().create_table();
+
+        float balance = 0.0f;
+        if (const auto pit = m_world.corporations.find(m_world.player_entity);
+            pit != m_world.corporations.end())
+            balance = pit->second.balance;
+
+        std::vector<entity_id> ids;
+        ids.reserve(m_world.corporations.size());
+        for (const auto& kv : m_world.corporations)
+            ids.push_back(kv.first);
+        std::sort(ids.begin(), ids.end());
+
+        const float k = m_registry.acquisition().multiple;
+        int corps = 0, public_held = 0, public_filed = 0, listed = 0;
+
+        sol::table rows = m_lua.state().create_table();
+        for (const entity_id id : ids)
+        {
+            const corporation_component& cc = m_world.corporations.at(id);
+            ++corps;
+            if (id == m_world.player_entity || cc.is_player)
+                continue;
+            if (cc.ownership_class != ownership_class::publicly_held)
+                continue;
+            ++public_held;
+            if (cc.returns.empty())
+                continue;   // never filed — cannot be priced, so never listed
+            ++public_filed;
+            const float price = corp_acquisition_price(cc, k);
+            if (!std::isfinite(price))
+                continue;
+
+            sol::table row = m_lua.state().create_table();
+            row["corp"]  = static_cast<unsigned int>(id);
+            row["name"]  = cc.name;
+            row["price"] = price;
+            row["filed"] = static_cast<int>(cc.returns.size());
+            // The group the ledger puts this row in — the seam's own solvency
+            // test, not a restatement of it.
+            row["group"] = std::string(balance >= price ? "purchasable" : "possible");
+            rows[++listed] = row;
+        }
+
+        out["balance"]      = balance;
+        out["corps"]        = corps;
+        out["public_held"]  = public_held;
+        out["public_filed"] = public_filed;
+        out["listed"]       = listed;
+        out["rows"]         = rows;
+        return out;
+    });
+
+    // Where the Acquisitions ledger's first Buy button IS, so a script can
+    // click the REAL control instead of a computed guess. Same reasoning as
+    // `tile_screen`: the surface that drew the thing is the only honest source
+    // for where it landed, and a script re-deriving it from the column width
+    // would be asserting against its own arithmetic. `ok` is false when the
+    // ledger is closed or the Purchasable group is empty — which, on a measured
+    // mean of 1.0 purchasable firms, is a real outcome and not an error.
+    v.set_function("acquisitions_buy_button", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        out["ok"]   = (m_ui.acquisitions_buy_x >= 0.0f);
+        out["x"]    = m_ui.acquisitions_buy_x;
+        out["y"]    = m_ui.acquisitions_buy_y;
+        out["corp"] = static_cast<unsigned int>(m_ui.acquisitions_buy_corp);
+        return out;
     });
 
     // BL-576: read every open mercenary offer — the id/client/target/fee/escrow

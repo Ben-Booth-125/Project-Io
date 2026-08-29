@@ -14,8 +14,9 @@
 #include "ui/charts.hpp"
 #include "ui/circumplanetary_canvas.hpp"
 #include "ui/construction_panel.hpp"
+#include "ui/acquisitions_ledger.hpp" // nav slot 5, the Acquisitions ledger + its profitability fold-out
 #include "ui/company_ledger.hpp"   // Company-lens click destination, no rail slot (BL-666)
-#include "ui/contracts_ledger.hpp" // nav slot 13, the mercenary Contracts ledger (BL-576)
+#include "ui/contracts_ledger.hpp" // nav slot 14, the mercenary Contracts ledger (BL-576)
 #include "ui/detail_level.hpp" // the drill-through fold idiom (BL-214)
 #include "ui/balance_ledger.hpp"
 #include "ui/corporation_dashboard.hpp" // nav slot 1, the four roll-ups (BL-248)
@@ -1963,7 +1964,14 @@ void app::render()
         ui::draw_balance_ledger(m_world, m_registry, m_last_econ_report, bhist,
                                 prior_rank, m_ui, m_ui.show_balance_ledger);
     }
-    // Contracts ledger (BL-576) — nav slot 13: offers, active contracts and
+    // Acquisitions ledger — nav slot 5, and the Company lens's click
+    // destination. Which firms can be bought outright and at what price, plus
+    // the full-canvas profitability fold-out over every corporation's filed
+    // return. Drawn before Contracts for no reason beyond reading order; every
+    // ledger here is guarded by its own open flag and at most one is set.
+    ui::draw_acquisitions_ledger(m_world, m_registry, m_ui,
+                                 m_ui.show_acquisitions_ledger);
+    // Contracts ledger (BL-576) — nav slot 14: offers, active contracts and
     // terminal history for the mercenary contract (CONTRACTS.md). Reads the
     // same m_contract_templates run_nation_step already threads through for
     // the tick-evaluation pass, so the Active view's predicate wording can

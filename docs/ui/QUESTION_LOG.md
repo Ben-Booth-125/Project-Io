@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**48 surfaces** — 4 settled, 44 awaiting Ben's wording.
+**50 surfaces** — 4 settled, 46 awaiting Ben's wording.
 
 ---
 
@@ -19,6 +19,22 @@ These were **drafted by an implementer for Ben to accept or rewrite**, not autho
 him. BL-260 is explicit that writing the pair *is* the design check — so each of these
 is an open question wearing a sentence, and they sit first rather than being buried in
 alphabetical order.
+
+### Acquisitions ledger - the Purchasable / Possible groups
+
+**Answers:** Which firms can I buy outright, and what do they cost?
+
+**Because:** FINANCE.md gives ownership a price and a verb, and until this surface existed neither was readable anywhere: buy_corporation could be issued by the scorer and by the wire, and by no press a player could find. It earns its space on the menus-are-broad-ledgers test - an overview across the whole field of firms, not a targeted action on one. The TWO groups are the load-bearing part and were kept after measurement rather than assumed: Purchasable carries the Buy press, Possible carries a price and deliberately NO press, and that contrast is the only way a player sees what the next rung costs. Measured before it was laid out (acquisition_viability.cpp section C, twelve seeds): the buyable field is one to three firms, mean 1.6, because ownership class is overwhelmingly closed - so the surface states the size of the field it is drawing rather than letting a one-row list read as a defect.
+
+*Demanded by BL-628, BL-658 · `src/ui/acquisitions_ledger.cpp`, `src/ui/nav_pane.cpp`, `src/ui/body_surface_canvas.cpp` · id `acquisitions_ledger_field`*
+
+### Acquisitions ledger - Profitability fold-out (full-canvas)
+
+**Answers:** How is the whole field of corporations actually doing?
+
+**Because:** BL-626 made every corporation file a quarterly return as world state, and BL-631 made ownership class decide who may read it - but neither put a single filed figure on screen where a player could compare firms. This is that surface: one row per corporation, sortable on every column, exact where the firm files and a dash where it does not, no bands (FINANCE.md section Disclosure; Ben 2026-08-26 retired the banded read). It earns a FULL-CANVAS takeover rather than a place in the column because of the measurement that also shrank the groups above it: 85.4 firms per seed file a return they do not disclose, so the table is ~88 rows over seven columns while the buyable field is ~1.6 rows. That inversion is the whole argument for the split - the column holds what you can act on, the takeover holds what you can read.
+
+*Demanded by BL-627 · `src/ui/acquisitions_ledger.cpp`, `src/ui/detail_level.hpp` · id `acquisitions_ledger_profitability`*
 
 ### Balance Ledger
 
