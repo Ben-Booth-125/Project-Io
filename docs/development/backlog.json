@@ -1,842 +1,899 @@
 {
- "_schema": "backlog/io-v2",
- "_note": [
-  "THIRD ARCHIVE PASS, 2026-08-26 (Sprint 20 closed, v0.1.21 cut): every terminal item moved to archive/backlog-complete-2026-08-26.json. What remains here is OPEN WORK ONLY.",
-  "TWO sprints open as of 2026-08-27: Sprint 21 (demand), wave 0 landed; and Sprint 22 (UI visibility), wave 0 landed. Sprint 21's remaining items plus Sprint 20's nine slipped ones are what is left; three of the nine are design-owed on Ben. Sprint 23 is named for new UI elements but not yet authored.",
-  "Canonical backlog for Project Io - the authoritative METADATA index of every open item.",
-  "One item = one object in `items`.",
-  "STATUS (authoritative; JSON wins over any prose/glyph disagreement):",
-  "  designed    (glyph ✓) - design settled, promote-ready.",
-  "  design-owed (glyph ~) - design still owed; must be settled before promotion.",
-  "PRIORITY (ascending): F C B A S SSS."
- ],
- "items": [
-  {
-   "id": "BL-595",
-   "short_name": "NATION_STARTING_TREASURY",
-   "title": "Generation credits every nation's starting treasury before garrison sizing and contract-offer funding read it",
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "B",
-   "difficulty": 3,
-   "version_goal": "post-v0.1.15",
-   "sprint": null,
-   "category": "Generation",
-   "written": "2026-08-24",
-   "author": "Ben",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "files": [
-    "src/world/hard_coded_world.cpp",
-    "src/world/nation_generation.cpp",
-    "docs/generation/NATION_GENERATION.md",
-    "docs/politics/NATIONS.md"
-   ],
-   "authority_doc": "docs/generation/NATION_GENERATION.md",
-   "design": "Ruled 2026-08-24 (NR-580): a generation-time levy/tariff pass credits every nation's `nation_component::treasury` before `seed_nation_garrisons` (BL-571) and before any contract-offer derivation (BL-572) can run — the same conservation-checked transfer `apply_budget`'s levy already uses, fired once at world creation off whatever each nation's own resource/territory profile earns that first quarter. No new authored number; a rich nation starts richer because its profile already says so. Design settled in `docs/generation/NATION_GENERATION.md` § Pass 7 and `docs/politics/NATIONS.md` § 2 — read those before implementing. Not yet built: every garrison and offer in a freshly generated world still lands on its funding floor today."
-  },
-  {
-   "id": "BL-619",
-   "short_name": "RESEARCH_SYSTEM",
-   "title": "Develop the research system from the RESEARCH.md stub: RP accrual, the tech graph, unlock economy",
-   "status": "open",
-   "glyph": "·",
-   "priority": "C",
-   "difficulty": 3,
-   "version_goal": "v0.1.19",
-   "sprint": "19",
-   "category": "Economy",
-   "written": "2026-08-25",
-   "author": "Ben",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "files": [
-    "docs/economy/RESEARCH.md",
-    "scripts/tech_tree.lua"
-   ],
-   "authority_doc": "docs/economy/RESEARCH.md",
-   "design": "Filed 2026-08-25 with the stub authority doc (Ben: 'write a stub authority doc for RESEARCH.md now... it helps to have the concept in writing'). Settled: universities (City+) produce RP; RP purchases unlocks; three live consumption touchpoints exist (era-gate Rocketry per BL-087, the unlock_recipe tech arm per BL-588, province-ceiling relief per BL-513). Open and owned here: the RP economy (rates; per-corp vs per-nation; tradeability), whether scripts/tech_tree.lua's ~150 inert nodes become the graph, and nation-budget funding. A design session of its own before any build."
-  },
-  {
-   "id": "BL-622",
-   "short_name": "DENSITY_RETUNES",
-   "title": "Re-derive the density-coupled tunables against the 6.0 tiles/centre world",
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "B",
-   "difficulty": 3,
-   "version_goal": "post-v0.1.19",
-   "sprint": null,
-   "category": "Economy",
-   "written": "2026-08-25",
-   "author": "Ben",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "files": [
-    "scripts/economy.lua",
-    "src/world/economy_system.cpp",
-    "src/world/market_clearing.cpp"
-   ],
-   "authority_doc": "docs/economy/POPULATION.md",
-   "design": "Ruled 2026-08-25 (Ben, Sprint 19 verdict form): keep 6.0 land tiles per centre; the retunes wait for the next (surfacing) sprint. The measured list from NR-630/NR-635, each a re-derivation against the live world, not a redesign: population_demand's demand_scale; workforce labour units per scale (1/3/10/30/100); the market carve's population anchoring; logistics node discounts (most tiles now near a centre); haulage_measure re-run for the price-band ceiling (its re-derive rule names map/scale changes). Measure first, then move constants - never clamp outcomes."
-  },
-  {
-   "status": "design-owed",
-   "glyph": "~",
-   "priority": "A",
-   "difficulty": 4,
-   "version_goal": "v0.1.20",
-   "sprint": "20",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [
-    "BL-626",
-    "BL-631"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-627",
-   "short_name": "PROFITABILITY_LEDGER",
-   "category": "UI",
-   "title": "The profitability ledger - the whole field's filed returns, one row per corporation",
-   "authority_doc": "docs/ui/question_log.json",
-   "files": [
-    "src/ui/",
-    "docs/ui/question_log.json",
-    "docs/ui/ledgers/"
-   ],
-   "design": "The surface for BL-626 (quarterly return) and the host of the buyout press. DESIGN-OWED BY CONSTRUCTION, not by omission: its question_log.json pair - the question it answers, why it earns its space, the item that demanded it - is required on every surface and its wording is Ben's. What is already settled: a table, one row per corporation, refreshed each quarter; exact figures where the firm files and a dash where it does not (FINANCE.md § Disclosure); no bands anywhere. Open: which rail slot it takes, and whether it absorbs the financial half of the slot-8 Corporations table (docs/ui/ledgers/corporation.md carries that as its own open question)."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "B",
-   "difficulty": 3,
-   "version_goal": "v0.1.20",
-   "sprint": null,
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [
-    "BL-628"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-629",
-   "short_name": "RIVAL_ACQUISITION",
-   "category": "AI",
-   "title": "Rivals buy firms too - buy_corporation joins the scored-utility candidate list",
-   "authority_doc": "docs/ai/AI_OPPONENT.md",
-   "files": [
-    "src/world/corp_ai.cpp",
-    "src/world/corp_ai.hpp",
-    "docs/ai/AI_OPPONENT.md",
-    ".claude/rules/io-standing-rules.md"
-   ],
-   "design": "The symmetry half of BL-628 (whole-firm buyout), and a widening of the BL-202/BL-203 exception in its established shape: deterministic, seeded, scored-utility, a legal verb and never a planner. THE WORK: score buy_corporation in corp_ai.cpp's existing candidate list, capped at one acquisition per evaluation, its price carried in the candidate's spend under the solvency gate so a rival cannot buy itself below its reserve floor. Availability is gated on the target's ownership class, not on the acquirer's cash - the 'never on cash' ruling's shape. Record the grant in the standing rules with its date, as every prior widening is recorded. SAVING UP IS NOT PLANNING, and this item owns the distinction: Ben's Sprint 20 goal wants a corp to accumulate cash toward an acquisition, but a scorer that defers a cheap build today in order to afford a firm tomorrow is edging toward the planner the standing rules forbid. The honest route needs no new machinery - accumulation is EMERGENT when the buy candidate outscores the marginal build, since a tick with no affordable positive candidate simply banks its cash. Whether that actually happens at the authored weights is a measurement, and BL-634 (acquisition viability) is where it is taken."
-  },
-  {
-   "status": "design-owed",
-   "glyph": "~",
-   "priority": "C",
-   "difficulty": 2,
-   "version_goal": "v0.1.20",
-   "sprint": "20",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [
-    "BL-630"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-632",
-   "short_name": "WARM_START_PROGRESS",
-   "category": "UI",
-   "title": "The loading screen's second phase - what the warm start shows while it runs",
-   "authority_doc": "docs/ui/STARTUP.md",
-   "files": [
-    "src/core/app.cpp",
-    "src/ui/startup_screens.cpp",
-    "docs/ui/STARTUP.md"
-   ],
-   "design": "Falls out of BL-630 (spawn shortlist): the warm start moves onto the loading screen as a second phase after the carve, and eighty econ ticks is long enough that it needs a surface. DESIGN-OWED - what it shows is Ben's call. The obvious candidates are the carve's own idiom (a ledger column of corps with their running net) or a plain progress read. Note the publish-contract limit the carve already documents: the tap is atomics-only, so a corporation's generated NAME cannot cross it."
-  },
-  {
-   "status": "design-owed",
-   "glyph": "~",
-   "priority": "A",
-   "difficulty": 2,
-   "version_goal": "v0.1.20",
-   "sprint": "20",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [],
-   "blocked_on": "Container cannot approve the OS-level computer-use dialog (NR-622)",
-   "parked": false,
-   "id": "BL-636",
-   "short_name": "LIVE_CLICK_DEBT",
-   "category": "UI",
-   "title": "Three sprints of owed live clicks - dispatch form and Throughput lens container access",
-   "authority_doc": "docs/development/DELIVERY.md",
-   "files": [
-    "docs/development/DELIVERY.md",
-    "docs/development/NEEDS_REVIEW.json"
-   ],
-   "design": "Carried from Sprint 18 and named in NEXT_SESSION.md as owed in Sprint 20's definition of done. Two visual requirements were marked complete on a scripted capture alone, which the 2026-08-19 rule says is not sufficient: a capture proves a surface renders, not that a press on it is reachable. The dispatch form and the Throughput lens both owe a live click. BLOCKED, and the blocker is environmental rather than a design gap - NR-622 records that the container cannot approve the OS-level computer-use dialog, which is why this has slipped three sprints rather than one. DESIGN-OWED on the route out: either Ben clicks them himself in one pass, or the session gets a path to drive the live app that does not need that dialog. Filing it as an item so it has an owner instead of living only in a handoff note.\n\nSPRINT 23 ADDS ONE, and it is blocked differently from the rest (folded in from NR-706, 2026-08-28, on Ben's instruction to close that entry - the concern stays relevant, so it lives here rather than in the transient queue).\n\nBL-666's COMPANY destination has never been live-clicked. Not for want of access: the corporation half WAS clicked in the built app the same session. The blocker is the WORLD - a freshly generated campaign (seed 00000000, 20 settle years, 1960 Q1) carried no background firm holding any tile on the home body, so the Company lens tinted nothing across a fully zoomed-out view and there was nothing to press. The route is asserted green in lens_one_tier against a world that does have one.\n\nSo this row needs a world or a save with a background firm on the home body, not a permission dialog. Worth measuring while there: count background firms and their holdings at year 20 against year 100 - if they are genuinely absent early, the Company lens needs an EMPTY STATE, because a lens that tints nothing and says nothing is indistinguishable from a broken one."
-  },
-  {
-   "id": "BL-639",
-   "short_name": "CORP_PANEL_COLUMN_BUDGET",
-   "title": "The Corporations panel does not fit its column - names cut to one letter, Declare Hostile clipped",
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "A",
-   "difficulty": 2,
-   "version_goal": "v0.1.20",
-   "sprint": "20",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "category": "UI",
-   "authority_doc": "docs/ui/LAYOUT.md",
-   "files": [
-    "src/ui/corporation_panel.cpp",
-    "docs/ui/ledgers/corporation.md"
-   ],
-   "design": "OBSERVED LIVE, 2026-08-26 (BL-633's capture), and pre-existing - BL-633 changed no width and no column count. Five columns carrying 62+62+62+220 px of fixed width do not fit the shell fold-out column (380-460 px by resolution) at 1280x720: the Corporation NAME column collapses to a single letter ('F', 'E', 'C') and the Stance column's 'Declare Hostile' button clips off the right edge as 'De...'. This is BL-449's shape exactly - the surface that shipped clean on a compile AND a 36/36 harness while being unusable - still live in the same panel. THE WORK: re-budget the columns against shell_column_width(disp.x) rather than fixed pixels, and decide whether the stance presses belong in-row at this width at all or behind the row's Selection drill. Note NR-663: expect_no_clipping did NOT catch this, because ImGui SmallButton labels are not instrumented into the overflow ledger - so this needs a real look, not a green row."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "A",
-   "difficulty": 4,
-   "version_goal": "v0.1.21",
-   "sprint": "21",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-642",
-   "short_name": "CONSTRUCTION_ACTUALLY_DRAWS",
-   "category": "Economy",
-   "title": "Construction draws materials - in the opening years, and as centres grow",
-   "authority_doc": "docs/economy/PRODUCTION.md",
-   "files": [
-    "src/world/corporation_generation.cpp",
-    "src/world/construction.cpp",
-    "src/world/population_dynamics.cpp",
-    "scripts/economy.lua",
-    "docs/economy/PRODUCTION.md"
-   ],
-   "design": "Ben, 2026-08-26: 'we need those first 20 years of generation to include construction'. MEASURED CONTEXT: materials are authored per building (resource_costs) and charged at the build press, but generation PLACES buildings rather than constructing them, so the draw never fires during the opening years - stone and timber have a construction sink on paper and no pull in practice. TWO HALVES, and the second is the one that lasts: (1) make the opening years actually build, so the warm start carries a real material pull; (2) make POPULATION CENTRES draw construction materials as they grow, which does not decay once the warm start ends. An ancient economy's largest material sink is building, and half (2) makes that structurally true rather than transiently."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "B",
-   "difficulty": 3,
-   "version_goal": "v0.1.21",
-   "sprint": "21",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-643",
-   "short_name": "NETWORK_UPKEEP_DRAWS",
-   "category": "Economy",
-   "title": "Roads, ports and hubs draw materials to stay standing",
-   "authority_doc": "docs/economy/LOGISTICS.md",
-   "files": [
-    "src/world/logistics.cpp",
-    "scripts/economy.lua",
-    "docs/economy/LOGISTICS.md"
-   ],
-   "design": "The infrastructure demand channel (MARKETS.md section Demand channels). The logistics_maintenance budget line already exists and names exactly this, so the state half has a home. THE WORK: a network that consumes stone and timber to stay standing - a permanent sink scaled by GEOGRAPHY rather than by population, which is a shape none of the other channels has. Second-order and wanted: it gives reach a running cost, so extending the network becomes a decision rather than a ratchet. OWED: this item writes its paragraph into LOGISTICS.md; the design register in MARKETS.md points at it."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "A",
-   "difficulty": 4,
-   "version_goal": "v0.1.21",
-   "sprint": "21",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-644",
-   "short_name": "SPACE_PROGRAMME_BUDGET_LINE",
-   "category": "Economy",
-   "title": "Government satellite launches - the tenth budget line, and space goods' first real buyer",
-   "authority_doc": "docs/politics/NATIONS.md",
-   "files": [
-    "src/world/nation_budget.hpp",
-    "src/world/nation_step.cpp",
-    "scripts/economy.lua",
-    "docs/politics/NATIONS.md"
-   ],
-   "design": "Ben, 2026-08-26: 'add endpoints for space goods in government issued satellite launches'. Design in NATIONS.md section A budget. THE MACHINERY EXISTS - nations hold a weighted budget over priority lines, run_national_budget has claim/transfer machinery, and strategic_reserve is already a goods-buying line that no consumer claims on. THE WORK: a tenth line, space_programme, buying spacecraft_components and propellant through the BL-350 procurement seam (never on the open market - that is strategic_reserve's own rule). APPEND-ONLY: the weight vector is indexed by the enum and serialised, so the line goes last. Why it is worth more than a sink: state demand arrives in LUMPS and follows a weight a rival can lobby to move, so it is worth playing politics over rather than merely scaling into. ALSO OWNS spacecraft_components (BL-648's measurement, 2026-08-26): the guard's red list came back with ELEVEN goods, not the ten expected, and the eleventh is this one. Its exemption claimed BL-350 procurement, but procurement is a resource-agnostic TRANSFER between two corps' pools - it moves goods without consuming them, and admitting it as an injector would substantiate the entire roster at once. src/world contains no militia, and corp_ai.cpp says outright that the scorer does not emit those verbs today, so nothing automatic buys it. This line is its first real buyer."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "B",
-   "difficulty": 3,
-   "version_goal": "v0.1.21",
-   "sprint": "21",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [
-    "BL-619"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-645",
-   "short_name": "RESEARCH_CONSUMES_GOODS",
-   "category": "Economy",
-   "title": "Research consumes goods, not only credits",
-   "authority_doc": "docs/economy/RESEARCH.md",
-   "files": [
-    "docs/economy/RESEARCH.md",
-    "scripts/economy.lua"
-   ],
-   "design": "Ben, 2026-08-26: 'perhaps we could make research consume alternate goods as well'. Design written into RESEARCH.md. It gives the TOP of the production chain a buyer and turns the tech ladder into an economic decision rather than a free accumulator only time gates. Two properties: the basket is era-banded like every other, and a shortfall SLOWS research rather than voiding it (the same shape every goods draw takes). BLOCKED BY DESIGN on BL-619 (research system), which is a session with Ben - the rates, and whether the draw sits on the university or on the nation's budget lines, belong to that session rather than being settled ahead of it."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "B",
-   "difficulty": 3,
-   "version_goal": "v0.1.21",
-   "sprint": "21",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-646",
-   "short_name": "BATTLES_BURN_ORDNANCE",
-   "category": "Military",
-   "title": "A battle consumes what it fires - conflict as a demand shock",
-   "authority_doc": "docs/military/MILITARY.md",
-   "files": [
-    "src/world/battle_system.cpp",
-    "scripts/economy.lua",
-    "docs/military/MILITARY.md"
-   ],
-   "design": "The conflict demand channel (MARKETS.md section Demand channels). MEASURED: ordnance is priced at 43.00, near the top of the ancient roster, and its only draw is a per-head upkeep rate that BL-635's rescale took to 0.0035 - effectively nil. So the roster's most valuable military good has no buyer. THE WORK: a battle draws ordnance in proportion to what it commits, against the owner's pool, deterministically. WHY IT IS THE MOST INTERESTING OF THE EIGHT: it is the only channel that couples the game's two pillars - it makes Conflict move Trade, so a war somewhere else is a price signal here. OWED: this item writes its paragraph into MILITARY.md."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "A",
-   "difficulty": 4,
-   "version_goal": "v0.1.21",
-   "sprint": "21",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-647",
-   "short_name": "ENDEMIC_LUXURY_DEMAND",
-   "category": "Economy",
-   "title": "Tobacco, spices, coffee and furs get the buyer they were authored for",
-   "authority_doc": "docs/economy/RESOURCES.md",
-   "files": [
-    "scripts/economy.lua",
-    "src/world/market_clearing.cpp",
-    "docs/economy/RESOURCES.md"
-   ],
-   "design": "MEASURED: four endemic goods are on the roster, extractable, priced - and wanted by nothing at all, in any band. They pass the orphan check by naming 'mercantile demand', which BL-648 shows does not exist. THE WORK: a household demand that scales with WEALTH rather than headcount, flavoured by NATIONAL CHARACTER so different nations crave different luxuries. That asymmetry is the design, not a detail: it makes the trade route directional by construction - extract where it grows, sell where the money is - which is the most Trade-shaped channel of the eight and the one that most directly serves the pillar. Note it is also the first demand whose SIZE is a function of prosperity, so it rewards a player who has made somewhere rich."
-  },
-  {
-   "id": "BL-650",
-   "short_name": "DISSOLUTION_COMPLETENESS",
-   "category": "Economy",
-   "title": "Finish the dissolution walk - ground follows the firm, and hoist the duplicated HQ rule",
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "B",
-   "difficulty": 2,
-   "version_goal": "v0.1.20",
-   "sprint": "20",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [
-    "BL-628"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "authority_doc": "docs/economy/FINANCE.md",
-   "files": [
-    "src/world/corp_command.cpp",
-    "src/world/corporation_generation.cpp",
-    "tools/verify/whole_firm_buyout.cpp",
-    "docs/economy/FINANCE.md"
-   ],
-   "design": "Two loose ends the wave-2 review barrier found in BL-628, neither a defect today. (1) world::province_holder takes a CORP id via battle_system.cpp's field_held_by, and dissolve_into's inventory does not carry it. Entity ids are monotonic with no recycling, so a stale holder is inert rather than aliasing - but R4's wording is 'no dangling reference survives', and ground is PROPERTY, so it TRANSFERS. Now written into FINANCE.md's three-way rule, which also gained a fourth outcome, KEEP, for the historical record - history is not property and is never rewritten, which is the one place a reference to the erased corp survives on purpose. Extend the harness fixture to hold a province, since it currently never constructs one. (2) recompute_hq in corp_command.cpp DUPLICATES designate_hq/corp_home_body from corporation_generation.cpp, including kProjectedReachUnits = 2.5f - unavoidable at authoring because another slice owned that file in the same wave. Both have landed; the review verified them line-for-line identical. Hoist to a shared seam so they cannot drift."
-  },
-  {
-   "id": "BL-651",
-   "short_name": "CHARTER_REACH_ON_THE_SEAM",
-   "category": "Generation",
-   "title": "charter_reach is computed at generation and silently zeroed on load",
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "B",
-   "difficulty": 2,
-   "version_goal": "v0.1.20",
-   "sprint": "20",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [
-    "BL-638"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
-   "files": [
-    "src/core/save_game.cpp",
-    "src/world/settlement.hpp",
-    "docs/generation/CORPORATION_GENERATION.md"
-   ],
-   "design": "Found by the wave-2 review barrier. BL-638 added settlement_state::charter (a charter_reach), and w_settlement/r_settlement do not carry it. The omission is SYMMETRIC so the stream stays consistent and no version bump is owed - it is not a corruption bug. It is a LATENT one: the field is silently zeroed on load, which is benign only while the sole readers are generate_corporations and its harness, both of which run before any save exists. It becomes wrong the moment BL-627 (profitability ledger), BL-629 (rival acquisition) or the generation ledger reads charter off a LOADED world - and it will read as 'this world has no charter' rather than as an error. TWO HONEST ROUTES, pick one and say why: serialise it (a version bump, claimed through next_save_version.js), or RECOMPUTE it on load from the ladder it is derived from, which costs no format change and cannot drift from its source. The second is probably right, since charter_reach is a pure function of already-serialised state."
-  },
-  {
-   "id": "BL-652",
-   "short_name": "INJECTORS_MUST_NOT_SKIP_SILENTLY",
-   "category": "Economy",
-   "title": "A demand injector that cannot price a basket entry must SAY SO, not skip it",
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "A",
-   "difficulty": 2,
-   "version_goal": "v0.1.21",
-   "sprint": "21",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "authority_doc": "docs/economy/MARKETS.md",
-   "files": [
-    "src/world/market_clearing.cpp",
-    "tools/verify/",
-    "docs/economy/MARKETS.md"
-   ],
-   "design": "THE MECHANISM THAT MADE TWO SEPARATE BUGS INVISIBLE ON THE SAME DAY, which is why it is an item rather than a note. inject_population_demand and inject_background_demand both SKIP a basket entry whose resource carries no market base price - silently, with no warning and no row anywhere. Consequences observed 2026-08-26: (1) BL-649's census read as having no background demand at all on its first run, and (2) tools/verify/spawn_solvency.cpp - whose own header says it loads world_gen.lua and did not - measured BL-635's entire spawn diagnosis in a world where background demand did not exist. Neither failed. Both just quietly answered a question about a different world. THE WORK: an injector that cannot price a basket entry must report it - a named diagnostic on the first occurrence, and a harness row that FAILS on a basket naming an unpriced good, since that combination is always either a missing script or an authoring error and is never intended. A basket entry is a STATEMENT that somebody wants the good; silently dropping it turns a design statement into a no-op. Cheap, and it protects every measurement the rest of Sprint 21 depends on."
-  },
-  {
-   "id": "BL-653",
-   "short_name": "RETURN_EIGHTH_FIELD",
-   "category": "Economy",
-   "title": "The eighth field - a return sees the whole quarter, not just the money loop",
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "A",
-   "difficulty": 4,
-   "version_goal": "v0.1.21",
-   "sprint": "20",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [
-    "BL-626"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "authority_doc": "docs/economy/FINANCE.md",
-   "files": [
-    "src/world/budget_system.cpp",
-    "src/world/components.hpp",
-    "src/core/app.cpp",
-    "src/world/world_save.cpp",
-    "src/world/corp_command.cpp",
-    "tools/verify/",
-    "docs/economy/FINANCE.md"
-   ],
-   "design": "Ben's ruling, 2026-08-26, on NR-655/NR-668 - option A of the three-way fork, and the measurement that forced it: a firm earning through mercenary contracts files a trailing_net IDENTICAL to a firm that earns nothing there, so BL-628's buyout undervalues it by exactly 640 credits (k 8.0 x the 80/quarter the record cannot see). Design in FINANCE.md section The eighth field. THE WORK: add `other` to quarterly_return = the whole-tick balance delta minus the money-loop net, and MOVE THE FILING from the end of apply_budget to after the tick's last balance mover - which is the part that needs care, since apply_budget does not own the tick and the headless harnesses call it directly. Then re-point corp_trailing_net at the mean of (net + other) so the buyout prices off the whole quarter. THREE PROPERTIES TO ASSERT: the seven flows still explain `net` unchanged; net+other telescopes EXACTLY over a run (the retain property extended from one function to the whole tick); and BL-628's own harness row that currently PINS the 640-credit blindness must be re-specified to pin the closure instead - do not delete it, invert it. `other` is deliberately NOT itemised: split into named lines it becomes a second budget breakdown competing with corp_budget, and the reason there is one accounting authority is that two of them disagree. Versions the save format."
-  },
-  {
-   "id": "BL-654",
-   "short_name": "A_CHANNEL_MUST_BID",
-   "category": "Economy",
-   "title": "A short pool buys on the market, up to a reservation ceiling",
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "A",
-   "difficulty": 4,
-   "version_goal": "v0.1.21",
-   "sprint": "21",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [
-    "BL-641"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "authority_doc": "docs/economy/MARKETS.md",
-   "files": [
-    "src/world/economy_system.cpp",
-    "src/world/market_clearing.cpp",
-    "docs/economy/MARKETS.md",
-    "docs/economy/FINANCE.md"
-   ],
-   "design": "THE BLOCKER UNDER BL-641, AND PROBABLY UNDER FOUR MORE CHANNELS. Measured 2026-08-26: with building upkeep rates on, operating firms went 227 -> 19, because the goods drawn are produced 0.0 in band and a POOL DRAW never reaches market_component::demand - so the want never becomes a price, no rival scores the building that would supply it, and the sink starves itself. run_construction and run_processing already bid; run_unit_upkeep does not and carries the same latent defect. DESIGN-OWED, and the open question is Ben's because it widens FINANCE.md: should a goods draw place real demand on the market when the pool is short - and if so, does it BUY (spending credits, which makes upkeep a market participant) or merely SIGNAL (raising price without a transaction, which is cheaper but invents demand nobody pays for)? The first is coherent and expensive; the second is a thumb on the scale and should probably be refused on the same grounds the project refuses clamps. Until this is settled, BL-641's rates stay at 0.0 and every remaining channel (BL-643 infrastructure, BL-644 state, BL-645 research, BL-646 conflict) should be checked against property 3 before it is built, not after. SETTLED (Ben, 2026-08-26): 'Buy on the market, but at a threshold, buying is not allowed. This goes hand in hand with maximum and minimum prices for goods.' And ONE RULE FOR EVERY GOODS DRAW - unit upkeep takes the same shape, not a second one. Written into MARKETS.md section Settled: a short pool BUYS, up to a reservation ceiling. THE WORK: a short pool bids the shortfall into market_component::demand and pays for what it gets; above the ceiling it does not bid at all and the existing shortfall rule weakens the building (or unit) instead. The ceiling is authored in the PRICE BAND family beside floor_mult/ceil_mult, not in upkeep - it is a statement about what a good is worth paying, not about who is buying - and its value is MEASURED against the census and the operating-firm count, never guessed. It is the exact mirror of BL-386's seller-side floor_price: both sides may decline a trade, neither may dictate one. Turning BL-641's rates non-zero is gated on this landing."
-  },
-  {
-   "id": "BL-656",
-   "short_name": "PASS6_CAP_IS_THE_DESIGN",
-   "category": "Generation",
-   "title": "Decide what actually shapes background density - the ratio, or the per-resource cap",
-   "status": "design-owed",
-   "glyph": "~",
-   "priority": "B",
-   "difficulty": 2,
-   "version_goal": "post-v0.1.21",
-   "sprint": null,
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [
-    "BL-655"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
-   "files": [
-    "src/world/corporation_generation.cpp",
-    "docs/generation/CORPORATION_GENERATION.md"
-   ],
-   "design": "Raised by BL-655's measurement and by its novelty flag. Pass 6 is documented as stopping on a 0.90 production/demand ratio, described as 'an emergent measurement rather than an injected clearing constant' and 'a stop condition, not a firm-count budget'. MEASURED: the ratio NEVER BINDS on the worlds we generate. `per_resource_firm_cap = 8` binds on every demanded resource, so the count is exactly specialists + 8 x basket breadth - which reproduced 104, 64 and 56 corps exactly across three configurations. Its own comment still says 'provisional - measure, then pin'. The doc has been corrected to describe what the code does; what is OPEN is which behaviour is wanted. THREE READINGS: (a) the cap is the real design and the ratio is dead weight - pin the cap deliberately, say density is breadth-driven, and delete the ratio; (b) the ratio is the real design and the cap is an emergency brake set too low - raise it until the ratio binds, which restores the 'calibrated, not authored' property the doc claims; (c) both, with the cap as a genuine guard against a pathological basket. Note the consequence either way: under (a) density becomes a function of how many DIFFERENT goods are wanted, so every demand channel Sprint 21 adds moves the world's size - which may be a feature."
-  },
-  {
-   "id": "BL-657",
-   "short_name": "A_FAILING_FIRM_FAILS",
-   "category": "Economy",
-   "title": "A firm underwater long enough exits - give interest the consequence it is supposed to have",
-   "status": "design-owed",
-   "glyph": "~",
-   "priority": "A",
-   "difficulty": 4,
-   "version_goal": "v0.1.21",
-   "sprint": "20",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [
-    "BL-628"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "authority_doc": "docs/economy/FINANCE.md",
-   "files": [
-    "src/world/economy_system.cpp",
-    "src/world/components.hpp",
-    "src/world/corp_command.cpp",
-    "scripts/economy.lua",
-    "tools/verify/",
-    "docs/economy/FINANCE.md"
-   ],
-   "design": "MEASURED 2026-08-26 from Ben's own observation of the live build. Of 12 seeds, 3 clear with ZERO interest; the 9 that fail all dipped negative once and interest is then 43-60% of their whole loss, against an operating gap of only -24 to -40 cr/qtr. 1.02^80 = 4.9x over the warm start. The rate is not the defect - components.hpp's 'no insolvency consequence' is. A firm that would have died in year three trades for twenty and is handed to the player as wreckage. THE WORK: a firm underwater for N consecutive quarters EXITS - dissolved, or absorbed via BL-628's dissolve_into, which already moves holdings, pools, balance and returns and cancels the promises nobody is left to keep. N and the trigger are authored in economy.lua and MEASURED, not picked. DESIGN-OWED on three questions that are Ben's: (1) dissolve or absorb - absorption by a solvent neighbour is richer and reuses the buyout path, dissolution is simpler and leaves ground free; (2) does this run IN PLAY as well as in the pre-game, i.e. can the player's own corp fail - NR-670 already ruled a rival may not BUY the player out, and this is a different question about the player failing on their own account; (3) what happens to the ground and the workforce - a dissolved firm's tiles should probably become available rather than stay held. EXPECTED CONSEQUENCE, and the reason this is priority A: the field at seat time becomes self-selected for viability, so BL-630's shortlist floor should start being met instead of falling through to its fallback on 23 of 24 seeds."
-  },
-  {
-   "id": "BL-658",
-   "short_name": "FREE_FIRM_TRAP",
-   "category": "Economy",
-   "title": "The solvency gate tests the price, not the position after the debt transfers",
-   "status": "designed",
-   "glyph": "✓",
-   "priority": "A",
-   "difficulty": 3,
-   "version_goal": "v0.1.21",
-   "sprint": "20",
-   "written": "2026-08-26",
-   "author": "Ben",
-   "requires": [
-    "BL-628"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "authority_doc": "docs/economy/FINANCE.md",
-   "files": [
-    "src/world/corp_command.cpp",
-    "tools/verify/acquisition_viability.cpp",
-    "docs/economy/FINANCE.md"
-   ],
-   "design": "MEASURED by BL-634, which found it by taking its own brief's gate literally. The acquisition price is max(0, book_value + k x trailing_net + balance) and the balance term is SIGNED, so a deeply indebted firm's negative cash cancels its book value, the sum goes below zero, and the floor hands it over FREE. On 5 of 8 seeds the cheapest buyable firm cost exactly 0 cr. The dissolution rule then transfers the debt at face value: one seed took on -13,358 cr for nothing, and 3 of 8 buyers that bought the cheapest firm were sunk by it. THE FLOOR IS NOT THE BUG - a worthless firm is worth nothing, and NR-648's reasoning stands. The bug is that the SOLVENCY GATE READS THE PRICE rather than the buyer's balance AFTER the transfer, which is the same shape as the non-finite-price bug BL-628 caught in its own code: a check applied to the wrong quantity. THE WORK: gate on the post-acquisition position, so a corp cannot be handed a liability it could never have chosen to take on. Then re-run acquisition_viability's --target cheapest sweep, where 'still earning after' should go 5/8 -> 8/8. Note the harness already measures BOTH gates and its --target flag exists for exactly this comparison."
-  },
-  {
-   "id": "BL-659",
-   "short_name": "deposit selects to market ledger",
-   "title": "Resource lens: a deposit is selectable, and routes to the Market ledger for that resource",
-   "status": "complete",
-   "priority": "medium",
-   "created": "2026-08-28",
-   "sprint": "22",
-   "touches": [
-    "docs/ui/LENSES.md",
-    "src/ui/body_surface_canvas.cpp",
-    "src/ui/market_ledger.cpp"
-   ],
-   "completed": "2026-08-28",
-   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
-   "archived": "docs/development/archive/backlog-design-2026-Q3.json",
-   "resolved": "2026-08-28"
-  },
-  {
-   "id": "BL-660",
-   "short_name": "tectonic hover and history route",
-   "title": "Continent lens: hover-select a plate, click through to its history (collision and drift)",
-   "status": "complete",
-   "priority": "medium",
-   "created": "2026-08-28",
-   "sprint": "22",
-   "touches": [
-    "docs/ui/LENSES.md",
-    "docs/generation/CONTINENTS.md",
-    "src/ui/body_surface_canvas.cpp",
-    "src/ui/tile_inspector.cpp"
-   ],
-   "completed": "2026-08-28",
-   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
-   "archived": "docs/development/archive/backlog-design-2026-Q3.json",
-   "resolved": "2026-08-28"
-  },
-  {
-   "id": "BL-661",
-   "short_name": "population regional heatmap",
-   "title": "Population lens: regional heatmap with harder scaling, not a per-tile mark",
-   "status": "open",
-   "priority": "medium",
-   "created": "2026-08-28",
-   "sprint": "22",
-   "touches": [
-    "docs/ui/LENSES.md",
-    "src/ui/body_surface_canvas.cpp"
-   ],
-   "design": "Ben, 2026-08-28: \"Population: Let's see what this looks like as a heatmap with more extreme scaling. This way we should be able to see population regionally, not just on each tile.\"\n\nToday the lens draws \"per-tile value marks, workforce efficiency\" (LENSES.md routing table) - a per-tile read, which is why a region of moderate population and a region of none look similar at whole-planet zoom. Two changes: a continuous heatmap fill rather than discrete marks, and a scaling curve steep enough that regional differences separate instead of compressing into the middle of the ramp.\n\nEXPLICITLY AN EXPERIMENT, in Ben's own framing - \"let's see what this looks like\". The deliverable is a capture to rule on, not a settled design; expect a second pass on the curve. Worth measuring the actual population distribution first so the curve is fitted to the data rather than guessed - the same discipline BL-649's census brought to demand."
-  },
-  {
-   "id": "BL-662",
-   "short_name": "scarcity takes the opportunity glyph",
-   "title": "Scarcity lens: drop the dead Opportunity code, reuse its glyph, render market scarcity per resource",
-   "status": "open",
-   "priority": "medium",
-   "created": "2026-08-28",
-   "sprint": "22",
-   "touches": [
-    "src/ui/icons.cpp",
-    "src/ui/icons.hpp",
-    "src/ui/overlay.cpp",
-    "docs/ui/LENSES.md",
-    "docs/ui/ICONS.md"
-   ],
-   "design": "Ben, 2026-08-28: \"I support changing opportunity to scarcity. Drop the old code, reuse the glyph, and render market scarcity per resource.\"\n\nREAD AS: the lens KEEPS the name Scarcity - the earlier idea of renaming it to Opportunity is dropped - while the retired Opportunity lens's leftovers are deleted and its GLYPH is reused for Scarcity. Recorded explicitly because the instruction can be read in both directions, and because the session had just flagged that Opportunity is a name BL-604 retired; if this reading is wrong it is a one-line revert.\n\nWHY A GLYPH MATTERS HERE: Scarcity is keyboard-cycle only, which is why Ben listed it among the lenses needing glyphs. icons::opportunity survives in src/ui/icons.{hpp,cpp} with no caller since BL-604, so the mark exists and is unused - reusing it costs nothing and lets Scarcity earn a strip slot, since LENSES.md's rule is that an on-screen lens carries one distinct glyph.\n\nAlso dead and worth removing in the same sweep, though Ben named only Opportunity: icons::country (BL-601) and icons::production (BL-604), neither of which has a caller.\n\nThe behaviour half - \"render market scarcity per resource\" - may already hold: the lens draws \"per-market shortfall blocks + key\" keyed to the selected resource, and the 2026-08-28 sweep captured scarcity_lens_full_iron and _steel. Confirm before changing anything; the glyph may be the whole of the real work."
-  },
-  {
-   "id": "BL-663",
-   "short_name": "lens glyph roster",
-   "title": "Give every strip-eligible lens a distinct glyph (Company; Supply, Supply-routes, Reach deferred)",
-   "status": "open",
-   "priority": "low",
-   "created": "2026-08-28",
-   "sprint": "22",
-   "touches": [
-    "src/ui/icons.cpp",
-    "src/ui/icons.hpp",
-    "src/ui/overlay.cpp",
-    "docs/ui/ICONS.md",
-    "docs/ui/LENSES.md"
-   ],
-   "design": "Ben, 2026-08-28: \"It looks like we need to add glyphs for scarcity, supply, supply-routes, and reach.\"\n\nSCOPE NARROWED BY BEN THE SAME DAY: \"I don't think we need body-to-body lenses yet. Keep the code but ignore for this session.\" Supply, Supply-routes and Reach are all body-to-body, so their glyphs are deferred with them - the code stays, the work waits. Scarcity is covered by BL-662 (it inherits the Opportunity mark).\n\nWHAT REMAINS LIVE HERE IS THE COMPANY LENS, added 2026-08-28. It borrows icons::corporation while keyboard-only, on the precedent Reach and Supply-routes set. It cannot join the on-screen strip until it has its own mark, because Corp would be its immediate neighbour and LENSES.md forbids two strip neighbours sharing a glyph. A company is a background firm, so the mark wants to read as smaller/plural against the corporation's single solid form.\n\nThree glyphs are dead and free to cannibalise: icons::country, icons::opportunity (claimed by BL-662), icons::production."
-  },
-  {
-   "id": "BL-664",
-   "short_name": "one tier under a lens",
-   "title": "A lens collapses selection to one tier: markers stop outranking, and a lens with no answer goes inert",
-   "status": "complete",
-   "priority": "high",
-   "created": "2026-08-28",
-   "sprint": "23",
-   "touches": [
-    "docs/ui/SELECTION.md",
-    "docs/ui/LENSES.md",
-    "docs/ui/TOOLTIP.md",
-    "src/ui/body_surface_canvas.cpp",
-    "src/ui/hover_content.cpp"
-   ],
-   "completed": "2026-08-28",
-   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
-   "archived": "docs/development/archive/backlog-design-2026-Q3.json",
-   "resolved": "2026-08-28"
-  },
-  {
-   "id": "BL-665",
-   "short_name": "corp and company tile groups",
-   "title": "Corporation and Company lenses resolve to an owner's tile group, hovered whole",
-   "status": "complete",
-   "priority": "high",
-   "created": "2026-08-28",
-   "sprint": "23",
-   "touches": [
-    "docs/ui/LENSES.md",
-    "docs/ui/SELECTION.md",
-    "src/ui/body_surface_canvas.cpp"
-   ],
-   "completed": "2026-08-28",
-   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
-   "archived": "docs/development/archive/backlog-design-2026-Q3.json",
-   "resolved": "2026-08-28"
-  },
-  {
-   "id": "BL-666",
-   "short_name": "owner ledger destinations",
-   "title": "A corporation and a company each need their own ledger destination; the company one does not exist",
-   "status": "complete",
-   "priority": "medium",
-   "created": "2026-08-28",
-   "sprint": "23",
-   "touches": [
-    "docs/ui/SELECTION.md",
-    "docs/ui/LENSES.md",
-    "docs/ui/ledgers/README.md",
-    "src/ui/body_surface_canvas.cpp",
-    "src/ui/ui_state.hpp"
-   ],
-   "completed": "2026-08-28",
-   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
-   "archived": "docs/development/archive/backlog-design-2026-Q3.json",
-   "resolved": "2026-08-28"
-  },
-  {
-   "id": "BL-667",
-   "short_name": "one hover mark under a lens",
-   "title": "Under a lens only the lens's structure lights on hover - not the tile and its province too",
-   "status": "complete",
-   "priority": "medium",
-   "created": "2026-08-28",
-   "completed": "2026-08-28",
-   "sprint": "23",
-   "touches": [
-    "docs/ui/SELECTION.md",
-    "src/ui/body_surface_canvas.cpp"
-   ],
-   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
-   "archived": "docs/development/archive/backlog-design-2026-Q3.json",
-   "resolved": "2026-08-28"
-  },
-  {
-   "id": "BL-668",
-   "short_name": "workforce heatmap",
-   "title": "The Population lens becomes a heatmap instead of a field of per-tile dots",
-   "status": "complete",
-   "priority": "medium",
-   "created": "2026-08-28",
-   "completed": "2026-08-28",
-   "sprint": "23",
-   "touches": [
-    "docs/ui/LENSES.md",
-    "src/ui/body_surface_canvas.cpp"
-   ],
-   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
-   "archived": "docs/development/archive/backlog-design-2026-Q3.json",
-   "resolved": "2026-08-28"
-  },
-  {
-   "id": "BL-669",
-   "short_name": "throughput ramp",
-   "title": "The Throughput field normalises against the 90th percentile, not the maximum",
-   "status": "complete",
-   "priority": "medium",
-   "created": "2026-08-28",
-   "completed": "2026-08-28",
-   "sprint": "23",
-   "touches": [
-    "docs/ui/LENSES.md",
-    "src/ui/body_surface_canvas.cpp",
-    "src/ui/ui_state.hpp",
-    "tools/verify/throughput_field_census.cpp"
-   ],
-   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
-   "archived": "docs/development/archive/backlog-design-2026-Q3.json",
-   "resolved": "2026-08-28"
-  },
-  {
-   "id": "BL-670",
-   "short_name": "rung-keyed lens strip",
-   "title": "The lens strip shows the lenses that draw at the current rung, instead of a hand-kept six",
-   "status": "complete",
-   "priority": "medium",
-   "created": "2026-08-28",
-   "completed": "2026-08-28",
-   "sprint": "23",
-   "touches": [
-    "docs/ui/LENSES.md",
-    "src/ui/overlay.cpp"
-   ],
-   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
-   "archived": "docs/development/archive/backlog-design-2026-Q3.json",
-   "resolved": "2026-08-28"
-  },
-  {
-   "id": "BL-671",
-   "short_name": "the two region cards",
-   "title": "A deposit and a plate each get Selection-band content, instead of leaving the previous card up",
-   "status": "complete",
-   "priority": "high",
-   "created": "2026-08-28",
-   "completed": "2026-08-28",
-   "sprint": "23",
-   "touches": [
-    "docs/ui/SELECTION.md",
-    "src/ui/selection_panel.cpp",
-    "src/ui/selection_card.cpp",
-    "src/ui/ui_state.hpp",
-    "src/ui/body_surface_canvas.cpp"
-   ],
-   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
-   "archived": "docs/development/archive/backlog-design-2026-Q3.json",
-   "resolved": "2026-08-28"
-  },
-  {
-   "id": "BL-672",
-   "short_name": "the deposit probe query",
-   "title": "A verify script can ask where a good is deposited - one tile, no other tile data",
-   "status": "complete",
-   "priority": "medium",
-   "created": "2026-08-28",
-   "completed": "2026-08-28",
-   "sprint": "23",
-   "touches": [
-    "src/core/verify_api.cpp",
-    "scripts/verify/lens_region_destinations.lua",
-    ".claude/rules/io-standing-rules.md"
-   ],
-   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
-   "archived": "docs/development/archive/backlog-design-2026-Q3.json",
-   "resolved": "2026-08-28"
-  },
-  {
-   "id": "BL-673",
-   "short_name": "per-lens hover cards",
-   "title": "Each structure lens gets its own hover card, describing what the click will select",
-   "status": "complete",
-   "priority": "medium",
-   "written": "2026-08-28",
-   "resolved": "2026-08-28",
-   "sprint": "23",
-   "touches": [
-    "docs/ui/TOOLTIP.md",
-    "src/ui/hover_content.cpp"
-   ],
-   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
-   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
-  }
- ]
+  "_schema": "backlog/io-v2",
+  "_note": [
+    "THIRD ARCHIVE PASS, 2026-08-26 (Sprint 20 closed, v0.1.21 cut): every terminal item moved to archive/backlog-complete-2026-08-26.json. What remains here is OPEN WORK ONLY.",
+    "TWO sprints open as of 2026-08-27: Sprint 21 (demand), wave 0 landed; and Sprint 22 (UI visibility), wave 0 landed. Sprint 21's remaining items plus Sprint 20's nine slipped ones are what is left; three of the nine are design-owed on Ben. Sprint 23 is named for new UI elements but not yet authored.",
+    "Canonical backlog for Project Io - the authoritative METADATA index of every open item.",
+    "One item = one object in `items`.",
+    "STATUS (authoritative; JSON wins over any prose/glyph disagreement):",
+    "  designed    (glyph ✓) - design settled, promote-ready.",
+    "  design-owed (glyph ~) - design still owed; must be settled before promotion.",
+    "PRIORITY (ascending): F C B A S SSS."
+  ],
+  "items": [
+    {
+      "id": "BL-595",
+      "short_name": "NATION_STARTING_TREASURY",
+      "title": "Generation credits every nation's starting treasury before garrison sizing and contract-offer funding read it",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "version_goal": "post-v0.1.15",
+      "sprint": null,
+      "category": "Generation",
+      "written": "2026-08-24",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "files": [
+        "src/world/hard_coded_world.cpp",
+        "src/world/nation_generation.cpp",
+        "docs/generation/NATION_GENERATION.md",
+        "docs/politics/NATIONS.md"
+      ],
+      "authority_doc": "docs/generation/NATION_GENERATION.md",
+      "design": "Ruled 2026-08-24 (NR-580): a generation-time levy/tariff pass credits every nation's `nation_component::treasury` before `seed_nation_garrisons` (BL-571) and before any contract-offer derivation (BL-572) can run — the same conservation-checked transfer `apply_budget`'s levy already uses, fired once at world creation off whatever each nation's own resource/territory profile earns that first quarter. No new authored number; a rich nation starts richer because its profile already says so. Design settled in `docs/generation/NATION_GENERATION.md` § Pass 7 and `docs/politics/NATIONS.md` § 2 — read those before implementing. Not yet built: every garrison and offer in a freshly generated world still lands on its funding floor today."
+    },
+    {
+      "id": "BL-619",
+      "short_name": "RESEARCH_SYSTEM",
+      "title": "Develop the research system from the RESEARCH.md stub: RP accrual, the tech graph, unlock economy",
+      "status": "open",
+      "glyph": "·",
+      "priority": "C",
+      "difficulty": 3,
+      "version_goal": "v0.1.19",
+      "sprint": "19",
+      "category": "Economy",
+      "written": "2026-08-25",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "files": [
+        "docs/economy/RESEARCH.md",
+        "scripts/tech_tree.lua"
+      ],
+      "authority_doc": "docs/economy/RESEARCH.md",
+      "design": "Filed 2026-08-25 with the stub authority doc (Ben: 'write a stub authority doc for RESEARCH.md now... it helps to have the concept in writing'). Settled: universities (City+) produce RP; RP purchases unlocks; three live consumption touchpoints exist (era-gate Rocketry per BL-087, the unlock_recipe tech arm per BL-588, province-ceiling relief per BL-513). Open and owned here: the RP economy (rates; per-corp vs per-nation; tradeability), whether scripts/tech_tree.lua's ~150 inert nodes become the graph, and nation-budget funding. A design session of its own before any build."
+    },
+    {
+      "id": "BL-622",
+      "short_name": "DENSITY_RETUNES",
+      "title": "Re-derive the density-coupled tunables against the 6.0 tiles/centre world",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "version_goal": "post-v0.1.19",
+      "sprint": null,
+      "category": "Economy",
+      "written": "2026-08-25",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "files": [
+        "scripts/economy.lua",
+        "src/world/economy_system.cpp",
+        "src/world/market_clearing.cpp"
+      ],
+      "authority_doc": "docs/economy/POPULATION.md",
+      "design": "Ruled 2026-08-25 (Ben, Sprint 19 verdict form): keep 6.0 land tiles per centre; the retunes wait for the next (surfacing) sprint. The measured list from NR-630/NR-635, each a re-derivation against the live world, not a redesign: population_demand's demand_scale; workforce labour units per scale (1/3/10/30/100); the market carve's population anchoring; logistics node discounts (most tiles now near a centre); haulage_measure re-run for the price-band ceiling (its re-derive rule names map/scale changes). Measure first, then move constants - never clamp outcomes."
+    },
+    {
+      "status": "designed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.1.22",
+      "sprint": "24",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [
+        "BL-626",
+        "BL-631",
+        "BL-675"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-627",
+      "short_name": "PROFITABILITY_LEDGER",
+      "category": "UI",
+      "title": "The profitability ledger - the whole field's filed returns, one row per corporation",
+      "authority_doc": "docs/ui/question_log.json",
+      "files": [
+        "src/ui/",
+        "docs/ui/question_log.json",
+        "docs/ui/ledgers/"
+      ],
+      "design": "The surface for BL-626 (quarterly return) and the host of the buyout press. DESIGN-OWED BY CONSTRUCTION, not by omission: its question_log.json pair - the question it answers, why it earns its space, the item that demanded it - is required on every surface and its wording is Ben's. What is already settled: a table, one row per corporation, refreshed each quarter; exact figures where the firm files and a dash where it does not (FINANCE.md § Disclosure); no bands anywhere. Open: which rail slot it takes, and whether it absorbs the financial half of the slot-8 Corporations table (docs/ui/ledgers/corporation.md carries that as its own open question).\n\nBEN ANSWERED BOTH OPEN QUESTIONS, 2026-08-29, describing the new acquisitions ledger: \"This ledger should have a fold out option which displays a full table, sortable by type, end resource, input resource, profit... And any other useful fields.\"\n\nSO: (1) it takes NO rail slot of its own - it is the FOLD-OUT of BL-675 (acquisitions ledger), reached by the BL-214 full-canvas disclosure control the Corporation dashboard already uses. (2) It DOES absorb the financial half of the slot-8 Corporations table: BL-674 strips Reach and Share from that surface, and this table is where the per-firm financial read now lives. docs/ui/ledgers/corporation.md carried both as its own open questions; both are now closed and the doc should say so.\n\nCOLUMNS, from Ben's list plus what the feed already holds: type, end resource (the recipe's output), input resource, profit (the filed net - BL-626's quarterly return, and the trailing mean the price is read off), price, and ownership class. Sortable on each. Exact where the firm files, a dash where it does not, no bands (FINANCE.md § Disclosure).\n\nSTILL OWED AND STILL BEN'S: the question_log.json pair. Every surface carries the question it answers and why it earns its space, and that wording is his - the item cannot close without it."
+    },
+    {
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "version_goal": "v0.1.20",
+      "sprint": null,
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [
+        "BL-628"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-629",
+      "short_name": "RIVAL_ACQUISITION",
+      "category": "AI",
+      "title": "Rivals buy firms too - buy_corporation joins the scored-utility candidate list",
+      "authority_doc": "docs/ai/AI_OPPONENT.md",
+      "files": [
+        "src/world/corp_ai.cpp",
+        "src/world/corp_ai.hpp",
+        "docs/ai/AI_OPPONENT.md",
+        ".claude/rules/io-standing-rules.md"
+      ],
+      "design": "The symmetry half of BL-628 (whole-firm buyout), and a widening of the BL-202/BL-203 exception in its established shape: deterministic, seeded, scored-utility, a legal verb and never a planner. THE WORK: score buy_corporation in corp_ai.cpp's existing candidate list, capped at one acquisition per evaluation, its price carried in the candidate's spend under the solvency gate so a rival cannot buy itself below its reserve floor. Availability is gated on the target's ownership class, not on the acquirer's cash - the 'never on cash' ruling's shape. Record the grant in the standing rules with its date, as every prior widening is recorded. SAVING UP IS NOT PLANNING, and this item owns the distinction: Ben's Sprint 20 goal wants a corp to accumulate cash toward an acquisition, but a scorer that defers a cheap build today in order to afford a firm tomorrow is edging toward the planner the standing rules forbid. The honest route needs no new machinery - accumulation is EMERGENT when the buy candidate outscores the marginal build, since a tick with no affordable positive candidate simply banks its cash. Whether that actually happens at the authored weights is a measurement, and BL-634 (acquisition viability) is where it is taken."
+    },
+    {
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 2,
+      "version_goal": "v0.1.20",
+      "sprint": "20",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [
+        "BL-630"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-632",
+      "short_name": "WARM_START_PROGRESS",
+      "category": "UI",
+      "title": "The loading screen's second phase - what the warm start shows while it runs",
+      "authority_doc": "docs/ui/STARTUP.md",
+      "files": [
+        "src/core/app.cpp",
+        "src/ui/startup_screens.cpp",
+        "docs/ui/STARTUP.md"
+      ],
+      "design": "Falls out of BL-630 (spawn shortlist): the warm start moves onto the loading screen as a second phase after the carve, and eighty econ ticks is long enough that it needs a surface. DESIGN-OWED - what it shows is Ben's call. The obvious candidates are the carve's own idiom (a ledger column of corps with their running net) or a plain progress read. Note the publish-contract limit the carve already documents: the tap is atomics-only, so a corporation's generated NAME cannot cross it."
+    },
+    {
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 2,
+      "version_goal": "v0.1.20",
+      "sprint": "20",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": "Container cannot approve the OS-level computer-use dialog (NR-622)",
+      "parked": false,
+      "id": "BL-636",
+      "short_name": "LIVE_CLICK_DEBT",
+      "category": "UI",
+      "title": "Three sprints of owed live clicks - dispatch form and Throughput lens container access",
+      "authority_doc": "docs/development/DELIVERY.md",
+      "files": [
+        "docs/development/DELIVERY.md",
+        "docs/development/NEEDS_REVIEW.json"
+      ],
+      "design": "Carried from Sprint 18 and named in NEXT_SESSION.md as owed in Sprint 20's definition of done. Two visual requirements were marked complete on a scripted capture alone, which the 2026-08-19 rule says is not sufficient: a capture proves a surface renders, not that a press on it is reachable. The dispatch form and the Throughput lens both owe a live click. BLOCKED, and the blocker is environmental rather than a design gap - NR-622 records that the container cannot approve the OS-level computer-use dialog, which is why this has slipped three sprints rather than one. DESIGN-OWED on the route out: either Ben clicks them himself in one pass, or the session gets a path to drive the live app that does not need that dialog. Filing it as an item so it has an owner instead of living only in a handoff note.\n\nSPRINT 23 ADDS ONE, and it is blocked differently from the rest (folded in from NR-706, 2026-08-28, on Ben's instruction to close that entry - the concern stays relevant, so it lives here rather than in the transient queue).\n\nBL-666's COMPANY destination has never been live-clicked. Not for want of access: the corporation half WAS clicked in the built app the same session. The blocker is the WORLD - a freshly generated campaign (seed 00000000, 20 settle years, 1960 Q1) carried no background firm holding any tile on the home body, so the Company lens tinted nothing across a fully zoomed-out view and there was nothing to press. The route is asserted green in lens_one_tier against a world that does have one.\n\nSo this row needs a world or a save with a background firm on the home body, not a permission dialog. Worth measuring while there: count background firms and their holdings at year 20 against year 100 - if they are genuinely absent early, the Company lens needs an EMPTY STATE, because a lens that tints nothing and says nothing is indistinguishable from a broken one."
+    },
+    {
+      "id": "BL-639",
+      "short_name": "CORP_PANEL_COLUMN_BUDGET",
+      "title": "The Corporations panel does not fit its column - names cut to one letter, Declare Hostile clipped",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 2,
+      "version_goal": "v0.1.20",
+      "sprint": "24",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "category": "UI",
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "files": [
+        "src/ui/corporation_panel.cpp",
+        "docs/ui/ledgers/corporation.md"
+      ],
+      "design": "OBSERVED LIVE, 2026-08-26 (BL-633's capture), and pre-existing - BL-633 changed no width and no column count. Five columns carrying 62+62+62+220 px of fixed width do not fit the shell fold-out column (380-460 px by resolution) at 1280x720: the Corporation NAME column collapses to a single letter ('F', 'E', 'C') and the Stance column's 'Declare Hostile' button clips off the right edge as 'De...'. This is BL-449's shape exactly - the surface that shipped clean on a compile AND a 36/36 harness while being unusable - still live in the same panel. THE WORK: re-budget the columns against shell_column_width(disp.x) rather than fixed pixels, and decide whether the stance presses belong in-row at this width at all or behind the row's Selection drill. Note NR-663: expect_no_clipping did NOT catch this, because ImGui SmallButton labels are not instrumented into the overflow ledger - so this needs a real look, not a green row.\n\nSUPERSEDED IN PLACE BY BL-674 (diplomacy by stance), 2026-08-29 - newest-dated wins, and this is recorded rather than quietly applied. BL-674 carries Ben's instruction to DELETE the Reach, Share and Stance columns and group the rows by stance instead, which removes the starvation this item proposed to re-budget: three of the five columns stop existing, so there is no fixed-width budget left to blow. This item's second half - whether the stance presses belong in-row at this width - is answered there too (they move into the row's own action affordance and keep their confirms). Left open rather than closed because Ben owns the close; do not build BL-639 and BL-674 as two changes to one file."
+    },
+    {
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.1.21",
+      "sprint": "21",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-642",
+      "short_name": "CONSTRUCTION_ACTUALLY_DRAWS",
+      "category": "Economy",
+      "title": "Construction draws materials - in the opening years, and as centres grow",
+      "authority_doc": "docs/economy/PRODUCTION.md",
+      "files": [
+        "src/world/corporation_generation.cpp",
+        "src/world/construction.cpp",
+        "src/world/population_dynamics.cpp",
+        "scripts/economy.lua",
+        "docs/economy/PRODUCTION.md"
+      ],
+      "design": "Ben, 2026-08-26: 'we need those first 20 years of generation to include construction'. MEASURED CONTEXT: materials are authored per building (resource_costs) and charged at the build press, but generation PLACES buildings rather than constructing them, so the draw never fires during the opening years - stone and timber have a construction sink on paper and no pull in practice. TWO HALVES, and the second is the one that lasts: (1) make the opening years actually build, so the warm start carries a real material pull; (2) make POPULATION CENTRES draw construction materials as they grow, which does not decay once the warm start ends. An ancient economy's largest material sink is building, and half (2) makes that structurally true rather than transiently."
+    },
+    {
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "version_goal": "v0.1.21",
+      "sprint": "21",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-643",
+      "short_name": "NETWORK_UPKEEP_DRAWS",
+      "category": "Economy",
+      "title": "Roads, ports and hubs draw materials to stay standing",
+      "authority_doc": "docs/economy/LOGISTICS.md",
+      "files": [
+        "src/world/logistics.cpp",
+        "scripts/economy.lua",
+        "docs/economy/LOGISTICS.md"
+      ],
+      "design": "The infrastructure demand channel (MARKETS.md section Demand channels). The logistics_maintenance budget line already exists and names exactly this, so the state half has a home. THE WORK: a network that consumes stone and timber to stay standing - a permanent sink scaled by GEOGRAPHY rather than by population, which is a shape none of the other channels has. Second-order and wanted: it gives reach a running cost, so extending the network becomes a decision rather than a ratchet. OWED: this item writes its paragraph into LOGISTICS.md; the design register in MARKETS.md points at it."
+    },
+    {
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.1.21",
+      "sprint": "21",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-644",
+      "short_name": "SPACE_PROGRAMME_BUDGET_LINE",
+      "category": "Economy",
+      "title": "Government satellite launches - the tenth budget line, and space goods' first real buyer",
+      "authority_doc": "docs/politics/NATIONS.md",
+      "files": [
+        "src/world/nation_budget.hpp",
+        "src/world/nation_step.cpp",
+        "scripts/economy.lua",
+        "docs/politics/NATIONS.md"
+      ],
+      "design": "Ben, 2026-08-26: 'add endpoints for space goods in government issued satellite launches'. Design in NATIONS.md section A budget. THE MACHINERY EXISTS - nations hold a weighted budget over priority lines, run_national_budget has claim/transfer machinery, and strategic_reserve is already a goods-buying line that no consumer claims on. THE WORK: a tenth line, space_programme, buying spacecraft_components and propellant through the BL-350 procurement seam (never on the open market - that is strategic_reserve's own rule). APPEND-ONLY: the weight vector is indexed by the enum and serialised, so the line goes last. Why it is worth more than a sink: state demand arrives in LUMPS and follows a weight a rival can lobby to move, so it is worth playing politics over rather than merely scaling into. ALSO OWNS spacecraft_components (BL-648's measurement, 2026-08-26): the guard's red list came back with ELEVEN goods, not the ten expected, and the eleventh is this one. Its exemption claimed BL-350 procurement, but procurement is a resource-agnostic TRANSFER between two corps' pools - it moves goods without consuming them, and admitting it as an injector would substantiate the entire roster at once. src/world contains no militia, and corp_ai.cpp says outright that the scorer does not emit those verbs today, so nothing automatic buys it. This line is its first real buyer."
+    },
+    {
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "version_goal": "v0.1.21",
+      "sprint": "21",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [
+        "BL-619"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-645",
+      "short_name": "RESEARCH_CONSUMES_GOODS",
+      "category": "Economy",
+      "title": "Research consumes goods, not only credits",
+      "authority_doc": "docs/economy/RESEARCH.md",
+      "files": [
+        "docs/economy/RESEARCH.md",
+        "scripts/economy.lua"
+      ],
+      "design": "Ben, 2026-08-26: 'perhaps we could make research consume alternate goods as well'. Design written into RESEARCH.md. It gives the TOP of the production chain a buyer and turns the tech ladder into an economic decision rather than a free accumulator only time gates. Two properties: the basket is era-banded like every other, and a shortfall SLOWS research rather than voiding it (the same shape every goods draw takes). BLOCKED BY DESIGN on BL-619 (research system), which is a session with Ben - the rates, and whether the draw sits on the university or on the nation's budget lines, belong to that session rather than being settled ahead of it."
+    },
+    {
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "version_goal": "v0.1.21",
+      "sprint": "21",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-646",
+      "short_name": "BATTLES_BURN_ORDNANCE",
+      "category": "Military",
+      "title": "A battle consumes what it fires - conflict as a demand shock",
+      "authority_doc": "docs/military/MILITARY.md",
+      "files": [
+        "src/world/battle_system.cpp",
+        "scripts/economy.lua",
+        "docs/military/MILITARY.md"
+      ],
+      "design": "The conflict demand channel (MARKETS.md section Demand channels). MEASURED: ordnance is priced at 43.00, near the top of the ancient roster, and its only draw is a per-head upkeep rate that BL-635's rescale took to 0.0035 - effectively nil. So the roster's most valuable military good has no buyer. THE WORK: a battle draws ordnance in proportion to what it commits, against the owner's pool, deterministically. WHY IT IS THE MOST INTERESTING OF THE EIGHT: it is the only channel that couples the game's two pillars - it makes Conflict move Trade, so a war somewhere else is a price signal here. OWED: this item writes its paragraph into MILITARY.md."
+    },
+    {
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.1.21",
+      "sprint": "21",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-647",
+      "short_name": "ENDEMIC_LUXURY_DEMAND",
+      "category": "Economy",
+      "title": "Tobacco, spices, coffee and furs get the buyer they were authored for",
+      "authority_doc": "docs/economy/RESOURCES.md",
+      "files": [
+        "scripts/economy.lua",
+        "src/world/market_clearing.cpp",
+        "docs/economy/RESOURCES.md"
+      ],
+      "design": "MEASURED: four endemic goods are on the roster, extractable, priced - and wanted by nothing at all, in any band. They pass the orphan check by naming 'mercantile demand', which BL-648 shows does not exist. THE WORK: a household demand that scales with WEALTH rather than headcount, flavoured by NATIONAL CHARACTER so different nations crave different luxuries. That asymmetry is the design, not a detail: it makes the trade route directional by construction - extract where it grows, sell where the money is - which is the most Trade-shaped channel of the eight and the one that most directly serves the pillar. Note it is also the first demand whose SIZE is a function of prosperity, so it rewards a player who has made somewhere rich."
+    },
+    {
+      "id": "BL-650",
+      "short_name": "DISSOLUTION_COMPLETENESS",
+      "category": "Economy",
+      "title": "Finish the dissolution walk - ground follows the firm, and hoist the duplicated HQ rule",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "version_goal": "v0.1.20",
+      "sprint": "20",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [
+        "BL-628"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/economy/FINANCE.md",
+      "files": [
+        "src/world/corp_command.cpp",
+        "src/world/corporation_generation.cpp",
+        "tools/verify/whole_firm_buyout.cpp",
+        "docs/economy/FINANCE.md"
+      ],
+      "design": "Two loose ends the wave-2 review barrier found in BL-628, neither a defect today. (1) world::province_holder takes a CORP id via battle_system.cpp's field_held_by, and dissolve_into's inventory does not carry it. Entity ids are monotonic with no recycling, so a stale holder is inert rather than aliasing - but R4's wording is 'no dangling reference survives', and ground is PROPERTY, so it TRANSFERS. Now written into FINANCE.md's three-way rule, which also gained a fourth outcome, KEEP, for the historical record - history is not property and is never rewritten, which is the one place a reference to the erased corp survives on purpose. Extend the harness fixture to hold a province, since it currently never constructs one. (2) recompute_hq in corp_command.cpp DUPLICATES designate_hq/corp_home_body from corporation_generation.cpp, including kProjectedReachUnits = 2.5f - unavoidable at authoring because another slice owned that file in the same wave. Both have landed; the review verified them line-for-line identical. Hoist to a shared seam so they cannot drift."
+    },
+    {
+      "id": "BL-651",
+      "short_name": "CHARTER_REACH_ON_THE_SEAM",
+      "category": "Generation",
+      "title": "charter_reach is computed at generation and silently zeroed on load",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "version_goal": "v0.1.20",
+      "sprint": "20",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [
+        "BL-638"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+      "files": [
+        "src/core/save_game.cpp",
+        "src/world/settlement.hpp",
+        "docs/generation/CORPORATION_GENERATION.md"
+      ],
+      "design": "Found by the wave-2 review barrier. BL-638 added settlement_state::charter (a charter_reach), and w_settlement/r_settlement do not carry it. The omission is SYMMETRIC so the stream stays consistent and no version bump is owed - it is not a corruption bug. It is a LATENT one: the field is silently zeroed on load, which is benign only while the sole readers are generate_corporations and its harness, both of which run before any save exists. It becomes wrong the moment BL-627 (profitability ledger), BL-629 (rival acquisition) or the generation ledger reads charter off a LOADED world - and it will read as 'this world has no charter' rather than as an error. TWO HONEST ROUTES, pick one and say why: serialise it (a version bump, claimed through next_save_version.js), or RECOMPUTE it on load from the ladder it is derived from, which costs no format change and cannot drift from its source. The second is probably right, since charter_reach is a pure function of already-serialised state."
+    },
+    {
+      "id": "BL-652",
+      "short_name": "INJECTORS_MUST_NOT_SKIP_SILENTLY",
+      "category": "Economy",
+      "title": "A demand injector that cannot price a basket entry must SAY SO, not skip it",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 2,
+      "version_goal": "v0.1.21",
+      "sprint": "21",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/economy/MARKETS.md",
+      "files": [
+        "src/world/market_clearing.cpp",
+        "tools/verify/",
+        "docs/economy/MARKETS.md"
+      ],
+      "design": "THE MECHANISM THAT MADE TWO SEPARATE BUGS INVISIBLE ON THE SAME DAY, which is why it is an item rather than a note. inject_population_demand and inject_background_demand both SKIP a basket entry whose resource carries no market base price - silently, with no warning and no row anywhere. Consequences observed 2026-08-26: (1) BL-649's census read as having no background demand at all on its first run, and (2) tools/verify/spawn_solvency.cpp - whose own header says it loads world_gen.lua and did not - measured BL-635's entire spawn diagnosis in a world where background demand did not exist. Neither failed. Both just quietly answered a question about a different world. THE WORK: an injector that cannot price a basket entry must report it - a named diagnostic on the first occurrence, and a harness row that FAILS on a basket naming an unpriced good, since that combination is always either a missing script or an authoring error and is never intended. A basket entry is a STATEMENT that somebody wants the good; silently dropping it turns a design statement into a no-op. Cheap, and it protects every measurement the rest of Sprint 21 depends on."
+    },
+    {
+      "id": "BL-653",
+      "short_name": "RETURN_EIGHTH_FIELD",
+      "category": "Economy",
+      "title": "The eighth field - a return sees the whole quarter, not just the money loop",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.1.21",
+      "sprint": "20",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [
+        "BL-626"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/economy/FINANCE.md",
+      "files": [
+        "src/world/budget_system.cpp",
+        "src/world/components.hpp",
+        "src/core/app.cpp",
+        "src/world/world_save.cpp",
+        "src/world/corp_command.cpp",
+        "tools/verify/",
+        "docs/economy/FINANCE.md"
+      ],
+      "design": "Ben's ruling, 2026-08-26, on NR-655/NR-668 - option A of the three-way fork, and the measurement that forced it: a firm earning through mercenary contracts files a trailing_net IDENTICAL to a firm that earns nothing there, so BL-628's buyout undervalues it by exactly 640 credits (k 8.0 x the 80/quarter the record cannot see). Design in FINANCE.md section The eighth field. THE WORK: add `other` to quarterly_return = the whole-tick balance delta minus the money-loop net, and MOVE THE FILING from the end of apply_budget to after the tick's last balance mover - which is the part that needs care, since apply_budget does not own the tick and the headless harnesses call it directly. Then re-point corp_trailing_net at the mean of (net + other) so the buyout prices off the whole quarter. THREE PROPERTIES TO ASSERT: the seven flows still explain `net` unchanged; net+other telescopes EXACTLY over a run (the retain property extended from one function to the whole tick); and BL-628's own harness row that currently PINS the 640-credit blindness must be re-specified to pin the closure instead - do not delete it, invert it. `other` is deliberately NOT itemised: split into named lines it becomes a second budget breakdown competing with corp_budget, and the reason there is one accounting authority is that two of them disagree. Versions the save format."
+    },
+    {
+      "id": "BL-654",
+      "short_name": "A_CHANNEL_MUST_BID",
+      "category": "Economy",
+      "title": "A short pool buys on the market, up to a reservation ceiling",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.1.21",
+      "sprint": "21",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [
+        "BL-641"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/economy/MARKETS.md",
+      "files": [
+        "src/world/economy_system.cpp",
+        "src/world/market_clearing.cpp",
+        "docs/economy/MARKETS.md",
+        "docs/economy/FINANCE.md"
+      ],
+      "design": "THE BLOCKER UNDER BL-641, AND PROBABLY UNDER FOUR MORE CHANNELS. Measured 2026-08-26: with building upkeep rates on, operating firms went 227 -> 19, because the goods drawn are produced 0.0 in band and a POOL DRAW never reaches market_component::demand - so the want never becomes a price, no rival scores the building that would supply it, and the sink starves itself. run_construction and run_processing already bid; run_unit_upkeep does not and carries the same latent defect. DESIGN-OWED, and the open question is Ben's because it widens FINANCE.md: should a goods draw place real demand on the market when the pool is short - and if so, does it BUY (spending credits, which makes upkeep a market participant) or merely SIGNAL (raising price without a transaction, which is cheaper but invents demand nobody pays for)? The first is coherent and expensive; the second is a thumb on the scale and should probably be refused on the same grounds the project refuses clamps. Until this is settled, BL-641's rates stay at 0.0 and every remaining channel (BL-643 infrastructure, BL-644 state, BL-645 research, BL-646 conflict) should be checked against property 3 before it is built, not after. SETTLED (Ben, 2026-08-26): 'Buy on the market, but at a threshold, buying is not allowed. This goes hand in hand with maximum and minimum prices for goods.' And ONE RULE FOR EVERY GOODS DRAW - unit upkeep takes the same shape, not a second one. Written into MARKETS.md section Settled: a short pool BUYS, up to a reservation ceiling. THE WORK: a short pool bids the shortfall into market_component::demand and pays for what it gets; above the ceiling it does not bid at all and the existing shortfall rule weakens the building (or unit) instead. The ceiling is authored in the PRICE BAND family beside floor_mult/ceil_mult, not in upkeep - it is a statement about what a good is worth paying, not about who is buying - and its value is MEASURED against the census and the operating-firm count, never guessed. It is the exact mirror of BL-386's seller-side floor_price: both sides may decline a trade, neither may dictate one. Turning BL-641's rates non-zero is gated on this landing."
+    },
+    {
+      "id": "BL-656",
+      "short_name": "PASS6_CAP_IS_THE_DESIGN",
+      "category": "Generation",
+      "title": "Decide what actually shapes background density - the ratio, or the per-resource cap",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 2,
+      "version_goal": "post-v0.1.21",
+      "sprint": null,
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [
+        "BL-655"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+      "files": [
+        "src/world/corporation_generation.cpp",
+        "docs/generation/CORPORATION_GENERATION.md"
+      ],
+      "design": "Raised by BL-655's measurement and by its novelty flag. Pass 6 is documented as stopping on a 0.90 production/demand ratio, described as 'an emergent measurement rather than an injected clearing constant' and 'a stop condition, not a firm-count budget'. MEASURED: the ratio NEVER BINDS on the worlds we generate. `per_resource_firm_cap = 8` binds on every demanded resource, so the count is exactly specialists + 8 x basket breadth - which reproduced 104, 64 and 56 corps exactly across three configurations. Its own comment still says 'provisional - measure, then pin'. The doc has been corrected to describe what the code does; what is OPEN is which behaviour is wanted. THREE READINGS: (a) the cap is the real design and the ratio is dead weight - pin the cap deliberately, say density is breadth-driven, and delete the ratio; (b) the ratio is the real design and the cap is an emergency brake set too low - raise it until the ratio binds, which restores the 'calibrated, not authored' property the doc claims; (c) both, with the cap as a genuine guard against a pathological basket. Note the consequence either way: under (a) density becomes a function of how many DIFFERENT goods are wanted, so every demand channel Sprint 21 adds moves the world's size - which may be a feature."
+    },
+    {
+      "id": "BL-657",
+      "short_name": "A_FAILING_FIRM_FAILS",
+      "category": "Economy",
+      "title": "A firm underwater long enough exits - give interest the consequence it is supposed to have",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.1.21",
+      "sprint": "20",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [
+        "BL-628"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/economy/FINANCE.md",
+      "files": [
+        "src/world/economy_system.cpp",
+        "src/world/components.hpp",
+        "src/world/corp_command.cpp",
+        "scripts/economy.lua",
+        "tools/verify/",
+        "docs/economy/FINANCE.md"
+      ],
+      "design": "MEASURED 2026-08-26 from Ben's own observation of the live build. Of 12 seeds, 3 clear with ZERO interest; the 9 that fail all dipped negative once and interest is then 43-60% of their whole loss, against an operating gap of only -24 to -40 cr/qtr. 1.02^80 = 4.9x over the warm start. The rate is not the defect - components.hpp's 'no insolvency consequence' is. A firm that would have died in year three trades for twenty and is handed to the player as wreckage. THE WORK: a firm underwater for N consecutive quarters EXITS - dissolved, or absorbed via BL-628's dissolve_into, which already moves holdings, pools, balance and returns and cancels the promises nobody is left to keep. N and the trigger are authored in economy.lua and MEASURED, not picked. DESIGN-OWED on three questions that are Ben's: (1) dissolve or absorb - absorption by a solvent neighbour is richer and reuses the buyout path, dissolution is simpler and leaves ground free; (2) does this run IN PLAY as well as in the pre-game, i.e. can the player's own corp fail - NR-670 already ruled a rival may not BUY the player out, and this is a different question about the player failing on their own account; (3) what happens to the ground and the workforce - a dissolved firm's tiles should probably become available rather than stay held. EXPECTED CONSEQUENCE, and the reason this is priority A: the field at seat time becomes self-selected for viability, so BL-630's shortlist floor should start being met instead of falling through to its fallback on 23 of 24 seeds."
+    },
+    {
+      "id": "BL-658",
+      "short_name": "FREE_FIRM_TRAP",
+      "category": "Economy",
+      "title": "The solvency gate tests the price, not the position after the debt transfers",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 3,
+      "version_goal": "v0.1.21",
+      "sprint": "20",
+      "written": "2026-08-26",
+      "author": "Ben",
+      "requires": [
+        "BL-628"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/economy/FINANCE.md",
+      "files": [
+        "src/world/corp_command.cpp",
+        "tools/verify/acquisition_viability.cpp",
+        "docs/economy/FINANCE.md"
+      ],
+      "design": "MEASURED by BL-634, which found it by taking its own brief's gate literally. The acquisition price is max(0, book_value + k x trailing_net + balance) and the balance term is SIGNED, so a deeply indebted firm's negative cash cancels its book value, the sum goes below zero, and the floor hands it over FREE. On 5 of 8 seeds the cheapest buyable firm cost exactly 0 cr. The dissolution rule then transfers the debt at face value: one seed took on -13,358 cr for nothing, and 3 of 8 buyers that bought the cheapest firm were sunk by it. THE FLOOR IS NOT THE BUG - a worthless firm is worth nothing, and NR-648's reasoning stands. The bug is that the SOLVENCY GATE READS THE PRICE rather than the buyer's balance AFTER the transfer, which is the same shape as the non-finite-price bug BL-628 caught in its own code: a check applied to the wrong quantity. THE WORK: gate on the post-acquisition position, so a corp cannot be handed a liability it could never have chosen to take on. Then re-run acquisition_viability's --target cheapest sweep, where 'still earning after' should go 5/8 -> 8/8. Note the harness already measures BOTH gates and its --target flag exists for exactly this comparison."
+    },
+    {
+      "id": "BL-659",
+      "short_name": "deposit selects to market ledger",
+      "title": "Resource lens: a deposit is selectable, and routes to the Market ledger for that resource",
+      "status": "complete",
+      "priority": "medium",
+      "created": "2026-08-28",
+      "sprint": "22",
+      "touches": [
+        "docs/ui/LENSES.md",
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/market_ledger.cpp"
+      ],
+      "completed": "2026-08-28",
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json",
+      "resolved": "2026-08-28"
+    },
+    {
+      "id": "BL-660",
+      "short_name": "tectonic hover and history route",
+      "title": "Continent lens: hover-select a plate, click through to its history (collision and drift)",
+      "status": "complete",
+      "priority": "medium",
+      "created": "2026-08-28",
+      "sprint": "22",
+      "touches": [
+        "docs/ui/LENSES.md",
+        "docs/generation/CONTINENTS.md",
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/tile_inspector.cpp"
+      ],
+      "completed": "2026-08-28",
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json",
+      "resolved": "2026-08-28"
+    },
+    {
+      "id": "BL-661",
+      "short_name": "population regional heatmap",
+      "title": "Population lens: regional heatmap with harder scaling, not a per-tile mark",
+      "status": "open",
+      "priority": "medium",
+      "created": "2026-08-28",
+      "sprint": "22",
+      "touches": [
+        "docs/ui/LENSES.md",
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "design": "Ben, 2026-08-28: \"Population: Let's see what this looks like as a heatmap with more extreme scaling. This way we should be able to see population regionally, not just on each tile.\"\n\nToday the lens draws \"per-tile value marks, workforce efficiency\" (LENSES.md routing table) - a per-tile read, which is why a region of moderate population and a region of none look similar at whole-planet zoom. Two changes: a continuous heatmap fill rather than discrete marks, and a scaling curve steep enough that regional differences separate instead of compressing into the middle of the ramp.\n\nEXPLICITLY AN EXPERIMENT, in Ben's own framing - \"let's see what this looks like\". The deliverable is a capture to rule on, not a settled design; expect a second pass on the curve. Worth measuring the actual population distribution first so the curve is fitted to the data rather than guessed - the same discipline BL-649's census brought to demand."
+    },
+    {
+      "id": "BL-662",
+      "short_name": "scarcity takes the opportunity glyph",
+      "title": "Scarcity lens: drop the dead Opportunity code, reuse its glyph, render market scarcity per resource",
+      "status": "open",
+      "priority": "medium",
+      "created": "2026-08-28",
+      "sprint": "22",
+      "touches": [
+        "src/ui/icons.cpp",
+        "src/ui/icons.hpp",
+        "src/ui/overlay.cpp",
+        "docs/ui/LENSES.md",
+        "docs/ui/ICONS.md"
+      ],
+      "design": "Ben, 2026-08-28: \"I support changing opportunity to scarcity. Drop the old code, reuse the glyph, and render market scarcity per resource.\"\n\nREAD AS: the lens KEEPS the name Scarcity - the earlier idea of renaming it to Opportunity is dropped - while the retired Opportunity lens's leftovers are deleted and its GLYPH is reused for Scarcity. Recorded explicitly because the instruction can be read in both directions, and because the session had just flagged that Opportunity is a name BL-604 retired; if this reading is wrong it is a one-line revert.\n\nWHY A GLYPH MATTERS HERE: Scarcity is keyboard-cycle only, which is why Ben listed it among the lenses needing glyphs. icons::opportunity survives in src/ui/icons.{hpp,cpp} with no caller since BL-604, so the mark exists and is unused - reusing it costs nothing and lets Scarcity earn a strip slot, since LENSES.md's rule is that an on-screen lens carries one distinct glyph.\n\nAlso dead and worth removing in the same sweep, though Ben named only Opportunity: icons::country (BL-601) and icons::production (BL-604), neither of which has a caller.\n\nThe behaviour half - \"render market scarcity per resource\" - may already hold: the lens draws \"per-market shortfall blocks + key\" keyed to the selected resource, and the 2026-08-28 sweep captured scarcity_lens_full_iron and _steel. Confirm before changing anything; the glyph may be the whole of the real work."
+    },
+    {
+      "id": "BL-663",
+      "short_name": "lens glyph roster",
+      "title": "Give every strip-eligible lens a distinct glyph (Company; Supply, Supply-routes, Reach deferred)",
+      "status": "open",
+      "priority": "low",
+      "created": "2026-08-28",
+      "sprint": "22",
+      "touches": [
+        "src/ui/icons.cpp",
+        "src/ui/icons.hpp",
+        "src/ui/overlay.cpp",
+        "docs/ui/ICONS.md",
+        "docs/ui/LENSES.md"
+      ],
+      "design": "Ben, 2026-08-28: \"It looks like we need to add glyphs for scarcity, supply, supply-routes, and reach.\"\n\nSCOPE NARROWED BY BEN THE SAME DAY: \"I don't think we need body-to-body lenses yet. Keep the code but ignore for this session.\" Supply, Supply-routes and Reach are all body-to-body, so their glyphs are deferred with them - the code stays, the work waits. Scarcity is covered by BL-662 (it inherits the Opportunity mark).\n\nWHAT REMAINS LIVE HERE IS THE COMPANY LENS, added 2026-08-28. It borrows icons::corporation while keyboard-only, on the precedent Reach and Supply-routes set. It cannot join the on-screen strip until it has its own mark, because Corp would be its immediate neighbour and LENSES.md forbids two strip neighbours sharing a glyph. A company is a background firm, so the mark wants to read as smaller/plural against the corporation's single solid form.\n\nThree glyphs are dead and free to cannibalise: icons::country, icons::opportunity (claimed by BL-662), icons::production."
+    },
+    {
+      "id": "BL-664",
+      "short_name": "one tier under a lens",
+      "title": "A lens collapses selection to one tier: markers stop outranking, and a lens with no answer goes inert",
+      "status": "complete",
+      "priority": "high",
+      "created": "2026-08-28",
+      "sprint": "23",
+      "touches": [
+        "docs/ui/SELECTION.md",
+        "docs/ui/LENSES.md",
+        "docs/ui/TOOLTIP.md",
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/hover_content.cpp"
+      ],
+      "completed": "2026-08-28",
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json",
+      "resolved": "2026-08-28"
+    },
+    {
+      "id": "BL-665",
+      "short_name": "corp and company tile groups",
+      "title": "Corporation and Company lenses resolve to an owner's tile group, hovered whole",
+      "status": "complete",
+      "priority": "high",
+      "created": "2026-08-28",
+      "sprint": "23",
+      "touches": [
+        "docs/ui/LENSES.md",
+        "docs/ui/SELECTION.md",
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "completed": "2026-08-28",
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json",
+      "resolved": "2026-08-28"
+    },
+    {
+      "id": "BL-666",
+      "short_name": "owner ledger destinations",
+      "title": "A corporation and a company each need their own ledger destination; the company one does not exist",
+      "status": "complete",
+      "priority": "medium",
+      "created": "2026-08-28",
+      "sprint": "23",
+      "touches": [
+        "docs/ui/SELECTION.md",
+        "docs/ui/LENSES.md",
+        "docs/ui/ledgers/README.md",
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/ui_state.hpp"
+      ],
+      "completed": "2026-08-28",
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json",
+      "resolved": "2026-08-28"
+    },
+    {
+      "id": "BL-667",
+      "short_name": "one hover mark under a lens",
+      "title": "Under a lens only the lens's structure lights on hover - not the tile and its province too",
+      "status": "complete",
+      "priority": "medium",
+      "created": "2026-08-28",
+      "completed": "2026-08-28",
+      "sprint": "23",
+      "touches": [
+        "docs/ui/SELECTION.md",
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json",
+      "resolved": "2026-08-28"
+    },
+    {
+      "id": "BL-668",
+      "short_name": "workforce heatmap",
+      "title": "The Population lens becomes a heatmap instead of a field of per-tile dots",
+      "status": "complete",
+      "priority": "medium",
+      "created": "2026-08-28",
+      "completed": "2026-08-28",
+      "sprint": "23",
+      "touches": [
+        "docs/ui/LENSES.md",
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json",
+      "resolved": "2026-08-28"
+    },
+    {
+      "id": "BL-669",
+      "short_name": "throughput ramp",
+      "title": "The Throughput field normalises against the 90th percentile, not the maximum",
+      "status": "complete",
+      "priority": "medium",
+      "created": "2026-08-28",
+      "completed": "2026-08-28",
+      "sprint": "23",
+      "touches": [
+        "docs/ui/LENSES.md",
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/ui_state.hpp",
+        "tools/verify/throughput_field_census.cpp"
+      ],
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json",
+      "resolved": "2026-08-28"
+    },
+    {
+      "id": "BL-670",
+      "short_name": "rung-keyed lens strip",
+      "title": "The lens strip shows the lenses that draw at the current rung, instead of a hand-kept six",
+      "status": "complete",
+      "priority": "medium",
+      "created": "2026-08-28",
+      "completed": "2026-08-28",
+      "sprint": "23",
+      "touches": [
+        "docs/ui/LENSES.md",
+        "src/ui/overlay.cpp"
+      ],
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json",
+      "resolved": "2026-08-28"
+    },
+    {
+      "id": "BL-671",
+      "short_name": "the two region cards",
+      "title": "A deposit and a plate each get Selection-band content, instead of leaving the previous card up",
+      "status": "complete",
+      "priority": "high",
+      "created": "2026-08-28",
+      "completed": "2026-08-28",
+      "sprint": "23",
+      "touches": [
+        "docs/ui/SELECTION.md",
+        "src/ui/selection_panel.cpp",
+        "src/ui/selection_card.cpp",
+        "src/ui/ui_state.hpp",
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json",
+      "resolved": "2026-08-28"
+    },
+    {
+      "id": "BL-672",
+      "short_name": "the deposit probe query",
+      "title": "A verify script can ask where a good is deposited - one tile, no other tile data",
+      "status": "complete",
+      "priority": "medium",
+      "created": "2026-08-28",
+      "completed": "2026-08-28",
+      "sprint": "23",
+      "touches": [
+        "src/core/verify_api.cpp",
+        "scripts/verify/lens_region_destinations.lua",
+        ".claude/rules/io-standing-rules.md"
+      ],
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json",
+      "resolved": "2026-08-28"
+    },
+    {
+      "id": "BL-673",
+      "short_name": "per-lens hover cards",
+      "title": "Each structure lens gets its own hover card, describing what the click will select",
+      "status": "complete",
+      "priority": "medium",
+      "written": "2026-08-28",
+      "resolved": "2026-08-28",
+      "sprint": "23",
+      "touches": [
+        "docs/ui/TOOLTIP.md",
+        "src/ui/hover_content.cpp"
+      ],
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
+    },
+    {
+      "id": "BL-674",
+      "short_name": "DIPLOMACY_BY_STANCE",
+      "category": "UI",
+      "title": "The Diplomacy ledger becomes corporations grouped by stance - Allies, Neutral, Rival",
+      "status": "designed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 3,
+      "version_goal": "v0.1.22",
+      "sprint": "24",
+      "written": "2026-08-29",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/ui/ledgers/corporation.md",
+      "files": [
+        "src/ui/corporation_panel.cpp",
+        "docs/ui/ledgers/corporation.md",
+        "docs/ui/MENU.md",
+        "docs/ui/question_log.json",
+        "docs/ui/ui_elements.json"
+      ],
+      "design": "Ben, 2026-08-29, on the slot-8 all-corporations table: \"we should condense this to show corporations, and arrange it for Allies, Neutral, and Rival.\" And, splitting the surface in two: \"This ledger is not quite the right place for companies, as they are less so diplomatic entities, and instead options to buy.\"\n\nTHE CONDENSE IS THE FIX, and it is a population change before it is a layout one. The table today lists EVERY corporation_component in the world - 88 rows on the fixture, measured 2026-08-29 from its own footer. Since the 2026-08-28 glossary split a Corporation is the player and its rivals and a Company is a background firm, so ~80 of those 88 rows are companies standing in a diplomatic surface. Filtering to !is_background is what takes the surface from 88 rows to a handful, and it is Ben's sentence read literally rather than a layout trick.\n\nTHREE GROUPS, NOT A COLUMN. Allies / Neutral / Rival become collapsing sections and the Stance COLUMN goes: under the grouping the column would restate its own heading on every row. Reach goes too - it reads \"1 bodies\" on all 88 rows on the fixture, a column that has never discriminated - and Share goes with it (0% or 1% on almost every row, and the acquisition surface takes over the financial read; see BL-627). What is left is the firm's NAME, which is the thing the surface has never been able to show.\n\nTHAT FIXES NR-709 AT THIS SITE. corporation_panel.cpp declares Reach/Capital/Share at WidthFixed 62 and Stance at WidthFixed 220 - 406 px of fixed width inside a ~358 px fold-out column - so the one WidthStretch column, the name, absorbs the whole overflow and collapses to a single glyph (NR-705). Deleting three of the five columns removes the starvation rather than papering over it. The sibling instance in the Economy panel Markets view is NOT in scope here and stays on NR-709.\n\nGROUP MEMBERSHIP reads the existing tables and invents no predicate: Allies from are_friends (symmetric), Rival from is_hostile in EITHER direction, Neutral is the remainder. Hostility is directed (RELATIONS.md § Stance), so a Rival row must say WHICH WAY - a corp the player declared against and a corp that declared against the player are not the same situation, and RELATIONS.md already settles that a declaration against the player is signalled (Ben, 2026-08-22). Do not collapse the two behind one stance_between() accessor; the doc names that as a thing never to do.\n\nTHE STANCE PRESSES STAY - they are the only route to the four stance verbs, and BL-449 (stance needs a surface) has no other host. They move out of a 220 px column into the row's own action affordance. Declare Hostile keeps its confirm (\"Dissolves any friendship. Not unilaterally reversible.\"); Offer / Accept Friendship and Return to Neutral keep their current behaviour. A press that changes stance MOVES THE ROW BETWEEN GROUPS, which is the grouping earning its place.\n\nCAPITAL stays and keeps the disclosure rule exactly (FINANCE.md § Disclosure): exact for a public firm, a dash for a private or closed one, exact always for the player's own row. A dash means the firm does not file, never that the player has not earned it. No bands - they are retired.\n\nOPEN, and Ben's: whether the three group headings carry a count, and whether an empty group renders as a heading with \"none\" or is omitted. Recommend a count on the heading and an explicit empty state, since Allies will usually be empty at campaign start and an omitted section reads as a missing feature.\n\nRELATIONSHIP TO BL-639 (corp panel column budget): this item SUPERSEDES it, and both must not be built. BL-639 is Ben's 2026-08-26 filing of the same defect at the same site, proposing to re-budget five columns against shell_column_width. Deleting three of the five is the stronger fix and is what the 2026-08-29 instruction asks for. BL-639 is annotated in place and left for Ben to close."
+    },
+    {
+      "id": "BL-675",
+      "short_name": "ACQUISITIONS_LEDGER",
+      "category": "UI",
+      "title": "A new ledger for buying companies - Purchasable and Possible, with a sortable fold-out",
+      "status": "designed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 5,
+      "version_goal": "v0.1.22",
+      "sprint": "24",
+      "written": "2026-08-29",
+      "author": "Ben",
+      "requires": [
+        "BL-674"
+      ],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/economy/FINANCE.md",
+      "files": [
+        "src/ui/",
+        "src/ui/ui_state.hpp",
+        "src/ui/nav_pane.cpp",
+        "docs/ui/ledgers/",
+        "docs/ui/MENU.md",
+        "docs/ui/question_log.json",
+        "docs/ui/ui_elements.json"
+      ],
+      "design": "Ben, 2026-08-29: \"we need a new ledger for purchasing companies... We can remove both the stance and reach columns, and collapse the 'share' mechanic, and just use outright purchasing. So we can have two dropdowns, one for 'purchasable' (can afford), and 'possible' (can't afford).\"\n\nTHE SURFACE. Two collapsing groups over the buyable field: PURCHASABLE (acquisition price <= the player corp's balance) and POSSIBLE (priced, but not affordable today). The same disclosure idiom as everywhere else - a firm that does not file does not appear at all, because it cannot be priced. Per row: the firm's name and its price. The buy press sits on Purchasable rows only; a Possible row shows the price and no press, which is the whole point of the second group.\n\nNO STANCE, NO REACH, NO SHARE. Those three columns belong to the diplomatic read (BL-674) and this surface is not that. \"Collapse the share mechanic and just use outright purchasing\" is already the settled model rather than a change: FINANCE.md § Whole-firm acquisition and GLOSSARY § Corporation both say ownership moves WHOLE, by buyout, with no fractional stake, no share count and no controlling-holder threshold. So this ledger asks the seam for nothing new.\n\nIT USES THE EXISTING VERB UNCHANGED. corp_verb::buy_corporation already prices at max(0, book_value + k_acquisition_multiple x trailing_net + balance) and already gates on: not the player, publicly_held, and has actually filed. Note what that gate does NOT say - it does not test is_background. So the buyable field is every public filed firm, which in practice is overwhelmingly background COMPANIES because rivals are few. Ben's framing describes that population; it is not a new gate, and none should be added.\n\nMEASURE BEFORE BUILDING THE LAYOUT, and treat the number as capable of overturning the design. On the fixture most firms showed a dash for Capital, i.e. are not public, so the two groups may be nearly empty at campaign start. FIRST TASK: report how many firms are public-and-filed, what their prices are, and how many fall each side of the player's balance over several seeds. tools/verify/acquisition_viability.cpp (BL-634) already measures the buy side and is the place to extend rather than a fresh harness. If the honest answer is \"two firms, both unaffordable\", say so and bring it back - do not pad the surface to look busy.\n\nTHE FOLD-OUT IS BL-627, not a second design. Ben: \"This ledger should have a fold out option which displays a full table, sortable by type, end resource, input resource, profit... And any other useful fields.\" That is the profitability ledger BL-627 has been design-owed for since Sprint 20, and BL-627 is already described as \"the host of the buyout press\". It takes the BL-214 full-canvas disclosure idiom the Corporation dashboard already uses - which is, on the evidence of the 2026-08-29 capture pass, the best-reading surface in the whole ledger family and the one the others should be measured against.\n\nREACHABILITY, and the one open call. The surface is wired first as the COMPANY-LENS click destination, replacing the placeholder BL-666 left there - a Company-lens press is literally \"I am looking at a firm I might buy\", so the routing is already right. WHETHER IT ALSO EARNS A NAV-RAIL SLOT IS BEN'S CALL and is deliberately not assumed here: MENU.md curates thirteen slots and a fourteenth is a shell change, not a ledger change. Build the ledger reachable from the lens; wire the rail slot when Ben names one. Recorded as an open call rather than a default so the rail is not grown by accident."
+    }
+  ]
 }

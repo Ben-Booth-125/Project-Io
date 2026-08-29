@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*81 entries — 81 open, 0 resolved.*
+*88 entries — 88 open, 0 resolved.*
 
 ---
 
@@ -742,6 +742,95 @@ THE GAP THAT MATTERS MORE: the round trip is not covered by any harness, and nev
 The fix is a CMake-declared envelope harness linking imgui, on the font_glyph_harness precedent. Worth an item: a serialisation seam with no read/write test is exactly where the asymmetry that corrupts a snapshot hides, and the max_overlay bug (NR-703) came out of this same file today.
 
 *Files: `src/core/save_game.cpp`, `src/core/save_game.hpp`, `tools/verify/build_harness.js`*
+
+### NR-709 — The fold-out column starves every stretch NAME column, and NR-705 is one of three
+*observation · raised 2026-08-29 · from Sprint 24 (ledgers), the batch-3 capture pass: shell_pass.lua over the thirteen slots plus a new ledger_pass.lua over every sub-view and scroll foot.*
+
+NR-705 filed the corporations table showing every firm as a single letter. The capture pass found the SAME defect on two more surfaces, so it is a class rather than an instance and should be fixed as one.
+
+The mechanism, read out of corporation_panel.cpp:128-134: the column host is ~358 px (shell_column_width at 1720 wide), and the table declares Reach/Capital/Share at WidthFixed 62 each plus Stance at WidthFixed 220 - 406 px of fixed width in a 358 px box. The Corporation column is the only WidthStretch column, so it absorbs the whole overflow and collapses to one glyph. Any table in this column that puts its identity column on stretch behind fixed siblings loses the identity.
+
+The three instances found: (1) the all-corporations table, header "C Reach Capital Share Stance", 88 rows of one letter (NR-705); (2) the Economy panel Markets view, header "R Supply Demand Price" - THE RESOURCE NAME IS GONE ENTIRELY, every row a colour swatch and three numbers; (3) the Economy panel Corps view, "CalonIntus-PaxisAthen Venture" cut mid-word by the Balance column.
+
+The question for you is whether the fix is per-table (shrink Stance, elide names) or a column-host rule - a minimum identity width the fold-out enforces, so the next table added here cannot reintroduce it.
+
+*Files: `src/ui/corporation_panel.cpp`, `src/ui/economy_panel.cpp`, `src/ui/foldout_column.hpp`*
+
+### NR-710 — The History ledger Ages view produced no frame in nineteen minutes, and no check has ever opened it
+*observation · raised 2026-08-29 · from Sprint 24 (ledgers), the batch-3 capture pass: shell_pass.lua over the thirteen slots plus a new ledger_pass.lua over every sub-view and scroll foot.*
+
+MEASURED, this build, this fixture: selecting history_view = 2 (Ages) and rendering produced NO CAPTURE after nineteen minutes of solid CPU. The run was killed rather than left to finish, so the pass could reach the views after it.
+
+Cause, read out of tile_inspector.cpp: the Ages cache is built inline on the drawing thread - run_history_sim(cached_ss, ..., start_year 0, stop_year campaign_epoch_year) over the body’s real terrain - so the first frame that shows the tab replays the whole Era -1 political history before it returns. In the built app that is a tab click that stops the application, with no progress and no way back.
+
+WHAT IS AND IS NOT ESTABLISHED: that no frame arrived in nineteen minutes is measured. Whether the sim is very slow or does not terminate on this fixture is NOT established - CPU climbed steadily throughout, which is consistent with both. Neither reading should be repeated as fact.
+
+WHY IT WAS NEVER SEEN: no verify script has ever selected this view. history_ledger_and_comms.lua covers Story and Chain and returns to Story. verify.ages_year was added with BL-277 and, until ledger_pass.lua, was called by nothing. A view shipped, documented in ledgers/tile_ledger.md, and never once rendered by a check.
+
+SECOND HALF, same fix window: tile_inspector.cpp sets s.ages_year = 0 on the frame it rebuilds the cache, which is the frame a script park lands on - so even once it renders, a captured Ages frame shows year 0 whatever the script asked for.
+
+*Files: `src/ui/tile_inspector.cpp`, `src/core/verify_api.cpp`, `scripts/verify/ledger_pass.lua`*
+
+### NR-711 — The Economy ledger Holdings view still itemises every rival corporation stockpile
+*observation · raised 2026-08-29 · from Sprint 24 (ledgers), the batch-3 capture pass: shell_pass.lua over the thirteen slots plus a new ledger_pass.lua over every sub-view and scroll foot.*
+
+Captured live: Economy > Holdings prints one expandable block per (corp x body) with EXACT quantities per resource for corporations the player does not own - Faros-YelenKalen 126.9 Iron Ore, 8.0 Agricultural Produce, 2.5 Peat; Exoar-Exoex 26.1 / 8.0; and so on down the list.
+
+That is the competitor-visibility rule (DISCOVERY.md) broken on the one surface that breaks it. Every other surface in the app meets the redaction standard - the Selection card, the hover card, and the corporations table, which prints a dash where a firm does not file.
+
+The doc that owns this surface, docs/ui/ledgers/economy.md, already flags it and names BL-482 (economy panel pools leak) as the owner. THAT ITEM NO LONGER EXISTS: backlog_query returns nothing for BL-482. So the defect is live, documented, and unowned - the doc is citing a dead id as its fix.
+
+Decision needed: refile the redaction as a sprint-24 item, or take economy.md’s own lead question (fold Economy into Corporation), which would delete the surface and the leak together.
+
+*Files: `src/ui/economy_panel.cpp`, `docs/ui/ledgers/economy.md`, `docs/ui/DISCOVERY.md`*
+
+### NR-712 — The Contracts ledger says ticks in two call sites, against the standing display rule
+*observation · raised 2026-08-29 · from Sprint 24 (ledgers), the batch-3 capture pass: shell_pass.lua over the thirteen slots plus a new ledger_pass.lua over every sub-view and scroll foot.*
+
+contracts_ledger.cpp:207 prints "Contract deadline in %d ticks" and :297 prints "Deadline in %d ticks". Both are on screen in the captures - the Offers view shows it three times over, once per offer.
+
+The display word is qtr, never tick (NR-002, your ruling 2026-08-01) - a Tick is literally a calendar quarter, and every other surface honours it: the Construction ledger says "~N qtrs", the Market ledger convoy rows say "1 qtr" / "2 qtrs", the header says "/ qtr".
+
+Two call sites, mechanical. Filed rather than fixed because it is one line of a larger contracts pass the batch is about to take, and because the same view has three other wording problems worth ruling on together: offers name their target as "Province #31808" (a raw entity id), the Accept press is greyed with an unexplained "(still filling)", and "escrow 5 / 400" appears with no definition anywhere on the surface.
+
+*Files: `src/ui/contracts_ledger.cpp`*
+
+### NR-713 — Three ledgers print a backlog id at the player, and seven of thirteen have no design doc
+*observation · raised 2026-08-29 · from Sprint 24 (ledgers), the batch-3 capture pass: shell_pass.lua over the thirteen slots plus a new ledger_pass.lua over every sub-view and scroll foot.*
+
+ON-SCREEN BACKLOG IDS, all three found in captures: balance_ledger.cpp:258 "Policy levers - not yet wired (BL-155)"; tech_tree_panel.cpp:599 "BL-087 design mock - read-only."; and the Tectonics view "First cut (BL-660)." A player has no way to resolve a BL- id, so the string says a thing is unfinished without saying what it will do. The honesty is right and the vocabulary is ours, not theirs.
+
+DOC COVERAGE, counted against docs/ui/ledgers/: six of the thirteen slots have a 5-axis design doc (Balance, Construction, Corporation-as-slot-8, Market, Economy, History). SEVEN DO NOT - Contracts (slot 13), Generation (10), AI decisions (11), Strategy (12), Research (4), and the Corporation OVERVIEW DASHBOARD (slot 1), which corporation.md excludes in its own header note. Each of the seven has a question_log entry, so the surface question is recorded; none has the sub-levels / lens / data / toggle answers the other six carry.
+
+ALSO STALE, found while reading: ledgers/tile_ledger.md documents THREE History views and names a "Tiles" view that no longer exists, while the code carries FOUR (Story/Chain/Ages/Tectonics, tile_inspector.hpp). ui_state.hpp’s own comment on history_view still reads "2=Tiles, 3=Ages" - two errors in one line. ui_elements.json carries UI-087 "Tiles view" as an element and has no entry for Tectonics.
+
+*Files: `src/ui/balance_ledger.cpp`, `src/ui/tech_tree_panel.cpp`, `src/ui/ui_state.hpp`, `docs/ui/ledgers/tile_ledger.md`, `docs/ui/ui_elements.json`*
+
+### NR-714 — Two capture instruments cannot see what they are named for, and the clipping ledger passes vacuously over six clipped strings
+*observation · raised 2026-08-29 · from Sprint 24 (ledgers), the batch-3 capture pass: shell_pass.lua over the thirteen slots plus a new ledger_pass.lua over every sub-view and scroll foot.*
+
+THE CHECK NAMED FOR THE RANKING CANNOT SEE IT. budget_ledger_ranked.lua captures two frames; the Balance ledger top-buildings ranking is in neither. One frame is scrolled to the head, where the ranking is below the fold; the other has the ledger CLOSED. The ranking does exist and reads well - ledger_pass scrolled foot capture is the first frame that has ever contained it.
+
+SCROLL CANNOT REACH TWO LEDGERS. verify.scroll_panel resolves a WINDOW name, so it moves Balance, History, Economy and the corporations table (head and foot differ) but does nothing on the Market ledger, whose price list is an inner child region (head and foot are byte-identical), and has no key at all for the Generation ledger (same). So everything below the first three goods in the Market ledger has never been captured.
+
+THE CLIPPING LEDGER IS VACUOUS ON THIS CLASS. expect_no_clipping reports "PASS: 0 failure(s), 0 RECORD(S) total" over both passes, on frames that visibly contain at least: "82% of labour demand n" (Corporation dashboard), "Cr 0.10 /" (Balance, Laws), "CalonIntus-PaxisAthen Ventu" (decision feed), "- 8 decision" (Strategy), "Huhaidar -> Kua Sua" (Market convoys), "Extraction Site [260" (Balance ranking). This is NR-663 again with a bigger sample: table cells and SmallButton labels are not instrumented into the overflow ledger, so the one free assertion the pass makes is a green that means nothing.
+
+The assertion is left in ledger_pass.lua deliberately, with this recorded beside it, so that instrumenting the ledger turns it red without anyone re-authoring the script.
+
+AND THE COVERAGE TOOL CANNOT SEE EITHER PASS. ui_coverage --captures attributes a PNG to an element through the element checks array, which names scripts. Neither shell_pass nor ledger_pass is named against any element, so a run that produced 36 fresh ledger frames reports FOUR of the thirty ledger elements as having something to look at - and the four are attributed to the older single-purpose scripts, not to the passes. The spine this sprint scopes off is blind to the instrument the sprint uses. (Second, smaller trap in the same tool: --captures defaults to a screenshots dir at the repo root, and the app writes to build/screenshots, so the bare flag reports zero captures rather than saying it looked in the wrong place.)
+
+*Files: `scripts/verify/budget_ledger_ranked.lua`, `scripts/verify/ledger_pass.lua`, `src/core/verify_api.cpp`, `tools/session/ui_coverage.js`, `docs/ui/ui_elements.json`*
+
+### NR-715 — ledger_pass.lua is new and unauthorised as a skill - a second class-wide capture instrument beside shell_pass
+*novel-work · raised 2026-08-29 · from Sprint 24 (ledgers), the batch-3 capture pass: shell_pass.lua over the thirteen slots plus a new ledger_pass.lua over every sub-view and scroll foot.*
+
+The batch needed every ledger SUB-VIEW, and shell_pass.lua only opens each slot on its default view. I authored scripts/verify/ledger_pass.lua: 36 captures over the thirteen slots - four expanded corp roll-ups, the Balance foot, three Economy views, four Research eras, three Market views, both ends of the corporations table, four History views and its three Chain rounds, the Generation ledger, both observability panels, three Contracts views.
+
+Flagged because the standing rule says a check without a tool should become one, and "tool creation is skill creation" needs your permission before it is named in a SKILL.md. verifier-visual auto-discovers scripts/verify/*.lua so it is RUNNABLE without that; naming it as a review instrument beside shell_pass is your call.
+
+It also deliberately does NOT capture the Ages view (NR-710) and records why in its own footer, which is the second thing worth your eye: a capture instrument that documents what it cannot reach, rather than quietly covering twelve of thirteen and reading as if it covered all of them.
+
+*Files: `scripts/verify/ledger_pass.lua`*
 
 ---
 

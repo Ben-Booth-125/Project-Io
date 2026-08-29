@@ -27,7 +27,7 @@ and so is the safety net.
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
 | `UI-016` Planetary Canvas > Building markers | sub-element | `built_tile_render`, `stacked_tile_ring`, `icon_silhouettes` | 3 | 0 | 0 |
-| `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 4 | 0 | 2 |
+| `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 5 | 0 | 2 |
 | `UI-063` Icon vocabulary | element | `icon_silhouettes` | 0 | 0 | 0 |
 
 ## ASSERTED (32)
@@ -37,23 +37,23 @@ and so is the safety net.
 | `UI-009` Circumplanetary Canvas | canvas | `canvas_levels`, `survey`, `landform_relief`, `tile_texture`, `spectator_god_view` | 1 | 0 | 0 |
 | `UI-020` Planetary Canvas > Corporate borders (reach rings) | sub-element | `corp_lens_border`, `corporate_reach`, `border_band` | 6 | 0 | 3 |
 | `UI-021` Planetary Canvas > Survey region mask | sub-element | `survey`, `visibility`, `survey_dispatch` | 4 | 0 | 0 |
-| `UI-027` Minimap > Lens mode bar | control | `lens_strip`, `lens_modes`, `lens_strip_and_fields` | 4 | 0 | 2 |
-| `UI-028` Minimap > Lens legend fold-out | sub-element | `lens_legend`, `lens_strip_and_fields` | 4 | 0 | 3 |
-| `UI-029` Lens system (overlay_mode family) | element | `lens_modes`, `default_lens`, `lens_strip_and_fields` | 4 | 0 | 2 |
-| `UI-030` Lens system (overlay_mode family) > Corporation lens | sub-element | `corporation_lens`, `corp_lens_border`, `lens_modes`, `lens_strip_and_fields` | 4 | 0 | 2 |
-| `UI-032` Lens system (overlay_mode family) > Resource lens | sub-element | `resource_lens`, `lens_modes`, `lens_strip_and_fields` | 4 | 0 | 2 |
-| `UI-033` Lens system (overlay_mode family) > Market lens | sub-element | `market_lens`, `lens_modes`, `lens_strip_and_fields` | 4 | 0 | 2 |
-| `UI-034` Lens system (overlay_mode family) > Population lens | sub-element | `population_lens`, `population_legibility`, `lens_modes`, `lens_strip_and_fields` | 4 | 0 | 2 |
-| `UI-037` Lens system (overlay_mode family) > Continent lens | sub-element | `continents_terrain`, `tile_texture`, `landform_relief`, `save_load`, `lens_strip_and_fields` | 10 | 0 | 3 |
-| `UI-038` Lens system (overlay_mode family) > Scarcity lens | sub-element | `scarcity_lens`, `lens_modes`, `lens_strip_and_fields` | 4 | 0 | 2 |
-| `UI-039` Lens system (overlay_mode family) > Industry lens | sub-element | `industry_lens`, `province_render`, `lens_strip_and_fields` | 4 | 0 | 0 |
-| `UI-041` Lens system (overlay_mode family) > Reach lens | sub-element | `lens_modes`, `lens_legend`, `province_render`, `lens_strip_and_fields` | 4 | 0 | 5 |
-| `UI-042` Lens system (overlay_mode family) > Supply-routes lens | sub-element | `lens_modes`, `province_render`, `lens_strip_and_fields` | 4 | 0 | 2 |
-| `UI-043` Selection band | element | `selection_band`, `selection_redesign`, `selection_bar`, `shell_pass`, `lens_one_tier`, `lens_region_destinations` | 26 | 1 | 3 |
-| `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields`, `lens_region_destinations` | 55 | 0 | 7 |
+| `UI-027` Minimap > Lens mode bar | control | `lens_strip`, `lens_modes`, `lens_strip_and_fields` | 5 | 0 | 2 |
+| `UI-028` Minimap > Lens legend fold-out | sub-element | `lens_legend`, `lens_strip_and_fields` | 5 | 0 | 3 |
+| `UI-029` Lens system (overlay_mode family) | element | `lens_modes`, `default_lens`, `lens_strip_and_fields` | 5 | 0 | 2 |
+| `UI-030` Lens system (overlay_mode family) > Corporation lens | sub-element | `corporation_lens`, `corp_lens_border`, `lens_modes`, `lens_strip_and_fields` | 5 | 0 | 2 |
+| `UI-032` Lens system (overlay_mode family) > Resource lens | sub-element | `resource_lens`, `lens_modes`, `lens_strip_and_fields` | 5 | 0 | 2 |
+| `UI-033` Lens system (overlay_mode family) > Market lens | sub-element | `market_lens`, `lens_modes`, `lens_strip_and_fields` | 5 | 0 | 2 |
+| `UI-034` Lens system (overlay_mode family) > Population lens | sub-element | `population_lens`, `population_legibility`, `lens_modes`, `lens_strip_and_fields` | 5 | 0 | 2 |
+| `UI-037` Lens system (overlay_mode family) > Continent lens | sub-element | `continents_terrain`, `tile_texture`, `landform_relief`, `save_load`, `lens_strip_and_fields` | 11 | 0 | 3 |
+| `UI-038` Lens system (overlay_mode family) > Scarcity lens | sub-element | `scarcity_lens`, `lens_modes`, `lens_strip_and_fields` | 5 | 0 | 2 |
+| `UI-039` Lens system (overlay_mode family) > Industry lens | sub-element | `industry_lens`, `province_render`, `lens_strip_and_fields` | 5 | 0 | 0 |
+| `UI-041` Lens system (overlay_mode family) > Reach lens | sub-element | `lens_modes`, `lens_legend`, `province_render`, `lens_strip_and_fields` | 5 | 0 | 5 |
+| `UI-042` Lens system (overlay_mode family) > Supply-routes lens | sub-element | `lens_modes`, `province_render`, `lens_strip_and_fields` | 5 | 0 | 2 |
+| `UI-043` Selection band | element | `selection_band`, `selection_redesign`, `selection_bar`, `shell_pass`, `lens_one_tier`, `lens_region_destinations` | 28 | 1 | 3 |
+| `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields`, `lens_region_destinations` | 58 | 0 | 7 |
 | `UI-045` Selection band > Tile selection layout | sub-element | `selection_tile_layout`, `selection_accordion`, `ui_shell_fixture` | 9 | 1 | 2 |
-| `UI-049` Hover Card | element | `hover_freeze`, `sticky_card`, `border_band`, `lens_one_tier`, `lens_strip_and_fields` | 28 | 0 | 4 |
-| `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields` | 35 | 0 | 3 |
+| `UI-049` Hover Card | element | `hover_freeze`, `sticky_card`, `border_band`, `lens_one_tier`, `lens_strip_and_fields` | 29 | 0 | 4 |
+| `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields` | 36 | 0 | 3 |
 | `UI-075` Construction Ledger > Build view | view | `tile_build_ledger`, `roads`, `build_door_wide_roster`, `fresh_start_build` | 1 | 0 | 0 |
 | `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `v009_batch` | 7 | 0 | 0 |
 | `UI-077` Construction Ledger > Sell Orders view | view | `sell_order` | 3 | 0 | 0 |
@@ -63,7 +63,7 @@ and so is the safety net.
 | `UI-088` Economy Panel (aggregate) | panel | `economy_panel`, `economy_panel_refit`, `processing_management_ux` | 1 | 0 | 0 |
 | `UI-096` Planetary Canvas > National border band | sub-element | `border_band` | 6 | 0 | 3 |
 | `UI-097` Planetary Canvas > Province render and selection | sub-element | `province_render`, `lens_structure_pivot` | 11 | 0 | 1 |
-| `UI-098` Lens system (overlay_mode family) > Throughput lens | sub-element | `throughput_lens`, `lens_strip_and_fields` | 4 | 0 | 0 |
+| `UI-098` Lens system (overlay_mode family) > Throughput lens | sub-element | `throughput_lens`, `lens_strip_and_fields` | 5 | 0 | 0 |
 | `UI-105` Generation Ledger | ledger | `save_load` | 6 | 0 | 3 |
 | `UI-111` Spectator god view | element | `spectator_god_view` | 1 | 0 | 0 |
 
