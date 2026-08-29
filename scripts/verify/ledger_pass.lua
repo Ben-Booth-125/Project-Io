@@ -25,7 +25,27 @@
 -- so `foot()` renders before capturing and resets to 0 afterwards — otherwise the
 -- next ledger inherits the request and a capture named for a head shows a foot.
 
-verify.window(1280, 720)
+-- 1920x1080, AND THAT IS THE POINT OF THE LINE (Ben, 2026-08-29): "it seems your
+-- captures are not at 1920x1080p, so what we see here is zoomed compared to my
+-- viewing. In other words, the UI doesn't shrink at smaller resolutions."
+--
+-- He is right, and the arithmetic says why the difference is all vertical.
+-- `shell_column_width` is 0.20 * disp_x clamped to [380, 460] — 380 px at 1280,
+-- 384 px at 1920, four pixels across the whole common range. But the chrome above
+-- and below the column is FIXED: the profile tile, and a bottom band whose height
+-- derives from `minimap_width` = max(336, 0.28 * min(disp_x, disp_y)), which is
+-- 336 at BOTH. So every one of the extra 360 rows at 1080p lands in the ledger's
+-- own content height.
+--
+-- Measured on this surface: the Market price list shows 3.5 goods at 720p and 9
+-- at 1080p. A density judgement taken at 720p is taken against half the content
+-- height the reviewer has, and every "only N rows fit" number this sprint produced
+-- before 2026-08-29 was measured on the wrong screen.
+--
+-- `shell_pass.lua` deliberately STAYS at 1280x720: it carries the clipping
+-- assertion, and the smallest supported display (BL-215) is where a string is
+-- most likely to overrun. Worst-case fit there, design review here.
+verify.window(1920, 1080)
 
 local staged = stage_ui_fixture()
 print("LEDGER state_hash=" .. verify.state_hash())
