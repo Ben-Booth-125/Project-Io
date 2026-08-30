@@ -56,6 +56,79 @@ constexpr float kKeystoneMul  = 1.5f;   ///< Keystone/capstone nodes draw larger
 constexpr float kMinZoom      = 0.35f;
 constexpr float kMaxZoom      = 3.0f;
 
+// ---------------------------------------------------------------------------
+// Palette — GLOBAL_STYLE_SHEET.md, tech tree sub-track (2026-08-25). The
+// background and the EARNED/LOCKED accent pair are SETTLED (colour2 render);
+// the depth treatment — flat hard-edged shadows, stepped ring bevel, etched
+// connector grooves — is the wide8 candidate softened per wide11, still being
+// tuned. Amber and cyan are the only two live hues on this surface; everything
+// structural stays in the grey ramp (wide4's many-hued pass was rejected).
+// ---------------------------------------------------------------------------
+
+constexpr ImU32 kColBackground    = IM_COL32(15, 15, 20, 255);    ///< #0F0F14 — app.cpp's clear colour.
+constexpr ImU32 kColEarnedFill    = IM_COL32(232, 168, 46, 255);  ///< Amber — EARNED.
+constexpr ImU32 kColEarnedEdge    = IM_COL32(120, 84, 18, 255);
+constexpr ImU32 kColLockedFill    = IM_COL32(44, 186, 224, 255);  ///< Saturated cyan — LOCKED (a full second live colour).
+constexpr ImU32 kColLockedEdge    = IM_COL32(16, 88, 110, 255);
+constexpr ImU32 kColUnearnFill    = IM_COL32(20, 21, 27, 255);    ///< No gate authored — recessive near-bg plate…
+constexpr ImU32 kColUnearnEdge    = IM_COL32(110, 116, 128, 170); ///< …under a dim grey outline, never a third accent.
+constexpr ImU32 kColNodeShadow    = IM_COL32(0, 0, 0, 110);       ///< Flat offset shadow, no blur; alpha softened per wide11.
+constexpr ImU32 kColRingHighlight = IM_COL32(66, 74, 90, 110);    ///< Terrace step: lit inner lip…
+constexpr ImU32 kColRingShadow    = IM_COL32(0, 0, 0, 160);       ///< …dark outer edge-line, no gradient.
+constexpr ImU32 kColEdgeIncision  = IM_COL32(6, 7, 10, 220);      ///< Connector groove: the cut…
+constexpr ImU32 kColEdgeLip       = IM_COL32(96, 106, 124, 110);  ///< …and its lit lower lip.
+constexpr float kShadowOffset     = 2.5f;                          ///< Screen px, deliberately not zoom-scaled.
+
+/// Node silhouette by category (wide7 — varied shapes fixed hexagon fatigue).
+/// Capstones alone carry the large hexagon; branch nodes point at each other's
+/// exclusion partner (A up, B down); regimes read as record-markers.
+enum class node_shape { circle, hexagon, diamond, tri_up, tri_down };
+
+bool is_branch_suffix(const std::string& id); // defined with the layout helpers below
+
+node_shape shape_for(const tech_node& t)
+{
+    if (t.kind == "capstone") return node_shape::hexagon;
+    if (t.kind == "regime")   return node_shape::diamond;
+    if (is_branch_suffix(t.id))
+        return t.id.back() == 'A' ? node_shape::tri_up : node_shape::tri_down;
+    return node_shape::circle;
+}
+
+void add_node_shape(ImDrawList* dl, node_shape s, ImVec2 c, float r, ImU32 col,
+                     bool filled, float thickness = 1.0f)
+{
+    switch (s)
+    {
+    case node_shape::circle:
+        if (filled) dl->AddCircleFilled(c, r, col);
+        else        dl->AddCircle(c, r, col, 24, thickness);
+        break;
+    case node_shape::hexagon:
+        if (filled) dl->AddNgonFilled(c, r, col, 6);
+        else        dl->AddNgon(c, r, col, 6, thickness);
+        break;
+    case node_shape::diamond:
+        if (filled) dl->AddNgonFilled(c, r, col, 4);
+        else        dl->AddNgon(c, r, col, 4, thickness);
+        break;
+    case node_shape::tri_up:
+    {
+        const ImVec2 p1{c.x, c.y - r}, p2{c.x - 0.866f * r, c.y + 0.5f * r}, p3{c.x + 0.866f * r, c.y + 0.5f * r};
+        if (filled) dl->AddTriangleFilled(p1, p2, p3, col);
+        else        dl->AddTriangle(p1, p2, p3, col, thickness);
+        break;
+    }
+    case node_shape::tri_down:
+    {
+        const ImVec2 p1{c.x, c.y + r}, p2{c.x - 0.866f * r, c.y - 0.5f * r}, p3{c.x + 0.866f * r, c.y - 0.5f * r};
+        if (filled) dl->AddTriangleFilled(p1, p2, p3, col);
+        else        dl->AddTriangle(p1, p2, p3, col, thickness);
+        break;
+    }
+    }
+}
+
 /// Ring = the authored `tier` field when set (>0) — the Era 1 sectors set
 /// tier = R1/R2/R3 directly, and the Antiquity transcription sets tier =
 /// band index (T1=1..T6=6), both authoritative. Falls back to 1 + longest
@@ -426,12 +499,16 @@ bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_i
 
     auto to_screen = [&](ImVec2 c) { return ImVec2{ centre.x + c.x * zoom, centre.y + c.y * zoom }; };
 
-    // Ring guides — subtle, so they read as depth without competing with nodes.
+    // Ring guides — wide8's terraced bevel: each ring is a flat step, drawn as
+    // a dark outer edge-line plus a lit inner lip, never a gradient.
     float outer_radius = kBaseRadius;
     for (const wedge_info& w : wedges)
         outer_radius = std::max(outer_radius, w.max_radius);
     for (float r = kBaseRadius; r <= outer_radius + 1.0f; r += kRingSpacing)
-        dl->AddCircle(centre, r * zoom, IM_COL32(60, 70, 90, 90), 64, 1.0f);
+    {
+        dl->AddCircle(centre, r * zoom + 1.5f, kColRingShadow, 96, 1.0f);
+        dl->AddCircle(centre, r * zoom, kColRingHighlight, 96, 1.0f);
+    }
 
     // Wedge boundary rays + quest labels.
     for (std::size_t i = 0; i < wedges.size(); ++i)
@@ -452,6 +529,9 @@ bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_i
     // Edges — prereqs whose source has a position in THIS view. A prereq
     // outside the view (e.g. an Era-1 node's Era-0 gate) is silently
     // skipped, not drawn as a dangling stub (BL-310 R2).
+    // Each connector is an etched groove (wide8): the incision plus a lit lip
+    // offset a pixel below. Whether the groove survives real crossing density
+    // is an open question on the style sheet — this is the stress-test.
     for (const node_layout& nl : layout)
     {
         for (const std::string& prereq_id : nl.node->prereqs)
@@ -459,7 +539,10 @@ bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_i
             auto it = pos_by_id.find(prereq_id);
             if (it == pos_by_id.end())
                 continue;
-            dl->AddLine(to_screen(it->second), to_screen(nl.canvas_pos), IM_COL32(90, 100, 120, 140), 1.5f);
+            const ImVec2 a = to_screen(it->second);
+            const ImVec2 b = to_screen(nl.canvas_pos);
+            dl->AddLine({a.x, a.y + 1.5f}, {b.x, b.y + 1.5f}, kColEdgeLip, 1.0f);
+            dl->AddLine(a, b, kColEdgeIncision, 2.0f);
         }
     }
 
@@ -471,11 +554,14 @@ bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_i
     {
         const ImVec2 a = to_screen(pa);
         const ImVec2 b = to_screen(pb);
-        dl->AddLine(a, b, IM_COL32(200, 120, 60, 160), 1.5f);
+        // Warm-neutral grey, not the old orange — amber now means EARNED
+        // (colour2), and a third live hue broke wide4. Warmth alone carries
+        // the "these two conflict" read.
+        dl->AddLine(a, b, IM_COL32(150, 140, 124, 150), 1.5f);
         const ImVec2 mid{ (a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f };
         const ImVec2 text_size = ImGui::CalcTextSize("excludes");
         dl->AddText({ mid.x - text_size.x * 0.5f, mid.y - text_size.y * 0.5f }, // fit-exempt: on-canvas node label, canvas pans to content
-                    IM_COL32(230, 160, 90, 230), "excludes");
+                    IM_COL32(184, 172, 150, 220), "excludes");
     }
 
     // Nodes.
@@ -485,35 +571,52 @@ bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_i
         const ImVec2 spos = to_screen(nl.canvas_pos);
         const bool is_capstone = (nl.node->kind == "capstone");
         const bool is_regime   = (nl.node->kind == "regime");
-        const bool branch_a = is_branch_suffix(nl.node->id) && nl.node->id.back() == 'A';
-        const bool branch_b = is_branch_suffix(nl.node->id) && nl.node->id.back() == 'B';
 
         const float r = kNodeRadius * zoom * (is_capstone ? kKeystoneMul : 1.0f);
-        ImU32 fill;
+        const node_shape shape = shape_for(*nl.node);
+
+        // Colour is keyed to STATE, not kind (colour2, SETTLED): amber EARNED,
+        // cyan LOCKED, dim grey outline for a node with no authored gate. Kind
+        // now lives in the silhouette (shape_for), so the old per-kind and
+        // per-branch hues are gone — branch identity is the triangle's point.
+        ImU32 fill, edge;
+        bool recessive = false;
         if (is_history)
         {
-            // History palette (Era -1) — muted/sepia, deliberately less saturated
-            // than Era 1's bright draft palette: this content is settled record,
-            // not a proposal awaiting a decision. Keystones read as a warm bronze
-            // rather than gold; regime (roster) nodes read distinctly from techs.
+            // History palette (Era -1) — muted/sepia, deliberately less saturated:
+            // this content is settled record, not a proposal awaiting a decision.
             if (is_capstone)    fill = IM_COL32(180, 140, 90, 220);
             else if (is_regime) fill = IM_COL32(140, 120, 100, 210);
             else                fill = IM_COL32(120, 130, 140, 200);
+            edge = IM_COL32(20, 24, 32, 200);
+        }
+        else if (!nl.node->earnable)
+        {
+            fill = kColUnearnFill;
+            edge = kColUnearnEdge;
+            recessive = true; // no shadow — deliberately recessive, not a third state colour
+        }
+        else if (w.has_tech(corp, nl.node->id))
+        {
+            fill = kColEarnedFill;
+            edge = kColEarnedEdge;
         }
         else
         {
-            fill = IM_COL32(90, 130, 180, 230);
-            if (branch_a) fill = IM_COL32(90, 170, 110, 230);
-            else if (branch_b) fill = IM_COL32(150, 110, 190, 230);
-            else if (is_capstone) fill = IM_COL32(215, 175, 70, 230);
+            fill = kColLockedFill;
+            edge = kColLockedEdge;
         }
 
         const bool hovered = ImGui::IsWindowHovered() &&
             (mouse.x - spos.x) * (mouse.x - spos.x) + (mouse.y - spos.y) * (mouse.y - spos.y) <= r * r * 2.25f;
 
-        dl->AddCircleFilled(spos, r, fill);
-        dl->AddCircle(spos, r, hovered ? IM_COL32(255, 255, 255, 255) : IM_COL32(20, 24, 32, 200), 24,
-                      hovered ? 2.0f : 1.0f);
+        if (!recessive)
+            add_node_shape(dl, shape, {spos.x + kShadowOffset, spos.y + kShadowOffset}, r,
+                           kColNodeShadow, /*filled=*/true);
+        add_node_shape(dl, shape, spos, r, fill, /*filled=*/true);
+        add_node_shape(dl, shape, spos, r,
+                       hovered ? IM_COL32(255, 255, 255, 255) : edge,
+                       /*filled=*/false, hovered ? 2.0f : 1.2f);
 
         if (zoom > 0.6f)
         {
@@ -555,7 +658,13 @@ bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_i
                     tip += "\n  - " + condition_text(c, resource_name, building_type_name)
                          + (evaluate_condition(c, w, corp) ? "  (met)" : "");
             }
+            // Hover card on the settled dark ground — flat plate, dim grey
+            // border, matching the node treatment. (wide8's hard-edged card
+            // shadow needs a custom tooltip window; not attempted here.)
+            ImGui::PushStyleColor(ImGuiCol_PopupBg, IM_COL32(22, 23, 30, 245));
+            ImGui::PushStyleColor(ImGuiCol_Border, kColUnearnEdge);
             ImGui::SetTooltip("%s", tip.c_str());
+            ImGui::PopStyleColor(2);
         }
     }
 
@@ -642,6 +751,10 @@ void draw_tech_tree_panel(const tech_tree_registry& tree, const world& w, entity
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+    // The takeover paints the SETTLED background itself rather than inheriting
+    // ImGui's default window grey — the style sheet's ground is the app clear
+    // colour, and the bevel/groove treatment only reads against it.
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, kColBackground);
     ImGui::Begin("##tech_tree_canvas", nullptr, flags);
 
     if (view == 0)
@@ -674,6 +787,7 @@ void draw_tech_tree_panel(const tech_tree_registry& tree, const world& w, entity
     }
 
     ImGui::End();
+    ImGui::PopStyleColor();
 }
 
 } // namespace ui
