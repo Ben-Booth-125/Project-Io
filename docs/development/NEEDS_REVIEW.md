@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*92 entries — 92 open, 0 resolved.*
+*94 entries — 94 open, 0 resolved.*
 
 ---
 
@@ -898,6 +898,36 @@ HASHED ALL FOUR PAIRS AFTER FINDING THE FIRST. Two are false and the causes diff
 SO THE FIX HAS TWO HALVES. scroll_panel should REJECT an unknown name loudly rather than clearing the request - a silent no-op on a typo or an unhandled panel is how a capture comes to be named for content it does not contain. And the market case needs the request to reach the child scroller, not the window.
 
 *Files: `scripts/verify/ledger_pass.lua`, `src/core/verify_api.cpp`, `src/ui/market_ledger.cpp`*
+
+### NR-720 — quarterly_return R2 fails on main and nothing owns it
+*observation · raised 2026-08-29 · from Sprint 24, verifying BL-685 (exchange record). Reported by the agent as pre-existing; confirmed here by a different method.*
+
+`quarterly_return` fails R2 — "every filed net == that tick's measured apply_budget delta, EXACTLY" — on current main. A search of the backlog and this file finds NO owner: no item, no prior entry, nothing.
+
+IT IS NOT BL-685's. The agent said so having reverted `market_clearing.cpp` to HEAD and reproduced. I checked it a different way rather than re-running its experiment: the whole clearing diff is ONE lambda that constructs an `exchange_record` and pushes it, called at four sites. No arithmetic, no balance write, no mutation of supply, demand or price. A budget identity cannot be broken by an append.
+
+WHY IT MATTERS MORE THAN ONE RED ROW. R2 is the assertion that the FILED return matches what the money loop actually did — the quarterly return is what the profitability ledger prints, what the acquisition price is read off (`corp_acquisition_price` uses trailing net), and what a player judges a buyout by. If a filed net can disagree with the real delta, then the price on the Acquisitions ledger is computed from a number that does not match the books. That is a correctness question about a figure now on two surfaces, not a stale test.
+
+It may well be small — a rounding tolerance, an ordering, a flow the harness does not model. But "exactly" is what it asserts, and nobody has looked.
+
+RELATED, and the reason this went unnoticed: `spectator_determinism` is also red on main, tracked as NR-661 (its golden was stale before wave 1). Two red harnesses on main train the eye to expect red, which is how a third arrives unremarked.
+
+*Files: `tools/verify/quarterly_return.cpp`, `src/world/budget_system.cpp`, `src/world/components.hpp`*
+
+### NR-721 — About thirty harnesses could not compile from a clean configure, and a release cut passed anyway
+*observation · raised 2026-08-29 · from Sprint 24, BL-685. Found by an agent that could not run the harnesses its brief required.*
+
+Since `b668434c` — the v0.1.21 cut — `harness_params.hpp` reaches `<sol/sol.hpp>`, but CMake's glob loop for `tools/verify/*.cpp` published only `src` as an include dir. Roughly THIRTY harnesses therefore could not compile from a clean configure: `determinism_harness`, `world_determinism`, `spectator_determinism`, `quarterly_return`, `save_roundtrip`, `demand_census` and more.
+
+FIXED as part of BL-685 (the glob now carries the sol2 and Lua include paths; linking Lua stays opt-in), taken because it blocked that item's own verification step.
+
+THE PART WORTH YOUR ATTENTION IS HOW IT SURVIVED. Existing build trees kept passing, because they had stale `.obj` files from before the header changed — so every developer and every CI run with a warm tree saw green. Only a clean configure exposed it, and nothing does a clean configure. A RELEASE WAS CUT over it.
+
+This is the same family as the four instances Sprint 21 collected under "a check whose green means less than it appears" — and a worse one, because the green was not merely weak, it was measuring a tree that could no longer be reproduced from source. The memory `io-headless-build-invocation` already records the sibling trap (ctest runs stale exes without rebuilding).
+
+The question this raises is process, not code: is a periodic clean-configure build worth adding to the loop, and where — `check.bat`, CI, or a release-cut precondition? A build that only works from a warm tree is a build that works by accident.
+
+*Files: `CMakeLists.txt`, `tools/verify/harness_params.hpp`*
 
 ---
 
