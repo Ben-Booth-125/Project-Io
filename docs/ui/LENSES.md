@@ -531,11 +531,27 @@ slots are not in it.
 |---|---|---|---|
 | 6 | Market | `market` | Which market is this ground in, and what does it pay? |
 | 7 | Convoys | `supply_routes` | What is moving, and along which lanes? |
-| 10 | History | `continent` — *proposed, see below* | Which plate made this ground? |
+| 10 | History | `continent` — on entering **Tectonics**, see below | Which plate made this ground? |
 
-Arming is **fixed**, not sub-view-following: where a ledger has a tab strip, every tab
-gets the same lens. That is a real constraint rather than a simplification — a strip can
-arm only one lens, and it is why Convoys left the Market ledger at all (`convoys.md` § 3).
+**There are two arming rules, and which one a slot uses follows from how many questions
+its ledger answers.**
+
+**Fixed on open** (slots 6 and 7). Every tab gets the same lens, because the ledger
+answers one question on every tab. That a strip can arm only one lens is a real
+constraint rather than a simplification — it is why Convoys left the Market ledger at
+all (`convoys.md` § 3).
+
+**On entering a sub-view** (slot 10, Ben 2026-08-30). History answers four questions and
+only **Tectonics** has a map twin, so a fixed arm would hand the Continent lens to a
+player who opened on Story to read a deep-time biography. The lens is armed on the
+**edge** — the frame the view starts being drawn — which covers both routes in: pressing
+the tab, and opening the ledger onto a Tectonics it was last left on.
+
+**On the edge, never while on it.** A player who reaches Tectonics and then deliberately
+picks another lens keeps it; re-arming every frame would make the lens strip unusable on
+that view. This is asserted rather than assumed — `lens_ledger_pairs.lua` checks that
+opening History on Story arms nothing, that entering Tectonics arms `continent`, and
+that a lens chosen afterwards survives.
 
 **The semantics, which are `nav_pane.cpp`'s and are still formally unowned (NR-722):**
 arm on **open** only, and **never disarm on close**. A player who closes a ledger keeps
@@ -543,12 +559,11 @@ the canvas they are looking at rather than having it yanked back. What is undeci
 the rest — whether opening a second ledger should re-arm to that one's lens, and whether
 a lens the player *deliberately* chose should be overridden by opening a ledger at all.
 
-**Why History's row is a proposal.** `Continent` routes to *"History ledger, at its
-tectonic record"*, so the pair is real — but History carries four views and only
-**Tectonics** has a map twin. Arming `continent` for a player who opened on Story would
-override their lens for a view about deep-time biography. Making it follow the sub-view
-instead would be a **second** arming rule beside the fixed one above, which is the kind
-of thing NR-722 exists to stop happening by implementation.
+**Why History takes the second rule.** `Continent` routes to *"History ledger, at its
+tectonic record"*, so the pair is real — but three of History's four views have nothing
+to do with plates. The choice was between a lens those three do not want and a second
+arming rule; Ben took the second rule (2026-08-30), stated here rather than left to be
+inferred from the code, which is what NR-722 exists to prevent.
 
 **Three lenses have no ledger to pair with, and that is not an omission.**
 `Corporation` and `Company` route to *that corporation's* / *that company's* ledger —

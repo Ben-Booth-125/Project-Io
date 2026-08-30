@@ -74,5 +74,64 @@ pair(6, "market ledger", "market", "lenspair_market")
 -- reason in this file's header, has never been asserted until now.
 pair(7, "convoys ledger", "supply_routes", "lenspair_convoys")
 
+-- Slot 10, History -> the Continent lens, but ON ENTERING THE TECTONICS VIEW
+-- rather than on opening the ledger (Ben's ruling on NR-742). A different rule
+-- from the two above, so it gets its own assertions rather than pair()'s.
+--
+-- History carries four views and only Tectonics has a map twin, which is why a
+-- fixed arm was refused: it would hand the Continent lens to a player who opened
+-- on Story. Three properties are checked, and the third is the one that makes
+-- "on entering" mean something.
+local function tectonics_pair()
+    local x, y = verify.nav_slot(10)
+    if x == nil then
+        print("FAIL history: rail slot 10 has no centre"); fails = fails + 1; return
+    end
+
+    -- 1. Opening History on a NON-Tectonics view must arm nothing.
+    verify.set_overlay("none")
+    verify.panel_view("history", 0)   -- Story
+    verify.frames(2)
+    verify.click(x, y)                -- open
+    verify.frames(3)
+    local on_story = verify.overlay_name()
+    if on_story ~= "none" then
+        print(string.format("FAIL history: opening on Story armed '%s', expected none", on_story))
+        fails = fails + 1
+    else
+        print("PASS history: opening on Story arms nothing")
+    end
+
+    -- 2. Entering Tectonics arms the Continent lens.
+    verify.panel_view("history", 3)   -- Tectonics
+    verify.frames(3)
+    local armed = verify.overlay_name()
+    if armed ~= "continent" then
+        print(string.format("FAIL history: entering Tectonics gave '%s', expected continent", armed))
+        fails = fails + 1
+    else
+        print("PASS history: entering Tectonics -> lens 'continent'")
+    end
+    verify.capture("lenspair_tectonics")
+
+    -- 3. A DELIBERATE lens change while sitting on Tectonics must SURVIVE. This is
+    -- the whole difference between arming on the edge and arming every frame, and
+    -- it is the property that would make the lens strip unusable if it regressed.
+    verify.set_overlay("population")
+    verify.frames(3)
+    local kept = verify.overlay_name()
+    if kept ~= "population" then
+        print(string.format("FAIL history: a deliberate lens was overridden ('%s')", kept))
+        fails = fails + 1
+    else
+        print("PASS history: a deliberate lens survives while on Tectonics")
+    end
+
+    verify.click(x, y)                -- close
+    verify.frames(2)
+end
+
+tectonics_pair()
+
 print(string.format("lens_ledger_pairs: %d failure(s)", fails))
 verify.expect(fails == 0, "every paired ledger arms its lens on open and keeps it on close")

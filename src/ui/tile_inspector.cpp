@@ -44,9 +44,20 @@ void draw_tile_inspector(const world& w, ui_state& s,
                          const generation_report& report,
                          const world_params& gen_params, bool* p_open)
 {
+    // WHICH VIEW THIS PANEL LAST DREW, for the Tectonics lens arm below. File-static
+    // rather than ui_state because it is a frame-to-frame edge detector, not state a
+    // save or a verify script has any business reading.
+    static int last_drawn_view = -1;
+
     // Honour the open flag; when closed the window draws nothing at all.
     if (p_open && !*p_open)
+    {
+        // Closed: forget the view we were on, so REOPENING onto Tectonics counts as
+        // entering it and arms the lens again. Without this, a player who closed the
+        // ledger on Tectonics, changed lens, and came back would get no arm.
+        last_drawn_view = -1;
         return;
+    }
 
     // Collect body IDs into a stable order for the combo box.
     std::vector<entity_id> body_ids;
@@ -130,6 +141,28 @@ void draw_tile_inspector(const world& w, ui_state& s,
     nav_button("Ages", view_ages, view, p_open);
     ImGui::SameLine();
     nav_button("Tectonics", view_tectonics, view, p_open);
+
+    // ARM THE CONTINENT LENS ON ENTERING TECTONICS (Ben's ruling on NR-742,
+    // 2026-08-30). LENSES.md's routing table already sends a plate press to this
+    // view; this closes the loop the other way.
+    //
+    // THIS IS A SECOND ARMING RULE, and it is deliberately not the one slots 6 and 7
+    // use. Those arm a FIXED lens when the ledger opens, which works because their
+    // ledgers answer one question on every tab. History answers four, and only this
+    // one has a map twin - a fixed arm would hand the Continent lens to a player who
+    // opened on Story to read a deep-time biography.
+    //
+    // ON ENTERING, not while on. The edge is what is armed, so a player who reaches
+    // Tectonics and then deliberately picks another lens keeps it; re-arming every
+    // frame would make the lens strip unusable on this view. Entering covers both
+    // routes in: pressing the tab, and opening the ledger onto a parked Tectonics
+    // (the reset above is what makes the second one an edge).
+    //
+    // Closing the ledger does NOT disarm, which is the one thing this shares with
+    // slots 6 and 7 - see LENSES.md, and NR-722 for what is still unowned.
+    if (view == view_tectonics && last_drawn_view != view_tectonics)
+        s.overlay = overlay_mode::continent;
+    last_drawn_view = view;
 
     // The view-level disclosure control (BL-214, revised BL-265). Story is a single
     // block that already shows its content in the column, so there is nothing for the
