@@ -1227,6 +1227,34 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "tech_tree")     m_ui.tech_tree_view = view;
     });
 
+    // Park a COLLAPSING SECTION open or closed.
+    //
+    // Sections are `ui_state` bools rather than a view index, so `panel_view`
+    // cannot reach them and a script had no way to open one. That is not a
+    // theoretical gap: the Generation ledger's whole content sits behind six of
+    // them, and before this every capture of it showed whatever the defaults were.
+    //
+    // AN UNKNOWN NAME IS AN ERROR HERE, not a silent no-op. `panel_view` above
+    // ignores what it does not recognise, and that is how a script came to ask for
+    // the Generation ledger's Tile view, get nothing, and still report success
+    // (NR-714's shape). A check that cannot aim should say so.
+    v.set_function("section", [this](const std::string& name, bool open) {
+        if      (name == "gen_profile")        m_ui.gen_profile_open        = open;
+        else if (name == "gen_thresholds")     m_ui.gen_thresholds_open     = open;
+        else if (name == "gen_bands")          m_ui.gen_bands_open          = open;
+        else if (name == "gen_substrate")      m_ui.gen_substrate_open      = open;
+        else if (name == "gen_cover")          m_ui.gen_cover_open          = open;
+        else if (name == "gen_landform")       m_ui.gen_landform_open       = open;
+        else if (name == "construction_queue") m_ui.construction.queue_open = open;
+        else if (name == "acq_purchasable")    m_ui.acquisitions_purchasable_open = open;
+        else if (name == "acq_possible")       m_ui.acquisitions_possible_open    = open;
+        else
+            std::printf("verify.section: unknown section '%s'. Known: gen_profile, "
+                        "gen_thresholds, gen_bands, gen_substrate, gen_cover, "
+                        "gen_landform, construction_queue, acq_purchasable, "
+                        "acq_possible.\n", name.c_str());
+    });
+
     // Park a fold-out ledger's SCROLL at a fraction of its extent (0 = top,
     // 1 = foot), so a capture can reach content the column clips. Without this the
     // verify API could open a panel and pick its view but never see past the fold —

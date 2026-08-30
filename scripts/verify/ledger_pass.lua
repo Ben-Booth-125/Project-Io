@@ -170,9 +170,15 @@ ledger("tile", "ledger_09_history_3_tectonics", "history", 3)
 -- ===========================================================================
 -- Slot 10 — Generation ledger (UI-105)
 -- ===========================================================================
--- Two tabs (Body / Tile) with no panel_view hook, so only the default is
--- reachable from a script. That gap is itself a finding, recorded here rather
--- than worked around.
+-- ONE FLAT PANEL of six collapsing sections since 2026-08-30 - the Body / Tile
+-- tab strip is gone. Two frames here (the resting index, and the foot) are the
+-- class pass's share; the sections themselves are opened and walked by
+-- generation_ledger.lua, which also carries the real-press check on a header.
+--
+-- The old note here recorded that only the default tab was script-reachable
+-- because there was no panel_view hook. That gap is closed by `verify.section`
+-- rather than by the tab strip going away: sections are ui_state BOOLS, which
+-- panel_view could never have reached whatever the surface's shape.
 ledger("generation_ledger", "ledger_10_generation_body")
 foot("generation_ledger", "generation_ledger", "ledger_10_generation_body_foot")
 

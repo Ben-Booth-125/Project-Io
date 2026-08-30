@@ -39,6 +39,13 @@ void draw_generation_ledger(const world& w, ui_state& s,
 /// (GENERATION_LEDGER.md § Surfacing; SELECTION.md § Shared content builders). The
 /// FRAME differs; the content must not.
 ///
+/// NO CALLER TODAY (2026-08-30). The ledger's Tile tab was retired when the surface
+/// became one flat panel of sections, and it was this function's only caller — the
+/// hover card and Selection wiring the paragraph above describes as its reason for
+/// existing was never built. Kept rather than deleted because the content is the
+/// asset and its stated destination is unchanged; that gap is the open question,
+/// not this declaration. See NEEDS_REVIEW.
+///
 /// Draws nothing but ImGui text into the current window.
 ///
 /// @param w       Read-only world — the tile's final state.

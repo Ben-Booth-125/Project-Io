@@ -1684,11 +1684,12 @@
     "src/ui/generation_ledger.cpp",
     "src/ui/nav_pane.cpp"
    ],
-   "summary": "Rail slot 10: the why-did-this-tile-generate surface - the per-pass derivation for a tile and the body's own histograms.",
+   "summary": "Rail slot 10: the why-did-this-body-generate surface - one flat panel of six collapsing sections over tables (Profile, Thresholds, Latitude bands, and the Substrate / Cover / Landform distributions), behind a body selector.",
    "interesting_question": "This is a developer tuning surface on a player-facing rail. Does it ship?",
-   "resolution": "Its own doc calls it the developer tuning surface, and it currently holds a permanent rail slot. Whether that survives to v1.0 is a ROADMAP question the catalogue does not answer.",
+   "resolution": "Its own doc calls it the developer tuning surface, and it currently holds a permanent rail slot. Whether that survives to v1.0 is a ROADMAP question the catalogue does not answer. RESHAPED 2026-08-30 on Ben's instruction - the Body/Tile tab strip is gone, the per-tile derivation view with it, and each section is now a collapsing header over a table. The three distributions name their denominator in the header, which is the whole grid, ocean included.",
    "checks": [
-    "save_load"
+    "save_load",
+    "generation_ledger"
    ]
   },
   {

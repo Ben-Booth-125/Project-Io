@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*102 entries — 102 open, 0 resolved.*
+*106 entries — 106 open, 0 resolved.*
 
 ---
 
@@ -1064,6 +1064,64 @@ SIX QUESTIONS ARE OPEN IN THE DOC, of which two look load-bearing: whether the u
 NOTHING WAS BUILT AGAINST THIS, per your instruction to keep the ledger similar.
 
 *Files: `docs/ui/ledgers/tile_ledger.md`*
+
+### NR-737 — The Generation ledger lost its Tile tab, and draw_tile_derivation now has no caller at all
+*decision · raised 2026-08-30 · from Sprint 24b, the Generation ledger reformat. Ben: "We can drop the tile tab."*
+
+Done as asked - the Body/Tile strip is gone and the ledger is one flat panel. Recorded because of what went with it, which the instruction did not name.
+
+`ui::draw_tile_derivation` - the five-step per-tile breadcrumb, ~250 of the file's 573 lines and the best explanatory prose in the ledger family - was called from ONE place, the Tile tab. It now has no caller anywhere.
+
+ITS HEADER SAYS IT SHOULD HAVE THREE. The declaration reads: "Factored out because the ledger is not its only intended caller - the hover card and the Selection info element show the same causal chain in a condensed frame." That wiring was never built. So the function was factored out for callers that do not exist, and its one real caller has now gone.
+
+I KEPT IT rather than deleting it, and that is the call to overturn if you disagree. Reasons: the content is the asset, its stated destination is unchanged and reasonable, and deleting 250 lines of written explanation is not what "drop the tile tab" asked for. The cost is a dead export carrying a comment that describes an intention rather than a fact - which is the shape of NR-717, filed nine days ago about a doc paragraph doing exactly this. I have noted the gap at the declaration and in GENERATION_LEDGER.md rather than letting the comment keep reading as a description.
+
+THE REAL QUESTION IS WHERE IT GOES: wire it into the Selection element (its stated home, and a tile is already a Selection subject), wire it into the hover card, or delete it and accept that the why-did-this-tile-generate question is no longer answerable anywhere.
+
+*Files: `src/ui/generation_ledger.cpp`, `src/ui/generation_ledger.hpp`, `docs/generation/GENERATION_LEDGER.md`*
+
+### NR-738 — verify.section is a new verify API, and it is the first hook that refuses an unknown name
+*novel-work · raised 2026-08-30 · from Sprint 24b, the Generation ledger reformat.*
+
+The reformat put the ledger's whole content behind six `CollapsingHeader` sections, and NOTHING COULD OPEN ONE FROM A SCRIPT. `panel_view` sets an int view index; a section is a `ui_state` bool, so no amount of extending it would have reached them. I added `verify.section(name, open)`.
+
+It covers the Generation ledger's six, plus three that were already unreachable for the same reason and had been since they landed: the Construction queue, and the Acquisitions ledger's two roll-ups.
+
+ONE DELIBERATE DEPARTURE FROM THE HOUSE PATTERN, and it is the part worth your eye. Every other name-dispatch hook in verify_api.cpp IGNORES a name it does not recognise - `panel_view` says so in a comment ("Unknown names are ignored"). That is how a script came to ask for the Generation ledger's Tile view, receive nothing, and still report a green run (NR-714's shape, and the reason NR-710's Ages view went four months uncaptured). `verify.section` PRINTS the unknown name and the list of known ones. It does not fail the run.
+
+Worth a ruling because it sets a precedent in a shared file: if refusing loudly is right here, it is right for `panel_view`, `fold` and the rest, and that is a small sweep rather than a one-line change. I have not touched the others.
+
+ALSO NEW AND UNAUTHORISED AS A SKILL, the NR-715/NR-734 shape a third time: `scripts/verify/generation_ledger.lua` - four captures (resting index, all sections open, the distributions scrolled to the foot, and the state after a REAL header press), plus a deliberate unknown-section call to prove the refusal fires.
+
+*Files: `src/core/verify_api.cpp`, `scripts/verify/generation_ledger.lua`, `scripts/verify/ledger_pass.lua`*
+
+### NR-739 — Zero rows are now SHOWN in the Generation ledger's distributions, reversing that file's own rule
+*decision · raised 2026-08-30 · from Sprint 24b, the Generation ledger reformat. A call taken inside "reformat", which you may read as beyond it.*
+
+The old `histogram_row` opened with `if (count == 0) return;` and the comment "an absent category says nothing; the zero rows crowd out the signal". The new tables show every category, with a dash in the share column.
+
+WHY I CHANGED IT. On a tuning surface an absent category says a great deal. The default body generates ZERO `valley` tiles, zero `metallic` and zero `regolith` substrate, and zero `salt` cover - and under the old rule each was indistinguishable from a category that does not exist. I only found the valley gap by reading the enum against the capture and counting rows. A bordered table of seven to ten rows has room for the zeroes that a hand-aligned text block did not.
+
+FLAGGED BECAUSE YOU SAID THE DATA WAS GREAT, and which rows appear is arguably data rather than formatting. It adds rows and removes none. One line to revert.
+
+*Files: `src/ui/generation_ledger.cpp`*
+
+### NR-740 — The Landform histogram counts ocean as plains, so every share on it answers a question nobody asked
+*question · raised 2026-08-30 · from Sprint 24b, measured off the Generation ledger's own capture.*
+
+MEASURED on the default body, 15120 tiles: Landform reads Plains 14405 (95.27%), Mountain 109 (0.72%). Substrate on the same grid reads Ocean 8154 (53.93%) and Lake 227.
+
+Water tiles carry `terrain_landform::plains` - there is no water landform - so more than half the plains row is sea floor. Over land the plains share is nearer 89% and mountain nearer 1.6%, better than double what the table shows. Roughly, because whether `coast` (689) counts as land moves it, and that ambiguity is part of the question.
+
+THIS IS THE SURFACE WHOSE JOB IS GENERATOR TUNING. The row that answers "how mountainous is this world" is diluted by the sea, on the one screen a person consults before changing a constant.
+
+WHAT I DID AND DID NOT DO. I put the denominator in every distribution header, so all three now say "(15120 tiles)" out loud. That makes it visible; it does not resolve it. I did not change a number - you said the data was great, and re-basing a histogram is a decision, not a reformat.
+
+THE ASYMMETRY IS WHY THIS IS A QUESTION. Substrate genuinely wants the whole grid, because ocean is one of its own categories. Landform does not. So "use land as the denominator" cannot be applied to all three, and the options are: keep one shared denominator and name it (today), give Landform a land-only denominator, or show both columns on Landform alone.
+
+SEPARATELY, AND PROBABLY THE BIGGER FINDING: even read over land, 89% plains means Pass 5's clusters are barely firing, and `valley` never fires at all. That is a generation tuning question, not a UI one, and it is the ledger doing exactly what it exists for.
+
+*Files: `src/ui/generation_ledger.cpp`, `docs/generation/GENERATION_LEDGER.md`, `docs/generation/TILE_GENERATION.md`*
 
 ---
 

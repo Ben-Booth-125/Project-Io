@@ -548,10 +548,24 @@ struct ui_state
     /// press. See ui/generation_ledger.hpp, docs/generation/GENERATION_LEDGER.md.
     bool show_generation_ledger = false;
 
-    /// Generation Ledger: 0=Body (histograms, thresholds, profile echo),
-    /// 1=Tile (the per-tile derivation breadcrumb). In ui_state, like every other
-    /// panel view index, so a verify script can park the ledger on a view.
-    int  generation_ledger_view = 0;
+    /// Generation Ledger section disclosure. The ledger is ONE flat panel of
+    /// stacked sections (the Balance ledger's shape) rather than a tab strip: the
+    /// Tile view was retired 2026-08-30 and there is no second view left to name.
+    ///
+    /// Held here rather than in ImGui's own storage for the construction_panel
+    /// reason - the state is then stable across a rebuild and drivable by a verify
+    /// script, which ImGui's internal id storage is not. A `CollapsingHeader` is a
+    /// toggle by construction, so the standing Toggle rule needs no second control.
+    ///
+    /// Profile and Thresholds open by default: they are short, and they are what
+    /// the other four sections are read AGAINST - a histogram that surprises is
+    /// traced back to the profile that asked for it.
+    bool gen_profile_open   = true;
+    bool gen_thresholds_open = true;
+    bool gen_bands_open     = false;
+    bool gen_substrate_open = false;
+    bool gen_cover_open     = false;
+    bool gen_landform_open  = false;
 
     // --- AI decision feed (BL-407) ---
     // A reader over stores that have always been populated and never surfaced:

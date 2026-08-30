@@ -148,14 +148,91 @@ std::vector<entity_id> raster_index(const world& w, entity_id body, int gw, int 
     return out;
 }
 
-/// One histogram row: a label, a count, and the share of the total.
-void histogram_row(const char* label, int count, int total)
+// --- Section and table furniture ------------------------------------------
+//
+// Every section on this surface is a collapsing header over a table (Ben,
+// 2026-08-30: "reformat each section in 'Body' to a dropdown header showing a
+// table"). Two helpers rather than six hand-rolled blocks, so the six cannot
+// drift into six slightly different table styles - which is exactly what the
+// hand-aligned `%-12s %6d` rows had already started to do.
+
+constexpr ImGuiTableFlags k_table_flags =
+    ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV |
+    ImGuiTableFlags_SizingStretchProp;
+
+/// One collapsing section header. `open` lives in `ui_state` rather than ImGui's
+/// own storage for the `construction_panel` reason: it is then stable across a
+/// rebuild and drivable by a verify script. The `###id` suffix keeps the widget's
+/// identity fixed while the visible label carries a live count.
+///
+/// A `CollapsingHeader` is a toggle by construction, so the standing Toggle rule
+/// is satisfied without a second control.
+bool section(const char* label, const char* id, bool& open)
 {
-    if (count == 0) return; // an absent category says nothing; the zero rows crowd out the signal
-    const float pct = (total > 0) ? 100.0f * static_cast<float>(count) / static_cast<float>(total) : 0.0f;
-    ImGui::Text("%-12s %6d", label, count);
-    ImGui::SameLine();
-    ImGui::TextDisabled("%5.2f%%", static_cast<double>(pct));
+    ImGui::SetNextItemOpen(open, ImGuiCond_Always);
+    char hdr[128];
+    std::snprintf(hdr, sizeof hdr, "%s###%s", label, id);
+    const bool now = ImGui::CollapsingHeader(hdr);
+    if (now != open)
+        open = now;
+    return now;
+}
+
+/// A two-column Field / Value table - the shape Profile and Thresholds share.
+struct field_row { const char* label; std::string value; };
+
+void field_table(const char* id, const std::vector<field_row>& rows)
+{
+    if (!ImGui::BeginTable(id, 2, k_table_flags))
+        return;
+    // NO HEADER ROW. "Field | Value" over a list of Temperature / Atmosphere /
+    // Hydrology names nothing the rows do not already say, and it repeats on every
+    // key-value section. The distribution tables DO carry one, because "Tiles" and
+    // "Share" are not inferable from the numbers under them.
+    ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthStretch, 1.6f);
+    ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch, 2.0f);
+    for (const field_row& r : rows)
+    {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::TextUnformatted(r.label);
+        ImGui::TableSetColumnIndex(1);
+        ImGui::TextUnformatted(r.value.c_str());
+    }
+    ImGui::EndTable();
+}
+
+/// A category / count / share table - the shape the three distributions share.
+struct dist_row { const char* label; int count; };
+
+/// ZERO ROWS ARE SHOWN, which reverses this file's earlier rule ("an absent
+/// category says nothing; the zero rows crowd out the signal"). On a TUNING
+/// surface an absent category says a great deal: `valley` never fires on the
+/// default body, and under the old rule that was indistinguishable from a
+/// landform that does not exist. A bordered table of seven rows has room for the
+/// zeroes that a hand-aligned text block did not.
+void dist_table(const char* id, const std::vector<dist_row>& rows, int total)
+{
+    if (!ImGui::BeginTable(id, 3, k_table_flags))
+        return;
+    ImGui::TableSetupColumn("Category", ImGuiTableColumnFlags_WidthStretch, 2.2f);
+    ImGui::TableSetupColumn("Tiles",    ImGuiTableColumnFlags_WidthStretch, 1.2f);
+    ImGui::TableSetupColumn("Share",    ImGuiTableColumnFlags_WidthStretch, 1.2f);
+    ImGui::TableHeadersRow();
+    for (const dist_row& r : rows)
+    {
+        const float pct = (total > 0)
+            ? 100.0f * static_cast<float>(r.count) / static_cast<float>(total) : 0.0f;
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::TextUnformatted(r.label);
+        ImGui::TableSetColumnIndex(1);
+        ImGui::Text("%d", r.count);
+        ImGui::TableSetColumnIndex(2);
+        if (r.count == 0) ImGui::TextDisabled("-");
+        else              ImGui::TextDisabled("%.2f%%", static_cast<double>(pct));
+    }
+    ImGui::EndTable();
 }
 
 } // namespace
@@ -415,18 +492,15 @@ void draw_generation_ledger(const world& w, ui_state& s,
     for (const auto& be : report.bodies)
         if (be.id == subject) { entry = &be; break; }
 
-    enum view_id { view_body = 0, view_tile };
-    int& view = s.generation_ledger_view;
-    if (view < view_body || view > view_tile)
-        view = view_body;
-
-    // Toggle rule: re-clicking the ACTIVE tab closes the ledger (p_open), which is
-    // also what the rail slot does. Switching tabs is an ordinary view change.
-    nav_button("Body", view_body, view, p_open);
-    ImGui::SameLine();
-    nav_button("Tile", view_tile, view, p_open);
-    ImGui::Separator();
-
+    // ONE FLAT PANEL OF STACKED SECTIONS, not a tab strip (Ben, 2026-08-30). The
+    // Tile view - the per-tile derivation breadcrumb - was retired with the strip
+    // that carried it, leaving the Body selector below as the only cross-cutting
+    // control. The breadcrumb itself survives as `draw_tile_derivation`; see the
+    // note on its declaration in generation_ledger.hpp.
+    //
+    // With no tabs there is no active-tab press to close the ledger. That is the
+    // Balance ledger's shape and needs no extra control: the rail slot toggles the
+    // surface, and each section header toggles itself.
     if (ImGui::BeginCombo("Body", entry ? entry->name.c_str() : "-"))
     {
         for (const auto& be : report.bodies)
@@ -457,79 +531,105 @@ void draw_generation_ledger(const world& w, ui_state& s,
     }
     ImGui::Separator();
 
-    // --- Tile: the derivation breadcrumb ------------------------------------
-    if (view == view_tile)
-    {
-        const auto sel = w.tiles.find(s.selected_entity);
-        if (sel == w.tiles.end())
-            ImGui::TextWrapped("Select a tile on the Planetary canvas to see how it "
-                               "was derived.");
-        else if (sel->second.body != subject)
-            ImGui::TextWrapped("The selected tile belongs to another body. Switch the "
-                               "selector above, or select a tile on %s.",
-                               entry->name.c_str());
-        else
-            draw_tile_derivation(w, *rec, *entry, s.selected_entity);
-
-        ui::foldout_end();
-        return;
-    }
-
-    // --- Body: the aggregate shape ------------------------------------------
+    // --- The body's aggregate shape -----------------------------------------
+    // Six sections, each a collapsing header over a table. What was asked for
+    // (Profile, Thresholds) reads above what came out (the three distributions),
+    // because a histogram that surprises is traced back to the profile above it.
     const body_profile& p = entry->state.profile;
     const int total = rec->gw * rec->gh;
 
-    ImGui::TextDisabled("PROFILE");
-    ImGui::Text("Temperature  %s", temperature_name(p.temperature));
-    ImGui::Text("Atmosphere   %s", atmosphere_name(p.atmosphere));
-    ImGui::Text("Hydrology    %s", hydrology_name(p.hydrology));
-    ImGui::Text("Geology      %s", geology_name(p.geology));
-    ImGui::Text("Bias         %s",
-                p.bias == composition_bias::metallic ? "Metallic" : "Standard");
-    ImGui::Text("Grid         %dx%d  (%d tiles)", rec->gw, rec->gh, total);
-    ImGui::Spacing();
+    char buf[128];
 
-    // Thresholds: the tuning read. A histogram that surprises is traced back to
-    // these, which is the whole reason the profile is echoed above it.
-    ImGui::TextDisabled("THRESHOLDS");
-    if (rec->ocean_score.empty())
+    // --- Profile -------------------------------------------------------------
+    if (section("Profile", "gen_profile", s.gen_profile_open))
     {
-        ImGui::TextWrapped("No ocean pass (hydrology = %s).", hydrology_name(p.hydrology));
+        std::snprintf(buf, sizeof buf, "%dx%d  (%d tiles)", rec->gw, rec->gh, total);
+        field_table("##gen_profile_tbl", {
+            {"Temperature", temperature_name(p.temperature)},
+            {"Atmosphere",  atmosphere_name(p.atmosphere)},
+            {"Hydrology",   hydrology_name(p.hydrology)},
+            {"Geology",     geology_name(p.geology)},
+            {"Bias",        p.bias == composition_bias::metallic ? "Metallic" : "Standard"},
+            {"Grid",        buf},
+        });
     }
-    else
-    {
-        const float actual = (total > 0)
-            ? static_cast<float>(rec->ocean_tiles) / static_cast<float>(total) : 0.0f;
-        ImGui::Text("ocean threshold  %.4f", static_cast<double>(rec->ocean_threshold));
-        ImGui::Text("ocean tiles      %d", rec->ocean_tiles);
-        ImGui::Text("water fraction   %.3f  (target %.3f)",
-                    static_cast<double>(actual), static_cast<double>(p.water_fraction));
-    }
-    ImGui::Spacing();
 
-    // Band boundaries, read off the record rather than restated from the
-    // generator's table — so this cannot drift from the widths actually used.
-    ImGui::TextDisabled("LATITUDE BANDS");
-    if (!rec->band.empty())
+    // --- Thresholds ----------------------------------------------------------
+    // The tuning read. A histogram that surprises is traced back to these, which
+    // is the whole reason the profile is echoed above it.
+    if (section("Thresholds", "gen_thresholds", s.gen_thresholds_open))
     {
-        int run_start = 0;
-        for (int row = 1; row <= rec->gh; ++row)
+        if (rec->ocean_score.empty())
         {
-            const std::uint8_t prev = rec->band[static_cast<std::size_t>(run_start) * static_cast<std::size_t>(rec->gw)];
-            const bool end_of_run = (row == rec->gh)
-                || rec->band[static_cast<std::size_t>(row) * static_cast<std::size_t>(rec->gw)] != prev;
-            if (end_of_run)
-            {
-                ImGui::Text("%-12s rows %3d - %3d  (%d)", band_name(prev),
-                            run_start, row - 1, row - run_start);
-                run_start = row;
-            }
+            std::snprintf(buf, sizeof buf, "no ocean pass (hydrology = %s)",
+                          hydrology_name(p.hydrology));
+            field_table("##gen_thresh_tbl", {{"Ocean pass", buf}});
+        }
+        else
+        {
+            const float actual = (total > 0)
+                ? static_cast<float>(rec->ocean_tiles) / static_cast<float>(total) : 0.0f;
+            std::vector<field_row> rows;
+            char t0[64], t1[64], t2[96];
+            std::snprintf(t0, sizeof t0, "%.4f", static_cast<double>(rec->ocean_threshold));
+            std::snprintf(t1, sizeof t1, "%d", rec->ocean_tiles);
+            std::snprintf(t2, sizeof t2, "%.3f   (target %.3f)",
+                          static_cast<double>(actual),
+                          static_cast<double>(p.water_fraction));
+            rows.push_back({"Ocean threshold", t0});
+            rows.push_back({"Ocean tiles",     t1});
+            rows.push_back({"Water fraction",  t2});
+            field_table("##gen_thresh_tbl", rows);
         }
     }
-    ImGui::Spacing();
 
+    // --- Latitude bands ------------------------------------------------------
+    // Read off the record rather than restated from the generator's table - so
+    // this cannot drift from the widths actually used.
+    if (section("Latitude bands", "gen_bands", s.gen_bands_open))
+    {
+        if (rec->band.empty())
+        {
+            ImGui::TextDisabled("No band data recorded.");
+        }
+        else if (ImGui::BeginTable("##gen_bands_tbl", 3, k_table_flags))
+        {
+            ImGui::TableSetupColumn("Band", ImGuiTableColumnFlags_WidthStretch, 2.2f);
+            ImGui::TableSetupColumn("Rows", ImGuiTableColumnFlags_WidthStretch, 1.6f);
+            ImGui::TableSetupColumn("Count", ImGuiTableColumnFlags_WidthStretch, 0.9f);
+            ImGui::TableHeadersRow();
+
+            int run_start = 0;
+            for (int row = 1; row <= rec->gh; ++row)
+            {
+                const std::uint8_t prev = rec->band[static_cast<std::size_t>(run_start) * static_cast<std::size_t>(rec->gw)];
+                const bool end_of_run = (row == rec->gh)
+                    || rec->band[static_cast<std::size_t>(row) * static_cast<std::size_t>(rec->gw)] != prev;
+                if (end_of_run)
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::TextUnformatted(band_name(prev));
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::Text("%d - %d", run_start, row - 1);
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::TextDisabled("%d", row - run_start);
+                    run_start = row;
+                }
+            }
+            ImGui::EndTable();
+        }
+    }
+
+    // --- The three distributions ---------------------------------------------
     // Histograms over the LIVE tiles: the record holds the intermediates, the
     // world holds the outcome, and the outcome is what a balance question is about.
+    //
+    // EVERY DENOMINATOR IS NAMED IN ITS HEADER, and it is the same one for all
+    // three: the whole grid, ocean included. That matters most on Landform, where
+    // water carries `plains` and so inflates the plains share far above its share
+    // of LAND. Naming the denominator does not fix that - it makes it visible,
+    // which is the least a tuning surface owes its reader.
     const std::vector<entity_id> tiles = raster_index(w, subject, rec->gw, rec->gh);
     // BL-519: two histograms where there was one. Collapsing them back into a
     // single 12-row table is exactly the overloading the axis split undid.
@@ -550,22 +650,32 @@ void draw_generation_ledger(const world& w, ui_state& s,
         ++counted;
     }
 
-    ImGui::TextDisabled("SUBSTRATE  (%d tiles)", counted);
-    for (std::size_t c = 0; c < sub_counts.size(); ++c)
-        histogram_row(substrate_name(static_cast<terrain_substrate>(c)),
-                      sub_counts[c], counted);
-    ImGui::Spacing();
+    std::snprintf(buf, sizeof buf, "Substrate  (%d tiles)", counted);
+    if (section(buf, "gen_substrate", s.gen_substrate_open))
+    {
+        std::vector<dist_row> rows;
+        for (std::size_t c = 0; c < sub_counts.size(); ++c)
+            rows.push_back({substrate_name(static_cast<terrain_substrate>(c)), sub_counts[c]});
+        dist_table("##gen_sub_tbl", rows, counted);
+    }
 
-    ImGui::TextDisabled("COVER");
-    for (std::size_t c = 0; c < cov_counts.size(); ++c)
-        histogram_row(cover_name(static_cast<terrain_cover>(c)),
-                      cov_counts[c], counted);
-    ImGui::Spacing();
+    std::snprintf(buf, sizeof buf, "Cover  (%d tiles)", counted);
+    if (section(buf, "gen_cover", s.gen_cover_open))
+    {
+        std::vector<dist_row> rows;
+        for (std::size_t c = 0; c < cov_counts.size(); ++c)
+            rows.push_back({cover_name(static_cast<terrain_cover>(c)), cov_counts[c]});
+        dist_table("##gen_cov_tbl", rows, counted);
+    }
 
-    ImGui::TextDisabled("LANDFORM");
-    for (std::size_t l = 0; l < land_counts.size(); ++l)
-        histogram_row(landform_name(static_cast<terrain_landform>(l)),
-                      land_counts[l], counted);
+    std::snprintf(buf, sizeof buf, "Landform  (%d tiles)", counted);
+    if (section(buf, "gen_landform", s.gen_landform_open))
+    {
+        std::vector<dist_row> rows;
+        for (std::size_t l = 0; l < land_counts.size(); ++l)
+            rows.push_back({landform_name(static_cast<terrain_landform>(l)), land_counts[l]});
+        dist_table("##gen_land_tbl", rows, counted);
+    }
 
     ui::foldout_end();
 }

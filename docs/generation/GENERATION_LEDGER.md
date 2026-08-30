@@ -16,19 +16,37 @@ The surface has three pieces:
 
 | Piece | Where |
 |---|---|
-| **Chain half — player-facing** (History slot: Story / Chain / Tiles views; stage charts redrawn from the persisted `generation_report`) | `src/ui/generation_charts.{hpp,cpp}` |
-| **Per-tile derivation breadcrumb + per-body summary ledger** | `src/ui/generation_ledger.{hpp,cpp}`, nav rail slot 10 |
+| **Chain half — player-facing** (History slot: the Chain view; stage charts redrawn from the persisted `generation_report`) | `src/ui/generation_charts.{hpp,cpp}` |
+| **Per-body summary ledger** | `src/ui/generation_ledger.{hpp,cpp}`, nav rail slot 10 |
+| **Per-tile derivation breadcrumb**, as a content builder with no surface of its own | `ui::draw_tile_derivation` (`generation_ledger.hpp`) |
 | **Field lenses** (heightmap / moisture / band painted over the Planetary canvas) | read the same `generation_record` seam (§ Surfacing) |
 
 **How it is reached and what it holds.** Nav rail slot 10 (the plate glyph)
-toggles it into the shell fold-out column, alongside every other ledger. Two views,
-obeying the standing toggle rule: **Body** (composition and landform histograms over
-the live tiles, the ocean threshold and resulting water fraction against the profile's
-target, the latitude-band row ranges read back off the record, and the profile echo)
-and **Tile** (the five-step breadcrumb for the shared selection, exported as
-`ui::draw_tile_derivation` so the hover card and Selection element can wrap the same
-content). The record is regenerated into a scratch world on open and on a body
-switch, cached on `(body, tile seed)`, and never stored — § Data lifetime.
+toggles it into the shell fold-out column, alongside every other ledger. It is **one
+flat panel** — a body selector over six sections, each a collapsing header holding a
+table: **Profile** (the body descriptor the passes were run from), **Thresholds** (the
+ocean threshold and the resulting water fraction against the profile's target),
+**Latitude bands** (the row ranges, read back off the record rather than restated from
+the generator's table), and the three distributions over the live tiles — **Substrate**,
+**Cover** and **Landform**. The record is regenerated into a scratch world on open and
+on a body switch, cached on `(body, tile seed)`, and never stored — § Data lifetime.
+
+There is **no tab strip**, so no active-tab press to close the ledger: the rail slot
+toggles the surface and each header toggles its own section, which is the Toggle rule
+satisfied by construction. Section disclosure lives in `ui_state` rather than ImGui's
+storage so a verify script can drive it (`verify.section`).
+
+**Every distribution names its denominator in its header, and all three share one:**
+the whole grid, ocean included. That matters most on Landform, where water carries
+`plains` and so lifts the plains share far above its share of *land*. Naming the
+denominator does not resolve that — whether a landform histogram should be taken over
+land alone is an open question below — but it stops the number reading as something it
+is not.
+
+**The per-tile derivation is not on this surface.** `ui::draw_tile_derivation` builds
+it and the design intent is unchanged — the hover card and Selection element are its
+destination (§ Surfacing; `SELECTION.md` § Shared content builders). What the ledger
+does not do is host a per-tile view of its own.
 
 Two additive taps make this possible, both pure captures that leave the generated
 surface bit-for-bit identical:
@@ -233,10 +251,24 @@ once as a tile-derivation builder and the three callers wrap it.
   seed-grown; showing the seed points and their growth is a richer view than a flat
   landform field, but needs the seed positions captured in `generation_record` — a
   small additive field when such a lens is built.
-- **The History slot's player-facing views.** The History nav-rail slot carries three
+- **The History slot's player-facing views.** The History nav-rail slot carries four
   views — **Story** (the body's dated oral-history biography), **Chain** (the generation
   stage charts, one collapsing accordion per chain stage, grouped by the wizard's three
-  rounds), and **Tiles** (the tile / building / market tables). The charts are the New
-  World wizard's own plots, extracted into `src/ui/generation_charts.{hpp,cpp}` and
-  redrawn from the persisted `generation_report`. The exploration gate on those views
-  (MENU.md's History slot calls for it) is owned by BL-211 (player-facing history ledger).
+  rounds), **Ages** (the Era −1 political time-lapse) and **Tectonics** (the plate
+  field). The charts are the New World wizard's own plots, extracted into
+  `src/ui/generation_charts.{hpp,cpp}` and redrawn from the persisted
+  `generation_report`. The exploration gate on those views (MENU.md's History slot
+  calls for it) is owned by BL-211 (player-facing history ledger).
+- **Should a landform histogram be taken over LAND rather than the whole grid?** Water
+  tiles carry `landform::plains`, and the grid is more than half ocean, so the plains
+  row reads 95% where the share of land is nearer 89% and mountain reads 0.72% where
+  over land it is nearer 1.6%. Every share on that table is therefore a share of
+  something the reader is probably not asking about. Three answers are defensible — keep
+  one denominator for all three distributions and name it (what the surface does now),
+  give Landform a land-only denominator, or show both columns. Substrate genuinely wants
+  the whole grid, since ocean is one of its categories; that asymmetry is the reason
+  this is a question rather than a fix.
+- **Where does the per-tile derivation live?** `ui::draw_tile_derivation` has no caller
+  since the ledger's Tile view was retired. Its stated destination — the hover card and
+  the Selection element — has never been wired, so the content exists and nothing shows
+  it.
