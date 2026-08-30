@@ -8,23 +8,28 @@
 -- is a comparison across years, not a picture. ledger_pass captures one frame
 -- per sub-view by construction; this walks the transport.
 --
--- WHAT IT REPLACES. Until 2026-08-30 this view was uncapturable, and
--- ledger_pass carried a footer explaining why: the first draw of Ages produced
--- no frame in NINETEEN MINUTES (NR-710). The cause was not slowness in the sim.
--- tile_inspector.cpp constructed its own `history_sim_params` — 0 -> 1960 CE
--- with the tick bands left at their struct default — and the default ladder's
--- last band ends at year 0, so every year past it fell back to a ONE-YEAR step.
--- That is 1960 decision rounds against the 100 generation runs, on a span lying
--- entirely AFTER the era the world actually has. The view now calls
--- `era_minus_one_sim_params` / `era_minus_one_sim_seed` (world/era_minus_one.hpp),
--- so it replays GENERATION'S era: 400 BCE -> 0 CE on one four-year band.
+-- WHAT IT REPLACES, in two steps. Until 2026-08-30 this view was uncapturable:
+-- the first draw produced no frame in NINETEEN MINUTES (NR-710). The cause was
+-- not a slow sim - tile_inspector.cpp constructed its own history_sim_params
+-- (0 -> 1960 CE, tick bands left at the struct default, so every year past 0 fell
+-- back to a ONE-YEAR step) and asked for 1960 decision rounds where generation
+-- runs 100. Correcting the span, clock and seed made it render.
 --
--- THE PARK ORDER IS LOAD-BEARING, and it is why every capture below runs frames
--- BEFORE setting the year. `tile_inspector.cpp` parks `s.ages_year` at the run's
--- first year on the frame it (re)builds the cache, so a year set before that
--- frame is overwritten and the capture shows the start whatever was asked for
--- (NR-710's second half). Opening the view, letting the cache build, and only
--- then scrubbing is the ordering that survives it.
+-- IT STILL SHOWED THE WRONG THING, and that is what the second step fixed. The
+-- view re-ran the era from the settlement as it stood AFTER generation's own sim,
+-- so every region already existed and was owned: 0 battles, 0 conquests, and a
+-- region count that only grew. A settlement time-lapse wearing a political one's
+-- label. Ben's ruling (NR-733): generation RECORDS its owner_changes into the
+-- report and this view replays them. No sim here at all now.
+--
+-- SO THE NUMBERS BELOW ARE THE REVIEW SUBJECT. The run summary should report a
+-- non-zero battle and conquest count, because it is generation's own era rather
+-- than a re-derivation of one.
+--
+-- THE PARK ORDER STILL MATTERS, for a smaller reason. The scrubber is parked at
+-- the record's first year the first time a body's timeline is shown, so a script
+-- opens the view, runs frames, and only THEN sets `ages_year`. The old reason -
+-- a cache-build frame that clobbered the park - is gone with the cache.
 --
 -- 1920x1080, the design-review resolution (ledger_pass § the resolution line).
 

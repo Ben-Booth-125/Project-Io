@@ -74,7 +74,7 @@ inline constexpr uint32_t save_game_magic =
 /// `read_save_game` compares this constant for equality and rejects on any
 /// mismatch. There is no upgrade path to write, and adding one for a single
 /// raster would be inventing a scheme this file does not have.
-inline constexpr uint32_t save_game_version = 2;
+inline constexpr uint32_t save_game_version = 3; // NR-733: the report carries the Era -1 time-lapse
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

@@ -6,9 +6,7 @@
 #include "generation_charts.hpp" // the chain-stage charts, shared with the wizard (BL-211)
 #include "presentation.hpp"
 #include "world/components.hpp"
-#include "world/era_minus_one.hpp" // ONE construction of the era invocation (BL-462)
-#include "world/history_sim.hpp"  // the Era -1 time-lapse the Ages view replays (BL-277)
-#include "world/sim_terrain_build.hpp" // real ground for the sim to fight over (BL-314)
+#include "world/era_timelapse.hpp" // the recorded Era -1 replay the Ages view folds over
 
 #include <imgui.h>
 
@@ -391,31 +389,27 @@ void draw_tile_inspector(const world& w, ui_state& s,
 
     // --- Ages: the Era -1 political time-lapse (BL-277) -------------------
     //
-    // The era's region ownership, scrubbable. The sim is re-run HERE, lazily,
-    // over a COPY of the body's settlement state — it does not run in the
-    // generation path and nothing it does reaches the world. That is the whole
-    // point of building this view first: the time-lapse is visible without the
-    // determinism/golden churn that wiring the sim into generation carries
-    // (BL-271 open question 2, still unanswered).
+    // A REPLAY, NOT A RE-RUN (NR-733, Ben's ruling 2026-08-30). Generation
+    // records the era's ownership history into the body's own report entry
+    // (`prehistory_timelapse`), and this view folds over it. There is no sim
+    // here, no cache to invalidate and no settlement to copy.
     //
-    // The cache is keyed on the body AND the generation's identity, and survives
-    // across frames, because the run is seconds rather than milliseconds and
-    // re-running it per frame would stall the UI. The old figure here (~2.1 s for
-    // a 2000-year run) is not comparable: that span was this call site's own
-    // invention, and it is now generation's — see the params block below.
+    // WHAT THAT REPLACED, because the shape it fixes is worth keeping in view.
+    // This block used to re-run `run_history_sim` itself, lazily, over a copy of
+    // the body's settlement. That made it a SEVENTH CALLER of an invocation
+    // `world/era_minus_one.hpp` exists to keep singular, and it diverged from
+    // generation on all six of BL-462's axes at once. Three (span, clock, seed)
+    // were closable at the call site and were closed. The other three were not:
+    // the report's `settlement` is the state AFTER generation's sim mutated it,
+    // so a re-run started the era from its own ending and reported 0 battles and
+    // 0 conquests no matter how carefully it was parameterised — a settlement
+    // time-lapse wearing a political one's label.
+    //
+    // Replaying deletes the second caller, which closes all six divergences at
+    // once, and turns minutes on the drawing thread into a fold over a change
+    // list. The cost of that is a save-format field; `save_game_version` is 3.
     if (view == view_ages)
     {
-        // Keyed on the body name AND the generation's own identity (the Ages
-        // stale-cache review fix, landed 2026-08-05).
-        // Name alone is not enough: body names are hard-coded literals, so
-        // regenerating the world left the key matching and the view rendered the
-        // PREVIOUS world's political history over the previous world's
-        // regions — confidently, with no cue that anything was wrong.
-        static entity_id          cached_body = null_entity; // identity, not display name (BL-257)
-        static uint64_t           cached_gen = 0;
-        static settlement_state   cached_ss;
-        static history_sim_state  cached_sim;
-
         if (!entry)
         {
             ImGui::TextDisabled("No generation record for this body.");
@@ -423,66 +417,32 @@ void draw_tile_inspector(const world& w, ui_state& s,
             return;
         }
 
-        // A cheap generation fingerprint: what this world actually generated.
-        // Two different seeds essentially never agree on all four.
-        const uint64_t gen_id =
-              (static_cast<uint64_t>(report.bodies.size()) << 48)
-            ^ (static_cast<uint64_t>(entry->settlement.regions.size()) << 32)
-            ^ (static_cast<uint64_t>(entry->settlement.median_industrial_year & 0xFFFF) << 16)
-            ^  static_cast<uint64_t>(report.attempts);
+        const era_timelapse&    lapse   = entry->prehistory_timelapse;
+        const settlement_state& settled = entry->settlement;
 
-        if (cached_body != selected_body || cached_gen != gen_id)
+        if (lapse.empty())
         {
-            cached_ss = entry->settlement; // The copy the sim is allowed to move.
-
-            // THE SPAN, THE CLOCK AND THE SEED COME FROM GENERATION, not from
-            // here. This call site used to construct its own — 0 -> 1960 CE with
-            // the tick bands left at their struct default — and both halves were
-            // wrong in the same direction. The default ladder's last band ends at
-            // year 0, so every year past it fell back to a ONE-YEAR step: 1960
-            // decision rounds against generation's 100, on a span lying entirely
-            // AFTER the history the world actually has. That is NR-710's hang
-            // (no frame in nineteen minutes, on the drawing thread) and it is
-            // also why the view never showed this world's era.
-            //
-            // era_minus_one.hpp is the file that exists to stop exactly this,
-            // and its doctrine is the reason these are calls rather than
-            // literals: a second derivation of generation's invocation is the
-            // defect repeating, not the repair. Three of BL-462's six
-            // divergences close here (span+clock, seed). THREE REMAIN and are
-            // NOT closable from this seam — the creeds pointer, the works table
-            // and the pre-sim settlement are none of them in the generation
-            // report. See NEEDS_REVIEW: what the Ages view should replay is a
-            // save-seam question, not a parameter one.
-            history_sim_params p = era_minus_one_sim_params(gen_params);
-
-            // Real terrain, so the replayed history is fought over this body's
-            // actual mountains and marshes rather than an imagined plain.
-            const sim_terrain_arrays terr =
-                build_sim_terrain(w, selected_body, sel_body.grid_width, sel_body.grid_height);
-            cached_sim = run_history_sim(cached_ss, nullptr, terr.view(),
-                                         sel_body.grid_width, sel_body.grid_height,
-                                         p, era_minus_one_sim_seed(gen_params));
-            cached_body   = selected_body;
-            cached_gen    = gen_id;
-            // Park the scrubber at the run's OWN first year. Zero was right only
-            // while the span started at zero; on a 400 BCE -> 0 CE run it is the
-            // END of the era, so the view opened on a finished map (NR-710's
-            // second half, which also made every parked capture show year 0).
-            s.ages_year   = static_cast<int>(cached_sim.start_year);
-            s.ages_playing = false;
-        }
-
-        if (cached_sim.owner_changes.empty())
-        {
+            // EMPTY IS THE COMMON CASE, not an error: generation runs the era for
+            // the cradle alone, and for no body at all in a 1960-era world.
             ImGui::TextDisabled("%s was never settled - no political history to replay.",
                                 sel_body.name.c_str());
             ui::foldout_end();
             return;
         }
 
-        const int first_year = static_cast<int>(cached_sim.start_year);
-        const int last_year  = static_cast<int>(cached_sim.start_year + cached_sim.years);
+        // Park the scrubber at the run's own first year the first time this
+        // body's record is shown. Keyed on the body so switching bodies
+        // re-parks, while scrubbing within one body is left alone.
+        static entity_id parked_for = null_entity;
+        if (parked_for != selected_body)
+        {
+            parked_for   = selected_body;
+            s.ages_year  = lapse.start_year;
+            s.ages_playing = false;
+        }
+
+        const int first_year = lapse.start_year;
+        const int last_year  = lapse.start_year + lapse.years;
 
         // --- Transport -----------------------------------------------------
         if (ImGui::Button(s.ages_playing ? "Pause" : "Play"))
@@ -518,7 +478,7 @@ void draw_tile_inspector(const world& w, ui_state& s,
         }
 
         // --- The map -------------------------------------------------------
-        const std::vector<uint16_t> slice = owner_slice_at(cached_sim, s.ages_year);
+        const std::vector<uint16_t> slice = owner_slice_at(lapse, s.ages_year);
 
         int live = 0;
         for (uint16_t o : slice) if (o != owner_none) ++live;
@@ -549,10 +509,10 @@ void draw_tile_inspector(const world& w, ui_state& s,
         // colour. Region granularity is what makes this cheap to draw as well
         // as cheap to store — there is no tile loop here at all.
         const float r = scale * 1.6f < 2.5f ? 2.5f : scale * 1.6f;
-        for (std::size_t i = 0; i < slice.size() && i < cached_ss.regions.size(); ++i)
+        for (std::size_t i = 0; i < slice.size() && i < settled.regions.size(); ++i)
         {
             if (slice[i] == owner_none) continue;
-            const region& p = cached_ss.regions[i];
+            const region& p = settled.regions[i];
             const ImVec2 at(origin.x + (static_cast<float>(p.col) + 0.5f) * scale,
                             origin.y + (static_cast<float>(p.row) + 0.5f) * scale);
             dl->AddCircleFilled(at, r,
@@ -566,13 +526,16 @@ void draw_tile_inspector(const world& w, ui_state& s,
         // and clipped mid-word ("371 foun"), the same failure the Story view's
         // consequence text already fixed this way.
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+        // The counters are GENERATION'S OWN, read off the report rather than off
+        // a local re-run — which is the whole difference this change made: they
+        // now describe the era the world actually has.
         ImGui::TextWrapped("Full run: %lld battles, %lld conquests, %lld foundings",
-                           static_cast<long long>(cached_sim.battles),
-                           static_cast<long long>(cached_sim.conquests),
-                           static_cast<long long>(cached_sim.foundings));
-        ImGui::TextWrapped("Time-lapse: %lld changes, %lld bytes",
-                           static_cast<long long>(cached_sim.owner_changes.size()),
-                           static_cast<long long>(owner_ring_bytes(cached_sim)));
+                           static_cast<long long>(report.prehistory_battles),
+                           static_cast<long long>(report.prehistory_conquests),
+                           static_cast<long long>(report.prehistory_foundings));
+        ImGui::TextWrapped("Time-lapse: %lld changes over %d regions",
+                           static_cast<long long>(lapse.changes.size()),
+                           lapse.region_stride);
         ImGui::PopStyleColor();
 
         ui::foldout_end();

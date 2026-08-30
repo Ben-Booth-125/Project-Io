@@ -226,18 +226,18 @@ verify.expect_no_clipping("ledger_pass")
 -- struct default — and the default ladder's last band ends at year 0, so every
 -- year past it fell back to a ONE-YEAR step. 1960 decision rounds where
 -- generation runs 100, on a span lying entirely AFTER the era the world has.
--- The view now calls `era_minus_one_sim_params` / `era_minus_one_sim_seed`
--- (world/era_minus_one.hpp) and replays generation's own era, 400 BCE -> 0 CE.
+-- That was corrected first by deriving the span, clock and seed from generation
+-- (era_minus_one.hpp); then superseded entirely - see below.
 --
--- IT IS STILL NOT CHEAP, and that is deliberately not hidden: the run costs
--- minutes rather than milliseconds, because the settlement it is handed is the
--- state AFTER generation's sim (BL-462 divergence 6), so it replays a full map
--- rather than a growing one. That is why Ages lives in its own script — a pass
--- that captures thirteen slots should not pay for it — and why the honest
--- summary is "the hang is fixed, the cost is not".
+-- IT IS CHEAP NOW, which was not true when this note was first written. The view
+-- no longer runs a sim at all: generation RECORDS the ownership history and the
+-- view folds over it (NR-733, Ben's ruling 2026-08-30). A capture pass that opens
+-- Ages six times runs within ~8 s of one that never opens it. Ages keeps its own
+-- script because its subject is TIME and one frame of it proves nothing - not
+-- because it is expensive.
 --
 --   ProjectIo --verify scripts/verify/ages_replay.lua
 --
--- THE PARK HOOK WORKS NOW, with an ordering the script has to honour: the year
--- is parked at the run's first year on the frame that builds the cache, so a
--- script must open the view, run frames, and only THEN set `ages_year`.
+-- THE PARK HOOK WORKS, with an ordering a script has to honour: the year is
+-- parked at the record's first year the first time a body's timeline is shown,
+-- so open the view, run frames, and only THEN set `ages_year`.

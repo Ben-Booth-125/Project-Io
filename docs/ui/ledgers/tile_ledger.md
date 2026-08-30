@@ -24,7 +24,7 @@ on nothing):
 |---|---|---|
 | **Story** | What happened here, in order? | Body summary line (`name | AU | WxH tiles`), then the dated biography — planetology, plate, and history-ladder events in sequence (`format_history_date`, whose unit comes from the date's own magnitude so deep-time and historical lines share one loop), each with an optional wrapped consequence line underneath; "No recorded history for this body" when the report has none. Takes the full-canvas disclosure control alone (the in-place one has nothing to expand) |
 | **Chain** | How did the generation chain arrive at this body? | The wizard's stage charts (`generation_charts.cpp`), re-rendered from the persisted `generation_report`, grouped into three rounds (**System / Life / Legacy**) via a second `nav_button` strip; one collapsing accordion per stage, only the round's first stage open by default. Every body side by side — the comparison *is* the view. No view-level disclosure control: each stage carries its own |
-| **Ages** | How did its polities rise and fall? | Transport (Play / Pause, Restart, a signed-year slider reading `400 BCE` … `0 CE`, the run playing through in a fixed ~16 s whatever the span), the replayed map over the body's actual terrain, and the multipolarity line `year | N regions | N powers`. The replay is **generation's own era** — the span, clock and seed come from `era_minus_one_sim_params` / `era_minus_one_sim_seed`, never from a second set constructed at the call site (`world/era_minus_one.hpp` § why a fixture rather than a second derivation). The sim is cached on the body's entity id **and** the generation's identity, so a regenerated world never replays the previous world's history over new regions. "Never settled" bodies say so instead of replaying. No disclosure control: the map sizes itself to its column |
+| **Ages** | How did its polities rise and fall? | Transport (Play / Pause, Restart, a signed-year slider reading `400 BCE` … `0 CE`, the run playing through in a fixed ~16 s whatever the span), the replayed map over the body's actual terrain, and the multipolarity line `year | N regions | N powers`. It **replays a recorded timeline** — `body_entry::prehistory_timelapse`, written by generation at its own sim call site — rather than re-running the era. There is no sim on this surface and no cache to invalidate. A body with an empty record says "never settled", which is every body but the cradle. No disclosure control: the map sizes itself to its column |
 | **Tectonics** | Which plates made this ground, and where do they meet? | The plate field over the body, reached from the canvas as well as the tab — a plate press under the Continent lens routes here (`CONTINENTS.md` § the Continent lens). |
 
 **Default view:** whatever `s.history_view` was last left on (persisted in `ui_state` so a verify
@@ -123,15 +123,17 @@ it is** — the direction is recorded here to be designed against, not acted on 
   history and so fits the slot's rule, but its multipolarity read is the number the nation layer
   will want live. The strategic turn above sharpens this rather than settling it.
 
-### Raised by the Ages replay
-- **What should Ages replay?** It re-runs the era from the settlement state as it stood *after*
-  generation's own sim, so every region already exists and is owned. The measured consequence:
-  the replay reports **0 battles and 0 conquests** and shows region count growing 1343 → 2090
-  with the power count pinned at 12. It is a settlement time-lapse wearing a political one's
-  label. The alternative is for generation to record its own `owner_changes` into the report and
-  for this view to replay that instead of re-simulating — which is a save-format change, and
-  therefore yours.
-- **Is a multi-minute view acceptable at all?** Even replaying the right era, the run costs
-  minutes on the drawing thread. If the answer to the previous question is "replay the recorded
-  timeline", this dissolves; if it is "keep re-simulating", the sim needs to come off the draw
-  thread with progress and a way back.
+### Settled by the Ages replay (Ben, 2026-08-30)
+Both questions this section used to hold are answered, and by the same change: **generation
+records `owner_changes` into the report and the view replays it.**
+
+What that fixed is larger than the view. Re-running the era made this surface a *seventh caller*
+of an invocation `world/era_minus_one.hpp` exists to keep singular, diverging from generation on
+all six of BL-462's axes. Three were closable at the call site; the other three were not, because
+the report's `settlement` is the state **after** the sim mutated it — so the replay started the era
+from its own ending and reported **0 battles and 0 conquests** however carefully it was
+parameterised. Replaying deletes the second caller, which closes all six at once.
+
+Measured after: **4 battles, 1 conquest, 1184 foundings** over 1334 changes — the era the world
+actually has. And the multi-minute cost is gone with the sim: a capture pass that opens Ages six
+times now runs within ~8 s of one that never opens it at all.

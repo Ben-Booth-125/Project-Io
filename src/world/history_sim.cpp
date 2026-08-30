@@ -185,15 +185,20 @@ int64_t stack_size(const std::vector<army_stack_entry>& s)
 
 // ---------------------------------------------------------------------------
 
-std::vector<uint16_t> owner_slice_at(const history_sim_state& s, int64_t year)
+std::vector<uint16_t> owner_slice_at(const era_timelapse& t, int64_t year)
 {
-    std::vector<uint16_t> slice(static_cast<std::size_t>(s.region_stride), owner_none);
-    for (const owner_change& c : s.owner_changes)
+    std::vector<uint16_t> slice(static_cast<std::size_t>(t.region_stride), owner_none);
+    for (const owner_change& c : t.changes)
     {
         if (static_cast<int64_t>(c.year) > year) break; // Appended in year order.
         if (c.region < slice.size()) slice[c.region] = c.owner;
     }
     return slice;
+}
+
+std::vector<uint16_t> owner_slice_at(const history_sim_state& s, int64_t year)
+{
+    return owner_slice_at(as_timelapse(s), year);
 }
 
 int region_distance(const region& a, const region& b, int gw)
