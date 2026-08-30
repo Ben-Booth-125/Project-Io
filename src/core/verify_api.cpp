@@ -1275,6 +1275,12 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // The Market ledger's Goods table scrolls in its own child (BL-686), so
         // the request must name the CHILD, not the window.
         else if (name == "market")               target = "##goods_scroll";
+        // The Trades tab has a scroller of its OWN (BL-687) — four headed
+        // sections in one child. It needs its own name because a tab strip's two
+        // views are two different scrollers and only one is on screen; aiming
+        // "market" at the Goods child while Trades was up would have been NR-719
+        // by a third route.
+        else if (name == "market_trades")        target = "##trades_scroll";
         else if (name == "convoys")              target = "Convoys";
         else if (name.empty())                   target = ""; // the documented "clear" call
 
@@ -1409,6 +1415,223 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             out[i++] = row;
         }
         return out;
+    });
+
+    // --- The Trades tab (BL-687) ------------------------------------------
+    // Four readers, one per section, and they are deliberately NOT one call
+    // returning a tagged list: the whole design point is that the three reads
+    // are not equally cheap and must not be presented as one table, so a check
+    // that could not tell them apart could not assert the thing being built.
+    //
+    // Same drawn-vs-world discipline as `goods_table` above — these read what
+    // the SURFACE computed, so an assertion crosses the surface against world
+    // state rather than restating the world to itself. On this class of surface
+    // `expect_no_clipping` records zero even over visibly clipped frames
+    // (NR-663), so the assertions are the whole verdict.
+
+    /// Read 1 — the player's own standing trades, as drawn.
+    v.set_function("my_trades", [this]() {
+        sol::table out = m_lua.state().create_table();
+        int i = 1;
+        for (const ui::trade_row_record& r : ui::my_trades())
+        {
+            sol::table row = m_lua.state().create_table();
+            row["order_id"]  = r.order_id;
+            row["good"]      = r.name;
+            row["holder"]    = r.corp_name;
+            row["is_buy"]    = r.is_buy;
+            row["quantity"]  = r.quantity;
+            row["limit"]     = r.limit_price;
+            row["mine"]      = r.mine;
+            out[i++] = row;
+        }
+        return out;
+    });
+
+    // Read 2 — every standing trade on the selected market's body, whoever owns
+    // it. `open` is the GATE (the player owns a building on that body), and it
+    // is reported separately because a shut gate and an empty book are different
+    // answers that the surface must not collapse — nor may a check.
+    v.set_function("market_trades", [this]() {
+        sol::table out = m_lua.state().create_table();
+        sol::table rows = m_lua.state().create_table();
+        int i = 1;
+        for (const ui::trade_row_record& r : ui::market_trades())
+        {
+            sol::table row = m_lua.state().create_table();
+            row["order_id"]  = r.order_id;
+            row["good"]      = r.name;
+            row["holder"]    = r.corp_name;
+            row["holder_id"] = r.corp;
+            row["is_buy"]    = r.is_buy;
+            row["quantity"]  = r.quantity;
+            row["limit"]     = r.limit_price;
+            row["mine"]      = r.mine;
+            rows[i++] = row;
+        }
+        out["open"] = ui::market_trades_open();
+        out["rows"] = rows;
+        return out;
+    });
+
+    // Read 3 — the potential-trade derivation, as drawn and IN DRAW ORDER, so a
+    // script can assert the ranking is really descending by margin (ranking is
+    // permitted on this surface and only on this one — CONCEPT.md § Player
+    // identity, and Ben's 2026-08-29 qualification of it).
+    v.set_function("potential_trades", [this]() {
+        sol::table out = m_lua.state().create_table();
+        int i = 1;
+        for (const ui::potential_trade_record& r : ui::potential_trades())
+        {
+            sol::table row = m_lua.state().create_table();
+            row["good"]         = r.name;
+            row["to"]           = r.dest_name;
+            row["to_market"]    = r.dest_market;
+            row["buy_price"]    = r.buy_price;
+            row["sell_price"]   = r.sell_price;
+            row["haulage"]      = r.haulage;
+            row["margin"]       = r.margin;
+            row["travel_ticks"] = r.travel_ticks;
+            out[i++] = row;
+        }
+        return out;
+    });
+
+    // The history half, over `world::exchanges`. There is NO `profit` key here
+    // and there must never be one: `stockpile_component` is `quantities[]` and
+    // nothing else, so no cost basis exists anywhere in the model and a margin
+    // is not derivable from a sale. `revenue` is `quantity * unit_price`, which
+    // is what the clearing statement actually accrued.
+    //
+    // `seller_is_market` / `buyer_is_market` report the `null_entity` side, which
+    // MEANS THE MARKET and not "unknown" — three of the four clearing paths trade
+    // against the market and carry the volume, so a surface that blanked those
+    // rows would show almost nothing.
+    v.set_function("trade_history", [this]() {
+        sol::table out = m_lua.state().create_table();
+        int i = 1;
+        for (const ui::exchange_row_record& r : ui::exchange_rows())
+        {
+            sol::table row = m_lua.state().create_table();
+            row["tick"]             = r.tick;
+            row["good"]             = r.name;
+            row["quantity"]         = r.quantity;
+            row["unit_price"]       = r.unit_price;
+            row["revenue"]          = r.revenue;
+            row["seller"]           = r.seller;
+            row["buyer"]            = r.buyer;
+            row["seller_is_market"] = r.seller_is_market;
+            row["buyer_is_market"]  = r.buyer_is_market;
+            out[i++] = row;
+        }
+        return out;
+    });
+
+    // The market the Trades tab last drew for, and the body it sits on — so a
+    // check can name a second body, re-point the selector and assert the gate
+    // actually moved rather than assuming it did.
+    v.set_function("trades_market", [this]() {
+        sol::table out = m_lua.state().create_table();
+        const entity_id mid = ui::trades_market();
+        out["market"] = mid;
+        const auto mit = m_world.markets.find(mid);
+        out["body"] = (mit != m_world.markets.end()) ? mit->second.body : null_entity;
+        return out;
+    });
+
+    // The WORLD's own count of standing orders on a body, independent of the
+    // surface — the second read that makes `market_trades` an assertion rather
+    // than a restatement, and the one that catches a gate quietly widened to
+    // "every market".
+    v.set_function("world_orders_on_body", [this](entity_id body) {
+        sol::table out = m_lua.state().create_table();
+        int sells = 0, buys = 0, mine = 0;
+        for (const sell_order& o : m_world.sell_orders)
+            if (o.body == body) { ++sells; if (o.corp == m_world.player_entity) ++mine; }
+        for (const buy_order& o : m_world.buy_orders)
+            if (o.body == body) { ++buys;  if (o.corp == m_world.player_entity) ++mine; }
+        out["sells"] = sells;
+        out["buys"]  = buys;
+        out["mine"]  = mine;
+        return out;
+    });
+
+    // Does the player own a building on this body — read from the world, not
+    // from the surface. `market_trades().open` must equal this and nothing else.
+    v.set_function("player_operates_on", [this](entity_id body) {
+        const auto cit = m_world.corporations.find(m_world.player_entity);
+        if (cit == m_world.corporations.end())
+            return false;
+        for (const entity_id bid : cit->second.assets)
+        {
+            const auto bit = m_world.buildings.find(bid);
+            if (bit == m_world.buildings.end())
+                continue;
+            const auto tit = m_world.tiles.find(bit->second.tile);
+            if (tit != m_world.tiles.end() && tit->second.body == body)
+                return true;
+        }
+        return false;
+    });
+
+    // Bodies that carry a market, with whether the player operates on each — so a
+    // script can FIND a body where the gate must be shut rather than guessing an
+    // id and asserting nothing when it guesses wrong.
+    v.set_function("market_bodies", [this]() {
+        sol::table out = m_lua.state().create_table();
+        std::vector<entity_id> bodies;
+        for (const auto& [mid, mc] : m_world.markets)
+        {
+            (void)mid;
+            if (std::find(bodies.begin(), bodies.end(), mc.body) == bodies.end())
+                bodies.push_back(mc.body);
+        }
+        std::sort(bodies.begin(), bodies.end());
+        int i = 1;
+        for (const entity_id b : bodies)
+        {
+            sol::table row = m_lua.state().create_table();
+            row["body"] = b;
+            const auto bit = m_world.bodies.find(b);
+            row["name"] = (bit != m_world.bodies.end()) ? bit->second.name : std::string{};
+            bool operates = false;
+            const auto cit = m_world.corporations.find(m_world.player_entity);
+            if (cit != m_world.corporations.end())
+                for (const entity_id bid : cit->second.assets)
+                {
+                    const auto bd = m_world.buildings.find(bid);
+                    if (bd == m_world.buildings.end())
+                        continue;
+                    const auto tit = m_world.tiles.find(bd->second.tile);
+                    if (tit != m_world.tiles.end() && tit->second.body == b) { operates = true; break; }
+                }
+            row["operates"] = operates;
+            // The body's lowest-id market — what `select_market` is handed to
+            // re-point the ledger at this body.
+            entity_id first = null_entity;
+            for (const auto& [mid, mc] : m_world.markets)
+                if (mc.body == b && (first == null_entity || mid < first))
+                    first = mid;
+            row["market"] = first;
+            out[i++] = row;
+        }
+        return out;
+    });
+
+    // Re-point the Market ledger's selectors at a market, THROUGH THE PATH A
+    // CLICK TAKES: the ledger jumps its Body/Market combos when the player's
+    // selection becomes a market entity (BL-159's focus routing), so this sets
+    // the selection rather than reaching into the ledger's own statics. A check
+    // that poked the statics would verify a route no press can take.
+    v.set_function("select_market", [this](unsigned id) {
+        if (m_world.markets.count(static_cast<entity_id>(id)))
+            m_ui.selected_entity = static_cast<entity_id>(id);
+    });
+
+    // The exchange ring's own size, so a check can tell "the surface filtered
+    // everything out" from "nothing has cleared anywhere yet".
+    v.set_function("world_exchange_count", [this]() {
+        return static_cast<int>(m_world.exchanges.size());
     });
 
     // Every good the selected market actually trades (`base_price > 0`), so a
@@ -2736,6 +2959,15 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 if (tile_it == m_world.tiles.end())
                     continue;
                 sol::table rec = s.create_table();
+                // The BUILDING's own entity id. `tile` below is the ground it
+                // stands on and is not interchangeable with it: `demolish`'s
+                // subject is the building, so without this a script could read the
+                // estate but not act on it — and the Trades tab's ownership gate
+                // (BL-687) has no other way to reach its SHUT state, since the
+                // generated campaign carries exactly one market-bearing body and
+                // the player operates on it (measured: still one body after 400
+                // econ ticks).
+                rec["id"]     = static_cast<unsigned>(bld_id);
                 rec["corp"]   = static_cast<unsigned>(corp_id);
                 rec["player"] = player;
                 rec["background"] = background;

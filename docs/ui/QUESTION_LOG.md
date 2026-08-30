@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**51 surfaces** — 6 settled, 45 awaiting Ben's wording.
+**52 surfaces** — 6 settled, 46 awaiting Ben's wording.
 
 ---
 
@@ -259,6 +259,24 @@ alphabetical order.
 **Because:** The Body and Market combos name a place but say nothing about who is IN it, and a price is not readable without knowing whose ground feeds it -- a market served by one nation and a market four nations compete over price the same way on screen and mean entirely different things. It earns the space between the selectors and the tabs because it qualifies the market the combos just chose, before the tabs ask a question about it, and it costs one wrapped row. THESE ARE COLOUR CHIPS WITH INITIALS, NOT FLAGS, and that is deliberate: nation_colour is a palette entry and is all that exists -- corporations carry an emblem tag, nations do not -- so real per-nation emblem artwork would be a generated identity system, a feature of its own, and a single stubbed glyph would teach a vocabulary the game does not have. Placeholder even at that (Ben, 2026-08-29: flags and glyphs are a later sprint). Presence is DERIVED, since no store answers it: a building sits on a tile, market_for_tile resolves that tile's catchment market (the same routing clear_markets uses), and tile_to_nation gives the owner -- so a nation appears exactly when its ground really clears here.
 
 *Demanded by BL-688 · `src/ui/market_ledger.cpp` · id `market_ledger_nation_row`*
+
+### Market Ledger - Trades tab
+
+**Answers:** What positions do I hold here, what else is standing, and what could I be doing?
+
+**Because:** IT IS CALLED TRADES BECAUSE THE WORD CARRIES THE WIDENING (Ben, 2026-08-29). A sell order is one direction and one actor; a trade is a position either way round, held by anyone in the market, and -- now that the clearing tick retains a per-exchange record -- one that has already happened. The tab it replaces answered only 'what am I currently offering, at what floor?', which is the narrowest of the four things a player standing at a market wants to know.
+
+It earns its space because markets are the public intelligence channel under the visibility rule: a rival's production and stockpiles are private, so price and the ORDER BOOK are the only honest read the player has on a competitor -- and the book was visible nowhere. THREE READS, KEPT VISIBLY DISTINCT, because they are not equally cheap to know and presenting them as one table would claim they were: my standing trades (a filter on my own orders), the market's standing trades (the same book past a gate), and potential trades (a derivation with no store behind it -- buy price here against sell price there, less the haulage the route would cost, priced through the same price_convoy_leg the auto-dispatcher and the player's own dispatch verb use, so the figure the player acts on is the figure that would bill them).
+
+THE GATE ON THE SECOND READ IS 'the player owns a building on that body' (Ben, 2026-08-29, choosing it over 'an order here', 'either', and 'any discovered market'). Orders are world state and the deliberate public signal, so this is a reading question rather than a disclosure one -- but 'operates in' is a real predicate and is enforced, not assumed: a player reads the books of markets they trade at, not of the whole system.
+
+THE HISTORY COLUMN IS REVENUE, NEVER PROFIT, and the limit is structural. stockpile_component is quantities[] and nothing else, so no cost basis exists anywhere in the model and the margin on a sale cannot be derived from it; quantity * unit_price is honest and a profit column would be a number the clearing loop never computed and a player would act on. An ABSENT counterparty renders as the market and not as 'unknown' -- three of the four clearing paths trade against the market as counterparty of last resort and they carry the volume, so blanking or skipping those rows would empty the section.
+
+RANKING IS PERMITTED HERE and this is the one surface where that has been ruled on explicitly (CONCEPT.md: rank where the top row is one input among several, not where it IS the move). Ben, same day: 'Market prices is a vital pillar of gameplay, but the strategy "just build the most profitable" is a red herring.' A potential trade sorted by margin is still weighed against reach, stock, competition and what the price does next.
+
+EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferred: the book runs to 24 rows on the shipped fixture and the exchange read to 120, so laid out end to end the first fills the column and the other three reads are below the fold on open. A tab whose headline question is 'what could I be doing?' cannot open on a list of rival orders with the answer three screens down.
+
+*Demanded by BL-687 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp` · id `market_ledger_trades`*
 
 ### National border band (Planetary canvas, always-on chrome)
 

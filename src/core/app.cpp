@@ -1949,7 +1949,12 @@ void app::render()
     // Construction panel — an ordinary fold-out tab in the shell column (BL-122),
     // one of the mutually-exclusive column occupants (ledgers + Selection).
     ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
-    ui::draw_market_ledger(m_world, m_ui, m_market_history, m_ui.show_market_ledger);
+    // Market ledger — Goods and Trades. It takes a NON-CONST world and the recipe
+    // registry because the Trades tab's potential-trade read prices real convoy
+    // legs through `price_convoy_leg` (which warms the A* cache and mutates no
+    // game state), rather than inventing a second haulage model that could
+    // disagree with the one that actually bills the player.
+    ui::draw_market_ledger(m_world, m_registry, m_ui, m_market_history, m_ui.show_market_ledger);
     // Convoys ledger (BL-689) — nav slot 7, directly after Market. Was the Market
     // ledger's third tab until the Goods flattening deleted that strip; it left
     // rather than being re-homed because a convoy is cargo in transit and belongs
