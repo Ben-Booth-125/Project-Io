@@ -503,10 +503,30 @@ void draw_goods_tab(const world& w, ui_state& s, entity_id body,
                             ? avail_h / static_cast<float>(rows_target)
                             : ImGui::GetFrameHeight();
 
-    // THE SHARED VERTICAL SPAN, computed once for the whole table. Every row's
-    // graph is drawn against this, which is what "shared scale" means here — a
-    // per-row span would just be the old autoscale wearing a table.
-    float lo = 1.0f, hi = 1.0f;
+    // THE SHARED VERTICAL SPAN — SYMMETRIC ABOUT BASE, AND ZOOMED (Ben,
+    // 2026-08-29: "we can fix it by centring on the body base price, and zooming
+    // in").
+    //
+    // The first cut spanned the global min and max of `price / base` across every
+    // good, which is honest and unreadable: the fixture runs 0.25x to 2.77x, so a
+    // good moving 1.00 -> 1.05 got 1.7% of the cell height and forty rows drew as
+    // empty boxes. One outlier set the scale for everyone.
+    //
+    // Two properties replace it, and the first is what keeps the rows comparable:
+    //
+    //  * SYMMETRIC about 1.0, so the baseline is the exact vertical centre of
+    //    every cell and "at base" means the same height on every row. That is the
+    //    comparability the shared span was for; it does not depend on the rows
+    //    sharing a numeric range, only a shared MEANING for the midline.
+    //  * ZOOMED to a robust spread rather than the extremes. The half-width is the
+    //    75th percentile of |ratio - 1| over every drawn sample, so at least three
+    //    quarters of the data is on-scale and the outliers clip instead of
+    //    flattening everything else.
+    //
+    // A clipped sample pins to the cell edge (`y_of` clamps), which reads as "off
+    // the scale" rather than as a value — and the `v.Base` column carries the
+    // exact ratio on the same row, so nothing is actually lost by clipping it.
+    std::vector<float> dev;
     if (hist_it != history.end())
         for (std::size_t r = 0; r < resource_count; ++r)
         {
@@ -518,15 +538,20 @@ void draw_goods_tab(const world& w, ui_state& s, entity_id body,
             const std::size_t n     = std::min(k_graph_quarters, ser.size());
             const std::size_t first = ser.size() - n;
             for (std::size_t i = 0; i < n; ++i)
-            {
-                const float ratio = ser[first + i] / mc.base_price[r];
-                lo = std::min(lo, ratio);
-                hi = std::max(hi, ratio);
-            }
+                dev.push_back(std::fabs(ser[first + i] / mc.base_price[r] - 1.0f));
         }
-    // A little headroom, and a guaranteed non-degenerate span.
-    lo = std::min(lo, 0.95f);
-    hi = std::max(hi, 1.05f);
+
+    // p75, and a floor so a market that has barely moved does not zoom into its
+    // own noise and report a flat quarter as a crisis.
+    float half = 0.05f;
+    if (!dev.empty())
+    {
+        const std::size_t k = (dev.size() * 3) / 4;
+        std::nth_element(dev.begin(), dev.begin() + static_cast<std::ptrdiff_t>(k), dev.end());
+        half = std::max(0.05f, dev[k]);
+    }
+    const float lo = 1.0f - half;
+    const float hi = 1.0f + half;
 
     // Named child so `verify.scroll_panel("market", …)` can reach the REAL
     // scroller (NR-719): the request names this key, not the window.

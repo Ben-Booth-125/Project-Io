@@ -137,12 +137,13 @@ verify.expect(bad_ini == 0,
     "every nation chip carries readable initials (" .. bad_ini .. " blank)")
 
 -- 5. ROW HEIGHT IS THE OPEN MEASUREMENT (Ben: "compare this at 8 rows, 10 rows,
---    and 12 rows"). Captured at 1920x1080 because that is the screen being
---    reviewed — a density judgement at 720p is taken against half the content
---    height, which is how such numbers were got wrong before 2026-08-29.
+--    and 12 rows", then "I'm thinking 12 looks best. In fact, let's see it with
+--    15 rows"). Captured at 1920x1080 because that is the screen being reviewed —
+--    a density judgement at 720p is taken against half the content height, which
+--    is how such numbers were got wrong before 2026-08-29.
 verify.window(1920, 1080)
 verify.frames(2)
-for _, n in ipairs({8, 10, 12}) do
+for _, n in ipairs({8, 10, 12, 15}) do
     verify.goods_rows(n)
     verify.frames(2)
     verify.capture("goods_table_1920_" .. n .. "rows")
