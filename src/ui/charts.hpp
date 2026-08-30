@@ -50,6 +50,62 @@ struct bar
     bool        hollow = false; ///< Draw as an outline — used for "before" / reference values.
 };
 
+// ---------------------------------------------------------------------------
+// Income against a STACKED expense column (BL-691 generalised BL-074's chart)
+//
+// Two columns sharing a baseline, each built from its own list of segments: what
+// came in on the left, what went out on the right, stacked bottom-up in array
+// order, every segment naming itself and its figure on hover. Drawn by hand
+// rather than through draw_bars, which has no notion of a stacked column.
+//
+// It has two callers at two grains — a BUILDING's revenue against its input
+// cost / maintenance / wages, and a CORPORATION's earnings against the whole
+// quarter's outflows — and it is ONE function because two implementations of one
+// chart is how two surfaces come to disagree about the same arithmetic.
+//
+// A ZERO SEGMENT IS ABSENT, NOT A SLIVER, and that is the mechanism behind the
+// variable segment count the corp grain needs: interest is charged only while a
+// corp is in debt, so the solvent stack is one segment shorter than the indebted
+// one. The row count changing across the solvency boundary is a fact about the
+// corporation, not a reason to fork the drawing. The single-segment case is
+// exempt: a lone column IS a plain bar, and a plain bar draws its own zero.
+// ---------------------------------------------------------------------------
+
+/// One segment of a stacked column.
+struct stack_segment
+{
+    float       value  = 0.0f;
+    ImU32       colour = IM_COL32(150, 160, 190, 255);
+    const char* label  = "";       ///< Named on hover, with the figure.
+    const char* detail = nullptr;  ///< Optional second hover line (an input basket).
+};
+
+/// Draw two stacked columns inside [@p mn, @p mx], sharing one baseline and one
+/// axis ceiling (nice_ceil over the taller column's total).
+///
+/// @param bar_cap       Maximum column width. 44.0f is the building card's fixed
+///                      mockup width. Pass 0 to auto-fit the column to the plot
+///                      — half the plot's own width, held under a fifth of its
+///                      height, because a column wider than that stops reading
+///                      as a column and starts reading as a block.
+/// @param left_caption  Optional baseline captions, drawn centred under each
+/// @param right_caption column. Both null (the default) reserves no room for
+///                      them and leaves the plot geometry exactly as the
+///                      un-captioned building card has always drawn it.
+/// @param tight_axis    Take the axis top from tight_ceil rather than nice_ceil.
+///                      The coarse ladder can leave two fifths of the plot empty
+///                      (a peak of 58.7 rounds to 100), which is the wrong
+///                      trade on a chart whose host budgeted it the height. A
+///                      caller opt-in, exactly as tight_ceil's own note asks:
+///                      the goldened building card keeps the coarse ladder.
+void draw_stacked_columns(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
+                          const stack_segment* left,  std::size_t left_count,
+                          const stack_segment* right, std::size_t right_count,
+                          float bar_cap = 44.0f,
+                          const char* left_caption = nullptr,
+                          const char* right_caption = nullptr,
+                          bool tight_axis = false);
+
 /// Where a chart's swatch legend sits (BL-215). The narrow-host mode is a CALLER
 /// opt-in, never a width test inside draw_bars — an internal test would move the
 /// goldened tile-selection graphs (host width ~238 px at 1280).

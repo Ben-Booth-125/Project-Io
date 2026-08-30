@@ -131,28 +131,35 @@ Notes on the mapping:
   **Two doors reach it**: this slot, and the Company lens's click destination (`LENSES.md`
   § Company lens) — a background firm's holdings resolve through to the firm, and the question a
   player has about a background firm is whether they can buy it.
-- **Slot 1 — Corporation overview dashboard (BL-248, corporation dashboard).** Four roll-up
-  cards — **Production**, **Trade**, **Workforce**, **Finance** — folded out into the shell
-  column (`src/ui/corporation_dashboard.{hpp,cpp}`). Each card **rests as one verdict line**
-  and expands, through the shared drill-through chevron (BL-214, drill-through; `LAYOUT.md`
-  § Drill-through), to a **full-screen view** carrying its chart and a **per-item drill** with a
-  breadcrumb back to the roll-up. There is no chart question log on the cards (NR-018; see
-  `LAYOUT.md` § The chart question log).
+- **Slot 1 — Corporation ledger (BL-248, corporation dashboard; BL-691, corp: how am I doing).**
+  Its question is **"how well am I doing?"**, and it holds **one card, Balance**, folded out into
+  the shell column (`src/ui/corporation_dashboard.{hpp,cpp}`). The card **rests as one verdict
+  line** (`±X/qtr, balance Y`) **over its chart** — a two-column graph, earnings against the
+  quarter's expenses stacked by flow, with the net beneath it. `›` gives it the canvas
+  (BL-214, drill-through; `LAYOUT.md` § Drill-through); there is no expand-in-place control,
+  because the card already shows its content at rest. There is no chart question log on the card
+  (NR-018; see `LAYOUT.md` § The chart question log).
 
-  The four drills are deliberately four *different shapes*, not one generic detail panel: a
-  building's operating economics (through the shared `draw_building_profit` builder), a lane's
-  completed convoys and recency, a building's assigned-against-effective labour, and — for
-  Finance, whose subject is not per-item — the budget's five flows. Every figure is derived from
-  the live world and the last `economy_report`.
+  **Three cards went, and where their questions went** (Ben, 2026-08-29): **Production** and
+  **Workforce** are answered by the **Construction ledger's Buildings tab**, which holds the
+  estate *and* the per-building levers; **Trade** by the **Market** and **Convoys** ledgers. The
+  per-item drills went with them — with one card there is no item list to drill, and the card's
+  subject is its own flows. Every figure is derived from the live world and the last
+  `economy_report`. The chart is `ui::charts::draw_stacked_columns`, shared with the building
+  card's Revenue / Expenses graph at the building grain.
 
-  > **Four roll-ups, not the MVP four (Ben, 2026-07-31).** An earlier cut named **balance +
+  **"Balance" here is a sub-header, not a surface name** (Ben, 2026-08-29): the ledger is called
+  Corporation, and the overlap with slot 2's **Budget** is explicitly accepted rather than
+  tolerated, with Budget to be revisited. See `ledgers/corporation.md` § Slot 1.
+
+  > **The MVP four, and what became of them (Ben, 2026-07-31).** An earlier cut named **balance +
   > last-tick delta**, a **holdings roll-up**, **workforce contention** and **alerts**; Ben chose
-  > the four roll-ups over those when asked directly. The MVP's **click-through into the relevant
-  > per-system ledger** survives as the **host axis** (`[>]` / `focus_on_entity`), available
-  > *alongside* the drill rather than instead of it, the two being orthogonal per BL-214's
-  > three-axis model. There is no separate **alert** mechanism on the dashboard: an idle building
-  > and a negative net read as red verdicts on their own cards, which is the same signal without
-  > a second mechanism to maintain (player alerts as a system are BL-261, player alerts).
+  > four roll-ups over those when asked directly, and the 2026-08-29 cut then reduced those four
+  > to one. The MVP's **click-through into the relevant per-system ledger** survives as the
+  > **host axis** (`[>]` / `focus_on_entity`), orthogonal per BL-214's three-axis model. There is
+  > no separate **alert** mechanism here: a negative net reads as a red verdict on the card,
+  > which is the same signal without a second mechanism to maintain (player alerts as a system
+  > are BL-261, player alerts).
 
   The **rival-field comparison** — corporations grouped by stance, with the stance verbs on each
   row — lives on **slot 9** (Diplomacy), not here. That slot stopped being provisional when its
