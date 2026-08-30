@@ -141,6 +141,23 @@ struct world_history_entry
 // authored in a `contract_template` (contract_template.hpp's own comment) —
 // it is bound HERE, once, at offer derivation, so the same "take" row serves
 // every province any client ever offers.
+//
+// ── DORMANT: THE MERCENARY CONTRACT IS RETIRED (BL-693) ─────────────────────
+// Ben, 2026-08-29: "I don't think mercenary contracts is the correct system."
+// The SELL side of CONTRACTS.md is retired. Its player-facing surface is gone —
+// no ledger, no rail slot, no way to see an offer or take one — so this record
+// and everything keyed to it (`world::mercenary_offers`,
+// `world::mercenary_contracts`, the `accept_offer` / `abandon_contract` verbs,
+// and their serialisation in world_save.cpp) are a DORMANT RECORD, not a live
+// system. They are kept only because deleting them would move the save
+// envelope, which the retirement was explicitly not worth.
+//
+// READ THIS BEFORE BUILDING ON ANY OF IT. A dormant system that looks live is
+// how three orphaned rulings were found in one sprint. Nothing drives this
+// today; do not treat its presence as evidence the mechanism is wanted.
+//
+// NOT AFFECTED: procurement — the BUY side — which is a separate sibling record
+// (procurement.{hpp,cpp}) and is live. CONCEPT.md's player identity rests on it.
 struct mercenary_offer
 {
     /// Stable handle, allocated by `world::allocate_offer_id()`. Nonzero on any

@@ -48,7 +48,7 @@ print("CONSTRUCTION_TABS state_hash=" .. verify.state_hash())
 local function close_column()
     for _, p in ipairs({ "corporation", "balance", "construction", "tech_tree",
                          "acquisitions", "market", "corporations_table", "tile",
-                         "generation_ledger", "decisions", "strategy", "contracts" }) do
+                         "generation_ledger", "decisions", "strategy" }) do
         verify.show_panel(p, false)
     end
     verify.frames(1)

@@ -6,7 +6,7 @@ The **navigation pane** is a fixed, full-height **icon rail** pinned to the left
 
 ## Structure
 
-- A vertical strip of **fourteen square icon slots** (`nav_pane.cpp`, `tab_count`; the rail's legibility model is BL-174, nav-rail legibility): the **ten curated player slots** below, a **three-slot developer / observability tail** (§ The tail), then **one further player-system slot** (§ The appended player slot — Contracts) after the tail rather than inside it. Of the ten, **eight carry their own subject** — Corporation overview, Budget, Construction, Acquisitions, Market Ledger, Convoys, Diplomacy, History. **One carries a provisional occupant** — a surface standing in for the slot's subject, because that surface would otherwise have no door: Research hosts the **tech-tree design mock** (BL-310, tech-tree mock). It keeps its real subject's name and glyph, lit like any other live slot, so the rail does not teach the wrong vocabulary; the tooltip says what the slot holds for now. **One is reserved** — Corp. Strategy — disabled, but carrying its own dimmed glyph so the rail teaches the shape of the game rather than showing a blank.
+- A vertical strip of **thirteen square icon slots** (`nav_pane.cpp`, `tab_count`; the rail's legibility model is BL-174, nav-rail legibility): the **ten curated player slots** below, then a **three-slot developer / observability tail** (§ The tail), which is the foot of the rail. Of the ten, **eight carry their own subject** — Corporation overview, Budget, Construction, Acquisitions, Market Ledger, Convoys, Diplomacy, History. **One carries a provisional occupant** — a surface standing in for the slot's subject, because that surface would otherwise have no door: Research hosts the **tech-tree design mock** (BL-310, tech-tree mock). It keeps its real subject's name and glyph, lit like any other live slot, so the rail does not teach the wrong vocabulary; the tooltip says what the slot holds for now. **One is reserved** — Corp. Strategy — disabled, but carrying its own dimmed glyph so the rail teaches the shape of the game rather than showing a blank.
 - Each slot shows a **vector glyph** (`src/ui/icons.hpp`) instead of a worded label; the slot's name plus a one-line blurb is shown in a wrapping hover tooltip. The rail is deliberately narrow — the profile above keeps its own (wider) `profile_panel_width` rather than matching the rail.
 - Each slot toggles a panel open/closed; the open slot lights its glyph in the selection accent — the same idiom as the minimap lens bar, so the two icon strips read as one vocabulary.
 - Opened menus **fold out into the shell column** to the rail's right (`foldout_begin`, `src/ui/foldout_column.hpp` — see `LAYOUT.md` § Ledger windows). **Nothing floats and there is no ✕**: closing is the toggle — re-click the slot, re-click the active sub-view tab (the toggle rule, `.claude/rules/io-standing-rules.md`), or open another slot (accordion, `close_all_panels`).
@@ -30,34 +30,25 @@ Slots 11–13 sit after the curated player slots and never displace them; the ta
 
 Slot 12 borrows the pennant glyph slot 8 draws dim, because its subject is exactly the strategic decision that slot is reserved for; slot 13 has its own glyph because two *lit* slots must not share a silhouette.
 
-### The appended player slot — Contracts (BL-576)
+### Appending versus inserting
 
-The curated player slots (§ Menu set and ordering) and the developer tail (§ The tail,
-slots 11–13) were both already full when the Contracts ledger (`docs/economy/CONTRACTS.md`)
-needed a door. Contracts is a **broad ledger** by the menus-are-broad-ledgers test — an
-overview across every open offer and every contract the player holds, not a targeted
-per-entity action — so it earns a slot rather than living only in the Selection element.
-It is **not** a developer/observability surface, so it does not belong inside the tail's
-own stated character; it is appended as slot 14, the rail's one slot outside both the
-curated set and the tail.
+The tail is the foot of the rail: **slot 13 is the last slot, and nothing sits below it.**
 
-**Appending is the default, not the only route.** Acquisitions (§ Menu set and ordering,
-slot 5) was *inserted* among the curated slots instead, on Ben's call (2026-08-29), and the
-distinction is worth keeping: a surface whose subject is one of the curated systems belongs
-in the curated sequence at the point that sequence would put it, while a surface that sits
-outside those systems — as Contracts does — is appended. Deciding by which is cheaper to
-implement is how a rail stops teaching anything.
+Where a new surface goes is nonetheless a real decision, and the rail has both routes.
+**Insertion** puts a surface among the curated slots at the point the curated sequence would
+put it — Acquisitions (§ Menu set and ordering, slot 5) was inserted above Market on Ben's
+call (2026-08-29), because buying a firm reads before the market it is priced from.
+**Appending** puts it below the developer tail, outside both the curated set and the tail.
 
-| # | Slot | tier-idx | System / source |
-|---|---|---|---|
-| 13 | **Contracts** (`icons::contract`) | 5 | Contracts ([SYSTEMS.md]) — offers, active contracts and terminal history for the mercenary contract (`docs/economy/CONTRACTS.md`) |
+The rule is the subject, not the convenience: a surface whose subject is one of the curated
+systems belongs in the curated sequence; only a surface that sits outside those systems is a
+candidate for appending. Deciding by which is cheaper to implement is how a rail stops
+teaching anything.
 
-Three views, the standing button-strip split (§ One-question-per-view splits,
-`LAYOUT.md`): **Offers** — open `mercenary_offer`s the fog admits, with an Accept press
-that opens a force picker over the player's own uncommitted units; **Active** — the
-player's own live `mercenary_contract`s, predicate rendered via `condition_text`, with an
-Abandon press that shows its reputation cost before it commits; **History** — the
-player's terminal-state contracts and what they paid.
+**An appended slot is the weaker position, and it should be earned rather than defaulted to.**
+It puts a player system below the developer/observability surfaces, which teaches the rail's
+own ordering wrong — the tail's stated character is "not a player system", and a player
+system beneath it contradicts that at a glance.
 
 ## Menus are broad ledgers
 

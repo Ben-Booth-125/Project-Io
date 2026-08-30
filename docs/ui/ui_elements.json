@@ -1657,73 +1657,6 @@
    ]
   },
   {
-   "id": "UI-101",
-   "name": "Contracts Ledger",
-   "kind": "ledger",
-   "parent": null,
-   "source": [
-    "docs/economy/CONTRACTS.md",
-    "src/ui/contracts_ledger.cpp",
-    "src/ui/nav_pane.cpp"
-   ],
-   "summary": "Rail slot 13: the mercenary contract end to end, split into three views by the standing button-strip idiom (LAYOUT.md, one question per view).",
-   "interesting_question": "A contract is a promise between named parties. Does a ledger of them read as a market, or as a relationship?",
-   "resolution": "As a market at the Offers end and a relationship at the History end, which is why the split is three views rather than one table - CONTRACTS.md owns the distinction and ui_state::contracts_ledger_view carries it.",
-   "checks": [
-    "contracts_ledger",
-    "mercenary_slice"
-   ]
-  },
-  {
-   "id": "UI-102",
-   "name": "Offers view",
-   "kind": "view",
-   "parent": "UI-101",
-   "source": [
-    "docs/economy/CONTRACTS.md",
-    "src/ui/contracts_ledger.cpp"
-   ],
-   "summary": "Contracts on offer and not yet taken - the market end of the ledger.",
-   "interesting_question": "An offer the player cannot service is noise. Is the list filtered by capability, or by nothing?",
-   "resolution": "Open - the view is built (BL-576) and its filtering rule is not stated in CONTRACTS.md. Worth settling before the roster of offers grows.",
-   "checks": [
-    "contracts_ledger"
-   ]
-  },
-  {
-   "id": "UI-103",
-   "name": "Active view",
-   "kind": "view",
-   "parent": "UI-101",
-   "source": [
-    "docs/economy/CONTRACTS.md",
-    "src/ui/contracts_ledger.cpp"
-   ],
-   "summary": "Contracts taken and running, with their obligations and their clock.",
-   "interesting_question": "An active contract is the one thing on this ledger that can fail while the player is not looking. Where does that failure surface?",
-   "resolution": "Partly on the Comms dock, which since 2026-08-19 gives battle traffic a standing channel of its own (chat_panel.hpp). Whether contract failure gets the same treatment is not settled.",
-   "checks": [
-    "contracts_ledger",
-    "mercenary_slice"
-   ]
-  },
-  {
-   "id": "UI-104",
-   "name": "History view",
-   "kind": "view",
-   "parent": "UI-101",
-   "source": [
-    "docs/economy/CONTRACTS.md",
-    "src/ui/contracts_ledger.cpp"
-   ],
-   "summary": "Terminal contracts - completed, failed or expired - the relationship end of the ledger.",
-   "interesting_question": "History is the only view here with no action on it. What is it for?",
-   "resolution": "Reputation: CONTRACTS.md ties terminal outcomes to standing with the counterparty, so the view is the evidence behind a number that gates future offers.",
-   "checks": [
-    "contracts_ledger"
-   ]
-  },
-  {
    "id": "UI-105",
    "name": "Generation Ledger",
    "kind": "ledger",
@@ -1887,9 +1820,9 @@
     "docs/ui/LAYOUT.md (container 8)",
     "src/ui/nav_pane.cpp"
    ],
-   "summary": "The rail's vertical budget: every one of its fourteen slots must be pressable at every supported resolution, not merely drawn.",
-   "interesting_question": "Inserting Convoys at slot 7 took the rail to fourteen — does the rail still fit at the documented 1280x720 floor?",
-   "resolution": "It did not. At a fixed 48 px pitch slot 14's centre landed at y=746 against a 720 px screen, so Contracts — a player system — was drawn and unreachable, since ImGui's hit-test rejects a press outside the window; at 1920x1080 the same layout was fine, which is why no single-resolution capture could have caught it. The slot square is now derived from the height the rail actually has, capped at its width, so 1080p is pixel-identical and 720p compresses to fit instead of dropping the last slot.",
+   "summary": "The rail's vertical budget: every one of its slots must be pressable at every supported resolution, not merely drawn.",
+   "interesting_question": "The rail grows by insertion and by append. Does it still fit at the documented 1280x720 floor?",
+   "resolution": "At one point it did not. With fourteen slots at a fixed 48 px pitch the fourteenth centre landed at y=746 against a 720 px screen, so a player system was drawn and unreachable - ImGui's hit-test rejects a press outside the window - while at 1920x1080 the same layout was fine, which is why no single-resolution capture could have caught it. The slot square is now derived from the height the rail actually has, capped at its width, so 1080p is pixel-identical and 720p compresses to fit instead of dropping the last slot. The property is a floor on the pitch, independent of the current count.",
    "checks": [
     "nav_rail_fit",
     "shell_pass"

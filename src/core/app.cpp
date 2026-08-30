@@ -16,7 +16,6 @@
 #include "ui/construction_panel.hpp"
 #include "ui/acquisitions_ledger.hpp" // nav slot 5, the Acquisitions ledger + its profitability fold-out
 #include "ui/company_ledger.hpp"   // Company-lens click destination, no rail slot (BL-666)
-#include "ui/contracts_ledger.hpp" // nav slot 13, the mercenary Contracts ledger (BL-576)
 #include "ui/detail_level.hpp" // the drill-through fold idiom (BL-214)
 #include "ui/balance_ledger.hpp"
 #include "ui/corporation_dashboard.hpp" // nav slot 1, the four roll-ups (BL-248)
@@ -1973,17 +1972,15 @@ void app::render()
     // Acquisitions ledger — nav slot 5, and the Company lens's click
     // destination. Which firms can be bought outright and at what price, plus
     // the full-canvas profitability fold-out over every corporation's filed
-    // return. Drawn before Contracts for no reason beyond reading order; every
-    // ledger here is guarded by its own open flag and at most one is set.
+    // return. Every ledger here is guarded by its own open flag and at most one
+    // is set.
     ui::draw_acquisitions_ledger(m_world, m_registry, m_ui,
                                  m_ui.show_acquisitions_ledger);
-    // Contracts ledger (BL-576) — nav slot 13: offers, active contracts and
-    // terminal history for the mercenary contract (CONTRACTS.md). Reads the
-    // same m_contract_templates run_nation_step already threads through for
-    // the tick-evaluation pass, so the Active view's predicate wording can
-    // never disagree with what actually settles the contract.
-    ui::draw_contracts_ledger(m_world, m_registry, m_contract_templates, m_ui,
-                              m_ui.show_contracts_ledger);
+    // NO CONTRACTS LEDGER (BL-693). The mercenary contract — the SELL side of
+    // CONTRACTS.md — is retired, so its ledger is deleted and slot 14 with it.
+    // `m_contract_templates` below is NOT dead: run_nation_step still threads it
+    // through, and it stays loaded so the dormant world-side record keeps its
+    // meaning. Procurement, the BUY side, is untouched.
     // Company ledger (BL-666) — where a Company-lens click lands. Drawn with the
     // rail ledgers because it occupies the same fold-out column, but it has no
     // rail slot: only a canvas click opens it. A declared placeholder for now.

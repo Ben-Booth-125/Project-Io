@@ -394,8 +394,14 @@ void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// away (a dog-ear fold) plus a short check mark near the bottom (a signed
 /// document motif) — in @p colour. Distinct from `ledger` (a plain ruled
 /// box) by the fold and the check, and from `history` (the hourglass) by
-/// having a baseline rectangle at all. Nav rail slot 13, the Contracts
-/// ledger (BL-576). See ICONS.md § Nav-rail affordances.
+/// having a baseline rectangle at all. See ICONS.md § Nav-rail affordances.
+///
+/// UNASSIGNED — it has NO CALLER (BL-693). It drew nav rail slot 14 for the
+/// Contracts ledger; the mercenary contract is retired and that slot is gone.
+/// The glyph is kept in the vocabulary because the shape is still the right one
+/// for a signed promise, and procurement — the BUY side of CONTRACTS.md, which
+/// is live — has no surface of its own yet. Anything drawing this again should
+/// take the slot deliberately, not inherit it.
 ///
 /// @param dl     Draw list to render into.
 /// @param centre Glyph centre, screen pixels.
