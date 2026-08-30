@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*97 entries — 97 open, 0 resolved.*
+*99 entries — 99 open, 0 resolved.*
 
 ---
 
@@ -976,6 +976,42 @@ THE OPTIONS, none costed:
 WORTH NOTING AS A PATTERN RATHER THAN AN INCIDENT: this is the THIRD time this sprint a deletion has silently orphaned an earlier ruling — BL-176's empty-room fix went with the Buildings tab (NR-718), NR-245's controls-on-the-card went with the levers (recorded in BL-683), and now BL-591's readout goes with the Production card. Each was found by reading rather than by any check. A deletion that removes a surface should ask what was placed there by a ruling, and nothing in the method prompts that question.
 
 *Files: `docs/economy/PRODUCTION.md`, `docs/development/user_stories.json`, `src/ui/corporation_dashboard.cpp`, `src/ui/construction_panel.cpp`*
+
+### NR-725 — Only ONE market-bearing body ever exists — measured to 400 econ ticks
+*observation · raised 2026-08-29 · from Sprint 24, BL-687. Found because the Trades gate needed a second body to test its shut half, and there is not one.*
+
+Measured at 16, 60, 120, 240 and **400 econ ticks** — a hundred in-game years: **one market-bearing body**, every time. The number is now printed by `trades_tab.lua` on every run ("MEASURED market-bearing bodies: 1") rather than living in a report.
+
+THE MECHANISM IS WORKING EXACTLY AS DESIGNED, WHICH IS THE PROBLEM. `MARKETS.md` § Spontaneous market emergence: generation seeds markets **only on the home body**, and an off-world market comes into existence the tick a body's first building COMPLETES there — "investment, not presence", deliberately not a survey completing. Nothing ever builds off-world in a hundred years, so the trigger never fires.
+
+So a designed and implemented mechanism — with its own pricing rule (`price_distance_gain`), its own demand injection (`inject_interbody_demand`, the counterpart rule, the one-tick lag), and its own harness (`interbody_pull_harness`) — has never once run in a played world.
+
+WHAT IT TOUCHES BEYOND THE TAB, and this is why it is filed rather than noted:
+  - The Market ledger's **Body combo has exactly one entry**, always. Its "which body" question is not a question.
+  - `body_average_price` (BL-686) averages across the markets of the only body there is.
+  - The **Convoys ledger** ships as an inter-body cargo read while all traffic is intra-body, between the home body's nine carved markets.
+  - Inter-body trade, the distance pricing, and the whole commercial half of the space arc are unexercised — not unbuilt, UNEXERCISED, which is harder to notice.
+
+IT IS NOT OBVIOUSLY A DEFECT. A hundred years with no off-world investment may be the honest consequence of an economy where nothing off-world pays yet — that is a finding about the ECONOMY, not the market layer. But it means several surfaces are designed against a world shape that does not occur, and at least one harness asserts behaviour no player will meet.
+
+The question for Ben: is off-world investment meant to happen inside a campaign, and if so what is supposed to trigger it? If not, the surfaces that assume multiple bodies should say so.
+
+*Files: `docs/economy/MARKETS.md`, `src/world/economy_system.cpp`, `src/ui/market_ledger.cpp`, `docs/ui/ledgers/market.md`, `docs/ui/ledgers/convoys.md`*
+
+### NR-726 — Two novel verification techniques from the Trades check, both worth a ruling before they spread
+*novel-work · raised 2026-08-29 · from Sprint 24, BL-687. Flagged by the agent, filed here.*
+
+TWO THINGS NO EXISTING CHECK DOES, both defensible, both worth Ben deciding on before they become the pattern.
+
+**1. Demolition as a verification instrument.** The Trades gate has two branches — the player owns a building on this body, or does not — and the shut branch is unreachable by selection because only one market-bearing body exists (NR-725). Rather than weaken the assertion to something it could reach, the check DESTROYS WORLD STATE to get there: it demolishes the player's three buildings through the real `demolish` verb, then asserts the gate is shut while the world still holds all 24 orders.
+
+It is defensible on three counts — a real verb rather than a back door, it runs LAST so nothing downstream inherits the wreckage, and the alternative was an assertion that could never fire. But no other check mutates the world to reach a predicate, and "destroy the world to test the else branch" is a technique that will be copied badly if it is not bounded. Worth a rule: last-only, real verbs only, and state what was destroyed.
+
+**2. A verify reader that exists to FIND a state rather than assert one.** `market_bodies` and `player_operates_on` were added not to check a claim but to discover whether a claim was checkable. The brief assumed the shut state was reachable; the honest answer was to measure that it is not, and report the number.
+
+That is a different kind of reader from every other one in `verify_api` — the rest answer "is this true", these answer "is this testable". It is the shape that turns a brief's wrong premise into a finding instead of a weakened test, which this sprint has now wanted four times.
+
+*Files: `scripts/verify/trades_tab.lua`, `src/core/verify_api.cpp`, `docs/development/DEVELOPMENT_PRACTICES.md`*
 
 ---
 
