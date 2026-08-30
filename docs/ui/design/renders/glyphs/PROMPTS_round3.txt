@@ -1,0 +1,126 @@
+PROJECT IO — GLYPH / ICON SET, ROUND 3 (FROM-SCRATCH REDESIGN)
+Drafted 2026-08-30. Supersedes round 2.
+
+WHY ROUND 2 FAILED
+Round 2 (G1-G4) told the renderer to reproduce the exact shapes documented in
+docs/ui/ICONS.md and only vary stroke weight — so all four came out identical.
+But ICONS.md describes the CURRENT PLACEHOLDER primitives (hand-coded in
+src/ui/icons.cpp), not a target. We are redesigning the whole set from scratch:
+real, stylish, game-ready glyphs with actual visual character.
+
+ROUND 3 SCOPE
+The list below is a list of MEANINGS to represent, not shapes to copy. Redesign
+every form. Explore four genuinely different DESIGN LANGUAGES (L1-L4) — not
+weight variations. Render the full set in each language on one labelled sheet so
+whole systems compare. Pick one language, then refine it.
+
+=============================================================================
+HARD CONSTRAINTS (real system requirements — keep all of these)
+=============================================================================
+- Each glyph is a SMALL ON-CANVAS MARKER drawn over live, textured terrain with
+  NO backing plate. Legibility is the glyph's own job — via weight, silhouette,
+  and a dark keyline on the filled family. Must read cleanly at ~16px and scale
+  up well.
+- RECOLOUR: the filled family's fill is set at runtime to the owning
+  corporation's identity colour — any hue from near-white ice to near-black
+  forest. So filled glyphs need a dark 1px keyline and a shape that survives
+  arbitrary fill colour. Stroke glyphs take a single stroke colour.
+- SEMANTIC SPLIT, must stay visually obvious:
+    * FILLED family  = "something is installed on this tile" (buildings, HQ,
+      unit, settlement, resource pip)
+    * STROKE family  = "the ground itself, an event, or a state" (landforms,
+      convoy, market centre, survey, battle, under-construction, activity)
+  A viewer should tell filled from stroke at a glance, across the whole set.
+- ONE COHESIVE FAMILY: shared construction grid, consistent optical size,
+  consistent corner/terminal treatment, consistent stroke weight within a
+  language. It must read as a designed system, not 30 separate icons.
+- IDENTITY: near-future corporate resource-and-military conflict, set across a
+  solar system. Settled UI look: background #0F0F14, single accent gold
+  #E8A33D, flat vector, NO gradient, NO glow, NO photoreal. Style within that.
+- Sheet: one image, ~1600x1100, dark #0F0F14 ground, glyphs in gold #E8A33D,
+  grouped by family with headers, each glyph labelled, no decorative frames.
+
+=============================================================================
+THE SET — meanings to design (hints are direction, not prescription)
+=============================================================================
+FILLED family (installed on a tile; fill recolours to owner):
+  Extraction site ...... raw-material extraction (mine / drill / derrick — your call)
+  Processing facility .. refining / manufacture
+  Port ................. coastal logistics / shipping
+  Inland logistics hub . inland freight node / distribution
+  Military base ........ a garrisoned martial installation
+  Building (generic) ... a built thing of no specific type
+  Settlement .......... a population centre; needs a tiered read (outpost -> city)
+  Settlement (razed) .. a destroyed population centre (same language, life removed)
+  Headquarters ........ the player's origin / seat of the company
+  Unit ................ a military force on the ground
+  Resource pip ........ a single unit of a tradeable good (small, sits in strips/lists)
+
+STROKE family (ground / event / state; single stroke colour):
+  Under construction .. a site being built (not yet its type)
+  Convoy ............. goods moving along a route
+  Market centre ...... a place where trade clears
+  Survey ............ exploration / scanning in progress
+  Activity .......... detected commercial activity (a beacon / signal)
+  Battle ........... a fight is happening here (must NOT read as an X / close button)
+  Unknown .......... unsurveyed / information withheld
+
+LANDFORM family (stroke only, no keyline; only these four — plains/highland/
+valley draw nothing):
+  Mountain / Canyon / Rift / Crater — four distinct terrain-shape marks that
+  never read as each other or as the stroke family above.
+
+CORP EMBLEM shapes (pure identity, not type): a set of ~6 clean geometric
+primitives that stay distinct at 12px — the game assigns one per corporation.
+
+LENS glyphs (toolbar buttons, stroke): Corp / Country / Resource / Market /
+Population / Continent — 6 marks for map-overlay modes.
+
+=============================================================================
+L1 — ENGRAVED INSTRUMENT
+=============================================================================
+Precision aerospace / mil-spec panel engraving. Fine confident geometry, a
+hairline of internal detail where it earns legibility, stencil-adjacent
+construction (small bridges/gaps), crisp terminals. Feels machined and
+authoritative. Filled family: solid gold with a dark keyline and one engraved
+seam. Stroke family: 1.5-2px, exact. Full set, dark #0F0F14 ground, gold, one
+labelled sheet.
+
+=============================================================================
+L2 — BOLD SIGNAGE PICTOGRAMS
+=============================================================================
+Transit-sign clarity. Heavy, high-contrast, unmistakable silhouettes, minimal
+internal detail, maximum instant read at tiny size. Filled family: big
+confident solid shapes with a dark keyline. Stroke family: thick (3px) even
+strokes. The set that wins on legibility over a noisy map. Full set, dark ground,
+gold, one labelled sheet.
+
+=============================================================================
+L3 — FACETED CONSTRUCTIVIST
+=============================================================================
+Angular, diagonal-driven, blueprint/schematic-derived — the same
+industrial-schematic HMI language as the tech-tree work (renders/refs/ON-STYLE).
+Shapes built from cut planes and nodes, 30/60/90 grid, occasional exposed
+"construction" lines. Filled and stroke families both faceted. Full set, dark
+ground, gold, one labelled sheet.
+
+=============================================================================
+L4 — ROUNDED-GEOMETRIC MODERN
+=============================================================================
+Contemporary icon craft — the "genuinely well-made app icon" end. Slight
+consistent corner radius, subtle personality in each mark, careful optical
+balance, still flat and sharp with no gradient. Warmer and more inviting than
+L1-L3 while staying legible and on-identity. Full set, dark ground, gold, one
+labelled sheet.
+
+=============================================================================
+NEXT
+=============================================================================
+Judge L1-L4 as whole systems. Pick a language, do a refinement pass on the full
+set in it, then it graduates into ICONS.md and the src/ui/icons.cpp rebuild.
+
+FLAG for Ben: ICONS.md currently mandates "hand-drawn ImGui vector primitives,
+no font, no image atlas". A genuinely stylish set with facets/seams/detail may
+outgrow hand-coded draw-list primitives and want an SVG path set (or a small
+monochrome SDF atlas) rendered into ImGui instead. That is a TECH_FOUNDATIONS-
+adjacent decision, not a style call — raise it before committing the rebuild.

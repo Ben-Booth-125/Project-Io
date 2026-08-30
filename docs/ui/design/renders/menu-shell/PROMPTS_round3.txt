@@ -1,0 +1,76 @@
+PROJECT IO — IN-GAME SHELL STYLE EXPLORATION, ROUND 3
+Drafted 2026-08-30, after round-2 verdicts. Lives in renders/menu-shell/.
+
+ROUND 2 VERDICTS (Joe)
+- S2 "Observatory + weight" is the clear winner. THE BASE for round 3.
+  (Hairline shell chrome + solid dark slabs on the Selection band / comms dock /
+  minimap frame + bold stencil section labels + filled-gold active nav slot.)
+- The thing liked in S3 is its SECOND colour — it breaks the shell up so the
+  panels don't all read as one monochrome field. Want to bring a second colour
+  onto the S2 base. (The minimap, once designed, will also add variety — but
+  test the second colour now.)
+- Confirmed: the FILLED-IN nav glyph on selection (S2's filled-gold active slot)
+  is liked — keep it.
+
+ROUND 3 SCOPE
+S2 base, unchanged, in all three variants. The only new variable is HOW a second
+colour is deployed. Second colour = saturated cyan #3FC9E8 (already the house
+pair with amber — tech-tree EARNED amber / LOCKED cyan is SETTLED, so this stays
+consistent). Each variant assigns the two colours a different JOB.
+
+=============================================================================
+SHARED BASE  (S2 — identical in T1, T2, T3)
+=============================================================================
+In-game screen of a near-future corporate 4X. Background near-black #0F0F14.
+Bone white #ECE7DD primary text, dim grey secondary. Type: thin geometric sans,
+with BOLD STENCIL for panel section labels.
+Chrome: the left icon rail, top data strips and top-right time panel are drawn
+as thin 1px hairline outlines with no fills. The Selection band (bottom-centre),
+the comms dock (bottom-left) and the minimap frame (bottom-right) are SOLID DARK
+SLABS (#141419) with a hard 1px edge. The active nav-rail slot is a FILLED
+block (not an outline) — keep this.
+Map: central canvas at a LOW OBLIQUE angle ~30-40 degrees above horizontal
+(close-up game view, per renders/map/it1). Semi-representational textured
+terrain with slight relief and flat shadows, small buildings / settlement
+skylines. NO hex grid except the hovered tile (faint bone outline) and the
+selected tile (accent outline).
+1280x720. Layout ref: ~/io_shell_captures_20260830/nav_rail_default.png
+Style refs: ../refs/ON-STYLE/mono, ../refs/ON-STYLE/hexclean.
+
+=============================================================================
+T1 — CYAN AS STRUCTURE / NAVIGATION
+=============================================================================
+Gold #E8A33D = action, selection, your-corp, positive figures, and the filled
+active nav slot. Cyan #3FC9E8 = the persistent navigation and structure layer:
+inactive nav-rail glyphs and their slot outlines, the minimap frame and its 6
+lens glyphs, the slab edges on the comms dock and Selection band, and section
+divider rules. Result: the shell scaffold reads cool, the things you act on
+read warm. + SHARED BASE.
+
+=============================================================================
+T2 — CYAN AS THE OPEN-LEDGER LAYER
+=============================================================================
+The always-on shell (rail, top strips, comms, minimap) stays exactly S2 —
+bone / gold, no cyan. Cyan #3FC9E8 appears ONLY on an OPEN fold-out ledger:
+show one ledger open along the left column (e.g. the Corporation overview), and
+give its slab edge, its stencil header label and its column rules cyan. While
+that ledger is open its nav-rail slot's FILLED block is cyan (not gold), tying
+the lit slot to the cyan panel. So an open menu is visibly a different layer
+from the persistent shell. + SHARED BASE.
+
+=============================================================================
+T3 — CYAN AS THE DATA CHANNEL
+=============================================================================
+Gold #E8A33D = actions, selection, active nav slot fill. Cyan #3FC9E8 = every
+numeric readout and its micro-chart: the "BALANCE / STOCKPILE / NET" figures and
+the NET sparkline, the corp roll-up numbers, price ticks, any gauge fill. Body
+text stays bone white. Structure stays hairline / bone. Result: the data reads
+as its own bright channel against a quiet shell. + SHARED BASE.
+
+=============================================================================
+NEXT
+=============================================================================
+Judge T1 / T2 / T3 against round-2 S2. Winner (which job the second colour does)
+graduates into ../../GLOBAL_STYLE_SHEET.md § Iterations and § Colour guide. The
+minimap pass (renders/minimap/) picks up whichever role the minimap frame lands
+in here.

@@ -1,0 +1,89 @@
+PROJECT IO — MENU STYLE EXPLORATION, ROUND 3
+Drafted 2026-08-30, after round-2 verdicts.
+
+ROUND 2 VERDICTS (Joe)
+- M1 "Observatory, refined" is the strongest of M1-M4 — but NOT clearly better
+  than the original round-1 C menu ("mainC"). Needs a head-to-head.
+- Want colour iterations on the C base (round 1 + 2 were pale-gold monochrome only).
+- Liked the hexagon motif that showed up in one round-2 render — but it should
+  NOT be top-down. Put the hexes in a bottom corner, drawn at an oblique angle,
+  matching the low camera we are going for in the close-up game view.
+
+ROUND 3 SCOPE
+Two things, combined in each render:
+  (1) colour variants on the C / M1 base (CV1-CV5 below)
+  (2) the tilted-hexagon corner motif as the hero element
+Judging set also includes the existing round-1 C render and the round-2 M1
+render — those are the incumbents to beat, no need to re-generate them.
+
+=============================================================================
+SHARED BASE  (every round-3 prompt starts from this)
+=============================================================================
+Main menu for a near-future corporate 4X strategy game titled "PROJECT IO",
+subtitle "Near-future corporate 4X". Deep-space minimalist / observatory
+aesthetic: background near-black #0F0F14 with a faint cool tint, vast negative
+space, hairline 1px strokes, thin geometric sans-serif type with generous
+letter-spacing, small sizes. No panels, no fills, no gradients, no texture.
+Controls form a calm, unmistakable vertical column on the LEFT-CENTRE of the
+frame:
+  - small-caps "PROJECT IO" over its subtitle
+  - a single thin-ruled seed field with "Roll" and "Copy seed" as text buttons
+  - a minimal "Sparse / Lean / Standard" segmented control, one segment active
+  - a dim "Bodies: 5 (fixed)" readout line
+  - "New Game" (primary) and "Quit" (secondary) as ghost buttons (text in a
+    hairline box)
+Flat vector throughout. 1280x720.
+Layout ref: ~/io_shell_captures_20260830/main_menu.png
+Style ref: ../techtree/refs/ON-STYLE/mono, ../techtree/refs/ON-STYLE/hexclean
+
+=============================================================================
+HERO ELEMENT — TILTED HEXAGON CORNER  (same in every round-3 render)
+=============================================================================
+In the BOTTOM-RIGHT corner of the frame, a small cluster of ~12-20 hexagonal
+map tiles drawn in OBLIQUE projection — camera low, roughly 30-40 degrees above
+the horizontal, the same low angle the game uses when zoomed close to the
+surface. NOT top-down. The tiles have slight extruded height so their side
+faces are visible; a couple carry low relief (a ridge, a small building block,
+a settlement cluster) casting hard-edged flat shadows. Terrain reads by muted
+desaturated fill colour. Hex edges are visible on this cluster (this is the
+"selected / close" state). The cluster sits low in the corner, partly cropped
+by the frame edge, at maybe 60-80% opacity so it anchors the composition
+without competing with the controls on the left. It doubles as a preview of the
+in-game close-up map style. Everything else on screen stays hairline and flat.
+
+=============================================================================
+COLOUR VARIANTS  (swap into the base + hero; one accent treatment each)
+=============================================================================
+CV1  Pale gold monochrome (the control / incumbent look)
+     Accent pale gold #D9C089. Hex terrain in warm greys. This is mainC's
+     palette — render it with the new tilted-hex hero so it compares like-for-like.
+
+CV2  Cold cyan
+     Single accent saturated cyan #3FC9E8. Text near-white. Hex terrain in
+     cool blue-greys. Icy, deep-space.
+
+CV3  Warm amber
+     Single accent amber #E8A33D (matches the tech-tree EARNED colour). Hex
+     terrain in warm ochre/umber greys. Warmer, more "industrial".
+
+CV4  Calm radium
+     Single accent a desaturated teal-green #5FB89E. Hex terrain in slate.
+     Nuclear-adjacent but quiet — none of B's clutter.
+
+CV5  Bone + ember (two-tone)
+     Primary text bone white #ECE7DD. ONE hot accent, ember orange #FF6B3D,
+     used only on the "New Game" button and the active resource segment. Hex
+     terrain neutral grey with a single ember-lit tile. Minimal, one spark.
+
+=============================================================================
+HOW TO RENDER
+=============================================================================
+Five renders: SHARED BASE + HERO ELEMENT, with CV1..CV5 swapped in.
+Keep composition, layout and type identical across all five so the only
+variable is colour. Then judge against the round-1 C and round-2 M1 renders.
+
+NEXT
+Winner (colour + whether the tilted-hex hero earns its place) graduates into
+../../GLOBAL_STYLE_SHEET.md § Iterations. The hero doubles as the first
+concrete test of the close-up map angle — copy the verdict on the tile
+treatment into renders/map/ notes too.

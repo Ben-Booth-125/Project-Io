@@ -1,0 +1,46 @@
+PROJECT IO — CHROME BUTTON ICONS, ROUND 5 NOTES
+Drafted 2026-08-30 as a handoff for next session. Not a full prompt yet.
+
+WHERE ROUND 4 LANDED
+- L1-L4 all came out looking very similar — the four "languages" in the prompt
+  did not differentiate enough on the render side.
+- Direction picked: L3 (faceted constructivist) takes the edge, for ONE concrete
+  reason: MINIMISE CURVES. Round 5 commits to L3, it does not keep comparing.
+
+ROUND 5 DIRECTION
+- As few curves as possible. Straight lines and hard angles by default. A curve
+  only where a mark genuinely cannot work without one (a ring, the pause->play
+  triangle is already straight). Prefer a chamfered/faceted corner to a radius.
+- Commit to L3 and push it hard. No L1/L2/L4 comparison sheet.
+- This will be iterative and partly per-glyph. Plan:
+    1. One committed L3 full-set sheet (groups A/B/C/D, ~28 marks), same layout
+       and constraints as round 4.
+    2. Then pull the weak / ambiguous ones out for solo iteration — each may
+       need its own small sheet of 3-4 takes.
+- Likely to need solo attention first: Corporation vs Contracts vs Budget
+  (three "business" meanings, easy to blur); Market Ledger vs the Market lens
+  (same word, different job); Workforce vs Population lens; the three dev-tail
+  marks (Generation Ledger / AI decisions / Strategy readout).
+
+CARRY FORWARD FROM ROUND 4 (unchanged)
+- Scope: chrome buttons only. A nav-rail 13, B lenses 6, C pause/play, D the
+  Selection-band 2x3 action grid (Construct / Manage / Mothball / Dismantle /
+  Auto / Swap / Go-to / Reserved). ~28 marks.
+- Background #0F0F14, single gold #E8A33D, flat, no gradient/glow, no frames.
+- Every nav glyph must read BOTH as gold-on-dark AND as a dark knockout on the
+  filled-gold active slot.
+- 13 rail marks stacked in a column: distinct by silhouette alone, fast.
+- Dismantle must NOT be a bare X (X = "close" everywhere else) — resolve this.
+- Reserved slot reads "empty / nothing here yet", not "disabled action".
+- One cohesive family: shared grid, weight, terminal treatment, optical size.
+
+STILL OPEN / FOR BEN
+- ICONS.md mandates "hand-drawn ImGui vector primitives, no font, no image
+  atlas". An L3 set with facets/cut-lines may want an SVG path set or a small
+  monochrome SDF atlas instead. TECH_FOUNDATIONS-adjacent — settle before the
+  icons.cpp rebuild.
+
+AFTER GLYPHS
+- Next session: get glyphs to a decent state, then start the MINIMAP
+  (renders/minimap/ is empty; MINIMAP.md has the role/chrome but no spec for
+  the "visual interest / traffic / rockets" Joe wants).

@@ -1,0 +1,86 @@
+PROJECT IO — IN-GAME SHELL STYLE EXPLORATION, ROUND 2
+Drafted 2026-08-30. Lives in renders/menu-shell/. Round-1 renders: shellA-D here.
+
+ROUND 1 CARRY-FORWARDS
+- shellD rendered notably well — but it may have won on the REALISTIC MAP it
+  happened to show, not the brutalist chrome. Round 2 controls for this: every
+  variant uses the SAME map treatment, so chrome is the only variable.
+- Carry brutalist-D weight forward as one variant to test directly.
+- Apply what the menu track has settled so far (still pending a Ben review, used
+  here as the working assumption):
+    * Background near-black #0F0F14 — essential, non-negotiable.
+    * Palette "CV5 with red -> gold": bone white text #ECE7DD, dim grey muted
+      text, ONE warm accent gold/amber #E8A33D used sparingly.
+    * Close-up map is drawn at a LOW OBLIQUE ANGLE, not top-down.
+
+=============================================================================
+SHARED MAP TREATMENT  (identical in S1, S2, S3 — the controlled variable)
+=============================================================================
+The central canvas shows the planetary surface at a LOW OBLIQUE camera angle,
+~30-40 degrees above the horizontal (the close-up game view, matching
+renders/map/it1). Semi-representational terrain: rock, water, scrub, forest,
+desert with real surface texture; mountains and ridges with slight extruded
+relief and hard-edged flat shadows; small stylised industrial buildings and
+settlement skylines sitting on the ground. NO hex grid is drawn EXCEPT on the
+single hovered tile and the selected tile — the selected tile carries a gold
+#E8A33D hex outline, the hovered tile a faint bone-white one. Building markers
+neutral cream; unit markers small gold triangles. Muted, desaturated terrain
+palette so the chrome and accents still read on top.
+
+=============================================================================
+SHARED LAYOUT  (all variants — keep this structure)
+=============================================================================
+1280x720. Layout ref: ~/io_shell_captures_20260830/nav_rail_default.png
+  - 56px left icon rail, 13 square glyph slots; active slot marked in gold
+  - top-left: hexagonal corp emblem + corp name
+  - top-centre: "BALANCE / STOCKPILE / NET" data strip
+  - top-right: date "1960 Jan 1st [Q1]" + speed buttons I-V + "Paused"
+  - bottom-left: COMMS dock (channel dropdown, message list, input)
+  - bottom-centre: Selection band — selected tile: mini hex map + buildings table
+  - bottom-right: circular minimap + a row of 6 lens glyphs
+Style refs: ../refs/ON-STYLE/mono, ../refs/ON-STYLE/hexclean, and for S3
+../refs/OFF-STYLE/3brutalistposter + ../refs/OFF-STYLE/1industrialschematic.
+
+=============================================================================
+S1 — OBSERVATORY SHELL   (the menu direction carried into gameplay)
+=============================================================================
+In-game screen of a near-future corporate 4X, deep-space minimalist /
+observatory style. Background #0F0F14. All chrome is hairline: the left icon
+rail, the top data strips, the comms dock, the Selection band and the minimap
+frame are drawn as thin 1px outlines with NO fills, over the map. Bone white
+#ECE7DD text, dim grey secondary, one gold #E8A33D accent (active rail slot,
+active lens glyph, the selected-tile hex outline, positive figures). Thin
+geometric sans type. + SHARED MAP TREATMENT + SHARED LAYOUT. Calm, precise, the
+map clearly the focus and the chrome barely there.
+
+=============================================================================
+S2 — OBSERVATORY + WEIGHT   (S1 chrome + brutalist-D structural heft)
+=============================================================================
+Same hairline observatory chrome, palette and type as S1, BUT the panel regions
+gain weight: the Selection band, the comms dock and the minimap frame become
+solid dark slabs (#141419) with a hard 1px edge; section labels set in a bold
+stencil; the active nav-rail slot is a filled gold block rather than an
+outline. The top data strips stay hairline. + SHARED MAP TREATMENT + SHARED
+LAYOUT. Tests whether the panel weight (not the map) was shellD's strength.
+
+=============================================================================
+S3 — BRUTALIST SHELL, CONTROLLED MAP   (clean re-run of shellD, same map)
+=============================================================================
+In-game screen of a near-future corporate 4X, orbital-industrial brutalist
+style: concrete-grey slabs, exposed structural grid, stencilled uppercase type,
+heavy black bars, near-black voids. ONE loud accent — render TWICE, once with
+safety orange #FF5A1F and once with gold #E8A33D, to see which the chrome
+wants. Left rail as heavy square glyph blocks; corp emblem + stencilled name;
+data strips in stencil figures on black bars; comms as a raw text channel;
+Selection band a stark slab table; minimap in a square heavy frame.
++ SHARED MAP TREATMENT (identical to S1/S2 — do NOT give this one a different or
+nicer map) + SHARED LAYOUT. If S3 still beats S1/S2 with the map held constant,
+the brutalist chrome is the real winner; if S1/S2 close the gap, shellD won on
+its map.
+
+=============================================================================
+NEXT
+=============================================================================
+Judge S1 / S2 / S3(orange) / S3(gold) against round-1 shellD. Winning chrome
+direction + the map verdict graduate into ../../GLOBAL_STYLE_SHEET.md
+§ Iterations; the map treatment verdict also goes to renders/map/ notes.

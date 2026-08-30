@@ -10,7 +10,7 @@ Working doc for narrowing Project Io's visual language to one specific style + U
 direction. Rules here are proposals until a render has actually been judged against
 them — then mark them **SETTLED** with the render that decided it.
 
-Composite example renders live in `docs/development/design/renders/`. The tech tree
+Composite example renders live in `docs/ui/design/renders/`. The tech tree
 panel work (2026-08-25) lives in its own `renders/techtree/` subfolder, informally named
 (`wide1`...`wide11`, `real1`, `nohover`, `compstate`, `colour2`) rather than the
 `iter-NN` convention below — fine for a fast first exploration pass, but a directory
@@ -54,10 +54,115 @@ trees) — nodes as catalogued components, not a mystical RPG skill tree.
 actually improve on it). Not marked SETTLED — Joe flagged wide8's overall aesthetic fits the
 game but isn't personally his preferred sci-fi direction; that reservation stands undecided.
 
+**Genre working definition (2026-08-26, come back to this — a good description):**
+
+> "Industrial schematic HMI" — flat-shaded, monochrome-plus-one-accent, hard-edged,
+> diegetic machine terminal. Minimal by subtraction (no glow, no gradient, no chrome)
+> rather than by whitespace.
+
+Sits in the flat + angular corner of a two-axis space (glow↔flat edge-lighting,
+organic/holographic↔angular/printed). Reference families being gathered under
+`renders/refs/` (on-style / off-style). Not the glossy Apple-in-space look and
+not holographic-glow FUI — both are the deliberate off-style contrast.
+
 **Process note for next session (Joe, 2026-08-25):** this pass iterated depth-first on one
 example almost the whole session. Next time, explore a wider spread of distinct styles early
 (several genuinely different directions) before optimising any single one — cheaper to find
 the right family first than to perfect a direction that turns out not to be it.
+
+### Menu / shell sub-track (2026-08-30, `renders/main-menu/` + `renders/menu-shell/`)
+
+Breadth-first pass per the process note: four distinct style families, each rendered as a
+main-menu and an in-game shell frame. Menu track lives in `renders/main-menu/` (prompts +
+screenshot pairing in `PROMPTS.txt`, then `PROMPTS_round2.txt` / `_round3.txt` / `_final.txt`);
+shell track in `renders/menu-shell/` (`PROMPTS_round2.txt`). Shared style refs moved to
+`renders/refs/ON-STYLE` and `OFF-STYLE`.
+
+| Family | Menu verdict | Shell verdict |
+|---|---|---|
+| A — Industrial schematic / HMI | Rejected — "too boring and flat". Confirms flat-vector alone reads as empty without a focal element | — |
+| B — Nuclear-era control room / atompunk | Rejected as a menu — mood liked, but wrong fit for the game and too busy: the settings were hard to find and select | — |
+| C — Deep-space minimalism / observatory | **Works** — "even though it is more minimal". The round-2 base | — |
+| D — Orbital-industrial brutalism | Rejected — "completely the wrong style" for the menu | **Strong** — shell-D rendered well enough to reconsider brutalist weight for the shell |
+
+Two carry-forwards:
+
+- **Menu round 2 (`PROMPTS_round2.txt`)** — all four variants (M1–M4) built on C, each adding
+  one focal / hero element (A's failure) and keeping the settings cluster simple (B's failure).
+  M2 tests borrowing B's warmth, M3 tests borrowing D's weight. **Verdict:** M1 ("Observatory,
+  refined") strongest of the four, but not clearly ahead of the round-1 C menu — head-to-head
+  still open.
+- **Menu round 3 (`PROMPTS_round3.txt`)** — colour iteration on the C/M1 base (rounds 1–2 were
+  pale-gold monochrome only): five accent treatments (CV1 gold / CV2 cyan / CV3 amber / CV4
+  radium-teal / CV5 bone+ember). Hero element becomes a **tilted-hexagon cluster in the
+  bottom-right corner**, drawn in oblique projection at the close-up game camera angle (not
+  top-down) — Joe liked the round-2 hex motif but wants it angled. Doubles as the first concrete
+  test of the close-up map treatment. **Verdict:** CV5 (bone white + one hot accent) the clear
+  favourite; dark background reaffirmed as essential; the round-3 layout reads as "an item
+  showcase" not a menu — the negative space needs a backdrop element.
+- **Menu final synthesis (`PROMPTS_final.txt`)** — one render: CV5 palette with the ember-red
+  swapped for gold/amber `#E8A33D` (CV5's red conflicts the amber+blue house direction); a
+  line-art planet + concentric orbital rings/leader-lines backdrop at ~30–40% opacity behind the
+  controls (merges mainC's "big circles and lines" with M1's "nice world" — which reads stronger
+  alone is still undecided, so the render combines them); the tilted-hex corner retained with one
+  gold-lit tile. After this, the menu track pauses to review the round 1–3 spread with Ben.
+- **Shell round 2 (`menu-shell/PROMPTS_round2.txt`)** — shell-D's strength may be the **realistic
+  map** it happened to show rather than the brutalist chrome, so all three variants shared one
+  controlled map (semi-representational, oblique ~30–40°, hexes only on hover/select). S1 hairline
+  observatory / S2 observatory + slab weight / S3 brutalist. **Verdict:** S2 the clear winner
+  (hairline shell chrome + solid dark slabs on Selection band / comms / minimap + stencil section
+  labels + **filled** active nav slot — the filled-on-select glyph is explicitly liked and kept).
+- **Shell round 3 (`menu-shell/PROMPTS_round3.txt`)** — S2 base, introducing a **second colour**
+  (what broke S3 up nicely). Second colour is cyan `#3FC9E8`, consistent with the SETTLED
+  amber+cyan tech-tree pair. Three variants differ only in the second colour's *job*: T1 cyan =
+  navigation/structure scaffold; T2 cyan = the open fold-out ledger layer only (an open menu
+  reads as a distinct layer, its lit nav slot goes cyan); T3 cyan = the numeric data channel
+  (figures, sparklines, gauges). **Verdict:** all three missed — Joe wanted **material
+  tonality**, not a highlight accent. What worked in S3 was its two greys (a lighter "concrete"
+  frame + darker panels), which gave the shell a body.
+- **Shell round 4 (`menu-shell/PROMPTS_round4.txt`)** — S2 base + a two/three-tone matte surface
+  system (flat planes, hard 1px edges, no grain). The map canvas stays `#0F0F14` (dark background
+  still essential); the shell *furniture* may go lighter. U1 light frame / dark content wells; U2
+  dark frame / light raised content panels; U3 three tones (canvas < furniture < open-ledger) so
+  an open menu is its own layer. **Verdict:** U2 the winner (U1 close behind).
+- **Shell final synthesis (`menu-shell/PROMPTS_final.txt`, v2)** — U2 with exactly one change:
+  the map is **no longer boxed** — no gutter, bezel or frame; it fills the whole screen and runs
+  *under* the shell bars to all four edges. The bars keep their U2 shapes and stay **anchored
+  flush to the screen edges** (not floating inset cards — v1 got this wrong, along with drifting
+  the palette). Panels opaque, U2 palette pinned exactly. Whether the map is boxed or full-bleed
+  under the bars is `LAYOUT.md`'s to own once a direction is picked.
+
+### Glyph / icon sub-track (2026-08-30, `renders/glyphs/`)
+
+Round 1 (`renders/glyphs/1`): a 24-glyph sheet, dark bg + gold, corner-bracket frames.
+**Rejected** — flattened the whole vocabulary to outline (losing `ICONS.md`'s load-bearing
+filled-vs-stroke split), invented glyphs that don't exist (gas field, energy node, farmland,
+forest), and drifted several shapes off spec.
+
+- **Glyphs round 2** — four directions (G1–G4) that all held the `ICONS.md` placeholder *shapes*
+  constant and varied only stroke weight. **Rejected as misframed** — `ICONS.md` documents the
+  current `icons.cpp` placeholder primitives, not a target; the renders came out identical.
+- **Glyphs round 3 (`renders/glyphs/PROMPTS_round3.txt`)** — from-scratch redesign: the list is
+  *meanings*, not shapes to copy. Four design languages (L1 engraved instrument / L2 bold signage /
+  L3 faceted constructivist / L4 rounded-geometric modern). **Scope then narrowed** — see round 4.
+- **Glyphs round 4 (`renders/glyphs/PROMPTS_round4.txt`)** — scope cut to the **chrome buttons
+  only** (~28 marks): the 13 left nav-rail buttons, the 6 map lens buttons, the time-panel
+  pause/play mark, and the Selection-band 2×3 action grid (Construct / Manage / Mothball /
+  Dismantle / Auto / Swap / Go-to / Reserved — `SELECTION.md`). Everything "installed on a tile"
+  (buildings, HQ, units, under-construction)
+  becomes **real rendered geometry on the oblique map**, not a glyph; landform marks are terrain
+  rendering; corp emblems are a separate brainstorm. Each nav glyph must read both as gold-on-dark
+  and as a dark knockout on the settled filled-gold active slot. Same four languages, full
+  button set per sheet. **Verdict:** L1–L4 rendered too similar to separate; **L3 (faceted
+  constructivist) picked** on one criterion — *minimise curves* (straight lines / hard angles,
+  a curve only where unavoidable). **Flag for Ben:** a stylish set may outgrow `ICONS.md`'s
+  "hand-drawn ImGui primitives, no atlas" rule and want an SVG path set or SDF atlas — a
+  `TECH_FOUNDATIONS`-adjacent call before the `icons.cpp` rebuild.
+- **Glyphs round 5 (`renders/glyphs/ROUND5_NOTES.txt`, next session)** — commit to L3, no more
+  comparison sheets. One L3 full-set sheet, then per-glyph solo iteration on the ambiguous ones
+  (Corporation/Contracts/Budget; Market Ledger vs Market lens; Workforce vs Population lens; the
+  three dev-tail marks). Then the track moves to the **minimap** (`renders/minimap/`, empty;
+  `MINIMAP.md` has role/chrome but no spec for the visual-interest / traffic Joe wants).
 
 ## Colour guide
 

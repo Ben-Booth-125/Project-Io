@@ -1,0 +1,179 @@
+PROJECT IO — MENU / SHELL STYLE-EXPLORATION PROMPTS
+Drafted 2026-08-30. Breadth-first pass: four distinct style families, each with a
+menu prompt and an in-game shell prompt, plus two supporting prompts (tile
+rendering + camera, icon/glyph sheet). Generate elsewhere; judge; settle one or
+two directions; write the winners into ../../GLOBAL_STYLE_SHEET.md.
+
+=============================================================================
+FIXED CONSTRAINTS (repeated in every prompt so each stands alone)
+=============================================================================
+- Locked clear colour / background: near-black #0F0F14 with a faint cool tint.
+- Flat vector. No gradients, no glows, no photoreal reflections (unless a family
+  explicitly calls for texture).
+- One accent PAIR only per family.
+- Target frame 1280x720.
+- Current shell layout (keep this structure):
+    * Left 56px icon rail, 13 square glyph slots.
+    * Top-left: hexagonal corp emblem + corp name.
+    * Top-centre: "BALANCE / STOCKPILE / NET" data strip.
+    * Top-right: date ("1960 Jan 1st [Q1]") + speed buttons I-V + Paused state.
+    * Bottom-left: COMMS dock (channel dropdown + message list + input).
+    * Bottom-centre: Selection band (selected tile: mini hex map + buildings table).
+    * Bottom-right: circular minimap + a row of 6 lens glyphs.
+    * Central canvas: flat top-down hex grid, terrain by colour, cream building
+      markers, amber unit triangles.
+
+=============================================================================
+SCREENSHOT PAIRING (game shots in ~/io_shell_captures_20260830/)
+=============================================================================
+Game shots = LAYOUT reference (keep this structure).
+Tech-tree refs = STYLE reference, in ../techtree/refs/ON-STYLE and /OFF-STYLE
+(files are extensionless — add .png before uploading if the tool needs it).
+
+  Prompt                         Layout ref                         Style ref
+  -----------------------------  ---------------------------------  ------------------------------------------
+  A Industrial/HMI  · menu       main_menu.png                      ON-STYLE/mono, hexclean, flatangularglow
+  A Industrial/HMI  · shell      nav_rail_default.png + corp_dashboard.png   ON-STYLE/wide8, colour2, tidycircuits
+  B Nuclear room    · menu       main_menu.png                      ON-STYLE/pipes, OFF-STYLE/6physical (positive)
+  B Nuclear room    · shell      nav_rail_default.png              OFF-STYLE/6physical, ON-STYLE/pipes
+  C Deep-space min  · menu       main_menu.png                      ON-STYLE/mono, Prometheus-or-Expanse-terminals
+  C Deep-space min  · shell      nav_rail_default.png              ON-STYLE/mono, hexclean
+  D Brutalism       · menu       main_menu.png                      OFF-STYLE/3brutalistposter (positive)
+  D Brutalism       · shell      nav_rail_default.png              OFF-STYLE/3brutalistposter, 1industrialschematic
+  Tile + camera                  nav_rail_default.png (flat = before)   —
+  Icon/glyph sheet               nav_rail_default.png + budget_ledger_ranked.png (pips)   ON-STYLE/niceglyphsntextures
+
+Notes:
+- main_menu.png is the only menu-layout ref needed — reuse for all four menus.
+- nav_rail_default.png is the master shell-layout ref — reuse for all four shells + both extras.
+- OFF-STYLE renders are "avoid this" for A and C. For B and D they flip to "aim for this" —
+  do NOT feed OFF-STYLE as a negative on B or D.
+- Single style ref per tool: A -> wide8, B -> 6physical, C -> mono, D -> 3brutalistposter.
+
+=============================================================================
+FAMILY A — INDUSTRIAL SCHEMATIC / HMI  (extends the tech-tree direction)
+=============================================================================
+
+--- A / MENU ---
+Main menu for a near-future corporate 4X strategy game, titled "PROJECT IO".
+Industrial-schematic / HMI aesthetic: etched groove lines, thin corner-bracket
+frames, terraced flat bevels (highlight + shadow edge-lines, no gradient),
+faint scanline and wear texture. Near-black background #0F0F14 with a faint
+cool tint. Flat vector, absolutely no gradients or glows. One accent pair only:
+amber/gold (#E8A33D) for primary, saturated cyan (#3FC9E8) for secondary.
+Monospaced technical labels. Centred column: seed field with "Roll" button,
+"Resources: Sparse / Lean / Standard" radio row, "New Game" and "Quit" buttons
+as flat outlined rectangles. Restrained, cold, precise. 1280x720.
+
+--- A / SHELL ---
+In-game screen of a near-future corporate 4X, industrial-schematic / HMI style.
+Near-black #0F0F14. Flat vector, no gradients. Amber + cyan accents only.
+Layout: 56px left icon rail of 13 square glyph slots; top-left hexagonal corp
+emblem + name; top-centre "BALANCE / STOCKPILE / NET" data strip; top-right date
+and speed buttons I-V; bottom-left comms dock; bottom-centre selection panel
+listing tile buildings in a table; bottom-right circular minimap with a row of 6
+lens glyphs. Central map is a flat top-down hex grid, terrain by colour, small
+etched building glyphs. Everything reads like an engineering console. 1280x720.
+
+=============================================================================
+FAMILY B — NUCLEAR-ERA CONTROL ROOM / ATOMPUNK
+=============================================================================
+
+--- B / MENU ---
+Main menu for a near-future corporate 4X titled "PROJECT IO". 1960s
+nuclear-control-room / atompunk aesthetic: heavy enamelled metal panels, visible
+rivets and seams, chunky toggle switches, phosphor-green readout digits, radium
+dial faces, yellow-black hazard chevrons at panel edges. Warm dark charcoal
+background, not pure black. Accent palette: hazard amber (#F0B429) and radium
+green (#7DE07D), used sparingly. Tactile, mechanical, slightly worn. Centred
+control cluster: seed readout with a physical "ROLL" key, a three-position
+rotary "RESOURCES" selector, illuminated "NEW GAME" and "QUIT" push-buttons.
+Flat shading, screen-print texture, no photoreal reflections. 1280x720.
+
+--- B / SHELL ---
+In-game screen of a near-future corporate 4X, 1960s nuclear-control-room style.
+Warm dark charcoal panels, enamelled metal, rivets, hazard chevrons, phosphor
+readouts. Accents: hazard amber and radium green only. Layout: 56px left rail of
+13 backlit square switch-glyphs; top-left round corp badge + name on a metal
+nameplate; top-centre "BALANCE / STOCKPILE / NET" as segmented phosphor gauges;
+top-right date and speed keys I-V; bottom-left comms teletype dock; bottom-centre
+selection panel as a labelled instrument readout of tile buildings; bottom-right
+circular radar-style minimap with 6 lens switches. Central map is a flat top-down
+hex grid glowing faintly like a plotting table. 1280x720.
+
+=============================================================================
+FAMILY C — DEEP-SPACE MINIMALISM / OBSERVATORY
+=============================================================================
+
+--- C / MENU ---
+Main menu for a near-future corporate 4X titled "PROJECT IO". Deep-space
+minimalist / observatory aesthetic: near-black #0F0F14, vast negative space,
+hairline 1px strokes, faint star-field and thin orbital-arc motifs. One warm
+accent only: pale gold (#D9C089). Thin geometric sans-serif type, generous
+letter-spacing, small sizes. Centred, quiet: small-caps "PROJECT IO", a single
+thin-ruled seed field, a minimal "Sparse / Lean / Standard" segmented control,
+two ghost buttons "New Game" / "Quit" as text with a hairline underline on hover.
+No panels, no fills, no texture. Elegant and sparse. 1280x720.
+
+--- C / SHELL ---
+In-game screen of a near-future corporate 4X, deep-space minimalist style.
+Near-black #0F0F14, hairline strokes, one pale-gold accent, thin sans type.
+Layout: 56px left rail of 13 line-art glyphs with no slot borders; top-left tiny
+corp mark + name; top-centre "BALANCE / STOCKPILE / NET" as thin-ruled figures;
+top-right date and speed markers I-V; bottom-left minimal comms list; bottom-centre
+selection readout of tile buildings as a plain ruled table; bottom-right circular
+minimap drawn as a fine astronomical chart with 6 small lens marks. Central map is
+a flat top-down hex grid, terrain in muted desaturated fills, buildings as single
+line glyphs. Feels like a telescope control interface. 1280x720.
+
+=============================================================================
+FAMILY D — ORBITAL-INDUSTRIAL BRUTALISM
+=============================================================================
+
+--- D / MENU ---
+Main menu for a near-future corporate 4X titled "PROJECT IO". Orbital-industrial
+brutalist aesthetic: raw concrete-grey slabs, exposed structural grid lines,
+stencilled uppercase type, heavy black bars. High contrast. One loud accent:
+safety orange (#FF5A1F). Near-black background behind grey slabs. Blocky layout:
+"PROJECT IO" stencilled top-left of a centred slab; seed field as an inset dark
+channel with a bracketed "ROLL"; "RESOURCES" as three hard-edged toggle blocks;
+"NEW GAME" a full-width orange bar, "QUIT" a hollow outlined bar. Flat, no
+gradients, faint concrete grain only. 1280x720.
+
+--- D / SHELL ---
+In-game screen of a near-future corporate 4X, orbital-industrial brutalist style.
+Concrete-grey slabs, exposed grid, stencilled type, safety-orange accent only,
+near-black voids. Layout: 56px left rail of 13 heavy square glyph blocks;
+top-left blocky corp emblem + stencilled name; top-centre "BALANCE / STOCKPILE /
+NET" in stencilled figures on a black bar; top-right date and speed blocks I-V;
+bottom-left comms as a raw text channel; bottom-centre selection panel listing
+tile buildings in a stark table; bottom-right square-framed minimap with 6 lens
+blocks. Central map: semi-realistic textured terrain (rock, water, scrub) seen
+top-down, hex edges hidden until a tile is hovered or selected. 1280x720.
+
+=============================================================================
+EXTRA — PLANETARY TILE RENDERING + CAMERA
+=============================================================================
+Three-panel comparison of a strategy-game planet surface. Panel 1 "zoomed out":
+straight top-down view, semi-realistic terrain (mountains, rivers, forest, desert,
+coast) like Civilization VI, no visible hex grid. Panel 2 "zoomed in, tile
+selected": camera dropped to a low oblique angle (~35 degrees from horizontal) so
+mountains and buildings have readable height and cast flat shadows; a single hex
+tile outlined in white, its 6 edges visible only on that tile and its neighbours.
+Panel 3 "close, building focus": same oblique angle, small stylised industrial
+buildings and a settlement skyline on the tiles, hex edges shown only under the
+cursor. Near-black UI chrome #0F0F14, flat vector overlays, amber selection
+outline. Cohesive art style across all three.
+
+=============================================================================
+EXTRA — ICON / GLYPH SHEET  (restyle of existing vector glyphs, not new assets)
+=============================================================================
+A vector icon sheet for a near-future corporate 4X strategy game, on a near-black
+#0F0F14 background. ~24 small monochrome glyphs in a grid, each in a 2r box,
+single accent colour amber #E8A33D, flat vector, no gradients, consistent 2px
+stroke weight. Glyphs: extraction site (ore crystal), processing facility (square),
+port (triangle), logistics hub (hexagon with centre dot), military base (shield),
+market centre (circle with cross), settlement (tiered skyline), ruin (broken
+skyline), convoy (chevron), unit (figure), HQ (ringed star), survey (magnifier),
+unknown (question mark), plus 6 lens glyphs (corp, country, resource, market,
+population, continent). Uniform silhouette weight, readable at 16px.
