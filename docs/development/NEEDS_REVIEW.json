@@ -1530,6 +1530,21 @@
         "scripts/tech_tree.lua",
         "src/world/tech_gate.cpp"
       ]
+    },
+    {
+      "id": "NR-729",
+      "kind": "question",
+      "status": "open",
+      "raised": "2026-08-29",
+      "title": "Retiring mercenary contracts leaves \"paid for outcomes\" without a mechanism, and the progression chain with a gap",
+      "source": "Sprint 24, BL-693. Raised before acting rather than discovered after.",
+      "what": "Ben retired the mercenary contract on 2026-08-29. Two authority claims now have nothing behind them, and both are load-bearing rather than decorative.\n\n**1. CONCEPT.md § Player identity.** *\"The player is a mercenary company... it is armed and for hire... and it is PAID FOR OUTCOMES.\"* The mercenary contract WAS being paid for outcomes. With it retired the player earns by trade alone — which is a coherent game, but it is not the sentence the identity doc opens with. Either the clause needs a new referent, or the identity needs restating.\n\n**2. SYSTEMS.md / CONTRACTS.md progression chain.** `markets -> CONTRACTS -> force -> territory`, with the stated argument that *\"the market cannot sell you a lead time, a refusal, or a reputation\"*. Contracts is the middle link — the thing that turns market income into a reason to hold force. Remove it and markets connects to force through nothing.\n\nNEITHER IS AN ARGUMENT AGAINST THE RETIREMENT. The measured state supports Ben: the surface was inert (`can_accept = fully_escrowed && !expired`, and seven offers read escrow 0/400 because client nations never fund them), so the loop was not running anyway. Retiring a mechanism that never ran is honest.\n\nWHAT IS OWED IS THE DOC WORK AND ONE DECISION. Ben has said the military attention-getter is still open and that *\"tech will later hold these elements\"*. So the question is narrow: **until tech carries it, does the player have an income loop other than trade, and should CONCEPT.md say so plainly rather than keep the mercenary framing?** Answering \"trade only, for now\" is a perfectly good answer — it just has to be written down, because the identity doc is the one place a reader goes to learn what the player IS.\n\nThe buy side (procurement, BL-350) is untouched and stays — it is live, and the identity depends on it separately.",
+      "files": [
+        "docs/CONCEPT.md",
+        "docs/SYSTEMS.md",
+        "docs/economy/CONTRACTS.md",
+        "docs/development/ROADMAP.md"
+      ]
     }
   ]
 }

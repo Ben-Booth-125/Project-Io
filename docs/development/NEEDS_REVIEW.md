@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*101 entries — 101 open, 0 resolved.*
+*102 entries — 102 open, 0 resolved.*
 
 ---
 
@@ -1043,6 +1043,23 @@ RELATED AND PARTLY CONTRADICTED: NR-591 records the opposite belief and holds fo
 CONTEXT THAT MAKES IT LOW-URGENCY BUT WORTH FIXING BEFORE THE TECH TREE IS BUILT: `tech_tree.lua`'s own header says **"DATA ONLY … nothing in the simulation reads this"**, and its ~150 nodes census as 83 derived, 40 sketch, 26 stub, 1 parked. The mismatch costs nothing today because the viewer is a mock. It costs a great deal the moment research becomes real and someone assumes the two stores were ever reconciled.
 
 *Files: `src/world/tech_tree.cpp`, `scripts/tech_tree.lua`, `src/world/tech_gate.cpp`*
+
+### NR-729 — Retiring mercenary contracts leaves "paid for outcomes" without a mechanism, and the progression chain with a gap
+*question · raised 2026-08-29 · from Sprint 24, BL-693. Raised before acting rather than discovered after.*
+
+Ben retired the mercenary contract on 2026-08-29. Two authority claims now have nothing behind them, and both are load-bearing rather than decorative.
+
+**1. CONCEPT.md § Player identity.** *"The player is a mercenary company... it is armed and for hire... and it is PAID FOR OUTCOMES."* The mercenary contract WAS being paid for outcomes. With it retired the player earns by trade alone — which is a coherent game, but it is not the sentence the identity doc opens with. Either the clause needs a new referent, or the identity needs restating.
+
+**2. SYSTEMS.md / CONTRACTS.md progression chain.** `markets -> CONTRACTS -> force -> territory`, with the stated argument that *"the market cannot sell you a lead time, a refusal, or a reputation"*. Contracts is the middle link — the thing that turns market income into a reason to hold force. Remove it and markets connects to force through nothing.
+
+NEITHER IS AN ARGUMENT AGAINST THE RETIREMENT. The measured state supports Ben: the surface was inert (`can_accept = fully_escrowed && !expired`, and seven offers read escrow 0/400 because client nations never fund them), so the loop was not running anyway. Retiring a mechanism that never ran is honest.
+
+WHAT IS OWED IS THE DOC WORK AND ONE DECISION. Ben has said the military attention-getter is still open and that *"tech will later hold these elements"*. So the question is narrow: **until tech carries it, does the player have an income loop other than trade, and should CONCEPT.md say so plainly rather than keep the mercenary framing?** Answering "trade only, for now" is a perfectly good answer — it just has to be written down, because the identity doc is the one place a reader goes to learn what the player IS.
+
+The buy side (procurement, BL-350) is untouched and stays — it is live, and the identity depends on it separately.
+
+*Files: `docs/CONCEPT.md`, `docs/SYSTEMS.md`, `docs/economy/CONTRACTS.md`, `docs/development/ROADMAP.md`*
 
 ---
 
