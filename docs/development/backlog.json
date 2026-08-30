@@ -1376,6 +1376,38 @@
       "completed": "2026-08-29",
       "resolved": "2026-08-29",
       "summary": "Landed 2026-08-29, Sprint 24. Merged and verified in the main session: BUILD_OK, corp_dashboard 10/10, construction_ledger_tabs 41/41, and every surface sharing the drawer green. One card, Balance, drawing a two-bar column chart that fills the column — the ~700 px void is gone. THE CHART BECAME A SHARED DRAWER RATHER THAN A FORK: `ui::charts::draw_stacked_columns` over a new `stack_segment`, with the building card's `draw_revenue_expense_bars` reduced to an adapter. The variable segment count lives in the drawer — a stack of several skips its zeros, a LONE column is exempt because a lone column is a plain bar and draws its own zero, which is what keeps the building card byte-identical. Two measured refinements past the first draft: auto-fit columns (97 px against the building's 44 px cap) and a `tight_axis` opt-in, because `nice_ceil(58.7)` is 100 and left 41% of the plot empty on the surface built to fix empty space. Interest absent solvent, present at 74.64 in debt with the stack growing by exactly one segment. The Workforce clip is gone WITH the card — confirmed by absence of the string, not assumed. NR-724 filed: deleting the Production card orphaned BL-591's growth-track readout, and two live docs still assert it exists; the agent correctly refused to resolve that. THE LIVE CLICK IS OWED."
+    },
+    {
+      "id": "BL-692",
+      "short_name": "RETIRE_DEPTH_GATE",
+      "category": "Economy",
+      "title": "Chain depth stops gating anything - tech becomes the only lock",
+      "status": "designed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.1.22",
+      "sprint": null,
+      "written": "2026-08-29",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "authority_doc": "docs/economy/PRODUCTION.md",
+      "files": [
+        "src/world/construction.cpp",
+        "src/world/economy_system.cpp",
+        "src/world/corp_ai.cpp",
+        "src/ui/selection_panel.cpp",
+        "tools/verify/chain_depth.cpp",
+        "docs/economy/PRODUCTION.md",
+        "docs/MANUAL.md",
+        "docs/META_LAYER.md",
+        "docs/ui/SELECTION.md",
+        "docs/ai/AI_OPPONENT.md",
+        "docs/development/ROADMAP.md"
+      ],
+      "design": "Ben, 2026-08-29: \"Chain depth is an interesting mechanic, and it sounds akin to what I expect for the major tech tree node unlocks. However most direct unlocks should be a consequence of research, not just economy. In essence, we should retire that feature and allow both corporations and companies to build any building, or use any method surfaced with current tech.\"\n\nHIS EXPECTATION OF THE CONSEQUENCE IS REFUTED, AND THAT IS WORTH KNOWING BEFORE BUILDING. He added: \"For our purpose here, that will be just the base buildings.\" It will not be. Measured across four independent read-only passes:\n\n**Tech is an allowlist of LOCKS, not of content.** `recipe_unlocked` and `structure_unlocked` fall through to `return true; // ungated`. Tech CANNOT surface a base set, because it has nothing to withhold with. The shipped game holds exactly FOUR gates — `military_base`, `toolmaker`, `refined_copper`, `steel_bessemer` — and two of the four are `era = industrial`, which a 0 CE campaign never reaches. So the ancient band has one gated recipe and one gated building.\n\nTHE ACTUAL DELTA IS SMALLER THAN THE PREMISE SUGGESTS EITHER WAY: placeable ancient recipes go **11 -> 17**, and of the six that open, **two stay shut on their own** (shipwright and toolmaker need planks, and the shipped ancient world produces none). The honest delta is the **Bloomery and the Coking Kiln**.\n\nAND THE GATE IS ALREADY A NO-OP ABOVE THE ANCIENT BAND — it fires only on `era == ancient` (`construction.cpp:48`). Generated processors are also authored with recipes WITHOUT passing through `construct_building`, so deep processors already exist at tick zero. The gate governs growth, never the starting state.\n\nTHE WORK — 5 gates, 6 readouts, and the computation stays:\n  G-1 `construction.cpp:48-53` · G-2 `economy_system.cpp:750-755` (closes the place-shallow-then-retool bypass) · G-3 `corp_ai.cpp:782,841-843` (the rival scorer; NO era condition, fires in every band) · G-4 `selection_panel.cpp:1190-1197,1220` (Method Switch disabled) · G-5 `selection_panel.cpp:3848-3866` (Build-door candidate erase).\n  Readouts: `app.cpp:2094-2099`, `selection_panel.cpp:1201-1204`, `agent_protocol.cpp:144`, `verify_api.cpp:1738/1775/1990`. There is NO numeric depth readout left — BL-691 deleted its only host, which NR-724 records.\n  Result codes then unreachable: `construction.hpp:21`, `economy_system.hpp:579-580`, `corp_command.hpp:247`, `corp_command.cpp:733,877`.\n\nLEAVE THE COMPUTATION. `depth_of` / `recipe_required_depth` / `max_depth` / `produced_ever` stay. Two reasons and both bind: `chain_depth.cpp` R2 uses `depth_of` as a load-bearing dominance axis, and **`produced_ever` is pinned by the save format** (`world_save.cpp:356,371`, field order for world_save_version 16) — removing it breaks every existing save. `mark_produced` becomes a write-only bit; say so at the site rather than leaving it looking live.\n\nHARNESS: `chain_depth.cpp` is the only one asserting the gate. G2 (monotonicity the gate rests on) and G3 (a pure gate assertion) become **vacuous** and must be retired, not left passing. G5's `k_open` expected set re-blesses **11 -> 17**. G1, G4, D1-D6 and R2 are computation and survive untouched.\n\nDOCS: PRODUCTION.md 659-700 (§ The gate, delete) plus 702-750, 272-273, 754/757/772; MANUAL.md 291-303; META_LAYER.md 219-223; SELECTION.md 259-269; AI_OPPONENT.md 305-307; ROADMAP.md 70 (\"the growth spine IS chain depth\"); CORPORATION_GENERATION.md 435-441; RESOURCES.md 156,175. Machine stores: ACTIONS.json:79, question_log.json:587, user_stories.json:489-513 (US-016).\n\nMEASURE IT WITH `tier_margin`, GATE-ON THEN GATE-OFF, same seeds and ticks. Read two numbers together — R2 processing net/tick against extraction net/tick, and the STARVED share of processing building-ticks. Processing net up with starved flat or down means depth was suppressing real value-add. Processing net down, or starved up, means the opening bought idle capex. R2 is currently RED, so the direction of movement is unambiguous either way.\n\nTHE SPECIFIC TAIL RISK, worth naming so it is recognised rather than rediscovered: the Bloomery opens near charcoal, blooms do not sell (measured market demand **0.000** for iron_blooms in the ancient census), the loss streak reaches 8, the reflex decommission fires, and the building then pays 30% maintenance forever with no refund. On corps whose `spawn_solvency` R2 is already red at 1/8 seeds. The counter-case is real too and is measurable: a Bloomery bidding for charcoal raises charcoal's price through the `wants` channel, which could induce the Charcoal Burner supply the band lacks."
     }
   ]
 }

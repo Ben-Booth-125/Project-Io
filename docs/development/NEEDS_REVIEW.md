@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*99 entries — 99 open, 0 resolved.*
+*101 entries — 101 open, 0 resolved.*
 
 ---
 
@@ -1012,6 +1012,37 @@ It is defensible on three counts — a real verb rather than a back door, it run
 That is a different kind of reader from every other one in `verify_api` — the rest answer "is this true", these answer "is this testable". It is the shape that turns a brief's wrong premise into a finding instead of a weakened test, which this sprint has now wanted four times.
 
 *Files: `scripts/verify/trades_tab.lua`, `src/core/verify_api.cpp`, `docs/development/DEVELOPMENT_PRACTICES.md`*
+
+### NR-727 — Chain depth is not the brake on the ancient economy - half the ungated roster already produces nothing
+*observation · raised 2026-08-29 · from Sprint 24, measuring BL-692 before building it.*
+
+Retiring the depth gate was expected to open the ancient roster. Measured, it opens **six recipes, of which two stay shut on their own** — and the evidence that depth was never the constraint is already on disk.
+
+**Sawmill, Stonemason, Potter's Kiln and Weaver are required-depth 0. They are open today. They produce 0.0.** `scripts/economy.lua` (2026-08-26) says it outright: *"NOTHING IN THE SHIPPED ANCIENT WORLD PRODUCES TOOLS OR PLANKS."* Six of eight design channels are ABSENT in this band, and seven produced goods have no sink at all.
+
+So a corp cannot reach depth 1 not because a gate refuses it, but because the inputs do not exist to produce. Removing the gate changes which door is locked; it does not put anything behind the door.
+
+THIS REFRAMES THE PROGRESSION QUESTION. Ben's instinct — that unlocks should follow research rather than economy — may well be right on its own terms. But retiring depth will not make the ancient economy progress, because the thing stopping it is missing supply, not a lock. Expect the measurement to show little movement, and do not read that as the retirement having failed.
+
+The adjacent facts, same measurement: market demand is **0.000** for iron_blooms, trade_goods_misc, leather, tools, rigging, ordnance and steel; starvation is **30.9%** of processing building-ticks; and the glut forecast that should penalise building into no demand is switched off (`corp_ai.cpp:372-398` returns 1.0 when demand is zero).
+
+*Files: `scripts/economy.lua`, `src/world/corp_ai.cpp`, `docs/economy/PRODUCTION.md`, `tools/verify/tier_margin.cpp`, `tools/verify/demand_census.cpp`*
+
+### NR-728 — The tech-gate ids do not match tech_tree.lua, so the viewer shows the wrong unlock
+*observation · raised 2026-08-29 · from Sprint 24, found in passing while measuring BL-692.*
+
+`tech_tree.cpp:95-99` resolves the simulation's gates against `tech_tree.lua` **by id**. The ids do not line up:
+  - `E0-EC-01` — the simulation's **Toolmaker** unlock. In `tech_tree.lua` (line 408) that id is **"Semiconductor Fabrication"**.
+  - `E0-EC-03` — the simulation's **refined_copper** unlock. In the Lua (line 414) that id is **"Semiconductor Fabrication II"**.
+  - `E1-EC-01` — the simulation's **steel_bessemer** unlock. **It does not exist in the Lua file at all.**
+
+So the F9 tech-tree viewer shows the Toolmaker gate's requirement list attached to a semiconductor node the simulation will never deliver. The viewer is not wrong about its own data; the two stores simply disagree and nothing checks that they agree.
+
+RELATED AND PARTLY CONTRADICTED: NR-591 records the opposite belief and holds for `E1-EC-01` only; NR-687 names a non-existent `E0-EC-02`. Both should be reconciled against this.
+
+CONTEXT THAT MAKES IT LOW-URGENCY BUT WORTH FIXING BEFORE THE TECH TREE IS BUILT: `tech_tree.lua`'s own header says **"DATA ONLY … nothing in the simulation reads this"**, and its ~150 nodes census as 83 derived, 40 sketch, 26 stub, 1 parked. The mismatch costs nothing today because the viewer is a mock. It costs a great deal the moment research becomes real and someone assumes the two stores were ever reconciled.
+
+*Files: `src/world/tech_tree.cpp`, `scripts/tech_tree.lua`, `src/world/tech_gate.cpp`*
 
 ---
 
