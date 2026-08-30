@@ -6,7 +6,6 @@
 #include "scripting/lua_state.hpp"
 #include "ui/ui_state.hpp"
 #include "world/body_names.hpp"
-#include "world/contract_template.hpp" // BL-573: contract_template_registry, loaded in load_economy()
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/recipe_registry.hpp"
@@ -364,7 +363,6 @@ private:
 
     sim_loop        m_sim_loop;
     lua_state       m_lua;
-    lua_state       m_contract_lua; ///< BL-573: separate Lua state for scripts/contracts.lua — see load_economy().
     world           m_world;
     world_params    m_pending_world_params; ///< Edited by the New World menu and then by the wizard; consumed by start_new_game (BL-114/167).
     world_params    m_active_world_params;  ///< The descriptor the live world was built from; shown as the "seed used".
@@ -465,7 +463,6 @@ private:
 
     ui_state        m_ui;
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
-    contract_template_registry m_contract_templates; ///< BL-573: mercenary-contract kinds, loaded from scripts/contracts.lua at startup, threaded into run_nation_step exactly like m_registry.
     works_registry  m_works;             ///< BL-321 Era -1 works table, loaded from scripts/works.lua at startup.
     tech_tree_registry m_tech_tree;      ///< BL-087 mock tech/quest tree, loaded from Lua at startup; F9 viewer only.
     economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the ledgers.

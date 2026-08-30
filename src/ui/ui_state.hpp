@@ -753,19 +753,6 @@ struct ui_state
     // MUTUALLY EXCLUSIVE with `selected_entity` and the battle triple, on the
     // same "whichever is set last clears the others" rule.
     //
-    // DORMANT, AND SAYING SO IS THE POINT (BL-693). The mercenary contract is
-    // RETIRED: its ledger and its rail slot are gone, so nothing anywhere sets
-    // this field and it is permanently zero. It survives only because the
-    // Selection element's contract card still reads it, and because
-    // `world::mercenary_contracts` — the record it keys into — is itself kept
-    // dormant rather than torn out (removing it would move the save envelope).
-    // Treat this as a record of a system that is not running, not as a hook.
-    uint32_t selected_contract_id = 0;
-
-    bool has_contract_selection() const { return selected_contract_id != 0; }
-
-    void clear_contract_selection() { selected_contract_id = 0; }
-
     /// The value of `selected_entity` the Planetary canvas last wrote, so the
     /// canvas can tell its OWN selection from one some other surface made — a
     /// ledger row, a corp list, a just-built building. On a mismatch the canvas

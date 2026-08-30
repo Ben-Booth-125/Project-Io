@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*156 entries — 29 gameplay · 25 canvas · 15 lens · 54 ledger · 33 chrome.*
+*154 entries — 27 gameplay · 25 canvas · 15 lens · 54 ledger · 33 chrome.*
 
 ---
 
@@ -500,45 +500,6 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** The withdrawal is RECORDED, not applied. It is honoured at the START of the next tick's battle pass, before that tick's round batch — which is what makes the window a real window rather than a same-instant escape. When honoured, the resolver's three-term cost (a flat base, plus a term per round already fought, plus a pursuit term scaled by how far behind the withdrawing side is) reduces that side's strength, the loss is distributed across its units proportional to count with the remainder by ascending unit id, and the side that stayed holds the field. A rejection mutates nothing at all.
 
 **Reason to select.** The ONLY decision a commander has once contact is made — a battle opens because two hostile forces share a province, not because anyone asked for it, so there is no 'attack' verb to weigh against this one. Weigh it on the cost curve rather than on the odds alone: the price rises with every round already fought AND with how badly you are losing, and the rounds themselves have already cost their own attrition, so a late withdrawal compounds twice. Breaking off early from a fight you are losing is cheap; breaking off late from one you are losing badly is where armies die. At the shipped pacing (3 rounds a tick, 6 to a stalemate) a full battle spans two ticks, so there is exactly ONE real opportunity to use this. THE CARD QUOTES THE PRICE BEFORE YOU PAY IT — base, per-round and pursuit shown separately, taken from the resolver's own arithmetic — so the cost curve is readable rather than something to infer from the rules.
-
-### `gameplay.accept_offer` — NO UI SURFACE. THE MERCENARY CONTRACT IS RETIRED. There is no ledger, no rail slot and no press anywhere in the app that reaches this verb - it survives only because the corp_verb enum is append-only, and removing a verb would renumber every verb below it. It remains reachable over the corp-command seam (ProjectIo --serve, COMMAND opcode) and still applies when issued.
-
-**Press.** No press exists. Over the seam only: COMMAND corp=<id> verb=25 order=<offer id> counterparty=<client nation id> units=[<unit id>, ...].
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `order` | `uint32 (mercenary_offer::id)` | The offer to accept. Must name a live entry in world.mercenary_offers — consumed (erased) on success, so accepting the same id twice fails the second time. |
-| `counterparty` | `entity_id` | The offer's CLIENT NATION, not a corp — this verb's counterparty check forks on verb (corp_command.cpp). Must equal the named offer's own client field. |
-| `units` | `entity_id[8]` | The corp's OWN units to commit — unused slots are 0/null. At least one must be named, each must be owned by the acting corp and not already committed to another ACTIVE mercenary contract. CONTRACTS.md Q1: the player chooses the force, the contract never does. |
-
-**Valid when:**
-- `order` names a real, still-open offer (rejected_invalid otherwise).
-- `counterparty` names a real nation matching that offer's client (rejected_invalid otherwise).
-- `current_econ_tick < offer.deadline` — the offer has not expired (rejected_invalid otherwise).
-- `offer_escrow >= fee` — the offer is FULLY ESCROWED (rejected_state otherwise); a partially-funded offer is not yet acceptable.
-- Every named unit is real, owned by the acting corp, and not already committed to another active mercenary contract (rejected_invalid / rejected_not_owner / rejected_state otherwise); at least one unit must be named (rejected_invalid on an empty force).
-- The acting corp exists (rejected_invalid otherwise).
-
-**Expected output.** A new mercenary_contract is created: client and template copied from the offer, province bound from the offer's target, fee copied, the deposit (fee x deposit_fraction) paid straight from the offer's own already-filled escrow, deadline copied, the named units set as the committed force, state = active. The consumed offer is erased from world.mercenary_offers so it cannot be accepted twice. A rejection mutates nothing.
-
-**Reason to select.** DO NOT SELECT. The system this verb belongs to is retired and has no player-facing surface; an agent choosing it is acting on a mechanism the design no longer carries. Listed here so the dictionary matches the seam rather than hiding a verb that still applies. Procurement (request_quote / accept_quote / cancel_contract) is the live contract family.
-
-### `gameplay.abandon_contract` — NO UI SURFACE. THE MERCENARY CONTRACT IS RETIRED. There is no ledger, no rail slot and no press anywhere in the app that reaches this verb - it survives only because the corp_verb enum is append-only, and removing a verb would renumber every verb below it. It remains reachable over the corp-command seam (ProjectIo --serve, COMMAND opcode) and still applies when issued.
-
-**Press.** No press exists. Over the seam only: COMMAND corp=<id> verb=26 order=<contract id>. No other field is read.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `order` | `uint32 (mercenary_contract::id)` | The contract to walk away from. Must be one of the acting corp's OWN contracts, still in the active state. |
-
-**Valid when:**
-- `order` names a real contract (rejected_invalid otherwise).
-- The acting corp is that contract's contractor (rejected_not_owner otherwise).
-- The contract is still active — an already-terminal contract cannot be abandoned again (rejected_state otherwise).
-
-**Expected output.** The contract's state becomes abandoned. Same money outcome as a failure — the deposit already paid at accept_offer is not clawed back, and the reserved remainder is simply never disbursed — but a DISTINCT, LESSER sentiment magnitude (contract_cancelled, not contract_failed) records that the contractor chose this rather than losing a fight (CONTRACTS.md Q2: 'an honest early exit costs less than a rout, but it still costs').
-
-**Reason to select.** DO NOT SELECT. The system this verb belongs to is retired and has no player-facing surface. Listed here so the dictionary matches the seam rather than hiding a verb that still applies.
 
 ### `gameplay.raze_centre` — Seam-only for now (BL-616, centre promotion and decline): a corp_verb issued against the corp-command seam (ProjectIo --serve, COMMAND opcode). No UI press exists yet — the occupation surface that would host one belongs to the conquest consequence item (BL-518).
 

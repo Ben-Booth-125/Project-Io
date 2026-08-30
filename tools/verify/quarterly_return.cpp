@@ -518,8 +518,28 @@ void run_warm_start_rows(const recipe_registry& reg)
             const double d = static_cast<double>(cit->second.balance)
                            - static_cast<double>(b0);
             measured[id].push_back(d);
+
+            // ASSERTED BY REPLAYING THE ADDITION, not by differencing it, and the
+            // difference is not cosmetic (NR-720, measured 2026-08-30).
+            //
+            // This line used to read `(double)net == d`, and it FAILED on main with
+            // no owner, on a check whose subject is the figure the profitability
+            // ledger prints and the acquisition price is read off. Measured: 7 of 640
+            // rows, max absolute error 9.2e-05 Cr, max RELATIVE error 3.89e-08 - which
+            // is float epsilon (2^-24 = 5.96e-08). `net` and `balance` are both floats;
+            // `d` is an exact DOUBLE difference of two floats. Demanding bit equality
+            // between them tests whether the sum happened to be representable, not
+            // whether the books agree.
+            //
+            // The invariant actually worth asserting is that the filed net is exactly
+            // what apply_budget added, so replay the float addition and require the
+            // stored balance back, bit for bit. NO TOLERANCE - this is stricter than
+            // an epsilon, not looser, and it passed on all 640 rows the moment it was
+            // tried. The explicit cast pins the result to float against a
+            // wider-evaluation FLT_EVAL_METHOD.
+            const float net_f = cit->second.returns.back().net;
             per_tick_exact = per_tick_exact
-                          && static_cast<double>(cit->second.returns.back().net) == d;
+                          && static_cast<float>(b0 + net_f) == cit->second.balance;
             ++per_tick_rows;
         }
         credit_arrived_convoys(w, t);
@@ -548,13 +568,14 @@ void run_warm_start_rows(const recipe_registry& reg)
     check(last_is_live, "R6",
           "each corp's last return's balance == its live corporation_component.balance");
 
-    // R2 on the real world: EVERY filed net equals that tick's measured
-    // apply_budget delta, exactly. This is the record checked against the loop
-    // rather than against itself, on a world where construction, hiring,
-    // convoys, surveys and the market all run.
+    // R2 on the real world: EVERY filed net is EXACTLY what apply_budget added to
+    // the balance that tick. This is the record checked against the loop rather
+    // than against itself, on a world where construction, hiring, convoys,
+    // surveys and the market all run. See the replay note at the comparison for
+    // why it is stated as an addition rather than as a difference.
     check(per_tick_exact && per_tick_rows > 0, "R2",
-          "every filed net == that tick's measured apply_budget delta, EXACTLY");
-    std::printf("       %d filed rows compared against the loop's own delta\n", per_tick_rows);
+          "every filed net is EXACTLY what apply_budget added to the balance");
+    std::printf("       %d filed rows replayed against the loop's own addition\n", per_tick_rows);
 
     // ...and the retained window's sum telescopes onto the same measured
     // deltas over that window, exactly.

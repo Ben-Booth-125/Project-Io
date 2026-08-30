@@ -1011,14 +1011,6 @@ void app::load_economy()
     m_lua.load("scripts/economy.lua");
     m_registry.load_from_lua(m_lua);
 
-    // BL-573: the mercenary-contract template roster, loaded the same way and
-    // at the same app-layer boundary as m_registry above — never a Lua load
-    // performed inside world/* itself. A separate lua_state (not m_lua) so a
-    // hot-reload of the economy tables cannot also silently reset the
-    // contract kinds a live campaign's contracts still reference by index.
-    m_contract_lua.load("scripts/contracts.lua");
-    m_contract_templates.load_from_lua(m_contract_lua);
-
     // BL-433: gate the roster on the campaign's era band, derived from the epoch
     // year the live world was actually built from. Must happen HERE, after the
     // load (which resets the band to `any`) and before anything browses recipes —
@@ -1131,8 +1123,7 @@ void app::step_economy()
     // apply_budget so the treasury holds this quarter's levy and tariff; before
     // the tech gates so a `surplus` gate reads the moved balance. Keyed on the
     // econ counter (BL-568), which step_economy set at its top.
-    run_nation_step(m_world, m_registry, m_last_econ_report, m_world.current_econ_tick,
-                    m_contract_templates);
+    run_nation_step(m_world, m_registry, m_last_econ_report, m_world.current_econ_tick);
     lap(3); // nation step (folded into the budget phase)
     // BL-344: evaluate the tech gates once per economy tick, after the money loop
     // has moved balances (a `surplus` gate should read this quarter's balance, not
@@ -1161,11 +1152,6 @@ void app::step_economy()
         // post lines the player never saw, all stamped on the same day.
         if (!m_warm_starting)
             session_history::post_battle_dispatches(m_world, m_last_econ_report, m_chat, day);
-        // BL-577: contract traffic to the Public channel, on the same
-        // pre-game suppression as battle dispatches — a nation should not
-        // announce a contract the player never saw open.
-        if (!m_warm_starting)
-            session_history::post_contract_events(m_world, m_last_econ_report, m_chat, day);
         // Persona counsel is suppressed through the pre-game warm start
         // (2026-08-12): measured at ~1.05 s/tick — 93% of the AppHangB1 stall —
         // against ~80 ms for everything else combined, and what it buys there
@@ -1977,11 +1963,11 @@ void app::render()
     // is set.
     ui::draw_acquisitions_ledger(m_world, m_registry, m_ui,
                                  m_ui.show_acquisitions_ledger);
-    // NO CONTRACTS LEDGER (BL-693). The mercenary contract — the SELL side of
-    // CONTRACTS.md — is retired, so its ledger is deleted and slot 14 with it.
-    // `m_contract_templates` below is NOT dead: run_nation_step still threads it
-    // through, and it stays loaded so the dormant world-side record keeps its
-    // meaning. Procurement, the BUY side, is untouched.
+    // NO CONTRACTS LEDGER, AND NO MERCENARY CONTRACT AT ALL (BL-693, then
+    // NR-731 on 2026-08-30). The SELL side of CONTRACTS.md is gone to the
+    // world layer: records, passes, serialisation and comms traffic. What is
+    // left of the word "contract" here is PROCUREMENT, the BUY side, which is
+    // live and untouched.
     // Company ledger (BL-666) — where a Company-lens click lands. Drawn with the
     // rail ledgers because it occupies the same fold-out column, but it has no
     // rail slot: only a canvas click opens it. A declared placeholder for now.
@@ -2026,7 +2012,7 @@ void app::render()
         const ui::resource_history_view rhist{ &m_body_resource_hist,
                                                &m_tile_resource_hist,
                                                &m_resource_hist_days };
-        ui::draw_selection_band(m_world, m_registry, m_last_econ_report, m_contract_templates,
+        ui::draw_selection_band(m_world, m_registry, m_last_econ_report,
                                 rhist, m_ui, band_origin, band_size);
     }
 

@@ -65,22 +65,6 @@ void post_nation_agency_comms(const world& w, const economy_report& report,
 void post_battle_dispatches(const world& w, const economy_report& report,
                             ui::chat_state& chat, int day_tick);
 
-/// Mercenary-contract dispatches (BL-577): one comms line per contract
-/// lifecycle event this tick (offer issued, accepted, completed, failed,
-/// abandoned), posted to the standing **Public** channel (index
-/// `k_public_channel`) — CHAT.md's "the only speakers ever posted here are
-/// nations", so every line speaks as `contract_dispatch::client`.
-///
-/// The world already reported these — `economy_report::contract_events`,
-/// filled by `derive_contract_offers` and `run_mercenary_contract_tick`
-/// (nation_step.cpp) in the order each event actually happened this tick.
-/// This turns them into words; the wording itself lives in
-/// `core/battle_dispatch_text.{hpp,cpp}` beside its battle sibling, in its
-/// own translation unit so it can be harnessed (this file cannot — it
-/// reaches <SDL3/SDL.h> through app.hpp).
-void post_contract_events(const world& w, const economy_report& report,
-                          ui::chat_state& chat, int day_tick);
-
 /// Persona counsel (BL-207 slice 1): every corp due at this strategic-eval
 /// boundary gets its seated bench's read of its own blackboard, posted to a
 /// per-corp Counsel channel (lazily created on first use). Advisory only.

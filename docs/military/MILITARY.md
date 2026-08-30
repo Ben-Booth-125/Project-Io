@@ -495,7 +495,8 @@ in a province where the target also has units. Directed suffices — the ambush 
 pays two tables for: the declarer attacks, the target is drawn in regardless of what it thinks.
 Two neutral corps sharing a province do not fight; the trigger is stance, not proximity. Friendship
 permits what BL-549 (friendship permits two things) names; it gates nothing here. A corp-vs-nation
-second trigger, over an active mercenary contract rather than a declared hostility, is § Nation
+retired second trigger, which opened over an active mercenary contract rather than a declared
+hostility, is § Nation
 garrisons, below.
 
 **Identity is (province, attacker, defender).** A corp pair fights at most one battle per province
@@ -576,8 +577,8 @@ battle element.
 
 ## Nation garrisons
 
-> A contract offer is a want the client nation cannot meet alone; the thing the hired company
-> actually fights is the OPPOSING nation's own force. This is that force.
+> Nations field force of their own. Whatever a corporation eventually fights a nation over, this
+> is the force it fights.
 
 Nations own units. `unit_component::owner` accepts a nation entity exactly as it accepts a corp's —
 the field was never corp-typed. A garrison is seeded at generation, not hired: one in the nation's
@@ -590,15 +591,23 @@ as a fourth, generation-time source, alongside the hard-coded stub, `seed_starti
 costs-twice-annual-salary anchor prices a garrison's count off the nation's own
 `nation_component::treasury`, so a rich nation fields a bigger standing force and a poor one a
 token one — no separate garrison-strength dial. Garrisons are **static** in this slice: they hold
-their seeded tile and do not march. A nation that wants ground *hires* — that is the whole point of
-the contract, and a garrison that marched would make the nation its own mercenary.
+their seeded tile and do not march.
 
-**The trigger.** `run_battles` gains a second trigger, alongside corp-vs-corp directed hostility
-(§ Battles, above): a unit owned by a corp holding an ACTIVE mercenary contract, standing in the
-contract's target province, engages that province's garrison, owned by the contract's client
-nation. No `declare_hostile` row is authored for this pair — **the contract itself is the
-hostility**, live only for the contract's term. The pair's stance is a row keyed on the contract id,
-cleared at the contract's terminal state (completed, failed or cancelled), never by a corp verb.
+**There is ONE battle trigger: corp-vs-corp directed hostility** (§ Battles, above).
+
+There were two. The second opened a corp-vs-nation fight automatically over an ACTIVE mercenary
+contract — no `declare_hostile` row was authored for it, because the contract itself was the
+hostility. It went with the mercenary contract (Ben, 2026-08-30), and it had **never fired**: its
+lookup returned nothing from every production state, because the contracts that would have
+populated it were never created.
+
+**The capability is intact; only the automatic trigger is gone.** `open_battle` is
+entity-id-agnostic and opens a corp-vs-nation fight exactly as it opens a corp-vs-corp one, so a
+garrison remains something that can be fought. What no longer exists is anything that *decides* to
+fight one. How a corporation comes to blows with a nation is an open design question, and
+[`../politics/RELATIONS.md`](../politics/RELATIONS.md)'s declared stance is the nearest existing
+mechanism — hostility is a state a party opts into (Ben, 2026-08-17), which is exactly the shape
+the retired trigger bypassed.
 
 **Upkeep is a budget claim, not the corp vector.** A garrison does not draw the credits+goods
 vector `run_unit_upkeep` charges corp units (§ Upkeep, below) — its upkeep is a `military_research`

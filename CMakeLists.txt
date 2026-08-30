@@ -503,11 +503,7 @@ target_compile_features(commercial_fog_harness PRIVATE cxx_std_20)
 enable_testing()
 
 file(GLOB IO_WORLD_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/world/*.cpp")
-# BL-570: contract_template.cpp joins this exclusion for the same reason as
-# recipe_registry.cpp -- it includes <sol/sol.hpp> directly (its load_from_lua
-# needs a live Lua table), so it cannot be part of the SDL/Lua-free world
-# superset. condition_set_harness (below) adds it back explicitly.
-list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|works_registry|tech_tree|world_gen_config|contract_template)\\.cpp$")
+list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|works_registry|tech_tree|world_gen_config)\\.cpp$")
 
 # ---------------------------------------------------------------------------
 # The world layer, compiled ONCE (BL-287)
@@ -531,50 +527,13 @@ target_include_directories(io_world_obj PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src"
 target_compile_features(io_world_obj PUBLIC cxx_std_20)
 target_compile_options(io_world_obj PRIVATE ${IO_WARNING_FLAGS})
 
-# condition_set_harness (BL-570) needs a live sol2/Lua state for its C9 rows:
-# it loads the REAL scripts/contracts.lua through contract_template_registry
-# (contract_template.cpp, the sol2/Lua TU the world superset above deliberately
-# excludes) rather than a hand-built fixture, so a typo in the authored table
-# is exactly what it must catch. Same shape as pregame_balance_harness below:
-# add back contract_template.cpp + scripting/lua_state.cpp, the sol2 include
-# dir, and link lua54. Declared BEFORE the generic glob so the `if(NOT TARGET
-# ...)` guard in the foreach skips redeclaring it, while the unconditional
-# add_test still registers it as a CTest test.
-add_executable(condition_set_harness
-    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/condition_set_harness.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/contract_template.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
-)
-target_include_directories(condition_set_harness PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-    "${sol2_src_SOURCE_DIR}/include"
-)
-target_link_libraries(condition_set_harness PRIVATE io_world_obj lua54)
-target_compile_features(condition_set_harness PRIVATE cxx_std_20)
-target_compile_options(condition_set_harness PRIVATE ${IO_WARNING_FLAGS})
-
-# mercenary_contract_harness (BL-573) needs a live sol2/Lua state for BOTH
-# registries the item threads: recipe_registry (scripts/recipes.lua +
-# economy.lua, for the authored procurement.deposit_fraction split and the
-# sentiment factor weights the item's own terminal-state rows measure) and
-# contract_template_registry (scripts/contracts.lua, for the real take/hold
-# predicates run_mercenary_contract_tick evaluates against). Same shape as
-# condition_set_harness above: add back recipe_registry.cpp AND
-# contract_template.cpp + scripting/lua_state.cpp, the sol2 include dir, and
-# link lua54.
-add_executable(mercenary_contract_harness
-    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/mercenary_contract_harness.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/contract_template.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
-)
-target_include_directories(mercenary_contract_harness PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-    "${sol2_src_SOURCE_DIR}/include"
-)
-target_link_libraries(mercenary_contract_harness PRIVATE io_world_obj lua54)
-target_compile_features(mercenary_contract_harness PRIVATE cxx_std_20)
-target_compile_options(mercenary_contract_harness PRIVATE ${IO_WARNING_FLAGS})
+# condition_set_harness NO LONGER NEEDS A LIVE LUA STATE. Its C9 rows loaded the
+# real scripts/contracts.lua through contract_template_registry; the mercenary
+# contract was retired (NR-731, 2026-08-30) and took the script, the registry and
+# those rows with it. It is an ordinary world-superset harness now, so the generic
+# glob below declares it and this block declares nothing.
+#
+# mercenary_contract_harness is deleted outright for the same reason.
 
 # pregame_balance_harness is another harness that genuinely needs a live Lua
 # state: it constructs a `lua_state`, loads scripts/economy.lua + recipes.lua,
