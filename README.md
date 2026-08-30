@@ -112,7 +112,9 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest releases — v0.1.18, v0.1.19, v0.1.20 and v0.1.21
+## Latest releases — v0.1.19, v0.1.20, v0.1.21 and v0.1.22
+
+**v0.1.22 — the ledgers get read.** Every nav-rail ledger was reviewed against live captures and most were rebuilt: Diplomacy became a stance surface rather than a balance table, Acquisitions and Convoys were created, Construction gained the estate and its levers, and the Market ledger flattened into one row per good with its price history drawn in the row. The sprint's real yield was not the surfaces, though — it was finding **four designed mechanisms that had never run in a played world**: off-world markets (one market-bearing body at four hundred ticks), rival acquisition (asserted by the docs in the present tense, absent from the code), mercenary contracts (client nations never fund their own offers), and chain depth as a growth gate (half the ungated roster already produces nothing). Two were retired on the spot. The release also records that roughly thirty harnesses could not compile from a clean configure — warm trees passed on stale objects, and a release was cut over it.
 
 **v0.1.21 — the loop closes.** A corporation now saves up over about two in-game years, buys another firm outright, and is still earning twenty quarters later — measured, not asserted. Spawn viability went from three seeds in twelve to twelve in twelve with no interest charged anywhere, and the demand baskets learned which era they are in, which removed the 65.7 % of demand that had been pointing at goods the ancient world cannot make. The release also records what it does not have: a guard deliberately red on eight goods still waiting for a buyer, and a free-firm trap where the cheapest company on the market is the one whose debt sinks you.
 

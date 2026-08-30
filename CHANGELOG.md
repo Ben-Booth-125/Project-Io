@@ -12,6 +12,85 @@ release.
 
 ## [Unreleased]
 
+## [0.1.22] — 2026-08-30
+
+*Sprint 24a closes: every nav-rail ledger reviewed against live captures, and most rebuilt rather
+than reviewed. Twenty-two items. The sprint's real yield was not the surfaces — it was finding
+**four designed mechanisms that had never run in a played world**, two of which were retired on
+the spot.*
+
+### Added
+- **The Acquisitions ledger** (BL-675, BL-627, BL-679, BL-680) — rail slot 5. Which firms you can
+  buy and what they cost, split **Purchasable** / **Possible** by your balance, with a full-canvas
+  profitability fold-out behind it: one row per firm that files, sortable, filtered by end
+  resource, input resource and body. A firm that does not file is **not listed at all** — known
+  everything or known nothing, no half-rows of dashes.
+- **The Convoys ledger** (BL-689) — rail slot 7, lifted out of the Market ledger. Cargo in transit
+  was never a market question; it belongs to `SUPPLY.md`. Arms the `supply_routes` lens on open,
+  which a tab strip could never do.
+- **The Trades tab** (BL-687) — your standing positions, the whole market's book behind a gate
+  (you own a building on that body), potential trades ranked by margin, and realised exchanges.
+- **The Buildings tab** (BL-682, BL-683, BL-684) — your estate grouped by type with count and
+  total profit; expanding a group lists its buildings and selecting one draws its levers. Method
+  and Workforce **moved here** from the Selection card, which now presents and does not operate.
+- **The clearing tick retains a per-exchange record** (BL-685) — tick, market, resource, quantity,
+  unit price, seller, buyer, ring-capped. It records **revenue, not profit**, and that limit is
+  structural: `stockpile_component` is `quantities[]` and nothing else, so a unit in a pool does
+  not know what it cost and margin cannot be derived from a sale.
+- **`save_envelope_roundtrip`** — the first round-trip assertion the save envelope has ever had, on
+  a seam where a version mismatch refuses the whole file. 20 rows, including a *wrapped* ring.
+
+### Changed
+- **Diplomacy is a stance surface, not a balance table** (BL-674). Filtered to corporations —
+  88 rows to 8, because ~80 were background companies standing in a diplomatic read — grouped
+  Friends / Hostile / Neutral, with the stance verbs on each row's action strip.
+- **The Market ledger is flattened** (BL-686, BL-688). One row per good — glyph, name, price, price
+  vs base, and an 8-quarter graph *in the row*. The old stacked sparklines gave every good its own
+  implicit scale, so the one thing a price board is for could not be done. The graph now centres on
+  base price and zooms to a robust spread, so at-base means the same height on every row.
+- **The Corporation ledger keeps one card** (BL-691), Balance, drawn as earnings against stacked
+  expenses. The chart is the building card's own drawer, generalised rather than forked.
+- **Closure is retired for companies** (BL-678). Every background firm is transparent and buyable;
+  corporations keep their ownership class. The buyable field went from a mean of **1.6 firms per
+  seed to 81.6**.
+- **The Selection element's centre presents data and never holds levers** — reversing NR-245, and
+  recorded as a reversal rather than applied quietly.
+
+### Removed
+- **The Economy panel**, outright (BL-676). Each of its three views was answered better elsewhere
+  and two disclosed rival figures the competitor-visibility rule forbids. Construction takes slot 3.
+- **The chain-depth gate** (BL-692). Tech is the only lock now. Measured before and after: the
+  opening costs **−4.6% processing net**, but starvation *fell* and produced-output share *rose* —
+  the new capacity runs, and the cost is a **price transfer**, not idle capex. The Coking Kiln bid
+  coal +5.3% and displaced peat by −21%.
+- **The mercenary contract surface** (BL-693). The sell side only — procurement stays, and the
+  player identity depends on it. The rail returns to thirteen slots.
+- **Four backlog ids printed to the player** (BL-690), one of which had shipped the day before.
+
+### Fixed
+- The fold-out column starved every stretched name column — the corporations table drew each firm
+  as a single glyph. Fixed at four surfaces.
+- `scroll_panel` aimed at outer windows and **silently cleared** unknown names, so two "scrolled to
+  the foot" captures were byte-identical to their heads and **nothing had ever seen past the fourth
+  of ~42 goods**. It now reaches the real scroller and fails loudly.
+- A convoy reading `Agricultural Produce x0` was **rounding, not reporting**: 1669 dispatches, zero
+  empty holds, and 4.6% carrying less than half a unit that `"%.0f"` erased.
+- The fourteenth rail slot put its centre below the 720 px floor, leaving Contracts drawn and
+  unpressable — invisible at 1080p, so only the resolution *pair* could catch it.
+- ~30 harnesses could not compile from a clean configure since the v0.1.21 cut; warm trees passed
+  on stale objects, and **a release was cut over it**.
+
+### Measured, and left honest
+- **Off-world markets have never existed.** One market-bearing body at 16, 60, 120, 240 and **400
+  econ ticks**. Emergence needs a building to complete off-world, and nothing ever builds there.
+- **Rivals cannot buy.** `FINANCE.md` asserts they do, in the present tense, naming the file. The
+  verb is absent from it.
+- **Client nations never fund their own contract offers**, so the mercenary loop was never
+  exercisable — which is why it was retired rather than repaired.
+- **Chain depth was never the brake**: Sawmill, Stonemason, Potter's Kiln and Weaver are depth-0,
+  open, and produce 0.0.
+- `quarterly_return` R2 fails on `main` and nothing owns it. Two goldens are knowingly red.
+
 ## [0.1.21] — 2026-08-26
 
 *Sprint 20 closes with its goal **met and proved**: a corporation saves up in ~8.6 quarters, buys
@@ -879,7 +958,12 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.17...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.22...HEAD
+[0.1.22]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.21...v0.1.22
+[0.1.21]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.20...v0.1.21
+[0.1.20]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.19...v0.1.20
+[0.1.19]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.18...v0.1.19
+[0.1.18]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.17...v0.1.18
 [0.1.17]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.15...v0.1.17
 [0.1.15]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.10...v0.1.14
