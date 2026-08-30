@@ -18,7 +18,6 @@ The surface has three pieces:
 |---|---|
 | **Chain half — player-facing** (History slot: the Chain view; stage charts redrawn from the persisted `generation_report`) | `src/ui/generation_charts.{hpp,cpp}` |
 | **Per-body summary ledger** | `src/ui/generation_ledger.{hpp,cpp}`, nav rail slot 10 |
-| **Per-tile derivation breadcrumb**, as a content builder with no surface of its own | `ui::draw_tile_derivation` (`generation_ledger.hpp`) |
 | **Field lenses** (heightmap / moisture / band painted over the Planetary canvas) | read the same `generation_record` seam (§ Surfacing) |
 
 **How it is reached and what it holds.** Nav rail slot 10 (the plate glyph)
@@ -36,17 +35,31 @@ toggles the surface and each header toggles its own section, which is the Toggle
 satisfied by construction. Section disclosure lives in `ui_state` rather than ImGui's
 storage so a verify script can drive it (`verify.section`).
 
-**Every distribution names its denominator in its header, and all three share one:**
-the whole grid, ocean included. That matters most on Landform, where water carries
-`plains` and so lifts the plains share far above its share of *land*. Naming the
-denominator does not resolve that — whether a landform histogram should be taken over
-land alone is an open question below — but it stops the number reading as something it
-is not.
+**Every distribution names its denominator in its header, and they do not all share
+one.** Substrate and Cover are taken over the whole grid; **Landform is taken over land
+alone** (Ben, 2026-08-30). Water carries `landform::plains` — there is no water
+landform — and a temperate body is more than half ocean, so a whole-grid denominator
+reports the sea as flat ground: 95.27% plains and 0.72% mountain, where the answer over
+land is 88.18% and 1.80%. Every share on that table was a share of a question nobody
+asks.
 
-**The per-tile derivation is not on this surface.** `ui::draw_tile_derivation` builds
-it and the design intent is unchanged — the hover card and Selection element are its
-destination (§ Surfacing; `SELECTION.md` § Shared content builders). What the ledger
-does not do is host a per-tile view of its own.
+**The asymmetry is deliberate and is why each header names its own denominator.** Ocean
+is one of Substrate's *own categories*, so excluding water there would delete a real
+row; Landform has no such category, so including water only dilutes it. `is_water()`
+(`components.hpp`) is the single definition, and it settles the question the ruling
+turned on: **coast is water**, with lake and ocean.
+
+**There is no per-tile derivation, here or anywhere.** The breadcrumb that explained a
+single tile pass by pass was retired with the Tile view (Ben, 2026-08-30). Its stated
+destination — a condensed frame in the hover card or the Selection element — had been
+written down since it was factored out and was never built, so the function outlived
+both the caller it had and the callers it was factored out for. Removed rather than
+kept dormant: a content builder nothing calls is a claim about a surface that does not
+exist.
+
+The **body-grain** question this ledger answers is unchanged. What is gone is the
+tile-grain one, and if it comes back it comes back as a Selection subject — a tile is
+already one — rather than as a ledger view.
 
 Two additive taps make this possible, both pure captures that leave the generated
 surface bit-for-bit identical:
@@ -259,16 +272,9 @@ once as a tile-derivation builder and the three callers wrap it.
   `src/ui/generation_charts.{hpp,cpp}` and redrawn from the persisted
   `generation_report`. The exploration gate on those views (MENU.md's History slot
   calls for it) is owned by BL-211 (player-facing history ledger).
-- **Should a landform histogram be taken over LAND rather than the whole grid?** Water
-  tiles carry `landform::plains`, and the grid is more than half ocean, so the plains
-  row reads 95% where the share of land is nearer 89% and mountain reads 0.72% where
-  over land it is nearer 1.6%. Every share on that table is therefore a share of
-  something the reader is probably not asking about. Three answers are defensible — keep
-  one denominator for all three distributions and name it (what the surface does now),
-  give Landform a land-only denominator, or show both columns. Substrate genuinely wants
-  the whole grid, since ocean is one of its categories; that asymmetry is the reason
-  this is a question rather than a fix.
-- **Where does the per-tile derivation live?** `ui::draw_tile_derivation` has no caller
-  since the ledger's Tile view was retired. Its stated destination — the hover card and
-  the Selection element — has never been wired, so the content exists and nothing shows
-  it.
+- **Is `valley` reachable at all, and are Pass 5's clusters firing hard enough?** Read
+  over land rather than over the grid, the default body is 88.18% plains, and `valley`
+  never generates - zero tiles, on a landform the enum declares and the generator can
+  apparently never produce. Mountain is 1.80% and rift 0.26%. This is a generation
+  tuning question rather than a surface one, and it is the ledger doing exactly what it
+  exists for: the numbers only became legible once the denominator was right.

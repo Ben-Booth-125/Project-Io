@@ -1,7 +1,7 @@
 #include "generation_ledger.hpp"
 
 #include "foldout_column.hpp" // the shell-column host + nav_button's toggle rule
-#include "presentation.hpp"   // terrain_name / substrate_name / cover_name / landform_name
+#include "presentation.hpp"   // substrate_name / cover_name / landform_name
 #include "world/components.hpp"
 
 #include <imgui.h>
@@ -26,11 +26,6 @@ const char* band_name(std::uint8_t b)
     static const char* k_names[] = { "Polar", "Subpolar", "Temperate", "Subtropical", "Tropical" };
     return (b < 5) ? k_names[b] : "?";
 }
-
-// Pass 4's moisture column: the three-way split the (band x moisture) table is
-// indexed by. Mirrors moisture_column() in tile_generation.cpp.
-int moisture_col(float m) { return m < 0.35f ? 0 : (m < 0.55f ? 1 : 2); }
-const char* moisture_col_name(int c) { return c == 0 ? "dry" : (c == 1 ? "mid" : "wet"); }
 
 const char* temperature_name(temperature_class t)
 {
@@ -238,223 +233,6 @@ void dist_table(const char* id, const std::vector<dist_row>& rows, int total)
 } // namespace
 
 // ---------------------------------------------------------------------------
-// The per-tile derivation breadcrumb
-// ---------------------------------------------------------------------------
-
-void draw_tile_derivation(const world& w, const generation_record& rec,
-                          const generation_report::body_entry& entry,
-                          entity_id tile_id)
-{
-    const auto it = w.tiles.find(tile_id);
-    if (it == w.tiles.end())
-    {
-        ImGui::TextDisabled("That entity is not a tile.");
-        return;
-    }
-    const tile_component& t = it->second;
-    if (rec.gw <= 0 || t.grid_x >= rec.gw || t.grid_y >= rec.gh)
-    {
-        ImGui::TextDisabled("Tile lies outside the regenerated grid.");
-        return;
-    }
-
-    const std::size_t idx = static_cast<std::size_t>(t.grid_y) * static_cast<std::size_t>(rec.gw)
-                          + static_cast<std::size_t>(t.grid_x);
-    const body_profile& p  = entry.state.profile;
-    const float  height    = rec.height[idx];
-    const float  moisture  = rec.moisture[idx];
-    const std::uint8_t bnd = rec.band[idx];
-    const bool   is_ocean  = is_water(t.substrate); // BL-516: the ledger's fork is
-                                                   // land-or-water, not which water.
-
-    ImGui::Text("Tile %d, %d", t.grid_x, t.grid_y);
-    ImGui::Separator();
-
-    // --- 1. Height, and the first fork -------------------------------------
-    ImGui::TextDisabled("1  HEIGHT");
-    ImGui::Text("height  %.4f", static_cast<double>(height));
-    if (rec.ocean_score.empty())
-    {
-        ImGui::TextWrapped("No ocean pass ran (hydrology = %s), so every tile is land "
-                           "and height decides nothing here on its own.",
-                           hydrology_name(p.hydrology));
-    }
-    else
-    {
-        const float score = rec.ocean_score[idx];
-        ImGui::Text("sea score  %.4f  vs threshold  %.4f",
-                    static_cast<double>(score), static_cast<double>(rec.ocean_threshold));
-        ImGui::TextWrapped("%s. The score is the height after Pass 2's equatorial "
-                           "down-bias; the threshold is the %.0f%% percentile of it.",
-                           score < rec.ocean_threshold ? "Below - OCEAN" : "Above - LAND",
-                           static_cast<double>(p.water_fraction * 100.0f));
-    }
-    ImGui::Spacing();
-
-    // --- 2. Latitude band and moisture -------------------------------------
-    ImGui::TextDisabled("2  BAND & MOISTURE");
-    ImGui::Text("band  %s  (row %d of %d, %s widths)",
-                band_name(bnd), t.grid_y, rec.gh, temperature_name(p.temperature));
-    ImGui::Text("moisture  %.4f  ->  %s column",
-                static_cast<double>(moisture), moisture_col_name(moisture_col(moisture)));
-    ImGui::Spacing();
-
-    // --- 3. The terrain axes, and which branch chose each ------------------
-    // BL-519 split what used to be one line into three, and the ledger is the one
-    // surface where that MUST show: its whole job is explaining why a tile came
-    // out as it did, and "substrate rocky, cover forest" is a different (and more
-    // honest) explanation than "composition forest" ever was.
-    ImGui::TextDisabled("3  TERRAIN");
-    ImGui::Text("%s", terrain_name(t).c_str());
-    ImGui::TextDisabled("   substrate  %s   (Pass 4a/4c - the biome table, then decomposed)",
-                        substrate_name(t.substrate));
-    if (t.cover == terrain_cover::none)
-    {
-        ImGui::TextDisabled("   cover      none   (bare ground is a real answer, not a gap)");
-    }
-    else
-    {
-        const char* dw = cover_density_word(t.cover_density);
-        ImGui::TextDisabled("   cover      %s, %s (density %u/255)", cover_name(t.cover),
-                            dw ? dw : "-", static_cast<unsigned>(t.cover_density));
-    }
-    if (is_ocean)
-    {
-        ImGui::TextWrapped("Set by Pass 2, not the climate table - an ocean tile never "
-                           "reaches Pass 4.");
-    }
-    else
-    {
-        const bool airless = p.atmosphere == atmosphere_class::none
-                          || p.atmosphere == atmosphere_class::thin;
-        const bool biotic  = entry.state.stage >= life_stage::land;
-
-        if (p.bias == composition_bias::metallic)
-        {
-            ImGui::TextWrapped("Metallic bias overrides the table entirely: "
-                               "55/30/15 metallic / rocky / regolith.");
-        }
-        else if (airless)
-        {
-            if (p.hydrology == hydrological_state::polar_frozen && bnd == 0)
-                ImGui::TextWrapped("Airless body, polar band, frozen poles: the polar "
-                                   "override sets icy without a draw.");
-            else if (p.temperature == temperature_class::scorching
-                  || p.temperature == temperature_class::hot)
-                ImGui::TextWrapped("Airless and hot: 45/40/15 volcanic / barren / rocky.");
-            else
-                ImGui::TextWrapped("Airless and cool: 65/30 regolith / rocky.");
-        }
-        else if (t.substrate == terrain_substrate::volcanic && (bnd == 3 || bnd == 4))
-        {
-            ImGui::TextWrapped("The volcanic roll fired: only the subtropical and tropical "
-                               "bands offer it, at p = %.3f for %s geological activity.",
-                               static_cast<double>(
-                                   p.geology == geological_activity::high     ? 0.375f :
-                                   p.geology == geological_activity::moderate ? 0.125f :
-                                   p.geology == geological_activity::low      ? 0.040f : 0.0f),
-                               geology_name(p.geology));
-        }
-        else if (t.cover == terrain_cover::marsh && bnd == 2)
-        {
-            // The table's wet cell yields wetland in the subtropical and tropical
-            // bands ONLY, so a temperate marsh can only have come from Pass 4b.
-            ImGui::TextWrapped("Pass 4b drainage: the temperate band's climate table has no "
-                               "wetland cell, so this is low-lying, high-moisture ground "
-                               "that carried a biotic cover and could not drain.");
-        }
-        else
-        {
-            ImGui::TextWrapped("The %s climate table, cell (%s, %s).%s",
-                               biotic ? "biotic" : "abiotic",
-                               band_name(bnd), moisture_col_name(moisture_col(moisture)),
-                               t.cover == terrain_cover::marsh
-                                   ? " Pass 4b drainage can also produce wetland here; the "
-                                     "record does not distinguish the two in this band."
-                                   : "");
-            if (!biotic)
-                ImGui::TextWrapped("Abiotic because the biosphere never reached land "
-                                   "(life stage %s) - grassland, forest, wetland and tundra "
-                                   "are masked out.", life_stage_name(entry.state.stage));
-        }
-    }
-    ImGui::Spacing();
-
-    // --- 4. Landform --------------------------------------------------------
-    ImGui::TextDisabled("4  LANDFORM");
-    ImGui::Text("%s", landform_name(t.landform));
-    switch (t.landform)
-    {
-        case terrain_landform::mountain:
-        case terrain_landform::rift:
-        case terrain_landform::crater:
-            ImGui::TextWrapped("A Pass 5 cluster CORE - ring 0 or 1 of a %s seed. WHICH "
-                               "seed is not recoverable: the record does not capture seed "
-                               "positions (GENERATION_LEDGER.md, open items).",
-                               t.landform == terrain_landform::mountain ? "mountain range"
-                             : t.landform == terrain_landform::rift     ? "rift zone"
-                                                                       : "crater");
-            break;
-        // Highland and canyon are never seeded directly - they are what a cluster's
-        // outer rings decay into (landform_at_ring), so reading them as a separate
-        // feature would misattribute the shoulder of a range to a rule of its own.
-        case terrain_landform::highland:
-            ImGui::TextWrapped("A cluster SHOULDER: the outer rings of a mountain range "
-                               "or crater decay to highland before dissolving to plains.");
-            break;
-        case terrain_landform::canyon:
-            ImGui::TextWrapped("A cluster SHOULDER: ring 1+ of a rift zone, which grows "
-                               "east-west so the fault reads as a linear feature.");
-            break;
-        case terrain_landform::valley:
-            ImGui::TextWrapped("The valley fill: land no cluster claimed, sitting below "
-                               "height 0.35 (this tile is %.4f).", static_cast<double>(height));
-            break;
-        default: // plains
-            ImGui::TextWrapped("Plains - either untouched by Pass 5, or the outermost ring "
-                               "of a cluster that decayed back to flat ground. The valley "
-                               "fill did not take it: %s.",
-                               height < 0.35f
-                                   ? "it is below the 0.35 cut, so a cluster must have "
-                                     "claimed it first"
-                                   : "it sits above the 0.35 cut");
-            break;
-    }
-    ImGui::Spacing();
-
-    // --- 5. Deposits --------------------------------------------------------
-    ImGui::TextDisabled("5  DEPOSITS");
-    if (is_ocean)
-    {
-        ImGui::TextWrapped("Ocean carries no land deposits.");
-        return;
-    }
-
-    int shown = 0;
-    for (std::size_t r = 0; r < resource_count; ++r)
-    {
-        const float richness = t.resource_deposit[r];
-        if (richness <= 0.0f) continue;
-        ++shown;
-        ImGui::Text("%-18s %8.1f", resource_name(static_cast<resource_type>(r)),
-                    static_cast<double>(richness));
-        ImGui::SameLine();
-        ImGui::TextDisabled("endowment x%.2f",
-                            static_cast<double>(entry.state.endowment[r]));
-    }
-    if (shown == 0)
-        ImGui::TextDisabled("None - the %s / %s profile rolls no deposit here.",
-                            terrain_name(t).c_str(), landform_name(t.landform));
-
-    ImGui::TextWrapped("Rolled from the (%s, %s) deposit profile, then post-multiplied by "
-                       "the abundance scalar (x%.2f), the Planetology endowment, and the ore-"
-                       "region field. Those multiplies draw no RNG, so the figure above is "
-                       "the roll times a known set of factors - not a separate draw.",
-                       terrain_name(t).c_str(), landform_name(t.landform),
-                       static_cast<double>(entry.tiles.deposit_scalar));
-}
-
-// ---------------------------------------------------------------------------
 // The ledger window
 // ---------------------------------------------------------------------------
 
@@ -636,7 +414,8 @@ void draw_generation_ledger(const world& w, ui_state& s,
     std::array<int, 10> sub_counts{}; // BL-516: 8 -> 10, lake and coast appended
     std::array<int, 10> cov_counts{};
     std::array<int, 7>  land_counts{};
-    int counted = 0;
+    int counted = 0;      // every tile on the body - Substrate's and Cover's denominator
+    int land_counted = 0; // land only - Landform's, see the note at that section
     for (entity_id id : tiles)
     {
         if (id == null_entity) continue;
@@ -646,8 +425,10 @@ void draw_generation_ledger(const world& w, ui_state& s,
         const std::size_t l  = static_cast<std::size_t>(t.landform);
         if (su < sub_counts.size()) ++sub_counts[su];
         if (cv < cov_counts.size()) ++cov_counts[cv];
-        if (l < land_counts.size()) ++land_counts[l];
         ++counted;
+        if (is_water(t.substrate)) continue; // NR-740: water has no landform
+        if (l < land_counts.size()) ++land_counts[l];
+        ++land_counted;
     }
 
     std::snprintf(buf, sizeof buf, "Substrate  (%d tiles)", counted);
@@ -668,13 +449,27 @@ void draw_generation_ledger(const world& w, ui_state& s,
         dist_table("##gen_cov_tbl", rows, counted);
     }
 
-    std::snprintf(buf, sizeof buf, "Landform  (%d tiles)", counted);
+    // LANDFORM IS THE ONE TABLE TAKEN OVER LAND, not over the grid (Ben's
+    // ruling on NR-740, 2026-08-30). Water carries `terrain_landform::plains` -
+    // there is no water landform - and the grid is more than half ocean, so a
+    // whole-grid denominator reported 95.27% plains and 0.72% mountain where the
+    // answer over land is nearer 88% and 1.8%. Every share on the table was a
+    // share of a question nobody asks.
+    //
+    // Substrate and Cover keep the whole grid deliberately, and the asymmetry is
+    // the point rather than an inconsistency: ocean is one of Substrate's OWN
+    // categories, so excluding it there would delete a real row. Each header
+    // names which denominator it used, so the two never have to be inferred.
+    //
+    // `is_water` (components.hpp) is the single definition, and it settles the
+    // question this ruling turned on: COAST IS WATER, with lake and ocean.
+    std::snprintf(buf, sizeof buf, "Landform  (%d land tiles)", land_counted);
     if (section(buf, "gen_landform", s.gen_landform_open))
     {
         std::vector<dist_row> rows;
         for (std::size_t l = 0; l < land_counts.size(); ++l)
             rows.push_back({landform_name(static_cast<terrain_landform>(l)), land_counts[l]});
-        dist_table("##gen_land_tbl", rows, counted);
+        dist_table("##gen_land_tbl", rows, land_counted);
     }
 
     ui::foldout_end();
