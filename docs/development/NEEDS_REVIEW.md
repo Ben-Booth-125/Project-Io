@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*102 entries — 102 open, 0 resolved.*
+*103 entries — 103 open, 0 resolved.*
 
 ---
 
@@ -1060,6 +1060,19 @@ WHAT IS OWED IS THE DOC WORK AND ONE DECISION. Ben has said the military attenti
 The buy side (procurement, BL-350) is untouched and stays — it is live, and the identity depends on it separately.
 
 *Files: `docs/CONCEPT.md`, `docs/SYSTEMS.md`, `docs/economy/CONTRACTS.md`, `docs/development/ROADMAP.md`*
+
+### NR-730 — No harness compiles src/ui or src/core, so a worktree agent cannot build what it changes
+*observation · raised 2026-08-29 · from Sprint 24a, BL-692. The agent hit it and wrote a stopgap rather than skipping verification.*
+
+A fresh git worktree has no configured `build/`, and `build_app.bat` requires one. Configuring from scratch risks a ~120 MB FetchContent download. So an agent working in a worktree **cannot build the GUI at all** — and no `tools/verify/*.cpp` harness compiles `src/ui/` or `src/core/` either, because the harness builder excludes anything reaching `<imgui.h>` by construction.
+
+The consequence: **every UI-touching worktree agent this sprint reported "green" on harness runs that never compiled the code it changed.** They were not wrong to — the checks they ran are real — but the compile itself only happened when the main session merged and built. That has worked because the main session always builds; it is not a property anyone designed, and it fails silently the day someone trusts an agent's green.
+
+The stopgap: `tools/verify/syntax_check_gui.bat` (committed with BL-692) runs `cl /Zs` over the GUI translation units against the shared `_deps_cache`. It proves COMPILE, not LINK. Better than nothing and explicitly not a build.
+
+The question for Ben is which of three this wants to become: a committed helper that configures a worktree build against `_deps_cache` (the previous agent wrote `cfg_worktree.bat` for the same reason and deleted it before committing — that is twice now); a fallback folded into `build_app.bat` itself; or a rule that worktree agents do not verify GUI changes and the integrating session owns that step entirely. The third is the current de-facto answer and nothing says so.
+
+*Files: `tools/verify/syntax_check_gui.bat`, `build_app.bat`, `tools/verify/build_harness.js`*
 
 ---
 
