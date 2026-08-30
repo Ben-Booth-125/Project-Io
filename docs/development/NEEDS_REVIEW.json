@@ -1455,6 +1455,21 @@
         "docs/ui/LAYOUT.md",
         "scripts/verify/nav_rail_fit.lua"
       ]
+    },
+    {
+      "id": "NR-724",
+      "kind": "question",
+      "status": "open",
+      "raised": "2026-08-29",
+      "title": "Deleting the Production card orphaned the growth-track readout, and two docs now assert it exists",
+      "source": "Sprint 24, BL-691. Found by the agent that deleted the card; it correctly refused to resolve it.",
+      "what": "BL-691 cut three of four roll-up cards from the Corporation ledger on Ben's 2026-08-29 call. One of them, Production, was the ONLY DISPLAY of the chain-depth growth track — and it was put there by Ben's own earlier ruling.\n\nBL-591 (2026-08-23): *\"the depth readout goes on the corporation dashboard\"*. The reason it was built at all is that `corp_reached_depth` GATES SIX PLACES in the simulation and was displayed in none of them. So the readout existed to close exactly the gap that deleting the card has just reopened.\n\nTWO LIVE DOCS NOW ASSERT SOMETHING UNTRUE, and neither was edited:\n  - `docs/economy/PRODUCTION.md` § Chain depth (~line 732): \"The readout lives on the corporation dashboard, not the building card\", with its three lines described in detail.\n  - `docs/development/user_stories.json:500`: a surface named \"Corporation dashboard — Production card, Growth track\".\n\nTHE AGENT WAS RIGHT NOT TO FIX EITHER. Choosing between \"give the growth track a new home\" and \"retire the readout\" is a design call, and editing PRODUCTION.md would have taken it silently in one direction — the exact failure mode the state-independence rule exists to prevent. Newest-dated wins, so the 2026-08-29 cut stands; what it leaves behind is Ben's.\n\nTHE OPTIONS, none costed:\n  - **Fold it into the Balance card.** Cheapest, but it is a production fact on a money surface, which is the reasoning that removed Production in the first place.\n  - **Move it to the Construction ledger's Buildings tab.** That tab now holds the estate and its levers, and chain depth is a fact about what the estate can make next. This is my lean.\n  - **Retire the readout.** Legitimate — but it puts `corp_reached_depth` back to gating six places and displaying in none, which is the state BL-591 was filed to end.\n\nWORTH NOTING AS A PATTERN RATHER THAN AN INCIDENT: this is the THIRD time this sprint a deletion has silently orphaned an earlier ruling — BL-176's empty-room fix went with the Buildings tab (NR-718), NR-245's controls-on-the-card went with the levers (recorded in BL-683), and now BL-591's readout goes with the Production card. Each was found by reading rather than by any check. A deletion that removes a surface should ask what was placed there by a ruling, and nothing in the method prompts that question.",
+      "files": [
+        "docs/economy/PRODUCTION.md",
+        "docs/development/user_stories.json",
+        "src/ui/corporation_dashboard.cpp",
+        "src/ui/construction_panel.cpp"
+      ]
     }
   ]
 }
