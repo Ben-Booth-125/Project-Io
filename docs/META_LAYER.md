@@ -216,11 +216,12 @@ item, so a tech could gate a *building type* but never the *method* a building a
 runs. `unlock_recipe` closes that: it names a `recipe::name` (never an id — ids are positional and
 a gate must survive a roster reorder), mirrored on `tech_gate::unlocks_recipe` the same way
 `unlocks_structure` already is, checked through `recipe_unlocked` at both `construct_building` and
-`try_switch_recipe` (guarding only placement leaves the retool bypass the depth gate's own comment
-already names). A recipe lock and a structure lock report the same `tech_locked` code on every
-seam — an agent cannot tell them apart, which is deliberate; the two stay distinct in MEANING, not
-in the code an agent reads. See `docs/economy/PRODUCTION.md` § Chain depth — the growth track for
-how this composes with the (separate) depth gate on the same recipe.
+`try_switch_recipe` — guarding only placement would leave a retool bypass, so both doors ask. A
+recipe lock and a structure lock report the same `tech_locked` code on every seam — an agent cannot
+tell them apart, which is deliberate; the two stay distinct in MEANING, not in the code an agent
+reads. **`tech_locked` is the only method lock**: within the roster a campaign's era band admits,
+research decides what a corp may run, and nothing else does. See `docs/economy/PRODUCTION.md`
+§ Chain depth — the growth track.
 
 ---
 

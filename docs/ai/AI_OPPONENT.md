@@ -302,10 +302,12 @@ where a processor genuinely differs from a mine:
 - **Recipe choice.** Walks the **browse** space (this era's roster) and crosses to the **absolute**
   id through `recipe_id(name)` — the two id spaces `recipe_registry.hpp` keeps apart. The recipe
   travels **with** the command, because `construct_building` substitutes steel for `no_recipe`.
-- **Reachability.** Two gates a mine never needs: the **chain-depth** gate (asked here rather than
-  discovered as a seam rejection), and **input access** — pool + local market inventory measured
-  against the production tick's own coverage threshold, since a processor with no reachable input
-  is an immediate loss-maker.
+- **Reachability.** Two gates a mine never needs: the **tech** gate (asked here rather than
+  discovered as a seam rejection — a candidate that can only ever be refused costs a build slot to
+  learn nothing), and **input access** — pool + local market inventory measured against the
+  production tick's own coverage threshold, since a processor with no reachable input is an
+  immediate loss-maker. The scorer asks exactly what the seam asks and no more: mirroring a lock
+  the seam does not apply would make the rival stricter than the rules it plays by.
 - **Pricing.** Priced by `estimate_prospective_profit` rather than the extraction candidate's
   inline revenue-minus-wages sum. The inline model survives on the extraction side because
   switching it would move every blessed golden for no player-visible gain; a new candidate had no

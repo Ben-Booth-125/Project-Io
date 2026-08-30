@@ -268,9 +268,9 @@ The ordnance route is the roster's **military terminal good** (BL-457, ordnance)
 `RESOURCES.md` § The two terminal goods for why the tier ends in two places. Three notes that
 belong here rather than there:
 
-- It sits at the **same depth as alloys**, one step below the Assembly Plant, deliberately. Under
-  the chain-depth gate that makes it a real growth-track object rather than something a
-  starting corp can produce on tick one.
+- It sits at the **same depth as alloys**, one step below the Assembly Plant, deliberately. That
+  is a statement about the roster's shape, not a lock: depth does not gate, so what keeps ordnance
+  off a starting corp's tick-one menu is the availability of its inputs, not a refusal.
 - It is `machinery`'s **second** consumer, after the heavy spacecraft route below. A single
   consumer is one revert away from orphaning a good.
 - Its `base_price` (43.0) is **derived** from this tier's own markup ratio, not authored — the
@@ -656,48 +656,39 @@ unordered container must never decide a number the economy reads.
 
 Measured on the authored recipes: **industrial max depth 4, ancient max depth 3**.
 
-### The gate — what depth unlocks
+### What depth does not do — it is a readout, not a gate
 
-Depth as a *readout* is only half the ruling. The half that makes it the **growth track** is the
-gate: a corporation may run a recipe only once it has already learned to make what that recipe
-needs. Build a Charcoal Burner and the Bloomery becomes placeable **because charcoal exists** — not
-because a flag was set somewhere.
+Depth is a **measurement of the economy a corp has built**, and it is only that. It does not gate
+a building, a recipe, or a retool, and no seam refuses anything on it.
 
-Two numbers meet at the gate, and neither is authored:
+**Tech is the only lock on a method** (Ben, 2026-08-29): *"most direct unlocks should be a
+consequence of research, not just economy... allow both corporations and companies to build any
+building, or use any method surfaced with current tech."* A corporation may place any building and
+run any recipe its **tech** permits, whatever it has or has not produced before.
 
-- **A recipe's required depth** is the depth of its **deepest input**
-  (`recipe_registry::recipe_required_depth`, derived in the same fixed point that computes
-  `depth_of`, so the two cannot drift). An input-free recipe requires 0; a recipe with an
-  unreachable input requires -1, matching `depth_of`'s code for the same fact.
-- **A corp's reached depth** is the depth of the deepest good it has **ever produced**
-  (`corp_reached_depth` over `corporation_component::produced_ever`, set by `run_extraction` /
-  `run_processing` at the moment a good is actually made).
+The reasoning is that a second progression axis has to earn its keep against the one already there.
+Research is the axis the design wants unlocks to hang from, and depth-as-a-gate duplicated it from
+the other side — the economy re-deriving a lock the tech tree is meant to own. Depth as a *number*
+costs nothing and says something true, so it stays; depth as a *refusal* was the part that had to go.
 
-**Produced-once-ever, never cleared**, and that is deliberate: progress must not evaporate because a
-building idled for a tick or was demolished for a better site. A corp that has smelted iron once
-knows how to smelt iron. Monotonicity is the property the gate rests on — a placement that was legal
-must never silently become illegal. It also means a corp cannot buy its way up the ladder: the bit
-is set by the *event of making* something, not by holding it.
+What survives, and where it is still read:
 
-The bit is set only where a good is genuinely produced, so **extraction seeds the ladder** — mining
-is how a corp reaches depth 0 goods in the first place, and every rung above is earned by processing.
+- **`recipe_registry::depth_of`** — the computed depth of every good (above). Still the roster's
+  layering measure, and a load-bearing **dominance axis** in `chain_depth.cpp`'s R2 row, which asks
+  whether one production method strictly dominates an interchangeable sibling.
+- **`recipe_registry::recipe_required_depth`** — a recipe's deepest input's depth. Derived in the
+  same fixed point as `depth_of`, so the two cannot drift.
+- **`corp_reached_depth`** over **`corporation_component::produced_ever`** — the deepest good a corp
+  has ever made, set by `run_extraction` / `run_processing` at the moment a good is actually
+  produced. Produced-once-ever and never cleared.
 
-**Ancient roster only** (Ben, 2026-08-16). The band check is on the **recipe**, not on the
-campaign: only content authored `era = "ancient"` opts into the ladder, so an industrial campaign
-is unshaped by it. Refusals surface as `construction_result::depth_locked` /
-`corp_command_result::rejected_depth_locked` — a third lock distinct from both `tech_locked` (earned
-by research) and `era_locked` (never available at all), because this one is earned by **building**.
-The Build door filters locked methods out rather than offering what the gate would refuse.
+`produced_ever` is **written and never read** by the simulation. It is retained because it is pinned
+by the flat-binary save format (`world_save.cpp`, field order for `world_save_version` 16): dropping
+the field would invalidate every existing save. Both the field and `mark_produced` carry an explicit
+note saying so, because a write with no read is otherwise indistinguishable from a defect.
 
-Guard: `tools/verify/chain_depth.cpp` (D1–D6 the metric, G1–G4 the gate — including the
-no-stranded-ancient-recipe row: *an unplaceable building is the roster's orphan*, BL-432). The
-ancient ladder climbs to **depth 3** with nothing stranded.
-
-The gate is applied at **both** doors, and that is not redundancy. `construct_building` guards
-placement; `try_switch_recipe` guards retooling (`recipe_switch_result::depth_locked`). Guarding only
-placement would leave a one-click bypass — place the shallowest method the corp can reach, retool
-onto the deepest sibling in the same group, and the ladder never has to be climbed. Both refusals map
-to the same `rejected_depth_locked` on the seam, so an agent cannot tell the two routes apart.
+Guard: `tools/verify/chain_depth.cpp` — D1–D6 for the metric, G1 and G4 for required depth, G5 for
+the tick-0 opening. Measured on the authored recipes, the ancient ladder reaches **depth 3**.
 
 **`tech_locked` reaches a recipe too, now** (BL-588, 2026-08-24). Until this item `tech_locked`
 only ever meant a *building type* was ungated — the effect union (`tech_gate.hpp`) had no arm that
@@ -705,10 +696,11 @@ could name a recipe. `unlock_recipe` is the third arm: a tech gate names a `reci
 (`tech_gate::unlocks_recipe`), and `recipe_unlocked(w, reg, corp, recipe_id)` resolves the id to
 that name and checks it against `world::has_tech`, at both `construct_building` (returning the
 SAME `construction_result::tech_locked` the structure-level check already used) and
-`try_switch_recipe` (a new `recipe_switch_result::tech_locked`), for the identical retool-bypass
-reason the depth gate is checked at both doors. **The two locks are independent and both must
-pass** — a recipe can be depth-locked, tech-locked, both, or neither; they ask genuinely different
-questions (earned by building vs. earned by research) and neither substitutes for the other.
+`try_switch_recipe` (a new `recipe_switch_result::tech_locked`). It is checked at **both** doors,
+and that is not redundancy: guarding only placement would leave a one-click bypass — place an
+ungated method, retool onto the locked sibling in the same group, and the lock never has to be
+cleared. **`tech_locked` is the only recipe-level lock**; the era band decides which roster a
+campaign sees, and within that roster tech decides what a corp may run.
 First-cut authored gates (`tech_gate.cpp`): `E0-EC-01` unlocks the Toolmaker (BL-586) on owning a
 processing facility and a Cr 500 surplus; `E1-EC-01` unlocks the Bessemer Converter (BL-587) on
 already holding `machinery` in stockpile — the Converter's own reagent, not a cash figure, after a
@@ -718,68 +710,55 @@ built (caught by `tech_gate_harness`'s T3 fixture, corrected before landing); `E
 widest anachronism before this gate, since `refined_copper` is `any`-band at required depth 0 and
 could be smelted for free on tick one of an ancient campaign with no ancient identity to it at all.
 
-**The Build door filters a tech-locked recipe out, the same way it already did for era- and
-depth-locked ones** (BL-593, 2026-08-24). The door's candidate filter (`selection_panel.cpp`)
-carried exactly two clauses before this item — `building_available` for era, `recipe_required_depth`
-for the ancient ladder — both resting on the same argument, stated in the code's own comment: *"the
-door not showing what the gate would refuse."* `recipe_unlocked` is now a third clause on that same
-predicate, extending the argument rather than starting a new one. Filtered was the ruled choice over
+**The Build door filters a tech-locked recipe out, the same way it does an era-locked one**
+(BL-593, 2026-08-24). The door's candidate filter (`selection_panel.cpp`) carries two clauses —
+`building_available` for era and `recipe_unlocked` for tech — both resting on the same argument,
+stated in the code's own comment: *"the door not showing what the gate would refuse."* Filtered was the ruled choice over
 shown-and-locked (Ben, 2026-08-24, same elicitation form as the opening ruling) — the alternative
 would have needed a new lock-reason string and a UI affordance the door doesn't have yet; the
 existing precedent already answers the question the same way. `refined_copper` is the first recipe
 this clause actually removes — every earlier tech gate targeted a `building_type`, never a recipe,
 so the branch was dead code on every campaign before `E0-EC-03`.
 
-**The readout lives on the corporation dashboard, not the building card** (BL-591, 2026-08-24).
-`corp_reached_depth` gates six places (construction, the recipe switch, the AI scorer, two Build
-door filters) and, until this item, displayed in none of them — the growth track this whole minor
-is named for was only ever felt as a lock, never seen as a ladder. Ben's ruling: reached depth is
-a **corporation-grain** fact (it reads `corporation_component::produced_ever`, not any one
-building), which is why the 2026-08-15 playtest rework was right to cut the building card's old
-Depth page — the surface was wrong, not the idea. The dashboard's Production card now opens with
-three lines, computed once in `derive_corp_rollups` and shared by both hosts (the in-place
-accordion and the full-canvas takeover, BL-265's own shared-body pattern):
-1. **Reached depth**, and the good that set it — the first (ascending `resource_type` id)
-   produced-ever good found at that depth.
-2. **Next** — the display names of every era-allowed recipe whose `recipe_required_depth` is
-   exactly `reached + 1`, comma-joined.
-3. **Needs** — every input those recipes need that the corp has never produced, comma-joined —
-   the line that turns a lock into an instruction.
-
-A rival's reached depth is private by construction, not by an added check: the dashboard only
-ever renders `world::player_entity`, so the question of a rival's card never arises.
+**Depth has no player-facing readout.** It is an internal measure of the recipe graph and of what
+a corp has produced; no surface displays a reached-depth number, and none needs to, because the
+number no longer decides anything the player can act on. A corporation is told what it may build by
+the Build door's own contents, which is filtered by era and tech alone.
 
 ---
 
 ## The start gate — what a fresh corp actually sees (BL-589, 2026-08-24)
 
 Ben's steer authoring Sprint 17: *"most building types, and most recipes are not buildable on
-game start."* Measured against it: a fresh ancient corp (reached depth 0, no tech earned) saw
-**five** of the Build door's processing groups open, not the "extraction, one food route, one
-fuel route" first cut the item began with — Metal Foundry, Fuel Production, Food Processing,
-Artisan Goods and Construction Materials all offered something on tick one.
+game start."* The opposite is now the design (Ben, 2026-08-29): a corp may run **any method its
+tech permits**, so the start gate is a **tech** question and nothing else.
 
-**The ruled opening** (Ben, 2026-08-24, the start-gate elicitation form) is wider than that first
-cut, and is now the authoritative shape — not a compromise, a decision:
+A fresh ancient corp — no tech earned, no buildings, no balance — sees **sixteen** of the ancient
+band's seventeen processing recipes open on tick one:
 
 | Group | Open at tick 0 | Why |
 |---|---|---|
-| Fuel Production | Charcoal Burner, Peat Kiln | A genuine supply-route pair (disjoint raws — R2's own classification), not a duplicate; both stay. |
-| Food Processing | Food Rations, Miller | Both stay — the any-band/ancient pair is not narrowed. |
-| Artisan Goods | Potter & Weaver, Glassworks, Tannery, Weaver | Left open — an early corp may sell trade goods without earning anything. The Tannery and Weaver (BL-586 slice 2) join under the same reasoning, not a re-opened ruling: both draw only on a raw (`hides`/`fibre`, required depth 0), same as the original pair. |
-| Construction Materials | Potter's Kiln, Stonemason, Sawmill | Left open — BL-586's slice-1 buildings are foundational, not earned content. |
-| Advanced Fabrication | *(nothing — the Shipwright is depth-locked)* | The Shipwright (BL-586 slice 2) draws `planks` and `cloth`, both required depth 1, so it is locked at tick 0 like every other depth>0 recipe — not a new closure, the ladder simply reaches it one rung up. |
-| Metal Foundry | *(nothing — the one closure)* | `refined_copper` gated by `E0-EC-03`; see § Chain depth's gate table. |
+| Fuel Production | Charcoal Burner, Peat Kiln, Coking Kiln | The Burner and the Kiln are a genuine supply-route pair (disjoint raws — R2's own classification). The Coking Kiln is the deeper fuel route; it is open, and what limits it is whether its reagent can be bought, not a lock. |
+| Food Processing | Food Rations, Miller | The any-band/ancient pair, both open. |
+| Artisan Goods | Potter & Weaver, Glassworks, Tannery, Weaver | An early corp may sell trade goods without earning anything first. |
+| Construction Materials | Potter's Kiln, Stonemason, Sawmill | BL-586's slice-1 buildings — foundational, not earned content. |
+| Metal Foundry | Bloomery, and the Smithy's two routes (steel, ordnance) | Open. The chain is limited by charcoal supply and by whether blooms find a buyer — a market fact, not a refusal. |
+| Advanced Fabrication | Shipwright | Open, and shut in practice by its own inputs: it draws `planks` and `cloth`, and the shipped ancient world produces no planks. |
+| **The one closure** | *(Toolmaker — tech)* | `E0-EC-01` "Tool-and-Die Practice" gates the Toolmaker on owning a processing facility and a Cr 500 surplus. A fresh corp meets neither. |
 
-**Only Metal Foundry closes**, and only because `refined_copper` (`any`-band, required depth 0)
-was the roster's widest anachronism — free industrial-grade copper smelting on turn one of a 0 CE
-campaign, with no ancient identity to it. The any-band depth exemption itself is **not** narrowed
-by this ruling; every other `any`-band recipe (Food Rations included) is deliberately untouched.
+**Exactly one ancient recipe is closed at tick 0, and tech closes it.** That is the whole shape of
+the start gate now. `refined_copper` is absent from the ancient band entirely — it carries an
+`industrial` era tag, so the band never lists it (an earlier reading had it closed by `E0-EC-03`
+instead; both close it, and the era tag closes it first).
 
-Guard: `tools/verify/chain_depth.cpp`'s **G5** row asserts the ruled opening exactly — every
-recipe outside the one deliberate lock matches its ruled open/closed state, `refined_copper`
-reads `tech_locked` at tick 0, and `E0-EC-03` genuinely resolves (not a permanent orphan) once its
-own authored predicate is met.
+**An open method is not a viable one, and the difference matters.** Most of what opened is limited
+by supply rather than permission: the Shipwright needs planks nothing makes, and the Bloomery's
+output has no measured buyer. The design's position is that an economy should say *no buyer* or
+*no input* — prices a player can read and act on — rather than *not permitted*.
+
+Guard: `tools/verify/chain_depth.cpp`'s **G5** row asserts this opening exactly — every recipe
+matches its stated open/closed state, and the one closure genuinely resolves (not a permanent
+orphan) once its own authored predicate is met.
 
 ---
 

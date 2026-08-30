@@ -33,32 +33,23 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     if (!reg.building_available(type))
         return construction_result::era_locked;
 
-    // BL-428 chain-depth gate — the growth spine. A corp may only run a recipe
-    // whose inputs it has already learned to make: the recipe's required depth
-    // (its deepest input) must not exceed the depth the corp has actually reached
-    // (the deepest good it has ever produced). Sits with the era gate for the same
-    // reason — a method you cannot yet reach is refused on every tile alike.
-    //
-    // ANCIENT ROSTER ONLY for this first cut (Ben, 2026-08-16), so no existing
-    // industrial campaign changes shape. The band check is on the RECIPE, not on
-    // the campaign, so an `any`-band recipe stays ungated even in an ancient
-    // campaign — only content authored as `ancient` opts into the ladder.
-    // `::recipe` qualified because construct_building's own parameter is named
-    // `recipe` and shadows the type here — the standing footgun in this codebase.
-    if (const ::recipe* rc = reg.get_recipe(recipe); rc && rc->era == era_band::ancient)
-    {
-        const int required = reg.recipe_required_depth(recipe);
-        if (required < 0 || required > corp_reached_depth(corp_it->second, reg))
-            return construction_result::depth_locked;
-    }
+    // BL-692 (2026-08-29): the BL-428 chain-depth gate that stood here is GONE.
+    // Ben's ruling: "most direct unlocks should be a consequence of research, not
+    // just economy... allow both corporations and companies to build any building,
+    // or use any method surfaced with current tech." Tech is now the only lock on
+    // a method — depth no longer refuses anything at any door. The METRIC survives
+    // (recipe_required_depth / corp_reached_depth / depth_of), because chain_depth's
+    // R2 uses it as a dominance axis and produced_ever is pinned by the save format;
+    // it simply no longer gates. See docs/economy/PRODUCTION.md § Chain depth.
 
-    // BL-588 tech-recipe gate — a SECOND, independent lock on top of the depth
-    // one above (both must pass). Reuses `construction_result::tech_locked`,
-    // the same value the structure-level gate already returns, so an agent
-    // reading the seam cannot tell a structure lock from a recipe lock apart —
-    // which is the point (corp_command_result::rejected_tech_locked mirrors
-    // this one level up). `corp` is guaranteed non-null here (the no_corp
-    // check above already returned), so this is never the ungated no-corp case.
+    // BL-588 tech-recipe gate — now the ONLY recipe-level lock at this door
+    // (BL-692 removed the depth one that used to sit above it). Reuses
+    // `construction_result::tech_locked`, the same value the structure-level
+    // gate already returns, so an agent reading the seam cannot tell a structure
+    // lock from a recipe lock apart — which is the point
+    // (corp_command_result::rejected_tech_locked mirrors this one level up).
+    // `corp` is guaranteed non-null here (the no_corp check above already
+    // returned), so this is never the ungated no-corp case.
     if (!recipe_unlocked(w, reg, corp, recipe))
         return construction_result::tech_locked;
 
