@@ -265,9 +265,19 @@ function raise_player_force(corp)
           .. " but no roster row could be hired onto it: " .. why)
 end
 
+-- THE FIXTURE NO LONGER STAGES CONTRACTS (BL-693). It used to inject four
+-- mercenary offers and accept two of them, deliberately putting content in all
+-- three Contracts views so that an empty tab in a capture read as a finding
+-- rather than a fixture accident. The mercenary contract is retired and that
+-- ledger is deleted, so the staging has nothing left to fill.
+--
+-- WHAT MOVED FOR THE SIX CONSUMERS. The four `inject_offer` calls, the two
+-- `accept_offer` commands and the `econ_step(2)` that settled the first one are
+-- all gone, so the staged world now sits at 12 econ ticks rather than 14 and
+-- carries no offers or contracts. Every consumer still gets the same
+-- `{ corp, unit }` it always did — that half is untouched, and the raised force
+-- is what most of them actually use.
 function stage_ui_fixture()
-    local VERB_ACCEPT_OFFER = 25 -- corp_verb::accept_offer
-
     verify.goto_surface("home")
 
     -- Twelve ticks: enough for the header's net figure and sparkline, the Budget
@@ -285,37 +295,12 @@ function stage_ui_fixture()
     if not unit then unit = raise_player_force(corp) end
     assert(unit, "the fixture could not raise a unit for the player (see raise_player_force)")
 
-    local province = verify.select_province(unit.col, unit.row)
-    assert(province ~= 0, "the player's own unit stands on an unpartitioned tile")
-    verify.clear_selection()
-
-    local client_of = function(offer_id)
-        for _, o in ipairs(verify.offers()) do
-            if o.id == offer_id then return o.client end
-        end
-        return nil
-    end
-    local accept = function(offer_id)
-        return verify.corp_command{
-            verb = VERB_ACCEPT_OFFER, corp = corp, order = offer_id,
-            counterparty = client_of(offer_id), units = { unit.id },
-        }
-    end
-
-    -- Content in ALL THREE Contracts views. A capture of two populated tabs
-    -- beside an empty third says nothing about whether the third lays out.
-    -- (a) History: a one-tick deadline, accepted for real, then stepped past it
-    --     so the real tick pass settles it into a terminal state.
-    local terminal = verify.inject_offer{ province = province, fee = 400, deadline_in = 1 }
-    assert(terminal ~= 0, "inject_offer could not resolve a client nation")
-    accept(terminal)
-    verify.econ_step(2)
-    -- (b) Active: a long deadline, accepted and left running.
-    accept(verify.inject_offer{ province = province, fee = 900, deadline_in = 400 })
-    -- (c) Offers: two left open, with different fees and deadlines so the table's
-    --     own columns are distinguishable rather than three copies of one row.
-    verify.inject_offer{ province = province, fee = 650,  deadline_in = 240 }
-    verify.inject_offer{ province = province, fee = 1250, deadline_in = 90 }
+    -- The unit must stand on partitioned ground. Kept as an assertion after the
+    -- contract staging was removed: it was the offers' target lookup, but it is
+    -- also the one cheap check that the world this fixture hands out is sane,
+    -- and a unit on an unpartitioned tile breaks the selection consumers too.
+    assert(verify.select_province(unit.col, unit.row) ~= 0,
+           "the player's own unit stands on an unpartitioned tile")
 
     verify.clear_selection()
     verify.set_overlay("none")

@@ -530,36 +530,17 @@ struct ui_state
     /// not serialised, rewritten every frame.
     std::vector<entity_id> acquisitions_profit_shown;
 
-    /// Whether the Contracts ledger is open (BL-576). Nav-rail slot 13 —
-    /// the curated nine and the developer/observability tail (slots 1-12,
-    /// MENU.md) were already full when this landed, so Contracts is a new
-    /// PLAYER-system slot appended after the tail rather than inside it (see
-    /// nav_pane.cpp's own comment on slot 13 for the reasoning).
-    bool show_contracts_ledger = false;
-
-    /// Contracts ledger view tab: 0=Offers, 1=Active, 2=History — the same
-    /// `ui::nav_button` button-strip idiom every split ledger uses
-    /// (LAYOUT.md § One-question-per-view splits).
-    int contracts_ledger_view = 0;
-
-    /// The Accept press's force picker (BL-576). Non-zero names the
-    /// `mercenary_offer::id` currently being staffed; the popup lists the
-    /// player's own uncommitted units with a checkbox each, writing into
-    /// `contracts_picker_units` below. Reset to 0 when the popup closes
-    /// (Confirm or Cancel) — there is no cross-frame "armed" state visible
-    /// outside the popup itself, unlike March's canvas-spanning two-step,
-    /// because picking a force needs no second surface: everything the
-    /// player touches lives inside this one ledger.
-    uint32_t contracts_picker_offer = 0;
-
-    /// Which owned units are checked in the open force picker, indexed
-    /// arbitrarily (unused slots stay `null_entity`) — the exact shape
-    /// `corp_command::units` and `mercenary_contract::units` already carry,
-    /// so Confirm copies this straight into the command with no translation.
-    /// Cleared whenever `contracts_picker_offer` changes to a different
-    /// offer (or to 0), so a stale pick from one offer cannot leak into
-    /// another's Accept.
-    std::array<entity_id, mercenary_contract_max_units> contracts_picker_units{};
+    // THE CONTRACTS LEDGER'S VIEW STATE IS GONE (BL-693). The mercenary
+    // contract — the SELL side of CONTRACTS.md — is retired, so the ledger, its
+    // rail slot and every flag that drove them are deleted rather than left
+    // dormant: view state has no reason to outlive the surface it described, and
+    // none of it was ever serialised (save_game.hpp's ui_state slice is the
+    // canvas rung, the selection and the pan/zoom, nothing else), so removing it
+    // does not move the save envelope.
+    //
+    // The WORLD-side record is a different matter and is still here — see
+    // `selected_contract_id` below, and `mercenary_offer` in components.hpp.
+    // Procurement, the BUY side, never had view state on `ui_state` at all.
 
     /// Whether the Generation Ledger is open (BL-303). A DEVELOPER TUNING surface,
     /// not shipped chrome — it explains why a tile generated as it did — so like
@@ -757,11 +738,14 @@ struct ui_state
     //
     // MUTUALLY EXCLUSIVE with `selected_entity` and the battle triple, on the
     // same "whichever is set last clears the others" rule.
-    // There is no canvas marker for a contract (CONTRACTS.md's ledger-and-map
-    // framing puts a contract's PROVINCE on the map, not the contract itself),
-    // so the setter is a future ledger row press (BL-576, Contracts ledger) —
-    // whichever surface sets this must clear the others, the same duty every
-    // other selecting surface already carries.
+    //
+    // DORMANT, AND SAYING SO IS THE POINT (BL-693). The mercenary contract is
+    // RETIRED: its ledger and its rail slot are gone, so nothing anywhere sets
+    // this field and it is permanently zero. It survives only because the
+    // Selection element's contract card still reads it, and because
+    // `world::mercenary_contracts` — the record it keys into — is itself kept
+    // dormant rather than torn out (removing it would move the save envelope).
+    // Treat this as a record of a system that is not running, not as a hook.
     uint32_t selected_contract_id = 0;
 
     bool has_contract_selection() const { return selected_contract_id != 0; }

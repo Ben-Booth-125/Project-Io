@@ -8,9 +8,9 @@
 
 ## Headline
 
-**108 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**104 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**65 of 108 elements can be changed without any check going red.**
+**61 of 104 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
@@ -19,7 +19,7 @@ and so is the safety net.
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
 | **ASSERTED** | 40 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
 | **CLIP-ONLY** | 14 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
-| **CAPTURE-ONLY** | 43 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
+| **CAPTURE-ONLY** | 39 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
 
 ## GOLDEN (3)
@@ -94,7 +94,7 @@ and so is the safety net.
 | `UI-087` History Ledger (Story/Chain/Tiles) > Tiles view | view | `history_ledger_and_comms`, `text_overflow_floor` | 0 | 2 | 0 |
 | `UI-091` Main Menu | view | `main_menu`, `planetology_generation`, `shell_pass` | 0 | 1 | 1 |
 
-## CAPTURE-ONLY (43)
+## CAPTURE-ONLY (39)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -132,10 +132,6 @@ and so is the safety net.
 | `UI-093` New World wizard > Wizard round (one of three) | sub-element | `planetology_generation` | 0 | 0 | 0 |
 | `UI-094` Zoom ladder navigation model | element | `zoom_ladder`, `canvas_levels`, `descend_into_selection` | 0 | 0 | 0 |
 | `UI-095` Zoom ladder navigation model > Keyboard navigation bindings | sub-element | `descend_into_selection` | 0 | 0 | 0 |
-| `UI-101` Contracts Ledger | ledger | `contracts_ledger`, `mercenary_slice` | 0 | 0 | 3 |
-| `UI-102` Contracts Ledger > Offers view | view | `contracts_ledger` | 0 | 0 | 0 |
-| `UI-103` Contracts Ledger > Active view | view | `contracts_ledger`, `mercenary_slice` | 0 | 0 | 3 |
-| `UI-104` Contracts Ledger > History view | view | `contracts_ledger` | 0 | 0 | 0 |
 | `UI-106` AI decision feed | ledger | `decision_feed` | 0 | 0 | 0 |
 | `UI-107` Strategy readout | ledger | `strategy_readout` | 0 | 0 | 0 |
 | `UI-108` Research panel (tech-tree design mock) | ledger | `tech_tree_panel` | 0 | 0 | 0 |

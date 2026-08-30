@@ -521,6 +521,15 @@ bool r_contract(std::istream& i, procurement_contract& c)
 /// BL-572: a mercenary contract offer. Rejects a non-finite `fee`/`offer_escrow`
 /// on the same grounds `r_nation_budget` does — the writer below cannot have
 /// produced one, so the stream is corrupt rather than odd.
+///
+/// SERIALISING A DORMANT RECORD, DELIBERATELY (BL-693). The mercenary contract —
+/// the SELL side of CONTRACTS.md — is retired and has no player-facing surface.
+/// This pair, and the `mercenary_offers` / `mercenary_contracts` sections that
+/// call it, stay ONLY because removing them would move `world_save_version` and
+/// invalidate every existing save. That was judged not worth it for a retirement
+/// whose brief was "keep it lightweight". Expect these vectors to be empty in
+/// practice; their presence is a format obligation, not a live mechanism. See
+/// `mercenary_offer` in world.hpp for the full note.
 void w_offer(std::ostream& o, const mercenary_offer& m)
 {
     w_u32(o, m.id);

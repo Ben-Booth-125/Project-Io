@@ -8,8 +8,8 @@
 --   * the Balance ledger's Assets block and its top-buildings ranking sit BELOW THE
 --     FOLD at 720p and were captured by nothing (`budget_ledger_ranked` is named for
 --     the ranking and its two frames do not contain it);
---   * Market, History and Contracts each carry three or four views, of which
---     shell_pass sees one;
+--   * Market and History each carry three or four views, of which shell_pass
+--     sees one;
 --   * the Research mock carries one era per tab and the campaign's era is not the
 --     first.
 -- A review that only ever looks at the resting frame reports on a fraction of the
@@ -53,7 +53,7 @@ print("LEDGER state_hash=" .. verify.state_hash())
 local PANELS = {
     "corporation", "balance", "construction", "tech_tree", "acquisitions",
     "market", "corporations_table", "tile", "generation_ledger", "decisions",
-    "strategy", "contracts", "build",
+    "strategy", "build",
 }
 
 local function close_all()
@@ -190,12 +190,9 @@ verify.strategy_filter(-1)
 shot("ledger_12_strategy_player")
 verify.strategy_filter(0)
 
--- ===========================================================================
--- Slot 13 — Contracts (UI-101..104)
--- ===========================================================================
-for i, v in ipairs({ "offers", "active", "history" }) do
-    ledger("contracts", string.format("ledger_13_contracts_%d_%s", i - 1, v), "contracts", i - 1)
-end
+-- Contracts held a fourteenth slot and three sub-views here (offers / active /
+-- history). The mercenary contract is retired and the ledger is deleted, so the
+-- sweep ends at slot 13, the last of the developer tail (BL-693).
 
 close_all()
 verify.frames(1)

@@ -935,7 +935,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             else if (m_ui.show_corporations_table) panel = "corporations";
             else if (m_ui.show_construction_panel) panel = "construction";
             else if (m_ui.show_tile_ledger)        panel = "tile";
-            else if (m_ui.show_contracts_ledger)   panel = "contracts";
             else if (m_ui.show_company_ledger)      panel = "company";
             else if (m_ui.show_acquisitions_ledger) panel = "acquisitions";
             // Convoys (BL-689), and the three tail surfaces that had no name here
@@ -1059,7 +1058,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "tech_tree")    m_ui.show_tech_tree = open;    // F9 mock viewer (BL-087)
         else if (name == "decisions")    m_ui.show_decision_feed = open; // AI decision feed (BL-407)
         else if (name == "strategy")     m_ui.show_strategy_readout = open; // Strategy readout (BL-411)
-        else if (name == "contracts")    m_ui.show_contracts_ledger = open; // Contracts ledger (BL-576)
         else if (name == "acquisitions") m_ui.show_acquisitions_ledger = open; // Acquisitions ledger, nav slot 5
         // Nav slot 8's all-corporations table. It had no name here, so the one
         // rail slot whose panel a script could not open was also the only one
@@ -1227,7 +1225,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "ages_year")     m_ui.ages_year = view;
         else if (name == "market")        m_ui.market_ledger_view = view;
         else if (name == "tech_tree")     m_ui.tech_tree_view = view;
-        else if (name == "contracts")     m_ui.contracts_ledger_view = view; // BL-576: 0 Offers, 1 Active, 2 History
     });
 
     // Park a fold-out ledger's SCROLL at a fraction of its extent (0 = top,
@@ -1266,7 +1263,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // instance of the same silence, found only because half 2 of the fix
         // above made the names worth checking against the actual call sites.
         else if (name == "construction")         target = "Construction";
-        else if (name == "contracts")            target = "Contracts";
         else if (name == "acquisitions")         target = "Acquisitions";
         else if (name == "generation_ledger")    target = "Generation Ledger";
         else if (name == "corporations_table")   target = "Corporations";
@@ -1289,7 +1285,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             ++m_verify_failures;
             SDL_Log("verify.scroll_panel FAIL: unknown panel '%s' - the request "
                     "reached no scroller. Known: tile, history, market, balance, "
-                    "corporation, construction, contracts, acquisitions, "
+                    "corporation, construction, acquisitions, "
                     "generation_ledger, convoys.", name.c_str());
             ui::foldout_request_scroll("", 0.0f);
             return;

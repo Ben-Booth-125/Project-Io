@@ -87,8 +87,19 @@ enum class corp_verb : uint8_t
     // CONTRACTS.md § The mercenary contract: "a contract is a condition_set
     // the client will pay to have become true, by a deadline". These two
     // verbs are the whole player/agent surface onto it — accepting an OFFER
-    // (BL-572, already landed) with a named force, and walking away from a
-    // live one early.
+    // (BL-572) with a named force, and walking away from a live one early.
+    //
+    // ── DORMANT: THE MERCENARY CONTRACT IS RETIRED (BL-693) ──────────────────
+    // Ben, 2026-08-29: "I don't think mercenary contracts is the correct
+    // system." No surface reaches these two verbs any more — the Contracts
+    // ledger and its rail slot are deleted — and no scorer candidate issues
+    // them. They remain callable, and they still apply, ONLY because the
+    // enum is APPEND-ONLY: removing a verb renumbers every verb below it and
+    // breaks the ACTIONS.json dictionary and every recorded command. They are a
+    // dormant record, not a live mechanism; see `mercenary_offer` in world.hpp.
+    //
+    // The `request_quote` / `accept_quote` / `cancel_contract` trio — PROCUREMENT,
+    // the BUY side — is a different system and is fully live. Do not confuse them.
     accept_offer,      ///< Convert live offer `order` (a mercenary_offer id) into a mercenary_contract, committing `units` (the corp's own). `counterparty` names the offer's client NATION for this verb, not a corp — the seam's counterparty check forks on verb; see corp_command.cpp.
     abandon_contract,  ///< `corp` (the contractor) walks away from live contract `order` early. Same money outcome as a failure (deposit only); a distinct, lesser sentiment magnitude (CONTRACTS.md § Q2).
     // --- BL-616: razing joins the seam (2026-08-25) ---

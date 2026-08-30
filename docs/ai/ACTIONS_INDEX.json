@@ -575,11 +575,11 @@
   ],
   [
    "gameplay.accept_offer",
-   "The Contracts ledger's Offers view, Accept press (BL-576). Select an offer whose escrow has cleared its fee, press Accept to open the force picker, check owned uncommitted units, press Confirm. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger."
+   "NO UI SURFACE. THE MERCENARY CONTRACT IS RETIRED. There is no ledger, no rail slot and no press anywhere in the app that reaches this verb - it survives only because the corp_verb enum is append-only, and removing a verb would renumber every verb below it. It remains reachable over the corp-command seam (ProjectIo --serve, COMMAND opcode) and still applies when issued."
   ],
   [
    "gameplay.abandon_contract",
-   "The Contracts ledger's Active view, Abandon press (BL-576). Select an active contract, press Abandon to see its reputation cost, confirm in the popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger."
+   "NO UI SURFACE. THE MERCENARY CONTRACT IS RETIRED. There is no ledger, no rail slot and no press anywhere in the app that reaches this verb - it survives only because the corp_verb enum is append-only, and removing a verb would renumber every verb below it. It remains reachable over the corp-command seam (ProjectIo --serve, COMMAND opcode) and still applies when issued."
   ],
   [
    "gameplay.raze_centre",
@@ -600,14 +600,6 @@
   [
    "chrome.load_cli",
    "Command line."
-  ],
-  [
-   "ledger.nav_contracts",
-   "Nav rail, slot 13 (Contracts icon — a page with a signed check mark)"
-  ],
-  [
-   "ledger.contracts_view_tab",
-   "Contracts ledger, view tab strip at the top"
   ],
   [
    "canvas.border_band_select",

@@ -51,9 +51,13 @@ end
 -- 4. MARKET KEEPS SLOT 6, AND THE SHIFTED SLOTS LAND WHERE MENU.md SAYS. The
 --    renumber is the risk this file exists to cover, so the neighbours are
 --    checked by press too, not just the new slot.
+-- Slot 14 (Contracts) is absent because the slot is: the mercenary contract is
+-- retired and its ledger deleted, and because Contracts was APPENDED below the
+-- developer tail rather than inserted, its removal renumbers nothing — every
+-- slot below is unchanged, which is what this map now asserts (BL-693).
 local expected = { [3] = "construction", [5] = "acquisitions", [6] = "market",
                    [9] = "corporations", [10] = "tile", [11] = "generation_ledger",
-                   [12] = "decisions", [13] = "strategy", [14] = "contracts" }
+                   [12] = "decisions", [13] = "strategy" }
 for slot, want in pairs(expected) do
     local sx, sy = verify.nav_slot(slot)
     verify.expect(sx ~= nil, "nav rail slot " .. slot .. " was drawn")

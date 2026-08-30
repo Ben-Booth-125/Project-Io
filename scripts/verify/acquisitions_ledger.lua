@@ -61,8 +61,7 @@ verify.econ_step(12)
 
 -- show_panel writes ui_state directly rather than through close_all_panels, so
 -- the column can otherwise hold two open windows at once (the same fix
--- decision_feed.lua and
--- contracts_ledger.lua both apply to themselves).
+-- decision_feed.lua applies to itself).
 verify.show_panel("acquisitions", true)
 verify.frames(2)
 

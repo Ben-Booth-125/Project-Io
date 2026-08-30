@@ -76,7 +76,6 @@ void close_all_panels(ui_state& state)
                                           // occupant reached by a canvas click, no rail slot
     state.show_decision_feed     = false; // AI decision feed (BL-407)
     state.show_strategy_readout  = false; // Strategy readout (BL-411)
-    state.show_contracts_ledger  = false; // Contracts ledger (BL-576)
     state.show_acquisitions_ledger = false; // Acquisitions ledger (slot 5)
     // BL-310 round 4: the tech-tree era-selector menu is now a real shell-
     // column occupant (draw_tech_tree_menu), so it must yield to every other
@@ -93,7 +92,7 @@ bool any_panel_open(const ui_state& state)
            state.show_tile_ledger       ||
            state.show_generation_ledger || state.show_tech_tree ||
            state.show_decision_feed     || state.show_strategy_readout ||
-           state.show_contracts_ledger  || state.show_acquisitions_ledger ||
+           state.show_acquisitions_ledger ||
            // Company ledger (BL-666). Counted here even though it has no rail
            // slot, because its only consumer asks "does something already own
            // the fold-out column?" — and it does. Leaving it out would let the
@@ -122,8 +121,8 @@ void draw_nav_pane(ui_state& state, float top_offset)
     ImGui::Begin("##nav_pane", nullptr, flags);
 
     // TEN curated slots from MENU.md § Menu set and ordering, then a
-    // three-slot developer/observability tail (11-13), then Contracts (14) —
-    // a player system appended after the tail rather than inside it.
+    // three-slot developer/observability tail (11-13). The tail is the foot of
+    // the rail; nothing is appended below it.
     // Live slots toggle their panel. Corp. Strategy is the one still-disabled
     // slot, and it carries its OWN glyph so the rail teaches the shape of the
     // game rather than showing a row of identical blanks (BL-174). Research and
@@ -149,11 +148,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
     // Slot 13 (BL-411, the Strategy readout) is the third tail occupant under
     // that rule: the feed's aggregate companion — verb mix, spend buckets and
     // reason tally per corp, the SHAPE of a run where the feed lists the moves.
-    // Slot 14 (BL-576, the Contracts ledger) is appended after the developer
-    // tail: unlike the tail's own occupants Contracts IS a player system —
-    // offers, active contracts, terminal history — so it does not belong inside
-    // a tail whose stated character is "not a player system". See MENU.md's
-    // slot table.
+    // It is the LAST slot; see MENU.md's slot table.
     //
     // ── ACQUISITIONS IN, ECONOMY OUT (Ben, 2026-08-29) ────────────────────
     // Acquisitions is INSERTED at slot 5, above Market. That is an insertion
@@ -182,22 +177,34 @@ void draw_nav_pane(ui_state& state, float top_offset)
     // It was the Market ledger's third tab and had to leave: the Goods
     // flattening (BL-686) deletes that tab strip, so without a slot Convoys is a
     // regression. Everything from Corp. Strategy down shifts one — Corp.
-    // Strategy 8, Diplomacy 9, History 10, the developer tail 11-13, Contracts
-    // 14. See MENU.md's slot table, which already describes this.
+    // Strategy 8, Diplomacy 9, History 10, the developer tail 11-13. See
+    // MENU.md's slot table, which already describes this.
     //
-    // The rail is fourteen slots: ten curated, an 11-13 tail, Contracts at 14.
-    constexpr int tab_count = 14;
+    // ── CONTRACTS OUT (BL-693) ────────────────────────────────────────────────
+    // The mercenary contract — the SELL side of CONTRACTS.md — is retired, so
+    // its ledger and its slot go with it. It had been APPENDED after the
+    // developer tail at 14 rather than inserted, which is why its removal is the
+    // one rail change of this sprint that renumbers nothing: every slot below it
+    // keeps the number it had. Procurement, the BUY side, is untouched — it has
+    // never had a rail slot and CONCEPT.md's player identity rests on it.
+    //
+    // The rail is thirteen slots: ten curated, plus the 11-13 developer tail.
+    constexpr int tab_count = 13;
 
     // Square slots; Selectable treats a nonzero size as literal, so derive the
     // rail width explicitly rather than passing -1.
-    // THE RAIL MUST FIT ITS SLOT COUNT AT THE 1280x720 FLOOR, and with fourteen
+    // THE RAIL MUST FIT ITS SLOT COUNT AT THE 1280x720 FLOOR, and at fourteen
     // slots it no longer did by default. Measured 2026-08-30, before this clamp:
     // the pitch was a fixed 48 px (a 44 px square plus 4 px spacing), slot 1's
-    // centre sat at y=122, and slot 14's landed at y=746 against a 720 px screen
-    // — 26 px past the bottom edge. Contracts, a player system, was drawn and
-    // unreachable; ImGui's hit-test rejects a press outside the window, so the
-    // slot simply did nothing. At 1920x1080 the same layout was fine, which is
-    // why a capture at one resolution could never have shown it.
+    // centre sat at y=122, and the fourteenth landed at y=746 against a 720 px
+    // screen — 26 px past the bottom edge. That slot was DRAWN and unreachable;
+    // ImGui's hit-test rejects a press outside the window, so it did nothing at
+    // all. At 1920x1080 the identical layout was fine, which is why a capture at
+    // one resolution could never have shown it.
+    //
+    // The count has since come back down, so the clamp does not currently bind
+    // at 720p. It stays because the failure it prevents is a property of the
+    // FIXED pitch, not of any particular count — `nav_rail_fit.lua` is the check.
     //
     // So the square is derived from the height the rail actually has, CAPPED at
     // the width (its natural size). Nothing changes where there is room — at
@@ -359,14 +366,6 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("Strategy readout", "What strategy is emerging - each corporation's decision mix, spend priorities and reasons over the recent run.", false);
             break;
-        case 14: // Contracts ledger (BL-576) — offers, active contracts, history
-            if (ImGui::Selectable(id, state.show_contracts_ledger, 0, {slot_size, slot_size})) {
-                const bool was_open = state.show_contracts_ledger;
-                close_all_panels(state);
-                state.show_contracts_ledger = !was_open;
-            }
-            slot_tooltip("Contracts", "Offers, active contracts and terminal history for the mercenary contract.", false);
-            break;
         default: // Unreachable — tab_count is 13 and every slot is handled above.
             break;
         }
@@ -434,7 +433,6 @@ void draw_nav_pane(ui_state& state, float top_offset)
         // pennant, and two lit slots sharing a silhouette is exactly the
         // collision BL-174 exists to prevent.
         case 13: icons::readout(dl, centre, r, lit(state.show_strategy_readout));      break;
-        case 14: icons::contract(dl, centre, r, lit(state.show_contracts_ledger));     break;
         default: icons::placeholder(dl, centre, r, dim); break;
         }
     }

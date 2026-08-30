@@ -2418,8 +2418,8 @@
   {
    "id": "gameplay.accept_offer",
    "family": "gameplay",
-   "surface": "The Contracts ledger's Offers view, Accept press (BL-576). Select an offer whose escrow has cleared its fee, press Accept to open the force picker, check owned uncommitted units, press Confirm. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger.",
-   "press": "Press 'Accept' on a fully-escrowed, unexpired offer to open a popup listing the player's own uncommitted units with a checkbox and strength each; check at least one, press 'Confirm' to dispatch, or 'Cancel' to back out with nothing sent. Over the seam: COMMAND corp=<id> verb=25 order=<offer id> counterparty=<client nation id> units=[<unit id>, ...].",
+   "surface": "NO UI SURFACE. THE MERCENARY CONTRACT IS RETIRED. There is no ledger, no rail slot and no press anywhere in the app that reaches this verb - it survives only because the corp_verb enum is append-only, and removing a verb would renumber every verb below it. It remains reachable over the corp-command seam (ProjectIo --serve, COMMAND opcode) and still applies when issued.",
+   "press": "No press exists. Over the seam only: COMMAND corp=<id> verb=25 order=<offer id> counterparty=<client nation id> units=[<unit id>, ...].",
    "args": [
     {
      "name": "order",
@@ -2446,13 +2446,13 @@
     "The acting corp exists (rejected_invalid otherwise)."
    ],
    "expected_output": "A new mercenary_contract is created: client and template copied from the offer, province bound from the offer's target, fee copied, the deposit (fee x deposit_fraction) paid straight from the offer's own already-filled escrow, deadline copied, the named units set as the committed force, state = active. The consumed offer is erased from world.mercenary_offers so it cannot be accepted twice. A rejection mutates nothing.",
-   "reason_to_select": "The only way to turn a want into income. Underbidding is the loop's teeth (CONTRACTS.md): a cheap contract with too little force risks losing the fight, the fee AND the standing — reading the target's garrison strength (Offers view) against the force you are about to commit is the whole skill."
+   "reason_to_select": "DO NOT SELECT. The system this verb belongs to is retired and has no player-facing surface; an agent choosing it is acting on a mechanism the design no longer carries. Listed here so the dictionary matches the seam rather than hiding a verb that still applies. Procurement (request_quote / accept_quote / cancel_contract) is the live contract family."
   },
   {
    "id": "gameplay.abandon_contract",
    "family": "gameplay",
-   "surface": "The Contracts ledger's Active view, Abandon press (BL-576). Select an active contract, press Abandon to see its reputation cost, confirm in the popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger.",
-   "press": "Press 'Abandon' on an active contract to open a confirm popup showing the deposit forfeit and the reputation (Trust) cost with the client nation, then press 'Abandon' again to dispatch or 'Keep' to back out. Over the seam: COMMAND corp=<id> verb=26 order=<contract id>. No other field is read.",
+   "surface": "NO UI SURFACE. THE MERCENARY CONTRACT IS RETIRED. There is no ledger, no rail slot and no press anywhere in the app that reaches this verb - it survives only because the corp_verb enum is append-only, and removing a verb would renumber every verb below it. It remains reachable over the corp-command seam (ProjectIo --serve, COMMAND opcode) and still applies when issued.",
+   "press": "No press exists. Over the seam only: COMMAND corp=<id> verb=26 order=<contract id>. No other field is read.",
    "args": [
     {
      "name": "order",
@@ -2466,7 +2466,7 @@
     "The contract is still active — an already-terminal contract cannot be abandoned again (rejected_state otherwise)."
    ],
    "expected_output": "The contract's state becomes abandoned. Same money outcome as a failure — the deposit already paid at accept_offer is not clawed back, and the reserved remainder is simply never disbursed — but a DISTINCT, LESSER sentiment magnitude (contract_cancelled, not contract_failed) records that the contractor chose this rather than losing a fight (CONTRACTS.md Q2: 'an honest early exit costs less than a rout, but it still costs').",
-   "reason_to_select": "An early, priced way out of a contract that reading the field has shown cannot be won — cheaper than letting it run to a failed deadline, never free. The ledger shows the exact reputation number before the press commits, not after."
+   "reason_to_select": "DO NOT SELECT. The system this verb belongs to is retired and has no player-facing surface. Listed here so the dictionary matches the seam rather than hiding a verb that still applies."
   },
   {
    "id": "gameplay.raze_centre",
@@ -2552,36 +2552,6 @@
    ],
    "expected_output": "Opens straight into the saved campaign, skipping the main menu, the New World wizard, and the world generation plus pre-game warm start that follow them (~30-45 s). A failed load falls through to the main menu with the reason printed, rather than exiting — a missing file must not look like a crash.",
    "reason_to_select": "Resume a campaign directly, or open a fixed world for a capture run without paying generation on every launch — the reason the save format exists (BL-536)."
-  },
-  {
-   "id": "ledger.nav_contracts",
-   "family": "ledger",
-   "surface": "Nav rail, slot 13 (Contracts icon — a page with a signed check mark)",
-   "press": "Click the contract glyph on the left icon rail",
-   "args": [],
-   "preconditions": [
-    "In-game"
-   ],
-   "expected_output": "Toggles the Contracts ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows three views: Offers (open mercenary_offers the activity fog admits), Active (the player's own live mercenary_contracts), History (the player's terminal-state contracts).",
-   "reason_to_select": "Answers 'who wants to hire me, what am I on the hook for, and how has it gone?' — the mercenary contract is the sell-side income loop (CONTRACTS.md) and the only door onto it."
-  },
-  {
-   "id": "ledger.contracts_view_tab",
-   "family": "ledger",
-   "surface": "Contracts ledger, view tab strip at the top",
-   "press": "Click the 'Offers', 'Active' or 'History' tab button",
-   "args": [
-    {
-     "name": "view",
-     "type": "enum",
-     "meaning": "'Offers' (default), 'Active' or 'History'"
-    }
-   ],
-   "preconditions": [
-    "Contracts ledger is open"
-   ],
-   "expected_output": "Switches the ledger to that view. Re-clicking the CURRENTLY-ACTIVE tab closes the whole Contracts ledger (toggle rule on tab strips); clicking a different tab is an ordinary view change.",
-   "reason_to_select": "Offers answers 'who wants to hire me'; Active answers 'what am I on the hook for now'; History answers 'how has it gone' — three different questions over the same mercenary-contract record."
   },
   {
    "id": "canvas.border_band_select",
