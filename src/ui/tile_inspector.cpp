@@ -242,7 +242,7 @@ void draw_tile_inspector(const world& w, ui_state& s,
         ImGui::Spacing();
         ImGui::SeparatorText("Placeholder surface");
         ImGui::TextWrapped(
-            "First cut (BL-660). What is missing is the per-boundary NARRATIVE - which "
+            "First cut. What is missing is the per-boundary NARRATIVE - which "
             "pair met, in which epoch, and what the meeting raised or opened. Those lines "
             "exist and are readable in this body's Story view; moving them here, keyed to "
             "the plate you pressed, is the follow-on. A tile can appear in both columns: "

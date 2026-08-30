@@ -27,6 +27,7 @@
 #include "ui/corporation_panel.hpp"
 #include "ui/detail_level.hpp"
 #include "ui/foldout_column.hpp"
+#include "ui/nav_pane.hpp"
 #include "ui/fonts.hpp"
 #include "ui/frame_stats.hpp"
 #include "ui/market_ledger.hpp"
@@ -46,6 +47,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -97,6 +99,30 @@ overlay_mode overlay_from_name(const std::string& s)
     if (s == "supply_routes") return overlay_mode::supply_routes;
     if (s == "throughput")  return overlay_mode::throughput;
     return overlay_mode::none;
+}
+
+/// The inverse of `overlay_from_name` — the SCRIPT's name for a lens, not the
+/// display name. `overlay_mode_short_name` returns "Supply routes" for the lens a
+/// script arms as "supply_routes", so a check comparing against that would be
+/// comparing two different vocabularies and would never match.
+const char* overlay_script_name(overlay_mode m)
+{
+    switch (m)
+    {
+        case overlay_mode::supply:        return "supply";
+        case overlay_mode::market:        return "market";
+        case overlay_mode::corporation:   return "corporation";
+        case overlay_mode::company:       return "company";
+        case overlay_mode::resource:      return "resource";
+        case overlay_mode::population:    return "population";
+        case overlay_mode::scarcity:      return "scarcity";
+        case overlay_mode::industry:      return "industry";
+        case overlay_mode::reach:         return "reach";
+        case overlay_mode::continent:     return "continent";
+        case overlay_mode::supply_routes: return "supply_routes";
+        case overlay_mode::throughput:    return "throughput";
+        default:                          return "none";
+    }
 }
 
 /// Every `resource_type` as its enum slug, INDEXED BY THE ENUM VALUE — so this is a
@@ -911,6 +937,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             else if (m_ui.show_contracts_ledger)   panel = "contracts";
             else if (m_ui.show_company_ledger)      panel = "company";
             else if (m_ui.show_acquisitions_ledger) panel = "acquisitions";
+            // Convoys (BL-689), and the three tail surfaces that had no name here
+            // at all. The gap mattered the moment BL-689 renumbered seven slots:
+            // a slot->surface check can only assert what this chain can name, so
+            // an unnamed surface is a slot the renumber check cannot cover
+            // (NR-716 is exactly this blindness one level up).
+            else if (m_ui.show_convoys_ledger)      panel = "convoys";
+            else if (m_ui.show_generation_ledger)   panel = "generation_ledger";
+            else if (m_ui.show_decision_feed)       panel = "decisions";
+            else if (m_ui.show_strategy_readout)    panel = "strategy";
+            else if (m_ui.show_tech_tree)           panel = "tech_tree";
             out["open_panel"] = std::string(panel);
         }
         // Which section of the tile Selection element's top nav is showing, so a
@@ -1001,6 +1037,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         if (name == "construction")      m_ui.show_construction_panel = open;
         else if (name == "tile")         m_ui.show_tile_ledger = open;
         else if (name == "market")       m_ui.show_market_ledger = open;
+        // Convoys ledger (BL-689) — nav slot 7. Opening it through the rail arms
+        // `supply_routes`; this hook deliberately does NOT, so a script can
+        // capture the ledger against whatever lens it chose. A check that wants
+        // the pairing asserts it through the rail press instead.
+        else if (name == "convoys")      m_ui.show_convoys_ledger = open;
         else if (name == "balance")      m_ui.show_balance_ledger = open;
         else if (name == "corporation")  m_ui.show_corporation_panel = open;
         // "build" is the tile-selection BUILD BAR, which is a section of the
@@ -1038,6 +1079,21 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // m_ui.spectating on each call and forwards it to the strategic tier, so
     // flipping it after the ticks have run would capture a feed populated by an
     // ordinary played session while claiming to show a spectated one.
+    // The screen centre of nav-rail slot `n` (1-based) as last drawn, so a script
+    // can CLICK the rail rather than setting a flag. Returns nil for a slot that
+    // was not drawn.
+    //
+    // This is the only form of check that can see a bad renumber (NR-716):
+    // `show_panel` and `shell_pass` address surfaces by NAME, so a slot->surface
+    // mapping that has silently shifted stays green through both. Pressing the
+    // slot and asserting which surface opened exercises the mapping itself.
+    v.set_function("nav_slot", [](int slot) -> sol::optional<std::tuple<float, float>> {
+        float x = 0.0f, y = 0.0f;
+        if (!ui::nav_slot_centre(slot, x, y))
+            return sol::nullopt;
+        return std::make_tuple(x, y);
+    });
+
     v.set_function("spectate", [this](bool on) { m_ui.spectating = on; });
 
     // Spectator god view (BL-408). Pure ui_state, read at the draw call only —
@@ -1183,15 +1239,68 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // content height, so a script must render at least one more frame before
     // capturing — and another after resetting to 0, or the next capture inherits it:
     //   verify.scroll_panel("history", 1.0); verify.frames(2); verify.capture(...)
-    // Names mirror show_panel's vocabulary; an unknown name clears the request.
-    v.set_function("scroll_panel", [](const std::string& name, double fraction) {
-        const char* window = "";
-        if (name == "tile" || name == "history") window = "Tile Ledger";
-        else if (name == "market")               window = "Market Ledger";
-        else if (name == "balance")              window = "Balance Ledger";
-        else if (name == "corporation")          window = "Corporations";
-        else if (name == "construction")         window = "Building";
-        ui::foldout_request_scroll(window, static_cast<float>(fraction));
+    //
+    // NR-719 — BOTH HALVES OF THE FIX. This call had two independent silences and
+    // together they meant no capture had ever seen past the fourth good of ~42 in
+    // the Market ledger's price list, golden or human.
+    //
+    //  1. IT AIMED AT THE WRONG SCROLLER. The name resolved to a ledger WINDOW,
+    //     but the price list lived in a nested `BeginChild`. A window whose
+    //     content is one child has no scrollable extent of its own, so
+    //     `SetScrollY` was a no-op and the "foot" capture came back
+    //     byte-identical to the head. Names now resolve to the REAL scroller,
+    //     which for such a ledger is the child's key (`ui::foldout_scroll_child`).
+    //  2. AN UNKNOWN NAME CLEARED THE REQUEST AND SAID NOTHING. `window` stayed
+    //     "" and the call became a silent no-op — `generation_ledger` had no case
+    //     at all, so every script that scrolled it was parked at the top while
+    //     believing otherwise. An unrecognised name is now a FAILURE, counted like
+    //     a golden miss, because a check that cannot aim is not a check.
+    v.set_function("scroll_panel", [this](const std::string& name, double fraction) {
+        const char* target = nullptr;
+        if (name == "tile" || name == "history") target = "Tile Ledger";
+        else if (name == "balance")              target = "Balance Ledger";
+        else if (name == "corporation")          target = "Corporations";
+        // "Building" until 2026-08-30, and no window has EVER had that name —
+        // construction_panel.cpp calls `foldout_begin("Construction")`. A third
+        // instance of the same silence, found only because half 2 of the fix
+        // above made the names worth checking against the actual call sites.
+        else if (name == "construction")         target = "Construction";
+        else if (name == "contracts")            target = "Contracts";
+        else if (name == "acquisitions")         target = "Acquisitions";
+        else if (name == "generation_ledger")    target = "Generation Ledger";
+        else if (name == "corporations_table")   target = "Corporations";
+        else if (name == "decisions")            target = "AI decisions";
+        else if (name == "strategy")             target = "Strategy readout";
+        // The Market ledger's Goods table scrolls in its own child (BL-686), so
+        // the request must name the CHILD, not the window.
+        else if (name == "market")               target = "##goods_scroll";
+        else if (name == "convoys")              target = "Convoys";
+        else if (name.empty())                   target = ""; // the documented "clear" call
+
+        if (target == nullptr)
+        {
+            ++m_verify_failures;
+            SDL_Log("verify.scroll_panel FAIL: unknown panel '%s' - the request "
+                    "reached no scroller. Known: tile, history, market, balance, "
+                    "corporation, construction, contracts, acquisitions, "
+                    "generation_ledger, convoys.", name.c_str());
+            ui::foldout_request_scroll("", 0.0f);
+            return;
+        }
+        ui::foldout_request_scroll(target, static_cast<float>(fraction));
+    });
+
+    // The companion assertion to scroll_panel's own aiming (NR-719). A name this
+    // build knows can still reach no scroller — the panel was not open, the view
+    // was not the one holding the list, or the child was renamed — and that is the
+    // same invisible failure by a different route. A script parks its scroll,
+    // renders, then calls this before capturing.
+    v.set_function("expect_scrolled", [this](sol::optional<std::string> label) -> bool {
+        const bool ok = ui::foldout_scroll_was_claimed();
+        if (!ok) ++m_verify_failures;
+        SDL_Log("verify.expect_scrolled %s: %s", ok ? "PASS" : "FAIL",
+                label ? label->c_str() : "");
+        return ok;
     });
 
     // Park a surface's drill-through disclosure state (BL-214) so a capture can show
@@ -1226,6 +1335,101 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // photographed. The page index is clamped by building_pages() at draw time, so
     // an out-of-range value parks on the last page rather than drawing nothing.
     v.set_function("building_page", [this](int page) { m_ui.selection_building_page = page; });
+
+    // How many Goods rows fill the Market ledger's column height (BL-686). The
+    // row height is the open measurement Ben asked to compare at 8 / 10 / 12, so
+    // it is a dial a capture script sets rather than three separate builds.
+    // Values <= 0 are ignored; the draw falls back to its own default.
+    v.set_function("goods_rows", [this](int rows) {
+        if (rows > 0) m_ui.market_goods_rows = rows;
+    });
+
+    // The rows the Goods table actually DREW last frame, in draw order (BL-686),
+    // each carrying a FRESH read of the same figure from `market_component`.
+    //
+    // Drawn-vs-world, not world-vs-world. A check written against the market
+    // alone would re-derive the numbers and compare them to themselves — it would
+    // pass against a table that drew nothing, which is exactly the failure mode
+    // here: `expect_no_clipping` records ZERO over visibly clipped frames on this
+    // class of surface (NR-663), and nothing had ever seen past the fourth good
+    // (NR-719). So the row reports what the surface computed AND what the world
+    // says, and the script requires them to agree.
+    v.set_function("goods_table", [this]() {
+        sol::table out = m_lua.state().create_table();
+        const entity_id mid = ui::goods_market();
+        const auto      mit = m_world.markets.find(mid);
+        int i = 1;
+        for (const ui::goods_row_record& r : ui::goods_rows())
+        {
+            const std::size_t ri = static_cast<std::size_t>(r.resource);
+            sol::table row = m_lua.state().create_table();
+            row["name"]        = r.name;
+            // As DRAWN by the surface.
+            row["price"]       = r.price;
+            row["base_price"]  = r.base_price;
+            row["body_avg"]    = r.body_avg;
+            row["vs_base"]     = r.vs_base;
+            row["samples"]     = r.samples;
+            // The name column's fit, measured at the live font — the figure the
+            // "does body_average_price survive" call is decided on.
+            row["name_avail"]  = r.name_avail;
+            row["name_needed"] = r.name_needed;
+            row["name_fits"]   = (r.name_needed <= r.name_avail);
+            // As the WORLD holds it, read independently right now.
+            if (mit != m_world.markets.end() && ri < resource_count)
+            {
+                row["world_price"] = mit->second.price[ri];
+                row["world_base"]  = mit->second.base_price[ri];
+            }
+            out[i++] = row;
+        }
+        return out;
+    });
+
+    // Whether the Goods table draws the body-average-price column (BL-686). The
+    // design named it the first column to drop IF the row will not fit, and asked
+    // that it be MEASURED first; this is the dial that lets one script capture
+    // both layouts and report the name column's fit under each.
+    v.set_function("goods_body_column", [this](bool on) {
+        m_ui.market_goods_show_body = on;
+    });
+
+    // The nation presence row's chips as drawn (BL-688) — the surface has no
+    // other check, and "no national presence" is a legitimate state that must be
+    // distinguishable from "the row is broken".
+    v.set_function("nation_chips", [this]() {
+        sol::table out = m_lua.state().create_table();
+        int i = 1;
+        for (const ui::nation_chip_record& c : ui::nation_chips())
+        {
+            sol::table row = m_lua.state().create_table();
+            row["name"]     = c.name;
+            row["initials"] = c.initials;
+            out[i++] = row;
+        }
+        return out;
+    });
+
+    // Every good the selected market actually trades (`base_price > 0`), so a
+    // script can assert the table listed ALL of them and not just the handful
+    // above the fold.
+    v.set_function("market_traded_goods", [this]() {
+        sol::table out = m_lua.state().create_table();
+        const auto mit = m_world.markets.find(ui::goods_market());
+        int i = 1;
+        if (mit != m_world.markets.end())
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (mit->second.base_price[r] > 0.0f)
+                    out[i++] = std::string{ui::resource_name(static_cast<resource_type>(r))};
+        return out;
+    });
+
+    // The current lens, by the name `set_overlay` accepts — so a script can
+    // assert the Convoys ledger armed `supply_routes` when its rail slot was
+    // pressed (convoys.md § 3).
+    v.set_function("overlay_name", [this]() {
+        return std::string{overlay_script_name(m_ui.overlay)};
+    });
 
     // Drill one row into the expanded Corporation-dashboard roll-up (BL-248), or
     // -1 to return to the roll-up itself.

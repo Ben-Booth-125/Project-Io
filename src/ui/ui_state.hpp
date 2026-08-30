@@ -370,6 +370,16 @@ struct ui_state
     bool show_construction_panel = false;
     bool show_market_ledger = false; ///< Whether the Market Ledger is open.
 
+    /// Whether the Convoys ledger is open (BL-689). Nav-rail slot 7, directly
+    /// after Market. It was the Market ledger's third tab until the Goods
+    /// flattening deleted that strip, and it left rather than being re-homed
+    /// because it was never a market question: a convoy is cargo in transit and
+    /// belongs to `SUPPLY.md`, not to the doc that owns clearing and the order
+    /// book. Its own slot also lets it arm `supply_routes` on open — the lane
+    /// overlay is the literal map twin of the list, and a tab strip could never
+    /// give it that, since opening the Market ledger armed the price wash.
+    bool show_convoys_ledger = false;
+
     /// Whether the Company ledger is open (BL-666). A column occupant with NO
     /// nav-rail slot: a company is not a population the player
     /// browses, it is the thing under the cursor when a Company-lens holding is
@@ -872,11 +882,47 @@ struct ui_state
     // button-strip views (ui::nav_button_strip); this is the selected view per panel,
     // persisted so a panel reopens where the player left it. See the Construction
     // panel's construction.panel_view for the template.
-    /// Market Ledger: 0=Prices, 1=Sell Orders (BL-159 — sell-order management
-    /// relocated here from the Construction/Building panel), 2=Convoys (BL-453 —
-    /// the player's cargo in flight, with its ticks-to-arrival; drawn on three
-    /// canvases before this and listed on none).
+    /// Market Ledger: 0=Goods (BL-686 — one row per traded good, the 8-quarter
+    /// graph flattened into the row), 1=Sell Orders (BL-159 — sell-order
+    /// management relocated here from the Construction/Building panel).
+    ///
+    /// There is no view 2. Convoys held it (BL-453) until BL-689 gave it rail
+    /// slot 7 and its own ledger; the draw clamps a stale 2 back to 0 so a save
+    /// or a verify hook carrying the old index lands on Goods rather than on
+    /// nothing. View 1 becomes TRADES in a later slice (BL-687), which waits on
+    /// an exchange record the world does not keep yet.
     int  market_ledger_view = 0;
+
+    /// How many Goods rows should fill the Market ledger's column height.
+    ///
+    /// ROW HEIGHT IS THE OPEN MEASUREMENT (Ben, 2026-08-29: "let's compare this
+    /// at 8 rows, 10 rows, and 12 rows"). A dial rather than a constant so the
+    /// three variants are one capture script rather than three builds, and so
+    /// the answer can be set without a recompile once Ben has picked. The
+    /// density judgement is taken at 1920x1080 — the screen being reviewed —
+    /// because `shell_column_width` is effectively fixed across the common
+    /// range and what a resolution change moves is the column's HEIGHT.
+    int  market_goods_rows = 10;
+
+    /// Whether the Goods table draws the `body average price` column.
+    ///
+    /// DEFAULTS OFF ON A MEASUREMENT, not a preference. The design nominated this
+    /// as the FIRST COLUMN TO DROP if the row will not fit, and required the fit
+    /// be measured rather than assumed — expecting the pressure at 384 px to be
+    /// on the graph's width rather than the column count. Measured at 1920x1080
+    /// over the real 45-good roster (`scripts/verify/goods_table.lua`, which
+    /// prints both):
+    ///
+    ///     with the column:     name column 42 px, 13 of 45 names fit
+    ///     without the column:  name column 98 px, 36 of 45 names fit
+    ///
+    /// So the expectation was wrong and the design's own rule applies: dropping
+    /// one text column more than doubles the name width, because the graph is
+    /// only ~3.4em to begin with. At 42 px "Iron Ore" and "Iron-something" BOTH
+    /// elide to "Iron ...", which defeats the one thing a price board is for.
+    /// Kept as a dial so the call is one line to revert, and the script reports
+    /// both numbers on every run.
+    bool market_goods_show_body = false;
 
     /// History ledger: 0=Story (the body's biography), 1=Chain (the generation
     /// charts), 2=Tiles (the tile/building/market tables), 3=Ages (the Era -1

@@ -34,6 +34,47 @@ void draw_market_ledger(const world& w,
                         const market_plot_history& history,
                         bool& open);
 
+/// One row of the Goods table AS DRAWN (BL-686). Recorded by `draw_goods_tab`
+/// each frame and read by the verify layer.
+///
+/// It records what the surface actually computed and put on screen, so a check
+/// can cross it against `market_component` rather than re-deriving the same
+/// figures and comparing them to themselves — which is what a check written
+/// against the world alone would do, and it would pass against a table that drew
+/// nothing at all. `expect_no_clipping` is vacuous on this class of surface
+/// (NR-663: zero records over visibly clipped frames), so this is the assertion
+/// that has to carry the weight.
+struct goods_row_record
+{
+    resource_type resource{};
+    const char*   name        = "";
+    float         price       = 0.0f;  ///< `market_component::price[r]` as drawn.
+    float         base_price  = 0.0f;  ///< `market_component::base_price[r]`.
+    float         body_avg    = 0.0f;  ///< Mean price across the body's markets.
+    float         vs_base     = 0.0f;  ///< `price / base_price`, the drawn column.
+    int           samples     = 0;     ///< Points the row's graph plotted (<= 8).
+    float         name_avail  = 0.0f;  ///< Px the name column actually offered.
+    float         name_needed = 0.0f;  ///< Px the full name needed at this font.
+};
+
+/// One chip of the nation presence row (BL-688), as drawn.
+struct nation_chip_record
+{
+    entity_id   nation = null_entity;
+    std::string name;
+    std::string initials;
+};
+
+/// The nation presence row's chips as last drawn, in draw order.
+const std::vector<nation_chip_record>& nation_chips();
+
+/// The Goods table's rows as last drawn, in draw order. Empty when the Goods view
+/// was not on screen.
+const std::vector<goods_row_record>& goods_rows();
+
+/// The market the ledger last drew the Goods table for (`null_entity` if none).
+entity_id goods_market();
+
 /// The city name of a market — the population centre anchoring its `centre_tile`
 /// (`world::population_centre_name`), or the body name as a fallback when the market is
 /// unanchored / unnamed. This is the market/city identity shown in the ledger's second

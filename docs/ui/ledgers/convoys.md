@@ -49,11 +49,25 @@ the column.
 
 ## Known defects it inherits, both visible in the 2026-08-29 capture
 - **Destinations clip.** `Huhaidar -> Kua Sua…` and `Huhaidar -> Sus Kha…` overrun the column
-  edge. Same family as NR-709, which has now bitten four surfaces.
-- **A convoy reads `Agricultural Produce x0`.** A zero-quantity convoy in flight, with a haul cost
-  paid and a progress bar running. Either a real defect in dispatch or a state nothing explains;
-  it is not a display bug, because the display is reporting what it was given. Worth measuring
-  before the surface is rebuilt around it.
+  edge. Same family as NR-709, which has now bitten four surfaces. The route takes its own line
+  and **wraps** — the fold-out column is `LAYOUT.md` container 1, whose policy is wrap, so a
+  destination name is readable in full rather than elided.
+- **`Agricultural Produce x0` is a FORMATTING defect, not a dispatch one — measured, not
+  argued** (`tools/verify/convoy_cargo_census.cpp`). It was worth measuring, and the measurement
+  overturned the premise this list was written with.
+
+  Neither dispatch path can commit an empty convoy, and both forbid it by construction: the auto
+  path (`dispatch_convoys`) skips a source whose surplus is `<= 0` and a destination whose
+  shortfall is `<= 0`, then takes `min(surplus, shortfall)`, strictly positive; the directed verb
+  (`corp_verb::dispatch_convoy`) rejects the whole command on `!(quantity > 0)`, finiteness first.
+  Over the real generated world the census found **1669 dispatches and zero with an empty hold**.
+
+  What was wrong was the row. `cargo_qty` is a **float**, and the row printed it with `"x%.0f"` —
+  which renders every cargo below 0.5 as `x0`. **4.6% of real convoys are below 0.5** (measured
+  minimum 0.0097 against a median of 5.62), so a 0.3-unit convoy and an empty one drew the same
+  six pixels. The display was not "reporting what it was given"; it was rounding it away. The
+  quantity is now formatted in tiers against that measured distribution, with an explicit
+  `<0.01` floor, so a convoy carrying something can never read as carrying nothing.
 
 ## Open questions for Ben
 - ~~Does it earn a rail slot, and where?~~ **Answered** (Ben, 2026-08-29): *"give convoys a slot,
@@ -61,8 +75,11 @@ the column.
   shifting Corp. Strategy down to 8. That placement keeps the commercial run of the rail together
   — Acquisitions, Market, Convoys — while giving the logistics read its own door and its own
   lens. See `MENU.md` § Scope-widening names.
-- **Is `x0` a defect?** See above. If dispatch can legitimately commit an empty convoy, the row
-  needs to say why; if it cannot, this is a supply-layer bug the ledger merely revealed.
+- ~~**Is `x0` a defect?**~~ **Answered by measurement** (see above): it is a formatting defect in
+  the row, not a supply-layer bug. Dispatch cannot commit an empty convoy — 1669 dispatches, zero
+  empty holds — and `"%.0f"` was rounding the 4.6% of convoys carrying less than half a unit down
+  to `x0`. The invariant is now asserted by `convoy_cargo_census`, so a real empty dispatch would
+  fail a check rather than reappear as a display puzzle.
 - **Do Routes and History earn views**, and does History need the per-arrival record that
   `MARKETS.md` § Trades notes is also missing for realised trades? The two gaps are the same
   shape — an aggregate loop that retains no per-event row — and might be worth closing together.

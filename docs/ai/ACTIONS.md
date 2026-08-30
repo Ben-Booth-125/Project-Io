@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*157 entries — 29 gameplay · 25 canvas · 15 lens · 55 ledger · 33 chrome.*
+*159 entries — 29 gameplay · 25 canvas · 15 lens · 57 ledger · 33 chrome.*
 
 ---
 
@@ -1482,20 +1482,32 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** A body can host several market centres with different books; this picks the exact venue for a trade.
 
+### `ledger.market_nation_chip` — Market Ledger, nation presence row (below the Body/Market selectors, above the tab strip)
+
+**Press.** Hover a coloured chip to name the nation. The chips are not clickable.
+
+**Valid when:**
+- Market Ledger is open
+- At least one nation operates in the selected market (the row reads "No national presence." otherwise)
+
+**Expected output.** A wrapped row of one chip per nation operating in the selected market, in ascending nation id, wrapping to further rows if needed. Each chip is that nation's identity colour carrying up to two initials; hovering names it in full. THESE ARE NOT FLAGS -- nation_colour is a palette entry and is all that exists, so real per-nation emblem artwork would be a generated identity system rather than a glyph, and the chip is an explicit placeholder. Presence is derived: a nation appears when a building stands on a tile whose catchment market (market_for_tile) is this one.
+
+**Reason to select.** Answers 'which nations operate in this market?'. A price is not readable without knowing whose ground feeds it: a market served by one nation and a market four nations compete over look identical on a price line and mean entirely different things for embargo risk, tariffs and stance.
+
 ### `ledger.market_view_tab` — Market Ledger, view tab strip at the top
 
-**Press.** Click the 'Prices' or 'Sell Orders' tab button
+**Press.** Click the 'Goods' or 'Sell Orders' tab button
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `view` | `enum` | 'Prices' (default) or 'Sell Orders' |
+| `view` | `enum` | 'Goods' (default, index 0) or 'Sell Orders' (index 1). Index 2 was Convoys until it became its own ledger at nav rail slot 7; a stale 2 clamps back to Goods rather than drawing nothing. |
 
 **Valid when:**
 - Market Ledger is open
 
-**Expected output.** Switches the ledger to that view. Re-clicking the CURRENTLY-ACTIVE tab closes the whole Market Ledger (toggle rule on tab strips); clicking the other tab is an ordinary view change. Prices shows the order book / price table for the selected market; Sell Orders shows the player's standing sell orders there.
+**Expected output.** Switches the ledger to that view. Re-clicking the CURRENTLY-ACTIVE tab closes the whole Market Ledger (toggle rule on tab strips); clicking the other tab is an ordinary view change. Goods shows one row per traded good at the selected market -- item glyph, name, price, price vs base, and an 8-QUARTER price graph flattened into the row, every row drawn against a SHARED price/base axis with a 1.0 baseline so goods can be compared. Sell Orders shows the player's standing sell orders there.
 
-**Reason to select.** Prices answers 'what is the market paying?'; Sell Orders answers 'what am I currently offering, at what floor?' - the two halves of a selling decision.
+**Reason to select.** Goods answers 'what is each good worth here, and which way is it moving?'; Sell Orders answers 'what am I currently offering, at what floor?' - the two halves of a selling decision. Convoys is no longer here: 'what is on its way to me' is a logistics question and now has its own rail slot (ledger.nav_convoys).
 
 ### `ledger.nav_budget` — Nav rail, slot 2 (Budget icon)
 
@@ -1559,9 +1571,20 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the Market Ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows prices, supply and demand for one market on one body (chosen by the Body and Market selectors), split into Prices and Sell Orders views.
+**Expected output.** Toggles the Market Ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows one market on one body (chosen by the Body and Market selectors), a nation presence row of colour chips naming who operates there, and the Goods / Sell Orders views.
 
 **Reason to select.** Answers 'what does this good trade for, where?' - the price signal behind every sell-order, extraction and routing decision.
+
+### `ledger.nav_convoys` — Nav rail, slot 7 (Convoys icon), directly after Market
+
+**Press.** Click the convoy chevron on the left icon rail
+
+**Valid when:**
+- In-game
+
+**Expected output.** Toggles the Convoys ledger open in the fold-out column; re-click closes; opening closes any other ledger AND ARMS THE supply_routes LENS -- the lane overlay is the map twin of this list. Closing does not disarm it, so the player's lens is left where they left it. Open, it lists one row per convoy of your corp in flight, soonest arrival first: cargo and quantity, origin -> destination and mode, a progress bar carrying the ETA in qtr (or 'held' / 'stalled'), and the haul cost already paid. One flat view; NO Body/Market selectors, because a convoy is a route between two places and is not scoped by the market you are looking at.
+
+**Reason to select.** Answers 'what is on its way, and what is it costing me?'. It is the only surface reporting TICKS TO ARRIVAL: convoys are drawn on three canvases and listed nowhere else, and since travel time became load-bearing a long haul takes several quarters, with the cargo out of your pool for all of it. Read it before planning a build against stock you think you have.
 
 ### `ledger.selection_body_goto_surface` — Selection band, body kind's action column, 'Go to surface' button
 

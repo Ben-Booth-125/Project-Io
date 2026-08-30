@@ -596,7 +596,7 @@ void draw_tech_tree_menu(const tech_tree_registry& tree, ui_state& s)
     // Short line, not TextDisabled's %s form — the shell column is ~380px
     // and the old "N quests, M techs" tail clipped rather than wrapped there.
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("BL-087 design mock - read-only.");
+    ImGui::TextWrapped("Design mock - read-only.");
     ImGui::PopStyleColor();
     ImGui::Separator();
     ImGui::Spacing();

@@ -7,11 +7,11 @@
 ## 1. Top question — the one thing this answers at first glance
 **"What is each good worth here, and which way is it moving?"** The default lands on the **Goods**
 table: one ROW per traded good, with its price, how that price stands against the body and against
-its own base, and a mini six-month graph inline in the row.
+its own base, and a mini 8-quarter graph inline in the row.
 
 **The stacked-sparkline layout it replaces is retired** (Ben, 2026-08-29). Each good took a name
 line plus a 44 px chart — about 72 px of column — so the view showed 3.5 goods at 1280x720 and 9 at
-1920x1080 against a roster of ~42. Three things were wrong with it and only one was density:
+1920x1080 against a roster of 45 (measured). Three things were wrong with it and only one was density:
 
 - **No shared scale.** Every sparkline was drawn to its own range, so Iron Ore's decay and Coal's
   flat line looked alike. The one thing a price board is for — comparing goods — was the one thing
@@ -20,7 +20,7 @@ line plus a 44 px chart — about 72 px of column — so the view showed 3.5 goo
   that has no axis.
 - **Nothing had ever seen past the fourth good.** The scroll hook aimed at the outer window while
   the sparklines sat in an inner child scroller, so the "foot" capture was byte-identical to the
-  head and goods 4–42 had never been looked at by any capture, golden or human (NR-719).
+  head and goods 4–45 had never been looked at by any capture, golden or human (NR-719).
 
 ## 2. Sub-levels — views & default
 
@@ -30,7 +30,7 @@ belongs to `SUPPLY.md`.
 
 | View | Answers (one question) | Content |
 |---|---|---|
-| **Goods** *(default)* | What is each good worth here, and which way is it moving? | A table, one row per traded good: **item glyph · name · price · body average price · price vs base · six-month graph**. The graph is flattened INTO the row rather than stacked under it. `body_average_price` is the first column to drop if the row will not fit — the pressure at 384 px is on the graph's width, not the column count, so dropping it buys little and it should be tried before it is cut |
+| **Goods** *(default)* | What is each good worth here, and which way is it moving? | A table, one row per traded good: **item glyph · name · price · price vs base · 8-quarter graph**, the graph flattened INTO the row rather than stacked under it. Every row is drawn against a **shared `price / base_price` axis with a 1.0 baseline**, which is what makes goods comparable; direction is carried by the line's colour. **`body_average_price` does not fit and is dropped** — see below |
 | **Trades** | What positions do I hold, what else is standing here, and what could I be doing? | Three reads, kept visibly distinct (`MARKETS.md` § Trades): **my standing trades**; **the market's standing trades** in markets the player operates in; and **potential trades** with their margins — a derivation, not a record |
 
 **Above the tabs, below the selectors: the nation presence row.** A wrapped row of one chip per
@@ -49,11 +49,26 @@ compare this at 8 rows, 10 rows, and 12 rows."* Build all three and look at them
 which is the screen being reviewed — a density judgement taken at 720p is taken against half the
 content height (NR-719's sibling finding).
 
+**`body_average_price` does not survive, and the expectation was wrong.** The column was
+nominated first-to-drop *if* the row would not fit, on the reasoning that the pressure at 384 px
+would be on the graph's width rather than the column count. Measured at 1920x1080 over the real
+45-good roster (`scripts/verify/goods_table.lua` prints both layouts on every run):
+
+| Layout | Name column | Names that fit |
+|---|---|---|
+| **with** body average | 42 px | **13 of 45** |
+| **without** body average | 98 px | **36 of 45** |
+
+So the column count was the pressure after all — the graph is only ~3.4 em, and dropping one
+text column more than doubles the name width. At 42 px `Iron Ore` and `Iron-Nickel Ore` both
+elide to `Iron ...`, which defeats the one thing a price board is for. It is kept as a one-line
+dial (`ui_state::market_goods_show_body`) rather than deleted, so the call is cheap to revisit.
+
 ## 3. Lens on open
 Arm **`market`** — the per-body price wash keyed to the selected resource — **fixed** across both views. Goods and Trades are both single-market reads that the price wash reinforces, so there is nothing for the lens to follow. The Convoys view that would have wanted `supply_routes` has left for its own ledger, which is where that pairing now lives ([convoys.md](convoys.md) § 3) — one of the quieter arguments for the split, since a tab strip cannot arm two lenses and the old third tab always got the wrong one.
 
 ## 4. Data sources
-Most of it is in `w.markets` (`market_component`: `supply[]`, `demand[]`, `price[]`, `base_price[]`, `body`, `centre_tile`) and `market_plot_history` for the six-month series. `price vs base` is `price[r] / base_price[r]`, already to hand. **`body_average_price` is the one new derivation** — mean `price[r]` across the markets on the selected body, which is a walk the surface can do itself.
+Most of it is in `w.markets` (`market_component`: `supply[]`, `demand[]`, `price[]`, `base_price[]`, `body`, `centre_tile`) and `market_plot_history` for the 8-quarter series (`record_histories` samples once per econ tick and a tick is a calendar quarter, so a "six-month" window would be two points; Ben chose 8 of the 64 retained). `price vs base` is `price[r] / base_price[r]`, already to hand. **`body_average_price` is the one new derivation** — mean `price[r]` across the markets on the selected body, which is a walk the surface can do itself.
 
 **Trades needs more than the surface can derive, and the doc says which half.** `w.sell_orders` and `w.buy_orders` are world state and carry both the player's positions and everyone else's, so reads 1 and 2 exist. Potential trades (read 3) derive from prices, reach and haulage. What does **not** exist is a REALISED trade: clearing is an aggregate that resolves a price and moves quantity without pairing a buyer to a seller, so no per-exchange profit is recorded anywhere. See `MARKETS.md` § Trades — positions and potentials are answerable now, history is not, and a realised margin must not be invented to fill the column.
 

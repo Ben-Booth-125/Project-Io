@@ -111,10 +111,29 @@ bool foldout_begin(const char* name);
 /// clears the request; only one panel can be parked at a time, which is all a linear
 /// verify script needs.
 ///
-/// Scrolls the ledger WINDOW. A panel that nests its own `BeginChild` scroller
-/// (Market Ledger's `##price_scroll`) is not reached by this — that needs its own
-/// hook, and none is claimed here.
+/// Scrolls the ledger WINDOW. A panel that nests its own `BeginChild` scroller is
+/// reached instead by `foldout_scroll_child`, using the same single pending
+/// request — pass that child's key as the name.
 void foldout_request_scroll(const char* window_name, float fraction);
+
+/// Apply the pending scroll request to the `BeginChild` scroller just opened, if
+/// the request names `key`. Call immediately after a successful `BeginChild`.
+///
+/// NR-719, the half `foldout_request_scroll` used to disclaim. A ledger that nests
+/// its content in a child scroller leaves the hosting WINDOW with no scrollable
+/// extent, so `SetScrollY` on the window is a silent no-op and every "foot"
+/// capture comes back identical to the head. The Market ledger's price list was
+/// captured that way for its whole life: nothing, golden or human, ever saw past
+/// the fourth good of ~42.
+void foldout_scroll_child(const char* key);
+
+/// Whether any window or child has claimed the pending scroll request since it was
+/// made (vacuously true when the request is the empty "clear" call).
+///
+/// The verify layer reads this AFTER rendering to turn a request that reached no
+/// scroller into a loud failure. Silence was the actual defect in NR-719 — a
+/// misaimed request and a working one were the same green run.
+bool foldout_scroll_was_claimed();
 
 /// End a foldout_begin() window. Must be called once per foldout_begin() — including
 /// the early-out path where foldout_begin() returned false — matching the

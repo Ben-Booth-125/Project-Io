@@ -1370,38 +1370,41 @@
     "docs/ui/MENU.md (slot 6)",
     "src/ui/market_ledger.cpp"
    ],
-   "summary": "Rail slot 6: per-market supply/demand/price/net board (Prices), a per-body multi-market turnover comparison (Markets), and price/supply/demand sparklines (Trends).",
+   "summary": "Rail slot 6: the Goods table (one row per traded good with an inline 8-quarter graph) and Sell Orders, under Body and Market selectors and a nation presence row.",
    "interesting_question": "The mock CSV exporter emits one row per market_component with no market_id/region column, so a body with 5 markets (Kepler) produces a 5x-inflated join in the Power BI mock — does that gap only affect the design mockup, or could the same ambiguity affect any future per-market export?",
    "resolution": "Named narrowly as an export-only gap, not a live-code bug: market.md states 'the gap is export-only, for the Power BI mock... Fix: add a market_id (and human region label...) column to the exporter' — the live in-app ledger reads w.markets directly and is unaffected.",
    "checks": [
     "market_ledger",
-    "lens_structure_pivot"
+    "lens_structure_pivot",
+    "goods_table"
    ]
   },
   {
    "id": "UI-081",
-   "name": "Prices view",
+   "name": "Goods table",
    "kind": "view",
    "parent": "UI-080",
    "source": [
     "docs/ui/ledgers/market.md § Sub-levels"
    ],
-   "summary": "Default view: one row per traded resource for the selected market — Supply/Demand/Price/Net, colour-washed, with a turnover-this-tick footer.",
-   "interesting_question": "n/a — see UI-080.",
-   "resolution": "n/a",
+   "summary": "Default view: one row per traded good at the selected market — item glyph, name, price, price vs base, and an 8-quarter price graph flattened into the row. Every row is drawn against a SHARED price/base axis with a 1.0 baseline, which is what makes goods comparable; the line's colour carries direction.",
+   "interesting_question": "The layout it replaces autoscaled every sparkline to its own range, so a good decaying 40% and a flat good drew the same shape — does a shared axis fit at 384 px once the graph is inline, and which column gives way if it does not?",
+   "resolution": "It fits, but not with every column. Measured over the real 45-good roster: with the body-average column the name column is 42 px and 13 of 45 names fit; without it, 98 px and 36 of 45. The design had nominated body_average_price first-to-drop only if the row would not fit, expecting the graph's width to be the pressure — the measurement says otherwise, so the column is off by default behind a one-line dial (ui_state::market_goods_show_body).",
    "checks": [
-    "market_ledger"
+    "market_ledger",
+    "goods_table",
+    "market_density"
    ]
   },
   {
    "id": "UI-082",
-   "name": "Markets view",
+   "name": "Sell Orders view",
    "kind": "view",
    "parent": "UI-080",
    "source": [
     "docs/ui/ledgers/market.md § Sub-levels"
    ],
-   "summary": "One row per market on the selected body (Market/Supply/Demand/Turnover), selectable to re-point the Prices and Trends views to a different market.",
+   "summary": "The player's standing sell orders on the selected body, with a Remove press per order and an add-order form (resource, quantity/qtr, floor price). Becomes Trades once a realised-exchange record exists — MARKETS.md § Trades records that clearing resolves a price without pairing a buyer to a seller, so no per-exchange margin is recorded anywhere yet.",
    "interesting_question": "n/a — see UI-080.",
    "resolution": "n/a",
    "checks": [
@@ -1835,6 +1838,58 @@
    "resolution": "Guaranteed at the draw call and asserted: body_surface_canvas.cpp notes \"the mask lifts AT THE DRAW CALL only\", and tools/verify/spectator_determinism.cpp asserts the flag defaults false so an ordinary session is byte-identical, and that admitting one more corp shifts no rival's cadence slot (BL-408/BL-409; the standing rules carry the full ruling).",
    "checks": [
     "spectator_god_view"
+   ]
+  },
+  {
+   "id": "UI-112",
+   "name": "Nation presence row",
+   "kind": "sub-element",
+   "parent": "UI-080",
+   "source": [
+    "docs/ui/ledgers/market.md § Sub-levels",
+    "src/ui/market_ledger.cpp"
+   ],
+   "summary": "A wrapped row of one chip per nation operating in the selected market, between the Body/Market selectors and the tab strip. Each chip is the nation's identity colour carrying up to two initials, named on hover.",
+   "interesting_question": "The design asked for 'a wrapped row of flags for each nation' — but nations have no emblem artwork at all, only a palette colour. Is a stubbed glyph acceptable as a stand-in for a flag?",
+   "resolution": "No. nation_colour is a palette entry and is all that exists; corporations carry an emblem tag and nations do not, so per-nation emblems would be a generated identity system, a feature of its own. A single stubbed glyph would teach a vocabulary the game does not have, so the row is colour chips with initials — honest about being an identity mark and nothing more — and a placeholder even at that (Ben, 2026-08-29: flags and glyphs are a later sprint). Presence is derived via market_for_tile + tile_to_nation, so a nation appears exactly when its ground really clears at this market.",
+   "checks": [
+    "goods_table"
+   ]
+  },
+  {
+   "id": "UI-113",
+   "name": "Convoys Ledger",
+   "kind": "ledger",
+   "parent": null,
+   "source": [
+    "docs/ui/ledgers/convoys.md",
+    "docs/ui/MENU.md (slot 7)",
+    "src/ui/convoys_ledger.cpp"
+   ],
+   "summary": "Rail slot 7: one flat view listing every convoy of the player's corp in flight, soonest arrival first — cargo and quantity, origin -> destination and mode, a progress bar carrying the ETA in qtr, and the haul cost already paid, with a Hold/Release press per row. No Body/Market selectors. Arms supply_routes on open.",
+   "interesting_question": "A row read 'Agricultural Produce x0' — a convoy in flight with a haul cost paid, a progress bar running and an apparently empty hold. Can dispatch legitimately commit an empty convoy, or had the ledger revealed a supply-layer bug?",
+   "resolution": "Neither: it was a formatting defect in the row, established by measurement rather than argument (tools/verify/convoy_cargo_census.cpp). Both dispatch paths forbid an empty convoy by construction and the census found 1669 dispatches with zero empty holds — but cargo_qty is a float printed with \"x%.0f\", and 4.6% of real convoys carry less than half a unit (measured minimum 0.0097 against a median of 5.62), so every one of them rendered as x0. The quantity is now tiered against that measured distribution with an explicit <0.01 floor, and the no-empty-hold invariant is asserted by the census harness.",
+   "checks": [
+    "convoys_ledger",
+    "ledger_pass"
+   ]
+  },
+  {
+   "id": "UI-114",
+   "name": "Nav rail slot fit",
+   "kind": "chrome",
+   "parent": null,
+   "source": [
+    "docs/ui/MENU.md",
+    "docs/ui/LAYOUT.md (container 8)",
+    "src/ui/nav_pane.cpp"
+   ],
+   "summary": "The rail's vertical budget: every one of its fourteen slots must be pressable at every supported resolution, not merely drawn.",
+   "interesting_question": "Inserting Convoys at slot 7 took the rail to fourteen — does the rail still fit at the documented 1280x720 floor?",
+   "resolution": "It did not. At a fixed 48 px pitch slot 14's centre landed at y=746 against a 720 px screen, so Contracts — a player system — was drawn and unreachable, since ImGui's hit-test rejects a press outside the window; at 1920x1080 the same layout was fine, which is why no single-resolution capture could have caught it. The slot square is now derived from the height the rail actually has, capped at its width, so 1080p is pixel-identical and 720p compresses to fit instead of dropping the last slot.",
+   "checks": [
+    "nav_rail_fit",
+    "shell_pass"
    ]
   }
  ]

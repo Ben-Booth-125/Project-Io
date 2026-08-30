@@ -143,7 +143,7 @@ void draw_tier_control(const char* label, int& tier, const char* what_it_does)
     const auto note = [what_it_does] {
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s\n\nRaising a tier moves it up, lowering it down.\n"
-                              "Not yet wired to the economy (BL-155).", what_it_does);
+                              "Not yet wired to the economy.", what_it_does);
     };
 
     if (ImGui::Button("-", {bw, bw})) tier = std::max(1, tier - 1);
@@ -255,7 +255,7 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
                       "What you pay your workforce, per head.\n"
                       "A higher tier costs more but competes harder for scarce labour.");
     ImGui::Spacing();
-    ImGui::TextDisabled("Policy levers - not yet wired (BL-155)");
+    ImGui::TextDisabled("Policy levers - not yet wired to the economy");
     ImGui::Spacing();
 
     // --- Laws in force (BL-343; read-only since BL-480). ---
