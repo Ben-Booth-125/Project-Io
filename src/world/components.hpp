@@ -1555,3 +1555,119 @@ struct nation_component
     /// whole stream.
     float qualification = 0.0f;
 };
+
+// ---------------------------------------------------------------------------
+// The exchange record (BL-685)
+// ---------------------------------------------------------------------------
+// docs/economy/MARKETS.md § The exchange record owns the shape; this is that
+// table as a struct, and the field set is a SEAM two layers build against — the
+// clearing tick writes it, the Market ledger's Trades tab reads it. Do not add,
+// rename or reorder a field without moving the doc with it.
+//
+// IT RECORDS REVENUE, NOT PROFIT, AND THAT LIMIT IS STRUCTURAL rather than an
+// omission. `stockpile_component` is `quantities[]` and nothing else — there is
+// no cost basis anywhere in the model, so a unit of ore in a pool does not know
+// what it cost to extract or to buy, and the margin on selling it cannot be
+// derived from the sale. `quantity * unit_price` is honest; a `profit` field is
+// not available at this grain and must not be added here. The two routes to a
+// real margin — a weighted-average cost basis carried on the pool, or answering
+// margin at the building where `building_profit.hpp` already nets revenue
+// against inputs, maintenance and wages — are both larger than this record, and
+// neither is taken.
+
+/// One realised exchange, appended by the clearing tick.
+///
+/// A row is written at each of the four points `clear_markets` actually moves
+/// goods for money: auto-surplus clearing, auto-demand (processor input) fills,
+/// matched order-book trades, and the buyer-of-last-resort auto-clear of
+/// unmatched standing sells. `quantity * unit_price` is exactly the term the
+/// same statement accrues into `corp_cash_flow`, so the record and the money
+/// loop cannot drift apart.
+struct exchange_record
+{
+    /// The econ tick it cleared on (`world::current_econ_tick`). An econ tick IS
+    /// one quarter, so this is the date — a surface renders it as a qtr.
+    int           tick       = 0;
+    /// Which board. The Trades surface is per-market.
+    entity_id     market     = null_entity;
+    /// What moved.
+    resource_type resource   = resource_type::iron_ore;
+    /// How much left the seller's pool (or reached the buyer's).
+    float         quantity   = 0.0f;
+    /// The price CLEARING RESOLVED, never the floor the order carried. An order
+    /// is honoured *at* clearing, so what a seller asked and what they got are
+    /// different numbers and only one of them is the trade: the three auto paths
+    /// transact at the resolved reference price, and a matched trade transacts at
+    /// the price its match executed on.
+    float         unit_price = 0.0f;
+    /// The two counterparties. Either may be a background firm — and either may
+    /// be `null_entity`, which means THE MARKET ITSELF rather than "unknown":
+    /// three of the four clearing paths trade against the market as buyer or
+    /// seller of last resort, and that side has no corp behind it. A reader must
+    /// render such a side as the market, never blank the row.
+    entity_id     seller     = null_entity;
+    entity_id     buyer      = null_entity;
+};
+
+/// Fixed-capacity ring of the most recent exchanges, world-wide — capped the way
+/// the plot histories are, so a campaign can run indefinitely without the record
+/// growing without bound. Insertion order is the deterministic clearing order
+/// (see `clear_markets`), so the ring is chronological within a tick as well as
+/// across ticks.
+///
+/// UNLIKE `corp_decision_ring`, this IS save-format state: it is world state the
+/// player reads back as history, so it joins the serialisation seam rather than
+/// being cleared on load.
+struct exchange_record_ring
+{
+    /// MEASURED rather than guessed (2026-08-30). `data_creep_harness` ran 4500
+    /// econ ticks of the generated world and filed 27,690 rows — **6.2 a
+    /// quarter** at that world's 8 corporations — with this ring's occupancy
+    /// plateauing at 8192 and never creeping past it, which is the row that
+    /// asserts the cap holds under a long campaign.
+    ///
+    /// The shipped campaign carries **160** corporations once
+    /// `generate_background_firms` has run (measured the same day). Scaling the
+    /// measured rate by the corp count puts a busy quarter near 120 rows, so
+    /// 8192 buys on the order of 60-70 quarters — fifteen-odd years of trade
+    /// history — for ~205 KB (25 written bytes a row) on a ~17 MB snapshot.
+    ///
+    /// THE SCALING STEP IS AN EXTRAPOLATION, not a reading: nothing has yet run
+    /// a long campaign of a 160-corp world. If the real rate lands far above
+    /// 120/quarter the window shortens in proportion. Widening this is a
+    /// SAVE-FORMAT change (the written row count follows it), so re-measure
+    /// before moving it. `exchange_record_harness`'s E6 row prints the rate for
+    /// its own small fixture and says it is a lower bound.
+    static constexpr std::size_t capacity = 8192;
+
+    std::vector<exchange_record> entries;   ///< Grows to `capacity`, then wraps.
+    std::size_t                  next  = 0; ///< Slot the next row overwrites once full.
+    std::size_t                  total = 0; ///< Lifetime rows pushed (telemetry).
+
+    void push(const exchange_record& e)
+    {
+        if (entries.size() < capacity)
+        {
+            entries.push_back(e);
+        }
+        else
+        {
+            entries[next] = e;
+            next = (next + 1) % capacity;
+        }
+        ++total;
+    }
+
+    /// Retained rows, OLDEST FIRST. `entries` is the raw ring and its vector
+    /// order stops being chronological the moment the ring wraps, so a reader
+    /// walking it directly reads history shuffled at the wrap point. Index 0 here
+    /// is always the oldest row still held, `size() - 1` the newest.
+    ///
+    /// @param i Age index in [0, size()).
+    const exchange_record& oldest_first(std::size_t i) const
+    {
+        return entries[entries.size() < capacity ? i : (next + i) % capacity];
+    }
+
+    std::size_t size() const { return entries.size(); }
+};

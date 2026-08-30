@@ -887,6 +887,29 @@ target_link_libraries(font_glyph_harness PRIVATE imgui)
 target_compile_features(font_glyph_harness PRIVATE cxx_std_20)
 target_compile_options(font_glyph_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# save_envelope_roundtrip (BL-685, closing NR-708) is the SECOND harness that
+# links ImGui, and it does so for font_glyph_harness's reason one layer over:
+# its subject is src/core/save_game.cpp, which includes ui/ui_state.hpp and so
+# <imgui.h>. The headless tier links io_world_obj and excludes ImGui BY
+# CONSTRUCTION, which is precisely why the save ENVELOPE had never had
+# round-trip coverage while the world half (save_roundtrip.cpp) has had it since
+# BL-536. save_game.cpp is not in ${IO_WORLD_SOURCES} (that glob is src/world
+# only), so it is compiled in here alongside io_world_obj for the world half it
+# embeds. It opens no window and creates no ImGui context: it writes a file into
+# the working directory and reads it back. Declared before the foreach so the
+# `if(NOT TARGET ...)` guard skips it while the unconditional add_test still
+# registers it.
+add_executable(save_envelope_roundtrip
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/save_envelope_roundtrip.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/save_game.cpp"
+)
+target_include_directories(save_envelope_roundtrip PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+target_link_libraries(save_envelope_roundtrip PRIVATE io_world_obj imgui)
+target_compile_features(save_envelope_roundtrip PRIVATE cxx_std_20)
+target_compile_options(save_envelope_roundtrip PRIVATE ${IO_WARNING_FLAGS})
+
 # price_band_harness (BL-442) is live-Lua for one row only, P2: it asserts that
 # the band the SHIPPED scripts/economy.lua authors is the band that reaches
 # recipe_registry, which a hand-built fixture cannot answer without becoming the
@@ -1246,7 +1269,36 @@ foreach(harness_src ${IO_VERIFY_HARNESSES})
         # Links io_world_obj rather than recompiling ${IO_WORLD_SOURCES} (BL-287).
         add_executable(${harness_name} "${harness_src}")
         target_link_libraries(${harness_name} PRIVATE io_world_obj)
-        target_include_directories(${harness_name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+        # The sol2 include dir is on EVERY harness, including the Lua-free ones,
+        # and that is deliberate rather than sloppy (fixed 2026-08-30, found
+        # while building BL-685's rows).
+        #
+        # `tools/verify/harness_params.hpp` is the shared `no_prehistory()` /
+        # `parsed_gen_config()` helper that ~30 harnesses include, and since
+        # b668434c (the v0.1.21 cut) it includes scripting/lua_state.hpp and so
+        # <sol/sol.hpp>. io_world_obj publishes only ${CMAKE_CURRENT_SOURCE_DIR}
+        # /src, so from a CLEAN configure every glob-declared harness that
+        # included that header died on
+        #     fatal error C1083: Cannot open include file: 'sol/sol.hpp'
+        # -- determinism_harness, world_determinism, spectator_determinism,
+        # quarterly_return, save_roundtrip, demand_census and two dozen more,
+        # i.e. most of the ctest gate. An existing build tree kept passing on
+        # stale objects, which is why it survived a release cut.
+        #
+        # An include path costs a TU that does not use it nothing, so it goes on
+        # all of them rather than on a hand-maintained list that the next shared
+        # header would fall off.
+        #
+        # `lua_src_SOURCE_DIR` travels with it because sol2's own headers include
+        # <lua.h>: it is the same INCLUDE path lua54 publishes, taken as a path
+        # rather than by linking the library. LINKING Lua is a different question
+        # and stays opt-in -- a harness that constructs a lua_state is
+        # hand-declared above with lua54, and nothing here changes that.
+        target_include_directories(${harness_name} PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/src"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+            "${sol2_src_SOURCE_DIR}/include"
+            "${lua_src_SOURCE_DIR}")
         target_compile_features(${harness_name} PRIVATE cxx_std_20)
         target_compile_options(${harness_name} PRIVATE ${IO_WARNING_FLAGS})
     endif()
