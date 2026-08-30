@@ -10,16 +10,16 @@
 
 **108 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**66 of 108 elements can be changed without any check going red.**
+**65 of 108 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
 | Class | Count | What green means |
 |---|---|---|
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
-| **ASSERTED** | 39 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
+| **ASSERTED** | 40 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
 | **CLIP-ONLY** | 14 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
-| **CAPTURE-ONLY** | 44 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
+| **CAPTURE-ONLY** | 43 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
 
 ## GOLDEN (3)
@@ -30,7 +30,7 @@ and so is the safety net.
 | `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 5 | 0 | 2 |
 | `UI-063` Icon vocabulary | element | `icon_silhouettes` | 0 | 0 | 0 |
 
-## ASSERTED (39)
+## ASSERTED (40)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -68,6 +68,7 @@ and so is the safety net.
 | `UI-096` Planetary Canvas > National border band | sub-element | `border_band` | 6 | 0 | 3 |
 | `UI-097` Planetary Canvas > Province render and selection | sub-element | `province_render`, `lens_structure_pivot` | 11 | 0 | 1 |
 | `UI-098` Lens system (overlay_mode family) > Throughput lens | sub-element | `throughput_lens`, `lens_strip_and_fields` | 5 | 0 | 0 |
+| `UI-100` Corporation ledger | ledger | `corp_dashboard` | 10 | 1 | 0 |
 | `UI-105` Generation Ledger | ledger | `save_load` | 6 | 0 | 3 |
 | `UI-111` Spectator god view | element | `spectator_god_view` | 1 | 0 | 0 |
 | `UI-112` Market Ledger > Nation presence row | sub-element | `goods_table` | 8 | 1 | 0 |
@@ -93,7 +94,7 @@ and so is the safety net.
 | `UI-087` History Ledger (Story/Chain/Tiles) > Tiles view | view | `history_ledger_and_comms`, `text_overflow_floor` | 0 | 2 | 0 |
 | `UI-091` Main Menu | view | `main_menu`, `planetology_generation`, `shell_pass` | 0 | 1 | 1 |
 
-## CAPTURE-ONLY (44)
+## CAPTURE-ONLY (43)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -131,7 +132,6 @@ and so is the safety net.
 | `UI-093` New World wizard > Wizard round (one of three) | sub-element | `planetology_generation` | 0 | 0 | 0 |
 | `UI-094` Zoom ladder navigation model | element | `zoom_ladder`, `canvas_levels`, `descend_into_selection` | 0 | 0 | 0 |
 | `UI-095` Zoom ladder navigation model > Keyboard navigation bindings | sub-element | `descend_into_selection` | 0 | 0 | 0 |
-| `UI-100` Corporation overview dashboard | ledger | `corp_dashboard` | 0 | 0 | 0 |
 | `UI-101` Contracts Ledger | ledger | `contracts_ledger`, `mercenary_slice` | 0 | 0 | 3 |
 | `UI-102` Contracts Ledger > Offers view | view | `contracts_ledger` | 0 | 0 | 0 |
 | `UI-103` Contracts Ledger > Active view | view | `contracts_ledger`, `mercenary_slice` | 0 | 0 | 3 |
