@@ -19,10 +19,41 @@ corpus generator, not a runtime**, producing the supervised traces a small model
 action-generating seat (Ben, 2026-08-08 — § 10g).** Read § 10 before any work on the language
 layer.
 
-**The goal.** A computer opponent of **roughly human skill** — a genuine rival across Io's loop
-(extraction, trade, conflict), **beatable** by a decent human, and **legible** (moves read as
-sensible, not alien or scripted). Explicitly *not* a superhuman optimiser and *not* a handicap-only
-fake.
+**The goal (Ben, 2026-08-31).** A computer opponent that plays like a **person**, not like an
+optimiser. Three properties, and the third orders the other two.
+
+**Skilled.** A genuine rival across Io's loop — extraction, trade, conflict — whose moves are
+**legible**: they read as sensible, not alien and not scripted. Skill is never dialled down. The
+scorer plays as well as it knows how.
+
+**Diplomatic.** It deals rather than merely competes. Stance, contracts and lobbying are positions
+it takes toward named parties, for reasons it can state (§ 7).
+
+**Restrained — it knows when to hold back.** Its objective is not *maximise my own position*. It is
+**stay narrowly ahead**: hold a slim margin over the strongest corporation in the world, and decline
+to press an advantage it already holds.
+
+**The margin is an objective, not a difficulty dial.** This is the load-bearing distinction in this
+document. Nothing is taken from the AI, no information is withheld from it, and it is handed
+nothing free. It scores holding back *above* pressing because holding back is what its objective
+rewards — the actor is undiminished and only the target moved. § 1 Area 4's fairness ordering
+weighs handicaps against genuine skill; an objective change does not sit on that ordering at all,
+because the AI is still playing its hardest at the thing it is trying to do.
+
+**The objective is uniform across corporations, and names no player.** Every corp holds the same
+rule and measures it against whoever leads, so rivals restrain each other exactly as they restrain
+a human. A margin term that named the player's corp specifically would be rubber-banding aimed at
+one seat, and would fail the moment the player is not the leader — or, under spectate, not present.
+The player is simply another corporation to it.
+
+**Transparent by construction**, which is § 1 Area 4's own tolerance test. A restrained move carries
+its reason — *held: already ahead* — into the decision log like every other move, so restraint reads
+as a choice rather than as a failure to act.
+
+**What follows.** A rout is a failure of the objective, in the same way a collapse is. Superhuman
+play is a regression, not an achievement. The measure of this AI is therefore the **margin it
+holds**, taken against the strongest corporation in the world — not an absolute wealth band, which
+says nothing about whether anyone was played with.
 
 ---
 
@@ -209,6 +240,12 @@ out-of-process policy over the state export.
 - **Benchmark seed-set (golden):** freeze N seeds spanning body/terrain/market diversity; the AI's
   economic outcomes become regression goldens (net-worth curve, survival rate, win-rate vs a
   reference AI). Re-run headlessly on every AI change — the direct analogue of `verifier-headless`.
+  **The primary metric is the MARGIN, not the level.** § "The goal" makes the objective relative,
+  so an absolute wealth band cannot score it: a run where every corp got rich together and a run
+  where one corp ran away both sit inside a generous net-worth band, and only the second is a
+  failure. The banded quantity is therefore the **spread between the leading corporation and the
+  field** — held narrow is a pass, a widening gap is the regression, and an absolute band survives
+  only as a solvency floor underneath it.
   `tools/verify/ai_skill_harness.cpp` is that harness.
 - **Bot-vs-bot rollouts** as the primary skill signal.
 - **Deterministic offline policy evaluation:** same seed, two policies, exact A/B.
@@ -865,7 +902,9 @@ fine-tuning corpus for the local model. This is CivAgent's data-flywheel pattern
 no-human-data self-play, applied to a game whose deterministic seeds can generate the scenarios
 for free (§ 3). Which layer that corpus trains is § 10g's ruling.
 
-**The goal remains "fair, beatable, legible", not "strong".** § 10c.1 is what makes this
+**The goal remains "fair, beatable, legible", not "strong"** — and since § "The goal" the ceiling
+is sharper still: the target is a **held margin**, so a fine-tune that made the model *win harder*
+would be moving away from the goal, not toward it. § 10c.1 is what makes this
 credible: parity with a tuned algorithmic 4X AI was reached *without any fine-tuning at all*, so
 the fine-tune's job is to get a **small** model to that bar — not to exceed it. Superhuman play
 is explicitly not the target and would be a regression against the § "The goal" statement.

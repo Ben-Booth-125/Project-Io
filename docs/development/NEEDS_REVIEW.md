@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*109 entries — 94 open, 15 resolved.*
+*96 entries — 96 open, 0 resolved.*
 
 ---
 
@@ -956,325 +956,53 @@ ON THROUGHPUT SPECIFICALLY, since you expected it to match one: it does not, and
 
 *Files: `docs/ui/LENSES.md`, `src/ui/nav_pane.cpp`, `docs/ui/ledgers/corporation.md`, `docs/ui/ledgers/balance.md`*
 
+### NR-743 — The margin is measured against the strongest corporation, uniformly - not against the player specifically
+*decision taken on your behalf · raised 2026-08-31 · from Sprint 26 opening. Ben, 2026-08-31: "trying to match the skill of their opponent, and beating them by a slim margin."*
+
+Rewriting AI_OPPONENT.md § The goal needed one thing decided that Ben's sentence leaves genuinely open: a slim margin over WHOM.
+
+TWO READINGS, both faithful to the words.
+  (a) UNIFORM - every corp holds the same rule and measures it against whoever currently leads. The player is simply another corporation to it.
+  (b) PLAYER-FACING - the margin term reads the player's corp specifically, so the AI tracks the human's performance and stays just above it.
+
+I TOOK (a) AND WROTE IT INTO THE DOC. Three reasons, in order of weight:
+  1. (b) is rubber-banding aimed at one seat. § 1 Area 4's own finding is that players tolerate rubber-banding only when it is explicit, and revolt when they detect it hidden. (a) is a rule about the world; (b) is a rule about the human, and reads as one the first time somebody notices it.
+  2. (b) has NO SUBJECT UNDER SPECTATE - the mode this very sprint exists to watch through (BL-695, live spectate route). A margin term that degenerates to nothing in spectate cannot be tuned in the mode we intend to tune it in.
+  3. (b) fails when the player is NOT the leader. Tracking a struggling human means the AI throttles down to match, which produces a world where nothing is happening rather than a close race.
+
+WHAT (a) COSTS, honestly stated. It does not literally 'match the skill of the opponent' when the opponent is mid-field: the AI holds a narrow margin over the LEADER, and if that leader is another rival, the player can be beaten by considerably more than a slim margin while the objective is technically satisfied. (b) is the truer reading of Ben's sentence taken literally. If the felt experience under (a) turns out to be 'the rivals had a close race and I was nowhere', that is the signal to revisit - and the fix is likely a hybrid (uniform rule, but the margin measured against the field's median rather than its leader) rather than a swing to (b).
+
+CHEAP TO OVERTURN NOW, expensive later. It is one term's definition in BL-698 (scorer margin term), which is not yet built. Once the tunables are calibrated against it, changing the measured quantity invalidates the tuning.
+
+**Why it matters.** It is the definition of the sprint's central quantity, and every tunable in BL-698 (scorer margin term) and every band in BL-697 (skill harness margin metric) is calibrated against whichever reading stands. It is also the difference between a design that survives being noticed and one that does not.
+
+> **Recommendation:** Keep (a) through the sprint and JUDGE IT BY WATCHING, under BL-695's (live spectate route) spectate. The question is not answerable on paper - it is whether a run feels like a close race or like a race you were not in. Revisit at the sprint retro with an actual run to point at.
+
+*Files: `docs/ai/AI_OPPONENT.md`, `src/world/corp_ai.cpp`, `tools/verify/ai_skill_harness.cpp`*
+
+### NR-744 — Three purged AI items still hold dated standing-rule grants and have no owner
+*observation · raised 2026-08-31 · from Sprint 26 opening; found while sizing the diplomatic half of the AI thread.*
+
+The 2026-08-23 cull purged BL-450 (rivals score stance), BL-539 (rival lobbying), BL-540 (nation stance gates the player) and BL-334 (Stage C dialogue layer). None was completed - the cull's own note is explicit that nothing in it is open work and nothing in it is done.
+
+THEIR GRANTS DID NOT GO WITH THEM. io-standing-rules.md still carries, dated and argued at length, Ben's 2026-08-22 permission for a rival to act politically against the player's corp (naming BL-539 and BL-540 by id), his same-date grant for a rival to score stance (naming BL-450), and AI_OPPONENT.md § 7 still names BL-334 as the item carrying Stage C.
+
+SO THE STANDING RULES CITE FOUR ITEM IDS THAT NO LONGER EXIST as work anywhere. A reader following those citations lands in the purge archive, whose note correctly says nothing in it is open - which is true of the record and false of the intent.
+
+BL-699 (rival stance scoring) resurrects the first, authored fresh. The other three remain unowned.
+
+This is the same failure shape as NR-70x's FINANCE.md finding: a document describing something in the present tense that no code and no item backs. Here it is subtler, because the rules are not wrong - the permission genuinely stands. It is the ID CITATIONS that dangle.
+
+**Why it matters.** The standing rules are the always-on file every session reads. An id in it that resolves only to a purge archive teaches the reader that its citations are unreliable, which is expensive for a file whose whole value is that it can be trusted without checking.
+
+> **Recommendation:** Two options, Ben's call. (1) Mint owners for lobbying, nation-stance-gating and Stage C now, so the citations resolve - probably the sprint after 26, since all three sit above the margin term. (2) Or edit the standing rules to cite the RULINGS by date rather than by item id, which is what the state-independence rule would prefer anyway - a doc citing a BL- id as the owner of a design is fine, citing one that no longer exists is not.
+
+*Files: `.claude/rules/io-standing-rules.md`, `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`*
+
 ---
 
 ## Resolved
 
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
-
-### NR-710 — The History ledger Ages view produced no frame in nineteen minutes, and no check has ever opened it
-*observation · raised 2026-08-29 · from Sprint 24 (ledgers), the batch-3 capture pass: shell_pass.lua over the thirteen slots plus a new ledger_pass.lua over every sub-view and scroll foot.*
-
-MEASURED, this build, this fixture: selecting history_view = 2 (Ages) and rendering produced NO CAPTURE after nineteen minutes of solid CPU. The run was killed rather than left to finish, so the pass could reach the views after it.
-
-Cause, read out of tile_inspector.cpp: the Ages cache is built inline on the drawing thread - run_history_sim(cached_ss, ..., start_year 0, stop_year campaign_epoch_year) over the body’s real terrain - so the first frame that shows the tab replays the whole Era -1 political history before it returns. In the built app that is a tab click that stops the application, with no progress and no way back.
-
-WHAT IS AND IS NOT ESTABLISHED: that no frame arrived in nineteen minutes is measured. Whether the sim is very slow or does not terminate on this fixture is NOT established - CPU climbed steadily throughout, which is consistent with both. Neither reading should be repeated as fact.
-
-WHY IT WAS NEVER SEEN: no verify script has ever selected this view. history_ledger_and_comms.lua covers Story and Chain and returns to Story. verify.ages_year was added with BL-277 and, until ledger_pass.lua, was called by nothing. A view shipped, documented in ledgers/tile_ledger.md, and never once rendered by a check.
-
-SECOND HALF, same fix window: tile_inspector.cpp sets s.ages_year = 0 on the frame it rebuilds the cache, which is the frame a script park lands on - so even once it renders, a captured Ages frame shows year 0 whatever the script asked for.
-
-> **RESOLVED.** RESOLVED 2026-08-30, and the stated cause was wrong. This entry offered two readings - the sim is very slow, or it does not terminate. Neither. The sim is not slow; the call site was asking for a different sim.
-
-Generation runs the era at 400 BCE -> 0 CE on one four-year band: 100 decision rounds, ~23 s. `tile_inspector.cpp` built its own `history_sim_params` - start_year 0, stop_year 1960, tick bands left at the struct default - and the default ladder's last band ends at year 0, so every year past it fell back to a ONE-YEAR step. 1960 rounds against 100, on a span lying entirely after the era the world has.
-
-The view now calls `era_minus_one_sim_params` / `era_minus_one_sim_seed`, and the scrubber parks at the run's own first year rather than 0 - which closes this entry's second half too. First frames of the view ever captured, by `scripts/verify/ages_replay.lua`.
-
-WHAT IS NOT CLOSED, and moved rather than dropped: the view is still expensive (minutes, on the drawing thread) and its political content is empty by construction, because the settlement it replays is the state AFTER generation's own sim. That is NR-733, and it is a save-format question. The wider lesson - that this was a seventh caller of an invocation `era_minus_one.hpp` exists to make singular - is NR-732.
-
-*Files: `src/ui/tile_inspector.cpp`, `src/core/verify_api.cpp`, `scripts/verify/ledger_pass.lua`*
-
-### NR-712 — The Contracts ledger says ticks in two call sites, against the standing display rule
-*observation · raised 2026-08-29 · from Sprint 24 (ledgers), the batch-3 capture pass: shell_pass.lua over the thirteen slots plus a new ledger_pass.lua over every sub-view and scroll foot.*
-
-contracts_ledger.cpp:207 prints "Contract deadline in %d ticks" and :297 prints "Deadline in %d ticks". Both are on screen in the captures - the Offers view shows it three times over, once per offer.
-
-The display word is qtr, never tick (NR-002, your ruling 2026-08-01) - a Tick is literally a calendar quarter, and every other surface honours it: the Construction ledger says "~N qtrs", the Market ledger convoy rows say "1 qtr" / "2 qtrs", the header says "/ qtr".
-
-Two call sites, mechanical. Filed rather than fixed because it is one line of a larger contracts pass the batch is about to take, and because the same view has three other wording problems worth ruling on together: offers name their target as "Province #31808" (a raw entity id), the Accept press is greyed with an unexplained "(still filling)", and "escrow 5 / 400" appears with no definition anywhere on the surface.
-
-> **RESOLVED.** MOOT 2026-08-30, by retirement rather than by fix. `contracts_ledger.{cpp,hpp}` no longer exists - BL-693 deleted the mercenary contract surface in Sprint 24a, and both offending call sites went with it. Confirmed: no file matches `src/ui/contracts_ledger.*`.
-
-The standing display rule it was raised against (qtr, never tick - NR-002) is unchanged and unchallenged; there is simply nothing left on this surface to correct. The three sibling wording problems named here - "Province #31808" as a raw entity id, the unexplained "(still filling)", and undefined "escrow 5 / 400" - are gone with the same file. Resolved rather than kept, because keeping it would leave a queue entry pointing at a deleted file.
-
-*Files: `src/ui/contracts_ledger.cpp`*
-
-### NR-715 — ledger_pass.lua is new and unauthorised as a skill - a second class-wide capture instrument beside shell_pass
-*novel-work · raised 2026-08-29 · from Sprint 24 (ledgers), the batch-3 capture pass: shell_pass.lua over the thirteen slots plus a new ledger_pass.lua over every sub-view and scroll foot.*
-
-The batch needed every ledger SUB-VIEW, and shell_pass.lua only opens each slot on its default view. I authored scripts/verify/ledger_pass.lua: 36 captures over the thirteen slots - four expanded corp roll-ups, the Balance foot, three Economy views, four Research eras, three Market views, both ends of the corporations table, four History views and its three Chain rounds, the Generation ledger, both observability panels, three Contracts views.
-
-Flagged because the standing rule says a check without a tool should become one, and "tool creation is skill creation" needs your permission before it is named in a SKILL.md. verifier-visual auto-discovers scripts/verify/*.lua so it is RUNNABLE without that; naming it as a review instrument beside shell_pass is your call.
-
-It also deliberately does NOT capture the Ages view (NR-710) and records why in its own footer, which is the second thing worth your eye: a capture instrument that documents what it cannot reach, rather than quietly covering twelve of thirteen and reading as if it covered all of them.
-
-> **RESOLVED.** REGISTERED, Ben 2026-08-30 ("name all four as skills"). `ledger_pass.lua` is named in `.claude/skills/verifier-visual/SKILL.md` under the file's own "authorising a new check = naming it" convention, alongside `ages_replay`, `generation_ledger` and `lens_ledger_pairs`.
-
-The entry's second half stands as written and is why it was worth filing: a capture instrument that documents what it CANNOT reach beats one that quietly covers twelve of thirteen and reads as if it covered all of them. Its Ages footer has since been rewritten twice as the reason changed - first the parameters, then the re-simulation itself (NR-733) - which is the practice working.
-
-*Files: `scripts/verify/ledger_pass.lua`*
-
-### NR-720 — quarterly_return R2 fails on main and nothing owns it
-*observation · raised 2026-08-29 · from Sprint 24, verifying BL-685 (exchange record). Reported by the agent as pre-existing; confirmed here by a different method.*
-
-`quarterly_return` fails R2 — "every filed net == that tick's measured apply_budget delta, EXACTLY" — on current main. A search of the backlog and this file finds NO owner: no item, no prior entry, nothing.
-
-IT IS NOT BL-685's. The agent said so having reverted `market_clearing.cpp` to HEAD and reproduced. I checked it a different way rather than re-running its experiment: the whole clearing diff is ONE lambda that constructs an `exchange_record` and pushes it, called at four sites. No arithmetic, no balance write, no mutation of supply, demand or price. A budget identity cannot be broken by an append.
-
-WHY IT MATTERS MORE THAN ONE RED ROW. R2 is the assertion that the FILED return matches what the money loop actually did — the quarterly return is what the profitability ledger prints, what the acquisition price is read off (`corp_acquisition_price` uses trailing net), and what a player judges a buyout by. If a filed net can disagree with the real delta, then the price on the Acquisitions ledger is computed from a number that does not match the books. That is a correctness question about a figure now on two surfaces, not a stale test.
-
-It may well be small — a rounding tolerance, an ordering, a flow the harness does not model. But "exactly" is what it asserts, and nobody has looked.
-
-RELATED, and the reason this went unnoticed: `spectator_determinism` is also red on main, tracked as NR-661 (its golden was stale before wave 1). Two red harnesses on main train the eye to expect red, which is how a third arrives unremarked.
-
-> **RESOLVED.** RESOLVED 2026-08-30. It was the ASSERTION, not the money loop, and the measurement says so decisively.
-
-MEASURED before changing anything, on a diagnostic copy of the harness: 640 filed rows, 7 mismatched, max absolute error 9.2e-05 Cr, max RELATIVE error 3.89e-08. That last figure is float epsilon (2^-24 = 5.96e-08), which is the whole answer. Example row: net 2352.101562 against a measured delta of 2352.101471 - a difference below one float ULP at that magnitude.
-
-THE CAUSE. `net` and `balance` are both floats. The assertion compared `(double)net` against `d`, an exact DOUBLE difference of two floats, and demanded bit equality. That tests whether the sum happened to be exactly representable, not whether the books agree - which is why every AGGREGATE assertion in the same harness passed exactly while this one failed: the sums round identically on both sides.
-
-THE FIX IS STRICTER, NOT LOOSER, and that mattered here (your standing rule: never weaken a failing test to pass). No tolerance was added. The line now replays the addition the money loop actually performed - `(float)(balance_before + net) == balance_after` - and requires the stored balance back bit for bit. That is the invariant worth asserting, it is exact, and it passed on ALL 640 rows the moment it was tried (verified by a second diagnostic build before the real harness was touched).
-
-SO THE CORRECTNESS WORRY THIS ENTRY RAISED IS ANSWERED: the filed net IS exactly what apply_budget added, on every row. The profitability ledger's figure and the acquisition price read off trailing net are sound. `quarterly_return` is ALL PASS (0 failures) on main.
-
-THE ENTRY'S OTHER OBSERVATION STANDS AND IS NOT CLOSED BY THIS: two red harnesses on main train the eye to expect red, which is how a third arrived unremarked. `spectator_determinism` (NR-661) is still red.
-
-*Files: `tools/verify/quarterly_return.cpp`, `src/world/budget_system.cpp`, `src/world/components.hpp`*
-
-### NR-722 — Arming a lens on ledger open has no owning doc, and slot 7 is the first to do it
-*novel-work · raised 2026-08-29 · from Sprint 24, BL-689 (convoys ledger). Flagged by the agent, filed here.*
-
-The Convoys ledger arms `supply_routes` when it opens. NO LEDGER HAS EVER DONE THIS — every ledger doc in `docs/ui/ledgers/` proposes a lens-on-open and none was built, so the pairing existed only as a recurring proposal until now.
-
-It is a good pairing and it is the reason Convoys left the Market ledger at all: a tab strip can arm only one lens, and the old third tab always got the price wash when it wanted the lane overlay. But the BEHAVIOUR is unowned. `LENSES.md` documents no menu-triggered arm; the ledger docs propose them individually with no rule behind them.
-
-The questions a rule would have to answer, none of which any doc does: does closing the ledger DISARM the lens, or does it persist (corporation.md guessed persist, on the grounds that lens state is canvas-owned)? Does opening a second ledger re-arm to that one's lens? What happens when the player has deliberately chosen a lens and then opens a ledger — is their choice overridden?
-
-Slot 7 answers all three by implementation rather than by design, and the next ledger to want a lens will copy whatever it did. Worth Ben settling before that happens.
-
-> **RESOLVED.** ANSWERED BY GIVING IT AN OWNER, 2026-08-30, which is what this entry asked for. LENSES.md gains "The other direction - a ledger opens, its lens arms": the pairs that exist, the test for what counts as a pair (both directions must name each other, which is what stops this becoming a lens on every slot), and BOTH arming rules.
-
-THERE ARE TWO RULES NOW, and the second arrived exactly the way this entry warned the first had. Slots 6 and 7 arm a FIXED lens on open. History arms `continent` ON ENTERING the Tectonics view (Ben, 2026-08-30) - and that was raised as NR-742 and ruled on rather than implemented quietly, which is this entry's own precedent being honoured.
-
-ONE OF THE THREE UNOWNED QUESTIONS IS NOW SETTLED: a lens the player deliberately chose is NOT overridden - arming happens on the edge, never while the view is open, and `lens_ledger_pairs.lua` asserts it. Closing still does not disarm, also asserted.
-
-WHAT REMAINS UNOWNED, and it is smaller than what this entry found: whether opening a SECOND paired ledger should re-arm to that one's lens. Today it does, because each slot arms on its own press and nothing coordinates them. Nobody has needed the answer yet; recorded in LENSES.md as open rather than left silent.
-
-*Files: `src/ui/convoys_ledger.cpp`, `docs/ui/LENSES.md`, `docs/ui/ledgers/`*
-
-### NR-731 — The retired mercenary system still runs every tick and still talks to the player
-*question · raised 2026-08-29 · from Sprint 24a, BL-693. Raised by the agent as the call its brief did not settle.*
-
-BL-693 removed the mercenary contract SURFACE and left the world-side records dormant, as Ben asked ("keep it lightweight"). They are not dormant.
-
-`run_nation_step` calls **`derive_contract_offers` and `run_mercenary_contract_tick` every tick** (`nation_step.cpp:99,105`). So offers are still generated, and client nations still drip escrow into them, for a surface that no longer exists.
-
-Worse, it SPEAKS: `app.cpp:1169` still posts contract dispatches to the **Public comms channel** — *"We have opened contract terms for %P"* — so a player is told about an offer with no door to open. And `balance_ledger.cpp:336` still draws **"Contract income: Cr N"**.
-
-THE BALANCE LINE IS THE ONE THAT IS NOT SIMPLY DEAD, which is why the agent left it: it reads `subsidies`, which also carries live national-budget transfers. Deleting the line would hide a real flow; leaving it labelled "Contract income" names it wrongly. That needs a decision, not a deletion.
-
-This is the fourth instance of the sprint's recurring shape — a mechanism that runs and is invisible, or is visible and does not run. Here it is both at once: invisible where it should be readable, and audible where it should be silent.
-
-THE OPTIONS: stop calling the two tick functions (cheapest, and the world stops generating offers nobody can take); or keep generating and silence the comms post; or tear the records out properly and move the save envelope. The third is the honest end state and the most expensive. Ben's call — and it should be taken before the next session, because a player running the build today gets told about contracts that do not exist.
-
-> **RESOLVED.** RULED: TEAR THE RECORDS OUT PROPERLY, and DELETE the Balance ledger's line - Ben 2026-08-30, the most expensive of the three options this entry offered and both halves of the question.
-
-Gone: `mercenary_offer` and `mercenary_contract` with their state enum and helpers; the two world vectors and their id allocators; `derive_contract_offers` and `run_mercenary_contract_tick`; the four (de)serialisers and both save sections; `contract_dispatch`, `economy_report::contract_events`, the five-bank dispatch text and `post_contract_events` - so the Public-channel voice this entry led with is silent because there is nothing left to speak; the Selection element's contract card; `contract_template_registry`, `scripts/contracts.lua`, and the two harnesses that existed only for this system. `world_save_version` 19 -> 20. Procurement is untouched.
-
-ONE PLACE "PROPERLY" COULD NOT BE HONOURED, and it is worth knowing: `accept_offer` and `abandon_contract` REMAIN IN `corp_verb` as rejecting tombstones. That enum is append-only by contract - deleting a value renumbers every verb below it and silently re-points ACTIONS.json and every recorded command. Breaking that invariant to finish a cleanup would trade one debt for a worse one. They reject rather than falling through to a default, and their ACTIONS.json entries are removed, so they are no longer controls.
-
-TWO CONSEQUENCES LARGER THAN THE CLEANUP, both written into the owning docs: MILITARY.md loses its second battle trigger (a corp holding a contract engaged the client nation's garrison automatically - it had NEVER fired), so nothing decides to fight a nation any more though `open_battle` can still open one; and META_LAYER.md loses its only content, because the two authored rows in contracts.lua were the ONLY non-empty `condition_set` in the game.
-
-*Files: `src/world/nation_step.cpp`, `src/core/app.cpp`, `src/ui/balance_ledger.cpp`*
-
-### NR-732 — The Ages view was a SEVENTH caller of the era sim, and diverged from generation on all six of BL-462's axes
-*observation · raised 2026-08-30 · from Sprint 24b, the Ages params fix. Found while measuring NR-710's hang rather than accepting its stated cause.*
-
-NR-710 recorded that Ages produced no frame in nineteen minutes and offered two readings - very slow, or non-terminating. NEITHER WAS RIGHT. The sim is not slow; this call site was asking for a different sim.
-
-MEASURED: generation runs the era at 400 BCE -> 0 CE on ONE four-year band - 100 decision rounds, ~23 s, priced in `hard_coded_world.cpp`'s own loading-screen comment. `tile_inspector.cpp` constructed its own `history_sim_params`: `start_year = 0`, `stop_year = 1960`, tick bands left at the struct default. The default ladder's last band ends at `until_year 0`, so EVERY year past it falls back to a ONE-YEAR step. 1960 rounds against 100, on a span lying entirely AFTER the era the world actually has.
-
-WHY THIS IS WORTH YOUR EYE RATHER THAN JUST A FIX. `world/era_minus_one.hpp` exists precisely to close this defect - BL-462 found that no check in the project measured the run that actually generates a world, and built ONE construction of the invocation so nothing could drift again. Its scope was HARNESSES. The Ages view is a seventh caller nobody counted, and it diverged on all six axes at once: span, clock, seed (a literal `7u` against `params.seed ^ 0x415C1E17u`), creeds (null, which flattens every polity's aggression to a neutral 500), works (null, a four-verb contest where generation runs five), and the settlement (the state AFTER generation's sim).
-
-THE LESSON IS ABOUT SCOPE, NOT ABOUT THIS VIEW. A file built to stop a class of defect stopped it for the callers its author was thinking about. The UI was not one of them, and nothing made the omission visible - there is no check that says "every caller of run_history_sim derives its params here". That guard is buildable and does not exist.
-
-FIXED, in part: the view now calls `era_minus_one_sim_params` / `era_minus_one_sim_seed`, closing span, clock and seed. THE OTHER THREE ARE NOT CLOSABLE FROM THIS SEAM - the creeds, the works table and the pre-sim settlement are none of them in the `generation_report`, deliberately (it is serialised, and the fixture was kept off the save seam for that reason). See NR-733.
-
-> **RESOLVED.** SUPERSEDED BY ITS OWN FIX, 2026-08-30, and closed with the observation intact.
-
-The seventh caller no longer exists: NR-733's ruling deleted the Ages view's re-simulation entirely, so all six divergences this entry enumerated are closed - not by correcting them one by one, but by removing the second invocation. `era_minus_one.hpp` now records that a seventh caller existed and that nothing made it visible.
-
-THE LESSON THIS ENTRY WAS FILED FOR IS NOT CLOSED, and is worth carrying: a file built to stop a class of defect stopped it for the callers its author had in mind. There is still no check that says "every caller of `run_history_sim` derives its params here" - buildable, and it does not exist. Filed as an observation rather than an item because the caller it would have caught is gone; the next one will not be.
-
-*Files: `src/ui/tile_inspector.cpp`, `src/world/era_minus_one.hpp`, `src/world/hard_coded_world.cpp`, `scripts/verify/ledger_pass.lua`*
-
-### NR-733 — What should the Ages view replay - and should generation record the timeline instead of the view re-simulating it?
-*question · raised 2026-08-30 · from Sprint 24b, the Ages params fix. The call the fix could not settle.*
-
-With the span, clock and seed corrected the view renders - first frames ever captured of it - and what it shows raises the real question.
-
-MEASURED across the era, 1920x1080, staged fixture: region count 1343 (400 BCE) -> 1710 (200 BCE) -> 2090 (0 CE); power count PINNED AT 12 throughout; the run's own summary line reads "0 battles, 0 conquests, 757 foundings". It is a SETTLEMENT time-lapse wearing a political one's label - the view asks "how did its polities rise and fall?" and nothing rises or falls.
-
-THE CAUSE IS BL-462's DIVERGENCE 6, and it is not a parameter. `generation_report::body_entry::settlement` is the state AFTER generation's sim has mutated it in place, so the replay starts the era from its own ending: every region already exists and is already owned, so there is nothing left to conquer and the sim can only re-found. No amount of parameter correction reaches this.
-
-IT IS ALSO WHY THE VIEW IS STILL EXPENSIVE. Replaying a full map rather than a growing one costs minutes on the DRAWING THREAD (the capture script's wall time is ~5 min against a ~1.5-3 min baseline for the same world without Ages; the machine was loaded and that is a range, not a figure I would defend to a second digit). The nineteen-minute hang is gone. A clickable tab it is not.
-
-THE OPTIONS, and the third is the honest one:
-  1. Leave it re-simulating and move the sim off the draw thread, with progress and a way back. Cheapest, and it keeps a view whose political content is empty by construction.
-  2. Hand the view the pre-sim settlement so the replay is real. Needs the fixture's settlement to reach the UI, which means either widening the report (a SAVE-FORMAT change - the report is serialised in full) or re-deriving it, which is the drift BL-462 exists to prevent.
-  3. Have generation record its own `owner_changes` into the report and have the view REPLAY rather than re-simulate. The time-lapse then shows the history the world actually has, costs nothing to draw, and deletes the seventh caller entirely. Also a save-format change, and the largest.
-
-Option 3 is the end state option 1 defers. Your call, and it is the one that decides whether this view has a subject.
-
-> **RESOLVED.** RULED: GENERATION RECORDS `owner_changes`, THE VIEW REPLAYS IT - Ben 2026-08-30, option three of the three offered, and the one that costs a save-format change. `save_game_version` 2 -> 3.
-
-THE ENTRY'S DIAGNOSIS HELD EXACTLY. The parameters were never the problem: with span, clock and seed corrected the view rendered and still reported 0 battles and 0 conquests, because the report's `settlement` is the state AFTER generation's sim mutated it - so a re-run started the era at its own ending. Recording the timeline closes all six of BL-462's divergences at once by deleting the second caller.
-
-MEASURED AFTER: 4 battles, 1 conquest, 1184 foundings over 1334 changes - the era the world actually has, where it read 0 and 0.
-
-THE COST WENT WITH THE SIM, which answers the entry's second question without needing its own decision: a capture pass that opens Ages six times runs in 4m32s against 4m24s for one that never opens it. About eight seconds, where it was minutes on the drawing thread.
-
-`owner_change` and `owner_none` moved to a new dependency-free `world/era_timelapse.hpp`, because the record crosses from history_sim.hpp into generation_report and hard_coded_world.hpp refuses in its own words to include the former. Moved rather than copied.
-
-*Files: `src/ui/tile_inspector.cpp`, `src/world/era_minus_one.hpp`, `src/world/hard_coded_world.hpp`, `docs/ui/ledgers/tile_ledger.md`*
-
-### NR-734 — ages_replay.lua is a new capture script and is unauthorised as a skill - the NR-715 shape again
-*novel-work · raised 2026-08-30 · from Sprint 24b, the Ages params fix.*
-
-I authored `scripts/verify/ages_replay.lua`: six captures walking the Ages transport - the resting frame, then 400 BCE / 300 / 200 / 100 / 0 CE - plus the clipping assertion.
-
-WHY IT IS A SCRIPT RATHER THAN FOUR LINES IN `ledger_pass`. Ages is the only ledger view whose subject is TIME, so one frame of it proves almost nothing: the review question is whether a frontier MOVES, which is a comparison across years. `ledger_pass` captures one frame per sub-view by construction, and it should not pay minutes of sim time for a thirteen-slot sweep.
-
-Flagged for the same reason NR-715 was: the standing rule says a check that becomes a tool should become a SKILL, and naming it in a SKILL.md is your permission, not mine. `verifier-visual` auto-discovers `scripts/verify/*.lua`, so it is runnable as it stands.
-
-ALSO DONE, and worth a glance because it changes what an existing instrument claims: `ledger_pass.lua`'s "Ages - why this pass does not capture it" footer asserted a cause that measurement overturned, so it is rewritten to say what is now true and to record that its own earlier reading was wrong. A footer explaining an omission is only worth having while it is accurate.
-
-> **RESOLVED.** REGISTERED with the other three, Ben 2026-08-30. `ages_replay.lua` is named in verifier-visual's SKILL.md.
-
-Its subject changed under it after filing, and the script's header now records that: the view no longer re-runs the era at all (NR-733), so what the script asserts is that the REPLAY shows generation's own history - the battle and conquest counts, which read 0 and 0 for as long as the view derived its own era.
-
-*Files: `scripts/verify/ages_replay.lua`, `scripts/verify/ledger_pass.lua`*
-
-### NR-737 — The Generation ledger lost its Tile tab, and draw_tile_derivation now has no caller at all
-*decision · raised 2026-08-30 · from Sprint 24b, the Generation ledger reformat. Ben: "We can drop the tile tab."*
-
-Done as asked - the Body/Tile strip is gone and the ledger is one flat panel. Recorded because of what went with it, which the instruction did not name.
-
-`ui::draw_tile_derivation` - the five-step per-tile breadcrumb, ~250 of the file's 573 lines and the best explanatory prose in the ledger family - was called from ONE place, the Tile tab. It now has no caller anywhere.
-
-ITS HEADER SAYS IT SHOULD HAVE THREE. The declaration reads: "Factored out because the ledger is not its only intended caller - the hover card and the Selection info element show the same causal chain in a condensed frame." That wiring was never built. So the function was factored out for callers that do not exist, and its one real caller has now gone.
-
-I KEPT IT rather than deleting it, and that is the call to overturn if you disagree. Reasons: the content is the asset, its stated destination is unchanged and reasonable, and deleting 250 lines of written explanation is not what "drop the tile tab" asked for. The cost is a dead export carrying a comment that describes an intention rather than a fact - which is the shape of NR-717, filed nine days ago about a doc paragraph doing exactly this. I have noted the gap at the declaration and in GENERATION_LEDGER.md rather than letting the comment keep reading as a description.
-
-THE REAL QUESTION IS WHERE IT GOES: wire it into the Selection element (its stated home, and a tile is already a Selection subject), wire it into the hover card, or delete it and accept that the why-did-this-tile-generate question is no longer answerable anywhere.
-
-> **RESOLVED.** RULED: DELETE, Ben 2026-08-30. `draw_tile_derivation` is gone, with the two helpers (`moisture_col`, `moisture_col_name`) that served only it.
-
-The alternative readings - wire it into Selection, wire it into the hover card - were both live options and both refused. What is worth keeping from this entry is WHY the function was there to be deleted: its header had claimed since it was factored out that the hover card and the Selection element were its real callers, and that wiring was never built. It was factored out for callers that do not exist, then lost the one it had. The doc now says the tile-grain question is not answered anywhere, rather than implying a surface that never existed.
-
-*Files: `src/ui/generation_ledger.cpp`, `src/ui/generation_ledger.hpp`, `docs/generation/GENERATION_LEDGER.md`*
-
-### NR-738 — verify.section is a new verify API, and it is the first hook that refuses an unknown name
-*novel-work · raised 2026-08-30 · from Sprint 24b, the Generation ledger reformat.*
-
-The reformat put the ledger's whole content behind six `CollapsingHeader` sections, and NOTHING COULD OPEN ONE FROM A SCRIPT. `panel_view` sets an int view index; a section is a `ui_state` bool, so no amount of extending it would have reached them. I added `verify.section(name, open)`.
-
-It covers the Generation ledger's six, plus three that were already unreachable for the same reason and had been since they landed: the Construction queue, and the Acquisitions ledger's two roll-ups.
-
-ONE DELIBERATE DEPARTURE FROM THE HOUSE PATTERN, and it is the part worth your eye. Every other name-dispatch hook in verify_api.cpp IGNORES a name it does not recognise - `panel_view` says so in a comment ("Unknown names are ignored"). That is how a script came to ask for the Generation ledger's Tile view, receive nothing, and still report a green run (NR-714's shape, and the reason NR-710's Ages view went four months uncaptured). `verify.section` PRINTS the unknown name and the list of known ones. It does not fail the run.
-
-Worth a ruling because it sets a precedent in a shared file: if refusing loudly is right here, it is right for `panel_view`, `fold` and the rest, and that is a small sweep rather than a one-line change. I have not touched the others.
-
-ALSO NEW AND UNAUTHORISED AS A SKILL, the NR-715/NR-734 shape a third time: `scripts/verify/generation_ledger.lua` - four captures (resting index, all sections open, the distributions scrolled to the foot, and the state after a REAL header press), plus a deliberate unknown-section call to prove the refusal fires.
-
-> **RESOLVED.** NAMED AS SKILLS, Ben 2026-08-30. `generation_ledger.lua` and `lens_ledger_pairs.lua` are registered in verifier-visual's SKILL.md.
-
-THE OTHER HALF OF THIS ENTRY WAS NOT TAKEN, and deliberately: Ben selected "name all four as skills" and did NOT select "spread the refusal". So `verify.section` keeps its refuse-on-unknown- name behaviour and `panel_view`, `fold` and the rest keep theirs. The asymmetry is now a recorded choice rather than an oversight, which is what this entry existed to get.
-
-*Files: `src/core/verify_api.cpp`, `scripts/verify/generation_ledger.lua`, `scripts/verify/ledger_pass.lua`*
-
-### NR-739 — Zero rows are now SHOWN in the Generation ledger's distributions, reversing that file's own rule
-*decision · raised 2026-08-30 · from Sprint 24b, the Generation ledger reformat. A call taken inside "reformat", which you may read as beyond it.*
-
-The old `histogram_row` opened with `if (count == 0) return;` and the comment "an absent category says nothing; the zero rows crowd out the signal". The new tables show every category, with a dash in the share column.
-
-WHY I CHANGED IT. On a tuning surface an absent category says a great deal. The default body generates ZERO `valley` tiles, zero `metallic` and zero `regolith` substrate, and zero `salt` cover - and under the old rule each was indistinguishable from a category that does not exist. I only found the valley gap by reading the enum against the capture and counting rows. A bordered table of seven to ten rows has room for the zeroes that a hand-aligned text block did not.
-
-FLAGGED BECAUSE YOU SAID THE DATA WAS GREAT, and which rows appear is arguably data rather than formatting. It adds rows and removes none. One line to revert.
-
-> **RESOLVED.** NOT OVERTURNED. Filed as a call taken inside "reformat" that Ben might read as beyond it; he reviewed the batch on 2026-08-30 and left it standing.
-
-It earned itself immediately: showing zero rows is how `valley` surfaced as a landform that NEVER GENERATES on the default body, along with zero `metallic`, zero `regolith` and zero `salt`. Under the old rule each was indistinguishable from a category that does not exist. That finding is now the Generation ledger doc's open question.
-
-*Files: `src/ui/generation_ledger.cpp`*
-
-### NR-740 — The Landform histogram counts ocean as plains, so every share on it answers a question nobody asked
-*question · raised 2026-08-30 · from Sprint 24b, measured off the Generation ledger's own capture.*
-
-MEASURED on the default body, 15120 tiles: Landform reads Plains 14405 (95.27%), Mountain 109 (0.72%). Substrate on the same grid reads Ocean 8154 (53.93%) and Lake 227.
-
-Water tiles carry `terrain_landform::plains` - there is no water landform - so more than half the plains row is sea floor. Over land the plains share is nearer 89% and mountain nearer 1.6%, better than double what the table shows. Roughly, because whether `coast` (689) counts as land moves it, and that ambiguity is part of the question.
-
-THIS IS THE SURFACE WHOSE JOB IS GENERATOR TUNING. The row that answers "how mountainous is this world" is diluted by the sea, on the one screen a person consults before changing a constant.
-
-WHAT I DID AND DID NOT DO. I put the denominator in every distribution header, so all three now say "(15120 tiles)" out loud. That makes it visible; it does not resolve it. I did not change a number - you said the data was great, and re-basing a histogram is a decision, not a reformat.
-
-THE ASYMMETRY IS WHY THIS IS A QUESTION. Substrate genuinely wants the whole grid, because ocean is one of its own categories. Landform does not. So "use land as the denominator" cannot be applied to all three, and the options are: keep one shared denominator and name it (today), give Landform a land-only denominator, or show both columns on Landform alone.
-
-SEPARATELY, AND PROBABLY THE BIGGER FINDING: even read over land, 89% plains means Pass 5's clusters are barely firing, and `valley` never fires at all. That is a generation tuning question, not a UI one, and it is the ledger doing exactly what it exists for.
-
-> **RESOLVED.** RULED: LAND-ONLY DENOMINATOR FOR LANDFORM, Ben 2026-08-30, of the three options offered.
-
-Substrate and Cover keep the whole grid; Landform is taken over land alone, and each header names which denominator it used. The asymmetry is the point rather than an inconsistency - ocean is one of Substrate's OWN categories, so excluding water there would delete a real row.
-
-`is_water()` (components.hpp) is the single definition and it settled the sub-question this entry flagged as genuinely ambiguous: COAST IS WATER, with lake and ocean, which is why the denominator is 6050 rather than 6739.
-
-MEASURED BEFORE AND AFTER: 95.27% plains / 0.72% mountain over the grid; 88.18% / 1.80% over land.
-
-THE ENTRY'S LAST PARAGRAPH IS NOT CLOSED BY THIS and has been promoted into GENERATION_LEDGER.md's open questions: even read correctly, 88% plains means Pass 5's clusters are barely firing, and `valley` never fires at all. That is a generation tuning question, and it only became legible once the denominator was right.
-
-*Files: `src/ui/generation_ledger.cpp`, `docs/generation/GENERATION_LEDGER.md`, `docs/generation/TILE_GENERATION.md`*
-
-### NR-742 — History/Tectonics is a real lens pair, and taking it would invent a second arming rule
-*question · raised 2026-08-30 · from Sprint 24b, the lens/ledger pass. The one pair I found and did not build.*
-
-`Continent` routes to "History ledger, at its tectonic record", and BL-660 built the press that gets there. So the pair is real and the reverse arm would close the loop exactly as Market's now does.
-
-I DID NOT BUILD IT, and the reason is the rule rather than the pair. Slots 6 and 7 arm a FIXED lens on open - every tab of the ledger gets the same one. History carries four views and only Tectonics has a map twin: arming `continent` for a player who opened on Story would override their lens for a view about deep-time biography, and History opens on whatever view it was last left on.
-
-Making it follow the sub-view instead would be a SECOND arming rule sitting beside the fixed one - and NR-722 exists precisely because slot 7 answered three unowned questions by implementation and the next ledger would copy it. Inventing a second rule the same way, in the same sprint that flagged the first, seemed like the wrong instinct.
-
-THE OPTIONS: fixed-arm on History open and accept that three of four views get a lens they have no use for; arm on entering the Tectonics VIEW (sub-view-following, the new rule); or leave History unpaired and keep the one direction that already works, since a plate press already lands here.
-
-This is the same decision NR-722 asks for, arriving with a concrete case attached.
-
-> **RESOLVED.** RULED: ARM ON ENTERING THE TECTONICS VIEW, Ben 2026-08-30 - the option that costs a second arming rule, over the two cheaper ones (fixed arm on open, or leave History unpaired).
-
-So there are now two rules, and which one a slot uses follows from how many questions its ledger answers. Slots 6 and 7 arm a FIXED lens on open, because their ledgers answer one question on every tab. History answers four and only Tectonics has a map twin.
-
-ARMED ON THE EDGE, NOT WHILE ON THE VIEW, which is the part that needed asserting rather than assuming: a player who reaches Tectonics and then deliberately picks another lens keeps it. `lens_ledger_pairs.lua` checks all three properties - opening on Story arms nothing, entering Tectonics arms `continent`, and a lens chosen afterwards survives.
-
-Both rules are written into LENSES.md rather than left to be inferred from nav_pane.cpp, which is what NR-722 asked for and is the reason this was raised instead of built.
-
-*Files: `docs/ui/LENSES.md`, `src/ui/tile_inspector.cpp`, `src/ui/nav_pane.cpp`*
-
-### NR-743 — The lens-on-open arm is unreachable from show_panel AND from verify.nav_slot, so slot 7's pairing was never checked
-*observation · raised 2026-08-30 · from Sprint 24b, the lens/ledger pass. Found by writing the check and watching it pass while proving nothing.*
-
-The arm lives in the rail slot's `Selectable` press in nav_pane.cpp. Two consequences, and the second is the trap:
-
-  1. `verify.show_panel` writes the ui_state flag directly, so it opens the ledger and arms NOTHING. That is expected - it is the documented shortcut.
-  2. `verify.nav_slot(n)` DOES NOT PRESS ANYTHING. Despite the name it returns the slot's centre coordinates and nothing else. My first cut of the check called it, saw the ledger open, and reported `overlay = none` - the arm had simply not run.
-
-So no check that opens a ledger by either route can observe a lens arm, and BL-689's convoy pairing has been unverified since it landed. `scripts/verify/lens_ledger_pairs.lua` now asserts both pairs through a REAL press (nav_slot for the point, `verify.click` for the press), and it asserts both halves of the rule - that opening arms, and that closing does NOT disarm, the latter being a behaviour rather than the absence of one.
-
-THE NAME IS THE DEFECT. `verify.nav_slot(6)` reads at every call site like "press rail slot 6". It is a coordinate getter. Renaming it (`nav_slot_centre`, matching the C++ function it wraps) would cost one sweep and remove a trap that has already cost this sprint one silent false pass. Not done - renaming a verify API touches every script that uses it.
-
-> **RESOLVED.** RECORDED, and the check that found it is now a named skill (NR-738). `lens_ledger_pairs.lua` asserts both pairs through a real press - `verify.nav_slot` for the point, `verify.click` for the press - and BL-689's convoy pairing is asserted for the first time since it landed.
-
-THE NAMING DEFECT IS NOT FIXED. `verify.nav_slot(6)` still reads at every call site like "press rail slot 6" and still only returns coordinates. Renaming it to `nav_slot_centre` (matching the C++ function it wraps) would cost one sweep across every script that uses it. Left as it is - the trap is now documented in the one script most likely to hit it, and a rename touches a verify API surface far wider than this sprint.
-
-*Files: `src/core/verify_api.cpp`, `scripts/verify/lens_ledger_pairs.lua`*
 

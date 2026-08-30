@@ -91,6 +91,26 @@ ONE ITEM WAS RESCUED FROM THE DELETED BATCH 4 and is carried here rather than dr
 
 METHOD, unchanged and proven across batches 1 and 3: capture the whole class first, send it to Ben in one go, take his calls, build, re-capture, and expect the re-capture to find something the code read did not. Capture at 1920x1080 for a design review and keep the fit check at 1280x720 - the two are different questions (sprint 24b's rule).
 
+### Sprint 26 — The AI that holds back - a rival worth watching
+*Open · opened 2026-08-31*
+
+**Goal.** Make the rival play like a person rather than an optimiser, and be ABLE TO WATCH IT DO SO. The goal statement changed first: the objective is now RELATIVE - hold a slim margin over the strongest corporation - which turns restraint from a handicap problem into a term in the utility function, and gives diplomacy something to be about. The sprint builds the two instruments (a decision feed that reads, a harness that bands the margin), then the objective itself, then stance. The felt goal is Ben’s, 2026-08-31: "hopefully by the end of this sprint we can use a spectator mode to view AI playing in real time, and tighten core gameplay loops."
+
+**Planned.**
+- BL-695 (live spectate route) - FIRST, and it is the sprint’s own instrument. Spectate is today reachable ONLY from a --verify script (verify.spectate is the single assignment site in the tree), so "watch the AI play in real time" is not currently possible from the running game. Everything below is watched through this.
+- BL-696 (decision feed reasons) - FIRST, with it. NR-626: every feed row reads ‘overridden’ at 0.00, so the only window onto rival reasoning is blank. Tuning anything else before this is tuning blind.
+- BL-697 (skill harness margin metric) - the measurement. ai_skill_harness bands absolute net worth and cannot score a relative objective at all. Carries NR-305’s stale-band debt: re-derive from a fresh bless with dated provenance.
+- BL-698 (scorer margin term) - THE ITEM THE SPRINT IS FOR. corp_ai.cpp scores purely absolutely today; the only mention of player_entity is to exclude it. Lands after both instruments, by design.
+- BL-699 (rival stance scoring) - diplomacy. The four stance verbs from BL-448 exist on the seam and the scorer issues none of them. Sits after the margin term, which is what gives stance its grammar.
+
+THE DESIGN CALL TAKEN ON BEN’S BEHALF, logged as NR-703 and cheap to overturn now: the margin is measured against the STRONGEST CORPORATION IN THE WORLD, uniformly, and the rule names no player. The alternative - a term that reads the player’s corp specifically - is truer to "match the skill of their opponent" read literally, but it is rubber-banding aimed at one seat, it fails the moment the player is not the leader, and it has no subject at all under spectate, which is the very mode this sprint is built to watch through. Written into AI_OPPONENT.md § The goal as the uniform form.
+
+ORDERING IS THE WHOLE PLAN AND IS NOT NEGOTIABLE: instruments (BL-695, BL-696, BL-697) before behaviour (BL-698, BL-699). Three of the five items exist because the thing that would have measured or shown the fourth is broken or absent.
+
+PROVENANCE WORTH CARRYING: the diplomatic half of this thread had authority and no owner. BL-450 (rivals score stance), BL-539 (rival lobbying), BL-540 (nation stance gates the player) and BL-334 (Stage C dialogue) were all PURGED in the 2026-08-23 cull, not completed - while their dated GRANTS survive in io-standing-rules.md. BL-699 resurrects only the first, authored fresh per the cull’s own rule. The other three are still unowned and are candidates for the sprint that follows.
+
+EXPECT MORE THAN ONE PASS. How wide "slim" is, and how hard the margin term bites, are corp_ai_params data - tuned against real runs, watched through spectate, not settled on paper.
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -134,6 +154,7 @@ METHOD, unchanged and proven across batches 1 and 3: capture the whole class fir
 | 24b | UI visibility - batch 3b: the ledgers not yet read | Closed 2026-08-30 - the six unread ledgers reviewed, three rebuilt, and the batch's review queue worked through rather than filed forward. |
 | 21 | The other half of the economy - demand | PAUSED 2026-08-28 with wave 0 landed - the UI batches take priority; resume at wave 1 (BL-640/641/642) |
 | 25 | UI visibility - batch 5: canvases & the zoom ladder | Proposed 2026-08-28 as sprint 26; RENUMBERED to 25 on 2026-08-30 when Ben retired the shell-chrome and startup batches - "Sprint 25 and 27 don't need a revisit, UI items for these are working great." |
+| 26 | The AI that holds back - a rival worth watching | OPENED 2026-08-31 on Ben’s central aim - "an AI which is highly skilled, works diplomatically, and knows when to hold back... matching the skill of their opponent, and beating them by a slim margin". AI_OPPONENT.md § The goal was rewritten first, on 2026-08-31, before any item was minted. |
 
 **Next up.** SPRINT NUMBERING, reset by Ben on 2026-08-30: the proposed shell-chrome (old 25) and startup (old 27) batches are DELETED - "Sprint 25 and 27 don't need a revisit, UI items for these are working great" - and the canvases batch renumbered from 26 to 25. THE NEXT NEW SPRINT IS 26. Two of the six UI review batches from 2026-08-28 therefore never run, and that is a judgement that their surfaces are good enough rather than a deferral.
 
@@ -143,4 +164,4 @@ NEXT UP: sprint 25 (canvases & the zoom ladder), carrying BL-694 (top-bar tracke
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*37 sprints archived cold; 2 open/gated in the hot store.*
+*37 sprints archived cold; 3 open/gated in the hot store.*
