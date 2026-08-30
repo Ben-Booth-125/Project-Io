@@ -28,6 +28,40 @@ without editing this file. The lens / canvas / panel checks form the bulk
 the ledger checks, …). v0.0.8 (Discovery & Intelligence) additions, named here per
 the "authorising a new check = naming it" convention:
 
+Sprint 24 (ledgers) additions, registered on Ben's ruling 2026-08-30 (NR-715, NR-734,
+NR-738). All four drive REAL PRESSES rather than only capturing frames, for the reason
+`corp_disclosure` below already establishes:
+
+- **`ledger_pass.lua`** (NR-715) — the **class pass**: every nav-rail ledger's SUB-VIEW and the
+  foot of every ledger that scrolls, from one staged world. The companion to `shell_pass`, which
+  opens each slot on its DEFAULT view only — the wrong instrument for a design review, because most
+  of what a ledger holds is not on its resting frame. Runs at **1920×1080**; `shell_pass` stays at
+  1280×720 deliberately, since worst-case fit and design review are different questions
+  (Ben, 2026-08-29).
+
+- **`ages_replay.lua`** (NR-734) — the History ledger's **Ages** view, walked across its own era
+  (the resting frame, then 400 BCE / 300 / 200 / 100 / 0 CE). Its own script because Ages is the
+  one ledger view whose subject is **time**: a single frame proves almost nothing, and the review
+  question — does a frontier move — is a comparison across years. The run summary's battle and
+  conquest counts are the assertion that matters; they read 0 and 0 for as long as the view
+  re-derived the era instead of replaying generation's own (NR-733).
+
+- **`generation_ledger.lua`** (NR-738) — the Generation ledger's six collapsing sections: the
+  resting index, every section open, the distributions scrolled to the foot, and **the state after
+  a real header press**. That last frame is the standing "a UI requirement needs a live check" rule
+  paid in the harness — the headers are driven by `SetNextItemOpen(ImGuiCond_Always)`, which is
+  precisely the shape that can swallow a click. It does not, and this is the observation rather
+  than the argument. It also calls a deliberately unknown section, to prove `verify.section`
+  complains instead of silently doing nothing.
+
+- **`lens_ledger_pairs.lua`** (NR-738) — every rail slot that **arms a lens on open**, asserted
+  through a real rail press. Both halves of the rule are checked: opening arms, and closing does
+  **not** disarm — the latter being a behaviour, not the absence of one. Slot 10 (History) carries
+  the second arming rule and its own three assertions, including that a lens the player chose
+  afterwards survives. **`verify.nav_slot` presses nothing** — it returns a slot's centre
+  coordinates — which is why the pairing landed with BL-689 and went unasserted until this script
+  (NR-743).
+
 - **`corp_disclosure.lua`** (BL-633, registered on Ben's ruling 2026-08-26 — NR-664) — the
   Corporations panel under the disclosure gate: exact reach and share on every row, capital where
   the firm files and a dash where it does not. **It injects a REAL PRESS** through ImGui's own event

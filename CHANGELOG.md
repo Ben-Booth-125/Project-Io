@@ -12,6 +12,80 @@ release.
 
 ## [Unreleased]
 
+## [0.1.23] — 2026-08-30
+
+*Sprint 24b closes the ledger pass: the six surfaces batch 3 never read. It reviewed all six,
+rebuilt three, and spent its second half on the queue those reviews produced — which is where the
+value was. **Its headline finding is that a recorded cause was wrong**, twice over.*
+
+### Changed
+- **The Ages view replays a recorded era instead of re-running one** (NR-710, NR-732, NR-733). It
+  had produced **no frame in nineteen minutes**, and the filed cause said the sim was slow or did
+  not terminate. Neither. `tile_inspector.cpp` built its own `history_sim_params` — 0 → 1960 CE
+  with the tick bands left at their struct default, so every year past 0 fell back to a **one-year
+  step**: 1960 decision rounds where generation runs 100, on a span lying entirely *after* the era
+  the world has.
+
+  Correcting the span, clock and seed made it render for the first time — and it still reported
+  **0 battles and 0 conquests**, because the settlement it replayed is the state *after*
+  generation's sim mutated it. A re-run starts the era at its own ending. So generation now
+  **records** its ownership history and the view replays that: **4 battles, 1 conquest, 1184
+  foundings over 1334 changes**, and a cost of about **eight seconds** where it had been minutes on
+  the drawing thread. `save_game_version` 3.
+- **The Generation ledger is one flat panel of six collapsing sections over tables**, and its Tile
+  tab is gone. Zero rows are now shown, which is how `valley` surfaced as a landform that **never
+  generates** — along with zero `metallic`, zero `regolith` and zero `salt`, each previously
+  indistinguishable from a category that does not exist.
+- **Landform is measured over land** (NR-740). Water carries `plains` and the grid is more than half
+  ocean, so the table read 95.27% plains and 0.72% mountain where the answer over land is **88.18%
+  and 1.80%**. Substrate and Cover keep the whole grid — ocean is one of Substrate's own categories
+  — and each header now names which denominator it used.
+- **Opening a ledger can arm its lens** (NR-722, NR-742). Market arms the price wash; Convoys
+  already armed the lane overlay; History arms the Continent lens **on entering its Tectonics view**
+  — a second arming rule, because History answers four questions and only one has a map twin.
+  `LENSES.md` owns both rules, and the test for what counts as a pair: both directions must name
+  each other.
+
+### Removed
+- **The mercenary contract, entirely** (NR-731). BL-693 removed its surface and left the world side
+  "dormant". It was not dormant: both tick passes ran every tick, so nations kept funding offers —
+  and it still **posted to the Public comms channel**, telling players about contract terms for a
+  surface that no longer existed. Records, passes, serialisation, the authored template table and
+  the comms traffic are gone; `world_save_version` 20. **Procurement is untouched.**
+
+  Two enum values survive as **rejecting tombstones**: `corp_verb` is append-only, and deleting a
+  value would renumber every verb below it and silently re-point `ACTIONS.json` and every recorded
+  command.
+- **`draw_tile_derivation`** (NR-737) — the per-tile derivation breadcrumb, whose header had claimed
+  since it was factored out that the hover card and Selection element were its real callers. That
+  wiring was never built.
+
+### Fixed
+- **`quarterly_return` R2 was red on main with no owner** (NR-720), on a check whose subject is the
+  figure the profitability ledger prints and the acquisition price is read off. **It was the
+  assertion, not the money loop**: 7 of 640 rows, max *relative* error 3.89e-08 — float epsilon.
+  It compared a `float` net against a `double` difference of two floats and demanded bit equality.
+  The replacement is **stricter, not looser** — it replays the addition the loop performed and
+  requires the stored balance back bit for bit, with no tolerance, and passes on all 640 rows.
+
+### Recorded, not fixed
+- **Retiring the mercenary contract cost two things larger than the cleanup.** `MILITARY.md` lost
+  its second battle trigger — a corp holding a contract engaged the client nation's garrison
+  automatically. It had **never fired**, and `open_battle` still opens a corp-vs-nation fight, but
+  nothing *decides* to any more. And `META_LAYER.md` lost its only content: the two authored rows in
+  `contracts.lua` were the **only non-empty `condition_set` in the game**, so the predicate
+  substrate is now a mechanism nothing exercises end to end.
+- **`verify.nav_slot` presses nothing** (NR-743). It returns a slot's centre coordinates while
+  reading at every call site like a press — which is why BL-689's lens pairing went unasserted from
+  the day it landed. The name is still wrong; renaming it touches every script that uses it.
+- **Still red on main:** `spectator_determinism` (NR-661). The tear-out also moved the staged
+  fixture's `state_hash`, so goldens keyed to it may want a re-bless this release did not sweep.
+- **Two whole sprints were retired rather than run** — the shell-chrome and startup review batches,
+  judged good enough rather than deferred. One item was rescued from them: BL-694, a top-bar tracker
+  for the quantities that gate progression. Two of its three (an untradeable **Boost**, and research
+  points) do not exist yet, which makes it a design item before it is a UI one.
+
+
 ## [0.1.22] — 2026-08-30
 
 *Sprint 24a closes: every nav-rail ledger reviewed against live captures, and most rebuilt rather
@@ -958,7 +1032,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.22...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.23...HEAD
+[0.1.23]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.22...v0.1.23
 [0.1.22]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.21...v0.1.22
 [0.1.21]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.20...v0.1.21
 [0.1.20]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.19...v0.1.20

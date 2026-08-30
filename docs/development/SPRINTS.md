@@ -75,37 +75,7 @@ and/or a version goal (v0.1.1 etc.).
 
 PAUSED 2026-08-28 on Ben's instruction, wave 0 complete (BL-648 guard, BL-649 census). Nothing is abandoned: the guard is deliberately red, the census is the before/after instrument, and wave 1 resumes where it stopped. Opened on Ben's instruction, 2026-08-26 ('A, and open it as sprint 21'), after the session's own measurement answered his question: the ancient band has TWO live demand sinks, and ten goods pass the orphan check by naming a 'mercantile demand' that grep says was never built (NR-671). Ceiling advanced to 21 on the same instruction. ORDERING IS LOAD-BEARING: BL-648 and BL-649 go FIRST, not last. The guard makes the gap visible and the census makes each pass measurable - without them a viability pass is a guess with a number attached. A red guard with a named list is worth more than a green one that means nothing; do not weaken it to pass while the channels are being built. SEVERAL CHANNELS ARE DESIGNED-BUT-INERT rather than missing, which is why the sprint is cheaper than it looks: `strategic_reserve` is already a goods-buying budget line no consumer claims on; `logistics_maintenance` already names network upkeep; recipes already carry the era field the demand baskets need; and `run_unit_upkeep` is already the credits-plus-goods shape BL-641 wants for buildings. RELATIONSHIP TO SPRINT 20: Sprint 20 stays open and owns the ledger, the buyout and the spawn shortlist. Its BL-634 (acquisition viability) CANNOT honestly pass until this sprint lands - a corp at -28/qtr never saves up for anything - so BL-634's measurement is the natural close-out for BOTH sprints. BL-630's shortlist gains a real mechanism to gate on once demand exists: BL-635 measured that a spawn's survival currently depends on whether the generator handed it a resource anyone wants.
 
-### Sprint 24b — UI visibility - batch 3b: the ledgers not yet read
-*Open · opened 2026-08-30*
-
-**Goal.** Finish the ledger pass. 24a reviewed and rebuilt most of the rail; SIX SURFACES WERE NEVER READ - History, Research, Generation, AI decisions, Strategy readout, and Budget beyond a glance. History is the first and the largest, and Ben has it queued.
-
-**Planned.**
-- HISTORY (slot 10) is first, and Ben named it. Three concrete targets, all resolution-independent: the AGES VIEW HANGS - no frame in nineteen minutes (NR-710), so a whole view has never been opened by any capture, golden or person; the biography REPEATS ITSELF VERBATIM (3.39 Gya and 3.27 Gya draw the identical sentence and the identical consequence line); and it OPENS AT 6.28 Gya, so a player meets the star forming before their own world.
-- The Tectonics view (BL-660) is uncatalogued - ui_elements.json still describes a Tiles view that no longer exists, and ui_state.hpp`s history_view comment reads "2=Tiles, 3=Ages" against an enum of Story/Chain/Ages/Tectonics. Two errors in one line.
-- RESEARCH (slot 4) is the only ledger that hijacks the whole canvas instead of living in the column, and its node labels overlap and truncate - two nodes both read "Semiconductor F...". Ben has DEFERRED tech, so this is a layout pass on a mock, not a design of the system behind it.
-- BUDGET (slot 2) - small and resolution-independent now that the backlog id is gone: the Extraction Levy line clips, building names truncate, and the Profit label overlaps the axis label. Its density complaint DISSOLVED at 1080p and should not be re-raised.
-- The developer tail (11-13) - Generation, AI decisions, Strategy readout. Ben: these are debug tools. Cheapest pass in the batch: clipped corp names, an unexplained "overridden" on every decision row, and a legend whose red tier never appears in any bar.
-- NR-731 - the retired mercenary system still runs every tick and still posts to the Public comms channel. A player is told about contracts with no door to open. Cheapest fix is to stop calling the two tick functions.
-
-Opened because 24a grew past its own scope: it set out to review thirteen ledgers and instead rebuilt seven, created two, deleted two, and spent its second half on findings the review turned up rather than on the surfaces still unread. Splitting rather than extending keeps 24a`s retro honest about what it actually did.
-
-METHOD CARRIED FORWARD, and 24a proved all three halves. Capture the class first and send it to Ben in one go. Run the review barrier over the integrated diff. And MEASURE BEFORE RESHAPING - which in 24a overturned a stated plan five times, twice where the wrong premise was mine and once where it was Ben`s.
-
-ONE NEW RULE THE BATCH EARNED: capture at 1920x1080 for a design review, and keep shell_pass at 1280x720 for the fit check. The two are different questions and 24a needed both on the same day - a density complaint measured at 720p was made against half the height Ben has, and the fourteenth rail slot broke the 720p floor invisibly at 1080p.
-
-### Sprint 25 — UI visibility - batch 4: shell chrome
-*Proposed · opened 2026-08-28*
-
-**Goal.** Review the persistent chrome - header, profile tile, nav rail, time panel, comms dock, minimap and the system/options menus. Everything on screen at all times, and therefore everything whose cost is paid on every frame the player looks at.
-
-**Planned.**
-- UI-025..UI-028, UI-051..UI-069, UI-099 in the catalogue
-- Observations already banked from batch 1: the minimap is near-empty at Planetary zoom; the Comms dock carries one line in a full column; the header shows NET +-0/qtr with no Runway readout (UI-055, NONE coverage); the nav rail glyphs read alike at rail size
-
-One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's instruction: "Let's make a sprint for each batch." The decomposition is by ELEMENT CLASS from docs/ui/ui_elements.json, because that is the spine the coverage tool already reports against - `node tools/session/ui_coverage.js --captures --since N` groups a run by element, so a batch's review list is a command rather than a judgement. Batch 1 (lenses) is sprint 22, closed. METHOD, proven in batch 1: capture the whole class first, send it to Ben in one go, take his calls, build, re-capture, and expect the re-capture to find something the code read did not.
-
-### Sprint 26 — UI visibility - batch 5: canvases & the zoom ladder
+### Sprint 25 — UI visibility - batch 5: canvases & the zoom ladder
 *Proposed · opened 2026-08-28*
 
 **Goal.** Review the three canvases and the ladder between them - Solar, Circumplanetary, Planetary - plus the render layers that sit on them (tiles, terrain, roads, settlements, fog, borders, provinces) and the keyboard navigation model.
@@ -113,19 +83,13 @@ One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's
 **Planned.**
 - UI-001..UI-024, UI-094..UI-097 in the catalogue
 - The body-to-body lenses deferred from batch 1 (Supply, Supply-routes, Reach) - Ben, 2026-08-28: "I don't think we need body-to-body lenses yet. Keep the code but ignore for this session." They are canvas-grain, so they belong here
+- BL-694 (top-bar tracker) - Ben, 2026-08-30, the one piece carried out of the retired shell-chrome batch. Steel / Boost / Research points on the top bar as 'absolute (+delta/qtr)'. TWO OF THE THREE QUANTITIES DO NOT EXIST YET: Boost is a new untradeable resource and untradeability is not a property the resource model has, and research points have no representation in src/world at all. So this is a design item before it is a UI one, and its research third is gated on BL-619.
 
-One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's instruction: "Let's make a sprint for each batch." The decomposition is by ELEMENT CLASS from docs/ui/ui_elements.json, because that is the spine the coverage tool already reports against - `node tools/session/ui_coverage.js --captures --since N` groups a run by element, so a batch's review list is a command rather than a judgement. Batch 1 (lenses) is sprint 22, closed. METHOD, proven in batch 1: capture the whole class first, send it to Ben in one go, take his calls, build, re-capture, and expect the re-capture to find something the code read did not.
+Was sprint 26, one of six UI review batches split out on 2026-08-28. RENUMBERED to 25 on 2026-08-30, when Ben closed out the other two proposed batches on the grounds that their surfaces are already working: batch 4 (shell chrome - header, profile tile, nav rail, time panel, comms dock, minimap, menus) and batch 6 (startup - main menu, the New World wizard, the generation screen). Neither was descoped for cost; both were judged done enough not to earn a review pass.
 
-### Sprint 27 — UI visibility - batch 6: startup & the wizard
-*Proposed · opened 2026-08-28*
+ONE ITEM WAS RESCUED FROM THE DELETED BATCH 4 and is carried here rather than dropped with it: the top-bar tracker, BL-694. It is header-grain rather than canvas-grain, so it sits slightly outside this sprint's theme - deliberately, because it is the only piece of shell chrome Ben still wants and keeping it needs no sprint of its own.
 
-**Goal.** Review the path in - main menu, the New World wizard and its three rounds - the only surfaces a player meets before the game exists, and the only ones with no world behind them to make them look busy.
-
-**Planned.**
-- UI-091..UI-093 in the catalogue
-- STARTUP.md owns the flow
-
-One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's instruction: "Let's make a sprint for each batch." The decomposition is by ELEMENT CLASS from docs/ui/ui_elements.json, because that is the spine the coverage tool already reports against - `node tools/session/ui_coverage.js --captures --since N` groups a run by element, so a batch's review list is a command rather than a judgement. Batch 1 (lenses) is sprint 22, closed. METHOD, proven in batch 1: capture the whole class first, send it to Ben in one go, take his calls, build, re-capture, and expect the re-capture to find something the code read did not.
+METHOD, unchanged and proven across batches 1 and 3: capture the whole class first, send it to Ben in one go, take his calls, build, re-capture, and expect the re-capture to find something the code read did not. Capture at 1920x1080 for a design review and keep the fit check at 1280x720 - the two are different questions (sprint 24b's rule).
 
 ## Where things stand
 
@@ -166,15 +130,17 @@ One of six batches the 2026-08-28 UI review split into, one sprint each on Ben's
 | 20 | The books open, and the start earns its way | Closed 2026-08-26 - GOAL MET AND PROVED. Fifteen items landed; BL-634 measured Ben's own criterion and it holds. Cuts v0.1.21. |
 | 22 | UI visibility - batch 1: lenses | Closed 2026-08-28 - the lens batch reviewed and reworked; the remaining element classes become their own sprints (23-27) |
 | 23 | UI visibility - batch 2: selection & hover | Closed 2026-08-28 - goal met. Twelve items across three waves; every planned item landed |
-| 21 | The other half of the economy - demand | PAUSED 2026-08-28 with wave 0 landed - the UI batches take priority; resume at wave 1 (BL-640/641/642) |
 | 24a | UI visibility - batch 3: ledgers | Closed 2026-08-29 - batch 3, the ledgers; goal met and exceeded, and four designed mechanisms found never to have run |
-| 24b | UI visibility - batch 3b: the ledgers not yet read | Opened 2026-08-30 straight out of 24a - the ledgers batch 3 did not reach |
-| 25 | UI visibility - batch 4: shell chrome | Proposed 2026-08-28 - one of the six UI review batches |
-| 26 | UI visibility - batch 5: canvases & the zoom ladder | Proposed 2026-08-28 - one of the six UI review batches |
-| 27 | UI visibility - batch 6: startup & the wizard | Proposed 2026-08-28 - one of the six UI review batches |
+| 24b | UI visibility - batch 3b: the ledgers not yet read | Closed 2026-08-30 - the six unread ledgers reviewed, three rebuilt, and the batch's review queue worked through rather than filed forward. |
+| 21 | The other half of the economy - demand | PAUSED 2026-08-28 with wave 0 landed - the UI batches take priority; resume at wave 1 (BL-640/641/642) |
+| 25 | UI visibility - batch 5: canvases & the zoom ladder | Proposed 2026-08-28 as sprint 26; RENUMBERED to 25 on 2026-08-30 when Ben retired the shell-chrome and startup batches - "Sprint 25 and 27 don't need a revisit, UI items for these are working great." |
 
-**Next up.** Sprint 22 (UI visibility, batch 1: lenses) CLOSED 2026-08-28. Sprint 21 (demand) is PAUSED with wave 0 landed. Next is sprint 23 (selection & hover), which Ben opens as a dedicated coding session - the two half-built region selections from batch 1 are its first work (NR-697, NR-698), and BL-659/BL-660 carry into it. Five items carry out of batch 1 with Ben's decisions already recorded: BL-659 deposit->Market Prices, BL-660 plate->a new tectonic History section (needs a divergent classification in continent_state, which does not exist - only `convergent` is computed), BL-661 population heatmap at scaling 2, BL-662 Scarcity re-cut keeping its name and taking the Opportunity glyph, BL-663 Company glyph as a cluster of small forms.
+**Next up.** SPRINT NUMBERING, reset by Ben on 2026-08-30: the proposed shell-chrome (old 25) and startup (old 27) batches are DELETED - "Sprint 25 and 27 don't need a revisit, UI items for these are working great" - and the canvases batch renumbered from 26 to 25. THE NEXT NEW SPRINT IS 26. Two of the six UI review batches from 2026-08-28 therefore never run, and that is a judgement that their surfaces are good enough rather than a deferral.
+
+OPEN AND PAUSED: sprint 24b (the ledgers not yet read) is the live one; sprint 21 (demand) stays PAUSED with wave 0 landed - its guard (BL-648) is deliberately red and its census (BL-649) is the before/after instrument for when it resumes. Sprint 20 also stays open and owns BL-634 (acquisition viability), which cannot honestly pass until sprint 21's demand channels land.
+
+NEXT UP: sprint 25 (canvases & the zoom ladder), carrying BL-694 (top-bar tracker) out of the retired batch 4.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*35 sprints archived cold; 5 open/gated in the hot store (1 completed and awaiting archive_sprints.js).*
+*37 sprints archived cold; 2 open/gated in the hot store.*
