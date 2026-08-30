@@ -1424,6 +1424,115 @@
         "src/world/corporation_generation.hpp"
       ],
       "resolution": "SETTLED 2026-08-28: Ben chose option C — the fixture reaches the state through the real verbs rather than re-enabling the seeder behind the game's back. Two properties bought: the captures depict a world a player can actually reach, and the BL-325 muster gate is exercised on every fixture run. Implemented and verified (see NR-693). The credits loan is repaid exactly, so every other surface still depicts the true opening economy; the goods grant is a new test-only hook, verify.grant_stock."
+    },
+    "NR-703": {
+      "id": "NR-703",
+      "title": "A save written under the Throughput or Company lens could not be loaded back",
+      "raised": "2026-08-28",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 23; found by the review barrier (finding 3) while checking the batch's serialisation seam.",
+      "what": "FIXED IN THIS BATCH, filed because of what it says about the class rather than the instance. save_game.cpp's `max_overlay` range bound was hand-kept at overlay_mode::supply_routes while two lenses had since been appended after it - throughput (Sprint 18) and company (2026-08-28). Saving with either active wrote a byte the loader's range check rejected, and a failed r_enum fails the WHOLE envelope, so the campaign simply would not reopen.\n\nSilent, total, and reachable by nothing more than picking a lens before saving. It predates this batch; what the batch changed is that the Company lens is now a destination a player has a reason to sit in.\n\nThe fix derives the bound from overlay_mode::count rather than naming a lens. WORTH A LOOK: the same file holds several hand-kept `max_*` constants (max_atmos, max_hydro, max_geo, max_bias, max_canvas). Each is a genuine domain bound rather than 'the last value', so none is wrong today - but the failure mode is identical if any of those enums grows, and it fails the entire save rather than one field.",
+      "files": [
+        "src/core/save_game.cpp"
+      ],
+      "resolved": "2026-08-29",
+      "resolution": "Resolved: the max_overlay bound now derives from overlay_mode::count rather than naming a lens, so appending a lens cannot make a save unreadable. Verified indirectly this sprint — three more lenses and two more ledgers landed without the envelope refusing a load."
+    },
+    "NR-705": {
+      "id": "NR-705",
+      "title": "The corporations table's NAME column is clipped to a single character",
+      "raised": "2026-08-28",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 23, live-clicking BL-666's corporation destination in the built app.",
+      "what": "Opening the all-corporations table from a Corporation-lens press showed every row as a single letter followed by its figures - \"C 1 bodies 1707.5 3% Neutral\", \"T 1 bodies -3677.3 0% Neutral\". The header reads \"C Reach Capital Share Stance\", so the name column is present and squeezed to about one glyph wide.\n\nThe table is unusable as a comparison surface in that state: it is a list of forty firms you cannot tell apart, and the row BL-666 aims cannot be read as the firm the player just pressed. The Selection band names the firm correctly, so the routing is right and the presentation is not.\n\nFound by looking, not by reading - the harness asserts open_panel and the aimed id, neither of which can see a column width. Sprint 24 (ledgers) owns this surface; filing it here so the batch that reviews it starts from a known defect rather than rediscovering it.",
+      "files": [
+        "src/ui/corporation_panel.cpp"
+      ],
+      "resolved": "2026-08-29",
+      "resolution": "Resolved by BL-674 (diplomacy by stance), verified 2026-08-29: the ImGui table is gone entirely — `corporation_panel.cpp` now has ZERO WidthStretch columns — and rows are drawn manually with every extent taken from the live content region. The one-glyph name column cannot recur here by the mechanism that caused it."
+    },
+    "NR-711": {
+      "id": "NR-711",
+      "kind": "observation",
+      "status": "resolved",
+      "raised": "2026-08-29",
+      "source": "Sprint 24 (ledgers), the batch-3 capture pass: shell_pass.lua over the thirteen slots plus a new ledger_pass.lua over every sub-view and scroll foot.",
+      "title": "The Economy ledger Holdings view still itemises every rival corporation stockpile",
+      "what": "Captured live: Economy > Holdings prints one expandable block per (corp x body) with EXACT quantities per resource for corporations the player does not own - Faros-YelenKalen 126.9 Iron Ore, 8.0 Agricultural Produce, 2.5 Peat; Exoar-Exoex 26.1 / 8.0; and so on down the list.\n\nThat is the competitor-visibility rule (DISCOVERY.md) broken on the one surface that breaks it. Every other surface in the app meets the redaction standard - the Selection card, the hover card, and the corporations table, which prints a dash where a firm does not file.\n\nThe doc that owns this surface, docs/ui/ledgers/economy.md, already flags it and names BL-482 (economy panel pools leak) as the owner. THAT ITEM NO LONGER EXISTS: backlog_query returns nothing for BL-482. So the defect is live, documented, and unowned - the doc is citing a dead id as its fix.\n\nDecision needed: refile the redaction as a sprint-24 item, or take economy.md’s own lead question (fold Economy into Corporation), which would delete the surface and the leak together.",
+      "files": [
+        "src/ui/economy_panel.cpp",
+        "docs/ui/ledgers/economy.md",
+        "docs/ui/DISCOVERY.md"
+      ],
+      "resolved": "2026-08-29",
+      "resolution": "Resolved by BL-676 (retire economy panel), verified 2026-08-29: `src/ui/economy_panel.{cpp,hpp}` no longer exist. The rival-stockpile leak is removed by DELETION rather than redaction, which is the stronger outcome — there is no surface left to disclose from."
+    },
+    "NR-716": {
+      "id": "NR-716",
+      "title": "shell_pass walks every rail slot by NAME, so it cannot see a renumbered rail",
+      "raised": "2026-08-29",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 24, verifying BL-676 (retire economy panel) after the rail was renumbered twice in one session.",
+      "what": "BL-676 moved Construction to slot 3, BL-675 had inserted Acquisitions at 5, and everything between shifted. The failure mode of a renumber is a rail that compiles and silently opens the WRONG SURFACE from a slot. shell_pass.lua is the check that looks like it would catch that - it is described as walking the thirteen nav-rail ledgers - and it CANNOT.\n\nIt reaches every ledger through verify.show_panel(\"construction\", true), which writes the ui_state flag directly. It never presses a rail slot, so nav_pane.cpp's switch is not on its path at all. Its green says every ledger DRAWS; it says nothing about which door opens which one. The capture filenames carry slot numbers, which makes it read as stronger evidence than it is - shell_22_slot03_construction.png is named by the script author, not measured.\n\nI verified the mapping by READING the switch instead, case by case, and it is correct. That is not a check and it will not survive the next renumber.\n\nSame shape as the four instances Sprint 21 collected: a check whose green means less than it appears. The fix is small - a check that clicks each rail slot at its known screen position and asserts pointer_target().open_panel is the expected surface, which verify.click and the existing open_panel field already support. Worth doing because the rail has now been renumbered twice in one session and will move again when Corp. Strategy is built.",
+      "files": [
+        "scripts/verify/shell_pass.lua",
+        "src/ui/nav_pane.cpp"
+      ],
+      "resolved": "2026-08-29",
+      "resolution": "Resolved 2026-08-29. `nav_rail_fit.lua` and `convoys_ledger.lua` now press rail slots through the real ImGui hit-test and assert which surface each opens — `convoys_ledger` covers 3/5/6/9/10/11/12/13. The gap this entry named (shell_pass reaches ledgers by NAME and so cannot see a renumber) is closed by a check that does not, and it earned itself twice: the rail was renumbered three times in one session."
+    },
+    "NR-718": {
+      "id": "NR-718",
+      "title": "BL-176's empty-room fix was deleted with the tab it lived on, and the problem came back unnoticed",
+      "raised": "2026-08-29",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 24, opening the Construction ledger review after Ben moved it to rail slot 3.",
+      "what": "The Construction panel draws two lines: \"Estimated cost: 0.0 / quarter\" and \"No active construction.\" That is the whole surface, and it now sits at slot 3.\n\nIT WAS DIAGNOSED AND FIXED ONCE ALREADY. `ui_state::construction::panel_view` still carries the comment: \"Defaults to Buildings (BL-176): the queue is empty most of the time, so opening on it made the panel's front door an empty room, while the player always owns buildings.\" BL-176 found this exact problem and solved it by opening on a Buildings roster instead of the queue.\n\nTHE 2026-08-15 REWORK DELETED THE FIX ALONG WITH THE TAB. construction_panel.cpp says so plainly: the Buildings tab and its inline detail moved onto the building Selection card, \"so the tab switcher and its selection-driven auto-focus are both gone with it; there is nothing left to switch between.\" That is a defensible move on its own terms — per-building configuration IS targeted, and the menus-are-broad-ledgers rule puts it on a Selection card. But it left the panel opening on the queue, which is the empty room BL-176 named, and nothing recorded that the fix had been undone.\n\nIT WENT UNNOTICED BECAUSE OF WHERE THE SLOT SAT. The panel was slot 6, then 7 after the Acquisitions insert. Ben moved it to 3 on 2026-08-29, which is why it is being read now. The rework was two weeks earlier.\n\nDEAD STATE LEFT BEHIND, and this is the part with a cheap fix. `construction.panel_view` is now WRITE-ONLY: verify_api.cpp:2241 sets it and nothing in src/ reads it. `construction.panel_focus_building` is referenced nowhere outside its own declaration. Both are fields describing a two-view panel that has one view, and the panel_view comment is a detailed description of a feature that does not exist — the kind of comment that is worse than none, because it reads as current.\n\nWHAT I WOULD NOT DO: quietly restore the Buildings tab. The rework moved that content for a reason and the doc (docs/ui/ledgers/construction.md) still carries \"does a Buildings roster earn a tab?\" as an open question for Ben. The question this raises is not \"put it back\" but \"what should the third slot on the rail show when nothing is building?\" — and that is a design call, not a defect fix.",
+      "files": [
+        "src/ui/construction_panel.cpp",
+        "src/ui/ui_state.hpp",
+        "src/core/verify_api.cpp",
+        "docs/ui/ledgers/construction.md"
+      ],
+      "resolved": "2026-08-29",
+      "resolution": "Resolved by BL-681 (construction two doors), verified 2026-08-29: the two tabs give `construction.panel_view` a real subject again with its comment rewritten, `panel_focus_building` is deleted, and the default tab is Buildings — so the empty-room front door BL-176 diagnosed is closed by the same reasoning that closed it the first time."
+    },
+    "NR-719": {
+      "id": "NR-719",
+      "title": "Two of four scrolled captures are the unscrolled frame, for two different reasons",
+      "raised": "2026-08-29",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Sprint 24, gathering Market captures for its redesign. Found by hashing two captures rather than by looking at them.",
+      "what": "`ledger_05_market_0_prices.png` and `ledger_05_market_0_prices_foot.png` are BYTE-IDENTICAL — same md5. The one named for the foot of the list is the head of the list. The Budget pair from the same run differ correctly, so the harness works; this surface defeats it.\n\nTHE CAUSE: `verify.scroll_panel(\"market\", …)` requests scroll on the window named \"Market Ledger\" (verify_api.cpp § scroll_panel), but the price sparklines are stacked inside an INNER child scroll region under \"Price over time\". The outer window scrolls and the inner child does not, so the request lands on the wrong scroller and silently does nothing.\n\nTHE CONSEQUENCE, and it is the reason this is filed rather than just fixed: the Market ledger prices roughly 42 goods, of which about 3.5 fit the column. NOTHING HAS EVER LOOKED AT GOODS 4 THROUGH 42 — not a capture, not a golden, not a human. Whatever is wrong down there has never been visible. That is a live blind spot going into the surface's redesign, and it is the single most useful thing to fix first.\n\nAND I WROTE THE CHECK THAT LIED. `ledger_pass.lua` is mine, from this session; its whole justification is that shell_pass only sees default views and misses what is below the fold. It produced a capture named `_foot` containing the head, and I did not notice until I hashed the pair — I had LOOKED at both images and read them as the same surface without registering that they were the same PIXELS. Exactly the shape Sprint 21 collected four instances of: a check whose green means less than it appears. The scroll helper needs to assert that the frame actually moved, which is one comparison and would have caught this on the run that introduced it.\n\nThe same doubt applies to every other `foot()` call in that script. The Budget pair is verified different; the corps-table, generation and history feet are not, and should be hashed before any of them is cited as evidence.\n\nHASHED ALL FOUR PAIRS AFTER FINDING THE FIRST. Two are false and the causes differ:\n  - MARKET prices: identical. scroll_panel knows the name and aims at the window \"Market Ledger\", but the sparklines live in an INNER child scroller, so the request lands on the outer window and moves nothing.\n  - GENERATION ledger: identical, and worse in kind. scroll_panel handles only tile/history, market, balance, corporation and construction - there is NO generation_ledger case at all. Its own comment says an unknown name CLEARS the request, so the call is a silent no-op by design. A caller cannot tell \"scrolled to the foot\" from \"this panel has no scroll hook\".\n  - Corps table and History story: verified genuinely different. Those two are sound.\n\nSO THE FIX HAS TWO HALVES. scroll_panel should REJECT an unknown name loudly rather than clearing the request - a silent no-op on a typo or an unhandled panel is how a capture comes to be named for content it does not contain. And the market case needs the request to reach the child scroller, not the window.",
+      "files": [
+        "scripts/verify/ledger_pass.lua",
+        "src/core/verify_api.cpp",
+        "src/ui/market_ledger.cpp"
+      ],
+      "resolved": "2026-08-29",
+      "resolution": "Resolved by BL-686 (goods table), verified 2026-08-29: `scroll_panel` now reaches the Market ledger's inner child scroller AND fails loudly on an unknown panel name rather than silently clearing the request. Making it loud immediately exposed a third instance — `scroll_panel(\"construction\")` aimed at a window named \"Building\" that had never existed."
+    },
+    "NR-724": {
+      "id": "NR-724",
+      "kind": "question",
+      "status": "resolved",
+      "raised": "2026-08-29",
+      "title": "Deleting the Production card orphaned the growth-track readout, and two docs now assert it exists",
+      "source": "Sprint 24, BL-691. Found by the agent that deleted the card; it correctly refused to resolve it.",
+      "what": "BL-691 cut three of four roll-up cards from the Corporation ledger on Ben's 2026-08-29 call. One of them, Production, was the ONLY DISPLAY of the chain-depth growth track — and it was put there by Ben's own earlier ruling.\n\nBL-591 (2026-08-23): *\"the depth readout goes on the corporation dashboard\"*. The reason it was built at all is that `corp_reached_depth` GATES SIX PLACES in the simulation and was displayed in none of them. So the readout existed to close exactly the gap that deleting the card has just reopened.\n\nTWO LIVE DOCS NOW ASSERT SOMETHING UNTRUE, and neither was edited:\n  - `docs/economy/PRODUCTION.md` § Chain depth (~line 732): \"The readout lives on the corporation dashboard, not the building card\", with its three lines described in detail.\n  - `docs/development/user_stories.json:500`: a surface named \"Corporation dashboard — Production card, Growth track\".\n\nTHE AGENT WAS RIGHT NOT TO FIX EITHER. Choosing between \"give the growth track a new home\" and \"retire the readout\" is a design call, and editing PRODUCTION.md would have taken it silently in one direction — the exact failure mode the state-independence rule exists to prevent. Newest-dated wins, so the 2026-08-29 cut stands; what it leaves behind is Ben's.\n\nTHE OPTIONS, none costed:\n  - **Fold it into the Balance card.** Cheapest, but it is a production fact on a money surface, which is the reasoning that removed Production in the first place.\n  - **Move it to the Construction ledger's Buildings tab.** That tab now holds the estate and its levers, and chain depth is a fact about what the estate can make next. This is my lean.\n  - **Retire the readout.** Legitimate — but it puts `corp_reached_depth` back to gating six places and displaying in none, which is the state BL-591 was filed to end.\n\nWORTH NOTING AS A PATTERN RATHER THAN AN INCIDENT: this is the THIRD time this sprint a deletion has silently orphaned an earlier ruling — BL-176's empty-room fix went with the Buildings tab (NR-718), NR-245's controls-on-the-card went with the levers (recorded in BL-683), and now BL-591's readout goes with the Production card. Each was found by reading rather than by any check. A deletion that removes a surface should ask what was placed there by a ruling, and nothing in the method prompts that question.",
+      "files": [
+        "docs/economy/PRODUCTION.md",
+        "docs/development/user_stories.json",
+        "src/ui/corporation_dashboard.cpp",
+        "src/ui/construction_panel.cpp"
+      ],
+      "resolved": "2026-08-29",
+      "resolution": "Resolved by BL-692 (retire depth gate), 2026-08-29 — by retirement rather than by rehoming. The growth-track readout was orphaned when BL-691 deleted the Production card; Ben then retired chain depth as a gate entirely, so there is no ladder left to display and no decision to take about where it lives. The docs that asserted the readout exists were corrected as part of BL-692."
     }
   }
 }

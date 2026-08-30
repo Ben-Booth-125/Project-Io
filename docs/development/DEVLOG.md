@@ -10,6 +10,109 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-08-29 — Sprint 24a: every ledger rebuilt, and three deletions that took a ruling with them
+
+**Mode:** Design → Full (Batch Delivery, eight waves). **Sprint 24a: closed.**
+**Runtime:** one long session. Eleven worktree agents, one measurement workflow, eight integrating builds.
+
+Twenty-two items. The sprint set out to *review* the ledgers against captures and ended having
+rebuilt most of them, deleted one outright, added two, and found four designed mechanisms that
+have never run in a played world.
+
+### The instrument was wrong before the work was
+
+Every density judgement made in the first half of this session was taken at **1280×720**. Ben
+reviews at 1920×1080, and he said so: *"the UI doesn't shrink at smaller resolutions."*
+
+He was right and the arithmetic says why the difference is entirely vertical. `shell_column_width`
+is `0.20 · disp_x` clamped to [380, 460] — 380 px at 1280, 384 px at 1920, four pixels across the
+whole common range. But the chrome above and below is fixed: the profile tile, and a bottom band
+whose height derives from `minimap_width = max(336, 0.28 · min(disp_x, disp_y))`, which is 336 at
+both. **All 360 extra rows land in the ledger's content height.**
+
+Measured on the Market ledger: **3.5 goods at 720p, nine at 1080p.** So several arguments for a
+redesign were made against half the height the reviewer has. Re-measured, the Budget ledger's
+complaint **dissolved entirely** — at 1080p it fits chart, levers, laws, assets and the full
+ranking at once — while the Corporation dashboard's got **worse**, its four verdict lines sitting
+above ~700 px of void.
+
+`ledger_pass` moved to 1080p. `shell_pass` deliberately stayed at 720p, and that split earned
+itself within the day: the fourteenth rail slot put its centre at **y = 746 against the 720 px
+floor**, leaving Contracts drawn and unpressable. Invisible at 1080p. **The review resolution and
+the fit resolution are different questions.**
+
+### Three deletions, three orphaned rulings
+
+The pattern only became visible because it happened three times:
+
+- **BL-176's empty-room fix** went with the Buildings tab in a 2026-08-15 rework. The Construction
+  panel went back to opening on an empty queue, and nothing recorded that the fix had been undone
+  (NR-718).
+- **NR-245's controls-on-the-card** went with the levers when Ben ruled that the Selection centre
+  presents and does not operate (BL-683).
+- **BL-591's growth-track readout** went with the Production card (NR-724) — a readout built
+  precisely because `corp_reached_depth` gated five places and displayed in none.
+
+All three were found by *reading*, none by a check. A deletion should ask what a ruling placed
+there, and nothing in the method prompts that question.
+
+### Measurement overturned the brief five times, and twice the wrong premise was mine
+
+- **The `x0` convoy.** I wrote into `convoys.md` that the display "is reporting what it was given".
+  It was **rounding** what it was given: 1669 dispatches over five seeds, **zero empty holds**, and
+  77 carrying a positive cargo below 0.5 that `"x%.0f"` renders as `x0`.
+- **`body_average_price`.** I predicted the pressure was on the graph's width. It was the column
+  count — with the column, 13 of 45 names fit; without it, 36 of 45.
+- **The roster is 45 goods**, not the ~42 the docs and I both repeated.
+- **The Trades gate's shut half is unreachable by selection**, because only one market-bearing body
+  ever exists.
+- **Chain depth's retirement** does not hand gating to tech, because tech is an allowlist of locks
+  with nothing to withhold.
+
+### Four designed mechanisms that have never run
+
+This is the sprint's real yield, and none of it was on the plan.
+
+- **Off-world markets.** One market-bearing body at 16, 60, 120, 240 and **400 econ ticks**. Markets
+  seed home-only and an off-world one needs a building to *complete* there; nothing ever builds
+  off-world. So spontaneous emergence, its distance pricing and its counterpart-demand rule describe
+  behaviour no played world has met (NR-725).
+- **Rival acquisition.** `FINANCE.md` says rivals buy, in the present tense, naming `corp_ai.cpp`.
+  `buy_corporation` appears nowhere in that file. I relayed the doc as fact to an agent and to Ben;
+  the agent found it by asking why a clean result was clean (NR-717).
+- **The mercenary contract.** `can_accept = fully_escrowed && !expired`, and client nations never
+  fund their own offers — seven offers at `escrow 0/400`. The player's stated income loop has never
+  been exercisable. Ben retired it the same day (BL-693).
+- **Chain depth as a growth gate.** Sawmill, Stonemason, Potter's Kiln and Weaver are depth-0, open
+  today, and produce **0.0**. Depth was never the brake (NR-727).
+
+### The seam that finally got a test
+
+`save_envelope_roundtrip` exists. NR-708 had recorded that **no envelope field had ever had
+round-trip coverage**, on a seam where `read_save_game` refuses the whole file on a version
+mismatch. The change that would have added one more untested field brought the assertion instead —
+20 rows, including a **wrapped** exchange ring.
+
+And in passing: since the v0.1.21 cut, roughly **thirty harnesses could not compile from a clean
+configure**. Warm trees kept passing on stale objects, so everyone saw green, and **a release was
+cut over it** (NR-721).
+
+### What Ben ruled
+
+The Selection centre presents data and never holds levers, reversing NR-245. The game does not play
+itself — declining a build-opportunity ledger — then the qualification that makes it usable: rank
+where the top row is *one input among several*, never where it *is* the move. Closure retired for
+companies. Convoys earned slot 7. Chain depth retired as a gate. Mercenary contracts retired.
+
+### Left open
+
+The growth track's new home (NR-724), whether off-world investment is meant to happen at all
+(NR-725), `quarterly_return` R2 failing on main with no owner (NR-720), and whether a clean
+configure belongs in the loop (NR-721). Goldens are knowingly red on Ben's instruction. The
+**live click** is owed on every surface this sprint touched.
+
+---
+
 ## 2026-08-28 — Sprint 23 closes: a lens becomes a question, and the answer stops disagreeing with itself
 
 **Mode:** Design, then Full (Batch Delivery, three waves). **Sprint 23: closed, goal met.**
