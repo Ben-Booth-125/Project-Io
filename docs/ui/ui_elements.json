@@ -1376,7 +1376,8 @@
    "checks": [
     "market_ledger",
     "lens_structure_pivot",
-    "goods_table"
+    "goods_table",
+    "lens_ledger_pairs"
    ]
   },
   {

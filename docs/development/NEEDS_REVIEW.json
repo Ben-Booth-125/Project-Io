@@ -1602,6 +1602,48 @@
         "docs/generation/GENERATION_LEDGER.md",
         "docs/generation/TILE_GENERATION.md"
       ]
+    },
+    {
+      "id": "NR-741",
+      "kind": "observation",
+      "status": "open",
+      "raised": "2026-08-30",
+      "title": "The lens/ledger scan: three pairs exist, not more, and LENSES.md's routing table is the test",
+      "source": "Sprint 24b. Ben: \"connect lenses with ledgers ... Scan to see if other pairs exist.\"",
+      "what": "SCANNED all twelve lenses against all thirteen rail slots. The scan needed no judgement in the end, because LENSES.md already carries the answer in the OTHER direction: its per-lens routing table names, for every lens, the ledger a click on it opens. A pair is real where both directions name each other.\n\nTHE THREE PAIRS:\n  * Slot 6 Market <-> `market`. Ben's, 2026-08-30, and the routing table already sent Market, Scarcity AND Resource clicks to this ledger.\n  * Slot 7 Convoys <-> `supply_routes`. Already built (BL-689).\n  * Slot 10 History <-> `continent`. Real - `Continent` routes to \"History ledger, at its tectonic record\" - but NOT built, and deliberately. See NR-742.\n\nWHAT IS NOT A PAIR, and why each is a finding rather than a gap:\n  * `Corporation` and `Company` route to \"that corporation's / that company's ledger\" - per-entity surfaces reached through Selection, not rail slots. There is no slot to arm from. Note this contradicts corporation.md, which proposes arming `corporation` from rail slot 1 - written when slot 1 WAS a rivals table, which BL-691 turned into the player's own dashboard. The proposal outlived its surface.\n  * `Population`, `Industry` and `Throughput` are all marked INERT in the routing table - they route nowhere at all.\n  * Balance/Budget: balance.md argues `none` at length and I agree. Money has no map field. But LENSES.md § Which lenses carry a structure says the Corporation lens opens the BUDGET ledger, while the routing table forty lines later says \"that corporation's ledger\". Two tables in one doc disagreeing about one lens's destination - worth a look independently of arming.\n  * Construction: its proposals were `opportunity` and `production`, BOTH RETIRED (BL-604), and `opportunity` is separately refused as a ledger pairing (your ruling, 2026-08-29). Nothing left to propose.\n  * Research, Acquisitions, Diplomacy, Generation, AI decisions, Strategy: no lens routes to any of them.\n\nON THROUGHPUT SPECIFICALLY, since you expected it to match one: it does not, and the reason is structural rather than an oversight. Throughput is the surface half of LOGISTICS.md's Logistic Points, and NO LEDGER SURFACES LP - it appears only on the canvas and the overlay legend. Logistics is the road and Supply is the traffic; the Convoys ledger is the traffic's and already pairs with `supply_routes`. Throughput's twin would be a Logistics ledger, and there isn't one. That is arguably the finding: a lens exists for a quantity no ledger reads.",
+      "files": [
+        "docs/ui/LENSES.md",
+        "src/ui/nav_pane.cpp",
+        "docs/ui/ledgers/corporation.md",
+        "docs/ui/ledgers/balance.md"
+      ]
+    },
+    {
+      "id": "NR-742",
+      "kind": "question",
+      "status": "open",
+      "raised": "2026-08-30",
+      "title": "History/Tectonics is a real lens pair, and taking it would invent a second arming rule",
+      "source": "Sprint 24b, the lens/ledger pass. The one pair I found and did not build.",
+      "what": "`Continent` routes to \"History ledger, at its tectonic record\", and BL-660 built the press that gets there. So the pair is real and the reverse arm would close the loop exactly as Market's now does.\n\nI DID NOT BUILD IT, and the reason is the rule rather than the pair. Slots 6 and 7 arm a FIXED lens on open - every tab of the ledger gets the same one. History carries four views and only Tectonics has a map twin: arming `continent` for a player who opened on Story would override their lens for a view about deep-time biography, and History opens on whatever view it was last left on.\n\nMaking it follow the sub-view instead would be a SECOND arming rule sitting beside the fixed one - and NR-722 exists precisely because slot 7 answered three unowned questions by implementation and the next ledger would copy it. Inventing a second rule the same way, in the same sprint that flagged the first, seemed like the wrong instinct.\n\nTHE OPTIONS: fixed-arm on History open and accept that three of four views get a lens they have no use for; arm on entering the Tectonics VIEW (sub-view-following, the new rule); or leave History unpaired and keep the one direction that already works, since a plate press already lands here.\n\nThis is the same decision NR-722 asks for, arriving with a concrete case attached.",
+      "files": [
+        "docs/ui/LENSES.md",
+        "src/ui/tile_inspector.cpp",
+        "src/ui/nav_pane.cpp"
+      ]
+    },
+    {
+      "id": "NR-743",
+      "kind": "observation",
+      "status": "open",
+      "raised": "2026-08-30",
+      "title": "The lens-on-open arm is unreachable from show_panel AND from verify.nav_slot, so slot 7's pairing was never checked",
+      "source": "Sprint 24b, the lens/ledger pass. Found by writing the check and watching it pass while proving nothing.",
+      "what": "The arm lives in the rail slot's `Selectable` press in nav_pane.cpp. Two consequences, and the second is the trap:\n\n  1. `verify.show_panel` writes the ui_state flag directly, so it opens the ledger and arms NOTHING. That is expected - it is the documented shortcut.\n  2. `verify.nav_slot(n)` DOES NOT PRESS ANYTHING. Despite the name it returns the slot's centre coordinates and nothing else. My first cut of the check called it, saw the ledger open, and reported `overlay = none` - the arm had simply not run.\n\nSo no check that opens a ledger by either route can observe a lens arm, and BL-689's convoy pairing has been unverified since it landed. `scripts/verify/lens_ledger_pairs.lua` now asserts both pairs through a REAL press (nav_slot for the point, `verify.click` for the press), and it asserts both halves of the rule - that opening arms, and that closing does NOT disarm, the latter being a behaviour rather than the absence of one.\n\nTHE NAME IS THE DEFECT. `verify.nav_slot(6)` reads at every call site like \"press rail slot 6\". It is a coordinate getter. Renaming it (`nav_slot_centre`, matching the C++ function it wraps) would cost one sweep and remove a trap that has already cost this sprint one silent false pass. Not done - renaming a verify API touches every script that uses it.",
+      "files": [
+        "src/core/verify_api.cpp",
+        "scripts/verify/lens_ledger_pairs.lua"
+      ]
     }
   ]
 }

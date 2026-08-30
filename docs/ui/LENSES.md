@@ -514,6 +514,50 @@ all of them (Ben, 2026-08-28: "hovering one tile displays an outline around all 
 for that corporation/company"), the same claim the market catchment's highlight makes. Ground held
 by nobody is inert.
 
+## The other direction — a ledger opens, its lens arms
+
+The table above sends a **click on a lens** to a ledger. The reverse also holds for
+some slots: **opening the ledger arms the lens**, so the list and the map answer the
+same question in two registers rather than the player having to arm it themselves.
+Ben's preference is the general form — *"opening a menu usually should arm a lens"* —
+and 2026-08-30 settled the Market half of it by name: *"when we open the market
+ledger, we should also activate the market lens."*
+
+**A pair exists only where both directions name each other.** That is what keeps this
+from becoming a lens on every slot: the routing table above is the test, and most rail
+slots are not in it.
+
+| Rail slot | Ledger | Arms | The shared question |
+|---|---|---|---|
+| 6 | Market | `market` | Which market is this ground in, and what does it pay? |
+| 7 | Convoys | `supply_routes` | What is moving, and along which lanes? |
+| 10 | History | `continent` — *proposed, see below* | Which plate made this ground? |
+
+Arming is **fixed**, not sub-view-following: where a ledger has a tab strip, every tab
+gets the same lens. That is a real constraint rather than a simplification — a strip can
+arm only one lens, and it is why Convoys left the Market ledger at all (`convoys.md` § 3).
+
+**The semantics, which are `nav_pane.cpp`'s and are still formally unowned (NR-722):**
+arm on **open** only, and **never disarm on close**. A player who closes a ledger keeps
+the canvas they are looking at rather than having it yanked back. What is undecided is
+the rest — whether opening a second ledger should re-arm to that one's lens, and whether
+a lens the player *deliberately* chose should be overridden by opening a ledger at all.
+
+**Why History's row is a proposal.** `Continent` routes to *"History ledger, at its
+tectonic record"*, so the pair is real — but History carries four views and only
+**Tectonics** has a map twin. Arming `continent` for a player who opened on Story would
+override their lens for a view about deep-time biography. Making it follow the sub-view
+instead would be a **second** arming rule beside the fixed one above, which is the kind
+of thing NR-722 exists to stop happening by implementation.
+
+**Three lenses have no ledger to pair with, and that is not an omission.**
+`Corporation` and `Company` route to *that corporation's* / *that company's* ledger —
+per-entity surfaces reached through Selection, not rail slots, so there is no slot to
+arm from. `Throughput` is **inert** in the routing table and has no ledger at all: it is
+the surface half of `LOGISTICS.md` § Logistic Points, and no ledger surfaces LP.
+Logistics is the road and Supply is the traffic; the Convoys ledger is the traffic's, so
+throughput's twin would be a **Logistics ledger that does not exist**.
+
 ## The strip rotates with the rung (Ben, 2026-08-28)
 
 The lens strip on the minimap shows **the lenses that draw something at the current canvas rung**,

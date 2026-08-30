@@ -289,6 +289,19 @@ void draw_nav_pane(ui_state& state, float top_offset)
                 const bool was_open = state.show_market_ledger;
                 close_all_panels(state);
                 state.show_market_ledger = !was_open;
+                // ARM THE PRICE WASH ON OPEN (market.md § 3; Ben, 2026-08-30:
+                // "when we open the market ledger, we should also activate the
+                // market lens"). The catchment tint is the map twin of this list
+                // — LENSES.md's routing table already sends a click on it BACK
+                // here, so this closes a loop that was only ever built one way.
+                //
+                // Fixed across both views, not sub-view-following: Goods and
+                // Trades are both single-market reads the wash reinforces. Armed
+                // only on OPEN, and never disarmed on close — slot 7's rule,
+                // followed deliberately rather than re-decided (NR-722 is still
+                // the open question about what that rule SHOULD be).
+                if (state.show_market_ledger)
+                    state.overlay = overlay_mode::market;
             }
             slot_tooltip("Market Ledger", "Prices, supply and demand on the bodies you trade on.", false);
             break;
