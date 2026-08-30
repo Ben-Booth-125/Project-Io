@@ -909,8 +909,11 @@ struct ui_state
     bool market_goods_show_body = false;
 
     /// History ledger: 0=Story (the body's biography), 1=Chain (the generation
-    /// charts), 2=Tiles (the tile/building/market tables), 3=Ages (the Era -1
-    /// political time-lapse, BL-277). BL-211.
+    /// charts), 2=Ages (the Era -1 political time-lapse, BL-277), 3=Tectonics
+    /// (the plate view, BL-660). BL-211. The names are `history_view_id` in
+    /// ui/tile_inspector.hpp — this comment is the mirror, not the source, and
+    /// it read "2=Tiles, 3=Ages" against a Tiles view that no longer exists
+    /// until 2026-08-30 (NR-713).
     int  history_view = 0;
 
     /// Ages view: the year currently scrubbed to, and whether playback is

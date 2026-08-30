@@ -30,7 +30,7 @@ authority; `backlog.json` is authority once items are minted, and the subject's 
 | [market.md](market.md) | Goods | Goods (the flattened price table) / Trades | `market`, fixed |
 | [construction.md](construction.md) | Buildings | Buildings (estate by type) / Construction (queue + build bar) | **none** — `opportunity` is refused, see below |
 | [selection.md](selection.md) | — (polymorphic by kind) | tile / province / body / building / unit / battle / market / corp / nation | contextual (none) |
-| [tile_ledger.md](tile_ledger.md) | last-left view | Story / Chain / Ages | none |
+| [tile_ledger.md](tile_ledger.md) | last-left view | Story / Chain / Ages / Tectonics | none |
 
 ## Cross-doc findings (see [_critic_notes.md](_critic_notes.md))
 - **A whole-enterprise aggregate ledger does not survive the duplication test.** Its cashflow view is

@@ -1927,7 +1927,8 @@ void app::render()
         m_prev_selection = m_ui.selected_entity;
     }
 
-    ui::draw_tile_inspector(m_world, m_ui, m_generation_report, &m_ui.show_tile_ledger);
+    ui::draw_tile_inspector(m_world, m_ui, m_generation_report, m_active_world_params,
+                            &m_ui.show_tile_ledger);
     // Generation Ledger (BL-303) — regenerates the per-pass record on demand from
     // the report's tile-pass inputs; nothing it reads is held on the world.
     ui::draw_generation_ledger(m_world, m_ui, m_generation_report, &m_ui.show_generation_ledger);

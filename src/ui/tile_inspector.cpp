@@ -6,6 +6,7 @@
 #include "generation_charts.hpp" // the chain-stage charts, shared with the wizard (BL-211)
 #include "presentation.hpp"
 #include "world/components.hpp"
+#include "world/era_minus_one.hpp" // ONE construction of the era invocation (BL-462)
 #include "world/history_sim.hpp"  // the Era -1 time-lapse the Ages view replays (BL-277)
 #include "world/sim_terrain_build.hpp" // real ground for the sim to fight over (BL-314)
 
@@ -25,8 +26,23 @@ namespace ui {
 static_assert(fmt::campaign_epoch_year == static_cast<int>(::campaign_epoch_year),
               "History dates and the tick calendar must share a campaign epoch");
 
+/// A calendar year as the Ages transport should read it.
+///
+/// The era runs 400 BCE -> 0 CE, so a bare "%d CE" prints "-400 CE" — a year
+/// that does not exist, on the one control whose whole job is saying WHEN.
+/// Kept local because it is the only surface in the project that scrubs a
+/// signed calendar year; the moment a second one appears this belongs in fmt.
+static std::string ages_year_label(int year)
+{
+    char buf[32];
+    if (year < 0) std::snprintf(buf, sizeof buf, "%d BCE", -year);
+    else          std::snprintf(buf, sizeof buf, "%d CE",   year);
+    return buf;
+}
+
 void draw_tile_inspector(const world& w, ui_state& s,
-                         const generation_report& report, bool* p_open)
+                         const generation_report& report,
+                         const world_params& gen_params, bool* p_open)
 {
     // Honour the open flag; when closed the window draws nothing at all.
     if (p_open && !*p_open)
@@ -342,17 +358,18 @@ void draw_tile_inspector(const world& w, ui_state& s,
 
     // --- Ages: the Era -1 political time-lapse (BL-277) -------------------
     //
-    // Two thousand years of region ownership, scrubbable. The sim is run HERE,
-    // lazily, over a COPY of the body's settlement state — it does not run in
-    // the generation path and nothing it does reaches the world. That is the
-    // whole point of building this view first: the time-lapse is visible without
-    // the determinism/golden churn that wiring the sim into generation carries
+    // The era's region ownership, scrubbable. The sim is re-run HERE, lazily,
+    // over a COPY of the body's settlement state — it does not run in the
+    // generation path and nothing it does reaches the world. That is the whole
+    // point of building this view first: the time-lapse is visible without the
+    // determinism/golden churn that wiring the sim into generation carries
     // (BL-271 open question 2, still unanswered).
     //
-    // The cache is keyed on body name and survives across frames, because a
-    // 2000-year run costs ~2.1 s and re-running it per frame would stall the UI.
-    // (~600 ms before the settle-occupancy fix; ~749 real regions instead of
-    // ~191 is roughly four times the work, and the growth is the improvement.)
+    // The cache is keyed on the body AND the generation's identity, and survives
+    // across frames, because the run is seconds rather than milliseconds and
+    // re-running it per frame would stall the UI. The old figure here (~2.1 s for
+    // a 2000-year run) is not comparable: that span was this call site's own
+    // invention, and it is now generation's — see the params block below.
     if (view == view_ages)
     {
         // Keyed on the body name AND the generation's own identity (the Ages
@@ -384,19 +401,42 @@ void draw_tile_inspector(const world& w, ui_state& s,
         if (cached_body != selected_body || cached_gen != gen_id)
         {
             cached_ss = entry->settlement; // The copy the sim is allowed to move.
-            history_sim_params p;
-            p.start_year = 0;
-            p.stop_year  = static_cast<int64_t>(fmt::campaign_epoch_year);
+
+            // THE SPAN, THE CLOCK AND THE SEED COME FROM GENERATION, not from
+            // here. This call site used to construct its own — 0 -> 1960 CE with
+            // the tick bands left at their struct default — and both halves were
+            // wrong in the same direction. The default ladder's last band ends at
+            // year 0, so every year past it fell back to a ONE-YEAR step: 1960
+            // decision rounds against generation's 100, on a span lying entirely
+            // AFTER the history the world actually has. That is NR-710's hang
+            // (no frame in nineteen minutes, on the drawing thread) and it is
+            // also why the view never showed this world's era.
+            //
+            // era_minus_one.hpp is the file that exists to stop exactly this,
+            // and its doctrine is the reason these are calls rather than
+            // literals: a second derivation of generation's invocation is the
+            // defect repeating, not the repair. Three of BL-462's six
+            // divergences close here (span+clock, seed). THREE REMAIN and are
+            // NOT closable from this seam — the creeds pointer, the works table
+            // and the pre-sim settlement are none of them in the generation
+            // report. See NEEDS_REVIEW: what the Ages view should replay is a
+            // save-seam question, not a parameter one.
+            history_sim_params p = era_minus_one_sim_params(gen_params);
+
             // Real terrain, so the replayed history is fought over this body's
             // actual mountains and marshes rather than an imagined plain.
             const sim_terrain_arrays terr =
                 build_sim_terrain(w, selected_body, sel_body.grid_width, sel_body.grid_height);
             cached_sim = run_history_sim(cached_ss, nullptr, terr.view(),
                                          sel_body.grid_width, sel_body.grid_height,
-                                         p, 7u);
+                                         p, era_minus_one_sim_seed(gen_params));
             cached_body   = selected_body;
             cached_gen    = gen_id;
-            s.ages_year   = 0;
+            // Park the scrubber at the run's OWN first year. Zero was right only
+            // while the span started at zero; on a 400 BCE -> 0 CE run it is the
+            // END of the era, so the view opened on a finished map (NR-710's
+            // second half, which also made every parked capture show year 0).
+            s.ages_year   = static_cast<int>(cached_sim.start_year);
             s.ages_playing = false;
         }
 
@@ -408,24 +448,37 @@ void draw_tile_inspector(const world& w, ui_state& s,
             return;
         }
 
-        const int last_year = static_cast<int>(cached_sim.start_year + cached_sim.years);
+        const int first_year = static_cast<int>(cached_sim.start_year);
+        const int last_year  = static_cast<int>(cached_sim.start_year + cached_sim.years);
 
         // --- Transport -----------------------------------------------------
         if (ImGui::Button(s.ages_playing ? "Pause" : "Play"))
             s.ages_playing = !s.ages_playing;
         ImGui::SameLine();
-        if (ImGui::Button("Restart")) { s.ages_year = 0; s.ages_playing = true; }
+        if (ImGui::Button("Restart")) { s.ages_year = first_year; s.ages_playing = true; }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        ImGui::SliderInt("##ages_year", &s.ages_year, 0, last_year, "%d CE");
+        // The "format" is a finished string, not a printf template, because a
+        // signed calendar year has no single printf form ("%d CE" prints
+        // "-400 CE"). ImGui supports this deliberately: ImParseFormatTrimDecorations
+        // returns "" for a format with no specifier and TempInputScalar then falls
+        // back to "%d", so ctrl+click editing still works on the raw year.
+        ImGui::SliderInt("##ages_year", &s.ages_year, first_year, last_year,
+                         ages_year_label(s.ages_year).c_str());
 
         if (s.ages_playing)
         {
-            // ~120 years a second: a 2000-year run reads in about a quarter of a
-            // minute, which is long enough to watch a frontier move and short
-            // enough to sit through.
+            // The playback RATE follows the span rather than being a constant.
+            // 120 years a second was tuned when this replayed 2000 years; on
+            // generation's real 400-year era it empties the transport in three
+            // seconds. Deriving it keeps the stated intent — long enough to
+            // watch a frontier move, short enough to sit through — if the era
+            // length (world_params::prehistory_years) is ever retuned.
+            const float span     = static_cast<float>(last_year - first_year);
+            const float run_secs = 16.0f;
+            const float rate     = span > 0.0f ? span / run_secs : 1.0f;
             static float carry = 0.0f;
-            carry += ImGui::GetIO().DeltaTime * 120.0f;
+            carry += ImGui::GetIO().DeltaTime * rate;
             const int whole = static_cast<int>(carry);
             if (whole > 0) { carry -= static_cast<float>(whole); s.ages_year += whole; }
             if (s.ages_year >= last_year) { s.ages_year = last_year; s.ages_playing = false; }
@@ -444,8 +497,9 @@ void draw_tile_inspector(const world& w, ui_state& s,
             if (o != owner_none && std::find(seen.begin(), seen.end(), o) == seen.end())
                 seen.push_back(o);
 
-        ImGui::TextDisabled("%d CE  |  %d regions  |  %d powers",
-                            s.ages_year, live, static_cast<int>(seen.size()));
+        ImGui::TextDisabled("%s  |  %d regions  |  %d powers",
+                            ages_year_label(s.ages_year).c_str(),
+                            live, static_cast<int>(seen.size()));
 
         const float avail = ImGui::GetContentRegionAvail().x;
         const int   gw    = sel_body.grid_width  > 0 ? sel_body.grid_width  : 1;

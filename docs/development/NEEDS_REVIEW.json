@@ -1478,6 +1478,76 @@
         "src/core/app.cpp",
         "src/ui/balance_ledger.cpp"
       ]
+    },
+    {
+      "id": "NR-732",
+      "kind": "observation",
+      "status": "open",
+      "raised": "2026-08-30",
+      "title": "The Ages view was a SEVENTH caller of the era sim, and diverged from generation on all six of BL-462's axes",
+      "source": "Sprint 24b, the Ages params fix. Found while measuring NR-710's hang rather than accepting its stated cause.",
+      "what": "NR-710 recorded that Ages produced no frame in nineteen minutes and offered two readings - very slow, or non-terminating. NEITHER WAS RIGHT. The sim is not slow; this call site was asking for a different sim.\n\nMEASURED: generation runs the era at 400 BCE -> 0 CE on ONE four-year band - 100 decision rounds, ~23 s, priced in `hard_coded_world.cpp`'s own loading-screen comment. `tile_inspector.cpp` constructed its own `history_sim_params`: `start_year = 0`, `stop_year = 1960`, tick bands left at the struct default. The default ladder's last band ends at `until_year 0`, so EVERY year past it falls back to a ONE-YEAR step. 1960 rounds against 100, on a span lying entirely AFTER the era the world actually has.\n\nWHY THIS IS WORTH YOUR EYE RATHER THAN JUST A FIX. `world/era_minus_one.hpp` exists precisely to close this defect - BL-462 found that no check in the project measured the run that actually generates a world, and built ONE construction of the invocation so nothing could drift again. Its scope was HARNESSES. The Ages view is a seventh caller nobody counted, and it diverged on all six axes at once: span, clock, seed (a literal `7u` against `params.seed ^ 0x415C1E17u`), creeds (null, which flattens every polity's aggression to a neutral 500), works (null, a four-verb contest where generation runs five), and the settlement (the state AFTER generation's sim).\n\nTHE LESSON IS ABOUT SCOPE, NOT ABOUT THIS VIEW. A file built to stop a class of defect stopped it for the callers its author was thinking about. The UI was not one of them, and nothing made the omission visible - there is no check that says \"every caller of run_history_sim derives its params here\". That guard is buildable and does not exist.\n\nFIXED, in part: the view now calls `era_minus_one_sim_params` / `era_minus_one_sim_seed`, closing span, clock and seed. THE OTHER THREE ARE NOT CLOSABLE FROM THIS SEAM - the creeds, the works table and the pre-sim settlement are none of them in the `generation_report`, deliberately (it is serialised, and the fixture was kept off the save seam for that reason). See NR-733.",
+      "files": [
+        "src/ui/tile_inspector.cpp",
+        "src/world/era_minus_one.hpp",
+        "src/world/hard_coded_world.cpp",
+        "scripts/verify/ledger_pass.lua"
+      ]
+    },
+    {
+      "id": "NR-733",
+      "kind": "question",
+      "status": "open",
+      "raised": "2026-08-30",
+      "title": "What should the Ages view replay - and should generation record the timeline instead of the view re-simulating it?",
+      "source": "Sprint 24b, the Ages params fix. The call the fix could not settle.",
+      "what": "With the span, clock and seed corrected the view renders - first frames ever captured of it - and what it shows raises the real question.\n\nMEASURED across the era, 1920x1080, staged fixture: region count 1343 (400 BCE) -> 1710 (200 BCE) -> 2090 (0 CE); power count PINNED AT 12 throughout; the run's own summary line reads \"0 battles, 0 conquests, 757 foundings\". It is a SETTLEMENT time-lapse wearing a political one's label - the view asks \"how did its polities rise and fall?\" and nothing rises or falls.\n\nTHE CAUSE IS BL-462's DIVERGENCE 6, and it is not a parameter. `generation_report::body_entry::settlement` is the state AFTER generation's sim has mutated it in place, so the replay starts the era from its own ending: every region already exists and is already owned, so there is nothing left to conquer and the sim can only re-found. No amount of parameter correction reaches this.\n\nIT IS ALSO WHY THE VIEW IS STILL EXPENSIVE. Replaying a full map rather than a growing one costs minutes on the DRAWING THREAD (the capture script's wall time is ~5 min against a ~1.5-3 min baseline for the same world without Ages; the machine was loaded and that is a range, not a figure I would defend to a second digit). The nineteen-minute hang is gone. A clickable tab it is not.\n\nTHE OPTIONS, and the third is the honest one:\n  1. Leave it re-simulating and move the sim off the draw thread, with progress and a way back. Cheapest, and it keeps a view whose political content is empty by construction.\n  2. Hand the view the pre-sim settlement so the replay is real. Needs the fixture's settlement to reach the UI, which means either widening the report (a SAVE-FORMAT change - the report is serialised in full) or re-deriving it, which is the drift BL-462 exists to prevent.\n  3. Have generation record its own `owner_changes` into the report and have the view REPLAY rather than re-simulate. The time-lapse then shows the history the world actually has, costs nothing to draw, and deletes the seventh caller entirely. Also a save-format change, and the largest.\n\nOption 3 is the end state option 1 defers. Your call, and it is the one that decides whether this view has a subject.",
+      "files": [
+        "src/ui/tile_inspector.cpp",
+        "src/world/era_minus_one.hpp",
+        "src/world/hard_coded_world.hpp",
+        "docs/ui/ledgers/tile_ledger.md"
+      ]
+    },
+    {
+      "id": "NR-734",
+      "kind": "novel-work",
+      "status": "open",
+      "raised": "2026-08-30",
+      "title": "ages_replay.lua is a new capture script and is unauthorised as a skill - the NR-715 shape again",
+      "source": "Sprint 24b, the Ages params fix.",
+      "what": "I authored `scripts/verify/ages_replay.lua`: six captures walking the Ages transport - the resting frame, then 400 BCE / 300 / 200 / 100 / 0 CE - plus the clipping assertion.\n\nWHY IT IS A SCRIPT RATHER THAN FOUR LINES IN `ledger_pass`. Ages is the only ledger view whose subject is TIME, so one frame of it proves almost nothing: the review question is whether a frontier MOVES, which is a comparison across years. `ledger_pass` captures one frame per sub-view by construction, and it should not pay minutes of sim time for a thirteen-slot sweep.\n\nFlagged for the same reason NR-715 was: the standing rule says a check that becomes a tool should become a SKILL, and naming it in a SKILL.md is your permission, not mine. `verifier-visual` auto-discovers `scripts/verify/*.lua`, so it is runnable as it stands.\n\nALSO DONE, and worth a glance because it changes what an existing instrument claims: `ledger_pass.lua`'s \"Ages - why this pass does not capture it\" footer asserted a cause that measurement overturned, so it is rewritten to say what is now true and to record that its own earlier reading was wrong. A footer explaining an omission is only worth having while it is accurate.",
+      "files": [
+        "scripts/verify/ages_replay.lua",
+        "scripts/verify/ledger_pass.lua"
+      ]
+    },
+    {
+      "id": "NR-735",
+      "kind": "decision",
+      "status": "open",
+      "raised": "2026-08-30",
+      "title": "History's catalogue entries were reconciled against the code, retiring UI-087 and minting two",
+      "source": "Sprint 24b, the Ages params fix. The doc half of NR-713, taken rather than re-filed.",
+      "what": "NR-713 recorded that `ui_elements.json` carried UI-087 \"Tiles view\" for a view that no longer exists and had no entry for Tectonics. Reading it to act on it turned up a third gap nobody had named: there was no entry for the AGES view either, so two of History's four views were absent from the inventory the UI sprints scope off.\n\nTAKEN ON YOUR BEHALF, all reversible and all doc-only:\n  * UI-087 (\"Tiles view\") REMOVED, its number left vacant per the file's own stable-not-dense id rule (the vacant list now reads 031, 035, 036, 087).\n  * UI-115 \"Tectonics view\" minted, carrying the `ledger_pass` check.\n  * UI-116 \"Ages view\" minted, carrying `ages_replay` - which also clears it from the orphan list.\n  * UI-084 renamed from \"History Ledger (Story/Chain/Tiles)\" to name the four views it actually has.\n  * `ui_state.hpp`'s `history_view` comment, which read \"2=Tiles, 3=Ages\" against a Story/Chain/Ages/Tectonics enum - two errors in one line - now mirrors `history_view_id` and says it is the mirror rather than the source.\n  * `tile_ledger.md` now describes four views, and documents Ages as replaying GENERATION's era.\n    `ledgers/README.md`'s view row was ALREADY corrected by uncommitted work in the tree when this\n    session opened - not mine, carried in this commit because leaving it out would have left two\n    ledger docs disagreeing about how many views History has.\n\nWHAT I DID NOT TAKE: `ui_coverage --orphans` still reports three unclaimed checks - `acquisitions_ledger`, `export_mockdata`, `pan_perf`. The first is Sprint 24a's and the other two are not ledger checks at all. Left alone rather than swept in under this item.",
+      "files": [
+        "docs/ui/ui_elements.json",
+        "docs/ui/ledgers/tile_ledger.md",
+        "docs/ui/ledgers/README.md",
+        "src/ui/ui_state.hpp"
+      ]
+    },
+    {
+      "id": "NR-736",
+      "kind": "question",
+      "status": "open",
+      "raised": "2026-08-30",
+      "title": "History answers a generation question, and you want it answering a strategy one",
+      "source": "Sprint 24b. Your direction, 2026-08-30, given while the Ages fix was in hand.",
+      "what": "Recorded here as the pointer; the questions themselves are written into `docs/ui/ledgers/tile_ledger.md` - The direction this surface is pointed - which is where they can be designed against.\n\nYOUR WORDS: \"History at present tells the story of generation. Rather it should in fact answer questions about strategy that goes deeper into the meta-game\" - which provinces are claimed by other nations, who your nation expects to be fighting soon, which resources are becoming depleted.\n\nTHE SHAPE WORTH NAMING, because it is what makes these one surface rather than three: all four existing views show STATE (a finished biography, a finished chain, a finished era, a finished plate map), and all three of your examples are a TREND or an EXPECTATION. That is why none of them can be read off what exists, and it is a sharper statement of the gap than \"the infrastructure isn't there\".\n\nSIX QUESTIONS ARE OPEN IN THE DOC, of which two look load-bearing: whether the unit is the BODY or the NATION (every view today sits behind a body combo; all three of your examples are per-nation, so the seam runs through the middle of the ledger), and whether a claim - ground a nation asserts and does not hold - exists anywhere in the model. It does not.\n\nNOTHING WAS BUILT AGAINST THIS, per your instruction to keep the ledger similar.",
+      "files": [
+        "docs/ui/ledgers/tile_ledger.md"
+      ]
     }
   ]
 }

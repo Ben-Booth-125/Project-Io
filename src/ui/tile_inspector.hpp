@@ -33,8 +33,15 @@ enum history_view_id { history_view_story = 0,
 ///                holds the ledger's view/round selection (BL-211).
 /// @param report  The Planetology/Continents-Drift generation report captured at
 ///                world-gen (app::m_generation_report) — the biography source.
+/// @param gen_params The descriptor the live world was built from
+///                (app::m_active_world_params). The Ages view needs it to
+///                replay the era on the span, clock and seed GENERATION ran,
+///                rather than on a second set constructed here — see
+///                world/era_minus_one.hpp for why a second derivation is the
+///                defect rather than the repair.
 /// @param p_open  Open/closed flag. Cleared by the window's close button.
 void draw_tile_inspector(const world& w, ui_state& s,
-                         const generation_report& report, bool* p_open);
+                         const generation_report& report,
+                         const world_params& gen_params, bool* p_open);
 
 } // namespace ui

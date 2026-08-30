@@ -205,33 +205,33 @@ verify.frames(1)
 verify.expect_no_clipping("ledger_pass")
 
 -- ===========================================================================
--- § Ages — why this pass does not capture it
+-- § Ages — captured by ages_replay.lua, not here
 -- ===========================================================================
--- The History ledger's Ages view (history_view = 2) is NOT swept above, and the
--- omission is the finding rather than a gap.
+-- The History ledger's Ages view (history_view = 2) is still not swept above,
+-- but the reason CHANGED on 2026-08-30 and the old one is no longer true.
 --
--- MEASURED 2026-08-29, this build, this fixture: the FIRST DRAW of Ages had not
--- produced a single frame after NINETEEN MINUTES of solid CPU, and the run was
--- killed rather than left to finish. tile_inspector.cpp § Ages builds its cache
--- inline on the drawing thread — `run_history_sim(cached_ss, ..., start_year 0,
--- stop_year campaign_epoch_year)` over the body's real terrain — so the first
--- frame that shows the tab pays for replaying the whole Era -1 political history
--- before it returns. In the built app that is a tab click that stops the
--- application, with no progress and no way back.
+-- WHAT THE FOOTER USED TO SAY, and it was measured: the first draw of Ages had
+-- produced no frame after NINETEEN MINUTES of solid CPU (NR-710). The reading
+-- offered here was that the sim is inherently too slow to draw inline.
 --
--- WHAT IS AND IS NOT ESTABLISHED. That no frame arrived in nineteen minutes is
--- measured. Whether the sim is merely very slow or does not terminate at all on
--- this fixture is NOT established — CPU climbed steadily throughout, which is
--- consistent with both. Do not repeat either reading as fact.
+-- THAT READING WAS WRONG, and the correction is worth keeping. The sim is not
+-- slow; this call site was asking for a different one. tile_inspector.cpp built
+-- its own `history_sim_params` — 0 -> 1960 CE with the tick bands left at their
+-- struct default — and the default ladder's last band ends at year 0, so every
+-- year past it fell back to a ONE-YEAR step. 1960 decision rounds where
+-- generation runs 100, on a span lying entirely AFTER the era the world has.
+-- The view now calls `era_minus_one_sim_params` / `era_minus_one_sim_seed`
+-- (world/era_minus_one.hpp) and replays generation's own era, 400 BCE -> 0 CE.
 --
--- WHY NOBODY HIT IT BEFORE: no verify script has ever selected this view.
--- `history_ledger_and_comms.lua` covers Story and Chain and returns to Story;
--- `verify.ages_year` was added with BL-277 and, until this file, called by
--- nothing. The view has been shipped, documented in tile_ledger.md, and never
--- once rendered by a check.
+-- IT IS STILL NOT CHEAP, and that is deliberately not hidden: the run costs
+-- minutes rather than milliseconds, because the settlement it is handed is the
+-- state AFTER generation's sim (BL-462 divergence 6), so it replays a full map
+-- rather than a growing one. That is why Ages lives in its own script — a pass
+-- that captures thirteen slots should not pay for it — and why the honest
+-- summary is "the hang is fixed, the cost is not".
 --
--- AND THE HOOK IS DEFEATED ANYWAY. tile_inspector.cpp sets `s.ages_year = 0` on
--- the frame it (re)builds the cache, which is the same frame a script's park
--- lands on — so a captured Ages frame would show year 0 whatever the script asked
--- for. Both halves want fixing together: the sim off the draw thread, and the
--- park applied after the cache build rather than before it.
+--   ProjectIo --verify scripts/verify/ages_replay.lua
+--
+-- THE PARK HOOK WORKS NOW, with an ordering the script has to honour: the year
+-- is parked at the run's first year on the frame that builds the cache, so a
+-- script must open the view, run frames, and only THEN set `ages_year`.
