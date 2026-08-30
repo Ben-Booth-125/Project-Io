@@ -21,7 +21,7 @@
   "(backlog.json's job). It answers 'what is this thing and how deep does it nest.'",
   "",
   "FIELDS.",
-  "  id                   — UI-XXX, zero-padded 3 digits. STABLE, NOT DENSE (changed 2026-08-27):\n                         a retired surface leaves its number behind rather than renumbering the\n                         file, because Sprint 21 works off these ids across several sessions and a\n                         shifting id is worse than a gap. Vacant today: 031, 035, 036.",
+  "  id                   — UI-XXX, zero-padded 3 digits. STABLE, NOT DENSE (changed 2026-08-27):\n                         a retired surface leaves its number behind rather than renumbering the\n                         file, because Sprint 21 works off these ids across several sessions and a\n                         shifting id is worse than a gap. Vacant today: 031, 035, 036, 087.",
   "  name                 — short human name for the element.",
   "  kind                 — canvas | panel | ledger | element | sub-element | control | view.",
   "                         canvas = one of the three primary spatial views (Solar/Circum/Planetary).",
@@ -1376,7 +1376,8 @@
    "checks": [
     "market_ledger",
     "lens_structure_pivot",
-    "goods_table"
+    "goods_table",
+    "lens_ledger_pairs"
    ]
   },
   {
@@ -1428,7 +1429,7 @@
   },
   {
    "id": "UI-084",
-   "name": "History Ledger (Story/Chain/Tiles)",
+   "name": "History Ledger (Story/Chain/Ages/Tectonics)",
    "kind": "ledger",
    "parent": null,
    "source": [
@@ -1477,19 +1478,37 @@
    ]
   },
   {
-   "id": "UI-087",
-   "name": "Tiles view",
+   "id": "UI-116",
+   "name": "Ages view",
    "kind": "view",
    "parent": "UI-084",
    "source": [
-    "docs/ui/ledgers/tile_ledger.md § Sub-levels (proposed target)"
+    "docs/ui/ledgers/tile_ledger.md § Sub-levels",
+    "src/ui/tile_inspector.cpp",
+    "src/world/era_minus_one.hpp"
    ],
-   "summary": "Per-tile table (X, Y, composition, landform, hazard, habitability, per-resource deposit) plus built-building and market sections for the selected body.",
-   "interesting_question": "The slot is named 'History' but the doc bluntly calls the actual content 'a current-state tile inspector, not a history/timeline' with no per-tile time series captured anywhere.",
-   "resolution": "Open, named as a genuine naming mismatch: tile_ledger.md asks 'What does History actually mean for slot 9?... Rename the slot to match the current tile-inspector behaviour, or commit to building real per-tile history capture' — MENU.md's own slot-rename history (§ Menu set and ordering) confirms 'History' was a deliberate broadening from 'Tile Ledger' with the stated intent of also carrying post-generation advisory detail, which is separately marked 'still owed.'",
+   "summary": "The Era -1 political time-lapse: a transport (Play/Pause, Restart, a signed-year slider reading 400 BCE to 0 CE), the replayed ownership map over the body's real terrain, and a multipolarity line of year, region count and power count.",
+   "interesting_question": "It is the only ledger view whose subject is TIME, so a single frame of it proves almost nothing — the review question is whether a frontier MOVES, which is a comparison across years rather than a picture. That is why it has a walking capture script of its own rather than one frame in the class pass.",
+   "resolution": "Open, and sharpened by measurement 2026-08-30: the view re-runs the era from the settlement as it stood AFTER generation's own sim, so every region already exists and is owned. It reports 0 battles and 0 conquests, and across the span the region count grows 1343 to 2090 while the power count stays pinned at 12 — a settlement time-lapse wearing a political one's label. Whether generation should instead record its own owner_changes for this view to replay is a save-format question (tile_ledger.md § Raised by the Ages replay).",
    "checks": [
-    "history_ledger_and_comms",
-    "text_overflow_floor"
+    "ages_replay"
+   ]
+  },
+  {
+   "id": "UI-115",
+   "name": "Tectonics view",
+   "kind": "view",
+   "parent": "UI-084",
+   "source": [
+    "docs/ui/ledgers/tile_ledger.md § Sub-levels",
+    "src/ui/tile_inspector.cpp",
+    "src/ui/tile_inspector.hpp § history_view_id"
+   ],
+   "summary": "The plate field over the selected body — which plates made this ground and where they meet. Reached from the tab strip and from the canvas: a plate press under the Continent lens routes the ledger here.",
+   "interesting_question": "It is the fourth History view and the only one reachable from the map, which makes it the one place the ledger is a DESTINATION rather than a reference — a press on the world opens it. Does that make it a History view at all, or a Selection drill-through wearing a tab?",
+   "resolution": "Open. Recorded 2026-08-30 while reconciling this catalogue against the code: the entry that stood here was UI-087 'Tiles view', a view that no longer exists (its per-tile table went to the canvas and the Selection element). 087 is left vacant per the stable-not-dense id rule.",
+   "checks": [
+    "ledger_pass"
    ]
   },
   {
@@ -1666,11 +1685,12 @@
     "src/ui/generation_ledger.cpp",
     "src/ui/nav_pane.cpp"
    ],
-   "summary": "Rail slot 10: the why-did-this-tile-generate surface - the per-pass derivation for a tile and the body's own histograms.",
+   "summary": "Rail slot 10: the why-did-this-body-generate surface - one flat panel of six collapsing sections over tables (Profile, Thresholds, Latitude bands, and the Substrate / Cover / Landform distributions), behind a body selector.",
    "interesting_question": "This is a developer tuning surface on a player-facing rail. Does it ship?",
-   "resolution": "Its own doc calls it the developer tuning surface, and it currently holds a permanent rail slot. Whether that survives to v1.0 is a ROADMAP question the catalogue does not answer.",
+   "resolution": "Its own doc calls it the developer tuning surface, and it currently holds a permanent rail slot. Whether that survives to v1.0 is a ROADMAP question the catalogue does not answer. RESHAPED 2026-08-30 on Ben's instruction - the Body/Tile tab strip is gone, the per-tile derivation view with it, and each section is now a collapsing header over a table. The three distributions name their denominator in the header, which is the whole grid, ocean included.",
    "checks": [
-    "save_load"
+    "save_load",
+    "generation_ledger"
    ]
   },
   {

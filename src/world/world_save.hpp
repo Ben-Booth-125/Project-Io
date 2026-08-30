@@ -225,7 +225,7 @@ inline constexpr uint32_t world_save_magic =
 /// where this one continues and is refused whole on the same strict-equality
 /// contract as every prior bump. Claimed through
 /// `tools/session/next_save_version.js --claim`.
-inline constexpr uint32_t world_save_version = 19;
+inline constexpr uint32_t world_save_version = 20;
 
 /// Write @p w as a complete world snapshot.
 ///

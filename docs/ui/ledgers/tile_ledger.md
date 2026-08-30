@@ -16,14 +16,16 @@ tile selection already puts it: the canvas and the Selection element, never here
 
 ## 2. Sub-levels — views & default
 
-Three `nav_button` views on `s.history_view` (`view_story` / `view_chain` / `view_ages`; an
-out-of-range saved index lands on Story rather than on nothing):
+Four `nav_button` views on `s.history_view` (`history_view_id` in `ui/tile_inspector.hpp` —
+`story` / `chain` / `ages` / `tectonics`; an out-of-range saved index lands on Story rather than
+on nothing):
 
 | View | Answers (one question) | Content |
 |---|---|---|
 | **Story** | What happened here, in order? | Body summary line (`name | AU | WxH tiles`), then the dated biography — planetology, plate, and history-ladder events in sequence (`format_history_date`, whose unit comes from the date's own magnitude so deep-time and historical lines share one loop), each with an optional wrapped consequence line underneath; "No recorded history for this body" when the report has none. Takes the full-canvas disclosure control alone (the in-place one has nothing to expand) |
 | **Chain** | How did the generation chain arrive at this body? | The wizard's stage charts (`generation_charts.cpp`), re-rendered from the persisted `generation_report`, grouped into three rounds (**System / Life / Legacy**) via a second `nav_button` strip; one collapsing accordion per stage, only the round's first stage open by default. Every body side by side — the comparison *is* the view. No view-level disclosure control: each stage carries its own |
-| **Ages** | How did its polities rise and fall? | Transport (Play / Pause, Restart, a `%d CE` year slider, ~120 years a second), the replayed map over the body's actual terrain, and the multipolarity line `year CE | N regions | N powers`. The sim is cached on the body's entity id **and** the generation's identity, so a regenerated world never replays the previous world's history over new regions. "Never settled" bodies say so instead of replaying. No disclosure control: the map sizes itself to its column |
+| **Ages** | How did its polities rise and fall? | Transport (Play / Pause, Restart, a signed-year slider reading `400 BCE` … `0 CE`, the run playing through in a fixed ~16 s whatever the span), the replayed map over the body's actual terrain, and the multipolarity line `year | N regions | N powers`. It **replays a recorded timeline** — `body_entry::prehistory_timelapse`, written by generation at its own sim call site — rather than re-running the era. There is no sim on this surface and no cache to invalidate. A body with an empty record says "never settled", which is every body but the cradle. No disclosure control: the map sizes itself to its column |
+| **Tectonics** | Which plates made this ground, and where do they meet? | The plate field over the body, reached from the canvas as well as the tab — a plate press under the Continent lens routes here (`CONTINENTS.md` § the Continent lens). |
 
 **Default view:** whatever `s.history_view` was last left on (persisted in `ui_state` so a verify
 script can park it) — there is no forced default-to-Story on every open.
@@ -58,11 +60,80 @@ and the Ages transport are in-view controls. As a docked ledger it shares the sh
 column with the other rail slots, so opening History closes whatever else occupied that column
 (accordion, `close_all_panels`).
 
+## The direction this surface is pointed (Ben, 2026-08-30)
+
+**The slot answers the wrong question.** Every one of the four views above narrates
+**generation** — how the body formed, how the chain arrived at it, how its polities settled, which
+plates made its ground. All of it is true and none of it is *strategy*. Ben, 2026-08-30:
+
+> History at present tells the story of generation. Rather it should in fact answer questions
+> about strategy that goes deeper into the meta-game.
+
+The examples he named, which are the shape of the target rather than a list to build:
+
+- **Which provinces are claimed by other nations** — the territorial picture as a *claim* state,
+  not a settled ownership fact.
+- **Who your nation expects to be fighting soon** — an expectation, forward-looking, off the
+  stance and sentiment quantities `RELATIONS.md` owns.
+- **Which resources are becoming depleted** — a *derivative*, not a level: the deposit field has
+  magnitudes today, and what this asks for is their trend.
+
+The common shape is worth naming, because it is what makes the target one surface rather than
+three: **all three are a trend or an expectation, not a state.** The existing views are all
+state — a finished biography, a finished chain, a finished era. Every question above is about
+where a line is *going*, which is why none of them can be read off the surfaces that exist.
+
+**None of this is buildable yet, and that is the finding rather than an obstacle.** Provincial
+claims distinct from holdings, a nation's expectation of war, and a depletion trend are three
+different pieces of missing infrastructure, in three different layers. So the ledger **stays as
+it is** — the direction is recorded here to be designed against, not acted on now.
+
 ## Open questions for Ben
+
+### The strategic turn
+- **Does History become the strategy surface, or does the strategy surface take the slot and
+  generation-history move?** The four existing views are a coherent answer to a real question
+  ("how did this body get to be what it is?") and the manual sends a player here for it. A slot
+  that answers both is two ledgers sharing a rail icon.
+- **Is the unit the BODY or the NATION?** Every view today is per-body, behind a body combo. All
+  three of Ben's examples are per-**nation** — claims, expectations, depletion of *someone's*
+  ground. If the answer is nation, the body combo is the wrong cross-cutting selector for the new
+  half of the surface, and the seam runs right through the middle of the ledger.
+- **What is a claim, and where does it live?** `NATIONS.md` owns territory and `province_holder`
+  records who holds a province; neither carries a claim a nation asserts and does not hold. A
+  claim is the thing the first question needs and the thing that does not exist.
+- **Is "expects to be fighting soon" a derived read or a stored intent?** Derived off stance and
+  sentiment it costs nothing and can be wrong in a way the player cannot appeal. Stored as a
+  scored intent it is honest but puts a planner-shaped object in the nation layer, which the
+  standing rules' nation grant admits only as deterministic scored utility.
+- **Does a depletion trend need history the world does not keep?** Deposit magnitude is a level;
+  a trend needs at least two samples. Nothing today records the deposit field's past, so this is
+  a storage question (and a save-seam one) before it is a UI question.
+- **Does any of this belong to History at all, or to Diplomacy and a Resources ledger?** The
+  honest reading is that Ben's three examples split cleanly across two future surfaces, and the
+  reason they feel like one is that all three are *what a player should be worrying about* —
+  which may be the actual top question, and a different surface from either.
+
+### Carried from the mockup pass
 - **Arm a lens on open?** Fixed `resource` on open, a Chain → generation-field overlay pairing
   (`BL-304`), or leave it unwired — which, if any, is worth building?
-- **Is a history / tile export in scope for a future mockup pass?** Without it none of the three
-  views can be mocked in Power BI.
+- **Is a history / tile export in scope for a future mockup pass?** Without it none of the views
+  can be mocked in Power BI.
 - **Does Ages belong under History, or under a future Diplomacy surface?** It is generation
   history and so fits the slot's rule, but its multipolarity read is the number the nation layer
-  will want live.
+  will want live. The strategic turn above sharpens this rather than settling it.
+
+### Settled by the Ages replay (Ben, 2026-08-30)
+Both questions this section used to hold are answered, and by the same change: **generation
+records `owner_changes` into the report and the view replays it.**
+
+What that fixed is larger than the view. Re-running the era made this surface a *seventh caller*
+of an invocation `world/era_minus_one.hpp` exists to keep singular, diverging from generation on
+all six of BL-462's axes. Three were closable at the call site; the other three were not, because
+the report's `settlement` is the state **after** the sim mutated it — so the replay started the era
+from its own ending and reported **0 battles and 0 conquests** however carefully it was
+parameterised. Replaying deletes the second caller, which closes all six at once.
+
+Measured after: **4 battles, 1 conquest, 1184 foundings** over 1334 changes — the era the world
+actually has. And the multi-minute cost is gone with the sim: a capture pass that opens Ages six
+times now runs within ~8 s of one that never opens it at all.

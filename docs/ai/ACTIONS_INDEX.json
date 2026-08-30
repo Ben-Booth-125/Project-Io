@@ -574,14 +574,6 @@
    "The BATTLE CARD in the Selection element (BL-469, landed 2026-08-21): select a live battle and its 'Break off' press sits under the withdrawal price, with a confirm popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card."
   ],
   [
-   "gameplay.accept_offer",
-   "NO UI SURFACE. THE MERCENARY CONTRACT IS RETIRED. There is no ledger, no rail slot and no press anywhere in the app that reaches this verb - it survives only because the corp_verb enum is append-only, and removing a verb would renumber every verb below it. It remains reachable over the corp-command seam (ProjectIo --serve, COMMAND opcode) and still applies when issued."
-  ],
-  [
-   "gameplay.abandon_contract",
-   "NO UI SURFACE. THE MERCENARY CONTRACT IS RETIRED. There is no ledger, no rail slot and no press anywhere in the app that reaches this verb - it survives only because the corp_verb enum is append-only, and removing a verb would renumber every verb below it. It remains reachable over the corp-command seam (ProjectIo --serve, COMMAND opcode) and still applies when issued."
-  ],
-  [
    "gameplay.raze_centre",
    "Seam-only for now (BL-616, centre promotion and decline): a corp_verb issued against the corp-command seam (ProjectIo --serve, COMMAND opcode). No UI press exists yet — the occupation surface that would host one belongs to the conquest consequence item (BL-518)."
   ],

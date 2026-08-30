@@ -338,6 +338,45 @@ bool r_settlement(std::istream& i, settlement_state& s)
 // generation_report
 // ---------------------------------------------------------------------------
 
+/// NR-733: the recorded Era -1 ownership replay. A plain change list plus the
+/// three scalars `owner_slice_at` folds against — no version guard of its own,
+/// because it arrived with `save_game_version` 3 and the envelope's whole-file
+/// check is what refuses an older stream.
+///
+/// The reader RANGE-CHECKS `region_stride` against the changes it actually read
+/// rather than trusting it: the stride is a slice WIDTH, and a corrupt or
+/// hand-edited value would size an allocation this file has no other bound on.
+/// Everything else is naturally bounded by its own type.
+void w_timelapse(std::ostream& o, const era_timelapse& t)
+{
+    w_i32(o, t.region_stride);
+    w_i32(o, t.start_year);
+    w_i32(o, t.years);
+    w_vec(o, t.changes, [](std::ostream& s, const owner_change& c) {
+        w_i32(s, c.year);
+        w_u16(s, c.region);
+        w_u16(s, c.owner);
+    });
+}
+
+bool r_timelapse(std::istream& i, era_timelapse& t)
+{
+    if (!(r_i32(i, t.region_stride) && r_i32(i, t.start_year) && r_i32(i, t.years)))
+        return false;
+    if (!r_vec(i, t.changes, [](std::istream& s, owner_change& c) {
+            return r_i32(s, c.year) && r_u16(s, c.region) && r_u16(s, c.owner);
+        }))
+        return false;
+    // A negative stride, or one that no change could index into, is corrupt
+    // rather than odd — the writer above cannot have produced either.
+    if (t.region_stride < 0 || t.years < 0)
+        return false;
+    for (const owner_change& c : t.changes)
+        if (c.region >= static_cast<uint16_t>(t.region_stride) && t.region_stride > 0)
+            return false;
+    return true;
+}
+
 void w_body_entry(std::ostream& o, const generation_report::body_entry& b)
 {
     w_str(o, b.name);
@@ -353,6 +392,7 @@ void w_body_entry(std::ostream& o, const generation_report::body_entry& b)
     w_int(o, b.tiles.gw);
     w_int(o, b.tiles.gh);
     w_bool(o, b.tiles.used_convergent);
+    w_timelapse(o, b.prehistory_timelapse); // save_game_version 3 (NR-733)
 }
 
 bool r_body_entry(std::istream& i, generation_report::body_entry& b)
@@ -362,7 +402,8 @@ bool r_body_entry(std::istream& i, generation_report::body_entry& b)
         && r_continents(i, b.continents) && r_settlement(i, b.settlement)
         && r_bool(i, b.tiles.valid) && r_u32(i, b.tiles.seed)
         && r_f32(i, b.tiles.deposit_scalar) && r_int(i, b.tiles.gw) && r_int(i, b.tiles.gh)
-        && r_bool(i, b.tiles.used_convergent);
+        && r_bool(i, b.tiles.used_convergent)
+        && r_timelapse(i, b.prehistory_timelapse); // save_game_version 3 (NR-733)
 }
 
 void w_report(std::ostream& o, const generation_report& g)

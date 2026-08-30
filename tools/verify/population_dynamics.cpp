@@ -32,7 +32,7 @@
 //
 // Build (WSL, from repo root):
 //   g++ -std=c++20 -O2 -I src -I tools/verify tools/verify/population_dynamics.cpp \
-//       $(ls src/world/*.cpp | grep -Ev 'recipe_registry|works_registry|tech_tree|world_gen_config|contract_template') \
+//       $(ls src/world/*.cpp | grep -Ev 'recipe_registry|works_registry|tech_tree|world_gen_config') \
 //       -o build_gen/verify/population_dynamics.out
 //
 // Note: recipe_registry.cpp is NOT linked -- it depends on Lua. The registry

@@ -91,7 +91,6 @@
 #include "harness_params.hpp"
 #include "world/budget_system.hpp"
 #include "world/components.hpp"
-#include "world/contract_template.hpp"
 #include "world/corp_command.hpp"
 #include "world/corporation_generation.hpp"
 #include "world/economy_system.hpp"
@@ -149,7 +148,6 @@ constexpr int k_r1_window  = 8;   ///< Quarters R1 reads for its trend. Two year
 
 /// BL-573: run_nation_step's template registry. Empty is correct — nothing in
 /// this sweep opens a mercenary contract, so the walk is vacuous.
-const contract_template_registry g_no_contract_templates;
 
 // ---------------------------------------------------------------------------
 // The tick
@@ -170,7 +168,7 @@ void tick(world& w, const recipe_registry& reg, int t, bool spectating)
     auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
                  &rep.building_labour);
-    run_nation_step(w, reg, rep, t, g_no_contract_templates);
+    run_nation_step(w, reg, rep, t);
     advance_tech_gates(w);
     credit_arrived_convoys(w, t);
 }

@@ -125,14 +125,6 @@ int run_serve(int ticks, long long as_corp, bool as_any)
     recipe_registry reg;
     reg.load_from_lua(lua);
 
-    // BL-573: contract_template_registry threaded from the app-layer boundary
-    // exactly where `reg` is, above — the same script-load + registry pattern,
-    // never a Lua load performed inside world/* itself.
-    lua_state contract_lua;
-    contract_lua.load("scripts/contracts.lua");
-    contract_template_registry contract_templates;
-    contract_templates.load_from_lua(contract_lua);
-
     world w = make_hard_coded_world();
 
     const uint16_t default_recipe = reg.default_recipe_id(); // BL-429
@@ -171,7 +163,7 @@ int run_serve(int ticks, long long as_corp, bool as_any)
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings,        // BL-343: law enforcement seam
                      &report.building_labour); // BL-614: wages on the per-building grant
-        run_nation_step(w, reg, report, t, contract_templates); // Sprint N3: nations score, spend, dispatch
+        run_nation_step(w, reg, report, t); // Sprint N3: nations score, spend, dispatch
         advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
         credit_arrived_convoys(w, t);
         // Age any dispatched survey by the days this tick spans (app.cpp does the
@@ -232,11 +224,6 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
     reg.load_from_lua(lua);
 
     // BL-573: same app-layer threading as run_serve, above.
-    lua_state contract_lua;
-    contract_lua.load("scripts/contracts.lua");
-    contract_template_registry contract_templates;
-    contract_templates.load_from_lua(contract_lua);
-
     world w = make_hard_coded_world();
 
     // Author default recipes onto generated processors (mirrors app::load_economy).
@@ -263,7 +250,7 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings,        // BL-343: law enforcement seam
                      &report.building_labour); // BL-614: wages on the per-building grant
-        run_nation_step(w, reg, report, t, contract_templates); // Sprint N3: nations score, spend, dispatch
+        run_nation_step(w, reg, report, t); // Sprint N3: nations score, spend, dispatch
         advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
         credit_arrived_convoys(w, t);
     }

@@ -514,6 +514,65 @@ all of them (Ben, 2026-08-28: "hovering one tile displays an outline around all 
 for that corporation/company"), the same claim the market catchment's highlight makes. Ground held
 by nobody is inert.
 
+## The other direction — a ledger opens, its lens arms
+
+The table above sends a **click on a lens** to a ledger. The reverse also holds for
+some slots: **opening the ledger arms the lens**, so the list and the map answer the
+same question in two registers rather than the player having to arm it themselves.
+Ben's preference is the general form — *"opening a menu usually should arm a lens"* —
+and 2026-08-30 settled the Market half of it by name: *"when we open the market
+ledger, we should also activate the market lens."*
+
+**A pair exists only where both directions name each other.** That is what keeps this
+from becoming a lens on every slot: the routing table above is the test, and most rail
+slots are not in it.
+
+| Rail slot | Ledger | Arms | The shared question |
+|---|---|---|---|
+| 6 | Market | `market` | Which market is this ground in, and what does it pay? |
+| 7 | Convoys | `supply_routes` | What is moving, and along which lanes? |
+| 10 | History | `continent` — on entering **Tectonics**, see below | Which plate made this ground? |
+
+**There are two arming rules, and which one a slot uses follows from how many questions
+its ledger answers.**
+
+**Fixed on open** (slots 6 and 7). Every tab gets the same lens, because the ledger
+answers one question on every tab. That a strip can arm only one lens is a real
+constraint rather than a simplification — it is why Convoys left the Market ledger at
+all (`convoys.md` § 3).
+
+**On entering a sub-view** (slot 10, Ben 2026-08-30). History answers four questions and
+only **Tectonics** has a map twin, so a fixed arm would hand the Continent lens to a
+player who opened on Story to read a deep-time biography. The lens is armed on the
+**edge** — the frame the view starts being drawn — which covers both routes in: pressing
+the tab, and opening the ledger onto a Tectonics it was last left on.
+
+**On the edge, never while on it.** A player who reaches Tectonics and then deliberately
+picks another lens keeps it; re-arming every frame would make the lens strip unusable on
+that view. This is asserted rather than assumed — `lens_ledger_pairs.lua` checks that
+opening History on Story arms nothing, that entering Tectonics arms `continent`, and
+that a lens chosen afterwards survives.
+
+**The semantics, which are `nav_pane.cpp`'s and are still formally unowned (NR-722):**
+arm on **open** only, and **never disarm on close**. A player who closes a ledger keeps
+the canvas they are looking at rather than having it yanked back. What is undecided is
+the rest — whether opening a second ledger should re-arm to that one's lens, and whether
+a lens the player *deliberately* chose should be overridden by opening a ledger at all.
+
+**Why History takes the second rule.** `Continent` routes to *"History ledger, at its
+tectonic record"*, so the pair is real — but three of History's four views have nothing
+to do with plates. The choice was between a lens those three do not want and a second
+arming rule; Ben took the second rule (2026-08-30), stated here rather than left to be
+inferred from the code, which is what NR-722 exists to prevent.
+
+**Three lenses have no ledger to pair with, and that is not an omission.**
+`Corporation` and `Company` route to *that corporation's* / *that company's* ledger —
+per-entity surfaces reached through Selection, not rail slots, so there is no slot to
+arm from. `Throughput` is **inert** in the routing table and has no ledger at all: it is
+the surface half of `LOGISTICS.md` § Logistic Points, and no ledger surfaces LP.
+Logistics is the road and Supply is the traffic; the Convoys ledger is the traffic's, so
+throughput's twin would be a **Logistics ledger that does not exist**.
+
 ## The strip rotates with the rung (Ben, 2026-08-28)
 
 The lens strip on the minimap shows **the lenses that draw something at the current canvas rung**,

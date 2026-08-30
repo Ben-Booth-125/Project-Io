@@ -317,23 +317,11 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
     ImGui::Text("Buildings Owned : %d", static_cast<int>(cc.assets.size()));
 
     float income    = 0.0f;
-    float subsidies = 0.0f;
     if (const auto bit = report.budgets.find(w.player_entity); bit != report.budgets.end())
     {
         income    = bit->second.income;
-        subsidies = bit->second.subsidies;
     }
     ImGui::Text("Income: Cr %.0f", static_cast<double>(income));
-    // BL-577: "Contract income" — subsidies this tick, sourced from
-    // budget_result::subsidies (corp_budget's own field name; the SAME line
-    // the header runway indicator reads, header_panel.cpp). Not exclusively
-    // a mercenary contract's remainder payment (an unearmarked national-
-    // budget transfer, nation_step.cpp's step 4, folds onto the same line
-    // today with no other producer), but every producer of this line IS a
-    // nation paying the player's corp, and the mercenary contract's is the
-    // only one live in the shipped economy — dimmed to zero rather than
-    // hidden when nothing has paid this tick, matching every other line here.
-    ImGui::Text("Contract income: Cr %.0f", static_cast<double>(subsidies));
     ImGui::Text("Cargo Value: Cr %.0f", static_cast<double>(player_stockpile_value(w)));
     ImGui::Spacing();
 

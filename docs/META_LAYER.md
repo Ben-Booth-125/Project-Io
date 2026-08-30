@@ -101,12 +101,19 @@ contested quantity is a predicate whose meaning is contested.
 | `corp_command.cpp` | is this buyer embargoed by this supplier? |
 
 **Quests** are the fourth reader the header names; BL-087 (era-1 tech/quest system) owns the quest
-object. **The mercenary contract is a fifth**, and it is what `province_held` exists for: BL-570
-gave `condition_set` its first location-qualified subject because `docs/economy/CONTRACTS.md`'s
-spine — *"a contract is a condition_set the client will pay to have become true"* — could not be
-expressed against the nine world-wide corp scalars above. A contract stores an INDEX into an
-authored template table (`scripts/contracts.lua`) rather than a free `condition_set`, so the
-predicate itself is still authored data, never a type enum in C++.
+object.
+
+**The mercenary contract WAS a fifth, and it is what `province_held` exists for.** BL-570 gave
+`condition_set` its first location-qualified subject because a contract's spine — *"a contract is a
+condition_set the client will pay to have become true"* — could not be expressed against the
+world-wide corp scalars above. That contract was retired on 2026-08-30
+([`economy/CONTRACTS.md`](economy/CONTRACTS.md)), and its authored template table went with it.
+
+**The consequence is worth stating plainly: nothing in the game authors a non-empty
+`condition_set` any more.** The substrate is intact and `province_held` is still a valid subject;
+the one live consumer of a stored predicate is `world::corp_embargo_conditions`, which no content
+populates. So this layer is currently a mechanism without content — which is a reason to be careful
+reading the rest of this document as a description of what runs, rather than of what it is for.
 
 ## The effect side — `modifier_set`
 

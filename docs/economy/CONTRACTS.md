@@ -17,10 +17,14 @@ them.
 
 **There is deliberately no sell side.** A symmetric mechanism — the player *hired*, against a
 `condition_set` and a deadline — is not part of the design. The military side of the game will be
-approached some other way, and this document does not hold a placeholder for it. Anything that
-still speaks of a mercenary contract, an offer, or a client nation paying for an outcome is a
-**dormant record kept for the save format's sake**, not a mechanism: `src/world/world.hpp`
-§ `mercenary_offer` carries the note.
+approached some other way, and this document does not hold a placeholder for it.
+
+**Nothing of it remains in the code.** The records, the two tick passes, their serialisation, the
+authored template table and the comms traffic are gone (Ben, 2026-08-30). Two things survive by
+necessity rather than by design, and both are inert: the `accept_offer` and `abandon_contract`
+values in `corp_verb`, which **reject**, because that enum is append-only and deleting a value
+would renumber every verb below it; and the word *contract* in `procurement_contract`, which is
+this document's other subject and is live.
 
 ---
 

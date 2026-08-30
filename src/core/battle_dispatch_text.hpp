@@ -45,18 +45,3 @@ std::string battle_dispatch_line(const world& w, const battle_dispatch& d);
 /// battle card's phase readout, so the two surfaces never disagree").
 const char* battle_phase_word(battle_phase p);
 
-/// BL-577's sibling to `battle_dispatch_line`: one line of Public-channel
-/// contract traffic, from one `contract_dispatch` record — offer issued,
-/// accepted, completed, failed or abandoned. THE PUBLIC CHANNEL IS NATION-
-/// VOICED ONLY (CHAT.md), so every phrasing speaks in the CLIENT nation's
-/// first person ("We ..."), the same register `session_history.cpp`'s
-/// `post_nation_agency_comms` already established; the contractor corp is
-/// named where the event has one (a commercial engagement between named
-/// counterparties, not a rival's internals — CONTRACTS.md never treats a
-/// contract's existence as private the way DISCOVERY.md treats production).
-///
-/// Deterministic on the SAME terms as `battle_dispatch_line`: phrase choice
-/// folds the record's own `id` (offers and contracts each draw from their own
-/// monotonic allocator, so it is already a stable per-record scalar) with the
-/// event `kind`, consuming no RNG draw.
-std::string contract_dispatch_line(const world& w, const contract_dispatch& d);

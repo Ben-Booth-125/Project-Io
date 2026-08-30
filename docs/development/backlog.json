@@ -1443,6 +1443,33 @@
       "resolved": "2026-08-29",
       "design": "@docs/development/archive/backlog-design-2026-Q3.json",
       "archived": "docs/development/archive/backlog-design-2026-Q3.json"
+    },
+    {
+      "id": "BL-694",
+      "short_name": "top-bar tracker",
+      "category": "UI",
+      "title": "A top-bar tracker for the quantities that gate progression - level and rate, e.g. \"200 Steel (+25/qtr)\"",
+      "status": "designed",
+      "glyph": "+",
+      "priority": "B",
+      "difficulty": 3,
+      "version_goal": null,
+      "sprint": "25",
+      "written": "2026-08-30",
+      "author": "Ben",
+      "requires": [],
+      "blocked_on": "BL-619",
+      "parked": false,
+      "authority_doc": "docs/ui/HEADER.md",
+      "files": [
+        "src/ui/header_panel.cpp",
+        "docs/ui/HEADER.md",
+        "docs/economy/RESOURCES.md",
+        "docs/economy/RESEARCH.md",
+        "docs/ui/question_log.json",
+        "docs/ui/ui_elements.json"
+      ],
+      "design": "Ben, 2026-08-30: \"a tracker for important items on the top-nav bar. We should show a stockpile for steel, a new type or resource (boost), which is untradeable, and research points. These can all have an absolute value for how much is in stockpile, and an addition to the right. E.g. '200 Steel (+25/qtr)'.\"\n\nTHE READ IT ADDS. The header today answers \"how is my money\" - BALANCE, STOCKPILE (one aggregated credit figure), NET/qtr and RUNWAY. It answers nothing about the GOODS a player is accumulating, so the three quantities that gate progression are invisible unless a ledger is opened. The tracker is the always-on half of that: a level and its rate, in the shape the header already uses for money.\n\nTHE FORMAT IS BEN'S AND IS THE WHOLE SPEC: `200 Steel (+25/qtr)` - absolute stockpile, name, and the per-quarter delta to its right. The delta is the same quantity the header's NET already reports for credits, so the two read as one family rather than two conventions.\n\nTWO OF THE THREE QUANTITIES DO NOT EXIST, and that is the item's real shape - it is a design item before it is a UI one. Do not start with the header.\n  1. STEEL exists. It is an Industrial-tier resource with a live recipe chain, so its stockpile and its per-quarter movement are both readable today. This third is buildable now and is the one that proves the format.\n  2. BOOST DOES NOT EXIST, and neither does untradeability. `RESOURCES.md` owns the roster and has no such resource; more importantly the model has no UNTRADEABLE PROPERTY - the nearest thing is a market opening at all-zero base_price, which is an accident of a fixture rather than a declared rule (`market_clearing.hpp`). An untradeable good is a genuinely new kind of thing: it cannot be bought, so the only way to have it is to make it, which makes it a different lever from every resource now in the game. That needs Ben's design, not an implementer's guess - what produces Boost, what consumes it, and what untradeable means at the order book (refused listing? absent from the goods table? present at no price?).\n  3. RESEARCH POINTS DO NOT EXIST either - grep finds no research_point quantity anywhere in `src/world`. `RESEARCH.md` is a stub and BL-619 (RESEARCH_SYSTEM) is an open DESIGN SESSION WITH BEN, not a build slice. This third is gated on that item and must not be faked with a placeholder number.\n\nSO THE ITEM SPLITS THREE WAYS, and only the first can start: build the tracker with Steel and a shape that takes N entries; add Boost when its design lands; add research points when BL-619 does. A header that shows one tracker is honest; one that shows three where two are zeros is not.\n\nWHERE IT LIVES. `docs/ui/HEADER.md` owns the top bar and is the authority for the surface. `docs/economy/RESOURCES.md` owns Boost and the untradeable property. `docs/economy/RESEARCH.md` and BL-619 own research points. The header is fixed chrome on every frame, so its cost is paid always - `LAYOUT.md`'s constraint, and the reason the entry count is a design question rather than a free parameter.\n\nCARRIED OUT OF A RETIRED SPRINT. This was the shell-chrome batch's subject (old sprint 25), which Ben deleted on 2026-08-30 as not needing a revisit. This is the one piece he kept, so it rides in sprint 25 (canvases) despite being header-grain."
     }
   ]
 }

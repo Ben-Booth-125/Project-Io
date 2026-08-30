@@ -664,16 +664,6 @@ void dissolve_into(world& w, entity_id acquirer, entity_id target)
                        [](const procurement_contract& c) { return c.buyer == c.supplier; }),
         w.procurement_contracts.end());
 
-    // --- TRANSFER: mercenary contracts -------------------------------------
-    // The committed force transferred above (the `units` array is unchanged and
-    // those units are now the acquirer's), so the contractor follows it. The
-    // client is a NATION and is untouched. A terminal row is re-pointed too: it is
-    // the ledger's record of work done, and the firm that did it is now part of
-    // the acquirer.
-    for (mercenary_contract& c : w.mercenary_contracts)
-        if (c.contractor == target)
-            c.contractor = acquirer;
-
     // --- CANCEL: live battles ----------------------------------------------
     // A battle is a fight between two parties; one of them ceasing to exist ends
     // it, and there is no honest way to substitute a combatant mid-engagement.
@@ -1550,18 +1540,10 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 return corp_command_result::rejected_invalid;
             if (uit->second.owner != cmd.corp)
                 return corp_command_result::rejected_not_owner;
-            // BL-573: a unit committed to a LIVE mercenary contract cannot be
-            // disbanded out from under it — the committed-unit lock the
-            // item's own requirement names. A unit whose contract has already
-            // gone terminal (completed/failed/abandoned) is free again; the
-            // check reads `state` rather than needing a separate release step.
-            for (const mercenary_contract& c : w.mercenary_contracts)
-            {
-                if (c.state != mercenary_contract_state::active)
-                    continue;
-                if (mercenary_contract_has_unit(c, cmd.subject))
-                    return corp_command_result::rejected_state;
-            }
+            // The committed-unit lock that used to sit here went with the
+            // mercenary contract (NR-731): a unit could not be disbanded out
+            // from under a live contract it was committed to. Nothing commits a
+            // unit any more, so there is no lock left to honour.
             w.units.erase(uit); // no refund — manpower walks away (BL-470's design)
             return corp_command_result::applied;
         }
@@ -1587,142 +1569,17 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
         // violation. Nothing below mutates until the single block of writes
         // at the end of each case.
 
+        // TOMBSTONES (BL-693 / NR-731, 2026-08-30). The mercenary contract is
+        // gone - its records, its passes and its serialisation with it - but
+        // these two enum values CANNOT be removed. `corp_verb` is append-only
+        // by contract: deleting a value renumbers every verb below it and
+        // silently re-points ACTIONS.json and every recorded command. So the
+        // slots stay and the behaviour goes. They reject rather than falling
+        // through to a default, so a caller is told No instead of being
+        // quietly ignored - the AI-facing-seam rule (io-standing-rules.md).
         case corp_verb::accept_offer:
-        {
-            if (cmd.order == 0)
-                return corp_command_result::rejected_invalid;
-            const auto oit = std::find_if(w.mercenary_offers.begin(), w.mercenary_offers.end(),
-                                          [&](const mercenary_offer& o) { return o.id == cmd.order; });
-            if (oit == w.mercenary_offers.end())
-                return corp_command_result::rejected_invalid; // no such offer (or already consumed)
-
-            // `counterparty` names the offer's CLIENT NATION for this verb,
-            // not a corp — the seam's counterparty check forks on verb
-            // (BL-573's own design text). Validated against w.nations, not
-            // w.corporations: a value that merely fits an entity_id must
-            // still name a REAL nation, and it must be the one this offer
-            // actually belongs to — an offer id is not secret, so a caller
-            // must also know (or be told) who it targets.
-            if (w.nations.find(cmd.counterparty) == w.nations.end())
-                return corp_command_result::rejected_invalid;
-            if (oit->client != cmd.counterparty)
-                return corp_command_result::rejected_invalid;
-
-            // Expired: this offer's eventual contract could not possibly
-            // complete in time. A self-contained check against the offer's
-            // OWN deadline field — no contract_offer_params dependency needed
-            // here, and none of the tunables that decide an OFFER's own TTL
-            // (a different clock — see mercenary_offer::deadline's own
-            // comment) belong on this seam.
-            if (w.current_econ_tick >= oit->deadline)
-                return corp_command_result::rejected_invalid;
-
-            // Not yet fully escrowed: CONTRACTS.md's "the fee this offer's
-            // escrow must clear before the contract it names is postable".
-            // A partially-funded offer is not yet a real acceptable contract.
-            if (oit->offer_escrow < oit->fee)
-                return corp_command_result::rejected_state;
-
-            // The committed force: every named slot must be a REAL unit,
-            // OWNED by the acting corp, and not already committed to another
-            // ACTIVE contract (no double-commit — the item's own requirement).
-            // At least one unit must be named; an empty force is refused
-            // rather than accepted into a contract nothing can prosecute.
-            std::array<entity_id, mercenary_contract_max_units> committed{};
-            std::size_t                                          committed_n = 0;
-            for (const entity_id u : cmd.units)
-            {
-                if (u == null_entity)
-                    continue;
-                const auto uit = w.units.find(u);
-                if (uit == w.units.end())
-                    return corp_command_result::rejected_invalid;
-                if (uit->second.owner != cmd.corp)
-                    return corp_command_result::rejected_not_owner;
-                for (const mercenary_contract& c : w.mercenary_contracts)
-                {
-                    if (c.state != mercenary_contract_state::active)
-                        continue;
-                    if (mercenary_contract_has_unit(c, u))
-                        return corp_command_result::rejected_state; // already committed
-                }
-                committed[committed_n++] = u;
-            }
-            if (committed_n == 0)
-                return corp_command_result::rejected_invalid;
-
-            // The supplier side of the transfer must still exist — every
-            // credit this seam moves is a TRANSFER, never a debit that reaches
-            // nobody (the accept_quote precedent, above).
-            const auto cit = w.corporations.find(cmd.corp);
-            if (cit == w.corporations.end())
-                return corp_command_result::rejected_invalid;
-
-            // --- everything above is a pure check; mutation starts here -----
-            //
-            // The deposit is paid straight from the offer's own escrow, NOT
-            // via a fresh nation-budget claim: `derive_contract_offers`
-            // (nation_step.cpp) already debited `oit->client`'s treasury,
-            // tick by tick, as the escrow accumulated toward `fee` — the full
-            // fee has therefore ALREADY left the nation's books by the time an
-            // offer is fully escrowed (the precondition above). Routing the
-            // deposit (or, on completion, the remainder) through
-            // run_national_budget's claim/gather machinery a second time
-            // would debit the SAME nation's treasury for the SAME contract
-            // twice — a real conservation leak, not a stylistic choice. Both
-            // halves of the split payment are therefore direct transfers,
-            // exactly like `run_nation_garrison_upkeep`'s "direct expenditure"
-            // precedent for a line with no corp claimant of its own.
-            const float deposit = oit->fee * reg.procurement().deposit_fraction;
-
-            mercenary_contract mc;
-            mc.id             = w.allocate_contract_id();
-            mc.client         = oit->client;
-            mc.contractor     = cmd.corp;
-            mc.template_index = oit->template_index;
-            mc.province       = oit->target_province;
-            mc.fee            = oit->fee;
-            mc.deposit_paid   = deposit;
-            mc.deadline       = oit->deadline;
-            mc.accepted_tick  = w.current_econ_tick;
-            for (std::size_t i = 0; i < committed_n; ++i)
-                mc.units[i] = committed[i];
-            mc.state = mercenary_contract_state::active;
-
-            cit->second.balance += deposit;
-            w.mercenary_contracts.push_back(mc);
-            w.mercenary_offers.erase(oit); // consumed: cannot accept twice
-            return corp_command_result::applied;
-        }
-
         case corp_verb::abandon_contract:
-        {
-            if (cmd.order == 0)
-                return corp_command_result::rejected_invalid;
-            const auto it = std::find_if(w.mercenary_contracts.begin(), w.mercenary_contracts.end(),
-                                         [&](const mercenary_contract& c) { return c.id == cmd.order; });
-            if (it == w.mercenary_contracts.end())
-                return corp_command_result::rejected_invalid;
-            if (it->contractor != cmd.corp)
-                return corp_command_result::rejected_not_owner;
-            if (it->state != mercenary_contract_state::active)
-                return corp_command_result::rejected_state; // already terminal
-
-            // Same money outcome as a failure — the deposit already paid at
-            // accept_offer is not clawed back, and the reserved remainder is
-            // simply never disbursed (CONTRACTS.md § Q2: "you are not paid
-            // for trying"). A DISTINCT, LESSER sentiment magnitude is what
-            // tells the two apart: the contractor CHOSE this one. Reuses
-            // `contract_cancelled` — the procurement seam's own "walked away
-            // early" kind — rather than minting a mercenary-only twin: the
-            // conduct it names ("the counterparty backed out") is identical
-            // across both contract families, and CONTRACTS.md's Q2 table
-            // already reads "cancelled" as this state's other name.
-            it->state = mercenary_contract_state::abandoned;
-            w.note_conduct(reg.sentiment(), it->client, it->contractor,
-                           sentiment_factor_kind::contract_cancelled);
-            return corp_command_result::applied;
-        }
+            return corp_command_result::rejected_invalid;
 
         case corp_verb::raze_centre:
         {

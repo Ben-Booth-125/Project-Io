@@ -364,36 +364,6 @@ bool request_withdraw(world& w, entity_id corp, uint32_t province, entity_id aga
     return false;
 }
 
-entity_id active_mercenary_contract_for(const world& w, entity_id corp, uint32_t province)
-{
-    // BL-573 (contract templates) landed: `world::mercenary_contracts` is now
-    // the real store this function was always going to read. "Active" reads
-    // `mercenary_contract_state::active` — a terminal contract (completed,
-    // failed, abandoned) is no longer the hostility for this pair, which is
-    // exactly "cleared at the contract's terminal state, never by a corp
-    // verb" (MILITARY.md § Nation garrisons): there is no separate stance row
-    // to clear, because this lookup IS the hostility signal.
-    //
-    // RETURN VALUE NOTE. This function's signature predates BL-573 and reads
-    // "returns the contract's entity id" — but `mercenary_contract::id`
-    // (like `mercenary_offer::id` before it, BL-572) is a uint32_t HANDLE
-    // from its own allocator, not an `entity_id` from `world::create_entity`;
-    // casting one into the other would be exactly the kind of silent id-space
-    // conflation the untrusted-seam rule exists to catch elsewhere. Every
-    // caller (run_battles, below) only compares the result against
-    // `null_entity`, so the value returned when one IS found is a sentinel
-    // that is honestly non-null rather than a borrowed number dressed as an
-    // identity — `corp` itself, which is already known non-null by the time
-    // one is found.
-    for (const mercenary_contract& c : w.mercenary_contracts)
-    {
-        if (c.state != mercenary_contract_state::active)
-            continue;
-        if (c.contractor == corp && c.province == province)
-            return corp;
-    }
-    return null_entity;
-}
 
 bool open_battle(world& w, int tick, uint32_t province, entity_id attacker, entity_id defender)
 {
@@ -634,82 +604,6 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
             ++out.opened;
         }
         std::sort(w.battles.begin(), w.battles.end(), battle_order_less);
-    }
-
-    // -----------------------------------------------------------------------
-    // 1b. DISCOVERY — corp vs. nation, over an ACTIVE MERCENARY CONTRACT
-    // -----------------------------------------------------------------------
-    // BL-571 (nation garrisons): no `declare_hostile` row is authored for this
-    // pair — the contract itself is the hostility, live only for its term
-    // (`active_mercenary_contract_for`). STUB TODAY (BL-573, contract
-    // templates, is Wave 4 of this batch and has not landed): the stub always
-    // returns `null_entity`, so this block is fully wired but finds no
-    // candidate from any production state yet. See battle_system.hpp's own
-    // doc comment on `active_mercenary_contract_for` and `open_battle`.
-    if (!w.units.empty() && !w.nations.empty() && !w.corporations.empty())
-    {
-        // province -> the nation whose garrison stands there. At most ONE by
-        // construction — BL-571 seeds exactly one nation's garrison per
-        // province — so "first found in ascending unit id" is exact, not a
-        // tie-break standing in for something that could genuinely differ.
-        std::map<uint32_t, entity_id> garrison_nation;
-        {
-            std::vector<entity_id> uids;
-            uids.reserve(w.units.size());
-            for (const auto& kv : w.units)
-                uids.push_back(kv.first);
-            std::sort(uids.begin(), uids.end());
-            for (const entity_id uid : uids)
-            {
-                const unit_component& u = w.units.at(uid);
-                if (u.count <= 0 || u.position == null_entity)
-                    continue;
-                if (w.nations.find(u.owner) == w.nations.end())
-                    continue; // a corp-owned unit
-                const uint32_t prov = w.provinces.province_of(u.position);
-                if (prov != 0)
-                    garrison_nation.emplace(prov, u.owner);
-            }
-        }
-
-        if (!garrison_nation.empty())
-        {
-            std::vector<entity_id> corp_ids;
-            corp_ids.reserve(w.corporations.size());
-            for (const auto& kv : w.corporations)
-                corp_ids.push_back(kv.first);
-            std::sort(corp_ids.begin(), corp_ids.end());
-
-            for (const entity_id corp : corp_ids)
-            {
-                // This corp's own provinces. A std::set, so the CONTENTS are
-                // all that matters — membership does not depend on w.units'
-                // iteration order, only on which units exist — and the
-                // consuming walk below is over the set's own ascending order.
-                std::set<uint32_t> corp_provinces;
-                for (const auto& kv : w.units)
-                {
-                    const unit_component& u = kv.second;
-                    if (u.owner != corp || u.count <= 0 || u.position == null_entity)
-                        continue;
-                    const uint32_t prov = w.provinces.province_of(u.position);
-                    if (prov != 0)
-                        corp_provinces.insert(prov);
-                }
-
-                for (const uint32_t prov : corp_provinces)
-                {
-                    const entity_id contract = active_mercenary_contract_for(w, corp, prov);
-                    if (contract == null_entity)
-                        continue; // always true today — see the stub's own doc comment
-                    const auto git = garrison_nation.find(prov);
-                    if (git == garrison_nation.end())
-                        continue; // no garrison standing here to engage
-                    if (open_battle(w, tick, prov, corp, git->second))
-                        ++out.opened;
-                }
-            }
-        }
     }
 
     if (w.battles.empty())

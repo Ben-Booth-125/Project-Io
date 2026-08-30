@@ -135,7 +135,6 @@
 #include "harness_params.hpp"
 #include "world/budget_system.hpp"
 #include "world/components.hpp"
-#include "world/contract_template.hpp"
 #include "world/corporation_generation.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
@@ -173,7 +172,6 @@ constexpr int k_window     = 8;    ///< Trailing quarters averaged (FINANCE.md's
 constexpr int k_dead_run   = 20;   ///< Trailing ticks of zero output that read as "dead".
 
 /// BL-573: empty is correct — nothing in this sweep opens a mercenary contract.
-const contract_template_registry g_no_contract_templates;
 
 /// Only these two building types produce, so only these two can be said to have
 /// "produced nothing". A port, an inland hub or a research institute NEVER emits
@@ -339,7 +337,7 @@ economy_report tick(world& w, const recipe_registry& reg, int t)
     auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
                  &rep.building_labour);
-    run_nation_step(w, reg, rep, t, g_no_contract_templates);
+    run_nation_step(w, reg, rep, t);
     advance_tech_gates(w);
     credit_arrived_convoys(w, t);
     return rep;

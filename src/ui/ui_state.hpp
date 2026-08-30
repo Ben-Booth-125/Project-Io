@@ -548,10 +548,24 @@ struct ui_state
     /// press. See ui/generation_ledger.hpp, docs/generation/GENERATION_LEDGER.md.
     bool show_generation_ledger = false;
 
-    /// Generation Ledger: 0=Body (histograms, thresholds, profile echo),
-    /// 1=Tile (the per-tile derivation breadcrumb). In ui_state, like every other
-    /// panel view index, so a verify script can park the ledger on a view.
-    int  generation_ledger_view = 0;
+    /// Generation Ledger section disclosure. The ledger is ONE flat panel of
+    /// stacked sections (the Balance ledger's shape) rather than a tab strip: the
+    /// Tile view was retired 2026-08-30 and there is no second view left to name.
+    ///
+    /// Held here rather than in ImGui's own storage for the construction_panel
+    /// reason - the state is then stable across a rebuild and drivable by a verify
+    /// script, which ImGui's internal id storage is not. A `CollapsingHeader` is a
+    /// toggle by construction, so the standing Toggle rule needs no second control.
+    ///
+    /// Profile and Thresholds open by default: they are short, and they are what
+    /// the other four sections are read AGAINST - a histogram that surprises is
+    /// traced back to the profile that asked for it.
+    bool gen_profile_open   = true;
+    bool gen_thresholds_open = true;
+    bool gen_bands_open     = false;
+    bool gen_substrate_open = false;
+    bool gen_cover_open     = false;
+    bool gen_landform_open  = false;
 
     // --- AI decision feed (BL-407) ---
     // A reader over stores that have always been populated and never surfaced:
@@ -739,19 +753,6 @@ struct ui_state
     // MUTUALLY EXCLUSIVE with `selected_entity` and the battle triple, on the
     // same "whichever is set last clears the others" rule.
     //
-    // DORMANT, AND SAYING SO IS THE POINT (BL-693). The mercenary contract is
-    // RETIRED: its ledger and its rail slot are gone, so nothing anywhere sets
-    // this field and it is permanently zero. It survives only because the
-    // Selection element's contract card still reads it, and because
-    // `world::mercenary_contracts` — the record it keys into — is itself kept
-    // dormant rather than torn out (removing it would move the save envelope).
-    // Treat this as a record of a system that is not running, not as a hook.
-    uint32_t selected_contract_id = 0;
-
-    bool has_contract_selection() const { return selected_contract_id != 0; }
-
-    void clear_contract_selection() { selected_contract_id = 0; }
-
     /// The value of `selected_entity` the Planetary canvas last wrote, so the
     /// canvas can tell its OWN selection from one some other surface made — a
     /// ledger row, a corp list, a just-built building. On a mismatch the canvas
@@ -909,8 +910,11 @@ struct ui_state
     bool market_goods_show_body = false;
 
     /// History ledger: 0=Story (the body's biography), 1=Chain (the generation
-    /// charts), 2=Tiles (the tile/building/market tables), 3=Ages (the Era -1
-    /// political time-lapse, BL-277). BL-211.
+    /// charts), 2=Ages (the Era -1 political time-lapse, BL-277), 3=Tectonics
+    /// (the plate view, BL-660). BL-211. The names are `history_view_id` in
+    /// ui/tile_inspector.hpp — this comment is the mirror, not the source, and
+    /// it read "2=Tiles, 3=Ages" against a Tiles view that no longer exists
+    /// until 2026-08-30 (NR-713).
     int  history_view = 0;
 
     /// Ages view: the year currently scrubbed to, and whether playback is

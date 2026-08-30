@@ -163,33 +163,18 @@ struct battle_tick
 /// existing orphan cleanup is what disbands a unit this pass reduced to zero.
 /// There is deliberately no second disband mechanism.
 ///
-/// TWO DISCOVERY TRIGGERS since BL-571 (nation garrisons): corp-vs-corp
-/// directed hostility (the original — `w.corp_hostile_pairs`), and corp-vs-
-/// nation over an ACTIVE MERCENARY CONTRACT (`active_mercenary_contract_for`,
-/// below) — no `declare_hostile` row is authored for the second; the contract
-/// itself is the hostility. See MILITARY.md § Nation garrisons.
-battle_tick run_battles(world& w, const recipe_registry& reg, int tick);
-
-// ---------------------------------------------------------------------------
-// BL-571 — the second trigger: corp vs. nation, over an active mercenary
-// contract
-// ---------------------------------------------------------------------------
-
-/// Whether @p corp holds an ACTIVE mercenary contract targeting @p province —
-/// the second battle trigger's hostility test (MILITARY.md § Nation
-/// garrisons: "no `declare_hostile` row is authored for this pair — the
-/// contract itself is the hostility"). Returns the contract's entity id, or
-/// `null_entity` when none is active.
+/// ONE DISCOVERY TRIGGER: corp-vs-corp directed hostility
+/// (`w.corp_hostile_pairs`).
 ///
-/// STUB (BL-571, nation garrisons). The real answer is BL-573 (contract
-/// templates — Wave 4 of this batch), which has not landed: no contract
-/// store exists anywhere in `world` yet. This is hard-coded to `null_entity`
-/// always, so `run_battles`' second trigger is fully wired and reachable but
-/// cannot fire from any production state today — "so this task is not
-/// blocked waiting on wave 4" (the item's own brief). BL-573 replaces this
-/// function's BODY with a real lookup; the SIGNATURE already carries
-/// everything the trigger needs.
-entity_id active_mercenary_contract_for(const world& w, entity_id corp, uint32_t province);
+/// THERE WERE TWO (BL-571). The second was corp-vs-nation over an active
+/// mercenary contract — no `declare_hostile` row was authored for it because
+/// the contract itself was the hostility. It went with the mercenary system
+/// (NR-731, 2026-08-30), and it had never fired: its lookup returned
+/// `null_entity` from every production state, because the contracts that would
+/// have populated it were never created. `open_battle` below still opens a
+/// corp-vs-nation fight symmetrically, so the CAPABILITY is intact and only the
+/// automatic trigger is gone. See MILITARY.md § Nation garrisons.
+battle_tick run_battles(world& w, const recipe_registry& reg, int tick);
 
 /// Open a battle between @p attacker's and @p defender's units standing in
 /// @p province — the existing-battle check, terrain pick and
@@ -198,11 +183,11 @@ entity_id active_mercenary_contract_for(const world& w, entity_id corp, uint32_t
 /// only as unit owners, so this opens a corp-vs-corp, corp-vs-nation or
 /// (symmetrically) nation-vs-corp battle exactly alike.
 ///
-/// EXPOSED so BOTH triggers share one code path AND so a harness can drive a
-/// corp-vs-nation battle directly, without a live mercenary contract to
-/// discover it through (BL-573 has not landed — see
-/// `active_mercenary_contract_for`) — the same "expose it so it can be
-/// asserted" precedent `battle_ground` already sets.
+/// EXPOSED so a harness can drive a corp-vs-nation battle directly — the same
+/// "expose it so it can be asserted" precedent `battle_ground` already sets.
+/// Since the mercenary trigger was removed (NR-731) this is the ONLY route to a
+/// corp-vs-nation battle, which makes the exposure load-bearing rather than a
+/// convenience.
 ///
 /// Returns false and leaves `w.battles` untouched if the pair is already
 /// fighting in @p province, if either side has no standing unit there, or if

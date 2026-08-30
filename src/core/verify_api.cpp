@@ -1227,6 +1227,34 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "tech_tree")     m_ui.tech_tree_view = view;
     });
 
+    // Park a COLLAPSING SECTION open or closed.
+    //
+    // Sections are `ui_state` bools rather than a view index, so `panel_view`
+    // cannot reach them and a script had no way to open one. That is not a
+    // theoretical gap: the Generation ledger's whole content sits behind six of
+    // them, and before this every capture of it showed whatever the defaults were.
+    //
+    // AN UNKNOWN NAME IS AN ERROR HERE, not a silent no-op. `panel_view` above
+    // ignores what it does not recognise, and that is how a script came to ask for
+    // the Generation ledger's Tile view, get nothing, and still report success
+    // (NR-714's shape). A check that cannot aim should say so.
+    v.set_function("section", [this](const std::string& name, bool open) {
+        if      (name == "gen_profile")        m_ui.gen_profile_open        = open;
+        else if (name == "gen_thresholds")     m_ui.gen_thresholds_open     = open;
+        else if (name == "gen_bands")          m_ui.gen_bands_open          = open;
+        else if (name == "gen_substrate")      m_ui.gen_substrate_open      = open;
+        else if (name == "gen_cover")          m_ui.gen_cover_open          = open;
+        else if (name == "gen_landform")       m_ui.gen_landform_open       = open;
+        else if (name == "construction_queue") m_ui.construction.queue_open = open;
+        else if (name == "acq_purchasable")    m_ui.acquisitions_purchasable_open = open;
+        else if (name == "acq_possible")       m_ui.acquisitions_possible_open    = open;
+        else
+            std::printf("verify.section: unknown section '%s'. Known: gen_profile, "
+                        "gen_thresholds, gen_bands, gen_substrate, gen_cover, "
+                        "gen_landform, construction_queue, acq_purchasable, "
+                        "acq_possible.\n", name.c_str());
+    });
+
     // Park a fold-out ledger's SCROLL at a fraction of its extent (0 = top,
     // 1 = foot), so a capture can reach content the column clips. Without this the
     // verify API could open a panel and pick its view but never see past the fold —
@@ -1945,23 +1973,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                                static_cast<unsigned int>(no_province)));
         cmd.unit_type    = static_cast<uint16_t>(t.get_or("unit_type", 0));
 
-        // BL-576: accept_offer's/abandon_contract's `order` (a mercenary_offer
-        // or mercenary_contract id) and accept_offer's committed `units` array
-        // — unreachable from every verify script until now, the same gap
-        // NR-345 named for hostility/march/withdraw before `corp_command`
-        // widened to cover them.
+        // `order` is a live field on other verbs (a standing order's id), so it
+        // survives the mercenary tear-out that took accept_offer's `units` array.
         cmd.order = static_cast<uint32_t>(t.get_or("order", 0u));
-        sol::optional<sol::table> units_tbl = t.get<sol::optional<sol::table>>("units");
-        if (units_tbl)
-        {
-            std::size_t i = 0;
-            for (auto& kv : *units_tbl)
-            {
-                if (i >= mercenary_contract_max_units)
-                    break;
-                cmd.units[i++] = static_cast<entity_id>(kv.second.as<unsigned int>());
-            }
-        }
 
         // Range-check BEFORE the narrowing cast, not after — a value that fits a
         // Lua number can still be outside the destination's domain.
@@ -1988,48 +2002,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             case corp_command_result::rejected_reputation:  return "rejected_reputation";
         }
         return "rejected_invalid";
-    });
-
-    // BL-576: seed a `mercenary_offer` directly. TEST-ONLY FIXTURE HOOK — there
-    // is no player-reachable verb that CREATES an offer (offers come from
-    // `derive_contract_offers`, a nation-budget-side pass with no corp_verb of
-    // its own), so a script cannot organically produce one the way battle_card.lua
-    // drives a battle into existence through real verbs. Fully escrows by
-    // default (`offer_escrow = fee`), so the offer is immediately acceptable —
-    // a script wanting to exercise the "still filling" state overrides `escrow`.
-    // Returns the new offer's id, or 0 on a bad province / no nation to bill it to.
-    v.set_function("inject_offer", [this](sol::table t) -> unsigned int {
-        const uint32_t province_id = static_cast<uint32_t>(t.get_or("province", 0u));
-        const province* pr = m_world.provinces.find(province_id);
-        if (pr == nullptr)
-            return 0;
-
-        // Client nation: whichever nation owns the province's own ground, if
-        // any, else the first nation in the world — this is fixture plumbing,
-        // not a claim about who SHOULD hold the target province.
-        entity_id client = null_entity;
-        if (!pr->tiles.empty())
-        {
-            const auto tnit = m_world.tile_to_nation.find(pr->tiles.front());
-            if (tnit != m_world.tile_to_nation.end())
-                client = tnit->second;
-        }
-        if (client == null_entity && !m_world.nations.empty())
-            client = m_world.nations.begin()->first;
-        if (client == null_entity)
-            return 0;
-
-        mercenary_offer o;
-        o.id               = m_world.allocate_offer_id();
-        o.client           = client;
-        o.target_province  = province_id;
-        o.template_index   = t.get_or("template", 0);
-        o.fee              = t.get_or("fee", 500.0f);
-        o.issued_tick      = m_world.current_econ_tick;
-        o.deadline         = m_world.current_econ_tick + t.get_or("deadline_in", 200);
-        o.offer_escrow     = t.get_or("escrow", o.fee);
-        m_world.mercenary_offers.push_back(o);
-        return o.id;
     });
 
     // The Acquisitions ledger's buyable field, as the LEDGER COMPUTES IT.
@@ -2417,57 +2389,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (slot == 2) m_ui.acquisitions_filter_input = value;
         else if (slot == 3) m_ui.acquisitions_filter_body  =
             (value < 0) ? null_entity : static_cast<entity_id>(value);
-    });
-
-    // BL-576: read every open mercenary offer — the id/client/target/fee/escrow
-    // a script needs to drive `corp_command{verb=accept_offer, order=..., ...}`
-    // against an offer it (or the live nation AI) produced, mirroring the
-    // units()/buildings() reader idiom rather than making a script guess ids.
-    v.set_function("offers", [this]() {
-        sol::table out = m_lua.state().create_table();
-        int i = 1;
-        for (const mercenary_offer& o : m_world.mercenary_offers)
-        {
-            sol::table row = m_lua.state().create_table();
-            row["id"]       = o.id;
-            row["client"]   = static_cast<unsigned int>(o.client);
-            row["province"] = o.target_province;
-            row["fee"]      = o.fee;
-            row["escrow"]   = o.offer_escrow;
-            row["deadline"] = o.deadline;
-            row["template"] = o.template_index;
-            out[i++] = row;
-        }
-        return out;
-    });
-
-    // BL-576: read every one of the PLAYER's own mercenary contracts — active
-    // or terminal — the same reader idiom as offers() above. `state` is a
-    // string ("active"/"completed"/"failed"/"abandoned") so a script asserts
-    // on the same words the History view renders, not a raw enum ordinal.
-    v.set_function("contracts", [this]() {
-        sol::table out = m_lua.state().create_table();
-        int i = 1;
-        for (const mercenary_contract& c : m_world.mercenary_contracts)
-        {
-            if (c.contractor != m_world.player_entity)
-                continue;
-            sol::table row = m_lua.state().create_table();
-            row["id"]           = c.id;
-            row["client"]       = static_cast<unsigned int>(c.client);
-            row["province"]     = c.province;
-            row["fee"]          = c.fee;
-            row["deposit_paid"] = c.deposit_paid;
-            row["deadline"]     = c.deadline;
-            const char* state_word =
-                (c.state == mercenary_contract_state::active)    ? "active"    :
-                (c.state == mercenary_contract_state::completed) ? "completed" :
-                (c.state == mercenary_contract_state::failed)    ? "failed"    :
-                                                                    "abandoned";
-            row["state"] = state_word;
-            out[i++] = row;
-        }
-        return out;
     });
 
     // Where every unit stands, as ids only — the read half NR-345 also names.

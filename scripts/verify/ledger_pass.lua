@@ -170,9 +170,15 @@ ledger("tile", "ledger_09_history_3_tectonics", "history", 3)
 -- ===========================================================================
 -- Slot 10 — Generation ledger (UI-105)
 -- ===========================================================================
--- Two tabs (Body / Tile) with no panel_view hook, so only the default is
--- reachable from a script. That gap is itself a finding, recorded here rather
--- than worked around.
+-- ONE FLAT PANEL of six collapsing sections since 2026-08-30 - the Body / Tile
+-- tab strip is gone. Two frames here (the resting index, and the foot) are the
+-- class pass's share; the sections themselves are opened and walked by
+-- generation_ledger.lua, which also carries the real-press check on a header.
+--
+-- The old note here recorded that only the default tab was script-reachable
+-- because there was no panel_view hook. That gap is closed by `verify.section`
+-- rather than by the tab strip going away: sections are ui_state BOOLS, which
+-- panel_view could never have reached whatever the surface's shape.
 ledger("generation_ledger", "ledger_10_generation_body")
 foot("generation_ledger", "generation_ledger", "ledger_10_generation_body_foot")
 
@@ -205,33 +211,33 @@ verify.frames(1)
 verify.expect_no_clipping("ledger_pass")
 
 -- ===========================================================================
--- § Ages — why this pass does not capture it
+-- § Ages — captured by ages_replay.lua, not here
 -- ===========================================================================
--- The History ledger's Ages view (history_view = 2) is NOT swept above, and the
--- omission is the finding rather than a gap.
+-- The History ledger's Ages view (history_view = 2) is still not swept above,
+-- but the reason CHANGED on 2026-08-30 and the old one is no longer true.
 --
--- MEASURED 2026-08-29, this build, this fixture: the FIRST DRAW of Ages had not
--- produced a single frame after NINETEEN MINUTES of solid CPU, and the run was
--- killed rather than left to finish. tile_inspector.cpp § Ages builds its cache
--- inline on the drawing thread — `run_history_sim(cached_ss, ..., start_year 0,
--- stop_year campaign_epoch_year)` over the body's real terrain — so the first
--- frame that shows the tab pays for replaying the whole Era -1 political history
--- before it returns. In the built app that is a tab click that stops the
--- application, with no progress and no way back.
+-- WHAT THE FOOTER USED TO SAY, and it was measured: the first draw of Ages had
+-- produced no frame after NINETEEN MINUTES of solid CPU (NR-710). The reading
+-- offered here was that the sim is inherently too slow to draw inline.
 --
--- WHAT IS AND IS NOT ESTABLISHED. That no frame arrived in nineteen minutes is
--- measured. Whether the sim is merely very slow or does not terminate at all on
--- this fixture is NOT established — CPU climbed steadily throughout, which is
--- consistent with both. Do not repeat either reading as fact.
+-- THAT READING WAS WRONG, and the correction is worth keeping. The sim is not
+-- slow; this call site was asking for a different one. tile_inspector.cpp built
+-- its own `history_sim_params` — 0 -> 1960 CE with the tick bands left at their
+-- struct default — and the default ladder's last band ends at year 0, so every
+-- year past it fell back to a ONE-YEAR step. 1960 decision rounds where
+-- generation runs 100, on a span lying entirely AFTER the era the world has.
+-- That was corrected first by deriving the span, clock and seed from generation
+-- (era_minus_one.hpp); then superseded entirely - see below.
 --
--- WHY NOBODY HIT IT BEFORE: no verify script has ever selected this view.
--- `history_ledger_and_comms.lua` covers Story and Chain and returns to Story;
--- `verify.ages_year` was added with BL-277 and, until this file, called by
--- nothing. The view has been shipped, documented in tile_ledger.md, and never
--- once rendered by a check.
+-- IT IS CHEAP NOW, which was not true when this note was first written. The view
+-- no longer runs a sim at all: generation RECORDS the ownership history and the
+-- view folds over it (NR-733, Ben's ruling 2026-08-30). A capture pass that opens
+-- Ages six times runs within ~8 s of one that never opens it. Ages keeps its own
+-- script because its subject is TIME and one frame of it proves nothing - not
+-- because it is expensive.
 --
--- AND THE HOOK IS DEFEATED ANYWAY. tile_inspector.cpp sets `s.ages_year = 0` on
--- the frame it (re)builds the cache, which is the same frame a script's park
--- lands on — so a captured Ages frame would show year 0 whatever the script asked
--- for. Both halves want fixing together: the sim off the draw thread, and the
--- park applied after the cache build rather than before it.
+--   ProjectIo --verify scripts/verify/ages_replay.lua
+--
+-- THE PARK HOOK WORKS, with an ordering a script has to honour: the year is
+-- parked at the record's first year the first time a body's timeline is shown,
+-- so open the view, run frames, and only THEN set `ages_year`.

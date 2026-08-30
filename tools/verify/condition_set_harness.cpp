@@ -23,14 +23,10 @@
 //   C8  BL-570: `province_held` reads `world::province_holder` correctly for a
 //       holder, a non-holder and a sea province, plus the unset/absent-id cases
 //       an authored contract template leaves.
-//   C9  BL-570: `scripts/contracts.lua`'s `contract_templates` table loads
-//       through the protected sol2 path (a real `lua_state`, not a hand-built
-//       fixture) and its id -> index reference round-trips.
 //
 // The process exits non-zero if any assertion FAILs.
 
 #include "world/condition_set.hpp"
-#include "world/contract_template.hpp"
 #include "world/province.hpp"
 #include "world/world.hpp"
 
@@ -369,48 +365,18 @@ int main()
               "C8l province_held is declared integral (held or not -- never a fractional 0.5)");
     }
 
-    // --- C9: contract-template table load + round-trip (BL-570) -------------
-    std::printf("\n-- C9  contract_templates (scripts/contracts.lua) --\n");
-    {
-        lua_state lua;
-        lua.load("scripts/contracts.lua"); // throws (protected sol2 path) on any parse/runtime error
-
-        contract_template_registry reg;
-        reg.load_from_lua(lua); // throws, naming the row/field, on anything malformed
-
-        check(reg.size() == 2, "C9a contract_templates loads exactly the two authored rows");
-
-        if (reg.size() == 2)
-        {
-            const contract_template& take = reg.at(0);
-            const contract_template& hold = reg.at(1);
-
-            check(take.id == "take" && hold.id == "hold", "C9b the two rows load in authored order (take, hold)");
-            check(!take.continuous, "C9c 'take' is point-in-time (continuous = false)");
-            check(hold.continuous, "C9d 'hold' is continuous (must hold every tick to the deadline)");
-            check(take.predicate.subject == condition_subject::province_held
-                      && hold.predicate.subject == condition_subject::province_held,
-                  "C9e both rows' predicate.subject parses as province_held");
-            check(take.predicate.comparator == condition_comparator::at_least
-                      && hold.predicate.comparator == condition_comparator::at_least,
-                  "C9f both rows' predicate.comparator parses as at_least");
-            check(take.predicate.operand == 1.0f && hold.predicate.operand == 1.0f,
-                  "C9g both rows' predicate.operand parses as 1");
-            check(take.predicate.province == no_province && hold.predicate.province == no_province,
-                  "C9h neither row authors a province -- it is bound per accepted offer, not in the template");
-            check(take.deadline_ticks > 0 && hold.deadline_ticks > 0,
-                  "C9i both rows carry a positive deadline_ticks");
-
-            // C9j: the round trip a saved contract's template reference makes --
-            // id -> index -> the SAME row, and an id that was never authored
-            // resolves to "not found" rather than to some other row.
-            check(reg.index_of("take") == 0 && reg.index_of("hold") == 1,
-                  "C9j index_of round-trips each row's own id to its own position");
-            check(&reg.at(static_cast<std::size_t>(reg.index_of("hold"))) == &hold,
-                  "C9k the resolved index names the identical row, not a coincidentally-equal one");
-            check(reg.index_of("siege") == -1, "C9l an unauthored id resolves to -1, not a guess");
-        }
-    }
+    // C9 IS GONE WITH THE TABLE IT READ (NR-731, 2026-08-30). It loaded the real
+    // scripts/contracts.lua through contract_template_registry and asserted the
+    // two authored rows round-tripped. The mercenary contract was retired, so the
+    // script, the registry and the rows no longer exist.
+    //
+    // WORTH KNOWING RATHER THAN JUST DELETING: those rows were the ONLY AUTHORED
+    // `condition_set` CONTENT IN THE GAME. The substrate is intact and still has a
+    // live consumer (`world::corp_embargo_conditions`), but nothing authors a
+    // non-empty one any more, so META_LAYER.md's predicate layer is now a
+    // mechanism with no content exercising it end to end. C1-C8 still measure the
+    // substrate itself; what is no longer covered is a real authored table
+    // parsing into it.
 
     // --- rendering ----------------------------------------------------------
     std::printf("\n-- text rendering --\n");

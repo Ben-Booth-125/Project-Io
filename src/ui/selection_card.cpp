@@ -207,7 +207,6 @@ void draw_metric_expanded(const world& w, const resource_history_view& hist, ui_
 
 void draw_selection_band(world& w, const recipe_registry& reg,
                          const economy_report& report,
-                         const contract_template_registry& templates,
                          const resource_history_view& history, ui_state& ui,
                          ImVec2 band_origin, ImVec2 band_size)
 {
@@ -263,7 +262,7 @@ void draw_selection_band(world& w, const recipe_registry& reg,
             // content itself re-pointed the selection (e.g. the Manage button).
             const entity_id real_sel = ui.selected_entity;
             ui.selected_entity       = sel;
-            draw_selection_content(w, reg, report, templates, ui);
+            draw_selection_content(w, reg, report, ui);
             if (ui.selected_entity == sel)
                 ui.selected_entity = real_sel;
         }

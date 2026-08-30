@@ -50,6 +50,7 @@
 // would not be.
 
 #include "combat.hpp"
+#include "era_timelapse.hpp"  // owner_change / owner_none / era_timelapse
 #include "creeds.hpp"
 #include "settlement.hpp"
 #include "works_roster.hpp"
@@ -477,26 +478,10 @@ enum class sim_verb : uint8_t
 // Result
 // ---------------------------------------------------------------------------
 
-/// One ownership change: region `region` came under polity `owner` in
-/// year `year`.
-///
-/// `owner_none` is reserved for a region leaving all ownership, but NOTHING
-/// EMITS IT TODAY: once settled or conquered a region always has an owner,
-/// and no code path resets one to unowned. The value is kept because
-/// `owner_slice_at` needs it for regions that do not exist yet in an early
-/// year, and because depopulation-to-abandonment is a plausible later mechanic
-/// — but a reader should not infer from the sentinel that abandonment exists
-/// (BL-312).
-///
-/// This is the whole time-lapse format. It is a change LIST rather than a
-/// per-year grid because ownership is overwhelmingly static — most years, on
-/// most regions, nothing happens, and a dense grid pays for all of it.
-struct owner_change
-{
-    int32_t  year     = 0;
-    uint16_t region = 0;
-    uint16_t owner    = 0;
-};
+// `owner_change` and `owner_none` live in era_timelapse.hpp (included above):
+// the recorded time-lapse crosses into `generation_report`, and
+// hard_coded_world.hpp refuses to include THIS header. Moved rather than
+// copied — a duplicated wire type is the drift BL-462 exists to prevent.
 
 /// The run's output. `owner_changes` is the time-lapse substrate; everything
 /// else is either the political result or a counter the harness binds to.
@@ -694,7 +679,7 @@ struct history_sim_state
 };
 
 /// Sentinel for "no polity owns this region in this year slice".
-inline constexpr uint16_t owner_none = 0xFFFFu;
+// `owner_none` — era_timelapse.hpp.
 
 /// Hard cap on the region count, because `owner_change::region` is a
 /// uint16_t and `owner_none` claims the top value. The Settle verb grows the
@@ -777,4 +762,18 @@ inline int64_t owner_ring_bytes(const history_sim_state& s)
 /// Linear in the change list, which is the point: a whole 2000-year playback
 /// is one forward walk, and a seek to a single year costs no more than the
 /// changes preceding it.
+/// The sim's output as the RECORDED time-lapse — the one place the live state
+/// becomes the thing generation stores and the Ages view replays (NR-733).
+/// Everything else in `history_sim_state` (the narration, the counters, the
+/// scorer's working set) stays behind; a record is not a snapshot of the run.
+inline era_timelapse as_timelapse(const history_sim_state& s)
+{
+    era_timelapse t;
+    t.changes       = s.owner_changes;
+    t.region_stride = s.region_stride;
+    t.start_year    = static_cast<int32_t>(s.start_year);
+    t.years         = static_cast<int32_t>(s.years);
+    return t;
+}
+
 std::vector<uint16_t> owner_slice_at(const history_sim_state& s, int64_t year);
