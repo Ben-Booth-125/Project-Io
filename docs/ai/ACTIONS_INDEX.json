@@ -271,15 +271,11 @@
   ],
   [
    "ledger.corp_card_expand",
-   "Corporation dashboard, one of the four roll-up cards (Production / Trade / Workforce / Finance)"
+   "Corporation ledger, the Balance card's title row"
   ],
   [
-   "ledger.corp_drill_back",
-   "Corporation dashboard, drill breadcrumb ('Corporation > Card > Subject')"
-  ],
-  [
-   "ledger.corp_rollup_drill",
-   "Corporation dashboard, expanded roll-up overlay (Production, Trade, or Workforce card)"
+   "ledger.corp_balance_segment_hover",
+   "Corporation ledger, a segment of the Balance card's expense column"
   ],
   [
    "ledger.corps_table_row_select",
