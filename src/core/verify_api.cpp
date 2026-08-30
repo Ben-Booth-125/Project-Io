@@ -24,6 +24,7 @@
 #include "ui/canvas_command.hpp"
 #include "ui/construction_panel.hpp"
 #include "ui/selection_panel.hpp"
+#include "ui/corporation_dashboard.hpp"
 #include "ui/corporation_panel.hpp"
 #include "ui/detail_level.hpp"
 #include "ui/foldout_column.hpp"
@@ -2591,6 +2592,46 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return it == m_world.corporations.end() ? 0.0
                                                  : static_cast<double>(it->second.balance);
     });
+    // The Corporation ledger's Balance card, read as the MODEL THAT IS ACTUALLY
+    // CHARTED (BL-691): `build_balance_columns` is the same call the drawer
+    // makes, so a check asserting over this is asserting over the chart rather
+    // than over a parallel sum that could agree with the budget while the
+    // drawing disagreed with both. `cards` comes from the surface's own count,
+    // so adding a card back fails the check instead of passing it silently.
+    //
+    // The expense array holds only the segments the stack DRAWS: interest is
+    // absent while the corp is solvent and present once it is in debt, which is
+    // the variable segment count this card exists to carry.
+    v.set_function("corp_balance_card", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+
+        const ui::corp_rollups r = ui::derive_corp_rollups(
+            m_world, m_registry, m_last_econ_report, m_world.player_entity);
+
+        out["cards"]    = static_cast<int>(ui::corp_card_count());
+        out["measured"] = r.budget_measured;
+        out["balance"]  = static_cast<double>(r.balance);
+        out["net"]      = static_cast<double>(r.budget.net());
+
+        const ui::balance_columns c = ui::build_balance_columns(r.budget);
+        const auto emit = [&st](const ui::charts::stack_segment* segs, std::size_t n) {
+            sol::table t = st.create_table();
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                sol::table row = st.create_table();
+                row["label"]   = std::string(segs[i].label);
+                row["value"]   = static_cast<double>(segs[i].value);
+                t[i + 1]       = row;
+            }
+            return t;
+        };
+        out["earnings"]      = emit(c.earnings, c.earning_count);
+        out["expenses"]      = emit(c.expenses, c.expense_count);
+        out["expense_total"] = static_cast<double>(c.expense_total());
+        return out;
+    });
+
     v.set_function("survey_regions_done", [this](const std::string& name) -> int {
         const entity_id body = find_body(m_world, name);
         if (body == null_entity) return -1;

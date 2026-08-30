@@ -84,18 +84,17 @@ local function foot(panel, scroll_key, name, view_key, view)
 end
 
 -- ===========================================================================
--- Slot 1 — Corporation overview dashboard (UI-100)
+-- Slot 1 — Corporation ledger (UI-100)
 -- ===========================================================================
--- Four roll-up cards, each resting as one verdict line. The resting frame is
--- shell_pass's; what is unseen is an EXPANDED card, which is the whole point of
--- the fold idiom (BL-214) and the only state that carries detail.
+-- ONE card since BL-691, Balance, which shows its chart AT REST — so the resting
+-- frame is no longer a verdict line with nothing under it. The takeover is still
+-- worth its own frame: it is the same card given the canvas. The old loop over
+-- four card indices is gone with the three cards it opened.
 ledger("corporation", "ledger_01_corp_dashboard_rest")
-for k = 0, 3 do
-    close_all()
-    verify.show_panel("corporation", true)
-    verify.fold("corp_rollup", k)
-    shot(string.format("ledger_01_corp_dashboard_expand_%d", k))
-end
+close_all()
+verify.show_panel("corporation", true)
+verify.fold("corp_rollup", 0)
+shot("ledger_01_corp_dashboard_expand_0")
 verify.fold()
 
 -- ===========================================================================

@@ -1640,17 +1640,18 @@
   },
   {
    "id": "UI-100",
-   "name": "Corporation overview dashboard",
+   "name": "Corporation ledger",
    "kind": "ledger",
    "parent": null,
    "source": [
     "docs/ui/ledgers/corporation.md",
     "src/ui/corporation_dashboard.cpp",
+    "src/ui/charts.cpp",
     "src/ui/nav_pane.cpp"
    ],
-   "summary": "Rail slot 1: the player corporation at a glance - balance, holdings and alerts, rolled up rather than enumerated. Distinct from the Corporations table (UI-078), which ranks the field of rivals.",
+   "summary": "Rail slot 1: \"how well am I doing?\", answered by one card - Balance. A verdict line over a two-column chart, earnings against expenses stacked by flow, with the quarter's net beneath it. Distinct from the Corporations table (UI-078), which ranks the field of rivals.",
    "interesting_question": "A roll-up is a summary of surfaces that already exist. What does it add beyond a shorter walk to them?",
-   "resolution": "The roll-ups are the point (BL-248, requirements.json section corp-dashboard-rollups): the ledgers answer \"what is the number\", the dashboard answers \"is anything wrong\", which no per-ledger read gives without visiting all of them.",
+   "resolution": "For three of the four original roll-ups the answer turned out to be nothing, so they went (BL-691): Production and Workforce are answered better by the Construction ledger's Buildings tab, Trade by the Market and Convoys ledgers. What survives is the read no other surface gives at this grain - the whole quarter's money as ONE picture, earnings against every outflow, where a per-ledger visit gives one flow at a time.",
    "checks": [
     "corp_dashboard"
    ]

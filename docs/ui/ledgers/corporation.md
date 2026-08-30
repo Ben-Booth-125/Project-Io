@@ -2,15 +2,17 @@
 
 > **Two surfaces share the word, and this doc is about the second.**
 >
-> - **Slot 1** is the **Corporation overview dashboard** — `src/ui/corporation_dashboard.cpp`.
->   Four roll-up cards (Production / Trade / Workforce / Finance), each resting as one verdict line
->   ("N making, N idle, X/qtr" · "N lanes, N convoys run" · "N % of labour demand met" ·
->   "±X/qtr, balance Y") and expanding in place or to a full-canvas drill. It is about the
->   **player's own corporation**, not the rival field. Owned by `BL-248` (corporation dashboard roll-ups).
+> - **Slot 1** is the **Corporation ledger** — `src/ui/corporation_dashboard.cpp`. It asks
+>   **"How well am I doing?"** and holds **one card, Balance**: a verdict line ("±X/qtr,
+>   balance Y") over a two-column chart — the quarter's earnings against its expenses stacked
+>   by flow — with the quarter's net beneath it. It is about the **player's own corporation**,
+>   not the rival field. Owned by `BL-248` (corporation dashboard roll-ups) and
+>   `BL-691` (corp: how am I doing). See § Slot 1 below.
 > - **Slot 8** (Diplomacy) hosts the **corporation ledger** this doc describes —
 >   `src/ui/corporation_panel.cpp`, `foldout_begin("Corporations")`.
 >
-> Everything below describes the slot-8 ledger. Its stance half is `BL-449` (stance needs a
+> The **numbered sections** below describe the slot-8 ledger; § Slot 1 describes slot 1.
+> Its stance half is `BL-449` (stance needs a
 > surface) / `BL-475` (corp ledger stance detail); its grouped shape and its column budget are
 > `BL-639` (corp panel column budget). **The banded "how do I stand against whom" read is
 > retired** (Ben, 2026-08-26) — figures are exact where a corporation files and absent where it
@@ -21,6 +23,61 @@
 > **Working design doc** for the ledger-mockup pass (Power BI). Strawman answers — Ben revises.
 > Menu slot: `nav rail slot 8` · Source: `src/ui/corporation_panel.cpp` · Mock table(s): `corporations.csv`, `cashflow.csv`
 > Host: shell fold-out column, ~380px @1720.
+
+## Slot 1 — the Corporation ledger
+
+> Source: `src/ui/corporation_dashboard.cpp` · Host: shell fold-out column.
+
+**Top question: "How well am I doing?"** — and that question is why the surface holds **one
+card**. It carried four roll-ups, and three of them were answered better somewhere else:
+Production and Workforce by the Construction ledger's Buildings tab, which holds the estate
+*and* the per-building levers; Trade by the Market and Convoys ledgers. What is left that only
+this surface can answer is how well the corporation is doing, and the honest answer to that
+today is **money** (Ben, 2026-08-29).
+
+**The card is Balance**, and it is a **sub-header inside the Corporation ledger**, not a
+competing surface name — the ledger is called Corporation (Ben, 2026-08-29). It shows its
+content **at rest**: a verdict line (`±X/qtr, balance Y`) carrying the full-canvas control
+alone — there is nothing to expand in place when the card already draws its chart — then the
+chart, then the quarter's net, and a force line when the corp fields units.
+
+**The chart is two columns sharing a baseline.** Earnings on the left; every outflow
+`corp_budget::net()` subtracts stacked on the right — **Inputs, Maintenance, Wages, Interest,
+Levies, Force** — each segment its own shade, naming itself and its figure on hover. Levies and
+Force keep their own segments rather than folding into Maintenance or Wages for the reason they
+were given their own bars in the first place: a tax the player cannot see working is
+indistinguishable from an unimplemented one, and a force cost buried inside Wages is a term
+nobody can tune against. Subsidies join the earnings column only when a nation paid any.
+
+**A zero flow is absent from the stack, not drawn flat**, so the **segment count itself reads
+the solvency boundary**: interest is charged only while the balance is negative, so a solvent
+corp's stack is one segment shorter than an indebted corp's
+(`docs/ui/ledgers/balance.md` § Data sources). That variable segment count is the one real
+difference between this grain and the building grain, and it lives in the **shared drawer**
+(`ui::charts::draw_stacked_columns`) rather than in a fork of it — the building card's
+Revenue / Expenses graph is the same function over `building_profit`. One chart, one
+arithmetic, two surfaces that cannot come to disagree.
+
+**Vertical budget.** The chart takes the host's own remaining height, less the lines that
+follow it. That is the point of the card: the resting column used to be four verdict lines over
+roughly 700 px of empty column at 1920×1080, and the space is now the answer rather than the
+complaint. The column is ~380 px at 1280 and 384 px at 1920 (`shell_column_width`) — the
+difference between the two resolutions is all vertical, so no extent here is a literal.
+
+**The overlap with the Budget ledger is explicitly ACCEPTED** (Ben, 2026-08-29): *"This is
+called the 'Corporation' ledger, it just has that 'Balance' sub-header. If the data is in both
+places, that's fine. We can revisit the 'Budget' ledger later."* That is a deliberate relaxation
+of this doc set's one-question-one-home line, taken for these two surfaces and dated — not a
+general licence to duplicate, and not an oversight for a later sweep to clean up.
+
+**Deferred by name, not forgotten:** research points, score, ranking, market cap and other
+heuristics — *"we will revisit this once core gameplay is established"* (Ben, 2026-08-29).
+Several have no store behind them at all: there is no score, no ranking and no market cap in
+the model, and research points are a stub (`docs/economy/RESEARCH.md`).
+
+**Toggle semantics.** The rail's slot-1 icon toggles the ledger. The card's one control is the
+full-canvas `›`; the takeover's return control folds it back, as does Esc. There are no
+sub-view tabs, so the toggle rule's tab clause has no subject here.
 
 ## 1. Top question — the one thing this answers at first glance
 **"Who am I standing with, and against?"** This is a **diplomacy** read, not a ranking. The surface answers it by *arranging* the field rather than by adding a column to it: the rows are filed under three collapsing groups — **Friends** (`are_friends`), **Hostile** (`is_hostile` in either direction), **Neutral** (the remainder) — each carrying its count in the header. The player's own row is tinted.

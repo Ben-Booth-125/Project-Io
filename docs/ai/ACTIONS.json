@@ -1262,51 +1262,27 @@
   {
    "id": "ledger.corp_card_expand",
    "family": "ledger",
-   "surface": "Corporation dashboard, one of the four roll-up cards (Production / Trade / Workforce / Finance)",
-   "press": "Click the chevron on a card's title row",
-   "args": [
-    {
-     "name": "card",
-     "type": "enum",
-     "meaning": "Which roll-up: Production, Trade, Workforce, or Finance"
-    }
-   ],
-   "preconditions": [
-    "Corporation dashboard is open"
-   ],
-   "expected_output": "Opens that card as a full-screen overlay (the drill-through idiom, BL-214) - the card's full item list and charts at screen size. Only one thing can be expanded at a time; expanding a second card folds the first. Re-clicking the chevron (or pressing Esc) folds the overlay back to the one-line verdict.",
-   "reason_to_select": "The folded card is a verdict line; expanding answers 'what is BEHIND this verdict?' - the per-item breakdown that names which building, lane, or account moves the number."
-  },
-  {
-   "id": "ledger.corp_drill_back",
-   "family": "ledger",
-   "surface": "Corporation dashboard, drill breadcrumb ('Corporation > Card > Subject')",
-   "press": "Click the card-name link in the breadcrumb",
+   "surface": "Corporation ledger, the Balance card's title row",
+   "press": "Click the full-canvas control on the Balance card's title row",
    "args": [],
    "preconditions": [
-    "A roll-up drill is open (a subject is being viewed)"
+    "Corporation ledger is open"
    ],
-   "expected_output": "Pops the drill: returns the overlay to the card's full item list. (Esc also unwinds one drill level before folding the overlay itself.)",
-   "reason_to_select": "Returns to the comparison list to check a different subject against the one just read."
+   "expected_output": "Gives the Balance card the canvas region: the same two-column chart (earnings against stacked expenses) at screen size, with the ledger column still visible beside it. Only one thing can be expanded at a time. Clicking the return control top-left (or pressing Esc) folds it back. There is no expand-in-place control on this card - it already shows its chart at rest, so the gutter's left slot is empty.",
+   "reason_to_select": "The column chart is legible at rest; the takeover is for reading the segment proportions and hovering individual flows with room to work."
   },
   {
-   "id": "ledger.corp_rollup_drill",
+   "id": "ledger.corp_balance_segment_hover",
    "family": "ledger",
-   "surface": "Corporation dashboard, expanded roll-up overlay (Production, Trade, or Workforce card)",
-   "press": "Click one of the labelled magnitude-bar rows in the expanded card",
-   "args": [
-    {
-     "name": "row",
-     "type": "index",
-     "meaning": "Which item (a building, trade lane, or workforce site) to drill into"
-    }
-   ],
+   "surface": "Corporation ledger, a segment of the Balance card's expense column",
+   "press": "Hover a segment of the stacked Expenses column",
+   "args": [],
    "preconditions": [
-    "A roll-up card is expanded",
-    "The card has drillable items (Production, Trade, Workforce do; Finance has no item rows)"
+    "Corporation ledger is open",
+    "At least one economy quarter has been measured"
    ],
-   "expected_output": "Drills to that subject's detail view inside the overlay, replacing the list; a 'Corporation > Card > Subject' breadcrumb appears at the top. Each row shows a 'Click to drill in' tooltip on hover.",
-   "reason_to_select": "Moves from 'production is down' to 'THIS building is the one dragging it' - the subject-level answer a decision needs."
+   "expected_output": "Names that flow and its figure for the quarter - Inputs, Maintenance, Wages, Interest, Levies or Force. A flow that is zero this quarter is ABSENT from the stack rather than drawn flat, so the segment count itself reads the corp's position: Interest appears only while the balance is negative.",
+   "reason_to_select": "The chart says which side is bigger at a glance; the hover says WHICH outflow is the one to act on."
   },
   {
    "id": "ledger.corps_table_row_select",
@@ -1545,8 +1521,8 @@
    "preconditions": [
     "In-game (the rail is permanent chrome)"
    ],
-   "expected_output": "Toggles the Corporation dashboard open in the fold-out column. Opening it closes whichever other ledger was open (accordion). If it is already open, clicking again closes it (toggle rule). Open, it shows the player corporation's four roll-up cards - Production, Trade, Workforce, Finance - each a one-line verdict with an expand chevron.",
-   "reason_to_select": "Answers 'how is my corporation doing overall, and where is the weak card?' - the top-level health check that decides which subsystem to drill into next."
+   "expected_output": "Toggles the Corporation ledger open in the fold-out column. Opening it closes whichever other ledger was open (accordion). If it is already open, clicking again closes it (toggle rule). Open, it shows ONE card, Balance: a verdict line ('+X/qtr, balance Y') over a two-column chart - the quarter's earnings against its expenses stacked by flow - and the quarter's net beneath it. Production and Workforce are answered by the Construction ledger's Buildings tab, Trade by the Market and Convoys ledgers.",
+   "reason_to_select": "Answers 'how well am I doing?' - the money read, which is the honest answer to that question today."
   },
   {
    "id": "ledger.nav_corporations_table",

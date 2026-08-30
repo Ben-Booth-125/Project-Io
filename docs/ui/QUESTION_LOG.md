@@ -426,13 +426,13 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 
 *Demanded by BL-663 · `src/ui/ui_state.hpp`, `src/ui/overlay.cpp`, `src/ui/body_surface_canvas.cpp` · id `company_lens`*
 
-### Corporation dashboard
+### Corporation ledger
 
-**Answers:** How is my corporation doing overall?
+**Answers:** How well am I doing?
 
-**Because:** Roll-up cards over holdings, balance and production, so the player has a whole-corp read without assembling it from four ledgers. Pairs existed on these cards before BL-247's log was removed. BL-343 added the sixth Finance bar, Levies: a law the player cannot see working is indistinguishable from an unimplemented one, so the levy is its own number rather than folded into maintenance. BL-591 (2026-08-24) added a fifth line to Production: the growth track (reached chain depth, the good that set it, what the next rung opens, what is missing to get there) — a corp-grain fact (corp_reached_depth) the 2026-08-15 playtest rework had cut from the building card without giving it a new home, so "how is my production going" had no answer to the growth-track half of the question until this item.
+**Because:** ONE card, Balance: earnings against stacked expenses, and nothing else. The surface shipped with four roll-ups and three of them were answered better elsewhere — Production and Workforce by the Construction ledger's Buildings tab, which holds the estate AND the per-building levers; Trade by the Market and Convoys ledgers. What is left that only this surface can answer is how well the corporation is doing, and the honest answer to that today is money (Ben, 2026-08-29). The card earns its column because it shows its chart AT REST rather than a verdict line over an empty column, and because the chart is the whole of the quarter's arithmetic: earnings on the left, every outflow corp_budget::net() subtracts stacked on the right, each segment naming itself and its figure on hover. Interest is absent while the corp is solvent and present once it is in debt, so the segment count itself reads the solvency boundary. It is the same ui::charts drawer the building card's Revenue/Expenses graph uses, at a different grain — one chart, one arithmetic, two surfaces that cannot disagree. "Balance" is a sub-header inside the Corporation ledger, not a competing surface name, and its overlap with the Budget ledger is explicitly ACCEPTED (Ben, 2026-08-29) rather than an oversight to clean up. Research points, score, ranking and market cap are deferred by name until core gameplay is established; several have no store behind them at all.
 
-*Demanded by BL-081, BL-214, BL-343, BL-591 · `src/ui/corporation_dashboard.cpp` · id `corporation_dashboard`*
+*Demanded by BL-081, BL-214, BL-343, BL-691 · `src/ui/corporation_dashboard.cpp`, `src/ui/charts.cpp` · id `corporation_dashboard`*
 
 ### Generation charts
 

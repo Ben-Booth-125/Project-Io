@@ -179,9 +179,14 @@ std::string input_basket_names(const recipe* ri)
 // reflow): input_cost / maintenance / wages stacked in one column, each segment
 // its own shade and its own hover tooltip. This is the finest real split
 // building_profit.hpp supports (no revenue sub-breakdown exists to chart
-// separately, logged docs/development/NEEDS_REVIEW.json). Two clustered
-// columns sharing a baseline, drawn by hand (not ui::charts::draw_bars) since
-// draw_bars has no notion of a stacked/segmented column.
+// separately, logged docs/development/NEEDS_REVIEW.json).
+//
+// THE DRAWING ITSELF NOW LIVES IN ui::charts (BL-691). The Corporation ledger's
+// Balance card is the same chart over `corp_budget` instead of `building_profit`,
+// so this became an ADAPTER — it decides what the BUILDING's two columns are and
+// hands them over — rather than a second implementation of the same arithmetic.
+// The corp grain's wider expense set and its variable segment count are the
+// shared drawer's business, not a fork of it.
 //
 // @p input_recipe: the building's active recipe (null for extraction sites) —
 // folded in from the former standalone Inputs chart (2026-08-15): the "Input
@@ -190,73 +195,33 @@ std::string input_basket_names(const recipe* ri)
 void draw_revenue_expense_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const building_profit& p,
                                const recipe* input_recipe)
 {
-    const float expenses = p.input_cost + p.maintenance + p.wages;
-    const float ceiling  = nice_ceil(std::max(p.revenue, expenses) > 0.0f
-                                     ? std::max(p.revenue, expenses) : 1.0f);
-    const float box_w = mx.x - mn.x;
-    const float box_h = mx.y - mn.y;
-    const float gap   = box_w / 2.0f;
-    const float bw    = std::min(44.0f, gap * 0.6f);
-
-    dl->AddRect(mn, mx, IM_COL32(70, 70, 78, 255));
-
-    // Revenue — one plain bar.
+    // Held for the whole call: `stack_segment::detail` is a BORROWED pointer and
+    // the drawer reads it while building the hover.
+    std::string input_detail;
+    if (input_recipe != nullptr)
     {
-        const float  cx = mn.x + gap * 0.5f;
-        const float  bh = std::max(2.0f, box_h * (p.revenue / ceiling));
-        const ImVec2 b0{cx - bw * 0.5f, mx.y - bh};
-        const ImVec2 b1{cx + bw * 0.5f, mx.y};
-        dl->AddRectFilled(b0, b1, palette::positive, 1.5f);
-        ImGui::SetCursorScreenPos(b0);
-        ImGui::InvisibleButton("##rev_bar", {bw, bh});
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Revenue: %.1f", static_cast<double>(p.revenue));
+        // The input-cost segment ALSO names the recipe's input basket (names
+        // only, no quantities — Ben's call): the former standalone Inputs
+        // chart's content, folded into this hover.
+        const std::string names = input_basket_names(input_recipe);
+        if (!names.empty())
+            input_detail = "Inputs: " + names;
     }
 
-    // Expenses — stacked segments, bottom-up: input cost, maintenance, wages.
-    {
-        const float cx = mn.x + gap * 1.5f;
-        struct seg { float v; ImU32 col; const char* label; };
-        const seg segs[3] = {
-            { p.input_cost,  IM_COL32(205, 120, 95, 255),  "Input cost"  },
-            { p.maintenance, IM_COL32(200, 170, 95, 255),  "Maintenance" },
-            { p.wages,       IM_COL32(160, 115, 200, 255), "Wages"       },
-        };
-        float y = mx.y;
-        for (int i = 0; i < 3; ++i)
-        {
-            if (segs[i].v <= 0.0f)
-                continue;
-            const float  bh = std::max(1.0f, box_h * (segs[i].v / ceiling));
-            const ImVec2 b0{cx - bw * 0.5f, y - bh};
-            const ImVec2 b1{cx + bw * 0.5f, y};
-            dl->AddRectFilled(b0, b1, segs[i].col);
-            char btn_id[24];
-            std::snprintf(btn_id, sizeof btn_id, "##exp_seg_%d", i);
-            ImGui::SetCursorScreenPos(b0);
-            ImGui::InvisibleButton(btn_id, {bw, bh});
-            if (ImGui::IsItemHovered())
-            {
-                // The input-cost segment ALSO names the recipe's input basket
-                // (names only, no quantities — Ben's call) — the former
-                // standalone Inputs chart's content, folded into this hover.
-                if (i == 0 && input_recipe != nullptr)
-                {
-                    const std::string names = input_basket_names(input_recipe);
-                    if (!names.empty())
-                    {
-                        ImGui::SetTooltip("%s: %.1f\nInputs: %s", segs[i].label,
-                                          static_cast<double>(segs[i].v), names.c_str());
-                    }
-                    else
-                        ImGui::SetTooltip("%s: %.1f", segs[i].label, static_cast<double>(segs[i].v));
-                }
-                else
-                    ImGui::SetTooltip("%s: %.1f", segs[i].label, static_cast<double>(segs[i].v));
-            }
-            y -= bh;
-        }
-    }
+    const charts::stack_segment revenue[1] = {
+        {p.revenue, palette::positive, "Revenue", nullptr},
+    };
+    const charts::stack_segment expenses[3] = {
+        {p.input_cost,  IM_COL32(205, 120, 95, 255),  "Input cost",
+         input_detail.empty() ? nullptr : input_detail.c_str()},
+        {p.maintenance, IM_COL32(200, 170, 95, 255),  "Maintenance", nullptr},
+        {p.wages,       IM_COL32(160, 115, 200, 255), "Wages",       nullptr},
+    };
+    // 44 px columns and NO baseline captions, which is what keeps this card's
+    // geometry exactly where it was: the chart sits in the left third of a
+    // building page under its own "Revenue / Expenses" title, and its column
+    // width was fixed by the mockup it was drawn from.
+    charts::draw_stacked_columns(dl, mn, mx, revenue, 1, expenses, 3, /*bar_cap=*/44.0f);
 }
 
 // --- Analog construction status (BL-095 task E) ------------------------------
