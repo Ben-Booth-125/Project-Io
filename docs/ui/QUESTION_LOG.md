@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**50 surfaces** — 6 settled, 44 awaiting Ben's wording.
+**51 surfaces** — 6 settled, 45 awaiting Ben's wording.
 
 ---
 
@@ -236,21 +236,29 @@ alphabetical order.
 
 *Demanded by BL-659 · `src/ui/ui_state.hpp`, `src/ui/body_surface_canvas.cpp`, `scripts/verify/lens_selection_paths.lua` · id `lens_region_selection`*
 
-### Market Ledger
+### Market Ledger - Goods table
 
-**Answers:** What is this good worth here, and who is willing to trade it?
+**Answers:** What is each good worth here, and which way is it moving?
 
-**Because:** Markets are the public intelligence channel under the BL-068 visibility rule -- a rival's production and stockpiles are private, so price and the order book are the only honest read the player has on a competitor. Without this surface the discovery model has no channel to reason through.
+**Because:** Markets are the public intelligence channel under the BL-068 visibility rule -- a rival's production and stockpiles are private, so price and the order book are the only honest read the player has on a competitor. The stacked-sparkline layout this replaces failed at that in three ways and only one was density: every sparkline was autoscaled to its OWN range, so a good decaying 40% and a good flat to a rounding error drew the same shape and goods could not be compared -- the one thing a price board is for; 'now 0.63' gave no direction; and the scroll hook aimed at the window while the list sat in a child scroller, so no capture, golden or human, had ever seen past the fourth good of 45. One row per good with the 8-quarter graph flattened into it fixes the density; drawing every row against a SHARED price/base axis with a 1.0 baseline fixes the comparison, which was the real defect.
 
-*Demanded by BL-122, BL-159 · `src/ui/market_ledger.cpp` · id `market_ledger`*
+*Demanded by BL-122, BL-159, BL-686 · `src/ui/market_ledger.cpp` · id `market_ledger`*
 
-### Market Ledger - Convoys tab
+### Convoys ledger (nav rail slot 7)
 
 **Answers:** What is on its way to me, and when does it land?
 
-**Because:** Convoys are drawn on three canvases -- a moving beam on the Planetary canvas, lines on the Solar canvas, a lens glyph, an aggregated route graph -- and were LISTED nowhere, so the one number the player needs from them had no home. Travel time became load-bearing on 2026-08-12: a long haul now takes several quarters where it used to take one, and stock committed to a convoy is out of the pool for the whole of it. Without ticks-to-arrival on a surface, a player cannot tell a delivery that is late from one that was always going to be slow, and cannot plan a build against stock already in transit. The tab also gives BL-452's Hold press a per-convoy row to sit on.
+**Because:** Convoys are drawn on three canvases -- a moving beam on the Planetary canvas, lines on the Solar canvas, a lens glyph, an aggregated route graph -- and were LISTED nowhere, so the one number the player needs from them had no home. Travel time became load-bearing on 2026-08-12: a long haul now takes several quarters where it used to take one, and stock committed to a convoy is out of the pool for the whole of it. Without ticks-to-arrival on a surface, a player cannot tell a delivery that is late from one that was always going to be slow, and cannot plan a build against stock already in transit. The tab also gives BL-452's Hold press a per-convoy row to sit on. It became a LEDGER OF ITS OWN at rail slot 7 rather than staying a Market tab: it was never a market question -- MARKETS.md owns clearing and the order book, while a convoy is cargo in transit and belongs to SUPPLY.md ('Logistics is the road, Supply is the traffic'). Its own slot also lets it arm supply_routes, the lane overlay that is the literal map twin of the list; a tab strip arms ONE lens for every tab, so opening the Market ledger for a logistics read armed the price wash instead.
 
-*Demanded by BL-452, BL-453 · `src/ui/market_ledger.cpp` · id `market_ledger_convoys`*
+*Demanded by BL-452, BL-453, BL-689 · `src/ui/convoys_ledger.cpp` · id `market_ledger_convoys`*
+
+### Market Ledger - nation presence row
+
+**Answers:** Which nations operate in this market?
+
+**Because:** The Body and Market combos name a place but say nothing about who is IN it, and a price is not readable without knowing whose ground feeds it -- a market served by one nation and a market four nations compete over price the same way on screen and mean entirely different things. It earns the space between the selectors and the tabs because it qualifies the market the combos just chose, before the tabs ask a question about it, and it costs one wrapped row. THESE ARE COLOUR CHIPS WITH INITIALS, NOT FLAGS, and that is deliberate: nation_colour is a palette entry and is all that exists -- corporations carry an emblem tag, nations do not -- so real per-nation emblem artwork would be a generated identity system, a feature of its own, and a single stubbed glyph would teach a vocabulary the game does not have. Placeholder even at that (Ben, 2026-08-29: flags and glyphs are a later sprint). Presence is DERIVED, since no store answers it: a building sits on a tile, market_for_tile resolves that tile's catchment market (the same routing clear_markets uses), and tile_to_nation gives the owner -- so a nation appears exactly when its ground really clears here.
+
+*Demanded by BL-688 · `src/ui/market_ledger.cpp` · id `market_ledger_nation_row`*
 
 ### National border band (Planetary canvas, always-on chrome)
 

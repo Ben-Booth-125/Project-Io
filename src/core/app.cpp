@@ -21,6 +21,7 @@
 #include "ui/balance_ledger.hpp"
 #include "ui/corporation_dashboard.hpp" // nav slot 1, the four roll-ups (BL-248)
 #include "ui/corporation_panel.hpp"     // all-corporations table, restored to slot 8 (NR-012)
+#include "ui/convoys_ledger.hpp"
 #include "ui/market_ledger.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/fonts.hpp"
@@ -1949,6 +1950,11 @@ void app::render()
     // one of the mutually-exclusive column occupants (ledgers + Selection).
     ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
     ui::draw_market_ledger(m_world, m_ui, m_market_history, m_ui.show_market_ledger);
+    // Convoys ledger (BL-689) — nav slot 7, directly after Market. Was the Market
+    // ledger's third tab until the Goods flattening deleted that strip; it left
+    // rather than being re-homed because a convoy is cargo in transit and belongs
+    // to SUPPLY.md, not to the doc that owns clearing and the order book.
+    ui::draw_convoys_ledger(m_world, m_ui, m_ui.show_convoys_ledger);
     {
         // Budget ledger (BL-171): profit chart reads the income/expenditure series;
         // the rank table's change column reads the ranking from ~4 econ ticks back.

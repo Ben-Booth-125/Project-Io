@@ -322,6 +322,10 @@
    "Market Ledger, 'Market' combo"
   ],
   [
+   "ledger.market_nation_chip",
+   "Market Ledger, nation presence row (below the Body/Market selectors, above the tab strip)"
+  ],
+  [
    "ledger.market_view_tab",
    "Market Ledger, view tab strip at the top"
   ],
@@ -348,6 +352,10 @@
   [
    "ledger.nav_market",
    "Nav rail, slot 6 (Market Ledger icon)"
+  ],
+  [
+   "ledger.nav_convoys",
+   "Nav rail, slot 7 (Convoys icon), directly after Market"
   ],
   [
    "ledger.selection_body_goto_surface",
