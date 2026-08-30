@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*94 entries — 94 open, 0 resolved.*
+*96 entries — 96 open, 0 resolved.*
 
 ---
 
@@ -928,6 +928,32 @@ This is the same family as the four instances Sprint 21 collected under "a check
 The question this raises is process, not code: is a periodic clean-configure build worth adding to the loop, and where — `check.bat`, CI, or a release-cut precondition? A build that only works from a warm tree is a build that works by accident.
 
 *Files: `CMakeLists.txt`, `tools/verify/harness_params.hpp`*
+
+### NR-722 — Arming a lens on ledger open has no owning doc, and slot 7 is the first to do it
+*novel-work · raised 2026-08-29 · from Sprint 24, BL-689 (convoys ledger). Flagged by the agent, filed here.*
+
+The Convoys ledger arms `supply_routes` when it opens. NO LEDGER HAS EVER DONE THIS — every ledger doc in `docs/ui/ledgers/` proposes a lens-on-open and none was built, so the pairing existed only as a recurring proposal until now.
+
+It is a good pairing and it is the reason Convoys left the Market ledger at all: a tab strip can arm only one lens, and the old third tab always got the price wash when it wanted the lane overlay. But the BEHAVIOUR is unowned. `LENSES.md` documents no menu-triggered arm; the ledger docs propose them individually with no rule behind them.
+
+The questions a rule would have to answer, none of which any doc does: does closing the ledger DISARM the lens, or does it persist (corporation.md guessed persist, on the grounds that lens state is canvas-owned)? Does opening a second ledger re-arm to that one's lens? What happens when the player has deliberately chosen a lens and then opens a ledger — is their choice overridden?
+
+Slot 7 answers all three by implementation rather than by design, and the next ledger to want a lens will copy whatever it did. Worth Ben settling before that happens.
+
+*Files: `src/ui/convoys_ledger.cpp`, `docs/ui/LENSES.md`, `docs/ui/ledgers/`*
+
+### NR-723 — The nav rail's height became a real constraint at fourteen slots, and it broke 720p
+*novel-work · raised 2026-08-29 · from Sprint 24, BL-689. Caught and fixed by the agent inside its own batch.*
+
+Adding the fourteenth slot put slot 14's centre at **y = 746 against a 720 px display**. ImGui rejects presses outside the window, so the Contracts ledger was DRAWN AND UNREACHABLE — visible, apparently fine, and inert.
+
+IT WAS INVISIBLE AT 1080p. The same layout is correct there, so no single-resolution capture could have caught it; it needed the pair. This is the counter-case to the same day's finding that reviews should happen at 1080p (NR-719) — the review resolution and the FIT resolution are different questions, and `shell_pass` staying at 720p is what makes the second answerable.
+
+Fixed by deriving slot size from the rail's actual height, capped at its width: 1080p is pixel-identical, 720p compresses. Saved as `scripts/verify/nav_rail_fit.lua`.
+
+THE NOVELTY IS THAT NO DOC COVERS THE RAIL'S HEIGHT BUDGET. `MENU.md` curates which slots exist and `LAYOUT.md` places the rail, but nothing says how many slots fit the smallest supported display, or what should give when they stop fitting — smaller slots, a scroll, a second column, or a cap on the curated set. The rail has grown 13 -> 14 twice in one day. The next addition needs a rule rather than another fix.
+
+*Files: `src/ui/nav_pane.cpp`, `docs/ui/MENU.md`, `docs/ui/LAYOUT.md`, `scripts/verify/nav_rail_fit.lua`*
 
 ---
 
