@@ -449,6 +449,29 @@ bool r_buy(std::istream& i, buy_order& b)
         && r_id(i, b.preferred_seller);
 }
 
+// --- the exchange record (BL-685) ------------------------------------------
+// One row, in the declaration order of `exchange_record` (components.hpp). The
+// two counterparty ids are written as plain ids because `null_entity` is a
+// LEGAL value on either side here and means the market itself, not an absent
+// field — the reader must not treat it as a defect.
+void w_exchange(std::ostream& o, const exchange_record& e)
+{
+    w_int(o, e.tick);
+    w_id(o, e.market);
+    w_enum(o, e.resource);
+    w_f32(o, e.quantity);
+    w_f32(o, e.unit_price);
+    w_id(o, e.seller);
+    w_id(o, e.buyer);
+}
+
+bool r_exchange(std::istream& i, exchange_record& e)
+{
+    return r_int(i, e.tick) && r_id(i, e.market) && r_enum(i, e.resource, max_resource)
+        && r_f32(i, e.quantity) && r_f32(i, e.unit_price) && r_id(i, e.seller)
+        && r_id(i, e.buyer);
+}
+
 void w_quote(std::ostream& o, const procurement_quote& q)
 {
     w_u32(o, q.id);
@@ -939,6 +962,24 @@ void write_world_snapshot(const world& w, std::ostream& out)
     // allocator cursor travels with it.
     w_u32(out, w.next_contract_id);
     w_vec(out, w.mercenary_contracts, w_mercenary_contract);
+
+    // --- the exchange record (BL-685), the v19 trailing section --------------
+    // Same shape as the two sections above: live tick state, its own section.
+    //
+    // The RING'S CURSORS travel with the rows and are not derivable from them.
+    // `entries` is the raw ring, so once it has wrapped its vector order is no
+    // longer chronological — `next` is the only thing that says where the oldest
+    // row sits, and a load that reset it to 0 would hand every reader the
+    // history rotated. `total` is the lifetime count, which the retained rows
+    // cannot reconstruct once the ring has dropped its first row.
+    //
+    // Written in the ring's STORED sequence, not re-ordered oldest-first, for
+    // the reason the order book is written as stored: the stored sequence is
+    // itself the state, and canonicalising it here would make write(read(x))
+    // differ from x for a wrapped ring.
+    w_vec(out, w.exchanges.entries, w_exchange);
+    w_u32(out, static_cast<uint32_t>(w.exchanges.next));
+    w_u64(out, static_cast<uint64_t>(w.exchanges.total));
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -1120,6 +1161,28 @@ bool read_world_snapshot(world& w, std::istream& in)
     if (!(r_u32(in, next_contract) && r_vec(in, s.mercenary_contracts, r_mercenary_contract)))
         return false;
     s.next_contract_id = next_contract;
+
+    // BL-685: the exchange record, format v19's trailing section. The two range
+    // checks are not defensive noise — `exchange_record_ring::oldest_first`
+    // indexes with `next` and would run off the end of a shorter `entries` on a
+    // corrupt or hand-edited stream, and this stream reaches an AI-facing seam
+    // (a save handed to `--serve`), so it is an untrusted input boundary. The
+    // writer cannot produce either violation: `push` never grows past `capacity`
+    // and keeps `next` in [0, capacity). Refuse whole, destination untouched.
+    {
+        uint32_t next_slot = 0;
+        uint64_t total     = 0;
+        if (!r_vec(in, s.exchanges.entries, r_exchange))
+            return false;
+        if (s.exchanges.entries.size() > exchange_record_ring::capacity)
+            return false;
+        if (!(r_u32(in, next_slot) && r_u64(in, total)))
+            return false;
+        if (next_slot >= exchange_record_ring::capacity)
+            return false;
+        s.exchanges.next  = static_cast<std::size_t>(next_slot);
+        s.exchanges.total = static_cast<std::size_t>(total);
+    }
 
     clear_derived_state(s);
     w = std::move(s); // replace only on full success

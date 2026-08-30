@@ -212,7 +212,20 @@ inline constexpr uint32_t world_save_magic =
 /// pass that writes it clamps to exactly that range, so the writer cannot have
 /// produced one. Claimed through `tools/session/next_save_version.js --claim`
 /// (docs/development/save_version_reservations.jsonl).
-inline constexpr uint32_t world_save_version = 18;
+///
+/// Bumped to 19 by BL-685 (exchange record): `world::exchanges` — the ring of
+/// realised exchanges the clearing tick appends to (`exchange_record_ring`,
+/// components.hpp; docs/economy/MARKETS.md § The exchange record) — is written
+/// as a new TRAILING section, directly after `mercenary_contracts` (itself the
+/// previous last section). Its wrap cursor and lifetime counter travel with the
+/// rows for the same reason the id allocators do: a load that reset `next` to 0
+/// would leave `oldest_first` reading the retained history shuffled at the wrap
+/// point, and one that reset `total` would under-report a campaign's lifetime
+/// trade count. Same shape as the v7/v8 additions, so a v18 stream simply ends
+/// where this one continues and is refused whole on the same strict-equality
+/// contract as every prior bump. Claimed through
+/// `tools/session/next_save_version.js --claim`.
+inline constexpr uint32_t world_save_version = 19;
 
 /// Write @p w as a complete world snapshot.
 ///

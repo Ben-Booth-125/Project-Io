@@ -537,7 +537,16 @@ One row per exchange, appended by the clearing tick, ring-capped the way the plo
 | `resource` | What moved. |
 | `quantity` | How much. |
 | `unit_price` | The price clearing resolved, not the floor the order carried — an order is honoured *at clearing*, so what the seller asked and what they got are different numbers and only one of them is the trade. |
-| `seller`, `buyer` | The two corps. Either may be a background firm. |
+| `seller`, `buyer` | The two corps. Either may be a background firm — and either may be **absent**, which means the market itself and not an unknown party (see below). |
+
+**One side is often the MARKET, and a reader must say so rather than blank the row.** Only the
+matched order-book path (§ Where the order book lives) has a real corp on both sides, and that path
+is dormant in play while the buy side has no emitter. The three paths that carry the volume trade
+against the market as counterparty of last resort: a corp's auto-surplus is *sold to the market*, a
+processor's input draw is *bought from the market*, and an unmatched standing sell auto-clears *to
+the market* at the resolved price. Those exchanges are real — goods moved, cash moved — so they are
+recorded, with the absent side left empty. A surface renders that side as the market; treating it as
+missing data would hide most of the history the record exists to keep.
 
 **It records REVENUE, not profit, and that limit is structural rather than an omission.**
 `stockpile_component` is `quantities[]` and nothing else — **there is no cost basis anywhere in

@@ -864,6 +864,31 @@ struct world
     /// save-format state — it does not join the serialisation seam.
     corp_decision_ring ai_decisions;
 
+    /// The exchange record (BL-685): a ring of the most recent realised
+    /// exchanges, appended one row per exchange by `clear_markets` in its own
+    /// deterministic clearing order. Authority: docs/economy/MARKETS.md
+    /// § The exchange record.
+    ///
+    /// The opposite call to `ai_decisions` one line above, and the contrast is
+    /// the point: a decision is observability, an exchange is a thing that
+    /// HAPPENED to the player's balance and their stock. So this IS save-format
+    /// state and travels in the world snapshot — a loaded campaign opens with
+    /// its trade history intact rather than a blank ledger.
+    ///
+    /// It carries REVENUE and no margin, structurally — see `exchange_record`
+    /// in components.hpp for why a profit column cannot be derived here.
+    ///
+    /// DELIBERATELY NOT IN `state_hash` (below). The hash canonicalises the
+    /// state a divergence would show up IN — balances, dials, resolved prices,
+    /// pools, the order book — and this ring is a pure downstream observation of
+    /// exactly those: an exchange that differed between two runs differed
+    /// because a price, a pool or an order did, and the hash already sees that.
+    /// Folding it in would add no detection and would move every golden hash
+    /// (`tools/verify/spectator_determinism.cpp` among them) for a quantity that
+    /// is a consequence rather than a cause. `exchange_record_harness` asserts
+    /// the ring's own run-to-run identity directly instead.
+    exchange_record_ring exchanges;
+
     /// Stockpile pool for a (corporation, body) pair, inserting an empty pool on
     /// first access. The single point through which the economy systems read and
     /// write the shared pool.
