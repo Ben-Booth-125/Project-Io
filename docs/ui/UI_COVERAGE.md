@@ -8,18 +8,18 @@
 
 ## Headline
 
-**105 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**108 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**68 of 105 elements can be changed without any check going red.**
+**66 of 108 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
 | Class | Count | What green means |
 |---|---|---|
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
-| **ASSERTED** | 34 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
+| **ASSERTED** | 39 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
 | **CLIP-ONLY** | 14 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
-| **CAPTURE-ONLY** | 46 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
+| **CAPTURE-ONLY** | 44 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
 
 ## GOLDEN (3)
@@ -30,7 +30,7 @@ and so is the safety net.
 | `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 5 | 0 | 2 |
 | `UI-063` Icon vocabulary | element | `icon_silhouettes` | 0 | 0 | 0 |
 
-## ASSERTED (34)
+## ASSERTED (39)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -52,22 +52,27 @@ and so is the safety net.
 | `UI-043` Selection band | element | `selection_band`, `selection_redesign`, `selection_bar`, `shell_pass`, `lens_one_tier`, `lens_region_destinations` | 28 | 1 | 3 |
 | `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields`, `lens_region_destinations` | 58 | 0 | 7 |
 | `UI-045` Selection band > Tile selection layout | sub-element | `selection_tile_layout`, `selection_accordion`, `ui_shell_fixture` | 9 | 1 | 2 |
-| `UI-047` Selection band > Building selection action/facts | sub-element | `building_element`, `sticky_card`, `construction_ledger_tabs` | 29 | 1 | 6 |
-| `UI-048` Selection band > Tile selection layout > Tile construction ledger (build-here fold-out) | sub-element | `tile_build_ledger`, `tile_build_ledger_survives`, `drill_through_fold`, `construction_ledger_tabs` | 29 | 1 | 6 |
+| `UI-047` Selection band > Building selection action/facts | sub-element | `building_element`, `sticky_card`, `construction_ledger_tabs` | 32 | 1 | 7 |
+| `UI-048` Selection band > Tile selection layout > Tile construction ledger (build-here fold-out) | sub-element | `tile_build_ledger`, `tile_build_ledger_survives`, `drill_through_fold`, `construction_ledger_tabs` | 32 | 1 | 7 |
 | `UI-049` Hover Card | element | `hover_freeze`, `sticky_card`, `border_band`, `lens_one_tier`, `lens_strip_and_fields` | 29 | 0 | 4 |
 | `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields` | 36 | 0 | 3 |
-| `UI-074` Construction Ledger | ledger | `construction_ledger`, `construction_panel`, `build_door_wide_roster`, `construction_ledger_tabs` | 29 | 1 | 6 |
+| `UI-074` Construction Ledger | ledger | `construction_ledger`, `construction_panel`, `build_door_wide_roster`, `construction_ledger_tabs` | 32 | 1 | 7 |
 | `UI-075` Construction Ledger > Build view | view | `tile_build_ledger`, `roads`, `build_door_wide_roster`, `fresh_start_build` | 1 | 0 | 0 |
 | `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `processing_management_ux`, `v009_batch` | 8 | 0 | 0 |
 | `UI-077` Construction Ledger > Sell Orders view | view | `sell_order` | 3 | 0 | 0 |
 | `UI-078` Corporation ledger (rail slot 8, Diplomacy) | ledger | `diplomacy_groups`, `corp_disclosure` | 16 | 3 | 6 |
 | `UI-079` Corporation ledger (rail slot 8, Diplomacy) > Stance groups and the row action strip | view | `diplomacy_groups`, `corp_disclosure` | 16 | 3 | 6 |
-| `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot` | 11 | 0 | 1 |
+| `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table` | 19 | 1 | 1 |
+| `UI-081` Market Ledger > Goods table | view | `market_ledger`, `goods_table`, `market_density` | 8 | 1 | 0 |
+| `UI-082` Market Ledger > Trades view | view | `market_ledger`, `trades_tab` | 25 | 1 | 0 |
 | `UI-096` Planetary Canvas > National border band | sub-element | `border_band` | 6 | 0 | 3 |
 | `UI-097` Planetary Canvas > Province render and selection | sub-element | `province_render`, `lens_structure_pivot` | 11 | 0 | 1 |
 | `UI-098` Lens system (overlay_mode family) > Throughput lens | sub-element | `throughput_lens`, `lens_strip_and_fields` | 5 | 0 | 0 |
 | `UI-105` Generation Ledger | ledger | `save_load` | 6 | 0 | 3 |
 | `UI-111` Spectator god view | element | `spectator_god_view` | 1 | 0 | 0 |
+| `UI-112` Market Ledger > Nation presence row | sub-element | `goods_table` | 8 | 1 | 0 |
+| `UI-113` Convoys Ledger | ledger | `convoys_ledger`, `ledger_pass` | 7 | 2 | 4 |
+| `UI-114` Nav rail slot fit | chrome | `nav_rail_fit`, `shell_pass` | 3 | 1 | 1 |
 
 ## CLIP-ONLY (14)
 
@@ -88,7 +93,7 @@ and so is the safety net.
 | `UI-087` History Ledger (Story/Chain/Tiles) > Tiles view | view | `history_ledger_and_comms`, `text_overflow_floor` | 0 | 2 | 0 |
 | `UI-091` Main Menu | view | `main_menu`, `planetology_generation`, `shell_pass` | 0 | 1 | 1 |
 
-## CAPTURE-ONLY (46)
+## CAPTURE-ONLY (44)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -120,8 +125,6 @@ and so is the safety net.
 | `UI-070` Balance Ledger | ledger | `balance_ledger`, `budget_ledger_ranked`, `debt_interest` | 0 | 0 | 0 |
 | `UI-071` Balance Ledger > Treasury view | view | `balance_ledger` | 0 | 0 | 0 |
 | `UI-072` Balance Ledger > Cashflow view | view | `budget_ledger_ranked` | 0 | 0 | 0 |
-| `UI-081` Market Ledger > Prices view | view | `market_ledger` | 0 | 0 | 0 |
-| `UI-082` Market Ledger > Markets view | view | `market_ledger` | 0 | 0 | 0 |
 | `UI-085` History Ledger (Story/Chain/Tiles) > Story view | view | `history_ledger_and_comms` | 0 | 0 | 0 |
 | `UI-086` History Ledger (Story/Chain/Tiles) > Chain view | view | `drill_through_fold` | 0 | 0 | 0 |
 | `UI-092` New World wizard | view | `planetology_generation` | 0 | 0 | 0 |
@@ -159,6 +162,5 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 
 - `acquisitions_ledger` (11 captures, 32 expects) — Verify the Acquisitions ledger and its profitability fold-out.
 - `export_mockdata` (0 captures, 0 expects) — Export live economy data to CSV for external ledger mock-ups (e.g. Power BI).
-- `ledger_pass` (5 captures, 0 expects) — The ledger pass: every nav-rail ledger SUB-VIEW, and the foot of every ledger
 - `pan_perf` (0 captures, 0 expects) — Pan-cost measurement (the "stutter while panning" report, 2026-08-02).
 

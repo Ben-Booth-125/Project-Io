@@ -154,9 +154,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Lowers intra-body haul cost along the tile, cheapening every supply run that routes through it — the press that tightens the chain between extraction sites, processors, and the market. Worth it on tiles carrying real freight; a road on an unused tile is pure spend.
 
-### `gameplay.place_sell_order` — The 'Sell Orders' tab of the Market Ledger (opened from the nav rail; the tab is scoped to the ledger's selected market body). Since BL-293 the press is not the only route: place_sell_order is a corp_verb, so an agent issues it directly against the corp-command seam and a rival corp's scorer issues it too.
+### `gameplay.place_sell_order` — The 'Trades' tab of the Market Ledger, under the 'Place a trade' fold in its 'My trades' section (opened from the nav rail; the tab is scoped to the ledger's selected market body). The tab was called 'Sell Orders' until it widened to hold four reads. Since BL-293 the press is not the only route: place_sell_order is a corp_verb, so an agent issues it directly against the corp-command seam and a rival corp's scorer issues it too.
 
-**Press.** Open the Market Ledger, switch to the Sell Orders tab, pick a resource in the combo (only resources the market prices are listed), type a Quantity/qtr and a Floor price, click 'Add sell order'. The button is disabled with no resource chosen or quantity <= 0. The button does not mutate anything itself — it queues a corp_command that the frame's end applies through apply_corp_command, which is the same call an agent makes.
+**Press.** Open the Market Ledger, switch to the Trades tab, expand 'Place a trade', pick a good in the combo (only goods the market prices are listed), type a Qty/qtr and a Floor, click 'Place sell trade'. The button is disabled with no good chosen or quantity <= 0. The button does not mutate anything itself — it queues a corp_command that the frame's end applies through apply_corp_command, which is the same call an agent makes.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -183,9 +183,9 @@ WHAT ACTUALLY HAPPENS TO YOUR THROUGHPUT, learned in play and not obvious from t
 
 **Reason to select.** Price and quantity control the auto-sell path lacks: floor-protect against dumping stock into a crashed price, or meter quantity to ration a stockpile toward a construction project or a better market. The manual side of the trade loop — the press when 'sell everything at whatever it fetches' is the wrong answer. The rival-corp scorer reaches for it on exactly one signal: stock past a hold threshold, listed at a floor over the rarity price.
 
-### `gameplay.remove_sell_order` — The 'Remove' button beside each listed order on the Market Ledger's Sell Orders tab; also a corp_verb, issuable directly.
+### `gameplay.remove_sell_order` — The 'x' button at the end of each row in the 'My trades' section of the Market Ledger's Trades tab; also a corp_verb, issuable directly. The tab was called 'Sell Orders' and the button 'Remove' until the tab widened to hold four reads.
 
-**Press.** Open the Market Ledger, switch to the Sell Orders tab; each of the player's standing orders on the selected body renders as a row ('<resource> x<qty> >= <floor>') with a small 'Remove' button. Click Remove on the target row. Immediate — no confirmation. The row queues a corp_command naming the order's id.
+**Press.** Open the Market Ledger, switch to the Trades tab; each of the player's standing orders on the selected body is a row of the 'My trades' table (good, quantity, and the limit as '>= floor' for a sell or '<= ceiling' for a buy) ending in a small 'x'. Click the 'x' on the target row. Immediate — no confirmation. The row queues a corp_command naming the order's id. A BUY row shows a disabled '-' instead: no verb removes a buy order, so a press that could not succeed is not drawn.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -1496,18 +1496,22 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 ### `ledger.market_view_tab` — Market Ledger, view tab strip at the top
 
-**Press.** Click the 'Goods' or 'Sell Orders' tab button
+**Press.** Click the 'Goods' or 'Trades' tab button
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `view` | `enum` | 'Goods' (default, index 0) or 'Sell Orders' (index 1). Index 2 was Convoys until it became its own ledger at nav rail slot 7; a stale 2 clamps back to Goods rather than drawing nothing. |
+| `view` | `enum` | 'Goods' (default, index 0) or 'Trades' (index 1). Index 1 was labelled 'Sell Orders' until the tab widened to hold four reads. Index 2 was Convoys until it became its own ledger at nav rail slot 7; a stale 2 clamps back to Goods rather than drawing nothing. |
 
 **Valid when:**
 - Market Ledger is open
 
-**Expected output.** Switches the ledger to that view. Re-clicking the CURRENTLY-ACTIVE tab closes the whole Market Ledger (toggle rule on tab strips); clicking the other tab is an ordinary view change. Goods shows one row per traded good at the selected market -- item glyph, name, price, price vs base, and an 8-QUARTER price graph flattened into the row, every row drawn against a SHARED price/base axis with a 1.0 baseline so goods can be compared. Sell Orders shows the player's standing sell orders there.
+**Expected output.** Switches the ledger to that view. Re-clicking the CURRENTLY-ACTIVE tab closes the whole Market Ledger (toggle rule on tab strips); clicking the other tab is an ordinary view change.
 
-**Reason to select.** Goods answers 'what is each good worth here, and which way is it moving?'; Sell Orders answers 'what am I currently offering, at what floor?' - the two halves of a selling decision. Convoys is no longer here: 'what is on its way to me' is a logistics question and now has its own rail slot (ledger.nav_convoys).
+Goods shows one row per traded good at the selected market -- item glyph, name, price, price vs base, and an 8-QUARTER price graph flattened into the row, every row drawn against a SHARED price/base axis with a 1.0 baseline so goods can be compared.
+
+TRADES shows FOUR headed sections, each bounded and scrolling inside itself so all four heads stay on screen: (1) MY TRADES -- the acting corp's standing orders on the selected market's BODY, each with a Remove press; (2) ALL TRADES HERE -- every standing order on that body whoever holds it, GATED on the player owning a building on the body (the section says so in words when the gate is shut, which is a different answer from an empty book); (3) POTENTIAL TRADES -- a derivation, ranked by margin best first: buy price here against sell price at another market, less the per-unit haulage price_convoy_leg charges for that route, with the three terms and the travel time in the row's hover, and no row at all for a lane that will not price; (4) RECENT TRADES -- the exchange record filtered to this market, newest first, columns qtr / good / counterparty / REVENUE. The revenue column is quantity * unit_price and is NOT a profit: no cost basis exists anywhere in the model, so a margin is not derivable from a sale. A counterparty that is the market itself renders as 'Market' -- it is not unknown, and three of the four clearing paths trade against the market.
+
+**Reason to select.** Goods answers 'what is each good worth here, and which way is it moving?'; Trades answers 'what positions do I hold here, what else is standing, and what could I be doing?'. Convoys is no longer here: 'what is on its way to me' is a logistics question and now has its own rail slot (ledger.nav_convoys).
 
 ### `ledger.nav_budget` — Nav rail, slot 2 (Budget icon)
 
@@ -1571,7 +1575,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the Market Ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows one market on one body (chosen by the Body and Market selectors), a nation presence row of colour chips naming who operates there, and the Goods / Sell Orders views.
+**Expected output.** Toggles the Market Ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows one market on one body (chosen by the Body and Market selectors), a nation presence row of colour chips naming who operates there, and the Goods / Trades views.
 
 **Reason to select.** Answers 'what does this good trade for, where?' - the price signal behind every sell-order, extraction and routing decision.
 

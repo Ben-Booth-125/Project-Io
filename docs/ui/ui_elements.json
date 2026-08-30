@@ -1398,17 +1398,19 @@
   },
   {
    "id": "UI-082",
-   "name": "Sell Orders view",
+   "name": "Trades view",
    "kind": "view",
    "parent": "UI-080",
    "source": [
-    "docs/ui/ledgers/market.md § Sub-levels"
+    "docs/ui/ledgers/market.md § 2b",
+    "docs/economy/MARKETS.md § Trades"
    ],
-   "summary": "The player's standing sell orders on the selected body, with a Remove press per order and an add-order form (resource, quantity/qtr, floor price). Becomes Trades once a realised-exchange record exists — MARKETS.md § Trades records that clearing resolves a price without pairing a buyer to a seller, so no per-exchange margin is recorded anywhere yet.",
-   "interesting_question": "n/a — see UI-080.",
-   "resolution": "n/a",
+   "summary": "Four headed sections, each bounded and scrolling inside itself. My trades (the player's standing orders on the body, sell and buy, with an x per row and the place-order form folded under it); All trades here (the whole book on that body, GATED on the player owning a building there); Potential trades (a derivation — buy here, sell there, less the haulage price_convoy_leg charges for that route — ranked by margin); Recent trades (the exchange record filtered to this market, newest first, column headed REVENUE). An absent counterparty renders as the market, not as unknown.",
+   "interesting_question": "The three reads are not equally cheap to know — one is a filter on the player's own orders, one is the same book past a gate, one has no store behind it at all. What stops them collapsing into one table at 380 px, where four sections end-to-end put three of them below the fold on open?",
+   "resolution": "Bounded sections. Measured on the shipped fixture the book runs to 24 rows and the exchange read to 120, so laid out end to end the first fills the column; caps of 5 / 5 / 7 / 6 rows against a ~595 px content height keep all four HEADS on screen and put the depth one scroll inside the section that has it. The gate on the second read is enforced rather than assumed and is asserted against the world, including its SHUT state.",
    "checks": [
-    "market_ledger"
+    "market_ledger",
+    "trades_tab"
    ]
   },
   {
