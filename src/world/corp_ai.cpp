@@ -779,7 +779,6 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             std::sort(tiles_with_processor.begin(), tiles_with_processor.end());
 
             const int   n_recipes = reg.recipe_count(building_type::processing_facility);
-            const int   depth     = corp_reached_depth(cc, reg);
             const float wf        = 0.5f; // construct_building staffs at 0.5, as above
             const float batches   = pe.base_rate * wf;
 
@@ -834,18 +833,17 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     if (abs == nullptr)
                         continue; // the name did not round-trip; never emit it
 
-                    // BL-428's growth gate, asked here rather than discovered at
-                    // the seam: construct_building rejects a recipe deeper than
-                    // the corp has reached, and a candidate that can only ever be
-                    // refused costs a build slot to learn nothing.
-                    const int required = reg.recipe_required_depth(rid);
-                    if (required < 0 || required > depth)
-                        continue;
+                    // BL-692: BL-428's growth gate used to sit here, skipping any
+                    // recipe deeper than the corp had reached. construct_building
+                    // no longer refuses on depth, so mirroring it here would make
+                    // the scorer stricter than the seam it is predicting. The
+                    // candidates are still visited in registry order, so admitting
+                    // more of them changes WHAT is considered, never the ORDER.
 
-                    // BL-588's tech gate, same reason as the depth one just
-                    // above: construct_building refuses a tech-locked recipe,
-                    // so a candidate that can only ever be refused costs a
-                    // build slot to learn nothing.
+                    // BL-588's tech gate — now the only lock asked here rather
+                    // than discovered at the seam: construct_building refuses a
+                    // tech-locked recipe, so a candidate that can only ever be
+                    // refused costs a build slot to learn nothing.
                     if (!recipe_unlocked(w, reg, corp, rid))
                         continue;
 

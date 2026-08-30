@@ -330,7 +330,7 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 
 **Answers:** What have I selected, and what can I do with it?
 
-**Because:** The pinned, polymorphic detail surface for the current selection. It is the answer to the click model's promise: single-click selects, and something must visibly happen when it does. BL-593 (2026-08-24) extended the tile construction ledger's candidate filter with a third lock kind (tech_locked, BL-588), filtered out the same way era_locked and depth_locked already were -- "the door not showing what the gate would refuse", not a new UI affordance.
+**Because:** The pinned, polymorphic detail surface for the current selection. It is the answer to the click model's promise: single-click selects, and something must visibly happen when it does. BL-593 (2026-08-24) extended the tile construction ledger's candidate filter to recipe-level tech locks (tech_locked, BL-588), filtered out the same way era_locked already was -- "the door not showing what the gate would refuse", not a new UI affordance.
 
 *Demanded by BL-067, BL-068, BL-071, BL-367, BL-593 · `src/ui/selection_panel.cpp` · id `selection_panel`*
 

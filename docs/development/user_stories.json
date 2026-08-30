@@ -490,27 +490,22 @@
       "id": "US-016",
       "cluster": "operate",
       "title": "Know how far my economy has actually reached",
-      "story": "As the player, I want to see my corporation's reached chain depth against the graph's ceiling, and what the next depth needs, so that chain depth reads as a growth target rather than an invisible gate.",
-      "coverage": "served",
-      "glyph": "●",
+      "story": "As the player, I want to see how far my corporation's production has actually reached through the chain, so that I can tell a broad economy from a shallow one at a glance.",
+      "coverage": "gap",
+      "glyph": "\u25cb",
       "traces": {
         "pillars": ["Trade"],
         "systems": ["Resources"],
-        "surfaces": [
-          { "doc": "docs/economy/PRODUCTION.md", "surface": "Corporation dashboard — Production card, Growth track (BL-591)" }
-        ],
-        "backlog": ["BL-428", "BL-591"],
-        "requirements": ["depth-readout-on-dashboard"]
+        "surfaces": [],
+        "backlog": ["BL-428", "BL-591", "BL-691", "BL-692"],
+        "requirements": []
       },
       "walkthrough": [
-        "Open the Corporation dashboard and expand the Production card (the ledger column accordion, or the full-canvas takeover — both draw the same shared body).",
-        "The Growth track reads the corp's reached depth (corp_reached_depth, the deepest good ever produced) and names the good that set it.",
-        "Next names every era-allowed recipe whose required depth is exactly reached+1 — the buildings one step past what the corp can place today.",
-        "Needs names every input those recipes need that the corp has never produced — the concrete instruction that turns a lock into a move."
+        "NO SURFACE SERVES THIS TODAY \u2014 the walkthrough is owed with the surface."
       ],
-      "friction": "STALE SURFACE CORRECTED 2026-08-24 (BL-591): this story was originally written 2026-08-15 against the Building element's own Depth readout (BL-431) — cut outright in a playtest rework the same period, per PRODUCTION.md's own note, and never actually built at that surface. Re-pointed to the dashboard readout BL-591 actually shipped, rather than left claiming coverage for a page that does not exist. Corporation-grain only, by design (Ben's ruling) — a rival's reached depth is private and this surface never shows one; the dashboard already only ever renders the player's own corp, so no separate gating was needed.",
+      "friction": "UNSERVED 2026-08-29 (BL-692, retire depth gate). Two changes emptied this story of a home, and the intent survives both. (1) BL-691 deleted the Corporation dashboard's Production-card Growth track, this story's only surface since 2026-08-24 \u2014 so it had already lost its home. (2) BL-692 then retired chain depth as a GATE entirely: tech is the only lock on a method, so the original framing (\"so that chain depth reads as a growth target rather than an invisible gate\") describes a mechanism that no longer exists, and the old walkthrough's Next/Needs lines named recipes one rung up a ladder nothing climbs. RE-FRAMED RATHER THAN RETIRED, deliberately: \"how broad is my production\" is still a real thing a player wants to know, and nothing answers it \u2014 a genuine gap, not a dissolved intent. Depth remains a live computation (PRODUCTION.md; chain_depth.cpp's D and G rows), so a future readout has a number to show; it must not be rebuilt as a lock. Marked `gap` rather than a bespoke `unserved`, which this store's vocabulary (served/partial/gap/planned) does not define.",
       "written": "2026-08-15",
-      "testing": {"mode": "manual", "note": "scripts/verify/corp_dashboard.lua's capture-only corp_rollup_production frame confirms the three lines render with real content (a fresh corp: \"Reached depth 0, via Iron Ore / Next: Bloomery / Needs: Charcoal\"). No computer-use access this session for a literal mouse-click pass — the capture drives the identical rollup_body() code path a click reaches, and the fold/expand control itself predates this item (BL-248, already live-verified); the residual literal-click gap is filed as NR-593."}
+      "testing": {"mode": "manual", "note": "No check \u2014 no surface. The prior note described scripts/verify/corp_dashboard.lua's corp_rollup_production frame, whose subject BL-691 removed."}
     }
   ]
 }

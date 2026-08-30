@@ -15,10 +15,11 @@
 // The asymmetry only starts to bite when BL-430 adds alternate methods, which is
 // exactly why it is pinned by a test now rather than discovered then.
 //
-// WHAT IS ASSERTED HERE (BL-428, then BL-432). The D/G rows cover the METRIC and
-// the GATE. The R rows are BL-432's roster invariants, which needed a fuller
-// roster to be meaningful. BL-432's third assertion — every building's minimum
-// depth reachable — is G3 below, landed with the gate.
+// WHAT IS ASSERTED HERE (BL-428, then BL-432). The D/G rows cover the METRIC —
+// they covered the GATE too until BL-692 retired it. The R rows are BL-432's
+// roster invariants, which needed a fuller roster to be meaningful. BL-432's
+// third assertion — every building reachable — was G3, and passed to G5 when
+// BL-692 retired G3 as vacuous.
 //
 //   D1  Raws are depth 0, and a good is deeper than every one of its inputs.
 //   D2  MAX-within-a-recipe: a two-input recipe takes the deeper input's depth.
@@ -32,17 +33,21 @@
 //       the shipped recipes produce, and the ancient band is not deeper than the
 //       industrial one (BL-433 masks routes out; masking must never ADD depth).
 //
-// THE GATE (BL-428 second half, 2026-08-16). The rows above cover the metric as a
-// READOUT. These cover it as a GATE - the half that makes depth the growth track:
+// THE GATE (BL-428 second half, 2026-08-16) — RETIRED BY BL-692 (2026-08-29).
+// Chain depth no longer gates a build or a retool anywhere; tech is the only lock
+// on a method. What survives here is the METRIC, which is still live code:
 //
 //   G1  A recipe's required depth is its DEEPEST input's depth, and 0 for an
 //       input-free recipe. Derived, so it cannot drift from the graph.
-//   G2  Monotonicity: a corp's reached depth is produced-once-ever. Clearing a
-//       stockpile, idling, or demolishing never lowers it - the property the
-//       gate rests on, since a placement that was legal must not become illegal.
-//   G3  No unreachable ancient recipe: every ancient-band recipe's required depth
-//       is climbable from a fresh corp by some chain of ancient recipes. An
-//       unplaceable building is the roster's orphan (BL-432 assertion 3).
+//   G2  RETIRED as vacuous by BL-692 — asserted monotonicity of reached depth,
+//       whose stated purpose was "a placement that was legal must not become
+//       illegal". No placement is depth-legal any more. Retired, not weakened:
+//       it was passing, and would have gone on passing over a dead property.
+//   G3  RETIRED as vacuous by BL-692 — asserted every ancient recipe is
+//       reachable by simulating the climb the gate forced. With no gate every
+//       ancient recipe is placeable at tick 0 by construction, so the row could
+//       not fail for any authoring mistake. G5 now owns "nothing is stranded",
+//       and owns it more strictly (an exact opening, not a reachability floor).
 //   G4  Determinism: the required-depth vector is byte-identical across two
 //       loads, and independent of insertion order (the BL-406 lesson).
 //
@@ -525,82 +530,32 @@ int main()
               "no_recipe requires -1 rather than accidentally reading as depth 0");
     }
 
-    std::printf("\nG2 - reached depth is produced-once-ever and monotonic\n");
-    {
-        recipe_registry reg;
-        reg.add_recipe(make("mid",  {{RAW_A, 1.0f}},              {{MID, 1.0f}}));
-        reg.add_recipe(make("deep", {{MID, 1.0f}, {RAW_B, 1.0f}}, {{DEEP, 1.0f}}));
-
-        corporation_component c;
-        check(corp_reached_depth(c, reg) == 0, "a fresh corp has reached depth 0");
-
-        c.produced_ever[static_cast<std::size_t>(MID)] = true;
-        const int after_mid = corp_reached_depth(c, reg);
-        check(after_mid == 1, "producing a depth-1 good raises reached depth to 1");
-
-        // The monotonicity property, stated as the thing that would break it: the
-        // bit is the ONLY input, so no stockpile or building state whose loss
-        // could lower the number even exists. Assert the invariant directly.
-        c.produced_ever[static_cast<std::size_t>(DEEP)] = true;
-        c.produced_ever[static_cast<std::size_t>(MID)]  = false; // as if MID were "forgotten"
-        check(corp_reached_depth(c, reg) >= after_mid,
-              "losing a shallower good never lowers reached depth below what a deeper one earned");
-    }
-
-    std::printf("\nG3 - every ancient recipe is reachable from a fresh corp\n");
-    {
-        lua_state lua;
-        lua.load("scripts/recipes.lua");
-        lua.load("scripts/economy.lua");
-        recipe_registry reg;
-        reg.load_from_lua(lua);
-        reg.set_era(era_band::ancient);
-
-        // Climb: start at reached 0, admit every ancient recipe the current depth
-        // allows, bank what they produce, repeat until nothing new opens. Anything
-        // still shut out at the fixed point is unplaceable for the whole campaign.
-        corporation_component c;
-        for (std::size_t pass = 0; pass < resource_count; ++pass)
-        {
-            const int reached = corp_reached_depth(c, reg);
-            bool      grew    = false;
-            for (int i = 0; i < reg.recipe_count(building_type::processing_facility); ++i)
-            {
-                const recipe&       rc   = reg.recipe_at(building_type::processing_facility, i);
-                const std::uint16_t id   = reg.recipe_id(rc.name);
-                const int           need = reg.recipe_required_depth(id);
-                if (need < 0 || need > reached)
-                    continue;
-                for (std::size_t r = 0; r < resource_count; ++r)
-                    if (rc.outputs[r] > 0.0f && !c.produced_ever[r])
-                    {
-                        c.produced_ever[r] = true;
-                        grew               = true;
-                    }
-            }
-            if (!grew)
-                break;
-        }
-
-        const int final_reached = corp_reached_depth(c, reg);
-        std::vector<std::string> stranded;
-        for (int i = 0; i < reg.recipe_count(building_type::processing_facility); ++i)
-        {
-            const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
-            if (rc.era != era_band::ancient)
-                continue;
-            const int need = reg.recipe_required_depth(reg.recipe_id(rc.name));
-            if (need < 0 || need > final_reached)
-                stranded.push_back(rc.display_name.empty() ? rc.name : rc.display_name);
-        }
-        for (const std::string& n : stranded)
-            std::printf("      stranded ancient recipe: %s\n", n.c_str());
-        std::printf("      ancient ladder climbs to depth %d\n", final_reached);
-        check(stranded.empty(),
-              "no ancient recipe is permanently unplaceable (the roster's orphan)");
-        check(final_reached >= 1,
-              "the ancient ladder actually has a rung above raw (anti-vacuity)");
-    }
+    // --- G2 and G3: RETIRED as VACUOUS by BL-692 (2026-08-29) ----------------
+    //
+    // RETIRED, NOT WEAKENED, and the distinction is the whole point. Neither row
+    // was failing and neither was relaxed to make it pass: the property each one
+    // asserted stopped existing when the gate did.
+    //
+    //   G2 asserted MONOTONICITY of `corp_reached_depth` — that losing a shallower
+    //      good never lowers the reached number. Its own comment named the reason
+    //      that mattered: "the property the gate rests on, since a placement that
+    //      was legal must not become illegal". With no gate, no placement is
+    //      legal-or-illegal by depth, so monotonicity guards nothing. The row would
+    //      still have gone green, which is exactly why leaving it would have been
+    //      worse than deleting it — a green row over a dead property is a claim
+    //      that something is protected when nothing is.
+    //
+    //   G3 asserted that every ancient recipe is REACHABLE from a fresh corp, by
+    //      simulating the climb the gate forced. It was a pure gate assertion: with
+    //      the gate gone every ancient recipe is placeable at tick 0 by
+    //      construction, so the row could not fail for any authoring mistake. It
+    //      became a tautology, not a test.
+    //
+    // What the roster still needs from those two — "no ancient recipe is stranded"
+    // — is now G5's job and G5 alone, which asserts the tick-0 opening EXACTLY
+    // rather than as a reachability floor. The metric G2 exercised
+    // (`corp_reached_depth`) is still live code and still covered: G1 and G4 pin
+    // required-depth, D1-D6 pin `depth_of`, and R2 uses depth as a dominance axis.
 
     std::printf("\nG4 - required depth is deterministic\n");
     {
@@ -663,15 +618,31 @@ int main()
 
         // The ruled opening, by recipe NAME (not display_name — the Smithy's two
         // recipes share a display_name and must not collide here).
+        // RE-BLESSED 2026-08-29 (BL-692): 11 -> 16. Retiring the chain-depth gate
+        // opened every ancient recipe that was shut on depth alone. The five that
+        // moved, all previously depth>0:
+        //     iron_blooms          (Bloomery)      — the Metal Foundry entry rung
+        //     steel_from_blooms    (Smithy)        — downstream of blooms
+        //     ordnance_from_blooms (Smithy)        — downstream of blooms
+        //     charcoal_from_kiln   (Coking Kiln)   — the deeper fuel route
+        //     shipwright           (Advanced Fab.) — inputs planks + cloth
+        //
+        // SIXTEEN, NOT SEVENTEEN, and the missing one is the interesting row.
+        // `toolmaker` is ancient-band and was shut by depth, so a count taken off
+        // required-depth alone predicts it opening here. It does not: E0-EC-01
+        // "Tool-and-Die Practice" gates it on tech, and this fixture's corp is
+        // fresh — no buildings, no balance — so that predicate fails. It was
+        // closed by BOTH locks and only one was removed. That is the design
+        // working, not a shortfall: tech is now the only lock, and it still holds.
         static const char* const k_open[] = {
-            "charcoal", "peat_charcoal",                 // Fuel Production
-            "food_rations", "food_rations_milled",        // Food Processing
-            "trade_goods", "glass", "tannery", "weaver",   // Artisan Goods
-            "ceramics_kiln", "stonemason", "sawmill",      // Construction Materials
-            // "shipwright" (Advanced Fabrication) is DELIBERATELY NOT here:
-            // its inputs (planks, cloth) are both depth 1, so its required
-            // depth is 1 — locked at tick 0 for a fresh corp exactly like
-            // every other depth>0 recipe, not a new closure this row asserts.
+            "charcoal", "peat_charcoal", "charcoal_from_kiln",       // Fuel Production
+            "food_rations", "food_rations_milled",                    // Food Processing
+            "trade_goods", "glass", "tannery", "weaver",               // Artisan Goods
+            "ceramics_kiln", "stonemason", "sawmill",                  // Construction Materials
+            "iron_blooms", "steel_from_blooms", "ordnance_from_blooms",// Metal Foundry
+            "shipwright",                                              // Advanced Fabrication
+            // "toolmaker" is DELIBERATELY NOT here — see the note above: it is
+            // the one ancient recipe still closed at tick 0, and by TECH now.
         };
         auto expected_open = [&](const std::string& name) {
             for (const char* n : k_open)
@@ -687,10 +658,10 @@ int main()
         {
             const recipe&  rc  = reg.recipe_at(building_type::processing_facility, i);
             const uint16_t rid = reg.recipe_id(rc.name);
-            const int      required = reg.recipe_required_depth(rid);
-            const bool     depth_ok = !(rc.era == era_band::ancient
-                                        && (required < 0 || required > 0));
-            const bool     placeable = depth_ok && recipe_unlocked(w, reg, corp, rid);
+            // BL-692: the `depth_ok` term that stood beside this one is gone.
+            // Tech is the only thing that can close a recipe at tick 0 now, so
+            // `placeable` asks exactly what construct_building asks.
+            const bool     placeable = recipe_unlocked(w, reg, corp, rid);
 
             if (rc.name == "refined_copper")
             {

@@ -1183,27 +1183,16 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
         {
             const bool  on_cooldown = b.recipe_switch_cooldown > 0;
 
-            // BL-428: the same chain-depth gate the Build door and
-            // try_switch_recipe apply, shown rather than discovered by a refused
-            // click. Ancient-band methods only, matching the first-cut scope.
+            // BL-692: the BL-428 chain-depth lock this row used to show ("Your
+            // industry cannot make what this needs yet", drawn greyed) is gone
+            // along with the gate behind it. try_switch_recipe no longer refuses
+            // on depth, so a greyed row here would be the UI inventing a refusal
+            // the seam would not make. Cooldown is the only thing that disables
+            // the Switch control now.
             const std::uint16_t row_id = reg.recipe_id(ri.name);
-            bool depth_locked = false;
-            if (ri.era == era_band::ancient)
-            {
-                const auto cit = w.corporations.find(w.player_entity);
-                const int  need = reg.recipe_required_depth(row_id);
-                const int  have = (cit != w.corporations.end())
-                                      ? corp_reached_depth(cit->second, reg) : 0;
-                depth_locked = (need < 0 || need > have);
-            }
 
             char tip[96];
-            if (depth_locked)
-                // Names the act, not the number — a reached-depth integer means
-                // nothing to a player who has never seen one.
-                std::snprintf(tip, sizeof tip,
-                              "Your industry cannot make what this needs yet");
-            else if (on_cooldown)
+            if (on_cooldown)
                 std::snprintf(tip, sizeof tip, "Locked %d more tick%s", b.recipe_switch_cooldown,
                              b.recipe_switch_cooldown == 1 ? "" : "s");
             else if (reg.recipe_switch().switch_cost > 0.0f)
@@ -1217,7 +1206,7 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
             // accent, not the same neutral grey every other glyph button uses.
             constexpr ImU32 switch_glyph_col = IM_COL32(90, 150, 210, 255);
             ImGui::SetCursorPos({row_w - glyph_w, 0.0f});
-            if (tile_icon_button("##switch", {glyph_w, row_h}, !on_cooldown && !depth_locked,
+            if (tile_icon_button("##switch", {glyph_w, row_h}, !on_cooldown,
                                  tip, glyph_swap, switch_glyph_col))
                 try_switch_recipe(w, reg, w.player_entity, b, row_id);
         }
@@ -3829,39 +3818,26 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     // construct_building refuses these anyway (construction_result::era_locked);
     // this is the door not showing what the gate would refuse.
     //
-    // BL-428 adds the second half of the same argument: an ancient recipe whose
-    // chain the corp has not yet reached is refused by construct_building
-    // (depth_locked), so the door should not offer it either. Ancient-band
-    // recipes only, per the 2026-08-16 first-cut ruling — an `any`-band recipe is
-    // never depth-filtered.
+    // BL-428 used to add a second half to the same argument — an ancient recipe
+    // deeper than the corp had reached was erased here too. BL-692 removed that
+    // clause with the gate behind it: construct_building no longer refuses on
+    // depth, so filtering here would hide rows the door would now accept.
     //
-    // BL-593 adds the third: a recipe locked by `recipe_unlocked` (BL-588's
-    // tech-recipe gate — the growth track and the era/depth ones are three
-    // independent locks) is dropped the same way, regardless of band. Ben's
-    // ruling (2026-08-24, the same shape as the era/depth precedent above, not
+    // BL-593 adds the remaining one: a recipe locked by `recipe_unlocked`
+    // (BL-588's tech-recipe gate) is dropped the same way, regardless of band.
+    // Ben's ruling (2026-08-24, the same shape as the era precedent above, not
     // a new one): filtered out, not shown-and-locked — "the door not showing
     // what the gate would refuse" is the standing argument, unchanged by this
     // item. `refined_copper` (E0-EC-03, BL-589) is the first recipe this
     // clause actually removes; before it, every tech gate targeted a
     // building_type, never a recipe, so this branch was dead code on every
     // prior campaign.
-    const int reached = [&]
-    {
-        const auto it = w.corporations.find(w.player_entity);
-        return (it != w.corporations.end()) ? corp_reached_depth(it->second, reg) : 0;
-    }();
     cands.erase(std::remove_if(cands.begin(), cands.end(),
-                               [&w, &reg, reached](const candidate& c)
+                               [&w, &reg](const candidate& c)
                                {
                                    if (!reg.building_available(c.type))
                                        return true;
-                                   if (!recipe_unlocked(w, reg, w.player_entity, c.recipe))
-                                       return true;
-                                   const recipe* rc = reg.get_recipe(c.recipe);
-                                   if (!rc || rc->era != era_band::ancient)
-                                       return false;
-                                   const int need = reg.recipe_required_depth(c.recipe);
-                                   return need < 0 || need > reached;
+                                   return !recipe_unlocked(w, reg, w.player_entity, c.recipe);
                                }),
                 cands.end());
 

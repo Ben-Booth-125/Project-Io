@@ -408,7 +408,8 @@ passes above have already produced:
   screen this mechanism replaces existed because a pure draw handed the player a pure-extraction
   corp on 13 of 24 seeds, and a viability floor alone would never have rejected one — a shallow
   corp is usually perfectly profitable. Viability answers *can this corp survive*; the weighting
-  answers *is there a game in it*.
+  answers *is there a game in it*. The concern is **variety of play**, not a ladder to climb:
+  a corp that only digs has fewer decisions in front of it, whatever it may build.
 - **Population centres.** A corp whose holdings sit on or near populated ground weights up, because
   labour, demand and market access are all there. This reads the settlement pass's own output, so
   it is one more consumer of an existing signal rather than new machinery.
@@ -434,9 +435,9 @@ mechanism's too, and their natural home is still the New World wizard.
 
 **What the floor alone does not solve — and where it is solved instead.** The selection stage was
 built on a *measured* problem: over 24 seeds the generator handed the player a pure-extraction corp
-on 13 of them, so the chain-depth ladder had no rung to stand on. A viability floor does not touch
-that, because a shallow pure-extraction corp is usually perfectly profitable and clears the floor
-every time. It is the **weighted draw above**, not the floor, that carries the depth concern — and
+on 13 of them, leaving the player a campaign with one kind of decision in it. A viability floor
+does not touch that, because a pure-extraction corp is usually perfectly profitable and clears it
+every time. It is the **weighted draw above**, not the floor, that carries this concern — and
 because the weighting is a bias rather than a gate, the shallow opening remains *possible*, just no
 longer the default. `player_seed_sweep` is the instrument that says by how much.
 

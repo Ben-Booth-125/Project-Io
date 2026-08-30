@@ -257,16 +257,21 @@ resources are absent, so the requirement is surfaced up front rather than only o
 click.
 
 **Rejection is reason-coded, not silent** — for a row the ledger actually shows. A DIFFERENT
-class of refusal never becomes a row at all: `construction_result::era_locked`,
-`depth_locked` and (since BL-593) `tech_locked` are filtered out of the candidate list before
-it renders, on one repeated argument stated in the filter's own code comment — *"the door not
-showing what the gate would refuse."* All three lock kinds resolve differently (never
-available at all / earned by building / earned by research, PRODUCTION.md § Chain depth) but
-share the same door-side treatment: not a reason string, an absent row. `refined_copper`
-(`E0-EC-03`, BL-589) was the first recipe the tech clause actually removed — every earlier
-tech gate targeted a `building_type`, never a recipe, so the branch was dead code until then.
-Filtered was the ruled choice over shown-and-locked (Ben, 2026-08-24) — extending the existing
-era/depth precedent rather than adding a new lock-reason string and UI affordance.
+class of refusal never becomes a row at all: `construction_result::era_locked` and (since
+BL-593) `tech_locked` are filtered out of the candidate list before it renders, on one repeated
+argument stated in the filter's own code comment — *"the door not showing what the gate would
+refuse."* The two lock kinds resolve differently (never available in this campaign at all /
+earned by research, PRODUCTION.md § Chain depth) but share the same door-side treatment: not a
+reason string, an absent row. `refined_copper` (`E0-EC-03`, BL-589) was the first recipe the
+tech clause actually removed — every earlier tech gate targeted a `building_type`, never a
+recipe, so the branch was dead code until then. Filtered was the ruled choice over
+shown-and-locked (Ben, 2026-08-24) — extending the existing era precedent rather than adding a
+new lock-reason string and UI affordance.
+
+**Chain depth locks nothing** (Ben, 2026-08-29). The door once carried a third clause erasing a
+recipe deeper than the corp had reached, and the Method Switch row once greyed itself with *"Your
+industry cannot make what this needs yet."* Neither exists: tech is the only method lock, so the
+Switch control is disabled by its cooldown alone.
 
 `placement_rules::can_place[_in_world]` return a `placement_result` — a `placement_reason`
 enum plus human string, implicitly convertible to `bool` — so an invalid type that DOES survive

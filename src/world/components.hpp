@@ -1376,13 +1376,19 @@ struct corporation_component
     /// BL-428 growth spine: every good this corporation has EVER produced, set the
     /// tick a building of its actually makes some (economy_system.cpp's
     /// run_extraction / run_processing). Read through `recipe_registry` to obtain
-    /// the corp's reached chain depth, which gates what it may build next.
+    /// the corp's reached chain depth.
+    ///
+    /// ⚠ WRITE-ONLY SINCE BL-692 (2026-08-29). Chain depth gates nothing any more
+    /// — tech is the only method lock — so nothing in `world/*` reads this bit to
+    /// decide anything. It survives because it is PINNED BY THE SAVE FORMAT
+    /// (`world_save.cpp`, field order for `world_save_version` 16): removing it
+    /// breaks every existing save. See `mark_produced` in economy_system.cpp for
+    /// the full note. A write with no read here is expected, not a defect.
     ///
     /// PRODUCED-ONCE-EVER, never cleared, and that is the design's legibility call
     /// (Ben, 2026-08-15): progress must not evaporate because a building idled for
     /// a tick or was demolished for a better site. A corp that has smelted iron
-    /// once knows how to smelt iron. Monotonicity is the property the gate rests
-    /// on — a placement that was legal must not silently become illegal.
+    /// once knows how to smelt iron.
     ///
     /// A bool per resource rather than a bitset: `resource_count` is small, and a
     /// plain array keeps this trivially copyable and order-independent, which
@@ -1406,6 +1412,11 @@ struct corporation_component
 /// deepest good it has ever produced. 0 for a fresh corporation (it has reached
 /// the raws and nothing beyond), which is exactly what an untouched
 /// `produced_ever` should mean.
+///
+/// NO LONGER A GATE (BL-692, 2026-08-29). Every call site that refused a build or
+/// a retool on this number is gone; it survives as a pure computation over the
+/// recipe graph, exercised by `chain_depth.cpp` and kept because `depth_of` is a
+/// load-bearing dominance axis in that harness's R2 row.
 ///
 /// Unreachable goods (`depth_of` == -1) cannot raise it: a corp cannot have
 /// produced a good the current era's graph says is unmakeable, and if a stale bit

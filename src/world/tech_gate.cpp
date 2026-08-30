@@ -59,13 +59,15 @@ std::vector<tech_gate> build_gates()
     // authoring pass owns). "First cut" per the item's own design — proving
     // the arm resolves end to end, not gating the whole roster in one item.
     //
-    // Neither predicate uses `stockpile` as a proxy for "produced" — BL-428's
-    // OWN mechanism (`corp_reached_depth`, produced_ever) already answers
-    // "has this corp ever made X", and re-deriving that from a stockpile
-    // snapshot would drift the moment a corp sold or consumed the good. A
-    // tech gate is a DIFFERENT, ADDITIONAL lock layered on top of the depth
-    // one (both must pass), so its predicate asks a genuinely different
-    // question — held infrastructure and cash — rather than shadowing depth.
+    // Neither predicate uses `stockpile` as a proxy for "produced". BL-428's own
+    // mechanism (`corp_reached_depth`, produced_ever) answered "has this corp ever
+    // made X", and re-deriving that from a stockpile snapshot would drift the
+    // moment a corp sold or consumed the good. The predicates therefore ask a
+    // genuinely different question — held infrastructure and cash.
+    //
+    // BL-692 (2026-08-29) makes this the ONLY lock rather than the second of two:
+    // the depth gate it used to layer on top of is retired, so a tech predicate is
+    // now the whole of what stands between a corp and a method.
 
     // E0-EC-01 "Tool-and-Die Practice" — unlocks the Toolmaker (BL-586), the
     // ancient roster's chain that needs both a smelted good and a milled one

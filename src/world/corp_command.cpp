@@ -730,7 +730,6 @@ corp_command_result map_construction(construction_result r)
         case construction_result::no_tile:                return corp_command_result::rejected_invalid;
         case construction_result::tech_locked:            return corp_command_result::rejected_tech_locked;
         case construction_result::era_locked:             return corp_command_result::rejected_era_locked;
-        case construction_result::depth_locked:           return corp_command_result::rejected_depth_locked;
         case construction_result::invalid_tile:
         case construction_result::out_of_range:
         case construction_result::slot_occupied:
@@ -870,11 +869,6 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 // all (see try_switch_recipe's comment) — same bucket as `invalid`,
                 // the closest existing generic refusal, rather than new plumbing.
                 case recipe_switch_result::cross_group:         return corp_command_result::rejected_invalid;
-                // BL-428: the retool bypass, refused with the SAME typed code the
-                // build door uses, so an agent reading the seam cannot tell the two
-                // routes apart — which is the point. Not `rejected_invalid`: the
-                // arguments are fine, the corp simply has not climbed far enough.
-                case recipe_switch_result::depth_locked:        return corp_command_result::rejected_depth_locked;
                 // BL-588: reuses the SAME typed code the build door's
                 // structure-level tech lock returns, so an agent cannot tell
                 // a structure lock from a recipe lock apart on the seam.
