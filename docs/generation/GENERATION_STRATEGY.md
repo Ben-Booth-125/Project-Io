@@ -107,6 +107,57 @@ alongside *what the ground holds*.
 
 ---
 
+## Asymmetry is the deliverable (Ben, 2026-08-31)
+
+> *"There is no reason that every start needs to be equally good and fair… If we send some of this
+> work into generation, we should be making rules that encourage a level of asymmetry."*
+
+`docs/economy/MARKETS.md` § Three properties, 4 and 5, settle the demand side: every resource needs
+a path to a terminal sink, terminal demand follows population and is therefore universal, and
+supply is regional. What that leaves to generation is the **shape of the supply asymmetry**, and it
+is a deliverable rather than a side effect.
+
+**The enemy is UNIFORMITY, not self-sufficiency.** Two failure modes, and they look opposite while
+being the same defect:
+
+- Every region can close its own chains → no region needs another → trade has no reason to exist.
+- No region can close any chain → every region is dependent in the same way → the dependency
+  carries no information, and one trade route is as good as any other.
+
+Both are *flat*. A world is interesting when regions differ in **what** they can close and **how
+much** of it — one rich in ore and starved of food, one that can feed itself and make nothing, one
+that happens to hold a whole chain and is therefore worth taking.
+
+**The measurable is CHAIN COMPLETENESS, and the target is its SPREAD.** For a market or region, the
+fraction of the chains terminating there that can be sourced within reach. Generation is answerable
+for the *distribution* of that number across the world — wide, with real tails at both ends — and
+answerable for nothing at all about any individual region's value. No start is clamped up to
+viability or down to fairness.
+
+That is the same discipline the rest of this document runs on: a stage is a **deterministic
+consequence of upstream scalars, not a roll**. The machinery to produce the spread already exists
+and is not yet being read as an economic instrument —
+
+- `planetology_state::endowment`, the per-resource deposit multiplier per body, where **0.0 means
+  the body cannot carry that resource at all** (`PLANETOLOGY.md`);
+- the endemic goods' **latitude band × longitude sector**, which already makes a cash crop a fact
+  about one region rather than about a world;
+- the six-pass tile pipeline's terrain and deposit passes (`TILE_GENERATION.md`), which decide what
+  ground is where.
+
+What is missing is not a mechanism but a **read**: nothing currently measures chain completeness,
+so nothing can say whether a generated world is flat or varied. Until something does, asymmetry is
+an intention rather than a property, and a tuning change to any upstream pass can quietly flatten
+the map without a single check going red.
+
+**A note on fairness, so it is not re-litigated.** An unequal start is not an unfair one here. The
+player is one corporation among several in a world none of them chose, and the campaign's shape —
+`docs/CONCEPT.md` § Stagnation as loss — already treats falling behind as progressive rather than
+terminal. A generator that made every start equivalent would be answering a multiplayer-ladder
+question this game does not ask.
+
+---
+
 ## The world descriptor — seed + generation parameters
 
 Generation is driven by a small **world descriptor** (BL-114, world descriptor) — a master

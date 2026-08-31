@@ -225,6 +225,64 @@ bid; `run_unit_upkeep` does not, and it has the same latent defect. **A sink tha
 its own supply is a slow way to shut the economy down**, and the cost of learning that is one
 harness run rather than a shipped world nobody can play.
 
+**4. Every resource must have a path to a TERMINAL sink** (Ben, 2026-08-31). A terminal sink
+consumes a good and produces nothing that must itself be sold: a household basket, an upkeep draw,
+a construction cost. **Processing is not one** — it is a pass-through, and a chain that ends in a
+processor ends nowhere.
+
+Measured 2026-08-31 with `demand_census`, and **the two bands fail differently** — which is worth
+keeping straight, because the fix is not the same:
+
+*Ancient band.* The endpoints largely work. BL-640's era-banded basket does what property 2 asked:
+ceramics, dressed stone, planks, leather, cloth and charcoal all carry real household demand. What
+is broken is the **middle**. `fibre` is produced 27613.5 against demand 89.7 and sits near its price
+floor, while `leather` — which fibre's sibling chain should feed — is produced **6.8** against demand
+87.1 and prices at **9.97× base, ceiled in 13 of 14 markets**. The chain is not converting: raw
+inputs glut, finished goods starve. Fifteen resources still have no market sink at all, and the
+census separates them usefully — four *produced in-band with no sink* (ordnance, rigging, tools,
+trade_goods_misc) and eleven *extractable with no sink* (coal, coffee, copper ore, iron-nickel ore,
+petroleum, platinum-group metals, rare-earth ore, regolith, silica, spices, tobacco).
+
+*Industrial band.* The endpoints barely exist. Household reaches 6 resources, construction reaches
+**0**, building upkeep **0**, and the largest single source of demand is the background-industrial
+**stopgap** at 3660.8 of 5268 total — 69%. Strip it and roughly **1.8% of what the world produces
+has a genuine buyer**. `iron_ore` is produced 42991.6 against demand **0.000**.
+
+So the ancient band needs its chain to convert; the industrial band needs endpoints to exist at all.
+
+The rule is not "every resource needs its own channel". It is that **intermediates earn DERIVED
+demand through the chain** — a market with people wants cloth, and should never need to want fibre
+directly; fibre's demand is the cloth-maker bidding for it. That is why property 3 above is
+load-bearing rather than fastidious: derived demand only propagates backwards through links that
+**bid**. Sever the chain at one pool draw and everything upstream of it becomes an orphan, however
+carefully its recipe was authored.
+
+This gives the admission rule its shape. A resource is legitimate in a band when a path exists from
+it to a terminal sink **in that band**, and the census can assert it per band rather than per
+opinion.
+
+**5. Terminal demand is UNIVERSAL; supply is not — and the asymmetry is generation's to PRODUCE,
+not to guarantee** (Ben, 2026-08-31).
+
+Terminal demand follows **population**, and population is everywhere. So every chain should
+*terminate* in every market: wherever there are people, there is a buyer for the consumer end of
+every chain the band supports. That half is a rule, and it is what stops a good being an orphan in
+one market and a staple in the next for no reason a player could read.
+
+Supply is regional, because deposits are. Trade therefore arises from **supply asymmetry**, not
+from demand asymmetry — which is the right way round, and the reason universal demand does not
+flatten the map.
+
+**But local self-sufficiency is NOT forbidden.** An earlier draft of this section proposed the
+stronger rule that no chain should be completable within any single market. Ben overturned it the
+day it was written: *"there is no reason that every start needs to be equally good and fair… we
+should be making rules that encourage a level of asymmetry."* A region that can close a chain by
+itself is a strong start, and a strong start is a legitimate outcome — the same way a poor one is.
+
+So the second half is **suppositional**: self-sufficiency is expected to be possible, uncommon, and
+unevenly distributed. What generation owes is the **spread**, not the floor. See
+`docs/generation/GENERATION_STRATEGY.md` § Asymmetry is the deliverable.
+
 ### Settled: a short pool BUYS, up to a reservation ceiling
 
 Ben's ruling, 2026-08-26 (BL-654): *"Buy on the market, but at a threshold, buying is not allowed.

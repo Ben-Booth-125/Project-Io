@@ -1785,6 +1785,56 @@
    "design": "Ben, 2026-08-31: \"We will be working on the 1960s start.\" This is what makes that sentence executable. Sprint 26 watches the AI play, and BL-703 (watch session finding) watches it on a 1960s world - which cannot currently be started.\n\nTHE BRANCH IS ALIVE AND UNREACHABLE, measured 2026-08-31. `world_params::epoch_year` defaults to 0 and its own comment says the 1960 arc is deliberately kept working: \"pass epoch_year = 1960 and it still runs, which is what keeps the parked space work buildable\". The branch is real - `era_band_for_epoch` puts the recipe registry on the industrial band, `era_minus_one.cpp` skips the antiquity prehistory above 1700, and hard_coded_world.cpp branches on the same threshold. But NOTHING EVER SETS IT. There is no CLI flag, no wizard field, and no assignment anywhere in src/. Reaching 1960 today means editing a default.\n\nTHE SECOND HALF IS A REAL BUG AND THIS ITEM INHERITS IT (raised earlier as the epoch half of the two-clocks entry). `campaign_epoch_year` is a hard-coded 1960 in BOTH src/ui/format.hpp:82 and src/world/planetology.hpp:275, tied by a static_assert in tile_inspector.cpp, and format.cpp:134 computes the displayed year as day_tick/days_per_year + that constant. NO UI SITE READS world_params::epoch_year AT ALL. So today a 0 CE campaign renders 1960-based dates - the constant is simply wrong for the default start.\n\nNOTE THE POLARITY, because it decides the order of work: moving to a 1960s start makes the hard-coded constant ACCIDENTALLY CORRECT again. That is a trap. Fix the constant to read world_params anyway - a value that is right by coincidence will silently break the moment either start is used again, and both starts remain supported (ERAS.md § Where the ladder starts).\n\nSCOPE:\n  1. epoch_year is selectable - the wizard is the natural home (STARTUP.md owns the screen state machine); a CLI flag is the cheap first cut and pairs with the --autostart family.\n  2. The UI epoch reads world_params rather than a constant, and the static_assert is replaced by whatever keeps the two clocks honest once the value is dynamic.\n  3. Whatever is stale on the 1960 path gets found by walking it - this is the first time anyone has.\n\nEXPECT TO FIND THINGS. The 0 CE start has had months of attention and the 1960 path has had none since the arc split. Treat surprises as findings to file, not as scope creep to absorb.",
    "completed": "2026-08-31",
    "resolved": "2026-08-31"
+  },
+  {
+   "id": "BL-706",
+   "short_name": "chain completeness read",
+   "category": "Generation",
+   "title": "Measure chain completeness per region, and the spread of it across the world",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": "27",
+   "written": "2026-08-31",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "files": [
+    "tools/verify/demand_census.cpp",
+    "docs/generation/GENERATION_STRATEGY.md",
+    "docs/economy/MARKETS.md"
+   ],
+   "design": "Ben, 2026-08-31: \"there is no reason that every start needs to be equally good and fair... If we send some of this work into generation, we should be making rules that encourage a level of asymmetry.\" GENERATION_STRATEGY.md § Asymmetry is the deliverable is the authority.\n\nWHAT IS MISSING IS A READ, NOT A MECHANISM. Generation already has everything needed to produce asymmetry: planetology_state::endowment (per-resource deposit multiplier per body, 0.0 = the body cannot carry it at all), the endemic goods' latitude band x longitude sector, and the six-pass tile pipeline's terrain and deposit passes. What nothing does is MEASURE the result in economic terms, so nothing can say whether a generated world is varied or flat.\n\nTHE MEASURABLE: for a market or region, the fraction of the chains TERMINATING there that can be sourced within reach. The deliverable is its DISTRIBUTION across the world - wide, with real tails - not any individual region's value.\n\nTHE ENEMY IS UNIFORMITY, NOT SELF-SUFFICIENCY, and this is the whole point of the item. Two failure modes that look opposite and are the same defect: every region can close its own chains (nothing needs anything, trade has no reason to exist), or no region can close any (every dependency is identical, so one trade route is as good as another). Both are FLAT. A region that closes a whole chain by itself is a strong start and a legitimate outcome.\n\nSO IT REPORTS, IT DOES NOT GATE. No start is clamped up to viability or down to fairness - that would be answering a multiplayer-ladder question this game does not ask. What it can legitimately assert is a floor on the SPREAD: a world where every region scores the same is a generation defect even when every region is individually fine.\n\nHOME: demand_census is the natural host - it already walks every market and every resource per band, and it already knows which sinks are terminal. Adding a per-market completeness column and a spread summary is cheaper than a new harness, and keeps the before/after discipline sprint 27 runs on.\n\nNOTE IT NEEDS 'WITHIN REACH' DEFINED, which is a real design question and not a detail: reach is LOGISTICS.md's, and whether completeness is measured at market grain, province grain or body grain changes what the number means. Settle that before implementing."
+  },
+  {
+   "id": "BL-707",
+   "short_name": "the ancient chain does not convert",
+   "category": "Economy",
+   "title": "Raw inputs glut while the finished goods that need them starve - the ancient chain is not converting",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": "27",
+   "written": "2026-08-31",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "scripts/economy.lua",
+    "src/world/economy_system.cpp",
+    "tools/verify/demand_census.cpp",
+    "docs/economy/PRODUCTION.md",
+    "docs/economy/MARKETS.md"
+   ],
+   "design": "MEASURED 2026-08-31 with demand_census, ancient band, and it is a DIFFERENT failure from the industrial band's. Filed separately for that reason - the two bands need different fixes and conflating them is how one gets applied to the other.\n\nTHE ANCIENT BAND'S ENDPOINTS LARGELY WORK. BL-640's era-banded basket did what MARKETS.md property 2 asked: ceramics, dressed_stone, planks, leather, cloth and charcoal all carry real household demand. That half is not the problem.\n\nTHE MIDDLE IS. The chain does not convert:\n  fibre    produced 27613.5   demand   89.7   price 0.756x base (near floor)\n  leather  produced     6.8   demand   87.1   price 9.97x base, CEILED in 13 of 14 markets\n  cloth    produced  4245.5   demand  178.6   price 8.87x base, ceiled in 11 of 14\n  ceramics produced    63.5   demand  117.4   price 9.24x base, ceiled in 12 of 14\n\nRaw inputs pile up at the floor; the finished goods the household actually wants are produced in single digits and price at the ceiling in almost every market. The demand exists, the input exists, and the conversion between them does not happen.\n\nWHY IT MATTERS MORE THAN A TUNING NOTE: a good ceiled in 13 of 14 markets is not a shortage, it is an absent industry. Something is stopping firms from being built on a conversion whose output sells at ten times base with unmet demand - which on the face of it is the most profitable thing available in the band. That is a question about the scorer's build candidates, placement rules, or the recipe graph, and it should be diagnosed before it is tuned.\n\nCANDIDATE CAUSES, none confirmed - diagnose first: the input_demand_pull that BL-440 added may not reach these chains; placement rules may refuse the sites; the recipe may want an input that is itself unavailable; or the background-firm calibration (~90% of real demand, GENERATION_STRATEGY.md § The economic premise) may be seeding the world without the converting firms and the scorer may not be adding them.\n\nDO NOT FIX BY RAISING THE PRICE CEILING. The ceiling is doing its job by reporting the shortage; moving it hides the reading. Same reasoning as the project's refusal of clamps."
   }
  ]
 }
