@@ -1,163 +1,169 @@
 # Project Io — Climate
 
-Authority doc for **climate**: the living state of a body's habitability under use, and the one
-world force that answers back to what corporations do. Ben, 2026-08-31: *"we haven't built a
-critical system which is climate."*
+Authority doc for **climate**: the state of a body's habitability as it changes during play, what
+changes it, and what that does to the people and corporations living under it. Ben, 2026-08-31:
+*"we haven't built a critical system which is climate."*
 
-Climate is a **commons** — shared by every actor on a body, degraded by use, owned by nobody. That
-single property is what makes it worth building, and everything below follows from it.
-
----
-
-## 1. What climate is here, and what it is not
-
-**It is not weather**, and it is not the generation-time climate that already exists.
-`docs/generation/PLANETOLOGY.md` owns a body's atmosphere, chemistry and biosphere history, and
-`docs/generation/TILE_GENERATION.md` uses climate bands to decide what terrain and what deposits a
-tile is born with. That layer answers *what kind of world is this*, once, at generation.
-
-This document owns the other half: **what happens to that world while it is being used.** It is
-the difference between the climate a world *has* and the climate a world is *left with*.
-
-**It is not a disaster generator.** Discrete things that happen *to* the player — a storm, a
-harvest failure, a flood — are events, and `docs/EVENTS.md` owns them. Climate is the slow
-continuous state underneath; an event may read climate as a precondition, and climate is never
-expressed as one.
+Climate is a **commons** — shared by every actor on a body, altered by use, owned by nobody — and
+it is the one world force that answers back to what corporations do at scale.
 
 ---
 
-## 2. Why it exists — one system, three jobs
+## 1. Two corrections that shape this document (Ben, 2026-08-31)
 
-Io's design test is `docs/SYSTEMS.md` § Structure: *does this change what the company can field, or
-what it must answer to?* Climate is squarely the second. It is admitted because it does three
-otherwise-unrelated jobs at once, and no other proposed system does any of them as honestly.
+**Climate does not run on `hazard`.** *"When we model climate, we will use a more detailed surface
+than hazard. Hazard is mostly just a tangible benefit for larger settlements on other bodies."*
+`tile_component.hazard_level` is the local operating-difficulty scalar in the production formula,
+and its real design job belongs to the **off-world settlement calculus** — what it costs to put a
+large settlement somewhere unwelcoming. It is far too coarse to carry a climate: it is one number
+per tile with one meaning, and climate is a body-scale state with several.
 
-**1. It brakes a runaway leader.** `docs/ai/AI_OPPONENT.md` § Where restraint comes from needs the
-world, not the agent, to keep a leader from running away. A commons does that by arithmetic: strain
-scales with what a corporation operates, and the consequence falls on everyone. The largest operator
-pays the largest share of a cost it imposed on the field. Nothing names the leader, nothing reads
-the player's seat, and the brake applies identically when the player is the one in front.
+**Era 1 is entered through nuclear war.** `docs/CONCEPT.md` § Eras already had the Era 0 exit as a
+global-rupture-scale war that reshapes the world enough for rapid space expansion to become
+plausible. The rupture is **nuclear**, and it is the single most important fact about this system:
+climate in Io is not only a slow industrial drift, it is also a **shock with a date**, and the shock
+is what makes the era arc happen.
 
-**2. It gives the Era boundary a cause.** `docs/economy/ERAS.md` § What moves an Era makes an Era
-transition a catastrophic seeded event on the world clock, with a **visible countdown**. Climate
-supplies what that countdown is counting: a meter the player can watch, driven by what the world's
-corporations are collectively doing, rather than a date with no reason behind it.
-
-**3. It gives the player a motive to leave.** The Era 0 → Era 1 gate is an economic threshold —
-rocketry, a staffed launchpad, a propellant reserve. It says what leaving *costs* and nothing about
-why anyone would. Climate is the why: a homeworld getting worse turns off-world extraction from an
-ambition into an exit.
+> Both eras' climate is the same model. What differs is whether the state is drifting or was hit.
 
 ---
 
-## 3. The seam — hazard and habitability already exist
+## 2. The surface — planetology's scalars, unfrozen
 
-Climate invents no new quantity. It makes two existing ones **move**.
+Io already has a detailed, physically-grounded climate model. `docs/generation/PLANETOLOGY.md` runs
+the carbonate–silicate thermostat, the greenhouse budget, insolation, oxygenation and the arable
+calculation, and deposits the result in `planetology_state` (`src/world/planetology.hpp`). That
+state is computed **once, at generation, and then never changes**.
 
-| Field | Today | Under climate |
+**Climate change is a defined subset of those scalars being allowed to move.** No parallel model, no
+invented vocabulary, and the physics is already written down.
+
+| Scalar | Meaning | Under climate |
 |---|---|---|
-| `tile_component.hazard_level` | 0–1, written once at tile generation, never mutated | Rises as the body's climate degrades |
-| `tile_component.habitability` | 0–1, same shape, sits beside it | Falls with it |
+| `instellation` | S — sunlight reaching the surface, Earth units | **Moves.** The nuclear-winter channel: aerosol loading cuts effective S hard and fast |
+| `surface_temp_k` | Surface temperature | **Moves.** The consequence of S and of greenhouse loading |
+| `arable_share` | Fraction of land that can be farmed | **Moves.** The number players actually feel |
+| `life_stage` / `peak` | Biosphere attainment | **Moves, downward only.** The severe case: a biosphere that loses a rung |
+| `o2_fraction` | Atmospheric oxygen | **Moves slowly**, if at all — a long-horizon quantity |
+| `endowment` | Per-resource deposit multiplier | **Fixed.** Deposits are geology, not weather |
+| `v_esc_kms`, `mass`, `orbit_au`, `mobile_lid` | Planetary facts | **Fixed.** These are what the body *is* |
 
-This is the whole reason the system is cheap rather than sprawling: **every consequence is already
-wired.** `docs/economy/PRODUCTION.md` already multiplies extraction output by `(1 − hazard)`.
-`docs/economy/POPULATION.md` already reads habitability for agglomeration and settlement.
-`docs/military/MILITARY.md` already reads terrain and hazard for the difficulty of operations. A
-climate that moves these two numbers is felt everywhere in the game on the day it lands, without a
-single consequence being authored twice.
+The dividing line: **climate moves what a world can currently support, never what it is made of.**
+A ruined world still has its iron.
 
-The corollary is a constraint on the design, not a convenience: **climate must express itself
-through hazard and habitability, and not through a parallel set of penalties.** A climate that
-reaches into the market, the budget and the roster directly would be a second economy wearing a
-weather costume.
-
----
-
-## 4. The loop
-
-    strain  →  state  →  consequence  →  legibility  →  decision
-
-**Strain** is what corporations do to the body: the intensity of extraction and processing running
-on it, weighted by scale. It is a *rate*, summed across every operator, and it is attributable —
-the model knows which corporation contributed what, which is what lets the interface name a cause.
-
-**State** is one value per body, degrading under strain and recovering when strain falls (subject
-to § 6). It is a stock, not a flow; it carries the history of how the body has been used.
-
-**Consequence** is hazard rising and habitability falling across that body's tiles.
-
-**Legibility** is non-negotiable and is treated here as part of the mechanism rather than as a
-surface that follows it — see § 7.
-
-**Decision** is what the loop is for. A player who can see the meter, see their own contribution to
-it, and see what it is doing to their yields has a real choice to make about scale.
+**Why this is the right surface and hazard was not.** These scalars already have consumers.
+`arable_share` feeds the tile pass and the food chain; `life_stage` gates living resources and the
+endemic goods; `instellation` and `surface_temp_k` are what the generation model reasons in. A
+climate expressed here is felt correctly across the game because the causal wiring was built by the
+generation layer that produced the world in the first place.
 
 ---
 
-## 5. Grain — per body
+## 3. Two regimes — the drift and the shock
 
-Climate state is held **per body**. Not per tile, and not per world.
+**The drift (Era 0).** Industrial activity loads the atmosphere. The change is slow, cumulative,
+attributable, and shared: every corporation operating on the body contributes in proportion to what
+it extracts and processes, and every corporation lives with the result. This is the commons, and it
+is the regime that does the AI-brake job in `docs/ai/AI_OPPONENT.md` § Where restraint comes from —
+the largest operator pays the largest share of a cost it imposed on the field, with nothing naming
+the leader and nothing reading the player's seat.
 
-**Per tile is a pollution puddle.** It makes the consequence local to the ground that caused it,
-which is exactly what a commons is not: it becomes a cost internal to the operator, dodgeable by
-moving, and it brakes nobody. It also collapses into a terrain modifier, which the tile model
-already has.
+**The shock (the Era 0 → Era 1 rupture).** A nuclear war is a **step change, not a trend**.
+Instellation falls sharply, temperature follows, and the arable share collapses within a handful of
+ticks rather than over a campaign. `docs/economy/ERAS.md` § What moves an Era already specifies the
+boundary as a seeded event that shocks markets and destroys infrastructure; the climate shock is the
+part of it that does not end when the shooting does.
 
-**Per world breaks the arc.** The game's territory is a solar system of bodies with genuinely
-different atmospheres. A single shared figure would have an asteroid's extraction degrading a
-homeworld's air, which is neither legible nor true to the generation layer that produced them.
+**The aftermath (Era 1).** Winter lifts as aerosols settle — recovery is real and observable — but
+it does not return to where it started. What is left is a **degraded floor**: a homeworld that
+supports meaningfully less than it did, permanently.
 
-**Per body is the commons that matters.** Every corporation on the homeworld shares one climate,
-and the homeworld is where Era 0 is played and where the pressure needs to bite. It also scales
-correctly into the space arc: each off-world body carries its own state, so the strategic content of
-Era 1 — spreading production across bodies — is *also* a way of spreading strain.
+The drift is what makes the shock plausible. A world already under strain, whose corporations could
+see the meter and did not coordinate, is a world where the war is a **consequence** rather than a
+scheduled event. `docs/economy/ERAS.md` puts it exactly right already: *the backstory establishes
+that these powers* can *pull back from the brink; the Era 0 exit is the occasion they do not.*
 
 ---
 
-## 6. Reversible or ratcheting — the shape of the curve
+## 4. What actually happens — the consequences, in Io's terms
 
-**This is the load-bearing open call, and it decides what climate feels like.** Three shapes:
+Climate is only worth building if its effects land on things the player already cares about.
 
-**Reversible.** Degrades under strain, recovers when strain falls. Climate is a live pressure and a
-standing negotiation. *Risk:* it becomes a thermostat — a cost to be managed, never a stake, and it
-supplies no Era boundary at all.
+**1. Food fails first, and food is a chain.** A falling `arable_share` cuts agricultural output.
+`docs/economy/POPULATION.md` centres generate demand for food rations every tick and already carry
+**decline and razing** when supply and habitability fall short. So the first thing a player sees is
+not a weather readout — it is their workforce shrinking because the centres feeding it are starving.
 
-**Ratcheting.** Degrades only. The countdown has teeth and the Era rupture is inevitable. *Risk:* it
-removes agency. If the ending arrives regardless of what anyone does, the rational player ignores it
-and the system becomes scenery with a number attached.
+**2. The growing bands move, and that is a trade event.** `docs/generation/PLANETOLOGY.md`'s endemic
+goods are pinned to **latitude bands** — the climate a good wants — and their whole economic point
+is being *valuable for being somewhere else* (`docs/economy/RESOURCES.md` § Mercantile). When bands
+migrate, a cash crop's home moves, shrinks, or ceases to exist. A trade route built on an endemic
+good is a trade route climate can end.
 
-**Recommended — reversible in the small, ratcheting in the large.** Recovery is real up to a
-threshold. Past that threshold a **floor** is set that never lifts: the body can recover to the
-floor and no further, and each further breach sets a higher one.
+**3. The coast is a real place.** Population footprints are already coastal-clipped and ports sit on
+water access. Sea level is the slowest of these channels and the least reversible.
 
-The recommendation is not a compromise for its own sake. It is the only one of the three that
-produces the fiction `docs/economy/ERAS.md` already commits to:
+**4. Winter is a famine, not a heat wave.** The nuclear case is fast, deep, and food-shaped. It is
+not the same experience as the drift and should not read as more of it.
 
-> *The backstory establishes that these powers* can *pull back from the brink; the Era 0 exit is the
-> occasion they do not.*
+**5. Contamination is spatial, severe, and temporary.** Fallout makes ground bad to work for a time
+and then decays. It is the one climate effect with a *map*, and it is how the rupture is felt
+locally rather than only as a global number.
 
-Under a ratchet nobody could ever have pulled back, so the backstory is a lie. Under pure
-reversibility nobody ever needed to, so the rupture is unmotivated. Under a floor, pulling back is
-genuinely possible, genuinely costly, and genuinely something a field of competing corporations may
-fail to coordinate on — which is a tragedy of the commons rather than a scripted apocalypse, and it
-is a **consequence of play** rather than a date.
+**6. The point is redistribution, not penalty.** This is the design's centre of gravity. Climate
+change does not make everything worse for everyone by the same amount — **it moves where value
+is.** Ground that was too cold becomes arable; a band that fed a continent stops. A corporation
+holding the right ground gains, and one holding the wrong ground must move or trade. That is what
+makes climate a **Trade** system rather than a tax, and it is what satisfies
+`docs/SYSTEMS.md`'s test: it changes what the company must answer to.
+
+---
+
+## 5. Why this is the reason to enter space
+
+`docs/economy/ERAS.md`'s Era 0 → Era 1 gate is an economic threshold — rocketry, a staffed
+launchpad, a propellant reserve. It says what leaving **costs** and nothing about why anyone would.
+
+Climate is the why, and the shape of the argument matters: **space does not get better — home gets
+worse.** Off-world bodies are exactly as hostile after the war as before it. What changes is the
+*gap*. A homeworld with a collapsed arable share and a wrecked biosphere is no longer sufficiently
+better than a cold rock to justify staying on it exclusively.
+
+This is also where `hazard` does its real job, per Ben's correction: the decision to put a **large
+settlement on another body** is a hazard calculus, and it becomes worth making only once the
+homeworld has stopped being the obvious answer. Climate creates the demand; hazard prices the
+alternative.
+
+**The gate's three conditions are unchanged.** Climate moves the motive to pass it, never the
+conditions.
+
+---
+
+## 6. Grain — per body
+
+Climate state is held **per body**. Not per tile — that is a pollution puddle: local to the ground
+that caused it, dodgeable by moving, and a brake on nobody. Not per world — the game's territory is
+a solar system of genuinely different atmospheres, and a shared figure would have an asteroid's
+extraction degrading a homeworld's air.
+
+Per body is the commons that matters. It also scales into Era 1 correctly: each off-world body
+carries its own state, so spreading production across bodies is *also* spreading strain.
+
+**Contamination is the exception** and is spatial by nature — it belongs to ground, not to a body.
 
 ---
 
 ## 7. Legibility is part of the mechanism
 
-A brake the player cannot see is a handicap, and `docs/ai/AI_OPPONENT.md` § Where restraint comes
-from rejects handicaps as the foundation of this design. Climate therefore carries a legibility
-requirement in its *mechanism*, not as a follow-up surface:
+A force the player cannot see is a handicap, and `docs/ai/AI_OPPONENT.md` rejects handicaps as the
+foundation of this design. So:
 
-- The body's climate state is **visible as a number and as a trend**, not inferred from falling
-  yields.
-- A corporation's **own contribution** to strain is visible to it. A player must be able to see that
-  they are the problem, or that they are not.
-- The **consequence is attributable**: when hazard rises, the interface can say why.
+- The body's climate state is **visible as a number and a trend**, not inferred from falling yields.
+- A corporation's **own contribution** to the drift is visible to it.
+- The consequence is **attributable** — when the harvest fails, the interface can say why.
 
-If a player experiences climate as "my yields got worse for no stated reason", the system has failed
-regardless of how correct its arithmetic is.
+If a player experiences climate as "my output got worse for no stated reason", the system has failed
+however correct its arithmetic.
 
 ---
 
@@ -166,92 +172,53 @@ regardless of how correct its arithmetic is.
 > *"'how far restraint goes' should never exclude extension and construction. If a player loses out,
 > they should be able to see that the world doesn't wait for them."*
 
-Climate makes operating **costly**. It never makes it **impossible**.
+Climate makes operating **costly** and **relocates value**. It never makes operating impossible.
 
-- It raises hazard and lowers habitability. It does **not** veto construction, remove a tile from
-  play, forbid extraction, or gate a building type.
+- It does not veto construction, remove a tile from play, forbid extraction, or gate a building
+  type.
 - A degraded body is a worse place to operate, never a closed one.
-- A corporation that falls behind finds a world that carried on without it — that is the honest
-  consequence the whole design protects, and a climate that freezes the map destroys it.
-
-This binds climate exactly as it binds the coalition brake; the two are the same ruling applied to
-the two systemic forces.
+- Contamination is the sharpest effect and is still **temporary** by construction.
 
 ---
 
-## 9. Climate and the era arc
+## 9. Where the era arc stands
 
-**The Era 0 exit is unchanged in kind, and gains a cause.** `docs/CONCEPT.md` § Eras says Era 0 ends
-in a global-rupture-scale war that reshapes the world enough for rapid space expansion to become
-plausible. Climate does not replace that rupture — it **drives** it. Competition over a degrading
-commons sharpens until it breaks, which is what a rupture is. `docs/economy/ERAS.md`'s seeded date
-and visible countdown remain the mechanism of the boundary; climate is what the countdown measures.
+**Era 0's exit is a nuclear war**, and climate is both its precondition and its aftermath.
 
-**The space-access gate is unchanged.** Rocketry, a staffed launchpad, a propellant reserve
-(`docs/economy/ERAS.md` § Era 0 → Era 1 gate). Climate changes the **motive** to pass it, never the
-conditions. The gate stays an economic threshold; what changes is that staying put stops being free.
+**Era 1's climate is the recovery** — winter lifting to a permanently degraded floor — and per-body
+state makes off-world expansion a way of spreading strain as well as reaching resources.
 
-**Era 1 is where climate becomes a strategy rather than a pressure.** Era 1's strategic question is
-already off-world self-sufficiency. With per-body climate, spreading production across bodies is
-also spreading strain — so the Era's existing content acquires a second reason to do it, and the
-homeworld's accumulated floor becomes a permanent fact the player carries rather than escapes.
-
-**Where Era 1 ends is not settled here.** `docs/economy/ERAS.md` marks the Era 1 → Era 2 gate
-undesigned, and this document does not design it. What it observes is the shape climate suggests:
-if climate is why you left, then the end of Era 1 is when the homeworld stops being the thing you
-depend on — and that is the same threshold Era 1's own strategic question already names.
+**Era 1 → Era 2 is not designed here.** `docs/economy/ERAS.md` marks that gate undesigned and this
+document does not fill it. The only shape it observes: if a wrecked homeworld is why the player
+left, Era 1 ends when the homeworld stops being what they depend on — which is the threshold Era 1's
+own strategic question already names.
 
 ---
 
-## 10. The two arcs — climate scales with the era, and the vocabulary changes with it
+## 10. What this document does not settle
 
-The live product is the **ancient arc** at 0 CE; the industrial and space arc is DLC scope
-(`docs/economy/ERAS.md` § The two arcs). Climate belongs to **both**, at different scale, and this is
-what keeps it from being a system that only pays off in a parked product.
-
-| Arc | What strains it | How it reads |
-|---|---|---|
-| **Ancient (0 CE, live)** | Timber felling, soil exhaustion under continuous cropping, salinisation under irrigation, silt and overgrazing | Local, agrarian, and slow. Land that stops giving what it gave |
-| **Industrial / space (parked)** | Extraction and processing at industrial throughput | Global and atmospheric. A whole body getting worse at once |
-
-It is **one mechanism** — strain against a shared stock, expressed through hazard and habitability —
-whose magnitude and vocabulary follow the era. That matters practically: the AI brake in
-`docs/ai/AI_OPPONENT.md` is needed on the **live** arc, so climate has to bite at 0 CE and not only
-after the launchpad fires.
-
-Real history is the mechanism reference here and never a name source
-(`.claude/rules/io-standing-rules.md` § Terms & docs): what transfers is how a commons fails, never
-a proper noun.
-
----
-
-## 11. What this document does not settle
-
-Named so they are chosen rather than accreted:
-
-1. **The curve** (§ 6) — reversible, ratcheting, or floored. Recommended: floored.
-2. **What exactly constitutes strain**, and the weighting between extraction, processing and
+1. **The recovery curve** — how far the drift is reversible, and where the permanent floor sits.
+   Recommended shape: recoverable up to a threshold, then a floor each further breach raises.
+2. **What exactly constitutes strain**, and the weighting across extraction, processing and
    throughput.
-3. **Recovery rate**, and whether anything a corporation can *build* accelerates it — which would
-   make climate a market rather than only a tax.
-4. **Whether nations act on it.** A tariff, a law, or a levy answering climate would reach the
-   2026-08-18 nation grant (`.claude/rules/io-standing-rules.md`) and is the natural home for
-   collective action failing.
-5. **The surface**: a lens, a ledger, a body-level readout, or some pair of them
-   (`docs/ui/LENSES.md`, `docs/ui/ledgers/`).
-6. **Whether habitability moving disturbs population** in ways `docs/economy/POPULATION.md` has to
-   answer for, since agglomeration reads it.
+3. **Whether anything a corporation builds accelerates recovery** — which would make remediation a
+   market rather than only a cost.
+4. **Whether nations act on it** — a levy, a tariff or a law answering climate would reach the
+   2026-08-18 nation grant (`.claude/rules/io-standing-rules.md`).
+5. **Whether the player can influence the war** at all, or only its aftermath.
+6. **The surface** — lens, ledger, body readout, or a pair (`docs/ui/LENSES.md`).
 
 ---
 
-## 12. Where the parts live
+## 11. Where the parts live
 
 | Subject | Doc |
 |---|---|
-| Generation-time climate, atmosphere, chemistry | `docs/generation/PLANETOLOGY.md` |
+| The physical model and its scalars | `docs/generation/PLANETOLOGY.md` |
 | Climate bands as a terrain and deposit input | `docs/generation/TILE_GENERATION.md`, `docs/economy/TILES.md` |
-| The `(1 − hazard)` production multiplier | `docs/economy/PRODUCTION.md` |
-| Habitability and agglomeration | `docs/economy/POPULATION.md` |
-| The Era boundary, its countdown, the space gate | `docs/economy/ERAS.md` |
-| Why a systemic brake rather than an agent-side one | `docs/ai/AI_OPPONENT.md` § Where restraint comes from |
+| Endemic goods and their latitude bands | `docs/generation/PLANETOLOGY.md` § Endemism, `docs/economy/RESOURCES.md` |
+| Centres, habitability, decline and razing | `docs/economy/POPULATION.md` |
+| Hazard as the off-world settlement calculus | `docs/economy/PRODUCTION.md`, `docs/economy/TILES.md` |
+| The Era boundary, the war, the space gate | `docs/economy/ERAS.md`, `docs/CONCEPT.md` |
+| Why a systemic brake rather than an agent-side one | `docs/ai/AI_OPPONENT.md` |
 | Discrete occurrences that read climate | `docs/EVENTS.md` |

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*99 entries — 97 open, 2 resolved.*
+*100 entries — 98 open, 2 resolved.*
 
 ---
 
@@ -998,7 +998,7 @@ SECOND RISK, smaller and worth naming: coalitions brake the leader, and the PLAY
 
 *Files: `docs/ai/AI_OPPONENT.md`, `docs/development/sprints.json`, `src/world/corp_ai.cpp`*
 
-### NR-747 — Does climate recover, ratchet, or set a floor? The call that decides what the system feels like
+### NR-747 — How far does the climate drift recover, and where does the permanent floor sit?
 *question · raised 2026-08-31 · from Ben, 2026-08-31: "Let's design climate docs here... how the hazard affects players." CLIMATE.md § 6 is written with a recommendation and marked as his call.*
 
 Climate degrades under the strain of what corporations extract and process on a body. The question is what happens when the strain stops. It is the one open call in CLIMATE.md that changes the system's FEEL rather than its numbers, and every other open call reads differently depending on it.
@@ -1007,13 +1007,15 @@ REVERSIBLE - degrades under strain, recovers when strain falls. Climate is a liv
 
 RATCHETING - degrades only, never recovers. The countdown has teeth and the Era rupture is inevitable. COST: it removes agency. If the ending arrives regardless, the rational player ignores the meter and climate becomes scenery with a number on it. It also makes ERAS.md's own sentence false - see below.
 
-FLOORED (recommended, and written into CLIMATE.md § 6 as the recommendation) - recovery is real up to a threshold; past it a floor is set that never lifts, and each further breach raises it. The body can recover TO the floor and no further.
+FLOORED (recommended, and written into CLIMATE.md § 3 and § 10.1 as the recommendation) - recovery is real up to a threshold; past it a floor is set that never lifts, and each further breach raises it. The body can recover TO the floor and no further.
 
 WHY FLOORED, and it is not a split-the-difference argument. ERAS.md already commits to this sentence about the Era 0 exit: "The backstory establishes that these powers CAN pull back from the brink; the Era 0 exit is the occasion they do not." Under a ratchet nobody could ever have pulled back, so that sentence is a lie. Under pure reversibility nobody ever needed to, so the rupture is unmotivated. Only a floor makes pulling back genuinely possible, genuinely costly, and genuinely something a field of competing corporations may fail to coordinate on. That is a tragedy of the commons rather than a scripted apocalypse - and it makes the Era boundary a CONSEQUENCE OF PLAY rather than a date on the clock.
 
-IT ALSO DECIDES WHETHER CLIMATE IS A MARKET. If recovery exists, something a corporation BUILDS could accelerate it, and remediation becomes a business - which is CLIMATE.md § 11's third open call and is only live under reversible or floored.
+IT ALSO DECIDES WHETHER CLIMATE IS A MARKET. If recovery exists, something a corporation BUILDS could accelerate it, and remediation becomes a business - which is CLIMATE.md § 10's third open call and is only live under reversible or floored.
 
 WHAT IT DOES NOT DECIDE: the constraint that climate never vetoes construction or extension is Ben's 2026-08-31 ruling and holds under all three shapes.
+
+UPDATED 2026-08-31 after Ben named the rupture as a NUCLEAR WAR. That does not answer this question, it SHARPENS it - the war supplies a permanent floor by itself, so the live question is now specifically about the Era 0 DRIFT: how much of the pre-war industrial loading is recoverable if the field pulls back. A fully reversible drift means the war is the only thing that ever leaves a mark, and the commons stops being a stake during the era the player actually plays.
 
 **Why it matters.** It decides whether climate is a pressure, a doom clock, or a commons - and therefore whether the Era 0 boundary is something the world's corporations did or something the calendar did. The build should not be minted before it is answered; building against an unsettled curve would be implementing the wrong feel efficiently.
 
@@ -1021,9 +1023,30 @@ WHAT IT DOES NOT DECIDE: the constraint that climate never vetoes construction o
 - Reversible - a pure pressure. Simplest, and the safest if climate turns out to be annoying rather than interesting; loses the Era boundary job.
 - Ratcheting - a pure doom clock. Strongest era arc, weakest agency; also contradicts ERAS.md's existing backstory sentence.
 
-> **Recommendation:** Floored. It is the only shape that keeps all three jobs climate was admitted for, and the only one under which ERAS.md's existing sentence about pulling back from the brink is true. If it proves fiddly in play, collapsing a floor to pure reversibility later is a cheap change; going the other way is not.
+> **Recommendation:** Floored, and the nuclear shock makes the case stronger rather than weaker: the war already guarantees a permanent floor, so a drift that recovers completely would mean nothing a corporation does before the war matters, and the AI brake would have nothing to bite on during Era 0 - which is the era the live product is played in.
 
 *Files: `docs/CLIMATE.md`, `docs/economy/ERAS.md`, `docs/CONCEPT.md`*
+
+### NR-748 — I read "Era 1 is actually nuclear war" as the Era 0 -> Era 1 BOUNDARY, and edited CONCEPT.md on that reading
+*decision taken on your behalf · raised 2026-08-31 · from Ben, 2026-08-31: "My mistake with the word choice. Era 1 is actually nuclear war."*
+
+Flagged because the sentence has two readings, because I picked one without asking, and because acting on it edited CONCEPT.md - a doc whose framing is Ben's.
+
+THE TWO READINGS.
+  (a) THE BOUNDARY. The Era 0 -> Era 1 rupture is a nuclear war. Era 1 itself remains Early Space and opens on the aftermath.
+  (b) THE ERA. Era 1 as a PERIOD is characterised by nuclear war - i.e. the ladder's naming is wrong and Era 1 is not Early Space at all.
+
+I TOOK (a). Reasons: CONCEPT.md § Eras already had the Era 0 exit as "a global-rupture-scale war" that reshapes the world enough for rapid space expansion, so (a) NAMES something already designed rather than overturning it; ERAS.md § What moves an Era already makes the boundary a catastrophic seeded event that shocks markets and destroys infrastructure, which is the shape of a war; and Ben's own sentence was a correction of MY word choice, which suggests a clarification rather than a redesign of the ladder.
+
+WHAT I WROTE ON IT. CONCEPT.md § Eras now says the rupture is nuclear and names climate as what makes the space expansion plausible. ERAS.md § What moves an Era says the same and splits climate into a pre-war drift and a post-war aftermath. CLIMATE.md § 1 and § 3 are built on it throughout.
+
+IF (b) IS WHAT HE MEANT, the correction is real but contained: the era NAMES and the ladder change, and CLIMATE.md's two-regime model survives unaltered, because it is anchored to 'before the war' and 'after the war' rather than to an era number.
+
+**Why it matters.** It is now written into CONCEPT.md, ERAS.md and CLIMATE.md as settled, and CONCEPT.md is the doc that owns what the game is about. A wrong reading propagating from there is expensive to unpick later, and cheap to correct today.
+
+> **Recommendation:** Confirm or correct in one line. If (a) is right, nothing to do. If (b), tell me and I will re-cut the ladder - the climate model itself does not move either way.
+
+*Files: `docs/CONCEPT.md`, `docs/economy/ERAS.md`, `docs/CLIMATE.md`*
 
 ---
 
