@@ -292,11 +292,24 @@ is building — which is why the channel currently measures 0.000 in the industr
 capacity gives it a non-zero reading from tick 0. `docs/economy/PRODUCTION.md` § Construction as a
 rate owns it.
 
-**Power is deliberately NOT a channel, and that is the point.** Electricity is a grid quantity, not a
-traded good: it never enters the order book and has no market price. What reaches the market is the
-**generator's fuel purchase**, as an ordinary processing input — so `coal` and `petroleum`, both
-currently on the *extractable, no market sink* list, gain a buyer without power itself needing a
-channel. `docs/economy/PRODUCTION.md` § Power and `docs/economy/LOGISTICS.md` § 3a own it.
+**Power is a BOUGHT good, and it is the Industry channel's first viable entry** (Ben, 2026-08-31:
+*"it has to be a bought good when it is taken as upkeep. Therefore corporations can buy power from
+each other, and background companies can produce power with a profit"*).
+
+Every building that needs power bids for it, so **both links of the fuel chain bid**: the generator
+buys fuel as a processing input, and every building buys power as upkeep. Neither is a pool draw, so
+neither severs the chain — property 3 satisfied twice, and property 4's derived demand propagating
+through links that bid, working as designed. `coal` and `petroleum` gain their endpoint and power
+gains its own.
+
+**It is the first entry in the Industry basket the world will actually make.** That basket ships at
+zero because tools and planks are *produced 0.0* in band; power is produced because producing it is
+profitable, which is why turning Industry on for power is a different proposition from turning it on
+for tools, and the order to do it in.
+
+Power is also the first good whose **movement and market are separate questions**: it has a price but
+no convoy, and a buyer can only match a seller its road network reaches, which keeps the price
+regional. `docs/economy/PRODUCTION.md` § Power and `docs/economy/LOGISTICS.md` § 3a own it.
 
 ### Settled: a short pool BUYS, up to a reservation ceiling
 

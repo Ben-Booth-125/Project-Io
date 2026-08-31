@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*113 entries — 108 open, 5 resolved.*
+*113 entries — 107 open, 6 resolved.*
 
 ---
 
@@ -1267,29 +1267,6 @@ THE COMMON SHAPE: the things that CHECK the code are themselves unchecked. Every
 
 *Files: `CMakeLists.txt`, `tools/verify/build_harness.js`, `build_app.bat`, `.claude/skills/verifier-headless/SKILL.md`*
 
-### NR-761 — Can a corporation SELL power to another corporation?
-*question · raised 2026-08-31 · from Sprint 27 design session on power, 2026-08-31. Ben answered how power MOVES; this is the half his answer leaves open.*
-
-Ben settled that power is "not a resource" and that it travels on the road network with a flat one-tick latency to anything connected. What that leaves open is whether power is ever SOLD.
-
-THE DESIGN AS WRITTEN SAYS NO: a corp generates for its own connected network, and the market demand power creates is the generator's FUEL purchase, not a trade in power itself. That reading is what makes "not a resource" coherent - no order book entry, no price, no convoy.
-
-IT IS ALSO A REAL CONSTRAINT ON THE PLAYER, which may be exactly right or may be too harsh. A corp with no fuel access and no generation is simply short of power, and cannot buy its way out. That is asymmetry with a cause, which GENERATION_STRATEGY.md § Asymmetry is the deliverable actively wants. But selling power is also an obvious business, and a world where nobody can is a world missing a firm type.
-
-THE SHAPE IF THE ANSWER IS YES, and it is not a market good: power is a standing relationship over a CONNECTION, not a spot trade in a fungible cargo - so the natural home is a CONTRACT (docs/economy/CONTRACTS.md, the BL-350 procurement seam) rather than the order book. A supply agreement between two corps whose networks touch, priced per tick, terminable. That keeps power off the market while making it sellable, and it reuses a seam that exists.
-
-NOT URGENT. BL-708 (power as a grid) is coherent and buildable without it, and the fuel-chain endpoint - which is the whole reason power is being built this sprint - does not depend on the answer either way.
-
-**Why it matters.** It decides whether power is infrastructure a corp builds for itself or a commodity with a market. The first is simpler and creates sharper regional asymmetry; the second adds a firm type and a reason to build generation beyond your own needs. Cheap to answer now, and awkward once generation buildings are tuned against one assumption.
-
-- NO - power is infrastructure you build for yourself. Simplest, sharpest asymmetry, and what the design as written assumes.
-- YES, via CONTRACT - a standing supply agreement between connected corps through the existing procurement seam. Keeps power off the order book while making it sellable.
-- YES, as a market good - overturns "not a resource" and needs power to acquire a price, a reach model for trading it, and an answer to what a convoy carrying electricity means.
-
-> **Recommendation:** Build BL-708 on option 1 and leave the question open - the item is coherent without it and nothing about the fuel endpoint depends on it. If it turns out that power-poor regions feel stuck rather than challenged when watched, option 2 is the answer and the contract seam already exists to carry it. Option 3 should probably be refused: it reintroduces every question 'not a resource' was chosen to avoid.
-
-*Files: `docs/economy/PRODUCTION.md`, `docs/economy/CONTRACTS.md`, `docs/economy/LOGISTICS.md`*
-
 ---
 
 ## Resolved
@@ -1472,4 +1449,39 @@ HOW I GOT HERE, recorded because it is a repeatable mistake. I read the open que
 NOTHING IS LOST: the analysis stands and is reproduced in BL-654's own prose. The only cost was a redundant entry and a wrong first line in sprint 27's plan, both corrected.
 
 *Files: `scripts/economy.lua`, `src/world/economy_system.cpp`, `src/world/market_clearing.cpp`, `docs/economy/MARKETS.md`*
+
+### NR-761 — Can a corporation SELL power to another corporation? YES - and internationally
+*question · raised 2026-08-31 · from Sprint 27 design session on power, 2026-08-31. Ben answered how power MOVES; this is the half his answer leaves open.*
+
+Ben settled that power is "not a resource" and that it travels on the road network with a flat one-tick latency to anything connected. What that leaves open is whether power is ever SOLD.
+
+THE DESIGN AS WRITTEN SAYS NO: a corp generates for its own connected network, and the market demand power creates is the generator's FUEL purchase, not a trade in power itself. That reading is what makes "not a resource" coherent - no order book entry, no price, no convoy.
+
+IT IS ALSO A REAL CONSTRAINT ON THE PLAYER, which may be exactly right or may be too harsh. A corp with no fuel access and no generation is simply short of power, and cannot buy its way out. That is asymmetry with a cause, which GENERATION_STRATEGY.md § Asymmetry is the deliverable actively wants. But selling power is also an obvious business, and a world where nobody can is a world missing a firm type.
+
+THE SHAPE IF THE ANSWER IS YES, and it is not a market good: power is a standing relationship over a CONNECTION, not a spot trade in a fungible cargo - so the natural home is a CONTRACT (docs/economy/CONTRACTS.md, the BL-350 procurement seam) rather than the order book. A supply agreement between two corps whose networks touch, priced per tick, terminable. That keeps power off the market while making it sellable, and it reuses a seam that exists.
+
+NOT URGENT. BL-708 (power as a grid) is coherent and buildable without it, and the fuel-chain endpoint - which is the whole reason power is being built this sprint - does not depend on the answer either way.
+
+**Why it matters.** It decides whether power is infrastructure a corp builds for itself or a commodity with a market. The first is simpler and creates sharper regional asymmetry; the second adds a firm type and a reason to build generation beyond your own needs. Cheap to answer now, and awkward once generation buildings are tuned against one assumption.
+
+- NO - power is infrastructure you build for yourself. Simplest, sharpest asymmetry, and what the design as written assumes.
+- YES, via CONTRACT - a standing supply agreement between connected corps through the existing procurement seam. Keeps power off the order book while making it sellable.
+- YES, as a market good - overturns "not a resource" and needs power to acquire a price, a reach model for trading it, and an answer to what a convoy carrying electricity means.
+
+> **Recommendation:** Build BL-708 on option 1 and leave the question open - the item is coherent without it and nothing about the fuel endpoint depends on it. If it turns out that power-poor regions feel stuck rather than challenged when watched, option 2 is the answer and the contract seam already exists to carry it. Option 3 should probably be refused: it reintroduces every question 'not a resource' was chosen to avoid.
+
+> **RESOLVED.** ANSWERED by Ben the same day, and it overturned the design I had just written.
+
+"I believe we need to distribute power across all industry. This means that it has to be a bought good when it is taken as upkeep. Therefore corporations can buy power from each other, and background companies can produce power with a profit." And, immediately after: "Even internationally."
+
+SO IT IS OPTION 3, WHICH I HAD RECOMMENDED REFUSING - and the recommendation was wrong. I argued option 3 "reintroduces every question not-a-resource was chosen to avoid". It does not, because the thing that made power awkward as a good was never the PRICE, it was the CONVOY. Power keeps its grid transmission - roads, flat one-tick latency, connection-gated matching - and simply also has a price. Movement and market are separate questions, and only the movement needed to be special.
+
+WHY BENS VERSION IS BETTER, and it is not close. As private infrastructure, power demand is bounded by each corp own generation - a small closed loop that adds one sink per generator. As a bought good, EVERY BUILDING ON THE MAP IS A BUYER, which is the economy-scaled sink demand_census says is missing. It also makes generation a BUSINESS rather than a cost centre, so background firms build power plants at a profit and the supply is induced by price the way every other goods is. And it removes the harsh consequence of the private reading, where a corp with no fuel access was simply stuck rather than able to buy.
+
+INTERNATIONAL TRADE NEEDS NO NEW MACHINERY. MARKETS.md section Tariffs already resolves a market to a jurisdiction and charges the enacted import duty on any matched trade whose buyer is domiciled outside it. Cross-border power is an ordinary cross-border sale.
+
+AND IT REACHES THE ERA CATASTROPHE. ERAS.md section The point of an Era scores Era 1 on Alarm, and its danger table names cross-border trade as the cheapest Alarm suppressant in the game, with Autarkic Substitution as the herring that cuts those ties. A nation whose lights depend on a neighbours generation has a reason not to escalate; severing that tie is a visible causal step toward the rupture. Power now feeds Trade and Conflict at once, which is the SYSTEMS.md test and very few systems pass it on both sides.
+
+*Files: `docs/economy/PRODUCTION.md`, `docs/economy/CONTRACTS.md`, `docs/economy/LOGISTICS.md`*
 

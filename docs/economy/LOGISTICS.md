@@ -123,6 +123,13 @@ Three properties, and each one reuses something already here:
    cut that strands a market from its generation is now a cut that turns the lights off there —
    Conflict reaching Trade through infrastructure rather than through a special case.
 
+**Connection gates the TRADE, not only the draw** (Ben, 2026-08-31). Power is bought and sold
+(`PRODUCTION.md` § Power), so what this network decides is **who may match whom**: a buyer can only
+clear against a generator its roads reach. Power therefore has a price that is **regional by
+construction** — a well-connected region with generation is cheap, a stranded one is expensive or
+dark — without any rule naming a region. It is the first good whose **movement and market are
+separate questions**: a price, and no convoy.
+
 The design consequence worth stating: **roads become dual-purpose.** A road built for convoys also
 carries power, so the network's value is no longer only throughput, and a region's power is a fact
 about its *connectedness* rather than about its ground. That is a supply asymmetry with a cause a
