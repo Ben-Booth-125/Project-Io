@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*114 entries — 108 open, 6 resolved.*
+*116 entries — 110 open, 6 resolved.*
 
 ---
 
@@ -1314,6 +1314,70 @@ THE DANGEROUS PROPERTY is that the failure is INVISIBLE AND GREEN. A harness mea
 > **Recommendation:** Option 1 is the real answer and it is the shape `no_prehistory()` already establishes - a shared helper in harness_params.hpp that harnesses call instead of hand-rolling their world setup. But it moves every golden in the project at once, so it wants to be its own item with Ben's timing, not a thing this batch absorbs. Option 3 first would tell us how big option 1 actually is, and is cheap: the probe to do it now exists.
 
 *Files: `tools/verify/harness_params.hpp`, `tools/verify/ai_skill_harness.cpp`, `tools/verify/demand_census.cpp`, `src/core/app.cpp`, `src/world/hard_coded_world.cpp`*
+
+### NR-763 — Self-sufficiency is the NORM, not the exception - chain closure saturates and destroys the endowment asymmetry generation produces
+*question · raised 2026-08-31 · from BL-706 (chain completeness read), first run, 2026-08-31. Measured by the slice agent, verified independently in the main session.*
+
+The instrument worked on its first run and its first finding contradicts the design assumption it was built to test.
+
+MEASURED - fraction of the band's terminal chains a market can source within reach:
+
+  ANCIENT (14 markets, 15 terminal goods)
+    min 0.400  p25 0.867  median 0.933  p75 0.933  max 1.000   sd 0.186
+    [0.4,0.5)  2 markets
+    [0.8,0.9)  3 markets
+    [0.9,1.0]  9 markets     <- and NOTHING between 0.5 and 0.8
+
+  INDUSTRIAL (9 markets, 11 terminal goods)
+    min 0.636  median 1.000  max 1.000   sd 0.134
+    SEVEN OF NINE markets close EVERY chain in the band.
+
+MARKETS.md property 5 expects self-sufficiency to be "possible, uncommon, and unevenly distributed". It is currently the NORM, most sharply in the industrial band - which is the band the 1960s start uses.
+
+THIS IS THE FLAT FAILURE MODE WE NAMED AS THE ENEMY, and it is now measured rather than feared. GENERATION_STRATEGY.md § Asymmetry is the deliverable: "every region can close its own chains -> no region needs another -> trade has no reason to exist." Nine of fourteen ancient markets and seven of nine industrial ones are effectively interchangeable.
+
+THE MECHANISM IS THE INTERESTING PART, and it is visible in the per-market table. The generator DOES produce real raw asymmetry - market 48704 reaches 7 distinct deposited resources, 48703 reaches 16, 48698 reaches 17. But CHAIN CLOSURE SATURATES:
+
+    market 48704:  7 raws -> closes  6 of 15
+    market 48706:  7 raws -> closes  6 of 15
+    market 48705: 12 raws -> closes 12 of 15
+    market 48699: 13 raws -> closes 14 of 15
+    market 48703: 16 raws -> closes 14 of 15
+    market 48698: 17 raws -> closes 15 of 15
+
+Twelve raws already closes twelve chains; going from 13 to 17 buys ONE more. So asymmetry in INPUTS does not survive into asymmetry in CAPABILITY - the middle of the distribution collapses upward and the world becomes bimodal: a large interchangeable cluster plus two genuinely poor outliers.
+
+That is a threshold effect, not a tuning miss, and it will not be fixed by varying deposits more.
+
+**Why it matters.** Trade is one of the game's two pillars and it needs a reason to exist. If most markets can close most chains locally, the reason is thin - and the 1960s start, which is what the prototype opens on, is the worse of the two bands. It also means BL-706's spread is currently reporting a world that fails the design's own intent, which is exactly what the instrument was built to be able to say.
+
+- DEEPER OR NARROWER CHAINS. If closing a chain needed more distinct inputs, fewer markets would clear the threshold and the middle would spread out. Touches the recipe graph, and it is the change that attacks the saturation directly.
+- A TIGHTER REACH BUDGET. `economy.construction.max_logistics_reach = 24.0` is generous - market 48706's catchment is 493 tiles and ALL 493 are in reach. Cutting it makes geography bite and costs nothing but a constant.
+- RARER INPUTS. Make some raws genuinely scarce rather than merely varied, so a market missing one is missing it badly. Touches planetology's endowment.
+- ACCEPT IT. Self-sufficiency being common is a legitimate world if trade comes from something other than necessity - price, scale, or specialisation rather than capability.
+
+> **Recommendation:** Option 2 first, because it is one authored constant and it is measurable the same day: re-run BL-706's spread at a few reach budgets and see whether the middle of the distribution opens up. If it does not, the saturation is structural and option 1 is the real answer. I would not reach for option 3 - varying deposits more is exactly what the measurement says does not help, since the generator already produces a 7-to-17 range that closure flattens.
+
+*Files: `tools/verify/demand_census.cpp`, `scripts/economy.lua`, `docs/generation/GENERATION_STRATEGY.md`, `docs/economy/MARKETS.md`*
+
+### NR-764 — Two definitions baked into the completeness instrument that other work will tune against
+*decision taken on your behalf · raised 2026-08-31 · from BL-706, flagged by the slice agent for Ben's eye.*
+
+BL-706 had to define two things no doc owned. Both are reasonable, both were composed from existing rules rather than invented, and both are now baked into an instrument that later work will be tuned against - which is why they are flagged rather than left in a code comment.
+
+1. "WITHIN REACH" FOR A MARKET. Resolved as the composition of two rules that already exist: `market_for_tile` (which already partitions every tile into exactly one market catchment, routing to the nearest centre_tile on multi-market bodies) plus `place_building_allowed`'s own reach clause against the AUTHORED constant `economy.construction.max_logistics_reach = 24.0`. So a tile counts for a market when it clears against that market AND a corporation could legally site a building on it.
+
+   The alternative the agent rejected - "connected to an anchor at any cost" - would have been far too permissive. Grain was market catchment rather than body because every market in the shipped world is on the same body (15124), so body grain yields exactly ONE data point and no spread at all.
+
+2. THE BACKGROUND-INDUSTRIAL BASKET IS EXCLUDED from the terminal set. MARKETS.md property 4 names three terminal sinks and it is not one of them, and the register already labels it a STOPGAP. Counting a world-scale constant basket as a chain endpoint would put identical goods in every market's denominator for a reason that is not a fact about the world.
+
+BOTH ARE CONTAINED. If Ben wants province grain instead of market catchment, or reach measured against a different budget, the change is confined to `measure_completeness` and `tile_in_reach`.
+
+**Why it matters.** NR-763 proposes tuning the reach budget on the strength of this instrument's reading. If the reach definition is wrong, that tuning would be chasing an artifact - so the definition wants an eye on it before it is used as a lever, not after.
+
+> **Recommendation:** Both calls look right to me and I would keep them. The reach one is the load-bearing half: it is composed from the game's own placement rule against an authored constant, so the instrument measures what a corporation could actually DO rather than an abstract connectivity. That is the property that makes NR-763's option 2 a legitimate experiment rather than a circular one.
+
+*Files: `tools/verify/demand_census.cpp`, `docs/economy/LOGISTICS.md`, `docs/economy/MARKETS.md`*
 
 ---
 
