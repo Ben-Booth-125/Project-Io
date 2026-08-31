@@ -78,6 +78,12 @@
 //       run-dependent noise. Run it twice and byte-compare.
 //   R4  Reproduces the hand-built finding at the 0 CE band: the produced-with-
 //       no-sink set. A regression check on the instrument.
+//   R5  BL-706. Per MARKET: the fraction of the band's TERMINAL chains that can
+//       be sourced WITHIN REACH of it, and — the actual deliverable —  the
+//       SPREAD of that fraction across the world. GENERATION_STRATEGY.md
+//       § Asymmetry is the deliverable. REPORTED, with one loose assertion on
+//       the spread and none on any market's value. See the block above
+//       `market_completeness` for the grain and the reach definition.
 //
 // Usage:  demand_census [--seed N] [--ticks N] [--fast] [--band ancient|industrial|both]
 //   --fast  zero the pre-epoch year-tick sim. Cheaper, and NOT the shipped
@@ -94,6 +100,7 @@
 #include "world/corporation_generation.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/logistics.hpp"
 #include "world/market_clearing.hpp"
 #include "world/nation_step.hpp"
 #include "world/recipe_registry.hpp"
@@ -113,6 +120,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -569,6 +577,299 @@ classify(const world& w, const recipe_registry& reg)
 }
 
 // ---------------------------------------------------------------------------
+// R5 — CHAIN COMPLETENESS, AND ITS SPREAD (BL-706)
+// ---------------------------------------------------------------------------
+// WHY IT LIVES HERE and not in a harness of its own. The census already walks
+// every market and every resource per band, and already knows which sinks are
+// TERMINAL (MARKETS.md § Three properties, 4: a household basket, an upkeep
+// draw, a construction cost — never a processor, which is a pass-through and a
+// chain that ends in one ends nowhere). Chain completeness is that same
+// classification asked per MARKET rather than per world, so it costs one tile
+// walk and inherits everything above it, before/after discipline included.
+//
+// WHAT IT MEASURES. GENERATION_STRATEGY.md § Asymmetry is the deliverable: "for
+// a market or region, the fraction of the chains terminating there that can be
+// sourced within reach". Generation is answerable for the DISTRIBUTION of that
+// number across the world — wide, with real tails at both ends — and answerable
+// for nothing at all about any individual market's value.
+//
+// THE GRAIN IS THE MARKET, because a market is where a chain's demand actually
+// lands. `market_for_tile` already partitions every tile into exactly one market
+// catchment (a body with several markets routes each tile to the nearest centre,
+// components.hpp § market_component), so a catchment is a real, disjoint,
+// GENERATED region rather than one invented for this measurement. Body grain
+// would fold a body's several markets into one figure and lose the intra-body
+// spread, which is the half a player actually stands in; province grain would
+// measure a partition no chain clears against.
+//
+// "WITHIN REACH" IS THE GAME'S OWN RULE, NOT A SECOND METRIC. A tile counts for
+// a market when (a) it clears against that market and (b) a corporation could
+// legally site a building on it — `place_building_allowed`'s reach clause
+// (placement_rules.cpp), mirrored exactly: a supply anchor always qualifies,
+// otherwise `tile_reach_cost` must be within the AUTHORED budget
+// `economy.construction.max_logistics_reach` (24.0 as shipped; < 0 disables the
+// rule, and then only an unreachable tile is excluded). An infinite cost — an
+// island carrying no city, a landmass cut off from the anchor network — fails
+// it, which is the point: ground nobody can supply is not supply.
+//
+// THE NUMERATOR IS STRUCTURAL, NOT OBSERVED. "Can be sourced" asks what the
+// GROUND plus the band's recipe roster permit, never what happens to stand on
+// this seed. A good is sourceable in a market when a deposit for it sits on a
+// qualifying tile, or when an era-allowed recipe makes it from goods that are —
+// computed as a monotone fixpoint over the era-masked recipe list, so a cyclic
+// roster terminates and the answer cannot depend on recipe order.
+//
+// THE DENOMINATOR IS THE BAND'S WHOLE TERMINAL SET, IDENTICAL FOR EVERY MARKET.
+// That is MARKETS.md property 5 taken at its word: terminal demand follows
+// population, population is everywhere, so every chain terminates in every
+// market. Scoring against each market's OBSERVED terminal demand instead would
+// let an empty market read 1.00 for wanting nothing, which measures settlement
+// rather than endowment. The `heads` column carries the settlement fact
+// separately, beside the score, so the two are never confused.
+//
+// The BACKGROUND-INDUSTRIAL basket is deliberately NOT terminal here. Property 4
+// names three terminal sinks and it is not one of them, and the channel register
+// above labels it a stopgap; counting a world-scale constant basket as a chain
+// endpoint would put identical goods in every market's denominator for a reason
+// that is not a fact about the world.
+//
+// IT REPORTS (R2, unchanged). No row below fails on a market being poor or rich.
+
+/// One market's reading. Sorted by market id; every field is an integer count or
+/// a ratio of two, so nothing here depends on container layout.
+struct market_completeness
+{
+    entity_id market = null_entity;
+    entity_id body   = null_entity;
+    int       catchment_tiles = 0;   ///< tiles clearing against this market
+    int       in_reach_tiles  = 0;   ///< of those, tiles a building could legally take
+    long long heads           = 0;   ///< population scale in the catchment (context, not score)
+    int       raws_in_reach   = 0;   ///< distinct resources with a deposit on a qualifying tile
+    int       terminals_closed = 0;
+    int       terminals_total  = 0;
+    double    completeness     = 0.0;
+};
+
+/// The spread — the deliverable. Percentiles by nearest rank over the sorted
+/// sample, so no interpolation constant has to be defended.
+struct spread_stats
+{
+    int    n = 0;
+    double min = 0.0, p25 = 0.0, median = 0.0, p75 = 0.0, max = 0.0;
+    double mean = 0.0, sd = 0.0, range = 0.0;
+    int    distinct = 0;            ///< distinct scores, rounded to 1e-6
+    std::array<int, 10> hist{};     ///< deciles of [0, 1]
+};
+
+/// MARKETS.md property 4's terminal set, read off the classification the census
+/// already builds. Processing is excluded by construction — it is a pass-through.
+std::vector<std::size_t>
+terminal_resources(const std::array<classification, resource_count>& cls)
+{
+    std::vector<std::size_t> out;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const classification& c = cls[r];
+        if (c.sink_household || c.sink_construct || c.sink_industry || c.sink_unit_upkeep)
+            out.push_back(r);
+    }
+    return out;
+}
+
+/// `place_building_allowed`'s reach clause, restated for a read-only question.
+/// Requires `body_reach_field` to have been built for the tile's body — the
+/// caller does that once per body before the walk.
+bool tile_in_reach(const world& w, entity_id tile, float max_reach)
+{
+    if (is_supply_anchor(w, tile))
+        return true;                       // the anchor exemption, as placement has it
+    const float reach = tile_reach_cost(w, tile);
+    if (reach < 0.0f)
+        return true;                       // "not computed" is permissive, as placement has it
+    return reach <= max_reach;             // infinity fails this, which is the point
+}
+
+std::vector<market_completeness>
+measure_completeness(world& w, const recipe_registry& reg,
+                     const std::array<classification, resource_count>& cls,
+                     std::vector<std::string>& terminal_names_out)
+{
+    const std::vector<std::size_t> terminals = terminal_resources(cls);
+    for (const std::size_t r : terminals)
+        terminal_names_out.emplace_back(rname(r));
+
+    const std::vector<entity_id> mids = sorted_keys_markets(w);
+    std::vector<market_completeness> rows(mids.size());
+    std::unordered_map<entity_id, std::size_t> slot;
+    for (std::size_t i = 0; i < mids.size(); ++i)
+    {
+        rows[i].market          = mids[i];
+        rows[i].body            = w.markets.at(mids[i]).body;
+        rows[i].terminals_total = static_cast<int>(terminals.size());
+        slot[mids[i]]           = i;
+    }
+
+    // The reach fields, one multi-source Dijkstra per body carrying a market,
+    // seeded in ascending body id. `body_reach_field` is itself deterministic
+    // (seeded from the anchor set in raster order); the order here only fixes
+    // which bodies get a field, and every one of them does.
+    {
+        std::vector<entity_id> bodies;
+        bodies.reserve(mids.size());
+        for (const entity_id mid : mids)
+            bodies.push_back(w.markets.at(mid).body);
+        std::sort(bodies.begin(), bodies.end());
+        bodies.erase(std::unique(bodies.begin(), bodies.end()), bodies.end());
+        for (const entity_id b : bodies)
+            (void)body_reach_field(w, b);
+    }
+
+    const float max_reach = reg.construction().max_logistics_reach;
+
+    // The tile walk. `w.tiles` is unordered, so every accumulation here is an
+    // integer increment or a boolean OR — both commutative, neither able to
+    // vary with map layout (the R3 rule this file already runs on).
+    std::vector<std::array<bool, resource_count>> deposit(mids.size());
+    for (auto& row : deposit)
+        row.fill(false);
+
+    for (const auto& [tid, t] : w.tiles)
+    {
+        const entity_id mid = market_for_tile(w, tid);
+        const auto it = slot.find(mid);
+        if (it == slot.end())
+            continue;                       // a body with no market: nothing clears here
+        const std::size_t s = it->second;
+        ++rows[s].catchment_tiles;
+        if (max_reach >= 0.0f && !tile_in_reach(w, tid, max_reach))
+            continue;
+        if (max_reach < 0.0f)
+        {
+            // Rule disabled: only genuinely unreachable ground is excluded.
+            const float reach = tile_reach_cost(w, tid);
+            if (reach >= 0.0f && !std::isfinite(reach) && !is_supply_anchor(w, tid))
+                continue;
+        }
+        ++rows[s].in_reach_tiles;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (t.resource_deposit[r] > 0.0f)
+                deposit[s][r] = true;
+    }
+
+    // Settlement, as context beside the score — never inside it.
+    for (const auto& [cid, pcc] : w.population_centres)
+    {
+        if (pcc.razed)
+            continue;
+        const auto tit = w.population_centre_tile.find(cid);
+        if (tit == w.population_centre_tile.end())
+            continue;
+        const auto it = slot.find(market_for_tile(w, tit->second));
+        if (it == slot.end())
+            continue;
+        rows[it->second].heads += static_cast<long long>(pcc.scale);
+    }
+
+    // The closure. Monotone: a good only ever enters the set, so the loop
+    // terminates whatever the roster's shape, and the fixpoint is independent of
+    // the order the recipes are visited in.
+    const bool processing_available = reg.building_available(building_type::processing_facility);
+    const int  n_allowed = processing_available
+                         ? reg.recipe_count(building_type::processing_facility) : 0;
+
+    for (std::size_t s = 0; s < rows.size(); ++s)
+    {
+        std::array<bool, resource_count> have = deposit[s];
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (have[r])
+                ++rows[s].raws_in_reach;
+
+        bool changed = true;
+        while (changed)
+        {
+            changed = false;
+            for (int i = 0; i < n_allowed; ++i)
+            {
+                const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+                bool inputs_ok = true;
+                for (std::size_t r = 0; r < resource_count && inputs_ok; ++r)
+                    if (rc.inputs[r] > 0.0f && !have[r])
+                        inputs_ok = false;
+                if (!inputs_ok)
+                    continue;
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    if (rc.outputs[r] > 0.0f && !have[r])
+                    {
+                        have[r] = true;
+                        changed = true;
+                    }
+            }
+        }
+
+        for (const std::size_t r : terminals)
+            if (have[r])
+                ++rows[s].terminals_closed;
+        rows[s].completeness = (rows[s].terminals_total > 0)
+                             ? static_cast<double>(rows[s].terminals_closed)
+                               / static_cast<double>(rows[s].terminals_total)
+                             : 0.0;
+    }
+
+    return rows;
+}
+
+spread_stats summarise_spread(const std::vector<market_completeness>& rows)
+{
+    spread_stats st;
+    st.n = static_cast<int>(rows.size());
+    if (st.n == 0)
+        return st;
+
+    std::vector<double> v;
+    v.reserve(rows.size());
+    for (const market_completeness& r : rows)
+        v.push_back(r.completeness);
+    std::sort(v.begin(), v.end());
+
+    auto rank = [&v](double q) {
+        std::size_t i = static_cast<std::size_t>(q * static_cast<double>(v.size() - 1) + 0.5);
+        if (i >= v.size())
+            i = v.size() - 1;
+        return v[i];
+    };
+
+    st.min    = v.front();
+    st.max    = v.back();
+    st.range  = st.max - st.min;
+    st.p25    = rank(0.25);
+    st.median = rank(0.50);
+    st.p75    = rank(0.75);
+
+    double sum = 0.0;
+    for (const double x : v)
+        sum += x;
+    st.mean = sum / static_cast<double>(v.size());
+    double ss = 0.0;
+    for (const double x : v)
+        ss += (x - st.mean) * (x - st.mean);
+    st.sd = std::sqrt(ss / static_cast<double>(v.size()));
+
+    st.distinct = 1;
+    for (std::size_t i = 1; i < v.size(); ++i)
+        if (std::fabs(v[i] - v[i - 1]) > 1e-6)
+            ++st.distinct;
+
+    for (const double x : v)
+    {
+        int b = static_cast<int>(x * 10.0);
+        if (b < 0) b = 0;
+        if (b > 9) b = 9;
+        ++st.hist[static_cast<std::size_t>(b)];
+    }
+    return st;
+}
+
+// ---------------------------------------------------------------------------
 // One band
 // ---------------------------------------------------------------------------
 
@@ -622,6 +923,13 @@ struct band_result
     std::array<int, resource_count> markets_at_floor{};  ///< of those, how many sit AT the floor
     std::array<int, resource_count> markets_at_ceil{};   ///< of those, how many sit AT the ceiling
     float price_floor_mult = 0.0f, price_ceil_mult = 0.0f;  ///< echoed from registry, for the header
+
+    // BL-706 R5 — chain completeness per market, and the spread of it. See the
+    // block above `market_completeness` for the grain and the reach definition.
+    std::vector<market_completeness> completeness;
+    std::vector<std::string>         terminal_goods;
+    spread_stats                     spread;
+    float                            reach_budget = -1.0f;  ///< echoed from the registry
 };
 
 band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
@@ -897,6 +1205,13 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     std::sort(out.basket_unmakeable.begin(), out.basket_unmakeable.end());
     std::sort(out.basket_unpriced.begin(), out.basket_unpriced.end());
 
+    // BL-706 R5. Last, and deliberately so: it builds the body reach fields (a
+    // cache on `world`) and reads the classification above. Nothing after it
+    // touches the world, so the Dijkstra it triggers perturbs no measurement.
+    out.reach_budget = reg.construction().max_logistics_reach;
+    out.completeness = measure_completeness(w, reg, out.cls, out.terminal_goods);
+    out.spread       = summarise_spread(out.completeness);
+
     return out;
 }
 
@@ -1026,6 +1341,50 @@ void print_band(const band_result& b)
     if (total_of(b.construction) > 0.0) ++live;
     if (total_of(b.processing)   > 0.0) ++live;
     std::printf("  live injecting passes this band  : %d of 5 measured\n", live);
+
+    // --- BL-706 R5: chain completeness, and the spread ----------------------
+    std::printf("\n  --- R5  CHAIN COMPLETENESS PER MARKET, and its SPREAD (BL-706) ---\n");
+    std::printf("  Fraction of the band's TERMINAL chains a market could source WITHIN REACH.\n"
+                "  Grain: the market catchment (market_for_tile). Reach: place_building_allowed's\n"
+                "  own clause against economy.construction.max_logistics_reach = %.1f.\n",
+                static_cast<double>(b.reach_budget));
+    std::printf("  Structural, not observed: what the ground and the band's recipes PERMIT.\n");
+    std::printf("  The SPREAD is the deliverable. No row here fails on a market being poor.\n");
+    std::printf("  terminal set (%zu goods, the denominator for EVERY market): %s\n",
+                b.terminal_goods.size(), join(b.terminal_goods).c_str());
+
+    std::printf("\n  %-10s %-8s | %9s %9s %9s | %6s | %6s %6s | %s\n",
+                "market", "body", "catchment", "in reach", "heads",
+                "raws", "closed", "of", "completeness");
+    std::printf("  %-10s %-8s | %9s %9s %9s | %6s | %6s %6s | %s\n",
+                "----------", "--------", "---------", "---------", "---------",
+                "------", "------", "------", "------------");
+    for (const market_completeness& m : b.completeness)
+        std::printf("  %-10llu %-8llu | %9d %9d %9lld | %6d | %6d %6d | %.4f\n",
+                    static_cast<unsigned long long>(m.market),
+                    static_cast<unsigned long long>(m.body),
+                    m.catchment_tiles, m.in_reach_tiles, m.heads,
+                    m.raws_in_reach, m.terminals_closed, m.terminals_total,
+                    m.completeness);
+
+    const spread_stats& s = b.spread;
+    std::printf("\n  SPREAD over %d markets: min %.4f  p25 %.4f  median %.4f  p75 %.4f  max %.4f\n",
+                s.n, s.min, s.p25, s.median, s.p75, s.max);
+    std::printf("           range %.4f   mean %.4f   sd %.4f   distinct scores %d of %d markets\n",
+                s.range, s.mean, s.sd, s.distinct, s.n);
+    std::printf("  histogram (decile of completeness -> markets):\n");
+    for (std::size_t i = 0; i < s.hist.size(); ++i)
+    {
+        std::printf("    [%.1f,%.1f)%s %4d  ", static_cast<double>(i) / 10.0,
+                    static_cast<double>(i + 1) / 10.0, (i == 9) ? "]" : " ", s.hist[i]);
+        for (int k = 0; k < s.hist[i] && k < 60; ++k)
+            std::printf("#");
+        std::printf("\n");
+    }
+    if (s.n >= 2 && s.distinct == 1)
+        std::printf("  FLAT: every market scores identically. Generation produced no supply\n"
+                    "        asymmetry at all in this band — see GENERATION_STRATEGY.md\n"
+                    "        § Asymmetry is the deliverable. Reported, not asserted.\n");
 }
 
 } // namespace
@@ -1177,6 +1536,53 @@ int main(int argc, char** argv)
                       "%s: the instrument is non-vacuous — some pass injected some demand",
                       b.band.c_str());
         check(any_demand > 0.0, "R2", msg);
+
+        // --- BL-706 R5 ------------------------------------------------------
+        // Anti-vacuity on the NEW instrument, in exactly the shape of the row
+        // above it: a completeness reading over zero markets, or against an
+        // empty terminal set, is a broken instrument reporting 0.00 everywhere
+        // and diagnosing nothing. This is a check on the census, NOT a target
+        // on the world — the world's own value is reported and never asserted.
+        std::snprintf(msg, sizeof msg,
+                      "%s: the completeness instrument is non-vacuous — %zu markets read "
+                      "against a terminal set of %zu goods",
+                      b.band.c_str(), b.completeness.size(), b.terminal_goods.size());
+        check(!b.completeness.empty() && !b.terminal_goods.empty(), "R5", msg);
+
+        // Internal consistency, R2's kind: a market cannot close more chains
+        // than the band has, and the ratio has to be the two counts it prints.
+        bool ratio_ok = true;
+        for (const market_completeness& m : b.completeness)
+        {
+            if (m.terminals_closed < 0 || m.terminals_closed > m.terminals_total ||
+                m.in_reach_tiles > m.catchment_tiles)
+                ratio_ok = false;
+            const double expect = (m.terminals_total > 0)
+                                ? static_cast<double>(m.terminals_closed)
+                                  / static_cast<double>(m.terminals_total) : 0.0;
+            if (std::fabs(expect - m.completeness) > 1e-9)
+                ratio_ok = false;
+        }
+        std::snprintf(msg, sizeof msg,
+                      "%s: every completeness row reconciles (closed <= total, in-reach <= "
+                      "catchment, ratio = the printed counts)", b.band.c_str());
+        check(ratio_ok, "R5", msg);
+
+        // THE ONE SPREAD ASSERTION, and it is deliberately the loosest one that
+        // still means something. It does NOT say a market must be rich or poor,
+        // and it sets no floor on any market's value — GENERATION_STRATEGY.md
+        // § Asymmetry is the deliverable is explicit that generation owes the
+        // spread and nothing about an individual region. What it says is that a
+        // world in which EVERY market scores the identical number carries no
+        // supply asymmetry at all, and that is a generation defect however fine
+        // each market looks alone. Two distinct values clear it; the shipped
+        // world is far above that, so this catches a flattening regression
+        // rather than grading the current tuning.
+        std::snprintf(msg, sizeof msg,
+                      "%s: the world is not FLAT — markets do not all score identically "
+                      "(%d distinct of %d; range %.4f). A floor on the SPREAD only",
+                      b.band.c_str(), b.spread.distinct, b.spread.n, b.spread.range);
+        check(b.spread.n < 2 || b.spread.distinct >= 2, "R5", msg);
     }
 
     // R4 — the hand-built finding, at the ancient band only.
