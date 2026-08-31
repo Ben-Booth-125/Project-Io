@@ -4,6 +4,8 @@
 #include "corp_command.hpp"
 #include "entity.hpp"
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <iosfwd>
 #include <string>
@@ -21,6 +23,52 @@ struct economy_report;
 // run_economy_step after the BL-079 reflex tier (tier 0). Deterministic by
 // construction: sorted iteration, lowest-id tie-breaks, and the only
 // "randomness" is a per-corp hash used as a fixed personality jitter.
+
+// ---------------------------------------------------------------------------
+// Standing — what a corporation's position is measured in (BL-700)
+// ---------------------------------------------------------------------------
+// AI_OPPONENT.md § "Standing — what the margin is measured in". Ben, 2026-08-31:
+// a corporation's standing is "an aggregate of net worth, research, military
+// strength… maybe others too".
+//
+// Balance alone is the wrong measure and would misread the game constantly — a
+// corp that has just spent its treasury on a smelter is not behind, and a corp
+// hoarding cash while its rivals arm is not ahead. Everything in the codebase
+// measures balance today; this is the one quantity that does not.
+//
+// NOT `standing.hpp`'s `corp_standing`, and the two are worth telling apart
+// because the word is overloaded. That one is a DISCLOSURE-GATED PROFILE for
+// the Corporations panel — reach, capital, market share, each shown or withheld
+// by the observed firm's own filing status. This one is a single scalar the
+// scorer compares corps by, computed from full world state with no visibility
+// filter at all, and it is deliberately NOT player-facing: a coalition scores
+// against it, and what the player may READ about a rival is that other type's
+// question. Hence `standing_index` rather than a second `corp_standing`.
+
+/// The components of the composite standing index.
+///
+/// APPEND-ONLY, and that is the point of the enum rather than three named
+/// fields: Ben's wording left the list deliberately open, so a FOURTH COMPONENT
+/// MUST BE AN ADDITION, NOT A REWRITE. Adding one is four edits and no
+/// restructuring — an enumerator here (appended, never inserted), one more
+/// initialiser in `corp_ai_params::standing_weights`, one `case` in
+/// `corp_ai.cpp`'s measurement switch, and a label in
+/// `standing_component_name`. Nothing sums the components by hand: the weighted
+/// total is a loop over this enum, so no arithmetic anywhere has to change.
+enum class standing_component : uint8_t
+{
+    economic = 0, ///< Net worth: cash + the assessed value of buildings and held stock.
+    research,     ///< The corp's accumulated `science` (reached, never spent).
+    military,     ///< Summed `unit_strength` over the corp's fielded units.
+};
+
+/// One past the highest component — the count every array here is sized by.
+/// Bound to the append-only rule above: appending a component moves this with it.
+inline constexpr std::size_t standing_component_count =
+    static_cast<std::size_t>(standing_component::military) + 1;
+
+/// Canonical prose label for a component ("economic", "research", "military").
+const char* standing_component_name(standing_component c);
 
 /// Tunables for the stage-A scorer. Defaults are the accepted-design values;
 /// a harness may tighten them to force behaviour into few ticks.
@@ -115,6 +163,57 @@ struct corp_ai_params
     /// ticks for "one clearing pass". 1 by default.
     int forecast_clearing_ticks = 1;
 
+    // --- Standing (BL-700). WEIGHTS ARE DATA, SO TUNING IS A DATA CHANGE ------
+    //
+    // Indexed by `standing_component`, and the array (rather than three named
+    // floats) is what keeps a fourth component an addition: one more
+    // initialiser here and the weighted sum in corp_ai.cpp picks it up
+    // untouched.
+    //
+    // EVERY WEIGHT IS "CREDITS PER UNIT OF THIS COMPONENT", so the composite is
+    // denominated in credits and stays legible: a corp's standing reads as a
+    // sum of money it holds, money it has spent reaching a research level, and
+    // money it has spent putting an army in the field. Three components in
+    // three unrelated units cannot be added without SOME conversion, and a
+    // conversion nobody can state is a magic number; this one anyone can check.
+    //
+    // The defaults below are DERIVED FIRST CUTS, not tuned values — each is an
+    // anchor read off the shipped `scripts/economy.lua`, and each is stated so
+    // it can be argued with. None has been calibrated against play; the
+    // coalition layer that scores against this composite is the thing that will
+    // want them revisited.
+    std::array<float, standing_component_count> standing_weights = {
+        // ECONOMIC — 1.0. Net worth is already in credits; it is the unit the
+        // other two convert INTO, so this weight is 1 by definition and moving
+        // it is really a rescaling of the other two.
+        1.0f,
+        // RESEARCH — 25 credits per science point. A research_institute
+        // produces exactly 1.0 science per econ tick
+        // (`economy.military.science_per_research_institute_tick`) and costs
+        // 15 maintenance + 10 wages per tick to run, so 25 credits is what a
+        // science point costs to make. Marginal production cost, not a market
+        // price: `science` has no market slot at all, by design — it is
+        // stockpiled, market-invisible and never decays.
+        25.0f,
+        // MILITARY — 0.02 credits per point of `unit_strength`. The anchor is
+        // the replacement cost of a fielded regiment: `hire_unit` raises
+        // `hire_batch_manpower` (50) heads for `hire_base_cost` +
+        // `hire_cost_per_power` x the row's power_mod, and `unit_strength`
+        // scores a fully-supplied unit at count x quality x 100. A Levy Spear
+        // costs 40 credits and stands at 5,000 (0.008 cr/point); a Rifle
+        // Regiment costs 230 and stands at 6,900 (0.033). 0.02 sits between
+        // them.
+        //
+        // A DELIBERATE UNDERSTATEMENT worth flagging rather than hiding: this
+        // prices an army at what it cost to raise, which is not what it is
+        // worth to the corp holding it. On the defaults, three regiments add
+        // roughly 300 credits to a standing whose economic term runs to five
+        // figures — so military barely registers today. That is a tuning
+        // question for whoever scores coalitions against this, and the reason
+        // the number lives here rather than in the code.
+        0.02f,
+    };
+
     /// Projected supply/demand ratio at which a build's score starts to taper
     /// (>1.0 = the forecast expects the market to be adequately served) and
     /// the ratio at which it is vetoed outright (a hard glut). Linear taper
@@ -122,6 +221,55 @@ struct corp_ai_params
     float glut_taper_ratio = 1.0f;
     float glut_veto_ratio  = 2.0f;
 };
+
+/// One corporation's standing, component by component plus the weighted total.
+///
+/// The components are kept ALONGSIDE the total rather than collapsed into it,
+/// and that is not convenience: a coalition that forms against a leader has to
+/// be able to say WHY it formed, and "ahead on military" is a different
+/// statement from "ahead on net worth" even when the totals match. It is also
+/// what makes the weights auditable — a reader can recompute the total.
+struct standing_index
+{
+    /// Raw, UNWEIGHTED component values, indexed by `standing_component`.
+    /// Economic is in credits, research in science points, military in
+    /// `unit_strength` (the x100 fixed point).
+    std::array<float, standing_component_count> component{};
+
+    /// Sum of `component[i] * p.standing_weights[i]`, in credits.
+    float total = 0.0f;
+};
+
+/// The composite standing of `corp` (BL-700) — AI_OPPONENT.md § "Standing".
+/// An unknown corp stands at zero on every component; this never throws.
+///
+/// READ POINT — BINDING, and the reason this is a free function over a const
+/// world rather than something the scorer computes inline.
+///
+/// Standing must be read at the ECON-TICK BOUNDARY: after `apply_budget` has
+/// written the closing balances and `clear_markets` has resolved the prices
+/// that value held stock, and BEFORE any corp's strategic evaluation mutates
+/// the world. `run_corp_strategic_step` walks corps in SORTED ID ORDER and
+/// applies each one's commands as it goes, so a standing read from inside that
+/// walk would answer differently for the first corp than for the last — the
+/// evaluation cadence would silently become the tiebreak of every comparison
+/// built on it, which is exactly the class of thing that makes a deterministic
+/// simulation replay differently for a reason nobody can see. A consumer that
+/// needs the whole field's standings must therefore SNAPSHOT them once at the
+/// boundary and score against the snapshot; it must never call this per corp
+/// from inside the walk.
+///
+/// DETERMINISTIC BY CONSTRUCTION, in three separate places:
+///   * cash and building value walk `corporation_component::assets`, a vector
+///     in authored order;
+///   * held stock walks `world::corp_body_pools`, a std::map, so key-ordered;
+///   * the military term accumulates `unit_strength` as an INTEGER over
+///     `world::units`, which is an unordered_map — a float accumulator there
+///     would make the sum depend on hash layout, since float addition is not
+///     associative. This is the same guard `condition_set.cpp`'s
+///     `military_strength` subject applies, for the same reason.
+standing_index corp_standing_index(const world& w, const recipe_registry& reg,
+                                  entity_id corp, const corp_ai_params& p = {});
 
 // ---------------------------------------------------------------------------
 // Stage B — strategy, priority buckets, predictive spending (BL-203,

@@ -362,16 +362,34 @@ struct corp_decision
     entity_id            corp          = null_entity;
     corp_command         command;
     float                winning_score = 0.0f;
-    /// Score of the best candidate the corp did NOT take in this evaluation —
-    /// the highest-scoring one rejected by an action budget, the one-touch rule,
-    /// the solvency gate or the seam. 0 when nothing was passed up.
+    /// Score of the best candidate the corp did NOT take in this evaluation
+    /// **from this command's own budget family** (build / dial / survey / hire /
+    /// trade / dispatch) — the highest-scoring one rejected by an action budget,
+    /// the one-touch rule or the solvency gate. 0 when nothing in that family
+    /// was passed up.
+    ///
+    /// A candidate the SEAM refused does not count (BL-696): `apply_corp_command`
+    /// mutates nothing on refusal, so that was never an option the corp had, and
+    /// counting it reports a counterfactual that did not exist.
     ///
     /// Was "the next candidate in sort order" until NR-232 (2026-08-14), which
     /// was misleading: one evaluation applies up to seven commands, so the next
     /// candidate was frequently a command that ALSO ran, and a reader comparing
-    /// the two scores saw a contest that never happened. Every decision from one
-    /// evaluation now carries the same value — the foregone option belongs to
-    /// the evaluation, not to the individual command.
+    /// the two scores saw a contest that never happened.
+    ///
+    /// The FAMILY qualifier is BL-696's, and it is what makes the pair readable
+    /// rather than merely honest. A family is scored by one formula in one unit;
+    /// across families the scores are not commensurable at all (a foregone sell
+    /// order scores hundreds of credits, a good workforce dial scores 3), so a
+    /// single evaluation-wide maximum made `runner_up >= winning_score` the
+    /// ordinary case and every feed row read "overridden" against a bar pinned
+    /// to zero. Comparing a decision only against what it actually displaced
+    /// restores the counterfactual the field's name claims.
+    ///
+    /// Still may EXCEED `winning_score` (NR-226): candidates sort by priority
+    /// bucket before score, so a Must-Have idle can displace a higher-scoring
+    /// Should-Have dial in the same family. Aggregators must not treat the pair
+    /// as a contest the winner was supposed to win.
     float                runner_up     = 0.0f;
     corp_decision_reason reason        = corp_decision_reason::best_build;
 };

@@ -40,6 +40,21 @@ entity_id tile_body(const world& w, entity_id tile)
     return (it != w.tiles.end()) ? it->second.body : null_entity;
 }
 
+/// The LOWEST-ID market on `body`, or `null_entity` if it carries none.
+///
+/// Lowest id rather than map order: `world::markets` is an unordered_map, so
+/// "the first one found" is a hash-layout answer and this file may not have
+/// one. The same stable pick `market_clearing.cpp` and `supply_system.cpp` each
+/// make internally (a body may host several markets — BL-096).
+entity_id market_on_body(const world& w, entity_id body)
+{
+    entity_id best = null_entity;
+    for (const auto& [mid, mc] : w.markets)
+        if (mc.body == body && (best == null_entity || mid < best))
+            best = mid;
+    return best;
+}
+
 // ---------------------------------------------------------------------------
 // World history log (BL-208) — decision + agency narration for the strategic
 // tier. Deliberately self-contained (no history_log.hpp include): both new
@@ -195,6 +210,54 @@ struct candidate
     corp_priority_bucket  bucket = corp_priority_bucket::nice_to_have;
 };
 
+/// The BUDGET CLASS a candidate competes in — and, by construction, the only
+/// grouping in which two candidate scores are COMPARABLE (BL-696).
+///
+/// Each family is scored by ONE formula in ONE unit: a build by `net^2 / capex`
+/// (capital efficiency), a dial by the estimator's modelled `gain` (credits per
+/// tick), a trade by `quantity x floor` (credits), a dispatch by
+/// `revenue - leg cost` (credits), a survey by `area / cost`, a hire by the
+/// roster row's weight. Those numbers live on wildly different scales — a
+/// listing of accumulated stock routinely scores in the hundreds while a
+/// perfectly good workforce dial scores 3 — so a comparison ACROSS families
+/// states nothing. Each family also has its own action budget below, which is
+/// what makes this the grouping a candidate genuinely competed in.
+///
+/// The classification mirrors the per-candidate booleans the selection loop
+/// already used, and is now their single definition so the two cannot drift.
+enum class candidate_family : uint8_t
+{
+    build = 0, ///< `construct_building` — one per evaluation (`max_builds`).
+    dial,      ///< recipe / workforce / idle / resume — `max_dials` per evaluation.
+    survey,    ///< paid discovery — one per evaluation.
+    hire,      ///< `hire_unit` — one per evaluation.
+    trade,     ///< order-book commands — `max_trades` per evaluation.
+    dispatch,  ///< directed convoys — `max_dispatches` per evaluation.
+};
+
+inline constexpr std::size_t candidate_family_count =
+    static_cast<std::size_t>(candidate_family::dispatch) + 1;
+
+/// The family a command competes in. `dial` is the default arm deliberately:
+/// it is the "acts on one of my own buildings" case, which is what every verb
+/// not named below is, and what the one-touch-per-building rule keys off.
+candidate_family family_of(const corp_command& cmd)
+{
+    switch (cmd.verb)
+    {
+        case corp_verb::build:             return candidate_family::build;
+        case corp_verb::survey:            return candidate_family::survey;
+        case corp_verb::hire_unit:         return candidate_family::hire;
+        // A trade's subject is a BODY and a dispatch's is a MARKET, so neither
+        // takes a dial slot nor records a building cooldown — see the selection
+        // loop, where that reasoning is spelt out.
+        case corp_verb::place_sell_order:
+        case corp_verb::remove_sell_order: return candidate_family::trade;
+        case corp_verb::dispatch_convoy:   return candidate_family::dispatch;
+        default:                           return candidate_family::dial;
+    }
+}
+
 /// Deterministic ordering: bucket asc FIRST (a lower bucket may never starve
 /// a higher one — AI_OPPONENT.md §2B), then score desc, then verb, subject,
 /// tile as the existing BL-202 tie-break.
@@ -343,6 +406,138 @@ corp_priority_bucket bucket_for_reason(corp_decision_reason reason)
         default:
             return corp_priority_bucket::nice_to_have; // expansion
     }
+}
+
+// ---------------------------------------------------------------------------
+// Standing — the composite index (BL-700, AI_OPPONENT.md § "Standing")
+// ---------------------------------------------------------------------------
+
+const char* standing_component_name(standing_component c)
+{
+    switch (c)
+    {
+        case standing_component::economic: return "economic";
+        case standing_component::research: return "research";
+        case standing_component::military: return "military";
+    }
+    return "unknown";
+}
+
+namespace {
+
+/// NET WORTH: cash, plus the assessed value of the corp's buildings, plus the
+/// assessed value of the stock it holds. In credits.
+float standing_economic(const world& w, const recipe_registry& reg,
+                        entity_id corp, const corporation_component& cc)
+{
+    // Accumulated in double and narrowed once at the end. The terms differ by
+    // orders of magnitude (a five-figure balance against a fractional pool
+    // quantity), which is exactly where float accumulation loses the small
+    // ones; the walk order is fixed, so this stays a deterministic answer.
+    double worth = cc.balance;
+
+    // BUILDINGS, AT HISTORICAL COST — the registry's flat `build_cost`, summed
+    // over `assets` (a vector: authored order, deterministic). This is
+    // DELIBERATELY the same definition `budget_system.cpp` files as
+    // `quarterly_return::book_value`, and it is one definition rather than a
+    // second: the build press charges `build_cost + material_cost`, where that
+    // second term is priced at the CURRENT MARKET, and folding it in would make
+    // a corp's standing move on commodity prices it does not own.
+    for (const entity_id bid : cc.assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        worth += reg.economics(bit->second.type).build_cost;
+    }
+
+    // HELD STOCK, at the resolved price of the market on the pool's OWN body.
+    // `corp_body_pools` is a std::map, so this walk is key-ordered.
+    //
+    // Unlike the building term this one IS marked to market, and the asymmetry
+    // is the right call rather than an oversight. A balance sheet must not move
+    // on prices, because it feeds an acquisition price a buyer has to be able
+    // to reproduce. Standing is a COMPARATIVE index read once per tick, and
+    // every corp in the field is marked at the same prices on the same tick, so
+    // a price move lifts or drops holders together rather than reordering them
+    // spuriously — and stock really is worth less on a market that pays less
+    // for it.
+    //
+    // A good the local market does not price contributes NOTHING, which is the
+    // honest answer rather than a gap: there is nowhere to sell it.
+    for (const auto& [key, pool] : w.corp_body_pools)
+    {
+        if (key.first != corp)
+            continue;
+        const entity_id mid = market_on_body(w, key.second);
+        if (mid == null_entity)
+            continue;
+        const market_component& mc = w.markets.at(mid);
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (mc.base_price[r] <= 0.0f)
+                continue; // this market does not price the good
+            // The RESOLVED price where there is one, falling back to the
+            // rarity base — the same two-step the dispatch candidate makes, so
+            // a market that has not cleared yet still values stock rather than
+            // valuing it at zero.
+            const float price = (mc.price[r] > 0.0f) ? mc.price[r] : mc.base_price[r];
+            worth += static_cast<double>(pool.quantities[r]) * static_cast<double>(price);
+        }
+    }
+
+    return static_cast<float>(worth);
+}
+
+/// MILITARY: summed `unit_strength` over the units this corp fields.
+float standing_military(const world& w, entity_id corp)
+{
+    // BL-459: strength is DERIVED — there is no stored `strength` field, and
+    // `unit_roster.hpp`'s function is the only place the roster's per-type
+    // quality and the unit's supply factor are applied.
+    //
+    // Accumulated as an INTEGER, exactly as condition_set.cpp's
+    // `military_strength` subject does and for the same reason: `w.units` is an
+    // unordered_map, so the walk order follows hash layout, and float addition
+    // is not associative. An int64 accumulator makes the sum order-independent
+    // by construction rather than by luck.
+    int64_t s = 0;
+    for (const auto& [uid, u] : w.units)
+        if (u.owner == corp)
+            s += unit_strength(w, u);
+    return static_cast<float>(s);
+}
+
+} // namespace
+
+standing_index corp_standing_index(const world& w, const recipe_registry& reg,
+                                  entity_id corp, const corp_ai_params& p)
+{
+    standing_index out;
+
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end())
+        return out; // an unknown corp stands at zero on every component
+    const corporation_component& cc = cit->second;
+
+    // The measurement switch. A FOURTH COMPONENT ADDS ONE LINE HERE and nothing
+    // else in this function — see `standing_component`'s append-only note.
+    out.component[static_cast<std::size_t>(standing_component::economic)] =
+        standing_economic(w, reg, corp, cc);
+    // RESEARCH: the BL-332 accumulator. Stockpiled, market-invisible, never
+    // decaying — reached, not spent, so this is a level and not a balance.
+    out.component[static_cast<std::size_t>(standing_component::research)] = cc.science;
+    out.component[static_cast<std::size_t>(standing_component::military)] =
+        standing_military(w, corp);
+
+    // A LOOP, not three hand-written terms: this is what makes a fourth
+    // component an addition rather than a rewrite.
+    double total = 0.0;
+    for (std::size_t i = 0; i < standing_component_count; ++i)
+        total += static_cast<double>(out.component[i]) *
+                 static_cast<double>(p.standing_weights[i]);
+    out.total = static_cast<float>(total);
+    return out;
 }
 
 float corp_should_have_buffer(const world& w, const recipe_registry& reg,
@@ -1499,16 +1694,6 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // numbers behind it are corp_ai_params fields precisely so tuning it
         // never needs this code changed. See AI_OPPONENT.md § 6.
         {
-            // Lowest-id market on a body, or null. Lowest id (not map order) so
-            // the choice is stable across container internals.
-            auto market_on_body = [&w](entity_id body) -> entity_id {
-                entity_id best = null_entity;
-                for (const auto& [mid, mc] : w.markets)
-                    if (mc.body == body && (best == null_entity || mid < best))
-                        best = mid;
-                return best;
-            };
-
             // corp_body_pools is a std::map, so this walk is already ordered by
             // (corp, body) — the deterministic iteration the whole scorer rests on.
             for (const auto& [key, pool] : w.corp_body_pools)
@@ -1516,7 +1701,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 if (key.first != corp)
                     continue;
                 const entity_id body = key.second;
-                const entity_id mid  = market_on_body(body);
+                const entity_id mid  = market_on_body(w, body);
                 if (mid == null_entity)
                     continue;
                 const market_component& mc = w.markets.at(mid);
@@ -1593,18 +1778,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // rather than flooding the candidate list with every (body, resource)
         // pair.
         {
-            // Lowest-id market on a body — the same stable pick
+            // `market_on_body` (top of this file) is the same stable pick
             // `supply_system.cpp`'s own (internal-linkage) `market_for_body`
-            // makes, duplicated rather than shared for the same reason that
-            // one's own comment gives.
-            auto market_on_body = [&w](entity_id body) -> entity_id {
-                entity_id best = null_entity;
-                for (const auto& [mid, mc] : w.markets)
-                    if (mc.body == body && (best == null_entity || mid < best))
-                        best = mid;
-                return best;
-            };
-
+            // makes. It was a lambda here and a second identical one in the
+            // trade block above until BL-700 needed a third for the standing
+            // read; three copies of one rule is one copy too many, so it is now
+            // a single file-local function.
             const logistics_nodes nodes = collect_logistics_nodes(w);
 
             entity_id   best_market   = null_entity;
@@ -1684,7 +1863,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
             if (best_market != null_entity)
             {
-                const entity_id src_market = market_on_body(best_src_body);
+                const entity_id src_market = market_on_body(w, best_src_body);
                 if (src_market != null_entity)
                 {
                     candidate c;
@@ -1741,9 +1920,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         //
         // It now records **the best option this corp did NOT take** — the
         // highest-scoring candidate rejected anywhere in the walk, by an action
-        // budget, the one-touch rule, the solvency gate, or the seam itself.
-        // That is what the field's name always claimed, and it is the
-        // counterfactual a reader actually wants: "what did it pass up?"
+        // budget, the one-touch rule or the solvency gate. That is what the
+        // field's name always claimed, and it is the counterfactual a reader
+        // actually wants: "what did it pass up?"
+        //
+        // "or the seam itself" was in that list until BL-696 and is now
+        // deliberately absent — a command the seam refuses was never an option
+        // to pass up. See the refusal branch below, which is where the whole
+        // argument lives.
         //
         // Consequences, both deliberate:
         //  - It is knowable only once the WHOLE list has been walked (a
@@ -1752,39 +1936,74 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         //    application order. The ring and the history log are still written
         //    one-for-one in that same order, so the feed's positional pairing
         //    between them is unchanged.
-        //  - Every decision from one evaluation therefore carries the SAME
-        //    runner-up. That is honest: the foregone option belongs to the
-        //    evaluation, not to the individual command.
+        //  - Every decision from one evaluation carried the SAME runner-up.
+        //    That much is now qualified by BL-696 below: the value is per
+        //    FAMILY, so two decisions from one evaluation share a runner-up
+        //    only when they competed for the same budget. The foregone option
+        //    still belongs to the evaluation rather than to the individual
+        //    command — it just belongs to one competition within it.
         //
         // Zero still means "nothing was passed up" — every enumerated candidate
-        // was acted on — which the feed renders as "uncontested".
+        // of that family was acted on — which the feed renders as "uncontested".
+        //
+        // BL-696 (the decision feed reads zero) narrows the field ONE further
+        // step, and the narrowing is what makes it mean anything at all. It was
+        // a single scalar broadcast onto every decision from the evaluation —
+        // the best foregone candidate of ANY family — and the feed divides the
+        // pair (`win / (win + run)`, decision_feed.cpp § read_margin) to draw a
+        // conviction bar. That division is only defined if the two numbers share
+        // a scale, and across families they do not: a foregone sell order scores
+        // in the hundreds of credits while a good workforce dial scores 3. So
+        // `runner_up >= winning_score` became the ORDINARY case, every row read
+        // "overridden", every bar pinned to zero, and the one surface onto rival
+        // reasoning stated nothing. Measured on the shipped world (24 quarters,
+        // spectated): every dial row read `3.62 v 307.02` / `8.93 v 328.16`,
+        // the same runner-up on each, because one listing dominated the whole
+        // evaluation.
+        //
+        // The runner-up is therefore now PER FAMILY (`candidate_family` above):
+        // the best candidate this corp passed up IN THE COMPETITION THIS ONE
+        // WON. It is still NR-232's counterfactual — the best option not taken,
+        // rejected by a budget, the one-touch rule, the solvency gate or the
+        // seam — with the qualifier that was missing and load-bearing. NR-226
+        // still holds: a runner-up may legitimately exceed its winner, because
+        // candidates sort by BUCKET before score, so a Must-Have idle can
+        // displace a higher-scoring Should-Have dial in the same family.
+        //
+        // Nothing about SELECTION changes. `best_rejected` is written and read
+        // for the record only; the greedy walk never consults it, so the world
+        // this scorer produces is byte-identical either side of this change and
+        // only the logged margin moves.
         struct pending_decision { corp_decision d; entity_id log_body; };
         std::vector<pending_decision> pending;
-        float best_rejected = 0.0f;
+        std::array<float, candidate_family_count> best_rejected{}; // value-initialised: all 0
         const auto forgo = [&best_rejected](const candidate& cand) {
-            best_rejected = std::max(best_rejected, cand.score);
+            float& slot = best_rejected[static_cast<std::size_t>(family_of(cand.cmd))];
+            slot = std::max(slot, cand.score);
         };
         for (std::size_t i = 0; i < cands.size(); ++i)
         {
             const candidate& c = cands[i];
-            const bool is_build  = (c.cmd.verb == corp_verb::build);
-            const bool is_survey = (c.cmd.verb == corp_verb::survey);
-            const bool is_hire   = (c.cmd.verb == corp_verb::hire_unit);
+            // One classification, used by the budgets, the one-touch rule, the
+            // cooldown and the runner-up alike (BL-696 hoisted it into
+            // `family_of` so a seventh verb family cannot be added to one of
+            // those and forgotten in another).
+            //
             // Trade gets its own budget rather than sharing the dial budget: its
             // subject is a BODY, not a building, so neither the dial cap nor the
             // one-touch-per-building rule below means anything for it, and folding
             // it in would let a listing consume a dial slot a loss-maker needed.
             // Hire is excluded from the dial budget for the same reason (its
             // subject is a tile), and capped at one per evaluation besides.
-            const bool is_trade  = (c.cmd.verb == corp_verb::place_sell_order ||
-                                    c.cmd.verb == corp_verb::remove_sell_order);
-            // Directed dispatch (BL-600) is excluded from the dial budget for
-            // the identical reason trade is: its subject is a MARKET, not a
-            // building, so neither the dial cap nor the one-touch-per-building
-            // rule below means anything for it. Its own cap, same shape as
-            // hire's.
-            const bool is_dispatch = (c.cmd.verb == corp_verb::dispatch_convoy);
-            const bool is_dial   = !is_build && !is_survey && !is_hire && !is_trade && !is_dispatch;
+            // Directed dispatch (BL-600) is excluded for the identical reason:
+            // its subject is a MARKET. Its own cap, same shape as hire's.
+            const candidate_family fam = family_of(c.cmd);
+            const bool is_build    = (fam == candidate_family::build);
+            const bool is_survey   = (fam == candidate_family::survey);
+            const bool is_hire     = (fam == candidate_family::hire);
+            const bool is_trade    = (fam == candidate_family::trade);
+            const bool is_dispatch = (fam == candidate_family::dispatch);
+            const bool is_dial     = (fam == candidate_family::dial);
             // Every `continue` below is a FOREGONE candidate, and each one calls
             // forgo() so it can compete to be the decision log's runner-up.
             // A budget-capped candidate is the purest case of the thing the
@@ -1856,7 +2075,36 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             entity_id built = null_entity;
             if (apply_corp_command(w, reg, c.cmd, &built) != corp_command_result::applied)
             {
-                forgo(c);
+                // A SEAM REFUSAL IS NOT A FOREGONE OPTION, and this line is
+                // BL-696's actual cause (it called forgo(c) until 2026-08-31).
+                //
+                // NR-232's definition folded "rejected by the seam" in with
+                // "rejected by a budget or the solvency gate", and the three are
+                // not the same fact. A budget-capped candidate is an option the
+                // corp HAD and did not take — the counterfactual the feed's
+                // margin column exists to show. A seam-refused one was never
+                // available to take at all: `apply_corp_command` mutates nothing
+                // on refusal, and the corp made no choice about it.
+                //
+                // It matters because refusals are not rare, they are STRUCTURAL,
+                // and they carry the largest scores in the list. The recipe
+                // margin-chase (above) is deliberately enumerated WITHOUT the
+                // switch cost and WITHOUT the cooldown the seam enforces at
+                // apply time — BL-430's stated call — so the same handful of
+                // high-scoring chases are proposed and refused every evaluation.
+                // Measured on the shipped world (24 quarters, spectated):
+                // 160 of 249 rejections scoring over 50 were seam-refused
+                // `set_recipe` candidates, so the top refused chase became the
+                // runner-up on EVERY decision that corp took, every row in the
+                // feed read "overridden", and the conviction bar sat at zero on
+                // all of them. The one surface onto rival reasoning reported the
+                // same thing about every decision, which is the same as
+                // reporting nothing.
+                //
+                // Not counting a refusal is therefore the fix at the cause. The
+                // refusal itself is unchanged and still benign (see the
+                // apply-then-count note below): the candidate consumes no action
+                // slot and the next-best candidate is still tried.
                 continue; // a seam rejection mutates nothing; just skip it
             }
 
@@ -2012,7 +2260,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // decision with its agency event must match on fields, not on adjacency.
         for (pending_decision& pd : pending)
         {
-            pd.d.runner_up = best_rejected;
+            // BL-696: the best option foregone IN THIS DECISION'S OWN FAMILY —
+            // the only comparison that is on one scale (see `candidate_family`).
+            pd.d.runner_up =
+                best_rejected[static_cast<std::size_t>(family_of(pd.d.command))];
             w.ai_decisions.push(pd.d);
 
             world_history_entry log_entry;

@@ -116,6 +116,31 @@ Balance alone is the wrong measure and would misread the game constantly — a c
 spent its treasury on a smelter is not behind, and a corp hoarding cash while its rivals arm is not
 ahead. The composite is what a coalition scores against, and what the skill harness bands.
 
+**The list is open, so the shape must let it grow.** A component is an entry in
+`standing_component`, its weight an entry in `corp_ai_params::standing_weights`, and the total a
+loop over the two — so a fourth component is an addition and never a rewrite, and **tuning the
+composite is a data change** (the `trade_hold_threshold` discipline).
+
+**Denominated in credits.** Three components in three unrelated units cannot be added without a
+conversion, and a conversion nobody can state is a magic number. Each weight is therefore *credits
+per unit of its component*, anchored on something the world already prices: research on what a
+science point costs to produce (a research institute's per-tick running cost), military on what a
+fielded regiment costs to raise (`hire_unit`'s own price against `unit_strength`'s scale). Net
+worth is already credits, so its weight is 1 by definition.
+
+**Read at the tick boundary, never inside the scorer's walk.** Standing is read after the budget
+pass has written balances and clearing has resolved the prices that value held stock, and *before*
+any corp's strategic evaluation mutates the world. `run_corp_strategic_step` walks corps in sorted
+id order and applies as it goes, so a standing read from inside that walk answers differently for
+the first corp than for the last — the evaluation cadence would become the tiebreak of every
+comparison built on it. A consumer that needs the whole field snapshots it once at the boundary
+and scores against the snapshot.
+
+**Not the Corporations panel's `corp_standing`** (`src/world/standing.hpp`), which is a
+disclosure-gated *profile* — reach, capital, market share, each shown or withheld by the observed
+firm's filing status. That answers what a player may READ about a rival. This answers who is
+ahead, from full world state, and is not player-facing.
+
 **What follows.** A rout is a failure of the design, in the same way a collapse is. Superhuman play
 is a regression, not an achievement. And the measure of this AI is the **spread across the field** —
 not an absolute wealth band, which says nothing about whether anyone was played with.
@@ -553,10 +578,27 @@ threshold, never a duplicate, and never on the player's own corp.
 **The decision record.** Each applied command is a `corp_decision` — `{tick, corp, command,
 winning_score, runner_up, reason}` — in `corp_decision_ring`, a 256-entry ring that is derived
 observability, not save-format state. `runner_up` is **the best candidate the corp did not take**
-in that evaluation (rejected by a budget, the one-touch rule, the solvency gate or the seam), the
-same value on every decision from one evaluation — the foregone option belongs to the evaluation,
-not the command (NR-232). Because candidates sort by bucket before score, `runner_up` can
-legitimately exceed `winning_score` (NR-226); aggregators must not treat the two as a contest.
+in that evaluation (rejected by a budget, the one-touch rule or the solvency gate) — the foregone
+option belongs to the evaluation, not the command (NR-232).
+
+**A command the seam refused is not a foregone option.** `apply_corp_command` mutates nothing on
+refusal, so a refused candidate was never available to take, and it belongs in no counterfactual.
+This is not a corner case: the recipe margin-chase is deliberately enumerated without the switch
+cost and without the cooldown the seam applies, so the same high-scoring chases are proposed and
+refused every evaluation — enough, on the shipped world, to make the top refusal the runner-up of
+every decision a corp took.
+
+**Scored within one budget family, never across.** The candidate families — build, dial, survey,
+hire, trade, dispatch — are the six action budgets above, and each is scored by **one formula in
+one unit**: a build by `net² / capex`, a dial by the estimator's modelled per-tick gain, a trade
+by `quantity × floor`, a dispatch by `revenue − leg cost`. Those scales are unrelated, so a
+comparison across families states nothing, and an evaluation-wide maximum makes
+`runner_up ≥ winning_score` the ordinary case — which is a decision surface that reports the same
+thing about every decision. The runner-up is therefore **the best option foregone in the winner's
+own family**: the competition this command actually won. Because candidates sort by bucket before
+score, `runner_up` can still legitimately exceed `winning_score` within a family (NR-226) —
+a Must-Have idle displacing a higher-scoring Should-Have dial; aggregators must not treat the two
+as a contest.
 
 ---
 
