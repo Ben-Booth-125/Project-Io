@@ -235,7 +235,14 @@ inline constexpr uint32_t world_save_magic =
 /// and deliberately none, since the pre-bump stream cannot say what a tile's
 /// `power` deposit was. Claimed through
 /// `tools/session/next_save_version.js --claim`.
-inline constexpr uint32_t world_save_version = 21;
+/// Bumped to 22 by BL-709 (construction becomes a sector): `resource_type` gains
+/// `construction_capacity` at the enum's tail, so `resource_count` moves 48 -> 49
+/// and every per-resource array in the stream changes length again — the exact
+/// same break the v20 -> v21 append above describes, for the same reason and with
+/// the same answer. Refused whole on the strict-equality contract; no migration,
+/// and deliberately none. Claimed through
+/// `tools/session/next_save_version.js --claim`.
+inline constexpr uint32_t world_save_version = 22;
 
 /// Write @p w as a complete world snapshot.
 ///

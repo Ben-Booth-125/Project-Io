@@ -627,6 +627,14 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
 {
     const float max_stretch = reg.construction().max_stretch;
     const float pause_below  = (max_stretch > 1.0f) ? (1.0f / max_stretch) : 0.0f;
+    // BL-709 — the CAPACITY a live project draws from the construction sector
+    // each full-rate tick (docs/economy/PRODUCTION.md § Construction as a rate:
+    // "Building projects consume that capacity"). Hoisted: it is a property of
+    // the registry and nothing in the loop can change it. ZERO = the pre-BL-709
+    // behaviour exactly, which is what every hand-built harness registry gets.
+    const float capacity_rate = reg.construction().capacity_per_build_tick;
+    const std::size_t cap_index =
+        static_cast<std::size_t>(resource_type::construction_capacity);
 
     std::vector<entity_id> ids;
     for (const auto& [bid, b] : w.buildings)
@@ -643,6 +651,32 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         // BL-590: the material cost specific to THIS named building.
         const auto& material_cost_row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
 
+        // BL-709 — THE PER-TICK NEED ROW, materialised ONCE rather than
+        // recomputed by each of the three loops below (rate, want, draw). That
+        // is not tidying: those three loops MUST agree about what this tick
+        // needs, and re-deriving the expression three times is exactly how a
+        // preview comes to disagree with what the tick charges — the argument
+        // BL-590 makes about `resource_build_cost_for` being the single lookup.
+        //
+        // Construction capacity joins the row as ONE MORE MATERIAL, deliberately
+        // and with no branch of its own. It is therefore stretched, paused,
+        // wanted, drawn from the shelf and billed by the same rules steel is:
+        // a market with no capacity slows a build exactly as a market with no
+        // steel does, and a build slowed for want of capacity REGISTERS that
+        // want — which is what prices capacity and induces the yard that answers
+        // it (MARKETS.md property 3). A second code path for the sector's own
+        // good would have severed precisely that loop.
+        std::array<float, resource_count> need_row{};
+        for (std::size_t r = 0; r < resource_count; ++r)
+            need_row[r] = material_cost_row[r] / duration;
+        // Flat per TICK, not per unit of material: it is the yard's throughput
+        // the site is consuming, and a site consumes it for as long as it is
+        // open regardless of what it is made of. Not divided by `duration` for
+        // the same reason — a build that takes twice as long occupies the sector
+        // for twice as long, and should pay for twice as much of it.
+        if (capacity_rate > 0.0f)
+            need_row[cap_index] += capacity_rate;
+
         // BL-130: read the market's REAL persistent inventory — what is actually
         // on hand from prior ticks' sales — rather than last tick's cleared
         // throughput. Mutable: a build that draws on it actually consumes it
@@ -655,12 +689,48 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         float rate = 1.0f;
         for (std::size_t r = 0; r < resource_count; ++r)
         {
-            const float need = material_cost_row[r] / duration;
+            if (r == cap_index)
+                continue; // BL-709 — capacity STRETCHES rather than pauses; see below
+            const float need = need_row[r];
             if (need <= 0.0f)
                 continue;
             const float avail = m ? std::max(0.0f, m->inventory[r]) : 0.0f;
             rate = std::min(rate, avail / need);
         }
+
+        // BL-709 — CAPACITY STRETCHES A BUILD; IT NEVER STOPS ONE, and that
+        // asymmetry against the materials above is the whole of what this item
+        // learned the hard way.
+        //
+        // MEASURED. Folding capacity into the minimum above like any other
+        // material collapsed operating firms 198 of 328 -> 6 of 315 on the
+        // ancient band: a market with NO capacity on the shelf gives coverage
+        // 0, coverage 0 pauses the build, and nothing completes — including the
+        // yards that would have made the capacity. A deadlock, not a shortage:
+        // you cannot build a construction yard without construction capacity.
+        //
+        // The rule that resolves it is BL-641's, unchanged and applied one level
+        // up: a shortfall SCALES A RATE DOWN, it never switches a thing off.
+        // Materials keep the pause because they are physical — no stone, no
+        // wall, at any speed. Capacity is LABOUR THROUGHPUT, and its absence
+        // means a crew of one instead of a crew of fifty: slow, not impossible.
+        // So its coverage is floored at `pause_below` == 1/max_stretch, which is
+        // exactly the "longest a starved build stretches to" the authored
+        // `max_stretch` already names — no new tunable, and the floor is the
+        // ceiling that was already there.
+        //
+        // A capacity-starved build therefore takes up to 10x as long, keeps
+        // REGISTERING its want every tick (the want loop below is unfloored, so
+        // the price signal is the full need), and so induces the yard that
+        // answers it. That loop is MARKETS.md property 3, and pausing severed it.
+        if (capacity_rate > 0.0f)
+        {
+            const float need  = need_row[cap_index];
+            const float avail = m ? std::max(0.0f, m->inventory[cap_index]) : 0.0f;
+            const float cov   = (need > 0.0f) ? (avail / need) : 1.0f;
+            rate = std::min(rate, std::max(cov, pause_below));
+        }
+
         rate = std::clamp(rate, 0.0f, 1.0f);
         if (rate < pause_below)
             rate = 0.0f; // paused: market can't supply even the max-stretched rate
@@ -680,7 +750,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             auto& want = report.wants[std::make_pair(corp, body)];
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                const float need = material_cost_row[r] / duration;
+                const float need = need_row[r];
                 if (need > 0.0f)
                     want[r] += need;
             }
@@ -699,7 +769,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             auto& bought = report.purchases[std::make_pair(corp, body)];
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                const float need = material_cost_row[r] / duration;
+                const float need = need_row[r];
                 if (need <= 0.0f)
                     continue;
                 const float drawn = need * rate;

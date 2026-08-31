@@ -1107,6 +1107,70 @@ std::array<float, resource_count> body_upkeep_demand(const world& w, const recip
     return demand;
 }
 
+/// BL-709 — the body's CONSTRUCTION demand: how much construction capacity a
+/// world with this many buildings standing on this body wants per tick, so the
+/// pre-game seeder provisions yards for it (docs/economy/PRODUCTION.md
+/// § Construction as a rate: "because generation can SEED CONSTRUCTION CAPACITY,
+/// the demand for its inputs is non-zero from tick 0").
+///
+/// WHY THIS IS NOT `body_upkeep_demand`. It was, first, and it is worth
+/// recording what happened, because the measurement is the argument. Authoring
+/// construction capacity as an ordinary per-building UPKEEP draw — BL-708's
+/// exact shape, which is the obvious thing to reach for — collapsed operating
+/// firms from 198 of 328 to 33 of 317 on the ancient band, and cutting the rate
+/// five-fold barely moved it (38 of 315). It is a CLIFF, not a curve, so it is
+/// not a magnitude problem: a brand-new universal draw is unmet on tick 1 in
+/// every market, `supply_factor_permille` decays before any yard's output can
+/// reach a shelf, and the reflex tier decommissions the firm while the market is
+/// still catching up. That is the BL-641 collapse arriving through the cold
+/// start rather than through the rate — and it is why this is a SEEDER-SIDE
+/// ESTIMATE with no live draw behind it. Nothing in the tick reads
+/// `seed_capacity_per_building`.
+///
+/// WHAT IT ESTIMATES. The live consumer of capacity is the build project
+/// (`run_construction`), which is EPISODIC — that is the whole defect this item
+/// exists to fix — so it reads ~zero at generation time and the seeder cannot
+/// size against it. The standing BUILDING STOCK is the steady-state proxy: a
+/// world of N buildings replaces and extends itself at some rate, and that rate
+/// is what a construction sector is for. It is MARKETS.md property 1's own
+/// "more buildings" scaling, read as a provisioning target.
+///
+/// Counts sites UNDER CONSTRUCTION too, unlike `body_upkeep_demand` — deliberately.
+/// A site under construction is precisely what consumes capacity; excluding it
+/// would provision against everything except the actual consumer.
+///
+/// Generation provisions the sector; the market decides everything downstream of
+/// it. Zero while no rate is authored, so every pre-BL-709 world generates
+/// byte-identically.
+///
+/// Deterministic: `w.buildings` is unordered, but this walk only COUNTS over a
+/// set that does not depend on order, so the finished figure is the same
+/// whatever order it was reached in.
+std::array<float, resource_count> body_construction_demand(const world& w,
+                                                           const recipe_registry& reg,
+                                                           entity_id body_id)
+{
+    std::array<float, resource_count> demand = {};
+    const float per = reg.construction().seed_capacity_per_building;
+    if (per <= 0.0f)
+        return demand;
+
+    int standing = 0;
+    for (const auto& [bid, b] : w.buildings)
+    {
+        (void)bid;
+        if (b.decommissioned)
+            continue;
+        const auto tit = w.tiles.find(b.tile);
+        if (tit == w.tiles.end() || tit->second.body != body_id)
+            continue;
+        ++standing;
+    }
+    demand[static_cast<std::size_t>(resource_type::construction_capacity)] =
+        per * static_cast<float>(standing);
+    return demand;
+}
+
 /// `body_id`'s aggregate demand: population_demand_params + BL-340's
 /// background_demand_params baskets, weighted by every population centre's
 /// `scale` on the body — the same two consumer-side pulls `clear_markets`
@@ -1213,6 +1277,31 @@ int best_recipe_for_gaps(const recipe_registry& reg,
         {
             best_score = score;
             best_i     = i;
+        }
+    }
+    return best_i;
+}
+
+/// BL-709 — the IN-BAND construction method that makes the most capacity per
+/// batch, or -1 if this band authors none. Returned as a BROWSE index into
+/// `recipe_at(processing_facility, i)`, which is the space the seeder's own
+/// `recipe_i` already speaks.
+///
+/// Deterministic: registry order, strict `>`, so the first of two equal outputs
+/// wins and the answer cannot depend on anything but the authored file.
+int best_construction_recipe(const recipe_registry& reg)
+{
+    const std::size_t cap = static_cast<std::size_t>(resource_type::construction_capacity);
+    const int n = reg.recipe_count(building_type::processing_facility);
+    int   best_i = -1;
+    float best_q = 0.0f;
+    for (int i = 0; i < n; ++i)
+    {
+        const float q = reg.recipe_at(building_type::processing_facility, i).outputs[cap];
+        if (q > best_q)
+        {
+            best_q = q;
+            best_i = i;
         }
     }
     return best_i;
@@ -2094,6 +2183,16 @@ std::vector<entity_id> generate_background_firms(
             for (std::size_t r = 0; r < resource_count; ++r)
                 demand[r] += upkeep[r];
 
+            // BL-709 — the CONSTRUCTION half, re-measured on the same schedule
+            // and for the same reason: every firm this loop places raises the
+            // body's construction demand, because a bigger world builds more.
+            // Self-limiting in the same way, since a yard is itself a building
+            // and so counts toward the target it helps fill.
+            const std::array<float, resource_count> construction_need =
+                body_construction_demand(w, reg, body_id);
+            for (std::size_t r = 0; r < resource_count; ++r)
+                demand[r] += construction_need[r];
+
             // MEASURED stop condition — real production vs real demand, not a
             // firm-count target.
             if (production_ratio(production, demand) >= target_ratio)
@@ -2110,14 +2209,101 @@ std::vector<entity_id> generate_background_firms(
                 if (firms_by_resource[r] >= per_resource_firm_cap)
                     selectable[r] = std::max(selectable[r], demand[r]);
 
-            const std::size_t gap_r = biggest_gap_resource(selectable, demand);
-            if (gap_r == resource_count)
-                break; // no resource genuinely short — nothing left worth filling
+            // BL-709 — THE CONSTRUCTION SECTOR IS PROVISIONED FIRST, and this
+            // is deliberately a SECOND selection rule rather than a weight
+            // inside the first. It is worth saying why, because this loop's own
+            // comment argues against exactly that.
+            //
+            // `biggest_gap_resource` ranks on ABSOLUTE shortfall. Measured, that
+            // rule cannot reach construction capacity on the ancient band at any
+            // honest target: the band's household gaps run to ~350 a tick, so a
+            // capacity target sized to what builds ACTUALLY consume (~40) never
+            // wins the argmax, and a target large enough to win would be a
+            // ten-fold over-provision that floods the band with yards eating the
+            // timber and planks everything else wants. Raising it to 0.30 per
+            // building was tried and measured: ancient capacity production
+            // stayed at 0.0 while industrial operating firms fell 72 -> 9.
+            //
+            // The two questions are genuinely different, which is what makes two
+            // rules right here rather than a fudge. "Fill the biggest gap" is a
+            // question about a body's TRADEABLE OUTPUT. "Does this body have a
+            // construction sector at all" is a question about INFRASTRUCTURE —
+            // the same distinction BL-708 drew when it said generation
+            // provisions the utility and the market decides everything
+            // downstream of it. A world with no yard cannot build, at any price,
+            // because capacity is not cargo and cannot be imported.
+            //
+            // BOUNDED BY THE SAME CAPS as every other resource: it stops at the
+            // measured target (`body_construction_demand`) and at
+            // `per_resource_firm_cap`, so it can neither run away nor starve the
+            // gap fill of firm slots. When it is satisfied — or when the band
+            // authors no construction method at all — the loop falls through to
+            // the ordinary rule unchanged.
+            std::size_t gap_r    = resource_count;
+            int         recipe_i = -1;
+            {
+                const std::size_t cap_i =
+                    static_cast<std::size_t>(resource_type::construction_capacity);
+                const int ci = best_construction_recipe(reg);
+                if (ci >= 0 && firms_by_resource[cap_i] < per_resource_firm_cap)
+                {
+                    // BOUNDED BY A COUNT OF YARDS, NOT BY MEASURED PRODUCTION,
+                    // and that is the difference between a provisioning pass and
+                    // a runaway. Measured: bounding it by "until production meets
+                    // demand" burned the whole per-resource firm cap on the
+                    // ancient band, because the yards it placed could not run at
+                    // all — `clay` is produced 0.0 in that band and `planks` are
+                    // thin, the same "the ancient chain does not convert" defect
+                    // MARKETS.md § Three properties records — so production never
+                    // rose, the condition never cleared, and ~35 dead firms cost
+                    // the band 38 operating buildings.
+                    //
+                    // A COUNT cannot run away. One yard's batch output divides
+                    // the body's target, so a body wants a fixed handful and gets
+                    // exactly that many whether they thrive or starve; if they
+                    // starve, the market kills them and the loss is bounded at
+                    // four or five firms instead of a cap's worth.
+                    //
+                    // Deliberately ignores the workforce and richness scalars
+                    // that decide a yard's ACTUAL batch count, so it is an
+                    // order-of-magnitude bound rather than a solve. That is the
+                    // right precision for a provisioning target: generation puts
+                    // a plausible number of yards on the ground, and the market
+                    // decides which of them survive.
+                    const float per_yard =
+                        reg.recipe_at(building_type::processing_facility, ci).outputs[cap_i];
+                    const int want_yards =
+                        (per_yard > 0.0f)
+                            ? static_cast<int>(std::ceil(demand[cap_i] / per_yard))
+                            : 0;
+                    // BOTH BOUNDS, and each catches what the other misses. The
+                    // COUNT stops the ancient runaway (yards that cannot run
+                    // never raise production, so a production-only test never
+                    // clears); the MEASURED SHORTFALL stops the industrial
+                    // over-provision (yards that CAN run cover the body long
+                    // before the count is exhausted, and placing the rest would
+                    // spend firm slots on capacity nobody needs).
+                    if (firms_by_resource[cap_i] < want_yards
+                        && demand[cap_i] > selectable[cap_i])
+                    {
+                        gap_r    = cap_i;
+                        recipe_i = ci;
+                    }
+                }
+            }
 
-            // Prefer processing when some recipe's output actually relieves the
-            // gap resource (a refined good — silicon, machinery, ...);
-            // otherwise the firm extracts the gap resource as a raw directly.
-            const int  recipe_i = best_recipe_for_gaps(reg, selectable, demand);
+            if (gap_r == resource_count)
+            {
+                gap_r = biggest_gap_resource(selectable, demand);
+                if (gap_r == resource_count)
+                    break; // no resource genuinely short — nothing left worth filling
+
+                // Prefer processing when some recipe's output actually relieves the
+                // gap resource (a refined good — silicon, machinery, ...);
+                // otherwise the firm extracts the gap resource as a raw directly.
+                recipe_i = best_recipe_for_gaps(reg, selectable, demand);
+            }
+
             const bool go_processing = (recipe_i >= 0)
                 && (reg.recipe_at(building_type::processing_facility, recipe_i).outputs[gap_r] > 0.0f);
             const industrial_focus focus = go_processing ? industrial_focus::processing
