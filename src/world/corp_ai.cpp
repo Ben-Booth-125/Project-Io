@@ -40,6 +40,21 @@ entity_id tile_body(const world& w, entity_id tile)
     return (it != w.tiles.end()) ? it->second.body : null_entity;
 }
 
+/// The LOWEST-ID market on `body`, or `null_entity` if it carries none.
+///
+/// Lowest id rather than map order: `world::markets` is an unordered_map, so
+/// "the first one found" is a hash-layout answer and this file may not have
+/// one. The same stable pick `market_clearing.cpp` and `supply_system.cpp` each
+/// make internally (a body may host several markets — BL-096).
+entity_id market_on_body(const world& w, entity_id body)
+{
+    entity_id best = null_entity;
+    for (const auto& [mid, mc] : w.markets)
+        if (mc.body == body && (best == null_entity || mid < best))
+            best = mid;
+    return best;
+}
+
 // ---------------------------------------------------------------------------
 // World history log (BL-208) — decision + agency narration for the strategic
 // tier. Deliberately self-contained (no history_log.hpp include): both new
@@ -391,6 +406,138 @@ corp_priority_bucket bucket_for_reason(corp_decision_reason reason)
         default:
             return corp_priority_bucket::nice_to_have; // expansion
     }
+}
+
+// ---------------------------------------------------------------------------
+// Standing — the composite index (BL-700, AI_OPPONENT.md § "Standing")
+// ---------------------------------------------------------------------------
+
+const char* standing_component_name(standing_component c)
+{
+    switch (c)
+    {
+        case standing_component::economic: return "economic";
+        case standing_component::research: return "research";
+        case standing_component::military: return "military";
+    }
+    return "unknown";
+}
+
+namespace {
+
+/// NET WORTH: cash, plus the assessed value of the corp's buildings, plus the
+/// assessed value of the stock it holds. In credits.
+float standing_economic(const world& w, const recipe_registry& reg,
+                        entity_id corp, const corporation_component& cc)
+{
+    // Accumulated in double and narrowed once at the end. The terms differ by
+    // orders of magnitude (a five-figure balance against a fractional pool
+    // quantity), which is exactly where float accumulation loses the small
+    // ones; the walk order is fixed, so this stays a deterministic answer.
+    double worth = cc.balance;
+
+    // BUILDINGS, AT HISTORICAL COST — the registry's flat `build_cost`, summed
+    // over `assets` (a vector: authored order, deterministic). This is
+    // DELIBERATELY the same definition `budget_system.cpp` files as
+    // `quarterly_return::book_value`, and it is one definition rather than a
+    // second: the build press charges `build_cost + material_cost`, where that
+    // second term is priced at the CURRENT MARKET, and folding it in would make
+    // a corp's standing move on commodity prices it does not own.
+    for (const entity_id bid : cc.assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        worth += reg.economics(bit->second.type).build_cost;
+    }
+
+    // HELD STOCK, at the resolved price of the market on the pool's OWN body.
+    // `corp_body_pools` is a std::map, so this walk is key-ordered.
+    //
+    // Unlike the building term this one IS marked to market, and the asymmetry
+    // is the right call rather than an oversight. A balance sheet must not move
+    // on prices, because it feeds an acquisition price a buyer has to be able
+    // to reproduce. Standing is a COMPARATIVE index read once per tick, and
+    // every corp in the field is marked at the same prices on the same tick, so
+    // a price move lifts or drops holders together rather than reordering them
+    // spuriously — and stock really is worth less on a market that pays less
+    // for it.
+    //
+    // A good the local market does not price contributes NOTHING, which is the
+    // honest answer rather than a gap: there is nowhere to sell it.
+    for (const auto& [key, pool] : w.corp_body_pools)
+    {
+        if (key.first != corp)
+            continue;
+        const entity_id mid = market_on_body(w, key.second);
+        if (mid == null_entity)
+            continue;
+        const market_component& mc = w.markets.at(mid);
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (mc.base_price[r] <= 0.0f)
+                continue; // this market does not price the good
+            // The RESOLVED price where there is one, falling back to the
+            // rarity base — the same two-step the dispatch candidate makes, so
+            // a market that has not cleared yet still values stock rather than
+            // valuing it at zero.
+            const float price = (mc.price[r] > 0.0f) ? mc.price[r] : mc.base_price[r];
+            worth += static_cast<double>(pool.quantities[r]) * static_cast<double>(price);
+        }
+    }
+
+    return static_cast<float>(worth);
+}
+
+/// MILITARY: summed `unit_strength` over the units this corp fields.
+float standing_military(const world& w, entity_id corp)
+{
+    // BL-459: strength is DERIVED — there is no stored `strength` field, and
+    // `unit_roster.hpp`'s function is the only place the roster's per-type
+    // quality and the unit's supply factor are applied.
+    //
+    // Accumulated as an INTEGER, exactly as condition_set.cpp's
+    // `military_strength` subject does and for the same reason: `w.units` is an
+    // unordered_map, so the walk order follows hash layout, and float addition
+    // is not associative. An int64 accumulator makes the sum order-independent
+    // by construction rather than by luck.
+    int64_t s = 0;
+    for (const auto& [uid, u] : w.units)
+        if (u.owner == corp)
+            s += unit_strength(w, u);
+    return static_cast<float>(s);
+}
+
+} // namespace
+
+standing_index corp_standing_index(const world& w, const recipe_registry& reg,
+                                  entity_id corp, const corp_ai_params& p)
+{
+    standing_index out;
+
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end())
+        return out; // an unknown corp stands at zero on every component
+    const corporation_component& cc = cit->second;
+
+    // The measurement switch. A FOURTH COMPONENT ADDS ONE LINE HERE and nothing
+    // else in this function — see `standing_component`'s append-only note.
+    out.component[static_cast<std::size_t>(standing_component::economic)] =
+        standing_economic(w, reg, corp, cc);
+    // RESEARCH: the BL-332 accumulator. Stockpiled, market-invisible, never
+    // decaying — reached, not spent, so this is a level and not a balance.
+    out.component[static_cast<std::size_t>(standing_component::research)] = cc.science;
+    out.component[static_cast<std::size_t>(standing_component::military)] =
+        standing_military(w, corp);
+
+    // A LOOP, not three hand-written terms: this is what makes a fourth
+    // component an addition rather than a rewrite.
+    double total = 0.0;
+    for (std::size_t i = 0; i < standing_component_count; ++i)
+        total += static_cast<double>(out.component[i]) *
+                 static_cast<double>(p.standing_weights[i]);
+    out.total = static_cast<float>(total);
+    return out;
 }
 
 float corp_should_have_buffer(const world& w, const recipe_registry& reg,
@@ -1547,16 +1694,6 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // numbers behind it are corp_ai_params fields precisely so tuning it
         // never needs this code changed. See AI_OPPONENT.md § 6.
         {
-            // Lowest-id market on a body, or null. Lowest id (not map order) so
-            // the choice is stable across container internals.
-            auto market_on_body = [&w](entity_id body) -> entity_id {
-                entity_id best = null_entity;
-                for (const auto& [mid, mc] : w.markets)
-                    if (mc.body == body && (best == null_entity || mid < best))
-                        best = mid;
-                return best;
-            };
-
             // corp_body_pools is a std::map, so this walk is already ordered by
             // (corp, body) — the deterministic iteration the whole scorer rests on.
             for (const auto& [key, pool] : w.corp_body_pools)
@@ -1564,7 +1701,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 if (key.first != corp)
                     continue;
                 const entity_id body = key.second;
-                const entity_id mid  = market_on_body(body);
+                const entity_id mid  = market_on_body(w, body);
                 if (mid == null_entity)
                     continue;
                 const market_component& mc = w.markets.at(mid);
@@ -1641,18 +1778,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // rather than flooding the candidate list with every (body, resource)
         // pair.
         {
-            // Lowest-id market on a body — the same stable pick
+            // `market_on_body` (top of this file) is the same stable pick
             // `supply_system.cpp`'s own (internal-linkage) `market_for_body`
-            // makes, duplicated rather than shared for the same reason that
-            // one's own comment gives.
-            auto market_on_body = [&w](entity_id body) -> entity_id {
-                entity_id best = null_entity;
-                for (const auto& [mid, mc] : w.markets)
-                    if (mc.body == body && (best == null_entity || mid < best))
-                        best = mid;
-                return best;
-            };
-
+            // makes. It was a lambda here and a second identical one in the
+            // trade block above until BL-700 needed a third for the standing
+            // read; three copies of one rule is one copy too many, so it is now
+            // a single file-local function.
             const logistics_nodes nodes = collect_logistics_nodes(w);
 
             entity_id   best_market   = null_entity;
@@ -1732,7 +1863,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
             if (best_market != null_entity)
             {
-                const entity_id src_market = market_on_body(best_src_body);
+                const entity_id src_market = market_on_body(w, best_src_body);
                 if (src_market != null_entity)
                 {
                     candidate c;
