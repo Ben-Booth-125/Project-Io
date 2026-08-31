@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*116 entries — 110 open, 6 resolved.*
+*118 entries — 112 open, 6 resolved.*
 
 ---
 
@@ -1378,6 +1378,54 @@ BOTH ARE CONTAINED. If Ben wants province grain instead of market catchment, or 
 > **Recommendation:** Both calls look right to me and I would keep them. The reach one is the load-bearing half: it is composed from the game's own placement rule against an authored constant, so the instrument measures what a corporation could actually DO rather than an abstract connectivity. That is the property that makes NR-763's option 2 a legitimate experiment rather than a circular one.
 
 *Files: `tools/verify/demand_census.cpp`, `docs/economy/LOGISTICS.md`, `docs/economy/MARKETS.md`*
+
+### NR-765 — THE SAME DEFECT, THREE TIMES: an argmax on an absolute quantity, in a domain whose values span orders of magnitude
+*observation · raised 2026-08-31 · from Sprint 27 waves 1 and 2. BL-707 diagnosed one instance; BL-708 hit a second building on top of it; BL-440 had already fixed a third.*
+
+Three separate symptoms this sprint traced to one shape. Naming it once is worth more than three fixes.
+
+THE SHAPE: a pre-selection step ranks candidates by ONE ABSOLUTE QUANTITY and truncates. Where that quantity's values span orders of magnitude, the truncation is not a ranking - it is a CATEGORY EXCLUSION. Everything below the top band never reaches scoring at all, so the scorer looks correct while never having been offered a real choice.
+
+INSTANCE 1 - BL-440, already fixed, and it named the trap in its own comment. Extraction site selection pre-picked a tile's RICHEST deposit. Its fix comment reads: "Pre-selecting the richest was a TILE-LOCAL heuristic answering a WORLD-level question."
+
+INSTANCE 2 - BL-707, diagnosed this sprint. `rank_extraction_sites` enumerates every deposit per tile (BL-440's fix working) and then truncates to a GLOBAL `top_m_sites = 8` by deposit x affinity x demand_weight. All eight slots are iron_ore, cut-off 7847.5, against clay's best 205.7 and peat's 75.0 - a 60x gap that `input_demand_pull` (bounded ~9x) cannot close. So BL-440 fixed the tile-local version and RE-SET THE IDENTICAL TRAP ONE ALTITUDE UP.
+
+INSTANCE 3 - found by BL-708 while building power. `corp_ai.cpp:1071` picks the max net margin per site: `if (n > best_net ...)`. Power's net is 3.98; price-ceiled electronics is 290. **The corp AI can never build a power plant**, in any world, at any time. The first attempt at BL-708 collapsed the industrial band to 25 of 407 operating firms with power produced 0.0, purely because of this.
+
+WHY IT KEEPS RECURRING, and this is the part worth carrying: each instance is locally reasonable. "Take the richest tile", "take the top 8 sites", "take the best-margin recipe" are all sensible sentences. The defect is invisible until you ask what the DISTRIBUTION of the ranked quantity looks like - and in this economy it is always long-tailed, because deposit magnitudes, margins and prices all span three orders.
+
+A CHEAP GOOD CAN NEVER WIN AN ABSOLUTE-MARGIN CONTEST, however badly the world needs it. Power is the clearest case: it is wanted by every building on the map and it is worth 3.98 a unit.
+
+THE FIXES ARE THE SAME SHAPE TOO: rank scale-free (normalise within resource or within category), or take a per-category top-K instead of a global top-M, so every category is represented in the candidate list and the SCORER decides - which is what the scorer is for.
+
+**Why it matters.** It is the root cause of two of this sprint's three biggest findings, and it will silently break the next channel too. Power only works today because the SEEDER places plants; the AI cannot add one, so power supply never grows with the world - which defeats the economy-scaled sink the channel was built to be.
+
+- One item fixing the shape wherever it appears - per-category top-K in the extraction pre-filter AND scale-free recipe selection. Determinism-affecting and moves every economy golden, so it wants its own sprint slot.
+- Fix only the recipe-selection instance now, since it is what makes BL-708's power supply unable to grow, and carry the extraction one as BL-707's handover already proposes.
+- Carry both as documented debt with the shape recorded here, and fix when a measurement shows it costing something beyond what is already measured.
+
+> **Recommendation:** Option 2, then 1. The recipe-selection instance is the one that makes a LANDED feature structurally incomplete rather than merely suboptimal - power exists in the world only because generation placed it, and no rival will ever build another. That is worth fixing before the sprint's own construction item lands on the same scorer. The extraction instance is bigger and already has a handover.
+
+*Files: `src/world/corp_ai.cpp`, `src/world/corp_ai.hpp`, `tools/verify/chain_conversion_probe.cpp`*
+
+### NR-766 — The world seeder sizes against consumer demand only, never against processing-input demand
+*novel-work · raised 2026-08-31 · from Found by the BL-708 slice while making power plants get built at all.*
+
+`body_demand` in `corporation_generation.cpp` counted only household baskets plus the background stopgap. It never counted what PROCESSORS need as inputs.
+
+THE CONSEQUENCE, and it explains a census reading that has been sitting unexplained: **any chain whose raw is not independently demanded by consumers never gets mined.** Coal has a recipe. Coal is produced 0.0. Nothing consumes coal directly, so the seeder never sized for it, so no coal mine was ever placed, so the recipe that wants coal starves - and the census reports it as an orphan resource rather than as a seeding gap.
+
+The slice added `body_upkeep_demand`, re-measured PER ITERATION because placing a firm creates its own draw, selecting on absolute shortfall. It is zero while no upkeep rate is authored, so pre-BL-708 worlds generate byte-identically.
+
+THAT PATCHES THE UPKEEP HALF ONLY. Processing-input demand is still unseen, which is the larger half: it is the difference between a world seeded to feed its own chains and one seeded to feed its households and hope.
+
+NOVELTY: the change is in `corporation_generation.cpp`, which is the GENERATION layer, and it was made by an economy slice whose brief did not name it. It was load-bearing - without it BL-708 cannot work at all - but it deserves generation-dev's eyes rather than standing as an economy agent's judgement call.
+
+**Why it matters.** It is a structural reason the demand census reads the way it does, and it is upstream of everything sprint 27 is doing. Building demand channels into a world that was never seeded to supply them produces exactly the starved chains BL-641 measured.
+
+> **Recommendation:** File the processing-input half as its own item and give it to generation-dev, with the upkeep half that just landed as the worked pattern. It is closely related to NR-765 - both are about a selection step that cannot see a whole category of want - and the two together are probably why the ancient chain does not convert.
+
+*Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`, `docs/generation/GENERATION_STRATEGY.md`*
 
 ---
 

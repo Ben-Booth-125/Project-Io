@@ -4462,14 +4462,14 @@
   {
    "brief": "power-as-a-grid",
    "title": "BL-708 - power, a bought upkeep draw transmitted on the road network",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-708 - Sprint 27, demand",
    "batch": "sprint-27-wave-2",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: demand_census showing coal/petroleum leaving the no-sink list"
      ],
@@ -4478,7 +4478,7 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: a harness asserting a disconnected building cannot draw"
      ],
@@ -4487,7 +4487,7 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: operating-firm count does not collapse when power is enabled"
      ],
@@ -4496,7 +4496,7 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: inspection plus a harness row"
      ],
@@ -4505,7 +4505,7 @@
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: a harness row on a cross-border match"
      ],
