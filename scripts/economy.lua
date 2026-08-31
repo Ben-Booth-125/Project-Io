@@ -405,23 +405,29 @@ economy = {
     -- idles it. The shortfall rule worked exactly as designed — it was fed a
     -- good nobody makes.
     --
-    -- AND WHY NOBODY MAKES THEM IS THE SAME LOOP, from the other end. This
-    -- draw is a POOL draw (FINANCE.md's own shape, copied from
-    -- run_unit_upkeep) and never reaches `market_component::demand`. So
-    -- wanting tools does not RAISE THE PRICE of tools, no rival ever scores
-    -- building a Toolmaker, and the supply that would meet the draw is never
-    -- induced. Tools and planks were on the census's "produced in-band, NO
-    -- market sink" list before this item, and a pool-only draw leaves them
-    -- there. Whether the Industry channel should also register a market WANT
-    -- — as run_construction and run_processing both do, and as MARKETS.md
-    -- § Demand channels arguably requires of a demand channel — is Ben's
-    -- call, not this file's.
+    -- AND WHY NOBODY MAKES THEM WAS THE SAME LOOP, from the other end. The
+    -- draw was a POOL draw (FINANCE.md's own shape, copied from
+    -- run_unit_upkeep) and never reached `market_component::demand`. So
+    -- wanting tools did not RAISE THE PRICE of tools, no rival ever scored
+    -- building a Toolmaker, and the supply that would meet the draw was never
+    -- induced. Tools and planks sat on the census's "produced in-band, NO
+    -- market sink" list for exactly that reason.
     --
-    -- SO WHAT LANDS. The shape, inert, with its ordering, its shortfall rule
+    -- BL-654 CLOSED THAT HALF (Ben's call, 2026-08-26, as the note above said
+    -- it had to be). The draw is no longer pool-only: the pool is drawn first
+    -- and the SHORTFALL IS BID on the local market and paid for, up to
+    -- price_band.reservation_mult x base_price, above which the building
+    -- declines to buy and the shortfall rule weakens it instead. One rule for
+    -- every goods draw — run_unit_upkeep takes the identical path, not a
+    -- second one. Wanting tools now prices tools.
+    --
+    -- THE RATES BELOW STILL SHIP AT ZERO, deliberately, and turning them on is
+    -- a separate data change with its own measurement. BL-654 closed the
+    -- PRICING half of the loop; the SUPPLY half — an ancient band that
+    -- actually makes tools — has to follow the price signal before the draw
+    -- can be met, and that takes ticks the harness has to be allowed to run.
+    -- The shape is inert until then, with its ordering, its shortfall rule
     -- and its era bands all built and verified (tools/verify/building_upkeep).
-    -- Switching it on is a data change the moment either half of the loop is
-    -- closed: an ancient band that actually makes tools, or an Industry draw
-    -- that prices what it wants.
     -- ===================================================================
     building_upkeep = {
         supply_decay_permille    = 50,   -- the ONE subtraction, per tick, on an unmet draw
@@ -1047,9 +1053,62 @@ economy = {
     -- the direction Sprint 19's falling numbers are already complaining about — and
     -- it would be an authored guess sitting next to a derived number, which is the
     -- exact confusion step 1 existed to remove.
+    -- ===================================================================
+    -- BL-654: THE BUYER'S RESERVATION CEILING lives in THIS family.
+    --
+    -- Ben's ruling, 2026-08-26: "Buy on the market, but at a threshold,
+    -- buying is not allowed. This goes hand in hand with maximum and minimum
+    -- prices for goods." It sits beside floor_mult / ceil_mult and not in
+    -- upkeep because it is a statement about what a good is worth PAYING, not
+    -- about who is buying — one number per world, read by every goods draw.
+    --
+    -- It is the exact mirror of the seller's floor_price (BL-386): both sides
+    -- may decline a trade, neither may dictate one.
+    --
+    -- MEASURED, NOT GUESSED. tools/verify/demand_census.cpp R3 reports the
+    -- mean resolved price as a multiple of base, per resource, per band, over
+    -- every market that prices it. Seed 0, 80-tick warm start, shipped spawn:
+    --
+    --   LOWER BOUND — it must ADMIT what the live draws actually buy. The only
+    --   goods draw live at shipped rates is unit upkeep, and its dearest good
+    --   is food_rations: 7.788x base in the ancient band (14 markets, ceiled in
+    --   8) and 8.629x in the industrial (9 markets, ceiled in 5). A ceiling
+    --   below 8.63 declines the food draw in the band where it is dearest, so
+    --   every unit's draw goes unmet — which is exactly the mechanism that took
+    --   operating firms 227 -> 19 when BL-641 turned building upkeep on. The
+    --   bound is the INDUSTRIAL figure, not the ancient one.
+    --
+    --   UPPER BOUND — it must DECLINE the cap. A resource pegged at ceil_mult
+    --   is a generation-calibration signal (MARKETS.md § Price resolution),
+    --   not a legitimate purchase, and a reservation equal to the cap declines
+    --   nothing at all: the rule would be inert the day it landed.
+    --
+    --     8.63  <  reservation_mult  <  10.0   ->  9.0
+    --
+    -- WHAT 9.0 ACTUALLY REFUSES, measured on the same run. Ancient: ceramics
+    -- (9.240x, ceiled in 12 of 14) and leather (9.968x, 13 of 14). Industrial:
+    -- consumer_goods (9.082x), silicon (9.377x), alloys (9.666x), ree_alloy
+    -- (9.867x) and electronics (9.986x). Every one of those is among its
+    -- band's most-ceiled rows — the goods nothing in the world makes — and all
+    -- 21 other priced goods are admitted. That is the rule doing its job: a
+    -- starving building does not bid a good to its cap chasing a shortfall no
+    -- amount of credits can fix.
+    --
+    -- A CONSEQUENCE WORTH EXPECTING, not a defect: a good that nobody supplies
+    -- OSCILLATES around this ceiling. Demand with zero supply resolves to
+    -- base x ceil_mult, which is above the reservation, so the next tick's draw
+    -- declines and the EMA pulls the price back down until it bids again. The
+    -- price settles near reservation_mult — high enough that a rival scoring
+    -- the building which supplies it can see the gap, which is the whole point.
+    --
+    -- RE-DERIVE RATHER THAN TRUST. Re-run demand_census and read the R3 table
+    -- whenever base_price, ceil_mult, or either upkeep basket changes — all
+    -- three move the two bounds above.
+    -- ===================================================================
     price_band = {
-        floor_mult = 0.25, -- lowest a price may fall, x base_price
-        ceil_mult  = 10.0, -- highest a price may rise, x base_price (derived; see above)
+        floor_mult       = 0.25, -- lowest a price may fall, x base_price
+        ceil_mult        = 10.0, -- highest a price may rise, x base_price (derived; see above)
+        reservation_mult = 9.0,  -- BL-654: a goods draw declines to buy above this (derived; see above)
     },
 
     -- BL-263 (2026-08-11): spontaneous market emergence — a market appears the

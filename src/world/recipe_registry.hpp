@@ -388,6 +388,36 @@ struct price_band_params
 {
     float floor_mult = 0.25f; ///< Lowest a price may fall: 0.25x base_price.
     float ceil_mult  = 4.0f;  ///< Highest a price may rise: 4x base_price.
+
+    /// BL-654 — the BUYER'S RESERVATION CEILING, x base_price. "Go without
+    /// rather than buy above this."
+    ///
+    /// It lives in THIS family and not in upkeep (Ben, 2026-08-26) because it
+    /// is a statement about what a good is worth PAYING, not about who is
+    /// buying: one number per world, read by every goods draw, exactly as
+    /// `floor_mult`/`ceil_mult` are read by every price resolution.
+    ///
+    /// It is the exact mirror of `sell_order::floor_price`, the seller's
+    /// reservation (BL-386): both sides may decline a trade, neither may
+    /// dictate one. A short pool bids its shortfall onto the market while the
+    /// good prices at or below `reservation_mult x base_price`, and declines to
+    /// bid at all above it — the shortfall then stands and the existing
+    /// shortfall rule weakens the building or unit, which is an outcome the
+    /// design already knows how to express.
+    ///
+    /// ZERO MEANS THE DRAW NEVER BUYS, which is the pre-BL-654 pool-only
+    /// behaviour exactly — and it is the DEFAULT, so a harness that hand-builds
+    /// a registry and never authors this table is byte-identical. A resource
+    /// with `base_price <= 0` is unbuyable for the same arithmetic reason (its
+    /// ceiling is 0 and no price clears it), which is `run_construction`'s own
+    /// "unpriced == unbuyable" reading rather than a second rule.
+    ///
+    /// Bounded above by `ceil_mult` in practice, and meaningfully BELOW it: a
+    /// resource pegged at `ceil_mult` is a generation-calibration signal
+    /// (MARKETS.md § Price resolution), not a legitimate purchase, so a
+    /// reservation equal to the ceiling would decline nothing and the rule
+    /// would be inert. See docs/economy/MARKETS.md § Settled: a short pool BUYS.
+    float reservation_mult = 0.0f;
 };
 
 /// BL-263 spontaneous-market-emergence tunables, authored in scripts/economy.lua

@@ -1953,7 +1953,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // deliberately: the strategic tier above demolishes at tick rate, so running
     // after it means a muster base torn down THIS tick orphans its units in the
     // same tick rather than leaving them live for one. See run_unit_upkeep.
-    run_unit_upkeep(w, reg);
+    run_unit_upkeep(w, reg, report);
 
     // BL-641: the building pass — the goods half of a building's upkeep and the
     // same decay rule, on the other kind of asset. Beside the unit pass rather
@@ -1962,7 +1962,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // from `w.buildings` and never draws. Running after production also means a
     // building may consume what it just made, which is the honest ordering — a
     // workshop's tools come out of stock, not out of next quarter's.
-    run_building_upkeep(w, reg);
+    run_building_upkeep(w, reg, report);
 
     return report;
 }
@@ -2176,7 +2176,124 @@ migration_tick run_population_migration(world& w, const recipe_registry& reg,
     return t;
 }
 
-unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg)
+// ---------------------------------------------------------------------------
+// BL-654 — ONE RULE FOR EVERY GOODS DRAW
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Draw one tick of `need` for (`corp`, `body`) standing at `tile`: the corp's
+/// own pool first, then the local market for whatever the pool could not cover
+/// — declining outright any good the market prices above the buyer's
+/// reservation ceiling. Returns true iff some required good is STILL short
+/// after both, which is the trigger the caller's own shortfall rule takes.
+///
+/// THIS IS THE ONE PATH, and that is the item's whole point (Ben, 2026-08-26).
+/// `run_unit_upkeep` and `run_building_upkeep` both call it; neither carries a
+/// parallel mechanism, and a third goods draw added later calls this rather
+/// than copying it. Before BL-654 both were POOL-ONLY: they consumed goods
+/// without pricing them, so wanting tools never raised the price of tools, no
+/// rival ever scored building a Toolmaker, and the supply that would have met
+/// the draw was never induced (MARKETS.md § Demand channels, property 3 — a
+/// channel that consumes without pricing cannot bootstrap its own supply).
+///
+/// THE SHAPE IS `run_construction`'s, deliberately and to the letter, because
+/// that is the buy path the market already has:
+///
+///   * the WANT registered is the full shortfall, UNREDUCED by what the shelf
+///     can actually supply — `report.wants` is the bid, and BL-441's finding
+///     was that registering the fill instead silences the very shortage that
+///     should have priced the good;
+///   * the PURCHASE recorded is what was actually drawn off `market.inventory`
+///     — the fill, which is what `clear_markets` bills the corp for at this
+///     tick's resolved price;
+///   * the market is the one the TILE clears against (`market_for_tile`), the
+///     shelf the buyer is standing at, while the want/fill are keyed by
+///     (corp, body) exactly as construction's are.
+///
+/// THE CEILING IS READ AGAINST THE PRIOR RESOLVED PRICE, one tick stale, since
+/// this pass runs before `clear_markets` resolves the new one. That lag is
+/// `run_construction`'s too — it commits its draw before `ref_price` exists —
+/// so it is the model's existing tolerance rather than a new one.
+///
+/// Deterministic: resource index order, no RNG, no container-order dependence.
+bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& report,
+                       entity_id corp, entity_id body, entity_id tile,
+                       const std::array<float, resource_count>& need)
+{
+    // pool_for INSERTS on first access, so callers reach this only when there is
+    // something to draw — an all-zero basket never creates a pool, which is what
+    // keeps a zero-rate world byte-identical down to its pool set.
+    stockpile_component& pool = w.pool_for(corp, body);
+
+    const entity_id  mid = market_for_tile(w, tile);
+    market_component* m  = (mid != null_entity) ? &w.markets.at(mid) : nullptr;
+    const float res_mult = reg.price_band().reservation_mult;
+
+    // `wants` / `purchases` are std::maps keyed by (corp, body); touching them
+    // only when there is a bid keeps a pool-covered tick from inserting empty
+    // rows the census would then have to explain.
+    std::array<float, resource_count>* want   = nullptr;
+    std::array<float, resource_count>* bought = nullptr;
+    std::array<float, resource_count>* upk    = nullptr;
+
+    bool unmet = false;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float required = need[r];
+        if (required <= 0.0f)
+            continue;
+
+        const float have = std::max(0.0f, pool.quantities[r]);
+        const float take = std::min(required, have);
+        pool.quantities[r] = have - take; // never negative, by construction
+        float shortfall = required - take;
+        if (shortfall <= 0.0f)
+            continue;
+
+        // --- the market backstop, gated on the reservation ceiling ----------
+        // `base <= 0` is untradeable, and its ceiling is 0, so no price clears
+        // it — "unpriced == unbuyable" falls out of the arithmetic rather than
+        // needing a rule of its own. `res_mult <= 0` is the authored OFF switch.
+        if (m != nullptr && res_mult > 0.0f)
+        {
+            const float base = m->base_price[r];
+            if (base > 0.0f)
+            {
+                const float price = (m->price[r] > 0.0f) ? m->price[r] : base;
+                if (price <= base * res_mult)
+                {
+                    if (want == nullptr)
+                    {
+                        want = &report.wants[std::make_pair(corp, body)];
+                        upk  = &report.upkeep_wants[std::make_pair(corp, body)];
+                    }
+                    (*want)[r] += shortfall; // the BID: the whole shortfall
+                    (*upk)[r]  += shortfall; // attribution mirror; nothing pays it
+
+                    const float avail = std::max(0.0f, m->inventory[r]);
+                    const float drawn = std::min(shortfall, avail);
+                    if (drawn > 0.0f)
+                    {
+                        m->inventory[r] -= drawn;
+                        if (bought == nullptr)
+                            bought = &report.purchases[std::make_pair(corp, body)];
+                        (*bought)[r] += drawn; // the FILL: this is what is billed
+                        shortfall -= drawn;
+                    }
+                }
+            }
+        }
+
+        if (shortfall > 0.0f)
+            unmet = true;
+    }
+    return unmet;
+}
+
+} // namespace
+
+unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_report& report)
 {
     unit_upkeep_tick out;
     if (w.units.empty())
@@ -2276,22 +2393,12 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg)
         const unit_upkeep_draw d = resolve_unit_upkeep(u, up);
         if (d.any_goods)
         {
-            // pool_for inserts on first access, so it is reached only when there
-            // is something to draw — an all-zero goods table never creates a pool.
-            stockpile_component& pool = w.pool_for(u.owner, body);
-            bool unmet = false;
-            for (std::size_t r = 0; r < resource_count; ++r)
-            {
-                const float need = d.goods[r];
-                if (need <= 0.0f)
-                    continue;
-                const float have = std::max(0.0f, pool.quantities[r]);
-                const float take = std::min(need, have);
-                pool.quantities[r] = have - take; // never negative, by construction
-                if (take < need)
-                    unmet = true;
-            }
-            if (unmet)
+            // BL-654: THE SAME PATH the building pass takes, not a second one.
+            // The pool is drawn first; whatever it cannot cover is bid onto the
+            // unit's local market and paid for, unless the good prices above the
+            // buyer's reservation ceiling — in which case the unit goes without
+            // and the decay rule below does exactly what it always did.
+            if (draw_goods_or_bid(w, reg, report, u.owner, body, u.position, d.goods))
             {
                 unsupplied = true;
                 ++out.unmet;
@@ -2321,7 +2428,8 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg)
 // BL-641 — the building pass
 // ---------------------------------------------------------------------------
 
-building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg)
+building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
+                                         economy_report& report)
 {
     building_upkeep_tick out;
     if (w.buildings.empty())
@@ -2389,22 +2497,13 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg)
         if (body == null_entity)
             continue; // detached tile; nothing to draw against
 
-        // pool_for INSERTS on first access, so it is reached only when there is
-        // something to draw — an all-zero table never creates a pool, which is
-        // what keeps a zero-rate world byte-identical down to its pool set.
-        stockpile_component& pool = w.pool_for(corp, body);
-        bool unmet = false;
-        for (std::size_t r = 0; r < resource_count; ++r)
-        {
-            const float need = basket[ti][r];
-            if (need <= 0.0f)
-                continue;
-            const float have = std::max(0.0f, pool.quantities[r]);
-            const float take = std::min(need, have);
-            pool.quantities[r] = have - take; // never negative, by construction
-            if (take < need)
-                unmet = true;
-        }
+        // BL-654: THE SAME PATH the unit pass takes, not a second one. The pool
+        // is drawn first; whatever it cannot cover is BID onto the building's
+        // local market — which is what finally makes the Industry channel a
+        // price signal rather than a silent sink — and paid for, unless the good
+        // prices above the buyer's reservation ceiling, in which case the
+        // building goes without and the shortfall rule below applies unchanged.
+        const bool unmet = draw_goods_or_bid(w, reg, report, corp, body, b.tile, basket[ti]);
 
         // THE SHORTFALL RULE IS THE SAME RULE. An unmet draw takes the same
         // subtraction an out-of-supply unit takes; it never destroys, idles or

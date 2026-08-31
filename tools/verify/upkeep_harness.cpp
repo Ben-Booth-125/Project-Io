@@ -50,6 +50,15 @@
 
 namespace {
 
+// BL-654: both upkeep passes now take an `economy_report&` — the shortfall bid
+// they place on the market lands in its `wants` / `purchases` / `upkeep_wants`
+// registers. Nothing in THIS harness reads those registers, and nothing here can
+// write to them either: `price_band_params::reservation_mult` defaults to 0 and
+// these fixtures hand-build their registry, so the bid path is off and the draw
+// is pool-only exactly as it was before BL-654. One shared scratch report keeps
+// that visible rather than scattering a fresh local at every call site.
+economy_report g_upkeep_report;
+
 int g_pass = 0, g_fail = 0;
 
 void check(bool ok, const std::string& what)
@@ -221,7 +230,7 @@ scenario_result run_scenario(const recipe_registry& reg)
     f.w.pool_for(corp_in_met, f.body).quantities[ordnance_idx()]  = 1000.0f;
     f.w.pool_for(corp_out_met, f.body).quantities[ordnance_idx()] = 1000.0f;
 
-    unit_upkeep_tick tick = run_unit_upkeep(f.w, reg);
+    unit_upkeep_tick tick = run_unit_upkeep(f.w, reg, g_upkeep_report);
 
     scenario_result r;
     r.supply_in_reach_met     = f.w.units.at(u_in_met).supply_factor_permille;
@@ -302,7 +311,7 @@ int main()
         const entity_id corp = add_corp(f.w);
         const entity_id u    = add_unit(f.w, corp, at(f, 2, 0), 10, 560);
         f.w.pool_for(corp, f.body).quantities[ordnance_idx()] = 1000.0f;
-        run_unit_upkeep(f.w, reg);
+        run_unit_upkeep(f.w, reg, g_upkeep_report);
         check(f.w.units.at(u).supply_factor_permille == 620,
               "U6 recovery continues on a second in-supply tick (560 -> 620)");
     }

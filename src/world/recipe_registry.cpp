@@ -340,6 +340,9 @@ void recipe_registry::load_from_lua(lua_state& lua)
         price_band_params pb;
         pb.floor_mult = price_band->get_or("floor_mult", pb.floor_mult);
         pb.ceil_mult  = price_band->get_or("ceil_mult",  pb.ceil_mult);
+        // BL-654: the buyer's reservation ceiling, in the same authored family.
+        // Absent -> 0.0 -> no goods draw ever buys, the pre-BL-654 behaviour.
+        pb.reservation_mult = price_band->get_or("reservation_mult", pb.reservation_mult);
         m_price_band = pb;
     }
 
