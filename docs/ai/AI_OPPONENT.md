@@ -67,8 +67,8 @@ at**. Nothing in the scorer knows what the margin is.
 2. **Climate is a commons that the biggest extractor strains most.** A world-level pressure that
    scales with total activity and bears hardest on the largest operator. It brakes a runaway
    without naming anyone, which is what makes it feel like weather rather than like a rule aimed at
-   the player. Climate exists in Io today only as a **generation-time** input to terrain; as a live
-   campaign force it is unbuilt, and it is the system this goal most depends on.
+   the player. Authority: `docs/CLIMATE.md`, which owns the commons, its grain, and the shape of its
+   curve; this section owns only why the AI design leans on it.
 
 Both are legible, both have causes, and both **feed Trade or Conflict** — which an objective term
 does not, and which every system in Io is required to do.

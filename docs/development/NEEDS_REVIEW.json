@@ -1477,7 +1477,7 @@
   {
    "id": "NR-745",
    "kind": "novel-work",
-   "status": "open",
+   "status": "resolved",
    "raised": "2026-08-31",
    "title": "No authority doc owns a LIVING climate, and it is now load-bearing for the AI design",
    "source": "Ben, 2026-08-31: \"we haven't built a critical system which is climate.\" Filed at the moment the feeling arose, per the novelty rule.",
@@ -1494,7 +1494,8 @@
     "docs/SYSTEMS.md",
     "docs/ai/AI_OPPONENT.md",
     "docs/economy/TILES.md"
-   ]
+   ],
+   "resolution": "ANSWERED by Ben the same day - \"Let's design climate docs here\" - and by BL-701 (climate doc), which took option 1: climate has its own authority doc.\n\ndocs/CLIMATE.md is top-level, alongside EVENTS.md and META_LAYER.md, NOT a section inside PLANETOLOGY.md. The reasoning the entry set out held up: PLANETOLOGY.md owns generation-time atmosphere, chemistry and biosphere history, and a live campaign force that responds to what corporations do is a different subject. Admitted to SYSTEMS.md § Environment and to CLAUDE.md's router.\n\nThe novelty is therefore CHOSEN rather than accreted, which is what the flag existed to secure. What remains is not novelty but ordinary open design - CLIMATE.md § 11 lists it, and the one call that changes the feel of the system is raised separately as NR-747."
   },
   {
    "id": "NR-746",
@@ -1510,6 +1511,27 @@
     "docs/ai/AI_OPPONENT.md",
     "docs/development/sprints.json",
     "src/world/corp_ai.cpp"
+   ]
+  },
+  {
+   "id": "NR-747",
+   "kind": "question",
+   "status": "open",
+   "raised": "2026-08-31",
+   "title": "Does climate recover, ratchet, or set a floor? The call that decides what the system feels like",
+   "source": "Ben, 2026-08-31: \"Let's design climate docs here... how the hazard affects players.\" CLIMATE.md § 6 is written with a recommendation and marked as his call.",
+   "what": "Climate degrades under the strain of what corporations extract and process on a body. The question is what happens when the strain stops. It is the one open call in CLIMATE.md that changes the system's FEEL rather than its numbers, and every other open call reads differently depending on it.\n\nREVERSIBLE - degrades under strain, recovers when strain falls. Climate is a live pressure and a standing negotiation between operators. COST: it becomes a thermostat. A cost to manage, never a stake, and it supplies no Era boundary at all - which loses one of the three jobs the system was admitted for.\n\nRATCHETING - degrades only, never recovers. The countdown has teeth and the Era rupture is inevitable. COST: it removes agency. If the ending arrives regardless, the rational player ignores the meter and climate becomes scenery with a number on it. It also makes ERAS.md's own sentence false - see below.\n\nFLOORED (recommended, and written into CLIMATE.md § 6 as the recommendation) - recovery is real up to a threshold; past it a floor is set that never lifts, and each further breach raises it. The body can recover TO the floor and no further.\n\nWHY FLOORED, and it is not a split-the-difference argument. ERAS.md already commits to this sentence about the Era 0 exit: \"The backstory establishes that these powers CAN pull back from the brink; the Era 0 exit is the occasion they do not.\" Under a ratchet nobody could ever have pulled back, so that sentence is a lie. Under pure reversibility nobody ever needed to, so the rupture is unmotivated. Only a floor makes pulling back genuinely possible, genuinely costly, and genuinely something a field of competing corporations may fail to coordinate on. That is a tragedy of the commons rather than a scripted apocalypse - and it makes the Era boundary a CONSEQUENCE OF PLAY rather than a date on the clock.\n\nIT ALSO DECIDES WHETHER CLIMATE IS A MARKET. If recovery exists, something a corporation BUILDS could accelerate it, and remediation becomes a business - which is CLIMATE.md § 11's third open call and is only live under reversible or floored.\n\nWHAT IT DOES NOT DECIDE: the constraint that climate never vetoes construction or extension is Ben's 2026-08-31 ruling and holds under all three shapes.",
+   "why_it_matters": "It decides whether climate is a pressure, a doom clock, or a commons - and therefore whether the Era 0 boundary is something the world's corporations did or something the calendar did. The build should not be minted before it is answered; building against an unsettled curve would be implementing the wrong feel efficiently.",
+   "options": [
+    "Floored - reversible up to a threshold, then a permanent floor that each breach raises. RECOMMENDED, and already written into CLIMATE.md § 6 as such.",
+    "Reversible - a pure pressure. Simplest, and the safest if climate turns out to be annoying rather than interesting; loses the Era boundary job.",
+    "Ratcheting - a pure doom clock. Strongest era arc, weakest agency; also contradicts ERAS.md's existing backstory sentence."
+   ],
+   "recommendation": "Floored. It is the only shape that keeps all three jobs climate was admitted for, and the only one under which ERAS.md's existing sentence about pulling back from the brink is true. If it proves fiddly in play, collapsing a floor to pure reversibility later is a cheap change; going the other way is not.",
+   "files": [
+    "docs/CLIMATE.md",
+    "docs/economy/ERAS.md",
+    "docs/CONCEPT.md"
    ]
   }
  ]

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*98 entries — 97 open, 1 resolved.*
+*99 entries — 97 open, 2 resolved.*
 
 ---
 
@@ -975,29 +975,6 @@ This is the same failure shape as NR-70x's FINANCE.md finding: a document descri
 
 *Files: `.claude/rules/io-standing-rules.md`, `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`*
 
-### NR-745 — No authority doc owns a LIVING climate, and it is now load-bearing for the AI design
-*novel-work · raised 2026-08-31 · from Ben, 2026-08-31: "we haven't built a critical system which is climate." Filed at the moment the feeling arose, per the novelty rule.*
-
-Climate became load-bearing today. AI_OPPONENT.md § Where restraint comes from names it as one of the two systemic brakes that keep a leader from running away - so the AI design now DEPENDS on a system that does not exist and that no doc owns.
-
-WHAT EXISTS, measured. Climate appears in planetology.cpp, tile_generation.cpp and hard_coded_world.cpp, and is documented in TILES.md, PLANETOLOGY.md, TILE_GENERATION.md and RESOURCES.md - all of it GENERATION-TIME, shaping terrain as tiles are made. economy_system.cpp, corp_ai.cpp and budget_system.cpp do not read the word. Both directions are missing: nothing a corporation does can affect climate, and climate cannot affect a running campaign.
-
-WHY IT IS A NOVELTY FLAG AND NOT JUST A BIG ITEM. PLANETOLOGY.md owns body-level atmosphere, chemistry and biosphere HISTORY - generation's concern. A live campaign force that responds to what corporations do is a different subject, and filing it under a generation doc would put a campaign system in the wrong authority. SYSTEMS.md owns the system map and would need to admit it. This is a new system in the project, and per the standing rule novelty should be CHOSEN rather than accreted.
-
-IT ALSO GROWS SCOPE IN A DIRECTION NOTHING ELSE HAS. A commons that strains under total activity touches production, habitability, terrain and plausibly nations (which would reach the 2026-08-18 nation grant). BL-701 (living climate) is filed design-owed at difficulty 8 with no build plan, deliberately.
-
-I DID NOT PAUSE THE SESSION FOR IT, per the rule's own carve-out, because the sprint does not depend on it: BL-699 (rival coalitions) can produce a close race on its own. Climate is what later makes that race honest when the PLAYER is the one leading.
-
-**Why it matters.** A design doc now cites a system that has no owner, no design and no code. That is the exact shape NR-70x caught in FINANCE.md - a doc describing something in the present tense that nothing backs - and it is worth catching before it is written into more places than one.
-
-- Give climate its own authority doc (docs/economy/CLIMATE.md or docs/generation/CLIMATE.md) and admit it to SYSTEMS.md. Cleanest, and matches how every other system in Io is owned.
-- Extend PLANETOLOGY.md with a live-campaign section. Cheaper, but puts a campaign force in a generation doc, which the state-independence rule would read as a category error.
-- Design it inside AI_OPPONENT.md as an AI-support mechanism. WRONG, and named here only to reject it - climate would bear on the player identically, so it is a world system that happens to brake the AI, not an AI feature.
-
-> **Recommendation:** Its own doc, admitted to SYSTEMS.md, designed in sprint 26 and built in the sprint after. The design questions BL-701 lists are unanswered and several are yours to call - notably whether it degrades reversibly or ratchets, which decides whether climate is a pressure or a doom clock.
-
-*Files: `docs/generation/PLANETOLOGY.md`, `docs/SYSTEMS.md`, `docs/ai/AI_OPPONENT.md`, `docs/economy/TILES.md`*
-
 ### NR-746 — Restraint moved out of the agent and into the world - the supersession record, and the one risk it carries
 *decision · raised 2026-08-31 · from Ben, 2026-08-31, answering the margin-objective design form.*
 
@@ -1020,6 +997,33 @@ SECOND RISK, smaller and worth naming: coalitions brake the leader, and the PLAY
 > **Recommendation:** No action - this is a record, not a question. Read it with NR-743, which the reframe dissolved. The thing to actually watch for at the sprint retro is the dogpile failure mode: a leader that COLLAPSES rather than being held is the new design failing, and it will look superficially like success in a spread band.
 
 *Files: `docs/ai/AI_OPPONENT.md`, `docs/development/sprints.json`, `src/world/corp_ai.cpp`*
+
+### NR-747 — Does climate recover, ratchet, or set a floor? The call that decides what the system feels like
+*question · raised 2026-08-31 · from Ben, 2026-08-31: "Let's design climate docs here... how the hazard affects players." CLIMATE.md § 6 is written with a recommendation and marked as his call.*
+
+Climate degrades under the strain of what corporations extract and process on a body. The question is what happens when the strain stops. It is the one open call in CLIMATE.md that changes the system's FEEL rather than its numbers, and every other open call reads differently depending on it.
+
+REVERSIBLE - degrades under strain, recovers when strain falls. Climate is a live pressure and a standing negotiation between operators. COST: it becomes a thermostat. A cost to manage, never a stake, and it supplies no Era boundary at all - which loses one of the three jobs the system was admitted for.
+
+RATCHETING - degrades only, never recovers. The countdown has teeth and the Era rupture is inevitable. COST: it removes agency. If the ending arrives regardless, the rational player ignores the meter and climate becomes scenery with a number on it. It also makes ERAS.md's own sentence false - see below.
+
+FLOORED (recommended, and written into CLIMATE.md § 6 as the recommendation) - recovery is real up to a threshold; past it a floor is set that never lifts, and each further breach raises it. The body can recover TO the floor and no further.
+
+WHY FLOORED, and it is not a split-the-difference argument. ERAS.md already commits to this sentence about the Era 0 exit: "The backstory establishes that these powers CAN pull back from the brink; the Era 0 exit is the occasion they do not." Under a ratchet nobody could ever have pulled back, so that sentence is a lie. Under pure reversibility nobody ever needed to, so the rupture is unmotivated. Only a floor makes pulling back genuinely possible, genuinely costly, and genuinely something a field of competing corporations may fail to coordinate on. That is a tragedy of the commons rather than a scripted apocalypse - and it makes the Era boundary a CONSEQUENCE OF PLAY rather than a date on the clock.
+
+IT ALSO DECIDES WHETHER CLIMATE IS A MARKET. If recovery exists, something a corporation BUILDS could accelerate it, and remediation becomes a business - which is CLIMATE.md § 11's third open call and is only live under reversible or floored.
+
+WHAT IT DOES NOT DECIDE: the constraint that climate never vetoes construction or extension is Ben's 2026-08-31 ruling and holds under all three shapes.
+
+**Why it matters.** It decides whether climate is a pressure, a doom clock, or a commons - and therefore whether the Era 0 boundary is something the world's corporations did or something the calendar did. The build should not be minted before it is answered; building against an unsettled curve would be implementing the wrong feel efficiently.
+
+- Floored - reversible up to a threshold, then a permanent floor that each breach raises. RECOMMENDED, and already written into CLIMATE.md § 6 as such.
+- Reversible - a pure pressure. Simplest, and the safest if climate turns out to be annoying rather than interesting; loses the Era boundary job.
+- Ratcheting - a pure doom clock. Strongest era arc, weakest agency; also contradicts ERAS.md's existing backstory sentence.
+
+> **Recommendation:** Floored. It is the only shape that keeps all three jobs climate was admitted for, and the only one under which ERAS.md's existing sentence about pulling back from the brink is true. If it proves fiddly in play, collapsing a floor to pure reversibility later is a cheap change; going the other way is not.
+
+*Files: `docs/CLIMATE.md`, `docs/economy/ERAS.md`, `docs/CONCEPT.md`*
 
 ---
 
@@ -1059,4 +1063,33 @@ What survives of it: the uniform-vs-player-facing instinct was right for the wro
 Ben DID answer the adjacent question directly: standing is a composite of net worth, research and military strength (BL-700, composite standing index).
 
 *Files: `docs/ai/AI_OPPONENT.md`, `src/world/corp_ai.cpp`, `tools/verify/ai_skill_harness.cpp`*
+
+### NR-745 — No authority doc owns a LIVING climate, and it is now load-bearing for the AI design
+*novel-work · raised 2026-08-31 · from Ben, 2026-08-31: "we haven't built a critical system which is climate." Filed at the moment the feeling arose, per the novelty rule.*
+
+Climate became load-bearing today. AI_OPPONENT.md § Where restraint comes from names it as one of the two systemic brakes that keep a leader from running away - so the AI design now DEPENDS on a system that does not exist and that no doc owns.
+
+WHAT EXISTS, measured. Climate appears in planetology.cpp, tile_generation.cpp and hard_coded_world.cpp, and is documented in TILES.md, PLANETOLOGY.md, TILE_GENERATION.md and RESOURCES.md - all of it GENERATION-TIME, shaping terrain as tiles are made. economy_system.cpp, corp_ai.cpp and budget_system.cpp do not read the word. Both directions are missing: nothing a corporation does can affect climate, and climate cannot affect a running campaign.
+
+WHY IT IS A NOVELTY FLAG AND NOT JUST A BIG ITEM. PLANETOLOGY.md owns body-level atmosphere, chemistry and biosphere HISTORY - generation's concern. A live campaign force that responds to what corporations do is a different subject, and filing it under a generation doc would put a campaign system in the wrong authority. SYSTEMS.md owns the system map and would need to admit it. This is a new system in the project, and per the standing rule novelty should be CHOSEN rather than accreted.
+
+IT ALSO GROWS SCOPE IN A DIRECTION NOTHING ELSE HAS. A commons that strains under total activity touches production, habitability, terrain and plausibly nations (which would reach the 2026-08-18 nation grant). BL-701 (living climate) is filed design-owed at difficulty 8 with no build plan, deliberately.
+
+I DID NOT PAUSE THE SESSION FOR IT, per the rule's own carve-out, because the sprint does not depend on it: BL-699 (rival coalitions) can produce a close race on its own. Climate is what later makes that race honest when the PLAYER is the one leading.
+
+**Why it matters.** A design doc now cites a system that has no owner, no design and no code. That is the exact shape NR-70x caught in FINANCE.md - a doc describing something in the present tense that nothing backs - and it is worth catching before it is written into more places than one.
+
+- Give climate its own authority doc (docs/economy/CLIMATE.md or docs/generation/CLIMATE.md) and admit it to SYSTEMS.md. Cleanest, and matches how every other system in Io is owned.
+- Extend PLANETOLOGY.md with a live-campaign section. Cheaper, but puts a campaign force in a generation doc, which the state-independence rule would read as a category error.
+- Design it inside AI_OPPONENT.md as an AI-support mechanism. WRONG, and named here only to reject it - climate would bear on the player identically, so it is a world system that happens to brake the AI, not an AI feature.
+
+> **Recommendation:** Its own doc, admitted to SYSTEMS.md, designed in sprint 26 and built in the sprint after. The design questions BL-701 lists are unanswered and several are yours to call - notably whether it degrades reversibly or ratchets, which decides whether climate is a pressure or a doom clock.
+
+> **RESOLVED.** ANSWERED by Ben the same day - "Let's design climate docs here" - and by BL-701 (climate doc), which took option 1: climate has its own authority doc.
+
+docs/CLIMATE.md is top-level, alongside EVENTS.md and META_LAYER.md, NOT a section inside PLANETOLOGY.md. The reasoning the entry set out held up: PLANETOLOGY.md owns generation-time atmosphere, chemistry and biosphere history, and a live campaign force that responds to what corporations do is a different subject. Admitted to SYSTEMS.md § Environment and to CLAUDE.md's router.
+
+The novelty is therefore CHOSEN rather than accreted, which is what the flag existed to secure. What remains is not novelty but ordinary open design - CLIMATE.md § 11 lists it, and the one call that changes the feel of the system is raised separately as NR-747.
+
+*Files: `docs/generation/PLANETOLOGY.md`, `docs/SYSTEMS.md`, `docs/ai/AI_OPPONENT.md`, `docs/economy/TILES.md`*
 

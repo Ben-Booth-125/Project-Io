@@ -1636,13 +1636,13 @@
   },
   {
    "id": "BL-701",
-   "short_name": "living climate",
+   "short_name": "climate doc",
    "category": "Economy",
-   "title": "Climate becomes a live campaign system - a commons that the largest operator strains most",
-   "status": "design-owed",
-   "glyph": "~",
+   "title": "Climate is designed and documented as a system, with its own authority doc",
+   "status": "complete",
+   "glyph": "✓",
    "priority": "A",
-   "difficulty": 8,
+   "difficulty": 2,
    "version_goal": null,
    "sprint": "26",
    "written": "2026-08-31",
@@ -1650,16 +1650,17 @@
    "requires": [],
    "blocked_on": null,
    "parked": false,
-   "authority_doc": "docs/generation/PLANETOLOGY.md",
+   "authority_doc": "docs/CLIMATE.md",
    "files": [
-    "docs/generation/PLANETOLOGY.md",
+    "docs/CLIMATE.md",
     "docs/SYSTEMS.md",
+    "docs/economy/ERAS.md",
     "docs/ai/AI_OPPONENT.md",
-    "docs/economy/TILES.md",
-    "src/world/planetology.cpp",
-    "src/world/economy_system.cpp"
+    "CLAUDE.md"
    ],
-   "design": "Ben, 2026-08-31: \"we haven't built a critical system which is climate... I prefer if an agent's decision to slow down can be framed as usually motivated by systems.\" Climate is the SECOND of the two systemic brakes in AI_OPPONENT.md § Where restraint comes from - the one that is not diplomacy.\n\nTHIS ITEM IS DESIGN-OWED, NOT DESIGNED, AND IT IS THE LARGEST THING IN SIGHT. It is filed at difficulty 8 with no build plan on purpose. Nothing here should be built until its design is settled and written into an authority doc, and PLANETOLOGY.md may not be the right owner - it owns BODY-LEVEL atmosphere, chemistry and biosphere HISTORY, which is generation's concern, and this is a live campaign force. NOVELTY FLAG (NR-745): no authority doc owns a living climate.\n\nTHE GAP, MEASURED 2026-08-31. Climate exists in Io only at GENERATION TIME. It appears in planetology.cpp, tile_generation.cpp and hard_coded_world.cpp, shaping terrain as tiles are made, and it is documented in TILES.md and PLANETOLOGY.md as a terrain input. `economy_system.cpp`, `corp_ai.cpp` and `budget_system.cpp` do not read the word at all. So there is no channel by which anything a corporation does can affect climate, and none by which climate can affect a running campaign. Both directions are absent, not weak.\n\nWHY IT IS THE RIGHT SHAPE FOR THE BRAKE. A commons brakes a runaway WITHOUT NAMING ANYONE. The largest operator strains it most and pays most, and that is a fact about scale rather than a rule aimed at the leader - which is what makes it read as weather rather than as rubber-banding. It is also the one brake that bears on the PLAYER identically when the player leads, which is the honesty test the whole reframe is built on.\n\nTHE DESIGN QUESTIONS, none of them answered yet: what a corporation does that strains it; whether it is per-body or per-world; whether it degrades reversibly or ratchets; what it does to production, habitability and terrain when strained; whether it is visible as a lens, a ledger, or a number on the body; and whether nations act on it (which would reach the 2026-08-18 nation grant).\n\nSCOPE WARNING, stated plainly: this is a SYSTEM, not a sprint item, and it will not fit sprint 26 alongside four other items and a spectator route. Recommend it be DESIGNED in sprint 26 - a settled design in an owning doc, which is a real deliverable - and BUILT in the sprint that follows. Landing a half-climate to hit a sprint boundary would be the worst outcome available.\n\nSEQUENCE NOTE: the coalition brake (BL-699, rival coalitions) can produce a close race on its own. Climate deepens it and makes it fair when the player leads. So climate is not a blocker for a watchable sprint 26 - it is the thing that makes the result honest rather than merely functional."
+   "design": "RESCOPED 2026-08-31 to DOCUMENTATION ONLY, at Ben's instruction: \"Move BL-701 to just documentation - it's not the focus here.\" It was filed the same day at difficulty 8 as a whole system build. It is not that, and nothing here builds climate.\n\nWHAT THE ITEM IS. Climate had become load-bearing for the AI design (AI_OPPONENT.md § Where restraint comes from names it as one of two systemic brakes) while no authority doc owned it - the exact dangling-reference shape NR-745 flagged. This item closes that: climate now has a doc, and the docs that lean on it point at it instead of describing it.\n\nWHAT WAS WRITTEN. docs/CLIMATE.md, a top-level world-system doc alongside EVENTS.md and META_LAYER.md rather than a section inside a generation doc - PLANETOLOGY.md owns generation-time atmosphere and chemistry, which is a different subject from a live campaign force. Admitted to SYSTEMS.md § Environment and to CLAUDE.md's router table.\n\nTHE DESIGN'S LOAD-BEARING FINDING, and the reason it came out small rather than sprawling: climate needs NO NEW QUANTITY. `tile_component.hazard_level` and `habitability` already exist, are written exactly once at tile_generation.cpp:1962 and never mutated, and are already read by the production formula's `(1 - hazard)` multiplier, by POPULATION.md's agglomeration, and by the military layer. Climate is the system that makes those two move. Every consequence is already wired, so the build is a strain model and a per-body stock, not a second economy.\n\nWHAT IT DELIBERATELY DOES NOT DO. It does not design Era 2, it does not touch the Era 0 -> Era 1 gate's three conditions, and it does not settle the curve. CLIMATE.md § 11 lists six open calls; the curve (§ 6 - reversible, ratcheting, or floored) is the one that decides what the system feels like and is raised as NR-747.\n\nTHE BUILD IS UNOWNED AND DELIBERATELY SO. Mint it once Ben answers the curve; a build started against an unsettled curve would be building the wrong feel efficiently.",
+   "completed": "2026-08-31",
+   "resolved": "2026-08-31"
   }
  ]
 }

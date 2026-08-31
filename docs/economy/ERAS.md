@@ -60,6 +60,14 @@ Two ruptures exist and they are **distinct**: HISTORY.md Stage 5's averted ruptu
 backstory, CONCEPT.md's is ahead of the player. The backstory establishes that these powers *can*
 pull back from the brink; the Era 0 exit is the occasion they do not.
 
+**What the countdown counts is climate** (`docs/CLIMATE.md`). The boundary stays what this section
+describes — a seeded date, a visible countdown, a rupture that shocks markets and destroys
+infrastructure — and climate supplies its **cause**: a shared per-body commons degrading under the
+strain of what every corporation extracts and processes, until competition over it breaks. This is
+what makes the sentence above true rather than asserted. Pulling back has to be genuinely possible
+for failing to pull back to mean anything, which is why the shape of the climate curve
+(CLIMATE.md § 6) is the load-bearing question under this boundary.
+
 ---
 
 ## Era 0 — Terrestrial
@@ -92,6 +100,11 @@ This is the **keystone quest** that unlocks space access (BL-087). All three con
 2. **Launchpad constructed and staffed.** A Launchpad building exists on the home body with `workforce_assigned > 0`.
 3. **Propellant reserve met.** The home body's stockpile contains at least the minimum propellant quantity required for an initial launch. This threshold is a Lua balance value. Propellant is the product of the propellant loop (`docs/research/ERA1_TECH_LANDSCAPE.md`), not a roster resource of the ancient arc.
 
+**The gate says what leaving costs, and nothing about why anyone would.** Climate is the motive
+(`docs/CLIMATE.md` § 9): a homeworld getting worse under its own industry turns off-world extraction
+from an ambition into an exit. The three conditions above are unchanged by it — climate moves the
+reason to pass the gate, never the gate.
+
 When all three conditions hold, space bodies become accessible to convoy dispatch, and the Ice Extractor and Assembly Plant become available for construction. The operative half of the gate in the convoy layer is launchpad presence — an inter-body convoy dispatches iff the corp holds a launchpad on the source body (`corp_has_launchpad_on`, `src/world/supply_system.cpp`; SUPPLY.md § Infrastructure gates).
 
 ---
@@ -114,9 +127,19 @@ Water (from icy bodies), iron-nickel ore (from metallic asteroids), platinum gro
 
 Ice Extractor, Surface Extractor, Assembly Plant, Orbital Port.
 
+### Climate in Era 1
+
+Climate state is held per body (`docs/CLIMATE.md` § 5), so spreading production across bodies is
+also **spreading strain** — Era 1's existing strategic question acquires a second reason to answer
+it. The homeworld's accumulated damage is a fact the player carries rather than escapes.
+
 ### Era 1 → Era 2 gate
 
 Not designed. Placeholder: expansion beyond the home solar system, requiring technologies and resources not yet defined.
+
+What climate suggests about its **shape**, without designing it: if a degrading homeworld is why the
+player left, the end of Era 1 is when the homeworld stops being the thing they depend on — which is
+the threshold Era 1's own strategic question already names.
 
 ---
 

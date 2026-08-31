@@ -102,7 +102,7 @@ METHOD, unchanged and proven across batches 1 and 3: capture the whole class fir
 - BL-700 (composite standing index) - the prerequisite for the two below, minted separately so they do not each invent their own number. Net worth + science + summed unit_strength. All three components verified to exist 2026-08-31.
 - BL-697 (skill harness margin metric) - the measurement. Bands the SPREAD in composite standing across the field; absolute bands demote to a solvency floor. Carries NR-305’s stale-band debt. Ben’s first-cut target: a leader ~28% ahead.
 - BL-699 (rival coalitions) - THE BRAKE, and the sprint’s real deliverable. The four stance verbs from BL-448 exist and the scorer issues none of them. Stance scores against standing, so the leader accumulates enemies and the field accumulates friends.
-- BL-701 (living climate) - DESIGN ONLY this sprint. The second brake and the largest thing in sight; climate today is generation-time terrain input that no economy code reads. A settled design in an owning doc is the deliverable; building it here would land a half-climate to hit a boundary.
+- BL-701 (climate doc) - DONE 2026-08-31, and rescoped to documentation only on Ben's instruction ("it is not the focus here"). docs/CLIMATE.md now owns the commons, its per-body grain, and the shape of its curve; SYSTEMS.md and the CLAUDE.md router admit it. THE BUILD IS UNOWNED ON PURPOSE - mint it once NR-747 (the curve) is answered.
 - BL-698 (opt-in margin dial) - DEMOTED to C the day it was minted. Kept as the explicit difficulty knob Ben preserved ("we can keep both modes"), off by default. If the systemic brakes need this dial to produce a close race, the brakes are the thing to fix.
 
 THE REFRAME, and it is the whole sprint. Ben, 2026-08-31: "The angle we are taking here is a literal handicap. I prefer to consider it as always a force from within the game system. With 7 corporations, we have plenty of room for alliances to form against leaders, and we haven't built a critical system which is climate." He named the contradiction with his own earlier steer himself and chose to keep both modes, with the systemic one as the foundation. NR-746 records the supersession; NR-743 (margin measured against the strongest corp) is answered by it and should be read as historical.
@@ -114,6 +114,10 @@ ORDERING: instruments (BL-695, BL-696, BL-700, BL-697) before the brake (BL-699)
 SCOPE HONESTY: climate is a system, not an item, and is deliberately design-only here. If the sprint runs long, BL-699 is the item to protect - it can produce a close race on its own, and climate is what later makes that race fair when the PLAYER is the one leading.
 
 STILL UNOWNED after this sprint (NR-744): lobbying, nation stance gating the player, and the Stage C dialogue layer - purged as BL-539/BL-540/BL-334 while their dated grants still stand in the standing rules.
+
+CLIMATE CAME OUT SMALL, and the reason is worth carrying: it needs NO NEW QUANTITY. tile_component.hazard_level and habitability are written exactly once at tile_generation.cpp:1962 and never mutated, and the (1 - hazard) multiplier is already in the production formula, in POPULATION.md's agglomeration and in the military layer. Climate is the system that makes those two move, so every consequence is already wired. What was filed at difficulty 8 as a system build is a strain model over a per-body stock.
+
+BEN'S RESTATED AIM, 2026-08-31: "What we are really aiming to do is observe how well AI strategizes, and begin considering when Era 1 ends, how the hazard affects players, and how players begin to enter space." The first half is this sprint and is unchanged - BL-695, BL-696, BL-700, BL-697, BL-699. The second half is now DOCUMENTED rather than built: CLIMATE.md § 9 connects the hazard to the Era boundary and to the motive for entering space, and marks the Era 1 -> Era 2 gate as still undesigned rather than designing it.
 
 ## Where things stand
 

@@ -84,6 +84,12 @@ Exploration reveals bodies, their resource profiles, and their suitability for s
 ### Environment
 Each body, and each subdivision of land within it, has a procedurally generated profile of resources, terrain, hazard, and habitability. Environment sets the local cost of construction, the difficulty of military operations, and extraction yields.
 
+**Climate** is the living half of that profile: a per-body commons, degraded by the strain of what
+corporations extract and process on it, expressed through the hazard and habitability the rest of the
+game already reads. It is the world force that answers back to use — the systemic brake on a runaway
+leader (§ AI opponent), the cause behind the Era boundary's countdown, and the reason a player has to
+leave a homeworld rather than merely the means. Authority: `docs/CLIMATE.md`.
+
 ### Generation (Planetology & the chain)
 The world is generated, not authored — a deterministic, seeded chain: planetology (atmosphere, chemistry, evolution history — `src/world/planetology.cpp`, BL-167 planetology) → continents → tiles → population centres → history ladder → nations → roads → markets → corporations. Each stage is a consequence of the one upstream, entered through the New World wizard. Authority: `docs/generation/GENERATION_STRATEGY.md` and `docs/generation/PLANETOLOGY.md`.
 

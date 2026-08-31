@@ -62,6 +62,7 @@ follow. Where a store has a query tool, use the tool, never load the file.
 | `docs/META_LAYER.md` | The predicate/effect substrate every rule is built from: `condition_set`, `modifier_set`. Read before adding any rule family. |
 | `docs/PEOPLE.md` | Named individuals holding roles — a person exists only where a role gates something. |
 | `docs/EVENTS.md` | Things that happen *to* the player; seeded uncertainty on the meta layer. |
+| `docs/CLIMATE.md` | The living commons: strain, per-body state, hazard/habitability, the Era boundary's cause. |
 | `docs/MANUAL.md` | The player-facing manual. |
 
 ### Economy
