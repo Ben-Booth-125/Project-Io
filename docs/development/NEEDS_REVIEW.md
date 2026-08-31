@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*103 entries — 99 open, 4 resolved.*
+*107 entries — 103 open, 4 resolved.*
 
 ---
 
@@ -1064,6 +1064,90 @@ CONTEXT THAT LOWERS THE URGENCY: the viewer is a MOCK. ACTIONS.md says so itself
 > **Recommendation:** Fix the labels when the tech/quest system gets a real owner (NR-750), not before - it is a string change that wants to happen in the same pass as the E0-/E1- id question, and doing it alone would just move the divergence from the labels to the ids. Regenerate ACTIONS.md from the code at that point rather than hand-editing it.
 
 *Files: `scripts/tech_tree.lua`, `docs/ai/ACTIONS.json`, `docs/ai/ACTIONS.md`, `docs/economy/ERAS.md`*
+
+### NR-752 — spectator_determinism's byte-identity golden is stale by 16 world-changing commits - re-bless is your call
+*question · raised 2026-08-31 · from Sprint 26 wave 1. Found by the slice-A agent, verified independently by the main session.*
+
+`spectator_determinism` fails one row on main, and has been failing it since before this sprint:
+
+  [FAIL] R2 byte-identity: the unspectated hash equals the pre-BL-409 golden
+     golden=E350DF2A50BF4BAA  observed=8274DFA6251C116E
+
+VERIFIED INDEPENDENTLY, not taken on the agent's word, and the verification caught something worth knowing on its own. The prebuilt exe under build_gen/ PASSES with E350DF2A50BF4BAA - which is why nobody noticed. It is stale: compiled from an older tree and still runnable. A freshly compiled harness on clean main, pinned MSVC 14.44, produces 8274DFA6251C116E, exactly matching what the agent got from its own build. So the agent's Ninja configuration was NOT the cause and the drift is real.
+
+A STALE PREBUILT HARNESS THAT PASSES IS WORSE THAN ONE THAT FAILS. It reports on a world that no longer exists, in the affirmative. Worth remembering the next time a verify exe is run without being rebuilt first.
+
+THE DRIFT IS EXPECTED AND ATTRIBUTABLE. The golden was last blessed at 1e43d696 (2026-08-26). Since then main landed a run of world-changing commits, several of which move the state hash by construction: the mercenary-contract tear-out, opening capital 0 -> 400, debt interest 2% -> 1.5%, no standing army at spawn, the era-banded household basket, ownership-closure retirement.
+
+THE TWO PROPERTIES THE STANDING RULE NAMES BOTH PASS, and they are the invariant:
+  [PASS] R1 unspectated the player corp is NEVER due, on any tick (the prohibition)
+  [PASS] R1 admitting the player shifts NO rival's cadence slot
+The rule's own words are that a state_hash constant is dated evidence, not the invariant itself.
+
+NEITHER THE AGENT NOR I RE-BLESSED IT. The NR-596 precedent is explicit: a golden re-blessed by whoever happens to trip over it is a golden nobody reviewed. This one wants a deliberate re-bless with dated provenance in the harness's own provenance log, which already records two prior instances of exactly this.
+
+**Why it matters.** It is red now and will stay red through this sprint's every harness run, which trains everyone to read a FAIL as background noise - the precise condition under which a real regression gets waved through.
+
+- Re-bless to 8274DFA6251C116E now, with a dated provenance entry naming the commits that moved it. Clears the noise before the sprint's own changes land.
+- Re-bless at the END of sprint 26, once the wave-2 corp_ai changes have moved it again - one bless instead of two.
+- Retire the byte-identity row. It asserts world-content stability, which is not what this harness is for; the two properties above are.
+
+> **Recommendation:** Option 2 - re-bless once at the sprint close. This sprint changes corp_ai (BL-700, BL-699), which will move the hash again, so blessing now buys a few days of green and a second bless. Option 3 is worth a thought at the same moment: the row keeps catching world-content drift that this harness never claimed to guard, which is the NR-596 argument one step further.
+
+*Files: `tools/verify/spectator_determinism.cpp`, `.claude/rules/io-standing-rules.md`*
+
+### NR-753 — Worktrees are cut from origin/main, which has diverged from local main - the stale-base trap, structurally
+*observation · raised 2026-08-31 · from Sprint 26 wave 1, reported by the slice-A agent and confirmed by the main session.*
+
+Every worktree this session is created at `origin/main` = e60cc726, a merge of PR #57 (sprint-24b-ledgers). Local `main` is 8 commits ahead and e60cc726 is NOT one of its ancestors, so the two have genuinely diverged and a fast-forward is impossible.
+
+CHECKED, AND NOTHING IS AT RISK: e60cc726 is the ONLY commit reachable from origin/main and not from local main, and it is a merge whose second parent (9a5537bd) was local main's tip at session start. Its other parent 442e999b is already an ancestor of local main. So origin's PR merge introduces no content local main lacks - local is simply ahead, and unpushed.
+
+THE OPERATIONAL PROBLEM IS REAL THOUGH. DELIVERY.md's rule is that every agent verifies its own base as its FIRST action and fast-forwards to the working branch tip. Here that instruction cannot be followed literally - the fast-forward is impossible by construction - so an agent that follows the rule exactly either stops, or (as slice A correctly did) branches fresh from local main and reports the discrepancy.
+
+This is the third recorded firing of the stale-base trap (NR-459, NR-480 are the first two), and the first where the cause is a DIVERGED REMOTE rather than a lagging worktree. The existing brief wording assumes the base is behind; it does not cover the base being sideways.
+
+Slice A handled it correctly and without being told how, which is the discipline working.
+
+**Why it matters.** Every agent spawned this sprint hits it. One that resolves it by hard-resetting to origin/main would silently discard eight commits of local work - which is the same class of loss as the 2026-08-23 incident where another session's commit path wiped uncommitted work.
+
+> **Recommendation:** Two things. Short term: push local main so origin and local reconverge, which makes the whole problem disappear for the rest of the sprint - that is Ben's call since git push is in the deny net. Longer term: amend the standing sub-agent brief wording from 'fast-forward to the tip' to 'fast-forward if possible; if the bases have DIVERGED, branch fresh from the named base commit and report' - the instruction currently has no branch for sideways.
+
+*Files: `docs/development/DELIVERY.md`, `.claude/rules/io-standing-rules.md`*
+
+### NR-754 — No doc owns HOW a session-scoped mode is entered, and --spectate just set the precedent
+*novel-work · raised 2026-08-31 · from Sprint 26 wave 1, novelty flagged by the slice-A agent.*
+
+AI_OPPONENT.md § 10i owns what spectator mode IS. TIME_CONTROLS.md owns the time panel. STARTUP.md owns the screen state machine. None of them owns launch-flag policy - whether a mode is entered at start or toggled live, and what that choice implies.
+
+The call was made on the argument supplied in the brief: ENTRY-AT-START ONLY, because BL-409's grant is a property of the SESSION (nobody seated), and flipping it mid-run changes who the scorer may legally act on halfway through - a separate argument nobody has made. The agent wrote the reasoning into § 10i so the next session inherits a settled answer rather than re-deciding.
+
+IT IS A PRECEDENT, which is why it is flagged rather than just done. Future session-scoped modes - a replay mode, a headless observer, whatever the MCP seam grows - will each face the same question, and there is now one answer in the tree with no doc claiming ownership of the general rule.
+
+ADJACENT AND WORTH KNOWING: the agent found that `app.cpp:1111` passes `m_ui.spectating || m_warm_starting`, so the warm start ALREADY runs under spectate unconditionally (BL-630's spawn shortlist). --spectate therefore only changes behaviour after seating. That is correct, and it means the flag's blast radius is smaller than it looks.
+
+**Why it matters.** Novelty should be chosen rather than accreted. A launch-flag policy set once inside an AI doc is exactly how a general rule ends up owned by a specific feature.
+
+> **Recommendation:** No action this sprint. If a second session-scoped mode appears, that is the moment to lift the rule out of § 10i into STARTUP.md, which owns how a session begins. Not worth a doc move for one instance.
+
+*Files: `docs/ai/AI_OPPONENT.md`, `docs/ui/STARTUP.md`*
+
+### NR-755 — A fresh worktree cannot run build_app.bat - no configured build/ directory
+*observation · raised 2026-08-31 · from Sprint 26 wave 1, reported by the slice-A agent.*
+
+`build_app.bat` hard-fails in a fresh worktree with "no configured build" - `build/` is gitignored, so a new worktree has none and the script does not cold-configure one.
+
+The agent worked around it by cold-configuring with Ninja -j 12 instead of the script's serial nmake, same pinned VS2022 BuildTools toolchain, same Debug config. 420 targets green.
+
+THAT WORKAROUND IS NOT FREE AND IT COST REAL TIME HERE. A different generator can produce different codegen, which is exactly the doubt that made the spectator_determinism result (NR-752) need independent re-verification from the main session. The answer came out the same, but the verification only happened because the toolchain differed and I did not want to trust it.
+
+The sibling problem in build_harness.js was FIXED at source this session (commit b7389013 - the sol2 include path). This one is not fixed: it needs either a cold-configure path in build_app.bat, or a documented worktree bootstrap step in the standing sub-agent brief.
+
+**Why it matters.** Every worktree agent this sprint pays a cold-configure cost and may reach for a different generator to do it - and a differing toolchain undermines exactly the determinism results this sprint's harnesses exist to produce.
+
+> **Recommendation:** Cheapest useful fix: have build_app.bat cold-configure when build/ is absent, using the same generator it always uses. Failing that, add the bootstrap command to the saved agent definitions so every agent uses the SAME toolchain rather than improvising one. Worth doing before wave 2 if it is quick.
+
+*Files: `build_app.bat`, `.claude/agents/ui-dev.md`, `.claude/agents/economy-dev.md`, `.claude/agents/generation-dev.md`*
 
 ---
 

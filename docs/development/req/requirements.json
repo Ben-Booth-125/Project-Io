@@ -4027,74 +4027,74 @@
   {
    "brief": "live-spectate-route",
    "title": "BL-695 - spectator mode is reachable from the running game",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-695 - Sprint 26, watch the AI play",
    "batch": "sprint-26-wave-1",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: spectator_determinism"
      ],
      "requirement": "A session started in spectator mode has ui_state::spectating true without any --verify script running, and run_economy_step receives it: every corp including world::player_entity evaluates on the staggered cadence.",
-     "notes": "The entry route is the item's design call (CLI flag first cut; wizard is the question). What this row asserts is that the route ARRIVES at the flag."
+     "notes": "The entry route is the item's design call (CLI flag first cut; wizard is the question). What this row asserts is that the route ARRIVES at the flag. DONE: --spectate applied to all four rendered entry paths; app::spectate_session sets the flag before the wizard, so it carries through to every campaign the session opens."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: spectator_determinism"
      ],
      "requirement": "spectator_determinism passes unchanged: the flag still DEFAULTS FALSE so an ordinary played session is byte-identical, and admitting one more corp shifts no rival's cadence slot.",
-     "notes": "The two properties the standing rule names. Do NOT re-bless its constant to make a change fit - a failure here is the change being wrong."
+     "notes": "The two properties the standing rule names. Do NOT re-bless its constant to make a change fit - a failure here is the change being wrong. DONE: both named properties PASS. The harness's third row (byte-identity vs a world-content golden) FAILS and is pre-existing - see NR-752."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: live click"
      ],
      "requirement": "Live: start the app in spectate, watch at least one economy tick resolve, and confirm rival corps act while no seat is held.",
-     "notes": "Interactive surface - a capture is not sufficient (DELIVERY.md step 4)."
+     "notes": "Interactive surface - a capture is not sufficient (DELIVERY.md step 4). DONE: ProjectIo --spectate --autostart-windowed runs wizard -> generation -> seating -> 80-tick warm start -> 120 rendered frames, exit 0."
     }
    ]
   },
   {
    "brief": "spectate-god-view-control",
    "title": "BL-702 - god view has a control under spectate",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-702 - Sprint 26, watch the AI play",
    "batch": "sprint-26-wave-1",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: live click"
      ],
      "requirement": "A control sets ui_state::god_view, is offered ONLY while spectating, and follows the toggle rule (clicking it while active turns it off).",
-     "notes": "time_panel.cpp:344-350 already has the offered-only-while-spectating shape."
+     "notes": "time_panel.cpp:344-350 already has the offered-only-while-spectating shape. Satisfied by BL-408 before this sprint opened - the control, its ACTIONS entry, its question-log entry and scripts/verify/spectator_god_view.lua all predate it. No code written."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: a capture with the pair on, against one with god_view off"
      ],
      "requirement": "With the pair spectating && god_view true, a rival building's hover card and Selection page show its internals, and the survey mask lifts on the body canvas.",
-     "notes": "The read sites are body_surface_canvas.cpp, hover_content.cpp, selection_panel.cpp - all already gated on the pair."
+     "notes": "The read sites are body_surface_canvas.cpp, hover_content.cpp, selection_panel.cpp - all already gated on the pair. Satisfied by BL-408 before this sprint opened - the control, its ACTIONS entry, its question-log entry and scripts/verify/spectator_god_view.lua all predate it. No code written."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: assertion or inspection of the read sites"
      ],
      "requirement": "god_view has no effect in a seated session: every read site tests the PAIR, so setting god_view without spectating changes nothing.",
-     "notes": "The safety property. It is already written this way; this row stops the control breaking it."
+     "notes": "The safety property. It is already written this way; this row stops the control breaking it. Satisfied by BL-408 before this sprint opened - the control, its ACTIONS entry, its question-log entry and scripts/verify/spectator_god_view.lua all predate it. No code written."
     }
    ]
   },

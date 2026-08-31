@@ -1476,8 +1476,8 @@
    "short_name": "live spectate route",
    "category": "AI",
    "title": "Spectator mode is reachable from the running game, not only from a --verify script",
-   "status": "designed",
-   "glyph": "~",
+   "status": "complete",
+   "glyph": "✓",
    "priority": "A",
    "difficulty": 2,
    "version_goal": null,
@@ -1498,7 +1498,9 @@
     "docs/ui/TIME_CONTROLS.md",
     "docs/ai/ACTIONS.json"
    ],
-   "design": "Ben, 2026-08-31: \"hopefully by the end of this sprint we can use a spectator mode to view AI playing in real time, and tighten core gameplay loops.\" This item is the route that makes that sentence possible; every other item in the sprint is watched THROUGH it.\n\nTHE GAP, MEASURED. `ui_state::spectating` has exactly ONE assignment site in the whole tree: `verify.spectate(on)` at src/core/verify_api.cpp:1096, bound behind --verify. There is no CLI flag and no in-game control. So spectate is today a headless-script capability only - the mode exists, is carried through to `corp_ai_params::spectating`, has a determinism harness guarding it (tools/verify/spectator_determinism.cpp), and cannot be entered by a person sitting in front of the game.\n\nWHAT IT NEEDS. A route in, and honest behaviour once in. Two halves:\n  1. ENTRY. A --spectate CLI flag is the cheap half and pairs with the existing --autostart family in main.cpp. Whether it ALSO wants a menu / new-game control is the design question - STARTUP.md owns the screen state machine, and a mode chosen at world creation is a different thing from one toggled mid-session. Toggling mid-session is the harder claim: BL-409's grant is written as a property of the SESSION (nobody seated), and flipping it live changes who the scorer may act on halfway through a run. Prefer entry-at-start unless mid-session toggling is separately argued.\n  2. THE VIEW. `god_view` is the second flag and is the one that makes watching worth doing - it lifts the survey mask and opens rival internals (BL-408; read sites in body_surface_canvas.cpp, hover_content.cpp, selection_panel.cpp). It is gated on the PAIR `spectating && god_view` at every read site, so it is already safe; it needs its own control, offered only while spectating - time_panel.cpp:344-350 already has the shape.\n\nDETERMINISM IS THE CONSTRAINT AND IT IS ALREADY PAID FOR. spectator_determinism.cpp asserts the two properties the standing rule names - the flag DEFAULTS FALSE so an ordinary played session is byte-identical, and admitting one more corp shifts no rival's cadence slot. Adding a route must not touch either. Re-run that harness as the verification, and do not re-bless its constant to make a change fit.\n\nACTIONS.json: any new control gets its entry, per the standing rule that a control change updates the dictionary."
+   "design": "Ben, 2026-08-31: \"hopefully by the end of this sprint we can use a spectator mode to view AI playing in real time, and tighten core gameplay loops.\" This item is the route that makes that sentence possible; every other item in the sprint is watched THROUGH it.\n\nTHE GAP, MEASURED. `ui_state::spectating` has exactly ONE assignment site in the whole tree: `verify.spectate(on)` at src/core/verify_api.cpp:1096, bound behind --verify. There is no CLI flag and no in-game control. So spectate is today a headless-script capability only - the mode exists, is carried through to `corp_ai_params::spectating`, has a determinism harness guarding it (tools/verify/spectator_determinism.cpp), and cannot be entered by a person sitting in front of the game.\n\nWHAT IT NEEDS. A route in, and honest behaviour once in. Two halves:\n  1. ENTRY. A --spectate CLI flag is the cheap half and pairs with the existing --autostart family in main.cpp. Whether it ALSO wants a menu / new-game control is the design question - STARTUP.md owns the screen state machine, and a mode chosen at world creation is a different thing from one toggled mid-session. Toggling mid-session is the harder claim: BL-409's grant is written as a property of the SESSION (nobody seated), and flipping it live changes who the scorer may act on halfway through a run. Prefer entry-at-start unless mid-session toggling is separately argued.\n  2. THE VIEW. `god_view` is the second flag and is the one that makes watching worth doing - it lifts the survey mask and opens rival internals (BL-408; read sites in body_surface_canvas.cpp, hover_content.cpp, selection_panel.cpp). It is gated on the PAIR `spectating && god_view` at every read site, so it is already safe; it needs its own control, offered only while spectating - time_panel.cpp:344-350 already has the shape.\n\nDETERMINISM IS THE CONSTRAINT AND IT IS ALREADY PAID FOR. spectator_determinism.cpp asserts the two properties the standing rule names - the flag DEFAULTS FALSE so an ordinary played session is byte-identical, and admitting one more corp shifts no rival's cadence slot. Adding a route must not touch either. Re-run that harness as the verification, and do not re-bless its constant to make a change fit.\n\nACTIONS.json: any new control gets its entry, per the standing rule that a control change updates the dictionary.",
+   "completed": "2026-08-31",
+   "resolved": "2026-08-31"
   },
   {
    "id": "BL-696",
@@ -1667,9 +1669,9 @@
    "id": "BL-702",
    "short_name": "spectate god view control",
    "category": "AI",
-   "title": "God view has a control under spectate, so a watcher sees rival internals rather than silhouettes",
-   "status": "designed",
-   "glyph": "~",
+   "title": "God view has a control under spectate - ALREADY DELIVERED by BL-408, closed unbuilt",
+   "status": "complete",
+   "glyph": "✓",
    "priority": "A",
    "difficulty": 2,
    "version_goal": null,
@@ -1689,7 +1691,9 @@
     "docs/ai/ACTIONS.json",
     "docs/ui/TIME_CONTROLS.md"
    ],
-   "design": "Ben, 2026-08-31, approving the proposal. The sibling of BL-695 (live spectate route) and worth almost nothing without it - and BL-695 is worth much less without this.\n\nTHE GAP. `ui_state::god_view` is READ at every site that matters - body_surface_canvas.cpp lifts the survey mask on it, hover_content.cpp opens the rival hover card, selection_panel.cpp opens the internals readout and the building status pages - and it is WRITTEN in exactly one place: `verify.god_view(on)` at src/core/verify_api.cpp:1103, behind --verify. Same shape as spectate itself, same single-assignment problem.\n\nWHY IT IS NOT COSMETIC. Spectating with god view off is watching silhouettes: the survey fog and the BL-068 rival-visibility rule hide exactly the balances, dials, recipes and stock that make a rival's decision legible. The sprint's whole method is watching the AI and reasoning about what it did. Without this a watcher can see that a rival built something and not what it cost, held or earned.\n\nTHE SAFETY IS ALREADY PAID FOR. Every read site tests the PAIR `spectating && god_view`, so god view cannot leak into a seated session even if its control is mis-wired - the pair is the gate and it is already written that way. time_panel.cpp:344-350 already has the shape: the god-view affordance is offered ONLY while spectating.\n\nSCOPE: a control, offered only under spectate, plus its ACTIONS.json entry per the standing rule that a control change updates the dictionary. Not a new visibility model - god view's semantics are BL-408's and are unchanged."
+   "design": "CLOSED 2026-08-31 WITHOUT A LINE OF CODE. The item's premise was wrong and the control already existed.\n\nWHAT IS ACTUALLY THERE, on main before this sprint: `src/ui/time_panel.cpp:353` carries `ImGui::Checkbox(\"God view\", &st.god_view)` inside an `if (st.spectating)` block, landed by BL-408 in commit 701cba55. It has its `chrome.sysmenu_god_view` ACTIONS entry, its `god_view_toggle` question-log entry, a `ui_elements.json` entry, and a visual check at `scripts/verify/spectator_god_view.lua`. Offered only while spectating, and a checkbox is a toggle by construction. Every requirement this item wrote was already met.\n\nHOW THE ITEM WAS FILED WRONG, recorded because the mistake is reusable. The claim was \"god_view is written in exactly one place, verify_api.cpp:1103\". That came from grepping for `god_view\\s*=` — an ASSIGNMENT. ImGui writes through a pointer: `&st.god_view`. So the grep was structurally incapable of finding the real control, and the absence it reported was an absence of a syntax, not of a feature.\n\nTHE LESSON, and it generalises past this item: a grep for `x =` does not find writes to x. For a C++ codebase specifically it misses address-of arguments, references, and member functions that mutate. Where the question is \"does anything set this\", the honest checks are the address-of form and the type's mutating surface, or a look at the one file most likely to own the control.\n\nThe slice agent found this in minutes by reading time_panel.cpp rather than trusting the brief, which is the behaviour the sub-agent discipline is meant to produce.",
+   "completed": "2026-08-31",
+   "resolved": "2026-08-31"
   },
   {
    "id": "BL-703",
