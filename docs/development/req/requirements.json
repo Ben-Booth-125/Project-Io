@@ -4319,6 +4319,246 @@
      "notes": "Non-negotiable."
     }
    ]
+  },
+  {
+   "brief": "a-channel-must-bid",
+   "title": "BL-654 - a short pool buys on the market, up to a reservation ceiling",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-654 - Sprint 27, demand",
+   "batch": "sprint-27-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: a harness asserting the bid reaches market demand and the credits leave the buyer"
+     ],
+     "requirement": "A goods draw that is short bids the shortfall into market_component::demand and PAYS for what it gets - it does not silently take from a pool. One rule for every goods draw: building upkeep and unit upkeep take the same path, not two.",
+     "notes": "Ben, 2026-08-26: 'Buy on the market, but at a threshold, buying is not allowed.'"
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: a harness row at both sides of the ceiling"
+     ],
+     "requirement": "Above a reservation ceiling the draw does NOT bid at all, and the existing shortfall rule weakens the building or unit instead. The ceiling is authored in the PRICE BAND family beside floor_mult/ceil_mult, not in upkeep.",
+     "notes": "It is a statement about what a good is worth paying, not about who is buying. Exact mirror of BL-386 seller-side floor_price: both sides may decline a trade, neither may dictate one."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census before/after plus the operating-firm count"
+     ],
+     "requirement": "The ceiling's value is MEASURED against the census and the operating-firm count, never guessed. Report the number and how it was derived.",
+     "notes": "BL-641 is the worked example of guessing: rates on, operating firms 227 -> 19."
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: ai_skill_harness R0 or equivalent"
+     ],
+     "requirement": "Determinism: the bid path is order-independent. Two runs on one seed produce an identical state_hash.",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "injectors-must-not-skip-silently",
+   "title": "BL-652 - an injector that cannot price a basket entry must say so",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-652 - Sprint 27, demand",
+   "batch": "sprint-27-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: run with a deliberately unpriced basket entry and observe the diagnostic"
+     ],
+     "requirement": "inject_population_demand and inject_background_demand emit a named diagnostic on the first basket entry they cannot price, rather than skipping it silently.",
+     "notes": "Two separate bugs hid behind this on one day in 2026-08: the census read as having no background demand, and spawn_solvency measured a whole spawn diagnosis in a world where background demand did not exist. Neither failed."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: the new row, red against a seeded fault and green otherwise"
+     ],
+     "requirement": "A harness row FAILS on a basket naming an unpriced good.",
+     "notes": "The combination is always a missing script or an authoring error and is never intended."
+    }
+   ]
+  },
+  {
+   "brief": "chain-completeness-read",
+   "title": "BL-706 - measure chain completeness per region and its spread",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-706 - Sprint 27, demand",
+   "batch": "sprint-27-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census"
+     ],
+     "requirement": "demand_census reports, per market, the fraction of chains TERMINATING there that can be sourced within reach.",
+     "notes": "'Within reach' needs defining and it is a real design question - reach is LOGISTICS.md's. Default to market grain since the census already walks markets; STOP AND REPORT if that reads wrong rather than inventing a grain."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census"
+     ],
+     "requirement": "It reports the SPREAD of that fraction across the world - the distribution, not any single value.",
+     "notes": "The deliverable is the spread. GENERATION_STRATEGY.md § Asymmetry is the deliverable."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: inspection plus demand_census"
+     ],
+     "requirement": "It REPORTS and does not GATE. No assertion fails on an individual region being poor or rich.",
+     "notes": "The enemy is uniformity, not self-sufficiency. A world where every region scores the same is the defect; any individual score is not."
+    }
+   ]
+  },
+  {
+   "brief": "ancient-chain-does-not-convert",
+   "title": "BL-707 - diagnose why raw inputs glut while finished goods starve",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-707 - Sprint 27, demand",
+   "batch": "sprint-27-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: whatever instrument the diagnosis rests on, cited"
+     ],
+     "requirement": "A written diagnosis, evidenced, naming why no firm converts fibre to cloth or hides to leather when the output prices at ~10x base with unmet demand in 13 of 14 markets.",
+     "notes": "Candidates, none confirmed: input_demand_pull not reaching these chains; placement rules refusing the sites; a recipe wanting an input that is itself unavailable; background-firm calibration seeding a world without the converting firms. DIAGNOSE BEFORE FIXING."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census before/after, if a fix lands"
+     ],
+     "requirement": "If a fix is small and clearly correct, it lands with a before/after census. If it is not, the diagnosis is the deliverable and a fresh item carries the fix.",
+     "notes": "DO NOT raise the price ceiling to make the reading go away. The ceiling is reporting the shortage; moving it hides it."
+    }
+   ]
+  },
+  {
+   "brief": "power-as-a-grid",
+   "title": "BL-708 - power, a bought upkeep draw transmitted on the road network",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-708 - Sprint 27, demand",
+   "batch": "sprint-27-wave-2",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census showing coal/petroleum leaving the no-sink list"
+     ],
+     "requirement": "A generation building converts fuel to power; every building that needs power BIDS for it as upkeep, through BL-654 path. Both links of the chain reach the market.",
+     "notes": "Power upkeep is the first channel built on BL-654 rule, not an exception to it."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: a harness asserting a disconnected building cannot draw"
+     ],
+     "requirement": "Transmission rides the EXISTING network: connectivity is tile_reach_cost read as a boolean, latency is a flat one tick regardless of distance, and no second graph is introduced.",
+     "notes": "LOGISTICS.md § 3a."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: operating-firm count does not collapse when power is enabled"
+     ],
+     "requirement": "A building short of power SCALES ITS OUTPUT DOWN and is not idled.",
+     "notes": "BL-641's lesson applied before the fact: 227 -> 19 was an upkeep draw that idled the firms that would have induced the supply."
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: inspection plus a harness row"
+     ],
+     "requirement": "Power is stockpiled with a CEILING, and never rides a convoy.",
+     "notes": "Its one genuinely novel property against every other good."
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: a harness row on a cross-border match"
+     ],
+     "requirement": "Cross-border power pays the enacted import duty through the existing tariff path - no new machinery.",
+     "notes": "MARKETS.md § Tariffs already resolves a market to a jurisdiction."
+    }
+   ]
+  },
+  {
+   "brief": "construction-as-a-rate",
+   "title": "BL-709 - construction becomes a sector with a throughput and a method",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-709 - Sprint 27, demand",
+   "batch": "sprint-27-wave-3",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census showing the construction channel non-zero when nothing is actively building"
+     ],
+     "requirement": "A construction building runs a production method, draws that method goods as upkeep every tick, and produces construction capacity that building projects consume.",
+     "notes": "The channel measures 0.000 in the industrial band today because run_construction fires only while something is building."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census per band"
+     ],
+     "requirement": "Five methods, era-banded as recipes are: timber frame and stone-and-brick (ancient); iron frame, steel frame, reinforced concrete (industrial).",
+     "notes": "Baskets and rates MEASURED against the census, never guessed."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: demand_census at tick 0"
+     ],
+     "requirement": "Seeded capacity gives the channel a non-zero reading at TICK 0 in every market that has any.",
+     "notes": "Ben's own reason for the change, and MARKETS.md property 5 delivered by the generator rather than an authored basket."
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: corp_ai_harness plus a thrash check"
+     ],
+     "requirement": "The AI scorer prices construction capacity as a contended shared resource - NR-592 is fixed here.",
+     "notes": "Under a lump sum a blind scorer is a missed opportunity; under a contended pool it proposes builds the pool cannot serve, every evaluation, for as long as the pool is short."
+    }
+   ]
   }
  ]
 }
