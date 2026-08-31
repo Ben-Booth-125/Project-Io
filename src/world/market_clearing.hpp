@@ -50,6 +50,41 @@ void inject_population_demand(world& w, const recipe_registry& reg);
 /// @param w World; market demand arrays are mutated in place.
 void inject_background_demand(world& w, const recipe_registry& reg);
 
+/// BL-652 — one basket entry the injectors CANNOT price, named.
+struct unpriced_basket_entry
+{
+    resource_type resource;
+    /// Which basket names it: "household" (`economy.population_demand`) or
+    /// "background" (`economy.background_demand`). A literal, never owned.
+    const char*   channel;
+};
+
+/// BL-652: every (channel, resource) pair that a demand basket NAMES with a
+/// positive weight and that NO market in @p w carries a base price for.
+///
+/// WHY IT IS A NAMED SURFACE AND NOT A SILENT `continue`. Both injectors skip
+/// such an entry — "untradeable, no base price to anchor the elasticity curve"
+/// — and that skip is invisible from the outside: a basket that is authored but
+/// unpriced looks exactly like a channel nobody ever wrote. Two separate bugs
+/// hid behind that silence on one day in August 2026. The demand census read as
+/// having no background demand at all, and `spawn_solvency` measured a whole
+/// spawn diagnosis in a world where background demand did not exist. NEITHER
+/// FAILED. Both quietly answered a question about a different world.
+///
+/// The combination is always either a missing script (`world_gen.lua`, which
+/// carries `kepler_market.base_price`, was not loaded) or an authoring error (a
+/// basket names a resource the price table does not), and it is never intended.
+/// So callers should treat a non-empty result as a fault: the app reports it on
+/// startup, and `tools/verify/demand_census.cpp` FAILS on it.
+///
+/// One entry per (channel, resource) — the FIRST occurrence, not one per market
+/// or per population centre, which would bury the finding in thousands of rows.
+/// Deterministic: channel order then resource-index order, and the price probe
+/// over `w.markets` is a pure OR, so the unordered map's layout cannot reach the
+/// result.
+std::vector<unpriced_basket_entry> unpriced_basket_entries(const world& w,
+                                                           const recipe_registry& reg);
+
 /// BL-263: if @p body carries no market yet, create one — the spontaneous
 /// market emergence trigger fires the tick a body's FIRST building completes
 /// (any corporation; investment, not presence). No-op if the body already has a
