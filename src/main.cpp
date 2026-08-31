@@ -497,6 +497,28 @@ int main(int argc, char* argv[])
             }
         }
 
+        // --spectate (BL-695): open the session with NOBODY SEATED, so the
+        // scored-utility layer evaluates every corporation and the human only
+        // watches (AI_OPPONENT.md § 10i). Until now the mode was reachable
+        // ONLY from `verify.spectate()` behind --verify, which made "watch the
+        // AI play" a headless-script capability and not something a person
+        // could do; this is the route in.
+        //
+        // ENTRY AT START, deliberately. § 10i removes the prohibition's
+        // SUBJECT rather than excepting the rule, which is a fact about the
+        // whole session. Flipping it mid-run would change, halfway through,
+        // which corps the scorer may legally act on — a separate argument
+        // nobody has made — so there is no in-game control that clears it.
+        //
+        // Applied to every RENDERED entry path below, the way --host-agent is
+        // (review 2026-08-19 #9: a path that silently ignores a startup flag
+        // is a bug). Not applied to --verify (scripts drive verify.spectate
+        // themselves) nor to --serve (that seam's session actor IS a seat).
+        bool spectate = false;
+        for (int i = 1; i < argc; ++i)
+            if (std::string(argv[i]) == "--spectate")
+                spectate = true;
+
         // --autostart: boot straight into a new campaign, headlessly, and exit.
         // Added 2026-08-12 to reproduce a crash that appears ONLY on the
         // interactive path: --verify calls setup_world directly and therefore
@@ -507,6 +529,8 @@ int main(int argc, char* argv[])
             {
                 app a;
                 a.host_agent(agent_port);
+                if (spectate)
+                    a.spectate_session();
                 return a.run(app::autostart_mode::smoke);
             }
 
@@ -521,6 +545,8 @@ int main(int argc, char* argv[])
             {
                 app a;
                 a.host_agent(agent_port);
+                if (spectate)
+                    a.spectate_session();
                 return a.run(app::autostart_mode::play);
             }
 
@@ -531,6 +557,8 @@ int main(int argc, char* argv[])
                 // silently; wire it like every sibling path.
                 app a;
                 a.host_agent(agent_port);
+                if (spectate)
+                    a.spectate_session();
                 return a.run_autostart();
             }
 
@@ -545,6 +573,8 @@ int main(int argc, char* argv[])
 
             app a;
             a.host_agent(agent_port);
+            if (spectate)
+                a.spectate_session();
             if (!load_path.empty())
                 a.open_save(load_path);
             return a.run();

@@ -594,6 +594,10 @@
    "Command line."
   ],
   [
+   "chrome.spectate_cli",
+   "Command line. The ONLY route into spectator mode for a human — before BL-695 the mode was reachable solely from `verify.spectate()` behind --verify, i.e. it was a headless-script capability and not something a person could do."
+  ],
+  [
    "canvas.border_band_select",
    "The national border band on the Planetary canvas — always-on chrome, not a lens. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths."
   ],
