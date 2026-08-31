@@ -424,7 +424,7 @@
    "priority": "A",
    "difficulty": 2,
    "version_goal": "v0.1.21",
-   "sprint": "21",
+   "sprint": "27",
    "written": "2026-08-26",
    "author": "Ben",
    "requires": [],
@@ -478,7 +478,7 @@
    "priority": "A",
    "difficulty": 4,
    "version_goal": "v0.1.21",
-   "sprint": "21",
+   "sprint": "27",
    "written": "2026-08-26",
    "author": "Ben",
    "requires": [
