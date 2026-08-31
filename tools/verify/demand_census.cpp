@@ -1,6 +1,6 @@
 // demand_census — BL-649. Per RESOURCE and per ERA BAND: how much demand the
 // world models, and WHICH PASS injects it. Requirement group `demand-census`,
-// rows R1-R4.
+// rows R1-R4, plus R5 (BL-706, chain completeness) and R6 (BL-652, unpriced basket).
 //
 // WHY THIS EXISTS. Sprint 21 runs several viability passes, and "did that change
 // help" has no answer without a before. More sharply: the 2026-08-26 session
@@ -14,7 +14,10 @@
 // that can fail are INTERNAL INCONSISTENCIES — a channel it cannot enumerate, a
 // resource it cannot name, an attribution that does not reconcile — plus R4,
 // which is a regression check on the INSTRUMENT (does it still reproduce the
-// hand-built finding), not on the economy.
+// hand-built finding), not on the economy; plus R6, which fails on a basket
+// naming a good no market prices. R6 is content, not magnitude: it asserts no
+// number and admits no tuning, because that combination has exactly two causes
+// and both are faults (BL-652).
 //
 // WHY IT LOADS LUA. The demand baskets ARE Lua data (economy.population_demand,
 // economy.background_demand, economy.military.unit_upkeep, economy.building_upkeep),
@@ -38,7 +41,7 @@
 //     inject_population_demand      -> HOUSEHOLD
 //     inject_background_demand      -> BACKGROUND-INDUSTRIAL (a stopgap; see the register)
 //     inject_interbody_demand       -> INTER-BODY PULL (redistribution, not a new want)
-//     economy_report::wants         -> CONSTRUCTION + PROCESSING INPUTS
+//     economy_report::wants         -> CONSTRUCTION + PROCESSING INPUTS + UPKEEP BID
 //
 // Those are the same functions, in the same order, reading the same prices
 // `clear_markets` would read on this tick. Nothing is re-derived and nothing is
@@ -53,6 +56,14 @@
 // per-tick expression (`cost[r] / build_duration_ticks`), and the processing half
 // is the remainder. If the remainder goes negative the attribution is wrong, and
 // that is an internal inconsistency — R2's kind of failure, and it is asserted.
+//
+// BL-654 PUT A THIRD CONSUMER IN THAT REGISTER: a short upkeep pool now bids its
+// shortfall. That share is NOT re-derived — it is read off
+// `economy_report::upkeep_wants`, the attribution mirror the same statement
+// writes — and subtracted out, because "the remainder" would otherwise report
+// the Industry channel as processing demand. The `upkeep/bd` column is that
+// share; `upkeep/pl` and `indust/pl` remain the GROSS per-tick need, so the
+// pool-covered part is the difference between them.
 //
 // STRUCTURAL SINK vs OBSERVED DEMAND. The per-resource table carries both, and
 // the distinction matters. OBSERVED demand can be zero merely because nobody has
@@ -84,6 +95,13 @@
 //       § Asymmetry is the deliverable. REPORTED, with one loose assertion on
 //       the spread and none on any market's value. See the block above
 //       `market_completeness` for the grain and the reach definition.
+//   R6  BL-652: FAILS if a demand basket names a good NO market prices. The one
+//       row here that fails on content rather than on the instrument, and it
+//       does not breach R2 — it is not a magnitude. Both injectors skip such an
+//       entry in silence, and the combination is always a missing script or an
+//       authoring error, never intent. Runtime counterpart:
+//       `unpriced_basket_entries` (src/world/market_clearing.cpp), which the
+//       app reports at campaign start.
 //
 // Usage:  demand_census [--seed N] [--ticks N] [--fast] [--band ancient|industrial|both]
 //   --fast  zero the pre-epoch year-tick sim. Cheaper, and NOT the shipped
@@ -218,10 +236,10 @@ const channel_row k_channels[] = {
       "inject_population_demand (market_clearing.cpp) <- economy.population_demand basket" },
     { "Industry",       ch_state::present,
       "run_building_upkeep (economy_system.cpp) <- economy.building_upkeep.goods, per building type "
-      "and ERA-BANDED, scaling with BUILDING COUNT (MARKETS.md property 1). A POOL draw, like the "
-      "standing-force one below, so it consumes goods WITHOUT pricing them -- and the rates ship at "
-      "ZERO because turning them on starves every firm of a good the band does not make; see the "
-      "`indust/pl` column and economy.lua's own measurement note (BL-641)" },
+      "and ERA-BANDED, scaling with BUILDING COUNT (MARKETS.md property 1). BL-654: it BIDS now -- "
+      "the pool is drawn first and the shortfall goes to market at up to price_band.reservation_mult "
+      "x base, so the draw prices what it wants (see the `upkeep/bd` column). The RATES still ship "
+      "at ZERO, which is a separate data change (BL-641)" },
     { "Construction",   ch_state::present,
       "run_construction -> economy_report::wants (economy_system.cpp) <- economy.buildings.resource_costs "
       "/ material_overrides. Fires only where something is BUILDING (owner BL-642)" },
@@ -257,8 +275,9 @@ const channel_row k_off_register[] = {
       "inject_interbody_demand -- REDISTRIBUTES the home body's unmet demand onto outposts. Injects no "
       "new want: with no home demand for a good it moves nothing" },
     { "Standing-force upkeep", ch_state::present,
-      "run_unit_upkeep -- a POOL draw (economy.military.unit_upkeep.goods_per_head). It never reaches "
-      "market_component::demand, so it consumes goods WITHOUT pricing them" },
+      "run_unit_upkeep (economy.military.unit_upkeep.goods_per_head). BL-654: pool first, then the "
+      "shortfall is BID on the unit's local market up to price_band.reservation_mult x base -- the "
+      "same single goods-draw path the Industry channel takes, so it prices what it wants" },
 };
 constexpr std::size_t k_off_register_count =
     sizeof(k_off_register) / sizeof(k_off_register[0]);
@@ -302,8 +321,25 @@ const char* state_word(ch_state s)
 //                       ancient household is ceramics, cloth, leather and
 //                       dressed stone, and rigging is none of them.
 //   trade_goods_misc  - endemic luxury demand (BL-647) owns its buyer.
+//
+// RE-BLESSED 2026-08-31 (BL-654, a short pool buys up to a reservation ceiling)
+// - ONE good removed, and again nothing relaxed: the match is still exact, both
+// directions. `ordnance` leaves because the sentence four lines above stopped
+// being true. The per-head standing-force draw is no longer pool-only: a short
+// pool bids its shortfall onto the unit's local market up to
+// price_band.reservation_mult x base_price and pays for what it gets, so
+// ordnance has a real market buyer at 0 CE for the first time. That was the
+// item's whole purpose - a channel that consumes without pricing cannot
+// bootstrap its own supply (MARKETS.md § Demand channels, property 3) - so this
+// removal is the change working, not the bar moving.
+//
+// `tools` and `planks` DID NOT leave with it, and that is the honest reading
+// rather than an oversight: their draw is BL-641 building upkeep, whose rates
+// still ship at zero (scripts/economy.lua). BL-654 gave that draw a bid path;
+// turning the rates on is a separate data change with its own measurement, and
+// until it happens no building names tools as a want.
 const char* const k_r4_expected[] = {
-    "ordnance", "rigging", "tools", "trade_goods_misc",
+    "rigging", "tools", "trade_goods_misc",
 };
 constexpr std::size_t k_r4_expected_count =
     sizeof(k_r4_expected) / sizeof(k_r4_expected[0]);
@@ -413,8 +449,14 @@ struct classification
     bool sink_background  = false;
     bool sink_process     = false;    ///< input to an era-allowed recipe
     bool sink_construct   = false;    ///< line in an era-available building's basket
-    bool sink_unit_upkeep = false;    ///< pool draw, NOT a market bid
-    bool sink_industry    = false;    ///< BL-641 building upkeep — pool draw, NOT a market bid
+    // BL-654 changed what these two ARE. Both upkeep draws used to be pool-only
+    // — they consumed a good without ever pricing it — so neither counted as a
+    // market sink and both printed in lower case to say so. They now take the
+    // ONE goods-draw path: pool first, then a BID onto the local market for the
+    // shortfall, up to the buyer's reservation ceiling. A short pool is a real
+    // participant in the price, so these are market sinks like any other.
+    bool sink_unit_upkeep = false;    ///< BL-454 unit upkeep — pool draw, then a market bid
+    bool sink_industry    = false;    ///< BL-641 building upkeep — pool draw, then a market bid
 
     /// Does ANY market carry a base price for it? Both basket injectors skip a
     /// resource whose `base_price` is 0 ("untradeable -- no base price to anchor
@@ -423,9 +465,16 @@ struct classification
     /// is the one thing this census exists to make impossible.
     bool priced = false;
 
+    /// BL-654: the two upkeep draws JOINED this set. Before it they were pool
+    /// draws that priced nothing, so counting them here would have called a good
+    /// "bought" that no market ever heard of. They now bid, so a resource whose
+    /// only consumer is unit or building upkeep genuinely does have a market
+    /// sink — and `ordnance`, drawn per head by every standing unit, leaves the
+    /// "produced in-band, NO market sink" list because of it.
     bool any_market_sink() const
     {
-        return sink_household || sink_background || sink_process || sink_construct;
+        return sink_household || sink_background || sink_process || sink_construct
+            || sink_unit_upkeep || sink_industry;
     }
 };
 
@@ -437,8 +486,8 @@ std::string sink_word(const classification& c)
     if (c.sink_background)  add("BG");
     if (c.sink_process)     add("PROC");
     if (c.sink_construct)   add("CONS");
-    if (c.sink_unit_upkeep) add("upk");   // lower case: not a market bid
-    if (c.sink_industry)    add("ind");   // BL-641, likewise a pool draw
+    if (c.sink_unit_upkeep) add("UPK");   // BL-654: a market bid now, hence upper case
+    if (c.sink_industry)    add("IND");   // BL-641 + BL-654, likewise
     if (s.empty())
         s = "NONE";
     return s;
@@ -891,6 +940,11 @@ struct band_result
 
     // the census tick's attribution
     res_row household{}, background{}, interbody{}, construction{}, processing{};
+    /// BL-654: the upkeep channels' share of the want register — the shortfall a
+    /// short pool actually BID on the market, read off `economy_report::
+    /// upkeep_wants` rather than re-derived. Subtracted out of `processing`,
+    /// which is a remainder and would otherwise swallow it whole.
+    res_row upkeep_bid{};
     res_row wants_raw{}, wants_folded{}, upkeep_pool{}, industry_pool{};
     double  wants_dropped_no_market = 0.0;
 
@@ -1102,11 +1156,25 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
         }
     }
 
-    // Processing = the want register less its construction half. A negative
-    // residual means the attribution is wrong — R2's kind of failure.
+    // BL-654: the UPKEEP half of the want register, taken off the report's own
+    // attribution mirror rather than re-derived from the baskets — the mirror is
+    // written by the same statement that writes the bid, so it cannot disagree
+    // with it. Folded on the same rule the wants above are: a want on a body
+    // with no market never reaches a demand register.
+    for (const auto& [key, wanted] : rep.upkeep_wants)  // std::map — sorted keys
+    {
+        if (bodies_with_market.count(key.second) == 0)
+            continue;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (wanted[r] > 0.0f)
+                out.upkeep_bid[r] += wanted[r];
+    }
+
+    // Processing = the want register less its construction and upkeep halves. A
+    // negative residual means the attribution is wrong — R2's kind of failure.
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        out.processing[r] = out.wants_folded[r] - out.construction[r];
+        out.processing[r] = out.wants_folded[r] - out.construction[r] - out.upkeep_bid[r];
         if (out.processing[r] < -1e-3)
             out.attribution_ok = false;
         if (out.processing[r] < 0.0)
@@ -1115,8 +1183,11 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     // The construction column is capped at what actually folded, for the same
     // reason: a site on a body with no market registers a want the market never
     // hears, and printing it in a MARKET demand column would overstate the total.
+    // BL-654: less the upkeep bid, which is a measured share of that same folded
+    // total rather than a modelled one.
     for (std::size_t r = 0; r < resource_count; ++r)
-        out.construction[r] = std::min(out.construction[r], out.wants_folded[r]);
+        out.construction[r] = std::min(out.construction[r],
+                                       std::max(0.0, out.wants_folded[r] - out.upkeep_bid[r]));
 
     // The standing-force pool draw — a real sink that never reaches a market.
     {
@@ -1250,41 +1321,44 @@ void print_band(const band_result& b)
                 b.industry_eligible, b.buildings, b.industry_drawing);
 
     std::printf("\n  --- per-resource demand census, census tick, summed over every market ---\n");
-    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s | %11s | %10s %10s | %10s | %s\n",
+    std::printf("  BL-654: `upkeep/bd` is the shortfall a short pool BID on the market, so it is\n"
+                "  MARKET demand; `upkeep/pl` and `indust/pl` are the GROSS per-tick need with the\n"
+                "  pool-covered part included, and are not. bd <= pl + ind, always.\n");
+    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s %10s | %11s | %10s %10s | %10s | %s\n",
                 "id", "resource", "prod", "d px",
-                "household", "backgrnd", "interbody", "construct", "process",
+                "household", "backgrnd", "interbody", "construct", "process", "upkeep/bd",
                 "MKT TOTAL", "upkeep/pl", "indust/pl", "produced", "structural sinks");
-    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s | %11s | %10s %10s | %10s | %s\n",
+    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s %10s | %11s | %10s %10s | %10s | %s\n",
                 "---", "----------------------", "----", "----",
-                "----------", "----------", "----------", "----------", "----------",
+                "----------", "----------", "----------", "----------", "----------", "----------",
                 "-----------", "----------", "----------", "----------", "----------------");
 
     for (std::size_t r = 0; r < resource_count; ++r)
     {
         const classification& c = b.cls[r];
         const double total = b.household[r] + b.background[r] + b.interbody[r]
-                           + b.construction[r] + b.processing[r];
-        std::printf("  %-3zu %-22s %-4s %2d %-1s | %10.3f %10.3f %10.3f %10.3f %10.3f | %11.3f | "
-                    "%10.3f %10.3f | %10.1f | %s\n",
+                           + b.construction[r] + b.processing[r] + b.upkeep_bid[r];
+        std::printf("  %-3zu %-22s %-4s %2d %-1s | %10.3f %10.3f %10.3f %10.3f %10.3f %10.3f | "
+                    "%11.3f | %10.3f %10.3f | %10.1f | %s\n",
                     r, rname(r), prod_word(c), c.depth, c.priced ? "$" : "-",
                     b.household[r], b.background[r], b.interbody[r],
-                    b.construction[r], b.processing[r], total,
+                    b.construction[r], b.processing[r], b.upkeep_bid[r], total,
                     b.upkeep_pool[r], b.industry_pool[r], b.produced[r], sink_word(c).c_str());
     }
 
-    std::printf("  %-3s %-22s %-4s %-4s | %10.3f %10.3f %10.3f %10.3f %10.3f | %11.3f | "
+    std::printf("  %-3s %-22s %-4s %-4s | %10.3f %10.3f %10.3f %10.3f %10.3f %10.3f | %11.3f | "
                 "%10.3f %10.3f | %10.1f |\n",
                 "", "TOTAL", "", "",
                 total_of(b.household), total_of(b.background), total_of(b.interbody),
-                total_of(b.construction), total_of(b.processing),
+                total_of(b.construction), total_of(b.processing), total_of(b.upkeep_bid),
                 total_of(b.household) + total_of(b.background) + total_of(b.interbody)
-                    + total_of(b.construction) + total_of(b.processing),
+                    + total_of(b.construction) + total_of(b.processing) + total_of(b.upkeep_bid),
                 total_of(b.upkeep_pool), total_of(b.industry_pool), total_of(b.produced));
-    std::printf("  %-3s %-22s %-4s %-4s | %10d %10d %10d %10d %10d | %11s | %10d %10d | %10s |  "
-                "(resources touched)\n",
+    std::printf("  %-3s %-22s %-4s %-4s | %10d %10d %10d %10d %10d %10d | %11s | %10d %10d | "
+                "%10s |  (resources touched)\n",
                 "", "BREADTH", "", "",
                 touched_by(b.household), touched_by(b.background), touched_by(b.interbody),
-                touched_by(b.construction), touched_by(b.processing), "",
+                touched_by(b.construction), touched_by(b.processing), touched_by(b.upkeep_bid), "",
                 touched_by(b.upkeep_pool), touched_by(b.industry_pool), "");
 
     if (b.wants_dropped_no_market > 0.0)
@@ -1331,7 +1405,7 @@ void print_band(const band_result& b)
     std::printf("  extractable, NO market sink      : %s\n", join(b.no_sink_raws).c_str());
     std::printf("  a basket names it, band cannot make it or dig it: %s\n",
                 join(b.basket_unmakeable).c_str());
-    std::printf("  a basket names it, NO market prices it (both injectors SKIP it silently): %s\n",
+    std::printf("  a basket names it, NO market prices it (BL-652, asserted by R6): %s\n",
                 join(b.basket_unpriced).c_str());
 
     int live = 0;
@@ -1385,6 +1459,8 @@ void print_band(const band_result& b)
         std::printf("  FLAT: every market scores identically. Generation produced no supply\n"
                     "        asymmetry at all in this band — see GENERATION_STRATEGY.md\n"
                     "        § Asymmetry is the deliverable. Reported, not asserted.\n");
+    if (total_of(b.upkeep_bid)   > 0.0) ++live;   // BL-654: the upkeep bid is a sixth
+    std::printf("  live injecting passes this band  : %d of 6 measured\n", live);
 }
 
 } // namespace
@@ -1448,7 +1524,7 @@ int main(int argc, char** argv)
         }
     }
 
-    std::printf("demand_census — BL-649, requirement group `demand-census` R1-R4\n");
+    std::printf("demand_census — BL-649, requirement group `demand-census` R1-R6\n");
     std::printf("  seed %u | warm ticks %d | prehistory %s | bands %s\n",
                 seed, warm_ticks,
                 prehistory ? "ON (the shipped spawn)" : "OFF (--fast, NOT the spawn)",
@@ -1531,7 +1607,7 @@ int main(int argc, char** argv)
         // target on the economy.
         const double any_demand = total_of(b.household) + total_of(b.background)
                                 + total_of(b.interbody) + total_of(b.construction)
-                                + total_of(b.processing);
+                                + total_of(b.processing) + total_of(b.upkeep_bid);
         std::snprintf(msg, sizeof msg,
                       "%s: the instrument is non-vacuous — some pass injected some demand",
                       b.band.c_str());
@@ -1583,6 +1659,28 @@ int main(int argc, char** argv)
                       "(%d distinct of %d; range %.4f). A floor on the SPREAD only",
                       b.band.c_str(), b.spread.distinct, b.spread.n, b.spread.range);
         check(b.spread.n < 2 || b.spread.distinct >= 2, "R5", msg);
+        // --- R6 (BL-652) — THE ONE MAGNITUDE-FREE ROW THAT FAILS -------------
+        // Both basket injectors SKIP a resource whose market base_price is 0,
+        // and they do it in silence: from every total downstream, an authored
+        // but unpriced basket entry is indistinguishable from a channel nobody
+        // wrote. Two separate bugs hid behind that on one day in August 2026 —
+        // this census read as having no background demand at all, and
+        // spawn_solvency measured a whole spawn diagnosis in a world where
+        // background demand did not exist. NEITHER FAILED. Both quietly
+        // answered a question about a different world.
+        //
+        // It is not a magnitude assertion and does not breach R2's discipline:
+        // the combination is ALWAYS either a missing script (world_gen.lua,
+        // which carries kepler_market.base_price) or an authoring error, and it
+        // is never intended. `src/world/market_clearing.cpp`'s
+        // `unpriced_basket_entries` is the same finding at runtime, where the
+        // app warns rather than fails.
+        std::snprintf(msg, sizeof msg,
+                      "%s: no demand basket names a good NO market prices — %s",
+                      b.band.c_str(),
+                      b.basket_unpriced.empty() ? "none do"
+                                                : join(b.basket_unpriced).c_str());
+        check(b.basket_unpriced.empty(), "R6", msg);
     }
 
     // R4 — the hand-built finding, at the ancient band only.

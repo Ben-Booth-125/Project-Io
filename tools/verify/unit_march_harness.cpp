@@ -59,6 +59,15 @@
 
 namespace {
 
+// BL-654: both upkeep passes now take an `economy_report&` — the shortfall bid
+// they place on the market lands in its `wants` / `purchases` / `upkeep_wants`
+// registers. Nothing in THIS harness reads those registers, and nothing here can
+// write to them either: `price_band_params::reservation_mult` defaults to 0 and
+// these fixtures hand-build their registry, so the bid path is off and the draw
+// is pool-only exactly as it was before BL-654. One shared scratch report keeps
+// that visible rather than scattering a fresh local at every call site.
+economy_report g_upkeep_report;
+
 int g_pass = 0, g_fail = 0;
 
 void check(bool ok, const char* what)
@@ -680,8 +689,8 @@ void m5_determinism_replay()
             ++ticks_in_flight;
         run_unit_march(t1.w, reg);
         run_unit_march(t2.w, reg);
-        run_unit_upkeep(t1.w, reg);
-        run_unit_upkeep(t2.w, reg);
+        run_unit_upkeep(t1.w, reg, g_upkeep_report);
+        run_unit_upkeep(t2.w, reg, g_upkeep_report);
         if (t1.w.state_hash(tick) != t2.w.state_hash(tick))
         {
             all_equal = false;

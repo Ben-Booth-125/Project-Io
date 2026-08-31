@@ -204,6 +204,23 @@ struct economy_report
     /// nondeterminism, so the accumulation order must stay SORTED.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> wants;
 
+    /// BL-654 ATTRIBUTION MIRROR: the subset of `wants` contributed by the two
+    /// upkeep passes (`run_unit_upkeep`, `run_building_upkeep`). Every figure
+    /// here is ALSO in `wants`, which stays the one register clearing reads —
+    /// this map is never summed into `mc.demand` and is never paid against.
+    ///
+    /// It exists because `wants` deliberately merges its consumers (the market
+    /// does not care who bid), and demand_census recovers the construction half
+    /// from world state and calls the remainder "processing". Before BL-654 that
+    /// remainder was exactly processing; now the upkeep bid is in there too, and
+    /// with no tag the census would report the Industry channel as processing
+    /// demand — a report about a different world, which is the failure that
+    /// census exists to prevent.
+    ///
+    /// Same key type and same std::map as `wants`, for the same
+    /// sorted-accumulation reason.
+    std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> upkeep_wants;
+
     /// Per (corporation, body): the pool-level workforce scarcity figure this
     /// tick — `min(1, supply/demand)`, rescaled by habitability efficiency after
     /// production. Since BL-614 (wage competition) this is a REPORTING aggregate
@@ -397,7 +414,12 @@ struct unit_upkeep_tick
 ///  2. THE GOODS DRAW. `resolve_unit_upkeep` resolves the cost vector from the
 ///     roster; each good is drawn from the unit owner's pool ON THE UNIT'S OWN
 ///     BODY. A pool can be empty, so the draw takes what is there and NEVER goes
-///     negative; a short draw marks the unit unmet.
+///     negative. **BL-654: what the pool cannot cover is then BID onto the
+///     unit's local market and paid for** — the same single path
+///     `run_building_upkeep` takes, never a second mechanism — unless the good
+///     prices above the buyer's reservation ceiling
+///     (`price_band_params::reservation_mult`), in which case the unit declines
+///     to buy. Only what is short after BOTH marks the unit unmet.
 ///
 ///  3. THE DECAY RULE — ONE rule, TWO triggers. (a) the unit is beyond the reach
 ///     field (BL-325 S3's out-of-supply decay), or (b) the draw in step 2 went
@@ -410,7 +432,12 @@ struct unit_upkeep_tick
 /// Inert at the shipped rates: every `unit_upkeep_params` rate defaults to zero,
 /// which means no pool is touched (not even created), no draw can go unmet, and
 /// the reach field is never built from here.
-unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg);
+///
+/// @param report BL-654: the shortfall bid lands in `wants` (the price signal),
+///               the fill in `purchases` (what the corp is billed for) and a
+///               copy of the bid in `upkeep_wants` (attribution only). With
+///               `reservation_mult` at its 0 default nothing is ever written.
+unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_report& report);
 
 // ---------------------------------------------------------------------------
 // BL-641 — the building pass
@@ -473,7 +500,18 @@ struct building_upkeep_tick
 /// Inert at the shipped-zero rates: every `building_upkeep_params` rate defaults
 /// to zero, which means no basket resolves non-zero, no pool is touched (not
 /// even created), no draw can go unmet, and no supply factor ever moves.
-building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg);
+///
+/// BL-654: what the pool cannot cover is BID onto the building's local market
+/// and paid for — the same single path `run_unit_upkeep` takes — unless the good
+/// prices above the buyer's reservation ceiling, in which case the building goes
+/// without and step 3's shortfall rule applies unchanged. This is what makes the
+/// Industry channel a PRICE SIGNAL rather than a silent sink: the draw's want
+/// reaches `market_component::demand`, so a rival scoring the building that
+/// supplies it finally has a reason to (MARKETS.md § Demand channels).
+///
+/// @param report Same three registers `run_unit_upkeep` writes.
+building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
+                                         economy_report& report);
 
 // ---------------------------------------------------------------------------
 // BL-470 — the unit march pass

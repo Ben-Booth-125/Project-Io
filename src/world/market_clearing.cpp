@@ -272,7 +272,11 @@ void inject_population_demand(world& w, const recipe_registry& reg)
         {
             const float base = mc.base_price[r];
             if (base <= 0.0f)
-                continue; // Untradeable — no base price to anchor the elasticity curve.
+                continue; // Untradeable — no base price to anchor the elasticity
+                          // curve. BL-652: this skip is SILENT by construction and
+                          // must not be the only record of it — `unpriced_basket_entries`
+                          // is the named diagnostic, reported at startup and failed
+                          // on by demand_census.
             const float weighted = scale * basket[r];
             if (weighted <= 0.0f)
                 continue;
@@ -325,7 +329,9 @@ void inject_background_demand(world& w, const recipe_registry& reg)
         {
             const float base = mc.base_price[r];
             if (base <= 0.0f)
-                continue; // untradeable — no base price to anchor the elasticity curve.
+                continue; // untradeable — no base price to anchor the elasticity
+                          // curve. BL-652: named by `unpriced_basket_entries`, for
+                          // the reason on inject_population_demand's copy of this line.
             const float weighted = scale * basket[r];
             if (weighted <= 0.0f)
                 continue; // spacecraft_components (and anything else unlisted, or
@@ -337,6 +343,36 @@ void inject_background_demand(world& w, const recipe_registry& reg)
             mc.demand[r] += weighted * elastic;
         }
     }
+}
+
+std::vector<unpriced_basket_entry> unpriced_basket_entries(const world& w,
+                                                           const recipe_registry& reg)
+{
+    // Does ANY market price it? A pure OR over an unordered map, so the map's
+    // layout cannot reach the answer. Taken once rather than per basket entry.
+    std::array<bool, resource_count> priced{};
+    for (const auto& [mid, mc] : w.markets)
+    {
+        (void)mid;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (mc.base_price[r] > 0.0f)
+                priced[r] = true;
+    }
+
+    // The registry's ERA-RESOLVED folds — the exact vectors the two injectors
+    // multiply by, not the shared `any` tranche on the params, so a band whose
+    // basket never names the good is never accused of naming it.
+    const std::array<float, resource_count>* baskets[2] = {
+        &reg.population_demand_basket(), &reg.background_demand_basket()
+    };
+    const char* const channels[2] = { "household", "background" };
+
+    std::vector<unpriced_basket_entry> out;
+    for (std::size_t c = 0; c < 2; ++c)
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if ((*baskets[c])[r] > 0.0f && !priced[r])
+                out.push_back({ static_cast<resource_type>(r), channels[c] });
+    return out;
 }
 
 namespace {

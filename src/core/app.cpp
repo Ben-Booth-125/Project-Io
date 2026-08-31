@@ -62,6 +62,7 @@
 #include "world/logistics.hpp"
 #include "world/market_clearing.hpp"
 #include "world/orbital_system.hpp"
+#include "world/resource_names.hpp" // BL-652: name the good in the unpriced-basket warning
 #include "world/supply_system.hpp"
 
 #include <algorithm>
@@ -1048,6 +1049,34 @@ void app::load_economy()
     // never produce, reported as ordinary idleness. 20.3% of processing
     // building-ticks in tier_margin, silently dragging the BL-436 calibration.
     assign_default_recipes(m_world, m_registry);
+
+    // BL-652 — AN INJECTOR THAT CANNOT PRICE A BASKET ENTRY SAYS SO.
+    //
+    // Both demand-basket injectors skip a resource whose market base_price is 0,
+    // and that skip is silent: an authored-but-unpriced basket entry is
+    // indistinguishable, from every total downstream, from a channel nobody ever
+    // wrote. Two separate bugs hid behind that silence on one day in August 2026,
+    // and NEITHER FAILED — each quietly answered a question about a different
+    // world. It is always a missing script or an authoring error, never intent.
+    //
+    // Reported HERE because this is the first moment both halves exist together:
+    // the era-resolved baskets (set_era, above) and the generated markets that
+    // carry base_price. Once per campaign start, one line per (channel,
+    // resource), never per market or per tick. The headless counterpart is
+    // demand_census's R5 row, which FAILS rather than warns.
+    {
+        const std::vector<unpriced_basket_entry> unpriced =
+            unpriced_basket_entries(m_world, m_registry);
+        for (const unpriced_basket_entry& e : unpriced)
+            std::fprintf(stderr,
+                         "ProjectIo: [demand-basket] the %s basket wants '%s', which NO market "
+                         "prices (base_price 0) - the injector will discard it in silence. "
+                         "Either scripts/world_gen.lua omits it from kepler_market.base_price, "
+                         "or the basket names a good it should not.\n",
+                         e.channel, resource_names::name_of(e.resource).c_str());
+        if (!unpriced.empty())
+            std::fflush(stderr);
+    }
 
     // Seat the persona counsel mountain bench (BL-207 slice 1). Every non-player
     // corp seats the same bench this slice (bench diversity by industrial focus
