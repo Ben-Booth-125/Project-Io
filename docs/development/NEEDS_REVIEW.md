@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*96 entries — 96 open, 0 resolved.*
+*98 entries — 97 open, 1 resolved.*
 
 ---
 
@@ -956,6 +956,78 @@ ON THROUGHPUT SPECIFICALLY, since you expected it to match one: it does not, and
 
 *Files: `docs/ui/LENSES.md`, `src/ui/nav_pane.cpp`, `docs/ui/ledgers/corporation.md`, `docs/ui/ledgers/balance.md`*
 
+### NR-744 — Three purged AI items still hold dated standing-rule grants and have no owner
+*observation · raised 2026-08-31 · from Sprint 26 opening; found while sizing the diplomatic half of the AI thread.*
+
+The 2026-08-23 cull purged BL-450 (rivals score stance), BL-539 (rival lobbying), BL-540 (nation stance gates the player) and BL-334 (Stage C dialogue layer). None was completed - the cull's own note is explicit that nothing in it is open work and nothing in it is done.
+
+THEIR GRANTS DID NOT GO WITH THEM. io-standing-rules.md still carries, dated and argued at length, Ben's 2026-08-22 permission for a rival to act politically against the player's corp (naming BL-539 and BL-540 by id), his same-date grant for a rival to score stance (naming BL-450), and AI_OPPONENT.md § 7 still names BL-334 as the item carrying Stage C.
+
+SO THE STANDING RULES CITE FOUR ITEM IDS THAT NO LONGER EXIST as work anywhere. A reader following those citations lands in the purge archive, whose note correctly says nothing in it is open - which is true of the record and false of the intent.
+
+BL-699 (rival stance scoring) resurrects the first, authored fresh. The other three remain unowned.
+
+This is the same failure shape as NR-70x's FINANCE.md finding: a document describing something in the present tense that no code and no item backs. Here it is subtler, because the rules are not wrong - the permission genuinely stands. It is the ID CITATIONS that dangle.
+
+**Why it matters.** The standing rules are the always-on file every session reads. An id in it that resolves only to a purge archive teaches the reader that its citations are unreliable, which is expensive for a file whose whole value is that it can be trusted without checking.
+
+> **Recommendation:** Two options, Ben's call. (1) Mint owners for lobbying, nation-stance-gating and Stage C now, so the citations resolve - probably the sprint after 26, since all three sit above the margin term. (2) Or edit the standing rules to cite the RULINGS by date rather than by item id, which is what the state-independence rule would prefer anyway - a doc citing a BL- id as the owner of a design is fine, citing one that no longer exists is not.
+
+*Files: `.claude/rules/io-standing-rules.md`, `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`*
+
+### NR-745 — No authority doc owns a LIVING climate, and it is now load-bearing for the AI design
+*novel-work · raised 2026-08-31 · from Ben, 2026-08-31: "we haven't built a critical system which is climate." Filed at the moment the feeling arose, per the novelty rule.*
+
+Climate became load-bearing today. AI_OPPONENT.md § Where restraint comes from names it as one of the two systemic brakes that keep a leader from running away - so the AI design now DEPENDS on a system that does not exist and that no doc owns.
+
+WHAT EXISTS, measured. Climate appears in planetology.cpp, tile_generation.cpp and hard_coded_world.cpp, and is documented in TILES.md, PLANETOLOGY.md, TILE_GENERATION.md and RESOURCES.md - all of it GENERATION-TIME, shaping terrain as tiles are made. economy_system.cpp, corp_ai.cpp and budget_system.cpp do not read the word. Both directions are missing: nothing a corporation does can affect climate, and climate cannot affect a running campaign.
+
+WHY IT IS A NOVELTY FLAG AND NOT JUST A BIG ITEM. PLANETOLOGY.md owns body-level atmosphere, chemistry and biosphere HISTORY - generation's concern. A live campaign force that responds to what corporations do is a different subject, and filing it under a generation doc would put a campaign system in the wrong authority. SYSTEMS.md owns the system map and would need to admit it. This is a new system in the project, and per the standing rule novelty should be CHOSEN rather than accreted.
+
+IT ALSO GROWS SCOPE IN A DIRECTION NOTHING ELSE HAS. A commons that strains under total activity touches production, habitability, terrain and plausibly nations (which would reach the 2026-08-18 nation grant). BL-701 (living climate) is filed design-owed at difficulty 8 with no build plan, deliberately.
+
+I DID NOT PAUSE THE SESSION FOR IT, per the rule's own carve-out, because the sprint does not depend on it: BL-699 (rival coalitions) can produce a close race on its own. Climate is what later makes that race honest when the PLAYER is the one leading.
+
+**Why it matters.** A design doc now cites a system that has no owner, no design and no code. That is the exact shape NR-70x caught in FINANCE.md - a doc describing something in the present tense that nothing backs - and it is worth catching before it is written into more places than one.
+
+- Give climate its own authority doc (docs/economy/CLIMATE.md or docs/generation/CLIMATE.md) and admit it to SYSTEMS.md. Cleanest, and matches how every other system in Io is owned.
+- Extend PLANETOLOGY.md with a live-campaign section. Cheaper, but puts a campaign force in a generation doc, which the state-independence rule would read as a category error.
+- Design it inside AI_OPPONENT.md as an AI-support mechanism. WRONG, and named here only to reject it - climate would bear on the player identically, so it is a world system that happens to brake the AI, not an AI feature.
+
+> **Recommendation:** Its own doc, admitted to SYSTEMS.md, designed in sprint 26 and built in the sprint after. The design questions BL-701 lists are unanswered and several are yours to call - notably whether it degrades reversibly or ratchets, which decides whether climate is a pressure or a doom clock.
+
+*Files: `docs/generation/PLANETOLOGY.md`, `docs/SYSTEMS.md`, `docs/ai/AI_OPPONENT.md`, `docs/economy/TILES.md`*
+
+### NR-746 — Restraint moved out of the agent and into the world - the supersession record, and the one risk it carries
+*decision · raised 2026-08-31 · from Ben, 2026-08-31, answering the margin-objective design form.*
+
+Recorded because AI_OPPONENT.md § The goal was rewritten TWICE on 2026-08-31 and the second rewrite supersedes the first. A future reader finding both framings in the git history should be able to tell which one stands and why.
+
+FIRST FRAMING (mine, from Ben's opening steer): the margin is a term in the scorer's objective. The AI plays at full skill but aims at 'stay narrowly ahead' instead of 'maximise'. Argued as honest on the grounds that nothing is taken from the AI - only the target moved.
+
+BEN'S RULING, which supersedes it: "The angle we are taking here is a literal handicap. I prefer to consider it as always a force from within the game system. With 7 corporations, we have plenty of room for alliances to form against leaders, and we haven't built a critical system which is climate. Therefore, I prefer if an agent's decision to slow down can be framed as usually motivated by systems."
+
+HE IS RIGHT AND THE FIRST FRAMING WAS WRONG. An objective term is invisible, uncausable and uncounterable: the player cannot see it, provoke it, benefit from it or fight it. Moving the target rather than lowering the skill is a real distinction, but it is a distinction the player never gets to observe - which makes it a handicap in every way that matters to the person playing. A coalition has a cause and a face.
+
+BOTH MODES KEPT, at Ben's instruction - the systemic route as the foundation, the scorer dial demoted to an opt-in difficulty knob (BL-698, opt-in margin dial), off by default.
+
+THE RISK THE NEW SHAPE CARRIES, and it is the reason this is a `decision` rather than an observation: an emergent brake CANNOT BE GUARANTEED. A margin term hits its number by construction; coalitions might not form, might form against the wrong corp, might form and not bite, or might over-bite and produce a dogpile where the leader collapses rather than being held. There is no dial that fixes that directly - the fix is always to the coalition scoring, which is the honest cost of preferring a system to a handicap. BL-697's (skill harness margin metric) spread band is what will tell us, and it is the reason that item is an instrument rather than a nicety.
+
+SECOND RISK, smaller and worth naming: coalitions brake the leader, and the PLAYER is often the leader. The brake will therefore be aimed at the player a good deal of the time, which is correct and is the design working - but it must be visibly caused, or it will read as exactly the rubber-banding this reframe rejected. Hence the legibility requirement written into BL-699 as a requirement rather than a follow-up.
+
+**Why it matters.** It is the central design decision of the AI thread, it reversed inside one session, and the reversal is the kind that a later reader would otherwise re-litigate from first principles. It also names the one thing the new shape cannot promise, which the old shape could.
+
+> **Recommendation:** No action - this is a record, not a question. Read it with NR-743, which the reframe dissolved. The thing to actually watch for at the sprint retro is the dogpile failure mode: a leader that COLLAPSES rather than being held is the new design failing, and it will look superficially like success in a spread band.
+
+*Files: `docs/ai/AI_OPPONENT.md`, `docs/development/sprints.json`, `src/world/corp_ai.cpp`*
+
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
+
 ### NR-743 — The margin is measured against the strongest corporation, uniformly - not against the player specifically
 *decision taken on your behalf · raised 2026-08-31 · from Sprint 26 opening. Ben, 2026-08-31: "trying to match the skill of their opponent, and beating them by a slim margin."*
 
@@ -978,31 +1050,13 @@ CHEAP TO OVERTURN NOW, expensive later. It is one term's definition in BL-698 (s
 
 > **Recommendation:** Keep (a) through the sprint and JUDGE IT BY WATCHING, under BL-695's (live spectate route) spectate. The question is not answerable on paper - it is whether a run feels like a close race or like a race you were not in. Revisit at the sprint retro with an actual run to point at.
 
+> **RESOLVED.** DISSOLVED, not answered, by Ben's systemic reframe the same day (see NR-746 and AI_OPPONENT.md § Where restraint comes from).
+
+The entry asked whether the margin is measured against the strongest corporation or against the player specifically. Both readings assumed a term in the scorer aiming at a margin. Ben removed that assumption: no actor aims at the margin at all, so there is no term whose subject needed choosing. The close race is produced by coalitions and climate, and the spread is something the HARNESS measures rather than anything the code targets.
+
+What survives of it: the uniform-vs-player-facing instinct was right for the wrong reason. Coalitions are inherently uniform - they form against whoever leads, and against the player identically when the player leads - so the property the entry argued for is now structural rather than a choice anyone has to keep making.
+
+Ben DID answer the adjacent question directly: standing is a composite of net worth, research and military strength (BL-700, composite standing index).
+
 *Files: `docs/ai/AI_OPPONENT.md`, `src/world/corp_ai.cpp`, `tools/verify/ai_skill_harness.cpp`*
-
-### NR-744 — Three purged AI items still hold dated standing-rule grants and have no owner
-*observation · raised 2026-08-31 · from Sprint 26 opening; found while sizing the diplomatic half of the AI thread.*
-
-The 2026-08-23 cull purged BL-450 (rivals score stance), BL-539 (rival lobbying), BL-540 (nation stance gates the player) and BL-334 (Stage C dialogue layer). None was completed - the cull's own note is explicit that nothing in it is open work and nothing in it is done.
-
-THEIR GRANTS DID NOT GO WITH THEM. io-standing-rules.md still carries, dated and argued at length, Ben's 2026-08-22 permission for a rival to act politically against the player's corp (naming BL-539 and BL-540 by id), his same-date grant for a rival to score stance (naming BL-450), and AI_OPPONENT.md § 7 still names BL-334 as the item carrying Stage C.
-
-SO THE STANDING RULES CITE FOUR ITEM IDS THAT NO LONGER EXIST as work anywhere. A reader following those citations lands in the purge archive, whose note correctly says nothing in it is open - which is true of the record and false of the intent.
-
-BL-699 (rival stance scoring) resurrects the first, authored fresh. The other three remain unowned.
-
-This is the same failure shape as NR-70x's FINANCE.md finding: a document describing something in the present tense that no code and no item backs. Here it is subtler, because the rules are not wrong - the permission genuinely stands. It is the ID CITATIONS that dangle.
-
-**Why it matters.** The standing rules are the always-on file every session reads. An id in it that resolves only to a purge archive teaches the reader that its citations are unreliable, which is expensive for a file whose whole value is that it can be trusted without checking.
-
-> **Recommendation:** Two options, Ben's call. (1) Mint owners for lobbying, nation-stance-gating and Stage C now, so the citations resolve - probably the sprint after 26, since all three sit above the margin term. (2) Or edit the standing rules to cite the RULINGS by date rather than by item id, which is what the state-independence rule would prefer anyway - a doc citing a BL- id as the owner of a design is fine, citing one that no longer exists is not.
-
-*Files: `.claude/rules/io-standing-rules.md`, `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`*
-
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
 

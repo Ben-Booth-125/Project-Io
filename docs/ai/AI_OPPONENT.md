@@ -20,7 +20,8 @@ action-generating seat (Ben, 2026-08-08 — § 10g).** Read § 10 before any wor
 layer.
 
 **The goal (Ben, 2026-08-31).** A computer opponent that plays like a **person**, not like an
-optimiser. Three properties, and the third orders the other two.
+optimiser. Three properties: **skilled**, **diplomatic**, and **restrained** — it knows when to
+hold back.
 
 **Skilled.** A genuine rival across Io's loop — extraction, trade, conflict — whose moves are
 **legible**: they read as sensible, not alien and not scripted. Skill is never dialled down. The
@@ -29,31 +30,89 @@ scorer plays as well as it knows how.
 **Diplomatic.** It deals rather than merely competes. Stance, contracts and lobbying are positions
 it takes toward named parties, for reasons it can state (§ 7).
 
-**Restrained — it knows when to hold back.** Its objective is not *maximise my own position*. It is
-**stay narrowly ahead**: hold a slim margin over the strongest corporation in the world, and decline
-to press an advantage it already holds.
+**Restrained.** No corporation runs away with the game. The intended shape of a campaign is a
+**close race** — a leader ahead by a slim margin, not by an era.
 
-**The margin is an objective, not a difficulty dial.** This is the load-bearing distinction in this
-document. Nothing is taken from the AI, no information is withheld from it, and it is handed
-nothing free. It scores holding back *above* pressing because holding back is what its objective
-rewards — the actor is undiminished and only the target moved. § 1 Area 4's fairness ordering
-weighs handicaps against genuine skill; an objective change does not sit on that ordering at all,
-because the AI is still playing its hardest at the thing it is trying to do.
+### Where restraint comes from — the world, not the agent (Ben, 2026-08-31)
 
-**The objective is uniform across corporations, and names no player.** Every corp holds the same
-rule and measures it against whoever leads, so rivals restrain each other exactly as they restrain
-a human. A margin term that named the player's corp specifically would be rubber-banding aimed at
-one seat, and would fail the moment the player is not the leader — or, under spectate, not present.
-The player is simply another corporation to it.
+This is the load-bearing decision in this document, and it **supersedes the objective-term framing
+first written on the same day**. Ben's ruling:
 
-**Transparent by construction**, which is § 1 Area 4's own tolerance test. A restrained move carries
-its reason — *held: already ahead* — into the decision log like every other move, so restraint reads
-as a choice rather than as a failure to act.
+> *"The angle we are taking here is a literal handicap. I prefer to consider it as always a force
+> from within the game system. With 7 corporations, we have plenty of room for alliances to form
+> against leaders, and we haven't built a critical system which is climate. Therefore, I prefer if
+> an agent's decision to slow down can be framed as usually motivated by systems."*
 
-**What follows.** A rout is a failure of the objective, in the same way a collapse is. Superhuman
-play is a regression, not an achievement. The measure of this AI is therefore the **margin it
-holds**, taken against the strongest corporation in the world — not an absolute wealth band, which
-says nothing about whether anyone was played with.
+**A term in the scorer that says "ease off, I am ahead" is a handicap wearing a costume.** It is
+invisible, the player cannot interact with it, cannot counter it, cannot cause it, and cannot be
+its beneficiary in any way they could name. It also earns its slim margin by making the AI *worse*,
+which is the one thing § "The goal" says it must not do.
+
+**So the agent does not hold back. The world holds it back.** Every corporation plays flat out for
+its own position. The margin stays slim because **leading is expensive** — a fact about the world
+that applies to whoever leads, the player included, and that the player can see, use and suffer.
+
+The margin is therefore an **emergent property of a healthy system, not a target any actor aims
+at**. Nothing in the scorer knows what the margin is.
+
+**The two systemic brakes.**
+
+1. **Coalitions form against the leader.** Seven corporations is enough room for this to be real.
+   A corp's stance scoring reads *who is winning*, so the leader accumulates enemies and the field
+   accumulates each other — the brake is applied **to** the leader **by others**, never by the
+   leader to itself. This is diplomacy doing the load-bearing work rather than decorating it, and
+   it is the reason § 7's medium matters: a coalition that forms in a channel the player can read
+   is a coalition the player can join, split, or provoke.
+
+2. **Climate is a commons that the biggest extractor strains most.** A world-level pressure that
+   scales with total activity and bears hardest on the largest operator. It brakes a runaway
+   without naming anyone, which is what makes it feel like weather rather than like a rule aimed at
+   the player. Climate exists in Io today only as a **generation-time** input to terrain; as a live
+   campaign force it is unbuilt, and it is the system this goal most depends on.
+
+Both are legible, both have causes, and both **feed Trade or Conflict** — which an objective term
+does not, and which every system in Io is required to do.
+
+### The constraint on restraint (Ben, 2026-08-31)
+
+> *"'how far restraint goes' should never exclude extension and construction. If a player loses
+> out, they should be able to see that the world doesn't wait for them."*
+
+**A pressured corporation still builds, still expands, still extends.** No brake in either mode may
+veto construction or extension outright. Pressure makes leading *costly*; it never makes the world
+*stop*. A player who falls behind must find a world that carried on without them — that is the
+honest consequence the whole design is protecting, and a frozen leader destroys it.
+
+So a brake scales what a corp does. It never forbids a category of what it does.
+
+### The second mode, kept but not the default
+
+The scorer-side margin term is **retained as an explicit, opt-in mode** — Ben, 2026-08-31: *"we can
+keep both modes."* Where it applies, it applies as an **even scaling across every candidate**, never
+as a carve-out that exempts or forbids one family of action, per the constraint above.
+
+It is a **difficulty knob**, and it is named as one: this is exactly § 1 Area 4's "small,
+transparent economic handicap", which that section permits as a knob and rejects as a foundation.
+The systemic route is the foundation. This is the dial on top of it.
+
+### Standing — what the margin is measured in
+
+A corporation's standing is a **composite**, not its bank balance (Ben, 2026-08-31: *"an aggregate
+of net worth, research, military strength… maybe others too"*):
+
+| Component | Quantity |
+|---|---|
+| Economic | Net worth — cash plus the assessed value of buildings and held stock |
+| Research | The corp's accumulated `science` (the BL-332 accumulator: reached, never spent) |
+| Military | Summed `unit_strength` over the corp's fielded units |
+
+Balance alone is the wrong measure and would misread the game constantly — a corp that has just
+spent its treasury on a smelter is not behind, and a corp hoarding cash while its rivals arm is not
+ahead. The composite is what a coalition scores against, and what the skill harness bands.
+
+**What follows.** A rout is a failure of the design, in the same way a collapse is. Superhuman play
+is a regression, not an achievement. And the measure of this AI is the **spread across the field** —
+not an absolute wealth band, which says nothing about whether anyone was played with.
 
 ---
 
@@ -240,12 +299,14 @@ out-of-process policy over the state export.
 - **Benchmark seed-set (golden):** freeze N seeds spanning body/terrain/market diversity; the AI's
   economic outcomes become regression goldens (net-worth curve, survival rate, win-rate vs a
   reference AI). Re-run headlessly on every AI change — the direct analogue of `verifier-headless`.
-  **The primary metric is the MARGIN, not the level.** § "The goal" makes the objective relative,
-  so an absolute wealth band cannot score it: a run where every corp got rich together and a run
-  where one corp ran away both sit inside a generous net-worth band, and only the second is a
-  failure. The banded quantity is therefore the **spread between the leading corporation and the
-  field** — held narrow is a pass, a widening gap is the regression, and an absolute band survives
-  only as a solvency floor underneath it.
+  **The primary metric is the MARGIN, not the level.** § "The goal" makes a close race the
+  intended shape of a campaign, and an absolute wealth band cannot score that: a run where every
+  corp grew together and a run where one corp ran away both sit inside a generous net-worth band,
+  and only the second is a failure. The banded quantity is therefore the **spread in composite
+  standing between the leading corporation and the field** — held narrow is a pass, a widening gap
+  is the regression, and an absolute band survives only as a solvency floor underneath it.
+  Note what this measures and what it does not: no actor aims at the margin, so the band is scoring
+  whether the WORLD'S brakes work, not whether an agent obeyed an instruction.
   `tools/verify/ai_skill_harness.cpp` is that harness.
 - **Bot-vs-bot rollouts** as the primary skill signal.
 - **Deterministic offline policy evaluation:** same seed, two policies, exact A/B.
@@ -902,9 +963,10 @@ fine-tuning corpus for the local model. This is CivAgent's data-flywheel pattern
 no-human-data self-play, applied to a game whose deterministic seeds can generate the scenarios
 for free (§ 3). Which layer that corpus trains is § 10g's ruling.
 
-**The goal remains "fair, beatable, legible", not "strong"** — and since § "The goal" the ceiling
-is sharper still: the target is a **held margin**, so a fine-tune that made the model *win harder*
-would be moving away from the goal, not toward it. § 10c.1 is what makes this
+**The goal remains "fair, beatable, legible", not "strong".** Note that § "The goal" puts the
+ceiling somewhere a fine-tune cannot reach it either way: the close race is produced by the world's
+brakes, not by the agent's restraint, so a model that played *harder* would be answered by the same
+coalitions and the same commons as any other leader. § 10c.1 is what makes this
 credible: parity with a tuned algorithmic 4X AI was reached *without any fine-tuning at all*, so
 the fine-tune's job is to get a **small** model to that bar — not to exceed it. Superhuman play
 is explicitly not the target and would be a regression against the § "The goal" statement.
