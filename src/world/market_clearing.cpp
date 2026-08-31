@@ -1,6 +1,7 @@
 #include "market_clearing.hpp"
 
 #include "law.hpp" // the D4 import tariff: any_import_tariff_enacted / nation_tariff_rate
+#include "logistics.hpp" // BL-708: body_reach_field / tile_reach_cost — the grid good's listing gate
 
 #include <algorithm>
 #include <array>
@@ -691,6 +692,39 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     std::unordered_map<entity_id, std::unordered_map<std::size_t, std::vector<ob_sell_entry>>> sell_books;
     std::unordered_map<entity_id, std::unordered_map<std::size_t, std::vector<ob_buy_entry>>>  buy_books;
 
+    // BL-708 — A GRID GOOD ONLY LISTS ONTO A MARKET ITS NETWORK REACHES.
+    //
+    // "Connection gates the TRADE, not only the draw" (LOGISTICS.md § 3a): power
+    // is bought and sold, so what the network decides is WHO MAY MATCH WHOM. The
+    // buyer's half of that lives in `draw_goods_or_bid`; this is the seller's,
+    // and the two together are what make power's price REGIONAL BY CONSTRUCTION
+    // — a well-connected region with generation is cheap, a stranded one is
+    // expensive or dark — without any rule naming a region.
+    //
+    // The market's own `centre_tile` is the shelf's position on the grid, and
+    // connectivity is `tile_reach_cost` read as a BOOLEAN, exactly as the draw
+    // reads it: finite connected, infinity (or an uncomputed -1) not. Memoised
+    // per market for this pass, so a body's Dijkstra is warmed at most once and
+    // each market is tested at most once however many corps list into it.
+    const grid_goods_params& grid_rules = reg.grid_goods();
+    const bool               any_grid   = grid_rules.any();
+    std::map<entity_id, bool> market_on_grid; // std::map: sorted, so no hash-order dependence
+    auto market_connected = [&](entity_id market_id) {
+        const auto memo = market_on_grid.find(market_id);
+        if (memo != market_on_grid.end())
+            return memo->second;
+        bool ok = false;
+        const auto mit = w.markets.find(market_id);
+        if (mit != w.markets.end() && mit->second.centre_tile != null_entity)
+        {
+            body_reach_field(w, mit->second.body); // warm; tile_reach_cost is the const half
+            const float rc = tile_reach_cost(w, mit->second.centre_tile);
+            ok = (rc >= 0.0f) && std::isfinite(rc);
+        }
+        market_on_grid.emplace(market_id, ok);
+        return ok;
+    };
+
     // Auto-surplus: each corp's pool above its processor reservation.
     for (auto& [key, pool] : w.corp_body_pools)
     {
@@ -711,6 +745,12 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             if (mc.base_price[r] <= 0.0f)
                 continue;
             if (order_controls(corp, body, r))
+                continue;
+
+            // BL-708: a grid good stranded off the network cannot be listed —
+            // there is no wire to sell it down. It stays in the pool, where the
+            // stockpile ceiling then stops the generator making more of it.
+            if (any_grid && grid_rules.grid(r) && !market_connected(mid))
                 continue;
 
             const float surplus = pool.quantities[r] - reserve[r];
@@ -742,6 +782,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         if (mid == null_entity)
             continue;
         const std::size_t r = static_cast<std::size_t>(order.resource);
+        // BL-708: the same listing gate the auto-surplus path takes. A standing
+        // sell order is still a seller, and an off-grid seller of a grid good
+        // has nothing to deliver against it.
+        if (any_grid && grid_rules.grid(r) && !market_connected(mid))
+            continue;
         const auto pkit = w.corp_body_pools.find(std::make_pair(order.corp, order.body));
         if (pkit == w.corp_body_pools.end())
             continue;

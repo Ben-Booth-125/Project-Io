@@ -134,6 +134,23 @@ world_gen = {
             leather                = 7.2,  -- hides 2.0*2.5 = 5.0; 5.0 * 1.433
             cloth                  = 3.7,  -- fibre 2.0*1.3 = 2.6; 2.6 * 1.433
             rigging                = 14.5, -- planks 1.5*4.3 + cloth 1.0*3.7 = 10.15; 10.15 * 1.433
+
+            -- BL-708 (2026-08-31) — POWER, the grid good. It HAS a price, and
+            -- that is the design's whole first claim: power clears on the market
+            -- like any other good, and only its MOVEMENT is special (it rides
+            -- the road network, never a convoy). A base price is therefore not
+            -- optional decoration here — a good with base_price 0 is unbuyable
+            -- by the arithmetic of the reservation ceiling, so an unpriced power
+            -- would leave every upkeep draw permanently unmet.
+            --
+            -- DERIVED, not picked, at the roster's ~1.433x markup, jointly with
+            -- the two recipes in recipes.lua (see their comment for the full
+            -- working): coal 2.0*2.0 = 4.0 in -> 4.0 power out, and petroleum
+            -- 1.0*3.5 = 3.5 in -> 3.5 power out, both clearing 1.45x at this
+            -- price. Cheaper PER UNIT than either fuel because one unit of fuel
+            -- makes about two of power: power is the divided, distributed form
+            -- of the same energy, and the price says so.
+            power                  = 1.45,
         },
 
         -- Nation tradeable-resource concentration gates (BL-096): a nation

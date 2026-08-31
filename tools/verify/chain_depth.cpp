@@ -196,6 +196,7 @@ enum class injector
     population_demand,
     background_demand,
     unit_upkeep_draw,
+    building_upkeep_draw,       ///< BL-708: run_building_upkeep's per-type, era-banded goods draw.
     construction_material_draw,
     launch_draw,
 };
@@ -208,6 +209,7 @@ const char* injector_label(injector i)
         case injector::population_demand:          return "inject_population_demand";
         case injector::background_demand:          return "inject_background_demand";
         case injector::unit_upkeep_draw:           return "run_unit_upkeep goods draw";
+        case injector::building_upkeep_draw:       return "run_building_upkeep goods draw";
         case injector::construction_material_draw: return "construction material draw";
         case injector::launch_draw:                return "commit_convoy launch draw";
     }
@@ -242,6 +244,36 @@ bool injector_moves(const recipe_registry& reg, injector i, std::size_t r)
             return reg.background_demand_basket()[r] > 0.0f;
         case injector::unit_upkeep_draw:
             return reg.military().upkeep.goods_per_head[r] > 0.0f;
+        // BL-708. Resolved through `building_upkeep_goods` — the SAME free
+        // function the live pass and the census both compose the bands with —
+        // so the probe reads what the pass reads.
+        //
+        // ACROSS EVERY BAND AND EVERY BUILDING TYPE, deliberately, because that
+        // is the question R1 asks: "does a real pass draw this good ANYWHERE",
+        // not "does it draw it in the band this probe registry happens to
+        // carry". The two basket cases above read the same way — `ceramics` is
+        // authored only in the ancient household tranche and substantiates here
+        // regardless of the probe's band — so scanning one band would make this
+        // row stricter than its neighbours for no reason. Whether producer and
+        // consumer meet IN THE SAME band is R1b's question, and R1b asks it
+        // separately with a banded registry.
+        //
+        // The contract this keeps: zero the Lua rate and the row goes red by
+        // name. Narrow the rate to a band and it stays green here, and R1b is
+        // what would speak if that band could not also make the good.
+        case injector::building_upkeep_draw:
+        {
+            for (std::size_t b = 0; b < era_band_count; ++b)
+                for (int t = 0; t < static_cast<int>(building_type_count); ++t)
+                {
+                    const auto basket = building_upkeep_goods(
+                        reg.building_upkeep(), static_cast<building_type>(t),
+                        static_cast<era_band>(b));
+                    if (basket[r] > 0.0f)
+                        return true;
+                }
+            return false;
+        }
         case injector::launch_draw:
             return launch_draw_per_convoy()[r] > 0.0f;
         case injector::construction_material_draw:
@@ -315,6 +347,18 @@ const exemption k_actor_consumed[] = {
     // that behaviour rather than trusting this comment.
     { resource_type::ordnance, injector::unit_upkeep_draw,
       "BL-454 unit upkeep draw (per-tick, per unit)" },
+
+    // BL-708. Power is produced by the two generation recipes and consumed by
+    // NO recipe, so it reads as terminal — but it is not an orphan, and this row
+    // says which pass buys it rather than leaving that to a comment. The claim
+    // resolves through `building_upkeep_goods`, so zeroing the Lua rate turns
+    // this row red by name rather than letting it quietly become a lie — the
+    // same contract ordnance's row above carries. The rate is authored on the
+    // industrial band alone (there is no ancient power analogue by design);
+    // R1b is the check that asks whether producer and consumer meet in one
+    // band, and it does so with a banded registry rather than this one.
+    { resource_type::power, injector::building_upkeep_draw,
+      "BL-708 building upkeep draw (per-tick, per building; industrial band only)" },
 
     // BL-640, and the three rows this item exists to move. They sat in the
     // no-pass half below claiming a "mercantile demand" that never existed; the

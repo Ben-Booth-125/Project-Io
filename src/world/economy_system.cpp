@@ -432,12 +432,36 @@ building_report run_processing(world& w, const recipe_registry& reg,
         bought[r] += from_market;
     }
 
+    // BL-708 — THE STOCKPILE CEILING, and it is power's one genuinely novel
+    // property against the rest of the roster (PRODUCTION.md § Power: "a
+    // generator running into a full store is producing nothing anyone will ever
+    // buy — a real decision rather than an accounting detail").
+    //
+    // Applied HERE, where output ACCRUES, so the overflow is never produced
+    // rather than produced and then deleted. That distinction is the whole
+    // point: `rep.output_quantity` is what the profitability model and the corp
+    // AI's idle reflex both read, so a plant backed up against a full store must
+    // report the truth — it made nothing this tick — or the AI would keep paying
+    // wages for output that evaporated after the fact.
+    //
+    // ZERO CEILING = UNCAPPED, which is every other good in the roster, so this
+    // block is arithmetically inert in a world that authors no ceiling.
+    const grid_goods_params& grid = reg.grid_goods();
+
     float produced = 0.0f;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        const float outq = rcp->outputs[r] * batches;
+        float outq = rcp->outputs[r] * batches;
         if (outq <= 0.0f)
             continue;
+        const float cap = grid.ceiling(r);
+        if (cap > 0.0f)
+        {
+            const float room = cap - pool.quantities[r];
+            outq = std::max(0.0f, std::min(outq, room)); // a store already over cap makes nothing
+            if (outq <= 0.0f)
+                continue;
+        }
         pool.quantities[r] += outq;
         produced           += outq;
         mark_produced(w, corp, static_cast<resource_type>(r)); // BL-428 growth spine
@@ -2216,7 +2240,27 @@ namespace {
 /// `run_construction`'s too — it commits its draw before `ref_price` exists —
 /// so it is the model's existing tolerance rather than a new one.
 ///
+/// BL-708 — THE ONE PATH ALSO CARRIES THE GRID RULE, and it is a narrowing of
+/// this path rather than a second one. A GRID GOOD (`grid_goods_params::is_grid`
+/// — `power` today) is transmitted on the road network instead of being carried,
+/// so it only reaches a tile the network reaches. Connectivity is
+/// `tile_reach_cost` READ AS A BOOLEAN — finite means connected, infinity means
+/// not — which is LOGISTICS.md § 3a's own reduction: the multi-source Dijkstra of
+/// § 3 already answers the question, so there is no second graph and no second
+/// field. Latency is a flat ONE TICK regardless of distance, which is the tick
+/// this draw already runs on, so it needs no expression at all.
+///
+/// The gate covers BOTH halves of the draw, and that is deliberate. A pool half
+/// exempted would let a corp's own generation reach a stranded site with no wire
+/// to it, which is exactly the "power is private infrastructure" reading Ben
+/// overturned. Cut off is cut off, whoever generated it.
+///
+/// A grid good's shortfall on an unreached tile therefore stands, and the
+/// caller's shortfall rule takes it unchanged: the building SCALES ITS OUTPUT
+/// DOWN (`building_supply_scalar`), it is not idled — the lights go dim, not out.
+///
 /// Deterministic: resource index order, no RNG, no container-order dependence.
+/// `tile_reach_cost` is a const read off a field the caller warms.
 bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& report,
                        entity_id corp, entity_id body, entity_id tile,
                        const std::array<float, resource_count>& need)
@@ -2229,6 +2273,18 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
     const entity_id  mid = market_for_tile(w, tile);
     market_component* m  = (mid != null_entity) ? &w.markets.at(mid) : nullptr;
     const float res_mult = reg.price_band().reservation_mult;
+
+    // BL-708. `any()` first, so a world that authors no grid good pays one bool
+    // for the whole feature and never reads the reach field at all. `rc < 0` is
+    // "not computed" (the caller did not warm it) and reads as NOT connected,
+    // the same conservative direction run_unit_upkeep's own reach trigger takes.
+    const grid_goods_params& grid = reg.grid_goods();
+    bool connected = true;
+    if (grid.any())
+    {
+        const float rc = tile_reach_cost(w, tile);
+        connected = (rc >= 0.0f) && std::isfinite(rc);
+    }
 
     // `wants` / `purchases` are std::maps keyed by (corp, body); touching them
     // only when there is a bid keeps a pool-covered tick from inserting empty
@@ -2243,6 +2299,15 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
         const float required = need[r];
         if (required <= 0.0f)
             continue;
+
+        // BL-708: a grid good on an unreached tile draws NOTHING — not from the
+        // pool, not from the shelf. The whole requirement falls through as
+        // shortfall to the caller's rule below.
+        if (grid.grid(r) && !connected)
+        {
+            unmet = true;
+            continue;
+        }
 
         const float have = std::max(0.0f, pool.quantities[r]);
         const float take = std::min(required, have);
@@ -2437,6 +2502,9 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
 
     const building_upkeep_params& up = reg.building_upkeep();
     const era_band band = reg.era();
+    // BL-708: is ANY good on the grid this campaign? Hoisted out of the loop —
+    // it is a property of the registry, and nothing below can change it.
+    const bool grid_rules = reg.grid_goods().any();
 
     // Resolve each type's basket ONCE, not per building — the basket is per
     // (type, band) and nothing in the loop can change either. `any_goods` is the
@@ -2496,6 +2564,16 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
         const entity_id body = building_body(w, b);
         if (body == null_entity)
             continue; // detached tile; nothing to draw against
+
+        // BL-708: warm the body's reach field before the draw reads it, exactly
+        // as run_unit_upkeep's own reach trigger does — `tile_reach_cost` is the
+        // CONST half of the pair and returns -1 ("not computed") rather than
+        // building the Dijkstra itself. Gated on a grid good actually being
+        // authored, so a world with none never pays for the field here; the
+        // field is cached on `world.body_reach_cost`, so this costs one Dijkstra
+        // per body per cache invalidation, not one per building.
+        if (grid_rules)
+            body_reach_field(w, body);
 
         // BL-654: THE SAME PATH the unit pass takes, not a second one. The pool
         // is drawn first; whatever it cannot cover is BID onto the building's

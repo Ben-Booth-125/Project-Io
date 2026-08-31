@@ -173,6 +173,7 @@ const char* const k_resource_names[] = {
     "clean_water", "consumer_goods", "medical_supplies", "ordnance",
     "ceramics", "dressed_stone", "planks", "tools",
     "hides", "fibre", "leather", "cloth", "rigging",
+    "power", // BL-708 — the grid good
 };
 constexpr std::size_t k_named = sizeof(k_resource_names) / sizeof(k_resource_names[0]);
 

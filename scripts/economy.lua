@@ -433,16 +433,82 @@ economy = {
         supply_decay_permille    = 50,   -- the ONE subtraction, per tick, on an unmet draw
         supply_recovery_permille = 100,  -- regained per tick while the draw is met
 
+        -- BL-708 (2026-08-31) — POWER IS THE FIRST NON-ZERO ENTRY IN THIS TABLE,
+        -- and the reason it can be is the reason PRODUCTION.md § Power gives:
+        -- "Power is the first entry in that basket the world will actually make,
+        -- because making it is profitable." The tools/machinery rates above sit
+        -- at zero because the goods they name are produced 0.0 in band, so every
+        -- draw went unmet and the firms collapsed 227 -> 19 (BL-641). Power has
+        -- two authored generation recipes with a positive margin, so the draw
+        -- induces the supply that answers it instead of starving against it.
+        --
+        -- THE SHORTFALL RULE IS UNCHANGED AND IS THE WHOLE SAFETY ARGUMENT: a
+        -- building short of power SCALES ITS OUTPUT DOWN
+        -- (`building_supply_scalar`), it is never idled. A firm on reduced
+        -- output keeps bidding for fuel, and the generation that answers it gets
+        -- built. Idling it would kill the buyer that induces the supply — which
+        -- is precisely the mistake BL-641 measured.
+        --
+        -- INDUSTRIAL ONLY. The ancient rows stay at zero: there is no ancient
+        -- power analogue by design, so the 0 CE band is arithmetically untouched
+        -- by this item.
+        --
+        -- SIZING, first cut. 156 of 317 industrial-band buildings are eligible
+        -- to draw, so ~0.3 each is roughly 50 power/tick demanded band-wide,
+        -- against a single plant's output of order tens per tick — a handful of
+        -- plants covers the map, which is the margin the induction needs. A
+        -- processor draws more than a mine because it runs machinery rather than
+        -- pumps, the same ordering the machinery/electronics rows above assume.
+        -- NR-600's first-cut-then-tune idiom: the SHAPE is the deliverable, the
+        -- numbers are for playtest.
         goods = {
             extraction_site = {
                 ancient    = { tools = 0.0, planks = 0.0 },      -- derived 0.07 / 0.15
-                industrial = { machinery = 0.0 },                -- derived 0.11
+                industrial = { machinery = 0.0, power = 0.25 },  -- derived 0.11; power BL-708
             },
             processing_facility = {
                 ancient    = { tools = 0.0, planks = 0.0 },      -- derived 0.14 / 0.30
-                industrial = { machinery = 0.0, electronics = 0.0 }, -- derived 0.15 / 0.06
+                industrial = { machinery = 0.0, electronics = 0.0, power = 0.40 }, -- derived 0.15 / 0.06; power BL-708
             },
         },
+    },
+
+    -- ===================================================================
+    -- BL-708 (2026-08-31) — GRID GOODS.
+    -- docs/economy/PRODUCTION.md § Power; docs/economy/LOGISTICS.md § 3a.
+    -- ===================================================================
+    --
+    -- The two properties that separate a grid good from every other good in the
+    -- roster, authored as DATA so no logic anywhere has to ask "is this power?".
+    -- An absent table means no good is a grid good and no store is capped, which
+    -- is the pre-BL-708 behaviour exactly.
+    --
+    -- `transmitted = true` says the good rides the ROAD NETWORK instead of a
+    -- convoy. Two consequences, both already wired:
+    --   * NEVER CARGO — price_convoy_leg refuses a leg for it, so auto-dispatch,
+    --     the player's dispatch_convoy verb and the rival scorer's directed
+    --     dispatch are all closed by one refusal at the one shared seam.
+    --   * CONNECTION-GATED — it only moves to or from a tile the network
+    --     reaches, and "reaches" is tile_reach_cost read as a BOOLEAN: finite
+    --     connected, infinity not. No second graph; the multi-source Dijkstra
+    --     the reach field already computes answers it. Latency is a flat ONE
+    --     TICK regardless of distance, which is the tick the draw runs on, so
+    --     there is nothing here to author for it.
+    -- Gating BOTH the draw and the listing is what makes power's price REGIONAL
+    -- BY CONSTRUCTION without any rule naming a region.
+    --
+    -- `stockpile_ceiling` is power's one genuinely novel property: its store is
+    -- capped, so "a generator running into a full store is producing nothing
+    -- anyone will ever buy". Applied where output accrues, per (corp, body) —
+    -- the grain the pool is held at — so it is a statement about a corp's
+    -- storage on a body, not about one plant's tank.
+    --
+    -- 400 is ~8 ticks of one plant's output against a band-wide demand of ~50 a
+    -- tick: generous enough that a plant serving a live region never throttles,
+    -- tight enough that a plant with no buyers in reach stops within a few ticks
+    -- instead of banking an unsellable mountain. First cut; retune by playtest.
+    grid_goods = {
+        power = { transmitted = true, stockpile_ceiling = 400.0 },
     },
 
     -- BL-455 (2026-08-17) removed `military_points_per_base_tick` from here with

@@ -1045,12 +1045,78 @@ void accumulate_body_production(const world& w, const recipe_registry& reg,
     }
 }
 
+/// BL-708 — the body's INDUSTRIAL demand: what the buildings standing on it draw
+/// as upkeep each tick (`run_building_upkeep`, economy_system.cpp), resolved
+/// through the SAME `building_upkeep_goods` free function the live pass and the
+/// census compose the era bands with, so this cannot drift from what is actually
+/// drawn.
+///
+/// WHY THE SEEDER HAS TO SEE IT. `body_demand` below sizes background production
+/// against what a body CONSUMES, and until this existed it counted only the two
+/// consumer-side baskets — households and the background stopgap. A building's
+/// upkeep draw is consumption too, and leaving it out meant the seeder happily
+/// declared a body provisioned while every firm on it was starving.
+///
+/// That gap is invisible while every authored upkeep rate is zero, which is
+/// exactly how it survived: it becomes load-bearing the moment ANY rate is
+/// turned on. With power it is decisive, because the corp AI's build scorer
+/// cannot cover for it — that scorer maximises NET MARGIN per site, and power is
+/// the cheapest good in the industrial roster, so it loses every comparison to a
+/// price-ceiled electronics or alloys and a plant is never built. The seeder
+/// chooses on ABSOLUTE SHORTFALL instead (`biggest_gap_resource` /
+/// `best_recipe_for_gaps`), which is the selection rule a cheap, universally
+/// needed good can actually win under. Generation provisions the utility; the
+/// market decides everything downstream of it.
+///
+/// Zero while no rate is authored, so every pre-BL-708 world generates
+/// byte-identically — including the whole ancient band, which has no power.
+std::array<float, resource_count> body_upkeep_demand(const world& w, const recipe_registry& reg,
+                                                     entity_id body_id)
+{
+    std::array<float, resource_count> demand = {};
+    const building_upkeep_params& up = reg.building_upkeep();
+
+    // One resolved basket per type, not per building — the basket is per (type,
+    // band) and nothing here can change either. `w.buildings` is an unordered
+    // map, but this walk only ACCUMULATES a per-resource sum over a set that
+    // does not depend on order, so the finished vector is the same whatever
+    // order it was filled in (the same argument run_building_upkeep's own
+    // ownership map carries).
+    std::array<std::array<float, resource_count>, building_type_count> basket{};
+    for (std::size_t t = 0; t < building_type_count; ++t)
+        basket[t] = building_upkeep_goods(up, static_cast<building_type>(t), reg.era());
+
+    for (const auto& [bid, b] : w.buildings)
+    {
+        (void)bid;
+        // The live pass's own eligibility: a building under construction draws
+        // through the CONSTRUCTION channel instead, and a decommissioned one is
+        // not operating. Sizing against either would provision for demand that
+        // is not there.
+        if (b.ticks_remaining > 0 || b.decommissioned)
+            continue;
+        const auto tit = w.tiles.find(b.tile);
+        if (tit == w.tiles.end() || tit->second.body != body_id)
+            continue;
+        const std::size_t ti = static_cast<std::size_t>(b.type);
+        if (ti >= building_type_count)
+            continue;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            demand[r] += basket[ti][r];
+    }
+    return demand;
+}
+
 /// `body_id`'s aggregate demand: population_demand_params + BL-340's
 /// background_demand_params baskets, weighted by every population centre's
 /// `scale` on the body — the same two consumer-side pulls `clear_markets`
 /// injects every tick (`inject_population_demand` / `inject_background_demand`,
 /// market_clearing.cpp). Read here at pre-game generation time as the target
 /// the measured stop condition below sizes background production against.
+///
+/// BL-708: the building-upkeep draw is added by the CALLER, per iteration, not
+/// folded in here — it grows as the seeder places firms, so it has to be
+/// re-measured rather than captured once. See the loop below.
 std::array<float, resource_count> body_demand(const world& w, const recipe_registry& reg,
                                               entity_id body_id)
 {
@@ -1983,7 +2049,11 @@ std::vector<entity_id> generate_background_firms(
             continue;
         std::sort(nation_ids.begin(), nation_ids.end());
 
-        const std::array<float, resource_count> demand = body_demand(w, reg, body_id);
+        // BL-708: the CONSUMER half, fixed for the body — households and the
+        // background stopgap, both weighted by population scale, neither of
+        // which this loop can move. The INDUSTRIAL half is re-measured inside
+        // the loop, because placing a firm creates its own upkeep draw.
+        const std::array<float, resource_count> consumer_demand = body_demand(w, reg, body_id);
 
         // Occupancy is rebuilt from the authoritative source each body (mirrors
         // generate_corporations' own player-muster-building block) — every
@@ -2005,6 +2075,24 @@ std::vector<entity_id> generate_background_firms(
         {
             std::array<float, resource_count> production = {};
             accumulate_body_production(w, reg, body_id, production);
+
+            // BL-708 — RE-MEASURED EACH ITERATION, and that is the whole point.
+            // Every firm this loop places adds its own upkeep draw to the body,
+            // so provisioning it is a moving target: place ten mines and the
+            // body now wants power it did not want a moment ago. Capturing the
+            // draw once, before any firm existed, would size generation against
+            // a demand that no longer applies by the time the loop finishes.
+            //
+            // This is a genuine feedback loop and it is self-limiting: the
+            // upkeep of the plants themselves is counted too, so it converges
+            // rather than chasing its own tail — a plant's draw is a fraction of
+            // its output. Under an all-zero upkeep table it adds exactly zero and
+            // every pre-BL-708 world generates byte-identically.
+            std::array<float, resource_count> demand = consumer_demand;
+            const std::array<float, resource_count> upkeep =
+                body_upkeep_demand(w, reg, body_id);
+            for (std::size_t r = 0; r < resource_count; ++r)
+                demand[r] += upkeep[r];
 
             // MEASURED stop condition — real production vs real demand, not a
             // firm-count target.

@@ -225,7 +225,17 @@ inline constexpr uint32_t world_save_magic =
 /// where this one continues and is refused whole on the same strict-equality
 /// contract as every prior bump. Claimed through
 /// `tools/session/next_save_version.js --claim`.
-inline constexpr uint32_t world_save_version = 20;
+/// Bumped to 21 by BL-708 (power): `resource_type` gains `power` at the enum's
+/// tail, so `resource_count` moves 47 -> 48 and EVERY per-resource array in the
+/// stream — tile deposits, pools, market supply/demand/price/base_price, every
+/// authored basket the reader reconstructs — changes length. That is the same
+/// break BL-586's append was (v9 -> v10): a v20 stream's very first tile record
+/// is short by one float and every byte after it misreads. Refused whole on the
+/// strict-equality contract, exactly as every prior bump; there is no migration
+/// and deliberately none, since the pre-bump stream cannot say what a tile's
+/// `power` deposit was. Claimed through
+/// `tools/session/next_save_version.js --claim`.
+inline constexpr uint32_t world_save_version = 21;
 
 /// Write @p w as a complete world snapshot.
 ///

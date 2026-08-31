@@ -69,6 +69,10 @@ const std::unordered_map<std::string, resource_type>& name_table()
         { "leather",               resource_type::leather },
         { "cloth",                 resource_type::cloth },
         { "rigging",               resource_type::rigging },
+        // BL-708 (2026-08-31) — the grid good. Same rule as the two blocks
+        // above: every new resource_type lands HERE the same change it is
+        // appended to the enum, or recipes.lua and world_gen.lua both throw.
+        { "power",                 resource_type::power },
     };
     return table;
 }

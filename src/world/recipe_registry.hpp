@@ -420,6 +420,81 @@ struct price_band_params
     float reservation_mult = 0.0f;
 };
 
+/// BL-708 — what makes a good a GRID GOOD, as authored data.
+///
+/// `power` is the roster's first good whose MOVEMENT and MARKET are separate
+/// questions (docs/economy/PRODUCTION.md § Power; docs/economy/LOGISTICS.md
+/// § 3a). It has a price and it clears like any other good — that half needs no
+/// new machinery at all, which is the design's whole claim. What is new is two
+/// properties, and they are carried HERE, per resource, rather than as a branch
+/// on `resource_type::power` in the four places that read them. A branch would
+/// make "is this power?" a question logic asks; a table makes it a fact the data
+/// states, which is the difference between a rule and a special case.
+///
+/// EVERY FIELD DEFAULTS TO THE INERT VALUE — `is_grid` all false, every ceiling
+/// zero — so a harness that hand-builds a registry and never authors
+/// `economy.grid_goods` behaves exactly as it did before this struct existed,
+/// the same tolerance `price_band_params::reservation_mult = 0` carries.
+struct grid_goods_params
+{
+    /// True for a good transmitted on the ROAD NETWORK rather than carried by a
+    /// convoy. Two consequences, and they are the two the design names:
+    ///
+    ///   * NEVER CARGO. `price_convoy_leg` refuses a leg for a grid good, so
+    ///     neither auto-dispatch nor the player's/rival's `dispatch_convoy` verb
+    ///     can ship it — one refusal at the one shared seam, not three.
+    ///   * CONNECTION-GATED. It only moves to or from a tile the network
+    ///     reaches, and connectivity is `tile_reach_cost` read as a BOOLEAN:
+    ///     finite means connected, infinity means not. That is the multi-source
+    ///     Dijkstra § 3 already computes — no second graph and no second field,
+    ///     which is LOGISTICS.md § 3a's own reduction of the problem.
+    ///
+    /// Latency is deliberately absent from this struct: it is a flat one tick
+    /// regardless of distance, which is the tick the draw already runs on, so
+    /// there is nothing to author.
+    std::array<bool, resource_count> is_grid = {};
+
+    /// Per-resource stockpile CEILING — the store may not hold more than this.
+    /// ZERO MEANS UNCAPPED, which is every other good in the roster and the
+    /// reason this lands inert.
+    ///
+    /// Power's one genuinely novel property against the rest of the roster
+    /// (PRODUCTION.md § Power): "a generator running into a full store is
+    /// producing nothing anyone will ever buy — a real decision rather than an
+    /// accounting detail." Applied where output ACCRUES, so the overflow is
+    /// never produced rather than produced and then deleted; a corp that has
+    /// filled its store has to find a buyer, sell down, or throttle.
+    ///
+    /// Deliberately per (corp, body) — the grain the pool itself is held at —
+    /// rather than per building, so it is a statement about a corp's storage on
+    /// a body, not about any one generator's tank.
+    std::array<float, resource_count> stockpile_ceiling = {};
+
+    /// Is @p r transmitted on the network rather than carried? Bounds-checked so
+    /// every reader can pass a raw index without repeating the guard.
+    bool grid(std::size_t r) const
+    {
+        return (r < resource_count) && is_grid[r];
+    }
+
+    /// @p r's stockpile ceiling, or 0 for "uncapped". Bounds-checked, as above.
+    float ceiling(std::size_t r) const
+    {
+        return (r < resource_count) ? stockpile_ceiling[r] : 0.0f;
+    }
+
+    /// Does ANY resource carry a grid rule? The zero-cost early out every
+    /// per-tick reader takes first, so a world that authors no grid good pays
+    /// one bool for the whole feature rather than a per-resource test per draw.
+    bool any() const
+    {
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (is_grid[r] || stockpile_ceiling[r] > 0.0f)
+                return true;
+        return false;
+    }
+};
+
 /// BL-263 spontaneous-market-emergence tunables, authored in scripts/economy.lua
 /// under `economy.market_emergence`. Two independent uses, both keyed off distance
 /// from the home body (world::home_body), the only body with a market at world
@@ -929,6 +1004,12 @@ public:
     /// (market_clearing.cpp) and wf_target_price (economy_system.cpp).
     const price_band_params& price_band() const { return m_price_band; }
 
+    /// BL-708 grid-good rules (economy.grid_goods in Lua): which goods ride the
+    /// road network instead of a convoy, and what their stockpile ceiling is.
+    /// Defaults to all-inert, so a hand-built registry authors nothing and
+    /// behaves exactly as it did before the table existed.
+    const grid_goods_params& grid_goods() const { return m_grid_goods; }
+
     /// BL-263 spontaneous-market-emergence tunables (economy.market_emergence in Lua).
     const market_emergence_params& market_emergence() const { return m_market_emergence; }
 
@@ -1150,6 +1231,7 @@ public:
         rebuild_baskets();
     }
     void set_price_band(const price_band_params& p) { m_price_band = p; }
+    void set_grid_goods(const grid_goods_params& g) { m_grid_goods = g; }
     void set_market_emergence(const market_emergence_params& m) { m_market_emergence = m; }
     void set_construction(const construction_params& c) { m_construction = c; }
     void set_military(const military_capability_params& m) { m_military = m; }
@@ -1387,6 +1469,7 @@ private:
     std::array<float, resource_count> m_population_basket = {};
     std::array<float, resource_count> m_background_basket = {};
     price_band_params m_price_band = {};
+    grid_goods_params m_grid_goods = {};
     market_emergence_params m_market_emergence = {};
 
     /// BL-095 construction-gate tunables (economy.construction). Defaults match

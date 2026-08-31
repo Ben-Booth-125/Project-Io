@@ -695,6 +695,72 @@ recipes = {
         inputs       = { planks = 1.5, cloth = 1.0 },
         outputs      = { rigging = 1.0 },
     },
+
+    -- ======================================================================
+    -- BL-708 (2026-08-31) — GENERATION. docs/economy/PRODUCTION.md § Power.
+    -- ======================================================================
+    --
+    -- Two routes, one product, INDUSTRIAL BAND ONLY (Ben, 2026-08-31: "the
+    -- ancient band gets no power analogue" — charcoal already carries real
+    -- household demand there and is not an orphan).
+    --
+    -- WHY THESE TWO FUELS. `coal` and `petroleum` are the census's named
+    -- orphans: on the 0 CE band both have NO structural sink at all, and on the
+    -- 1960 band petroleum produced 6169.9 against observed demand 0.000. A
+    -- generator gives them an endpoint that is ALWAYS on, and — because the
+    -- plant buys its fuel as an ordinary processing input while every building
+    -- buys the power as an upkeep bid — BOTH links of `fuel -> power ->
+    -- consumed` price on the market. Neither is a pool draw, so neither severs
+    -- the chain (MARKETS.md property 3, satisfied twice over).
+    --
+    -- "Generation is a business, not a cost centre" (PRODUCTION.md § Power), so
+    -- both routes carry the roster's own ~1.433x markup over their input basket
+    -- — the SAME derivation the BL-585/BL-586 ancient prices used, not a picked
+    -- number. Against `power`'s base price of 1.45 (world_gen.lua):
+    --
+    --   oil-fired  : 1.0 petroleum @ 3.5 = 3.50 in;  3.5 power @ 1.45 = 5.075 out  (1.450x)
+    --   coal-fired : 1.5 coal      @ 2.0 = 3.00 in;  3.0 power @ 1.45 = 4.350 out  (1.450x)
+    --
+    -- IDENTICAL MARGIN, DIFFERENT SIZE, and that pairing is deliberate. Equal
+    -- markup is what stops either route being quietly the better business, so
+    -- which fuel a region burns is decided by what its ground carries and what
+    -- its market charges. The oil plant is simply the LARGER unit — 3.5 power a
+    -- batch against 3.0 — and that is what the pre-game seeder's gap scorer
+    -- (`best_recipe_for_gaps`, corporation_generation.cpp) reads when it picks a
+    -- recipe to fill a shortfall: it ranks on output quantity, so it provisions
+    -- a new region with oil plants first. That ordering matters because it is
+    -- the only one the shipped world can actually run — `petroleum` is produced
+    -- in real quantity on the industrial band while `coal` is produced 0.0, so a
+    -- seeder that reached for the coal route first would build plants with no
+    -- fuel to burn. The coal route is the one a player or a rival switches to
+    -- where the ground favours it.
+    --
+    -- Note what this does NOT do: it does not make oil cheaper. Both routes
+    -- clear the same 1.450x, so the choice stays a question about geology.
+    --
+    -- Re-derive both if a base price in world_gen.lua moves.
+    --
+    -- DEPTH. depth(coal) = depth(petroleum) = 0 (both are dug), so
+    -- depth(power) = 1. Power is NOT terminal — it is consumed by the
+    -- building-upkeep draw (economy.building_upkeep.goods), which is a named
+    -- actor in exactly the sense `ordnance` is, so it needs no orphan exemption.
+    {
+        name         = "oil_power_plant",
+        display_name = "Oil-Fired Power Plant",
+        era          = "industrial",
+        group        = "Power Generation", -- BL-434: a sub-facility kind of its own, so the Build door reads it as a distinct plant
+        inputs       = { petroleum = 1.0 },
+        outputs      = { power = 3.5 },
+    },
+
+    {
+        name         = "coal_power_plant",
+        display_name = "Coal-Fired Power Plant",
+        era          = "industrial",
+        group        = "Power Generation", -- BL-434, with the oil route above
+        inputs       = { coal = 1.5 },
+        outputs      = { power = 3.0 },
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))
