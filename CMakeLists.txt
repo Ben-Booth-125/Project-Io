@@ -569,7 +569,6 @@ target_compile_options(pregame_balance_harness PRIVATE ${IO_WARNING_FLAGS})
 add_executable(spawn_solvency
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/spawn_solvency.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/contract_template.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
 )
 target_include_directories(spawn_solvency PRIVATE
@@ -786,13 +785,13 @@ target_compile_options(throughput_field_census PRIVATE ${IO_WARNING_FLAGS})
 # into a world_gen_config, because the C++ fallback prices ten resources against
 # that table's forty-two and a sweep run on the fallback measures a world where a
 # third of the roster cannot be sold at all. So recipe_registry.cpp and
-# world_gen_config.cpp both come back, plus contract_template.cpp for the empty
-# template registry run_nation_step takes.
+# world_gen_config.cpp both come back. (contract_template.cpp used to come back
+# with them for run_nation_step's empty template registry; the mercenary contract
+# was torn out in cc88997c and took that TU with it.)
 add_executable(acquisition_viability
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/acquisition_viability.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/contract_template.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
 )
 target_include_directories(acquisition_viability PRIVATE
@@ -949,22 +948,10 @@ target_link_libraries(battle_engagement_harness PRIVATE io_world_obj)
 target_compile_features(battle_engagement_harness PRIVATE cxx_std_20)
 target_compile_options(battle_engagement_harness PRIVATE ${IO_WARNING_FLAGS})
 
-# contract_dispatch_harness (BL-577). Hand-declared for the SAME reason
-# battle_engagement_harness is, immediately above: it exercises
-# contract_dispatch_line, defined in src/core/battle_dispatch_text.cpp
-# (battle_dispatch_line's own TU, kept out of session_history.cpp for the
-# identical <SDL3/SDL.h> reason that file's own header comment gives) — so
-# the generic glob loop below (io_world_obj alone) cannot link it either.
-add_executable(contract_dispatch_harness
-    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/contract_dispatch_harness.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/battle_dispatch_text.cpp"
-)
-target_include_directories(contract_dispatch_harness PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-)
-target_link_libraries(contract_dispatch_harness PRIVATE io_world_obj)
-target_compile_features(contract_dispatch_harness PRIVATE cxx_std_20)
-target_compile_options(contract_dispatch_harness PRIVATE ${IO_WARNING_FLAGS})
+# contract_dispatch_harness (BL-577) is GONE. It exercised contract_dispatch_line
+# for the mercenary contract, which was torn out in cc88997c (NR-731) — the
+# harness source went with it and only this hand-declaration was left behind,
+# which is what made main unbuildable from that commit until 2026-08-31.
 
 file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/*.cpp")
 
