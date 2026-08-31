@@ -174,6 +174,7 @@ const char* const k_resource_names[] = {
     "ceramics", "dressed_stone", "planks", "tools",
     "hides", "fibre", "leather", "cloth", "rigging",
     "power", // BL-708 — the grid good
+    "construction_capacity", // BL-709 — the construction sector's product
 };
 constexpr std::size_t k_named = sizeof(k_resource_names) / sizeof(k_resource_names[0]);
 
@@ -591,6 +592,15 @@ classify(const world& w, const recipe_registry& reg)
             note(reg.resource_build_cost_for(bt, resource_type::iron_ore, no_recipe));
         }
     }
+
+    // BL-709: the sector's own draw is a construction sink too, and a
+    // STRUCTURAL one — it applies to every building under construction whatever
+    // its type or recipe, so it is not expressible as a row in any of the
+    // baskets enumerated above. Read from the same registry dial
+    // `run_construction` reads, so zeroing it un-substantiates this sink by
+    // name rather than leaving a comment claiming one.
+    if (reg.construction().capacity_per_build_tick > 0.0f)
+        c[static_cast<std::size_t>(resource_type::construction_capacity)].sink_construct = true;
 
     // --- is it priced on any market? ---------------------------------------
     for (const auto& [mid, mc] : w.markets)
@@ -1075,6 +1085,16 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
             for (std::size_t r = 0; r < resource_count; ++r)
                 if (row[r] > 0.0f)
                     out.construction[r] += static_cast<double>(row[r] / econ.build_duration_ticks);
+            // BL-709: the sector's own draw is part of THIS channel, and it has
+            // to be counted here or the reconciliation below misattributes it.
+            // `processing` is derived by subtraction (wants_folded less this
+            // half less the upkeep half), so a construction want the census does
+            // not recognise does not vanish — it silently reappears as a
+            // processor's input bid, which is a worse lie than a missing row.
+            // Mirrors `run_construction`'s own expression exactly: flat per
+            // tick, NOT divided by build_duration_ticks.
+            out.construction[static_cast<std::size_t>(resource_type::construction_capacity)] +=
+                static_cast<double>(reg.construction().capacity_per_build_tick);
         }
     }
 

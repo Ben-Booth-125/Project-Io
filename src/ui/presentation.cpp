@@ -116,6 +116,13 @@ constexpr resource_presentation resource_table[resource_count] = {
     { "Leather",            "Lthr",IM_COL32(120,  78,  52, 255) }, // tanned, darker and warmer than raw Hides
     { "Cloth",              "Cth", IM_COL32(210, 200, 160, 255) }, // woven undyed fibre, paler than raw Fibre
     { "Rigging",            "Rig", IM_COL32(176, 140,  72, 255) }, // tarred cordage gold-brown, the roster's deepest good
+    // The two goods that are SERVICES rather than substances, and the only rows
+    // here whose colour is not a material's. Power is BL-708's; it was left
+    // unauthored and so rendered as "(unnamed resource)" through the fallback
+    // below — authored here with BL-709's own row rather than left for a good
+    // the player now buys every tick to keep reading as a gap.
+    { "Power",              "Pwr", IM_COL32(240, 208,  80, 255) }, // live-wire yellow, no material shares it
+    { "Construction Capacity", "Cap", IM_COL32(232, 148,  40, 255) }, // hazard orange — crews and plant, the sector's throughput
 };
 
 // Reserved corporation identity colours. Slot 0 is the player's corporation; the

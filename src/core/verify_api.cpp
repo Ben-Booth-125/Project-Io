@@ -185,6 +185,7 @@ constexpr const char* k_resource_slugs[] = {
     "cloth",                   // 45
     "rigging",                 // 46
     "power",                   // 47
+    "construction_capacity",   // 48
 };
 static_assert(std::size(k_resource_slugs) == static_cast<std::size_t>(resource_type::count),
               "resource_type grew - append its slug to k_resource_slugs (and keep the order)");

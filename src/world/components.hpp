@@ -225,7 +225,46 @@ enum class resource_type : uint8_t
     //
     // world_save_version bumped 20 -> 21 for this append (world_save.hpp).
     power                  = 47, ///< Power Plant, from coal or petroleum. Industrial band only. Drawn per-tick as building upkeep; never cargo.
-    count                  = 48
+
+    // --- Construction as a SECTOR (BL-709, 2026-08-31) ---
+    //
+    // CONSTRUCTION CAPACITY, and it is the roster's first good that is a
+    // SERVICE rather than a substance (docs/economy/PRODUCTION.md § Construction
+    // as a rate). A construction building runs one of five authored PRODUCTION
+    // METHODS — a recipe, exactly as every other processor does — draws that
+    // method's goods every tick, and makes capacity. Building projects consume
+    // it (`run_construction`), and every standing firm draws a trickle of it as
+    // upkeep, which is the maintenance-construction a plant needs to keep
+    // standing.
+    //
+    // WHY IT IS A RESOURCE AND NOT A COUNTER. The channel it exists to fix
+    // measures 0.000 on the industrial band (MARKETS.md § Three properties,
+    // property 1) because `run_construction` fires only where something is
+    // actively building — it is EPISODIC. A counter would stay episodic. A
+    // priced good on the market is CONTINUOUS and ECONOMY-SCALED by
+    // construction: the sector's inputs are bid for every tick whether or not
+    // anything is under construction, and the sector grows because its buyers
+    // do. Being a resource is also what makes the demand BID rather than draw
+    // from a pool, which is property 3 — the property that decides whether the
+    // chain upstream of it (timber, planks, stone, dressed stone, clay, sand,
+    // iron ore, steel) ever gets induced.
+    //
+    // ERA-BANDED, which is property 2: the five methods carry `era` tags like
+    // any other recipe — two ancient (timber frame, stone and brick), three
+    // industrial (iron frame, steel frame, reinforced concrete) — so an ancient
+    // campaign builds out of timber and dressed stone and an industrial one out
+    // of steel and concrete, with no rule anywhere naming a year.
+    //
+    // IT IS A GRID GOOD (`grid_goods_params`, BL-708's table, reused unchanged):
+    // capacity is crews and plant, so it is NEVER CARGO — no convoy can haul it
+    // — it is CONNECTION-GATED to ground the network reaches, and its store has
+    // a CEILING, because unused capacity is a rate that lapses rather than a
+    // stock that banks. All three are authored data in economy.grid_goods, not
+    // a branch on this enumerator.
+    //
+    // world_save_version bumped 21 -> 22 for this append (world_save.hpp).
+    construction_capacity  = 48, ///< Construction Yard, from one of five era-banded methods. Consumed by builds and as building upkeep; never cargo.
+    count                  = 49
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);

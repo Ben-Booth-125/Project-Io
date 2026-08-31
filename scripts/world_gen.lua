@@ -151,6 +151,33 @@ world_gen = {
             -- makes about two of power: power is the divided, distributed form
             -- of the same energy, and the price says so.
             power                  = 1.45,
+
+            -- BL-709 (2026-08-31) — CONSTRUCTION CAPACITY, the sector's product.
+            -- docs/economy/PRODUCTION.md § Construction as a rate.
+            --
+            -- It needs a price for exactly the reason power did: a good with
+            -- base_price 0 is unbuyable by the arithmetic of the reservation
+            -- ceiling, so an unpriced capacity would leave every build and every
+            -- maintenance draw permanently unmet — the shape of the BL-641
+            -- collapse, arrived at from the pricing side instead of the supply
+            -- side.
+            --
+            -- 3.0 is the SHARED ANCHOR the five methods are sized against, and
+            -- it is chosen so all five clear the roster's own observed
+            -- 1.415-1.443x markup at once (recipes.lua carries the full working
+            -- per method). Sizing the METHODS to the price, rather than picking
+            -- five prices, is what makes the choice of method a question about
+            -- what the ground carries instead of a question about which method
+            -- is quietly the better business:
+            --
+            --   timber frame        : in 7.30 -> out 3.50 * 3.0 = 10.50  (1.438x)
+            --   stone and brick     : in 6.10 -> out 2.90 * 3.0 =  8.70  (1.426x)
+            --   iron frame          : in 7.25 -> out 3.45 * 3.0 = 10.35  (1.428x)
+            --   steel frame         : in 8.00 -> out 3.80 * 3.0 = 11.40  (1.425x)
+            --   reinforced concrete : in 8.00 -> out 3.80 * 3.0 = 11.40  (1.425x)
+            --
+            -- Re-derive all five if this moves, or if any input price does.
+            construction_capacity  = 3.0,
         },
 
         -- Nation tradeable-resource concentration gates (BL-096): a nation

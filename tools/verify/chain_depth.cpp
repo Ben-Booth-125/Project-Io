@@ -286,6 +286,17 @@ bool injector_moves(const recipe_registry& reg, injector i, std::size_t r)
             // carrying a BAND sees only that band's buildings. Under the default
             // `any` band every type is available, so R1 and R4's own probes are
             // unchanged; R1b, which sets a band, gets the truth instead.
+            // BL-709: the construction SECTOR's own per-project draw. It is a
+            // real part of this pass — `run_construction` adds
+            // `capacity_per_build_tick` to the same per-tick need row it builds
+            // from the material baskets below — but it is not expressible AS a
+            // basket row, because it applies to every building under
+            // construction whatever its type or recipe. Read from the dial the
+            // pass itself reads, so zeroing the dial turns the claim red by name
+            // rather than leaving this branch asserting a draw that stopped.
+            if (r == static_cast<std::size_t>(resource_type::construction_capacity)
+                && reg.construction().capacity_per_build_tick > 0.0f)
+                return true;
             for (int t = 1; t <= 9; ++t) // building_type 1..9; `none` (0) has no economics
             {
                 const building_type bt = static_cast<building_type>(t);
@@ -359,6 +370,22 @@ const exemption k_actor_consumed[] = {
     // band, and it does so with a banded registry rather than this one.
     { resource_type::power, injector::building_upkeep_draw,
       "BL-708 building upkeep draw (per-tick, per building; industrial band only)" },
+
+    // BL-709. Construction capacity is produced by the five era-banded
+    // construction methods and consumed by NO recipe, so it reads terminal here
+    // exactly as power does — and, exactly as power does, it names the pass that
+    // buys it rather than leaving that to a comment. TWO passes buy it, and the
+    // pass named is the one that actually fires: `run_construction`'s per-project
+    // draw. A per-building MAINTENANCE draw was authored first and measured — it
+    // collapsed the ancient band's operating firms 198 of 328 -> 33 of 317 on a
+    // cold start no rate could soften — so `economy.building_upkeep.goods` ships
+    // that rate at zero and would leave this row a lie. Resolving through
+    // `economy.construction.capacity_per_build_tick` means zeroing THAT dial
+    // turns this row red BY NAME, the same contract ordnance's and power's rows
+    // carry.
+    { resource_type::construction_capacity, injector::construction_material_draw,
+      "BL-709 run_construction's per-project draw (economy.construction."
+      "capacity_per_build_tick) — every site under construction, both bands" },
 
     // BL-640, and the three rows this item exists to move. They sat in the
     // no-pass half below claiming a "mercantile demand" that never existed; the
@@ -685,6 +712,13 @@ int main()
             "ceramics_kiln", "stonemason", "sawmill",                  // Construction Materials
             "iron_blooms", "steel_from_blooms", "ordnance_from_blooms",// Metal Foundry
             "shipwright",                                              // Advanced Fabrication
+            // BL-709 (2026-08-31) — the two ANCIENT construction methods. Both
+            // open at tick 0 and must: capacity is not cargo, so a region with
+            // no yard cannot import its way to one, and a start that cannot
+            // build a yard cannot build. Neither carries a tech lock and both
+            // draw goods the ancient band already makes, so nothing else could
+            // close them. 16 -> 18.
+            "timber_frame_construction", "stone_and_brick_construction",
             // "toolmaker" is DELIBERATELY NOT here — see the note above: it is
             // the one ancient recipe still closed at tick 0, and by TECH now.
         };
@@ -1110,6 +1144,18 @@ int main()
                 case resource_type::coal:   return 0.5f;
                 case resource_type::clay:   return 1.2f;
                 case resource_type::sand:   return 1.0f;
+                // BL-709: steel and stone are TABLED because this comparison now
+                // has to judge a pair that trades an EXPENSIVE input against
+                // CHEAP BULK — the steel frame against reinforced concrete. Under
+                // the neutral 1.0 default a unit of steel and a unit of stone
+                // cost the same, so the bulk-heavy basket always reads dearer and
+                // the check fires on a difference that does not exist: at the
+                // roster's own prices (world_gen.lua) the two baskets cost 8.00
+                // each, deliberately and to the digit. Flat across both regimes,
+                // because the cheap/dear axis of this table is FUEL and neither
+                // of these is one.
+                case resource_type::steel:  return 8.0f;
+                case resource_type::stone:  return 1.0f;
                 default:                    return 1.0f; // untabled input: neutral
             }
         };
@@ -1121,6 +1167,8 @@ int main()
                 case resource_type::coal:   return 2.5f;
                 case resource_type::clay:   return 1.2f;
                 case resource_type::sand:   return 1.0f;
+                case resource_type::steel:  return 8.0f; // BL-709, see the cheap table
+                case resource_type::stone:  return 1.0f; // BL-709, see the cheap table
                 default:                    return 1.0f; // untabled input: neutral
             }
         };

@@ -408,6 +408,25 @@ void recipe_registry::load_from_lua(lua_state& lua)
         cp.site_time_reach_scale = construction->get_or("site_time_reach_scale", cp.site_time_reach_scale);
         cp.site_time_stack_discount = construction->get_or("site_time_stack_discount", cp.site_time_stack_discount);
         cp.site_time_stack_min = construction->get_or("site_time_stack_min", cp.site_time_stack_min);
+        // BL-709 — what a live project draws from the construction sector each
+        // full-rate tick. Rejected by name rather than clamped, the same
+        // untrusted-input-at-the-authoring-boundary rule economy.grid_goods'
+        // ceiling takes below: a negative rate would credit a build with
+        // capacity it never consumed and could drive `rate` above 1, and a
+        // non-finite one poisons the min() that applies it.
+        cp.capacity_per_build_tick =
+            construction->get_or("capacity_per_build_tick", cp.capacity_per_build_tick);
+        if (!std::isfinite(cp.capacity_per_build_tick) || cp.capacity_per_build_tick < 0.0f)
+            throw std::runtime_error("recipe_registry: economy.construction.capacity_per_build_tick "
+                                     "must be finite and >= 0");
+        // BL-709 — the seeder's provisioning rate. Same rejection rule: a
+        // negative or non-finite target would make the gap vector meaningless
+        // and could send `biggest_gap_resource` chasing a phantom forever.
+        cp.seed_capacity_per_building =
+            construction->get_or("seed_capacity_per_building", cp.seed_capacity_per_building);
+        if (!std::isfinite(cp.seed_capacity_per_building) || cp.seed_capacity_per_building < 0.0f)
+            throw std::runtime_error("recipe_registry: economy.construction.seed_capacity_per_building "
+                                     "must be finite and >= 0");
         m_construction = cp;
     }
 

@@ -161,6 +161,56 @@ float local_price(const world& w, entity_id tile, std::size_t r)
     return (m.price[r] > 0.0f) ? m.price[r] : m.base_price[r];
 }
 
+/// BL-709 / NR-592 — the MATERIAL half of a build's capital cost, priced at the
+/// market serving @p tile, plus the CONSTRUCTION CAPACITY the project will draw
+/// from the sector over its whole build.
+///
+/// WHAT THIS CLOSES. The build candidates below scored on `build_cost` alone —
+/// the flat CASH figure — and never priced `resource_build_cost` at all
+/// (NR-592, recorded by BL-590 and left open deliberately). Under a lump-sum
+/// model that was a missed opportunity and no worse: a candidate whose materials
+/// the corp could not reach was refused cleanly by `construct_building`'s own
+/// affordability gate, mutating nothing, so the cost was one wasted seam call.
+///
+/// UNDER A CONTENDED SHARED CAPACITY POOL IT BECOMES A CORRECTNESS PROBLEM, and
+/// that is why Ben scheduled it here rather than leaving it filed. Capacity is
+/// one pool that every project on a body bids into. A scorer that cannot see it
+/// proposes builds the pool cannot serve — every evaluation, for as long as the
+/// pool is short — which is the same thrash shape BL-696 measured in the recipe
+/// margin-chase. Pricing it makes the shortage visible where the decision is
+/// actually taken.
+///
+/// PRICED AT LOCAL PRICES, not base, because that is the whole signal: a
+/// material the local market has ceiled is genuinely dearer to build with there,
+/// and the scorer should prefer the site where it is not. Same `local_price`
+/// every other estimate in this file reads, so a build and a margin cannot
+/// disagree about what a good costs.
+///
+/// CAPACITY IS PRICED OVER THE WHOLE BUILD (`rate * build_duration_ticks`),
+/// because that is what the project will actually consume — `run_construction`
+/// draws `capacity_per_build_tick` on every tick the site is open. Zero when the
+/// dial is unauthored, which is the pre-BL-709 default.
+///
+/// Deterministic: a fixed walk over resource indices and two const reads.
+float build_material_cost(const world& w, const recipe_registry& reg, entity_id tile,
+                          building_type type, resource_type target, std::uint16_t recipe)
+{
+    const auto& row = reg.resource_build_cost_for(type, target, recipe);
+    float total = 0.0f;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (row[r] > 0.0f)
+            total += row[r] * local_price(w, tile, r);
+
+    const float cap_rate = reg.construction().capacity_per_build_tick;
+    if (cap_rate > 0.0f)
+    {
+        const float dur = std::max(0.0f, reg.economics(type).build_duration_ticks);
+        total += cap_rate * dur
+               * local_price(w, tile, static_cast<std::size_t>(resource_type::construction_capacity));
+    }
+    return total;
+}
+
 /// Per-batch margin of `recipe_id` at the prices of the market serving `tile`.
 float recipe_margin(const world& w, const recipe_registry& reg,
                     entity_id tile, uint16_t recipe_id)
@@ -878,7 +928,20 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 const float net           = revenue - ex.maintenance - ex.base_wage * wf;
                 if (net <= 0.0f)
                     continue; // never build into an expected loss
-                const float capex = std::max(1.0f, ex.build_cost);
+                // BL-709 / NR-592: capex is now CASH PLUS MATERIALS PLUS the
+                // capacity the project will draw. It feeds both `c.score` (via
+                // the net^2/capex curve) and `c.spend` (the solvency gate), so
+                // a rival now prefers the site whose materials are cheap and
+                // reserves against what the build will really cost it.
+                //
+                // THIS MOVES NUMBERS, and knowingly: every economy golden
+                // records a world evolved under a materials-blind scorer. Ben
+                // scheduled it with this item precisely because the shared
+                // capacity pool makes the blindness a correctness problem
+                // rather than a missed opportunity.
+                const float capex = std::max(1.0f, ex.build_cost
+                    + build_material_cost(w, reg, s.tile, building_type::extraction_site,
+                                          s.target, no_recipe));
 
                 // Predictive spending (BL-203): forecast this build's added
                 // supply against the local market's PUBLIC demand over its
@@ -1091,7 +1154,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 if (net <= 0.0f)
                     continue; // never build into an expected loss, same as above
 
-                const float capex      = std::max(1.0f, pe.build_cost);
+                // BL-709 / NR-592, the processing half — same reasoning as the
+                // extraction candidate above. The recipe travels into the
+                // lookup, because since BL-590 the material basket is keyed by
+                // it: a Sawmill and a Smithy do not cost the same to build, and
+                // the scorer should not pretend they do.
+                const float capex      = std::max(1.0f, pe.build_cost
+                    + build_material_cost(w, reg, tile, building_type::processing_facility,
+                                          target, best_recipe));
                 const float added_rate = primary_q * batches;
                 const int   horizon    = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
                 const float glut       = forecast_glut_multiplier(w, tile, target, added_rate, horizon, p);

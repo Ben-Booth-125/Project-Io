@@ -73,6 +73,10 @@ const std::unordered_map<std::string, resource_type>& name_table()
         // above: every new resource_type lands HERE the same change it is
         // appended to the enum, or recipes.lua and world_gen.lua both throw.
         { "power",                 resource_type::power },
+        // BL-709 (2026-08-31) — the construction sector's product. Same rule
+        // again: the name lands here in the same change as the enum append, or
+        // recipes.lua and world_gen.lua both throw on the unknown key.
+        { "construction_capacity", resource_type::construction_capacity },
     };
     return table;
 }

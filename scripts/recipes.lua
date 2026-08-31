@@ -761,6 +761,146 @@ recipes = {
         inputs       = { coal = 1.5 },
         outputs      = { power = 3.0 },
     },
+
+    -- ======================================================================
+    -- BL-709 (2026-08-31) - THE CONSTRUCTION SECTOR'S FIVE PRODUCTION METHODS.
+    -- docs/economy/PRODUCTION.md § Construction as a rate.
+    -- ======================================================================
+    --
+    -- Ben, 2026-08-31: "we should parameterize construction. We can use
+    -- construction as a rate, and pay upkeep on construction buildings which
+    -- costs (depending on production method)."
+    --
+    -- A CONSTRUCTION YARD IS AN ORDINARY PROCESSING FACILITY. That is the whole
+    -- structural claim, and it is why this item adds five rows here rather than
+    -- a building_type, a second tick pass and a parallel draw: "runs a
+    -- PRODUCTION METHOD" is what a recipe already is (§ Alternate production
+    -- methods -- the same `set_recipe` verb and the same construction panel
+    -- method dropdown), so the yard inherits the workforce scalar, the two-
+    -- threshold run model, `building_supply_scalar`, the corp AI's build and
+    -- dial scorers, the seeder's gap filler and the Build door for free.
+    --
+    -- WHAT THE ITEM ACTUALLY FIXES. Construction demand on the industrial band
+    -- measures 0.000 because `run_construction` fires only where something is
+    -- actively building: it is EPISODIC, so when nothing is under construction
+    -- the channel is silent. A sector is CONTINUOUS -- the yard bids for its
+    -- method's goods every tick whether or not a single site is under way -- and
+    -- ECONOMY-SCALED, because what buys its output is the standing building
+    -- stock (economy.building_upkeep.goods) plus every live project. That is
+    -- MARKETS.md property 1 satisfied by construction rather than asserted of it.
+    --
+    -- ERA-BANDED EXACTLY AS RECIPES ARE (property 2), which is the reason the
+    -- ladder spans both bands: two ancient methods, three industrial. The
+    -- ancient band's construction channel is already non-zero (65.1) but still
+    -- episodic; a yard makes it continuous there too.
+    --
+    -- EVERY INPUT IS REACHABLE IN ITS OWN BAND, and that is a real constraint
+    -- rather than a formality. `planks` and `dressed_stone` are made by ancient
+    -- recipes (Sawmill, Stonemason) and by NOTHING in the industrial band, so
+    -- the two ancient methods are the only ones that may name them; the three
+    -- industrial methods draw `steel` (industrial-produced) and raws
+    -- (`iron_ore`, `stone`, `sand`, `timber`), which are dug in any band. A
+    -- method naming a good its own band cannot make would be an authored
+    -- starvation, which is what property 3 exists to catch.
+    --
+    -- THE SHARED PRICE ANCHOR. All five are sized against
+    -- `construction_capacity` = 3.0 (world_gen.lua) so that every one of them
+    -- clears the roster's own observed 1.415-1.443x markup -- the same
+    -- derivation BL-585/BL-586 and BL-708 used, not a picked number. Equal
+    -- markup across the five is deliberate and is the same argument the two
+    -- power routes make: it stops any method being quietly the better business,
+    -- so which one a region runs is decided by what its ground carries and what
+    -- its market charges. What differs is BASKET and SIZE, not margin.
+    --
+    -- Re-derive all five if `construction_capacity` or any input price moves.
+    --
+    -- DEPTH. Ancient: max(depth(timber)=0, depth(planks)=1) + 1 = 2 for the
+    -- timber frame, and the same 2 for stone and brick through dressed_stone --
+    -- so the sector sits at the design's "every chain should reach depth 2 or
+    -- better" bar in that band. Industrial: the iron frame is depth 1 (both its
+    -- inputs are dug), and since chain depth is a MIN across recipes that is the
+    -- industrial figure. Capacity is TERMINAL -- consumed by builds and by the
+    -- building-upkeep draw, producing nothing that must itself be sold -- so it
+    -- is a genuine endpoint in MARKETS.md property 4's sense, not a pass-through.
+
+    {
+        name         = "timber_frame_construction",
+        display_name = "Timber Frame Yard",
+        era          = "ancient",
+        group        = "Construction", -- BL-434: a sub-facility kind of its own, so the Build door reads the five methods as one plant
+        -- timber 2.0*1.5 = 3.00 + planks 1.0*4.3 = 4.30  ->  7.30 in
+        -- 3.5 capacity * 3.0 = 10.50 out  ->  1.438x
+        -- The cheapest ancient start: a corp with a Sawmill already has half the
+        -- basket, which is the point of putting `planks` in it -- the ancient
+        -- band's milled goods gain a sink that is on EVERY tick rather than only
+        -- when someone happens to be building.
+        inputs       = { timber = 2.0, planks = 1.0 },
+        outputs      = { construction_capacity = 3.5 },
+    },
+
+    {
+        name         = "stone_and_brick_construction",
+        display_name = "Stone and Brick Yard",
+        era          = "ancient",
+        group        = "Construction",
+        -- stone 2.0*1.0 = 2.00 + dressed_stone 1.0*2.9 = 2.90 + clay 1.0*1.2 = 1.20  ->  6.10 in
+        -- 2.9 capacity * 3.0 = 8.70 out  ->  1.426x
+        -- The SMALLEST unit of the five and the cheapest basket, so it is the
+        -- method a thin market can actually run. It is also the one that gives
+        -- `dressed_stone` and `clay` a continuous buyer, which the census had
+        -- reading as household-only.
+        inputs       = { stone = 2.0, dressed_stone = 1.0, clay = 1.0 },
+        outputs      = { construction_capacity = 2.9 },
+    },
+
+    {
+        name         = "iron_frame_construction",
+        display_name = "Iron Frame Yard",
+        era          = "industrial",
+        group        = "Construction",
+        -- iron_ore 2.0*2.5 = 5.00 + timber 1.5*1.5 = 2.25  ->  7.25 in
+        -- 3.45 capacity * 3.0 = 10.35 out  ->  1.428x
+        -- ASSUMPTION, FLAGGED: RESOURCES.md has no wrought-iron good, so the
+        -- design table's "iron" is read here as `iron_ore` -- the roster's only
+        -- iron in this band, since `iron_blooms` is smelted by an ANCIENT recipe
+        -- and is unreachable industrially. That is also what makes this the
+        -- cheapest industrial entry: it is the method a region with ore and
+        -- forest runs before it has a steelworks.
+        inputs       = { iron_ore = 2.0, timber = 1.5 },
+        outputs      = { construction_capacity = 3.45 },
+    },
+
+    {
+        name         = "steel_frame_construction",
+        display_name = "Steel Frame Yard",
+        era          = "industrial",
+        group        = "Construction",
+        -- steel 1.0*8.0 = 8.00 in
+        -- 3.8 capacity * 3.0 = 11.40 out  ->  1.425x
+        -- The single-input method: no basket to assemble, so it is the one a
+        -- market with a steelworks can stand up immediately -- and the one that
+        -- finally gives industrial `steel` a terminal buyer that is not another
+        -- processor.
+        inputs       = { steel = 1.0 },
+        outputs      = { construction_capacity = 3.8 },
+    },
+
+    {
+        name         = "reinforced_concrete_construction",
+        display_name = "Reinforced Concrete Yard",
+        era          = "industrial",
+        group        = "Construction",
+        -- steel 0.5*8.0 = 4.00 + stone 2.0*1.0 = 2.00 + sand 2.0*1.0 = 2.00  ->  8.00 in
+        -- 3.8 capacity * 3.0 = 11.40 out  ->  1.425x
+        -- SAME SIZE AND SAME MARGIN as the steel frame, and that pairing is the
+        -- deliberate one: it spreads half the steel cost onto bulk the ground
+        -- gives away, so a region with quarries runs it and a region with a mill
+        -- runs the frame, at identical profit. It is also the only industrial
+        -- sink `sand` has -- the census reads it as extractable-with-no-sink in
+        -- that band.
+        inputs       = { steel = 0.5, stone = 2.0, sand = 2.0 },
+        outputs      = { construction_capacity = 3.8 },
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))
