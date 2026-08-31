@@ -51,7 +51,7 @@ Layer 5 of the economy is the **convoy layer** — the mechanism that couples bo
 
 **Logistical cost.** Each convoy incurs a `base_logistics_cost × distance × qty` budget term, drawn from the Lua economy-constants registry. For space convoys, distance is Euclidean body-centre to body-centre. The cost is the term that makes distant arbitrage marginal and grounds the rule that *logistics affects margin*.
 
-**Dispatch trigger.** The **auto path is the default**: the system fills a destination shortfall from the cheapest reachable source without player intervention. Player-direction of individual convoys is reserved for sell-order / buy-match counterparties on another body. **Exception:** space launches — leaving the gravity well — are **always player-directed** and never auto-dispatched, in Era 0 and Era 1 alike. Terrestrial (land / sea / air) convoys auto-dispatch.
+**Dispatch trigger.** The **auto path is the default**: the system fills a destination shortfall from the cheapest reachable source without player intervention. Player-direction of individual convoys is reserved for sell-order / buy-match counterparties on another body. **Exception:** space launches — leaving the gravity well — are **always player-directed** and never auto-dispatched, in Era 1 and Era 2 alike. Terrestrial (land / sea / air) convoys auto-dispatch.
 
 **Infrastructure gates per mode.**
 - **Land** — ungated; always available across contiguous land on a body. Roads are a per-tile cost-reducer: the three-tier Track/Road/Highway ladder (BL-146–149, road network + hubs; generated lattice in `src/world/road_generation.cpp` plus player placement; `tile_component.road_level` discounts A* traversal).

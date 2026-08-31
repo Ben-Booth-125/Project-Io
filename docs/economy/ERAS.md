@@ -1,18 +1,39 @@
 # Project Io — Eras
 
-An **Era** is a named phase in the game's industrial arc, defined by the accessible territory, available buildings, and the dominant strategic challenge. Eras are a formal game system: each has a defined entry, a distinct resource profile, and a characteristic question for the player to answer. The game begins in Era 0; an Era changes as a **gear shift that changes what the game is about**, each Era necessitating the one before.
+An **Era** is a named phase in the game's industrial arc, defined by the accessible territory, available buildings, and the dominant strategic challenge. Eras are a formal game system: each has a defined entry, a distinct resource profile, and a characteristic question for the player to answer. An Era changes as a **gear shift that changes what the game is about**, each Era necessitating the one before — and each poses **one catastrophe the player is playing to avoid**.
 
-Only Era 0 and Era 1 are designed. Later eras are stubbed.
+Only Era 1 is designed in any depth; Era 2 has its territory and its catastrophe named and little
+else. Later Eras are stubbed. **The game begins in Era 1** — the ladder is 1-based, and each Era's
+number matches its catastrophe (§ The point of an Era).
 
 ---
 
-## The two arcs, and where the ladder starts
+## The ladder, and its numbering (Ben, 2026-08-31)
 
-**The campaign epoch is 0 CE** (Ben, 2026-08-12; NR-177). The player is a mercenary company; the
-**ancient arc** is the live product, and the **industrial / space arc** — Era 0's terrestrial
-industry and the Era 1 space transition below — is DLC scope, parked on `era/space`
-(`docs/development/ROADMAP.md` § The two arcs). The Era *structure* is the same on both arcs;
-what differs is where the ladder starts.
+**Each Era's number matches its catastrophe** (§ The point of an Era). The ladder was renumbered on
+2026-08-31, resolving NR-749, when Ben confirmed *"Era 1 is actually nuclear war"* and *"we will be
+working on the 1960s start"* — the previous ladder started at Era 0 and put the nuclear catastrophe
+at an Era boundary rather than inside an Era, which is what made the numbering collide with his.
+
+| Era | Territory | Its catastrophe |
+|---|---|---|
+| **Era 1 — Terrestrial** | Home planet and equivalent bodies | **Nuclear war** |
+| **Era 2 — Early Space** | The whole solar system | **Climate collapse** (`docs/CLIMATE.md`) |
+| **Era 3 — Dimensional** | Open | Open |
+| **Era 4 — Megastructure** | Open | Open |
+
+**This renumber is the DOCUMENT's Era axis only.** It does not touch `era_band`, does not touch
+`condition_subject::era`, and does not renumber any `E0-`/`E1-` technology id — see § Three things
+that say "era" in code, which already establishes those as separate axes. Nothing in `src/` moves.
+
+### Where the ladder starts
+
+**The working start is the 1960s** (Ben, 2026-08-31). `world_params::epoch_year = 1960` selects it
+and the branch is live: `era_band_for_epoch` puts the recipe registry on the industrial band, and the
+Era −1 antiquity prehistory is skipped (`era_minus_one.cpp` runs only below 1700). The 0 CE ancient
+start (Ben, 2026-08-12; NR-177 — the mercenary company, the antiquity prehistory) remains a supported
+configuration on the same ladder; `docs/development/ROADMAP.md` § The two arcs owns which is the
+commercial product, and this document owns only the Era structure, which is the same on both.
 
 **The prehistory is a generator, not a play layer.** Generation runs a pre-epoch history sim that
 produces the 0 CE world the campaign opens on: **400 years in one band, at 4 years a tick — 100
@@ -42,7 +63,11 @@ steady economy, not generated at an earlier date and advanced.
   that reads wrongly under it:** `era >= 1` means *owns a launchpad*, so a condition capturing "the
   corp has reached space" is fine and one meaning "the campaign has advanced to Era 1" is not,
   since the proxy is per-corp and the Era is world-wide. `condition_set_harness` C2h/C2l pin it.
-- **The Era of this document** asks *how far has the campaign got within its arc*. A building can
+- **The Era of this document** asks *how far has the campaign got within its arc*. It was renumbered
+  1-based on 2026-08-31 (§ The ladder) and **the two axes above did not move with it** — `era_band`
+  is still `any`/`ancient`/`industrial`, and `condition_subject::era` still measures 1 for a corp
+  that owns a launchpad. That proxy now reads one Era later than its name suggests (space is Era 2
+  in this document), which is exactly why the section below insists the axes never merge. A building can
   be `industrial`-band and still Era-0 (a refinery); nothing is `ancient`-band and Era 1. The three
   axes must not be merged — one word with two meanings in one file is the failure the proxy note
   already guards against.
@@ -135,12 +160,12 @@ designed; the drafted node set and the full herring roster live in
 2026-07-08). The Era boundary is an external clock: a **seeded date with a visible countdown**,
 and the boundary event **shocks markets, destroys some infrastructure, and unlocks the new Era's
 quest trees**, all three together. Tech can move faster than the clock but never opens an Era;
-capstone techs open **quest trees**. The condition set in § Era 0 → Era 1 gate therefore gates
+capstone techs open **quest trees**. The condition set in § Era 1 → Era 2 gate therefore gates
 **space access** — a keystone quest — not the Era transition proper, which is the rupture.
 
 Two ruptures exist and they are **distinct**: HISTORY.md Stage 5's averted rupture is in the
 backstory, CONCEPT.md's is ahead of the player. The backstory establishes that these powers *can*
-pull back from the brink; the Era 0 exit is the occasion they do not.
+pull back from the brink; Era 1's test is the occasion they may not.
 
 **This Era's catastrophe is a NUCLEAR WAR** (Ben, 2026-08-31) — which is what `docs/CONCEPT.md`'s
 "global-rupture-scale war" names, and what the player is playing to **avoid**. It is the failure
@@ -153,7 +178,7 @@ reason the answer is the same.
 
 ---
 
-## Era 0 — Terrestrial
+## Era 1 — Terrestrial
 
 **Starts:** the campaign epoch.
 **Territory:** home planet and bodies of equivalent class (rocky, habitable, or near-habitable planets).
@@ -163,7 +188,7 @@ reason the answer is the same.
 
 The opening economy is heavy industry: iron ore, coal, petroleum, and the products derived from them. Corporations operate globally but the solar system is a project, not yet an industry. The player competes for terrestrial resources and market position while working toward the economic threshold required for space access.
 
-The epoch signals the technology level and industrial character, not historical accuracy. The home planet's specific resource profile varies between campaigns (procedurally generated); what matters is that Era 0 resources are bulk, extractable, and refinable with pre-space infrastructure.
+The epoch signals the technology level and industrial character, not historical accuracy. The home planet's specific resource profile varies between campaigns (procedurally generated); what matters is that Era 1 resources are bulk, extractable, and refinable with pre-space infrastructure.
 
 ### Available resources
 
@@ -173,9 +198,9 @@ All home-body raw materials and their downstream products: iron ore, coal, petro
 
 Mine, Oil Platform, Farm, Smelter, Refinery, Chemical Plant, Electronics Lab, Fabricator, Food Processor, Port. These are the Era's *roles*; the authored `building_type` roster expresses them as generic extraction and processing buildings (PRODUCTION.md § Extraction buildings).
 
-The Launchpad can be **constructed** during Era 0 (a ground installation; authored cost steel 50 + refined fuel 20 plus 500 credits, `scripts/economy.lua`) but cannot be **operated** until the space-access gate is fully met.
+The Launchpad can be **constructed** during Era 1 (a ground installation; authored cost steel 50 + refined fuel 20 plus 500 credits, `scripts/economy.lua`) but cannot be **operated** until the space-access gate is fully met.
 
-### Era 0 → Era 1 gate — space access
+### Era 2 → Era 3 gate — space access
 
 This is the **keystone quest** that unlocks space access (BL-087). All three conditions must be met simultaneously:
 
@@ -192,9 +217,10 @@ When all three conditions hold, space bodies become accessible to convoy dispatc
 
 ---
 
-## Era 1 — Early Space
+## Era 2 — Early Space
 
-**Starts:** after the Era 0→1 rupture.
+**Starts:** after Era 1's test is passed — the nuclear catastrophe averted, not survived
+(§ The point of an Era).
 **Territory:** all bodies in the solar system.
 **Strategic question:** establish self-sustaining extraction on at least one off-world body to reduce dependence on the home planet for key inputs.
 
@@ -227,9 +253,9 @@ the threshold Era 1's own strategic question already names.
 
 ---
 
-## Era 2 and beyond
+## Era 3 and beyond
 
-Era 2 likely involves multi-system expansion where the home solar system becomes a single node in a larger trade network. The era system is designed to accommodate this without retroactive changes: each era entry gate is a self-contained condition set, and later eras extend rather than replace the resource and building model.
+Era 3 likely involves multi-system expansion where the home solar system becomes a single node in a larger trade network. The era system is designed to accommodate this without retroactive changes: each era entry gate is a self-contained condition set, and later eras extend rather than replace the resource and building model.
 
 ---
 

@@ -55,7 +55,7 @@ without disturbing the ordering. The additions are drawn on an **independent rng
 cannot perturb the calibrated subset or the derived environment — preserving determinism. The
 distribution is guarded by the `world_audit` headless harness (all additions authored; PGM
 strictly rarer than copper). Metallic-only goods (iron-nickel, PGM) appear only where metallic
-terrain exists — in Era 0 that is the asteroid belt, so they read as scarce until space access
+terrain exists — in Era 1 that is the asteroid belt, so they read as scarce until space access
 opens.
 
 ---
@@ -74,7 +74,7 @@ Raw materials are extracted by buildings placed on tiles with matching deposits.
 
 ### Earth-sourced
 
-Available in Era 0 and all subsequent eras. Found predominantly on habitable or rocky planets.
+Available in Era 1 and all subsequent eras. Found predominantly on habitable or rocky planets.
 
 | Resource | Terrain affinity | Notes |
 |----------|-----------------|-------|
@@ -235,7 +235,7 @@ If every market traded the same industrial goods there would be no structural re
 things are**.
 
 And the premium does not stop at the coastline. An endemic good is by construction the thing that can
-never be produced off-world, so it is the highest-margin cargo in the system — an Era 0 trade game
+never be produced off-world, so it is the highest-margin cargo in the system — an Era 1 trade game
 that becomes the reason early off-world runs pay for themselves, before the industrial chain reaches
 out there.
 
@@ -255,7 +255,7 @@ Refined goods are the primary goods in inter-body trade during the early game.
 | Food rations | Agricultural produce | Food Processor | 6.0 |
 
 **Liquid oxygen has no enum value of its own.** It is folded into the Chemical Plant's two
-propellant recipes — separated cryogenically from the local air on the Era 0 route, electrolysed
+propellant recipes — separated cryogenically from the local air on the Era 1 route, electrolysed
 from water on the Era 1 route — because nothing outside the plant would ever hold it
 (`docs/economy/PRODUCTION.md` § Chemical Plant).
 

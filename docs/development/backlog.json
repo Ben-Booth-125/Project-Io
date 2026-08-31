@@ -1662,6 +1662,119 @@
    "design": "DOCUMENTATION ONLY, per Ben 2026-08-31: \"Move BL-701 to just documentation - it's not the focus here.\" Filed the same day at difficulty 8 as a system build; it is not that, and nothing here builds climate.\n\nIT TOOK THREE PASSES IN ONE SESSION AND THE CORRECTIONS ARE THE VALUE. Recorded so the reasoning is not re-derived:\n\nPASS 1 proposed running climate through `tile_component.hazard_level` - static (written once at tile_generation.cpp:1962), already carried by the production formula's (1 - hazard) multiplier. REJECTED by Ben: \"we will use a more detailed surface than hazard. Hazard is mostly just a tangible benefit for larger settlements on other bodies.\" One number per tile with one meaning cannot carry a body-scale state with several.\n\nPASS 2 found the right surface - `planetology_state` unfrozen. Io already runs a physically grounded climate model at generation (the carbonate-silicate thermostat, the greenhouse budget, insolation, oxygenation, the arable calculation) and freezes the result. Climate change is a defined subset of those scalars moving: instellation, surface_temp_k, arable_share, life_stage, o2_fraction slowly. Fixed: endowment and the planetary facts. THIS SURVIVES. The dividing line is that climate moves what a world can SUPPORT, never what it is MADE OF.\n\nPASS 2 ALSO got the era placement wrong, treating the nuclear war as a scheduled boundary event and climate as its aftermath. REJECTED by Ben: \"The aim of each era is to give a catastrophe for players to avoid... I am not against climate change being a large problem for Era 2, but our prototype works solely on Era 1 for now.\"\n\nPASS 3, WHICH STANDS. Every Era carries ONE CATASTROPHE THE PLAYER PLAYS TO AVOID, resolved deterministically from a watched scalar. The prototype Era's catastrophe is a nuclear war and its scalar is ALARM. Climate is the NEXT Era's catastrophe and its scalar is LOAD. CLIMATE.md is now written as that parallel, so the machinery built for the first rung - watched scalar, seeded test, red herrings with tells, deed-gated capstones - is what the second rung reuses. That parallel is what makes the Era ladder a system rather than a series of set-pieces.\n\nTHE ERA MODEL ITSELF WAS PROMOTED OUT OF RESEARCH in the same pass. ERAS.md § The point of an Era now carries the Ceiling/Alarm model, the test, the seven red-herring kinds, the tell-before-commitment rule and the inverse herring - drafted 2026-08-05 in docs/research/ERA1_TECH_LANDSCAPE.md and owned by BL-087, which the 2026-08-23 cull PURGED. The design was sitting in a research doc that is explicitly not authority. See NR-750.\n\nKNOCK-ON, and it is the one that changes another design: AI_OPPONENT.md had named climate as the SECOND systemic brake on a runaway leader. Climate is out of prototype scope, so coalitions now carry that brake ALONE, and the doc says so plainly rather than leaning on an unavailable system.",
    "completed": "2026-08-31",
    "resolved": "2026-08-31"
+  },
+  {
+   "id": "BL-702",
+   "short_name": "spectate god view control",
+   "category": "AI",
+   "title": "God view has a control under spectate, so a watcher sees rival internals rather than silhouettes",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": null,
+   "sprint": "26",
+   "written": "2026-08-31",
+   "author": "Ben",
+   "requires": [
+    "BL-695"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/ui/time_panel.cpp",
+    "src/ui/ui_state.hpp",
+    "src/core/verify_api.cpp",
+    "docs/ai/ACTIONS.json",
+    "docs/ui/TIME_CONTROLS.md"
+   ],
+   "design": "Ben, 2026-08-31, approving the proposal. The sibling of BL-695 (live spectate route) and worth almost nothing without it - and BL-695 is worth much less without this.\n\nTHE GAP. `ui_state::god_view` is READ at every site that matters - body_surface_canvas.cpp lifts the survey mask on it, hover_content.cpp opens the rival hover card, selection_panel.cpp opens the internals readout and the building status pages - and it is WRITTEN in exactly one place: `verify.god_view(on)` at src/core/verify_api.cpp:1103, behind --verify. Same shape as spectate itself, same single-assignment problem.\n\nWHY IT IS NOT COSMETIC. Spectating with god view off is watching silhouettes: the survey fog and the BL-068 rival-visibility rule hide exactly the balances, dials, recipes and stock that make a rival's decision legible. The sprint's whole method is watching the AI and reasoning about what it did. Without this a watcher can see that a rival built something and not what it cost, held or earned.\n\nTHE SAFETY IS ALREADY PAID FOR. Every read site tests the PAIR `spectating && god_view`, so god view cannot leak into a seated session even if its control is mis-wired - the pair is the gate and it is already written that way. time_panel.cpp:344-350 already has the shape: the god-view affordance is offered ONLY while spectating.\n\nSCOPE: a control, offered only under spectate, plus its ACTIONS.json entry per the standing rule that a control change updates the dictionary. Not a new visibility model - god view's semantics are BL-408's and are unchanged."
+  },
+  {
+   "id": "BL-703",
+   "short_name": "watch session finding",
+   "category": "AI",
+   "title": "A watched run produces a written finding on how the AI actually strategises, into STRATEGIES.md",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "26",
+   "written": "2026-08-31",
+   "author": "Ben",
+   "requires": [
+    "BL-695",
+    "BL-696",
+    "BL-702"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/ai/STRATEGIES.md",
+   "files": [
+    "docs/ai/STRATEGIES.md",
+    "docs/ai/AI_OPPONENT.md",
+    "docs/development/NEEDS_REVIEW.json"
+   ],
+   "design": "Ben, 2026-08-31: \"Our aim for sprint 26 is to ensure spectator mode works, and visibly watch AI play in order to further develop the meta.\" THIS IS THE ITEM THAT DELIVERS THE SECOND HALF OF THAT SENTENCE, and it is the reason the sprint is not just plumbing.\n\nWITHOUT IT THE SPRINT CAN END WITH A WORKING SPECTATE MODE AND NOTHING LEARNED. That is the specific failure this item exists to prevent: three instrument items land, everything is green, and no statement about rival play is any truer than it was at the start.\n\nTHE DELIVERABLE IS PROSE, NOT CODE. A run watched end to end on the 1960s start (BL-705, selectable 1960s start), with god view on, and a written finding: what the rivals actually did, in what order, what they never did, where the scorer looked competent and where it looked blind.\n\nIT LANDS IN docs/ai/STRATEGIES.md, which owns the meta and was AUTHORED AHEAD OF THE GAME - CLAUDE.md calls it \"the meta, authored ahead of the game - research, not authority\". This is the first chance to check that authored meta against what the scorer actually does. TREAT A DIVERGENCE AS A FINDING ABOUT ONE OR THE OTHER, not as a defect in the scorer by default: an authored strategy that no rival ever reaches may be a scorer gap OR a meta that was never real.\n\nWHAT TO LOOK FOR, so the watching has a spine rather than being a vibe:\n  1. Does any rival do anything that reads as a PLAN across ticks, or only locally good moves?\n  2. What does the field's spread in composite standing (BL-700) do over the run - converge, hold, or run away?\n  3. Which corp_verbs are never issued? A verb family with zero uses across a run is either dead code or an unreachable candidate.\n  4. What does the decision feed's reason vocabulary actually say, once BL-696 makes it say anything?\n  5. Where does a rival do something a human would obviously not do? That is the legibility bar from AI_OPPONENT.md § The goal.\n\nFILE WHAT IT FINDS as NEEDS_REVIEW entries and, where warranted, fresh items - do not fold defects into this item's own prose and call it done."
+  },
+  {
+   "id": "BL-704",
+   "short_name": "rival trace export",
+   "category": "AI",
+   "title": "A run exports a per-rival trace of what was decided and why, so a finding can cite evidence",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "26",
+   "written": "2026-08-31",
+   "author": "Ben",
+   "requires": [
+    "BL-696"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/corp_ai.hpp",
+    "src/core/verify_api.cpp",
+    "tools/verify/ai_skill_harness.cpp",
+    "docs/ai/AI_OPPONENT.md"
+   ],
+   "design": "Ben, 2026-08-31, approving the proposal. Optional relative to the sprint's core - BL-703 (watch session finding) can be done by watching alone - but it is what turns a finding from a memory of watching into something that cites evidence.\n\nTHE SHAPE: a per-run, per-corp log of the scorer's decisions - the candidate chosen, its score, the runners-up, the reason, the tick. The data already exists inside the evaluation; nothing new is computed, it is a question of getting it OUT in a form that can be read after the run rather than only watched during it.\n\nTHE ADJACENT MACHINERY IS ALREADY THERE and should be reused rather than duplicated: `corp_decision_reason` is the reason vocabulary; the decision feed consumes the same stream; AI_OPPONENT.md § 8a's world history log (history_log.{hpp,cpp}) is the project's append-only tagged serialisation seam and already carries a `decision` topic. Check whether this is a NEW export or a READER over the log that already exists - the second is much the better answer if it holds.\n\nDETERMINISM: the trace is an OBSERVATION, never an input. Nothing in the scorer may read it, and its presence or absence must not change a single decision - assert that a run with tracing on and one with it off produce the same state_hash.\n\nIT ALSO PAYS FORWARD. AI_OPPONENT.md § 10d's corpus-generation direction is exactly this artifact: \"every decision is logged as an input/output pair... those pairs are the supervised fine-tuning corpus\", and § 10d notes the corpus and the replay log are the same artifact. Do not build the corpus here - but do not build something that cannot become it."
+  },
+  {
+   "id": "BL-705",
+   "short_name": "selectable 1960s start",
+   "category": "Generation",
+   "title": "The 1960s start is selectable, and the campaign epoch reads world_params instead of a hard-coded constant",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "26",
+   "written": "2026-08-31",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/economy/ERAS.md",
+   "files": [
+    "src/world/hard_coded_world.hpp",
+    "src/ui/format.hpp",
+    "src/ui/format.cpp",
+    "src/world/planetology.hpp",
+    "src/ui/tile_inspector.cpp",
+    "src/ui/startup_screens.cpp",
+    "docs/economy/ERAS.md",
+    "docs/ui/STARTUP.md"
+   ],
+   "design": "Ben, 2026-08-31: \"We will be working on the 1960s start.\" This is what makes that sentence executable. Sprint 26 watches the AI play, and BL-703 (watch session finding) watches it on a 1960s world - which cannot currently be started.\n\nTHE BRANCH IS ALIVE AND UNREACHABLE, measured 2026-08-31. `world_params::epoch_year` defaults to 0 and its own comment says the 1960 arc is deliberately kept working: \"pass epoch_year = 1960 and it still runs, which is what keeps the parked space work buildable\". The branch is real - `era_band_for_epoch` puts the recipe registry on the industrial band, `era_minus_one.cpp` skips the antiquity prehistory above 1700, and hard_coded_world.cpp branches on the same threshold. But NOTHING EVER SETS IT. There is no CLI flag, no wizard field, and no assignment anywhere in src/. Reaching 1960 today means editing a default.\n\nTHE SECOND HALF IS A REAL BUG AND THIS ITEM INHERITS IT (raised earlier as the epoch half of the two-clocks entry). `campaign_epoch_year` is a hard-coded 1960 in BOTH src/ui/format.hpp:82 and src/world/planetology.hpp:275, tied by a static_assert in tile_inspector.cpp, and format.cpp:134 computes the displayed year as day_tick/days_per_year + that constant. NO UI SITE READS world_params::epoch_year AT ALL. So today a 0 CE campaign renders 1960-based dates - the constant is simply wrong for the default start.\n\nNOTE THE POLARITY, because it decides the order of work: moving to a 1960s start makes the hard-coded constant ACCIDENTALLY CORRECT again. That is a trap. Fix the constant to read world_params anyway - a value that is right by coincidence will silently break the moment either start is used again, and both starts remain supported (ERAS.md § Where the ladder starts).\n\nSCOPE:\n  1. epoch_year is selectable - the wizard is the natural home (STARTUP.md owns the screen state machine); a CLI flag is the cheap first cut and pairs with the --autostart family.\n  2. The UI epoch reads world_params rather than a constant, and the static_assert is replaced by whatever keeps the two clocks honest once the value is dynamic.\n  3. Whatever is stale on the 1960 path gets found by walking it - this is the first time anyone has.\n\nEXPECT TO FIND THINGS. The 0 CE start has had months of attention and the 1960 path has had none since the arc split. Treat surprises as findings to file, not as scope creep to absorb."
   }
  ]
 }

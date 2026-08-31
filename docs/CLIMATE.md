@@ -3,11 +3,15 @@
 Authority doc for **climate**: the state of a body's habitability as it changes during play, what
 changes it, and what that does to the people and corporations living under it.
 
-**Scope, stated first.** Climate is the **next Era's catastrophe**, not the prototype's. Ben,
+**Scope, stated first.** Climate is **Era 2's catastrophe** — Early Space — not Era 1's. Ben,
 2026-08-31: *"I am not against climate change being a large problem for Era 2, but our prototype
 works solely on Era 1 for now."* This document designs it **ahead**, so the Era ladder has a second
-rung that is a real design rather than a placeholder. **Nothing in the prototype is built against
-it**, and no other doc should lean on it as though it were available.
+rung that is a real design rather than a placeholder. **Nothing in Era 1 is built against it**, and
+no other doc should lean on it as though it were available.
+
+That placement is also the right one on its own terms: climate state is per body (§ 5), so the
+catastrophe only has its full shape once more than one body is reachable — which is Era 2's
+territory.
 
 ---
 
@@ -17,16 +21,16 @@ it**, and no other doc should lean on it as though it were available.
 catastrophe the player is playing to avoid**, resolved deterministically from a quantity the player
 can watch and act on, with attractive technologies whose real cost is not on their own stat line.
 
-Climate is that pattern with a different quantity. The prototype Era's catastrophe is a war and its
-watched scalar is **Alarm** — how threatened other nations feel. Climate's catastrophe is a
-habitability collapse and its watched scalar is **load** — how hard the world is being pushed.
+Climate is that pattern with a different quantity. Era 1's catastrophe is a nuclear war and its watched
+scalar is **Alarm** — how threatened other nations feel. Era 2's is a habitability collapse and its
+watched scalar is **Load** — how hard the world is being pushed.
 
 The parallel is deliberate and load-bearing. It is what makes the Era ladder a **system** rather
 than a series of unrelated set-pieces, and it means the machinery built for the first rung — a
 watched accumulating scalar, a seeded test date, red herrings with tells, deed-gated capstones —
 is the machinery the second rung reuses.
 
-| | Prototype Era | The climate Era |
+| | Era 1 — Terrestrial | Era 2 — Early Space |
 |---|---|---|
 | Catastrophe | Nuclear war | Habitability collapse |
 | Watched scalar | **Alarm** — how threatened others feel | **Load** — how hard the world is pushed |
@@ -147,8 +151,7 @@ place to operate, never a closed one.
 
 ## 8. What this document does not settle
 
-1. **Which Era number this is**, pending the ladder question in NR-749.
-2. **The recovery curve** — how much load is reversible, and where a permanent floor sits.
+1. **The recovery curve** — how much load is reversible, and where a permanent floor sits.
 3. **What exactly constitutes load**, and the weighting across extraction, processing and throughput.
 4. **Whether remediation is buildable**, which would make it a market rather than only a cost.
 5. **Whether nations act on it** — a levy or a law answering climate would reach the 2026-08-18

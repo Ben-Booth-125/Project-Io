@@ -166,7 +166,7 @@ campaign opens under the *threat* of the catastrophe, not its residue, and the s
 economics survive on their own merits only as a restatement of `GENERATION_STRATEGY.md`.
 
 The replacement — the bloc structure the threat produces, the diplomacy origin, the seizure cost
-of Stage 3, and the reconciliation of where the rupture sits across `docs/CONCEPT.md` (the Era 0
+of Stage 3, and the reconciliation of where the rupture sits across `docs/CONCEPT.md` (the Era 1
 exit) and `docs/research/ERA1_TECH_LANDSCAPE.md` (a visible countdown) — is **owned by BL-223
 (averted rupture, diplomacy origin)**. `COLLAPSE.md` supplies the mechanism the pre-epoch version
 of the same idea runs on: strain, culminations, and the reach-fed slow strain that BL-510 makes

@@ -248,7 +248,7 @@ The two routes are `propellant_atmospheric` and `propellant_electrolysis` (BL-30
 Liquid oxygen has no `resource_type`: it is folded into each recipe, because nothing outside the
 Chemical Plant would ever hold it.
 
-On a body with an atmosphere, liquid oxygen is produced in Era 0 by cryogenic air separation — the Chemical Plant draws oxygen from the local atmosphere and consumes no stockpiled input (energy cost only, abstracted into the recipe rate). Propellant is therefore an Era 0 capability anywhere refined fuel is available. On airless bodies there is no atmosphere to separate, so the water-electrolysis recipe is the only liquid-oxygen route off-world; closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 1 logistical problem.
+On a body with an atmosphere, liquid oxygen is produced in Era 1 by cryogenic air separation — the Chemical Plant draws oxygen from the local atmosphere and consumes no stockpiled input (energy cost only, abstracted into the recipe rate). Propellant is therefore an Era 1 capability anywhere refined fuel is available. On airless bodies there is no atmosphere to separate, so the water-electrolysis recipe is the only liquid-oxygen route off-world; closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 2 logistical problem.
 
 #### Electronics Lab
 
@@ -407,7 +407,7 @@ not per AU — the pad is the thing being fuelled. An unfuelled pad is exactly a
 all. A convoy exporting propellant itself cannot burn the cargo it carries; the gate subtracts
 the cargo first. Propellant is deliberately **left out of the market's base-price table**, so it
 is made and burned within a corp's own pool rather than traded. See **`docs/economy/ERAS.md`**
-for the Era 0→1 transition.
+for the Era 1→2 transition.
 
 *Save-format note.* Appending a `resource_type` value renumbers nothing but changes the length of
 every per-resource array; every such array is sized off `resource_count`, so the append costs a
@@ -790,7 +790,7 @@ because no research reaches it), and the Selection panel's build door filters on
 `building_available` so the door does not offer what the gate would refuse. Guard:
 `tools/verify/era_roster.cpp`.
 
-The band is **not** ERAS.md's Era 0 / Era 1 — that axis is per-corp progression *within* the
+The band is **not** ERAS.md's Era 1 / Era 2 — that axis is per-corp progression *within* the
 industrial arc, gated on space access. The untagged (`any`) processing recipes shared by both
 arcs are `food_rations` and `refined_copper`; everything else is banded.
 

@@ -375,7 +375,7 @@ not. Terrestrial peak conventional oil and the exhaustion of near-surface high-g
 real analogue.
 
 This is the cheapest possible generated, in-fiction answer to *"why would a corporation go to
-space"* — and it makes Era 0 → Era 1 a **pressure** rather than a menu choice, which is exactly what
+space"* — and it makes Era 1 → Era 2 a **pressure** rather than a menu choice, which is exactly what
 `GENERATION_STRATEGY.md`'s economic premise asserts but does not currently generate.
 
 ---

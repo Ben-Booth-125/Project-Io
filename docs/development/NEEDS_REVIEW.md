@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*102 entries — 99 open, 3 resolved.*
+*103 entries — 99 open, 4 resolved.*
 
 ---
 
@@ -1029,32 +1029,6 @@ RETARGETED 2026-08-31, THIRD TIME, and DEMOTED. Ben placed climate in the NEXT E
 
 *Files: `docs/CLIMATE.md`, `docs/economy/ERAS.md`, `docs/CONCEPT.md`*
 
-### NR-749 — Three Era numbering schemes are live in the corpus, and they disagree by one
-*question · raised 2026-08-31 · from Ben, 2026-08-31: "My mistake with the word choice. Era 1 is actually nuclear war... our prototype works solely on Era 1 for now."*
-
-THE UNCLEAR THING, raised because Ben invited it and because I cannot write the era docs precisely without it. The CONCEPTS are now settled and consistent; only the NUMBERS disagree.
-
-THREE SCHEMES, all currently in the tree.
-  (1) ERAS.md / CONCEPT.md: **Era 0 = Terrestrial** (Cold War / Information Age footing), **Era 1 = Early Space**, **Era 2 = Dimensional**. The era you play is Era 0 and its EXIT is the war.
-  (2) BL-087 and docs/research/ERA1_TECH_LANDSCAPE.md prose: "**Era 1 failure (WW3)**" - the era you play is Era 1 and its catastrophe is the war. Ben's own 2026-08-05 wording, and the wording he used again today.
-  (3) The same research doc's NODE IDS, and the live tech ids in code: **E0-**HEAVY, E0-ELEC, E0-ROCKET; and shipped ancient-arc ids E0-EC-01 (Toolmaker), E1-EC-01 (Bessemer Converter), E0-ML-01. Here E0/E1 are era BANDS on the ancient arc, a third meaning again.
-
-So "Era 1" means the space era in (1), the nuclear era in (2), and an ancient tech band in (3). Note ERAS.md ALREADY warns about exactly this class of collision in its section 'Three things that say era in code, and which one this is' - era_band, condition_subject::era, and the Era of that document. This is a fourth.
-
-WHAT I DID, and it is deliberately number-light: I wrote the corrections using RELATIVE language - 'this Era's catastrophe', 'the next Era's catastrophe', 'the prototype Era' - wherever the number is contested, so nothing needs rewriting whichever way this goes. CLIMATE.md § 8.1 names the open number explicitly.
-
-THE SECOND HALF OF THE QUESTION, and possibly the bigger one: "our prototype works solely on Era 1 for now" sits oddly against ROADMAP.md § The two arcs, which says the LIVE product is the ANCIENT arc at 0 CE with the player as a mercenary company, and that the industrial/space arc (v0.2.0-v1.0.0) is PARKED for DLC. Under scheme (1) the prototype is Era 0 of the ancient arc. Under scheme (2) the prototype is the Cold-War-footing era, which is the SPACE arc's first rung - a parked product. These cannot both be true, and I do not know which one moved.
-
-**Why it matters.** Era numbers appear in ERAS.md, CONCEPT.md, CLIMATE.md, the research draft, the tech ids in code, and now in sprint planning. A silent off-by-one across those is the exact failure ERAS.md already has a section warning about, and it gets more expensive with every doc that cites a number. The arc question is larger still: it decides whether the era work being designed is for the live product or for a parked one.
-
-- RENUMBER the ladder so the era you play is Era 1, its catastrophe the nuclear war, and climate's era is Era 2. Matches Ben's own wording twice, and makes the catastrophe ladder and the era numbers line up.
-- KEEP ERAS.md's numbering (played era = Era 0, exit test = the war, Early Space = Era 1) and treat Ben's 'Era 1' as shorthand for the era-1 TRANSITION. Cheapest in edits; leaves the wording collision live.
-- DROP the numbers from prose entirely and name eras by their catastrophe or territory - 'the nuclear Era', 'the climate Era'. Sidesteps the collision permanently; larger doc sweep.
-
-> **Recommendation:** Answer the ARC half first - is the era/catastrophe work for the ancient live product or for the parked space arc? The numbering follows from it and is cheap either way. On the numbering itself I would take option 1: aligning the number with the catastrophe is what makes the ladder readable, and Ben has now used that scheme twice unprompted.
-
-*Files: `docs/economy/ERAS.md`, `docs/CONCEPT.md`, `docs/CLIMATE.md`, `docs/development/ROADMAP.md`, `docs/research/ERA1_TECH_LANDSCAPE.md`*
-
 ### NR-750 — The Era catastrophe model was promoted from a research doc into ERAS.md, and its owner BL-087 is purged
 *observation · raised 2026-08-31 · from Sprint 26 doc correction, 2026-08-31.*
 
@@ -1073,6 +1047,23 @@ SAME SHAPE AS NR-744, which found three other purged AI items whose dated grants
 > **Recommendation:** Mint a fresh owner for the era tech/quest system when the era work is actually next, authored against the current docs per the cull's resurrection rule - not now, since sprint 26 is about watching the AI. Worth doing at the same time as NR-744's three, since all four are the same cull and the same shape.
 
 *Files: `docs/economy/ERAS.md`, `docs/research/ERA1_TECH_LANDSCAPE.md`, `docs/development/backlog.json`*
+
+### NR-751 — The Era renumber leaves the F9 tech-tree viewer labelling its tabs by the old numbers
+*observation · raised 2026-08-31 · from The 2026-08-31 Era renumber (NR-749).*
+
+The ladder renumbered 1-based in the docs. The F9 mock tech-tree viewer's TAB LABELS are authored strings in scripts/tech_tree.lua and its viewer, and they still read 'Era -1 Antiquity' / 'Era 0 - Terrestrial' / 'Era 1 - Early Space' / 'Standing lines'.
+
+docs/ai/ACTIONS.md records those labels in three places (the F9 entry, its expected output, and the tab-button press with its enum). ACTIONS.md was DELIBERATELY NOT SWEPT with the rest of the docs, and that was the right call: it is a mirror of what the control actually says, so editing it to match the new numbering would have made the dictionary lie about the UI. A dictionary that describes a press must track the code, not the design.
+
+So the divergence is real, narrow, and currently HONEST - the docs say Era 1 Terrestrial, the viewer says Era 0 Terrestrial, and ACTIONS.md correctly reports the viewer.
+
+CONTEXT THAT LOWERS THE URGENCY: the viewer is a MOCK. ACTIONS.md says so itself - "a design aid with no simulation coupling; nothing can be researched and nothing in the world reads it". No simulation behaviour depends on these strings.
+
+**Why it matters.** It is small now and gets worse the moment anyone authors real tech content against the viewer's numbering, because the authored ids and the doc ladder would then disagree structurally rather than cosmetically.
+
+> **Recommendation:** Fix the labels when the tech/quest system gets a real owner (NR-750), not before - it is a string change that wants to happen in the same pass as the E0-/E1- id question, and doing it alone would just move the divergence from the labels to the ids. Regenerate ACTIONS.md from the code at that point rather than hand-editing it.
+
+*Files: `scripts/tech_tree.lua`, `docs/ai/ACTIONS.json`, `docs/ai/ACTIONS.md`, `docs/economy/ERAS.md`*
 
 ---
 
@@ -1172,4 +1163,44 @@ CORRECTED IN: ERAS.md (§ The point of an Era, new, and § What moves an Era), C
 WHAT REMAINS OPEN is only the numbering, which is a separate and narrower question - NR-749.
 
 *Files: `docs/CONCEPT.md`, `docs/economy/ERAS.md`, `docs/CLIMATE.md`*
+
+### NR-749 — Three Era numbering schemes are live in the corpus, and they disagree by one
+*question · raised 2026-08-31 · from Ben, 2026-08-31: "My mistake with the word choice. Era 1 is actually nuclear war... our prototype works solely on Era 1 for now."*
+
+THE UNCLEAR THING, raised because Ben invited it and because I cannot write the era docs precisely without it. The CONCEPTS are now settled and consistent; only the NUMBERS disagree.
+
+THREE SCHEMES, all currently in the tree.
+  (1) ERAS.md / CONCEPT.md: **Era 0 = Terrestrial** (Cold War / Information Age footing), **Era 1 = Early Space**, **Era 2 = Dimensional**. The era you play is Era 0 and its EXIT is the war.
+  (2) BL-087 and docs/research/ERA1_TECH_LANDSCAPE.md prose: "**Era 1 failure (WW3)**" - the era you play is Era 1 and its catastrophe is the war. Ben's own 2026-08-05 wording, and the wording he used again today.
+  (3) The same research doc's NODE IDS, and the live tech ids in code: **E0-**HEAVY, E0-ELEC, E0-ROCKET; and shipped ancient-arc ids E0-EC-01 (Toolmaker), E1-EC-01 (Bessemer Converter), E0-ML-01. Here E0/E1 are era BANDS on the ancient arc, a third meaning again.
+
+So "Era 1" means the space era in (1), the nuclear era in (2), and an ancient tech band in (3). Note ERAS.md ALREADY warns about exactly this class of collision in its section 'Three things that say era in code, and which one this is' - era_band, condition_subject::era, and the Era of that document. This is a fourth.
+
+WHAT I DID, and it is deliberately number-light: I wrote the corrections using RELATIVE language - 'this Era's catastrophe', 'the next Era's catastrophe', 'the prototype Era' - wherever the number is contested, so nothing needs rewriting whichever way this goes. CLIMATE.md § 8.1 names the open number explicitly.
+
+THE SECOND HALF OF THE QUESTION, and possibly the bigger one: "our prototype works solely on Era 1 for now" sits oddly against ROADMAP.md § The two arcs, which says the LIVE product is the ANCIENT arc at 0 CE with the player as a mercenary company, and that the industrial/space arc (v0.2.0-v1.0.0) is PARKED for DLC. Under scheme (1) the prototype is Era 0 of the ancient arc. Under scheme (2) the prototype is the Cold-War-footing era, which is the SPACE arc's first rung - a parked product. These cannot both be true, and I do not know which one moved.
+
+**Why it matters.** Era numbers appear in ERAS.md, CONCEPT.md, CLIMATE.md, the research draft, the tech ids in code, and now in sprint planning. A silent off-by-one across those is the exact failure ERAS.md already has a section warning about, and it gets more expensive with every doc that cites a number. The arc question is larger still: it decides whether the era work being designed is for the live product or for a parked one.
+
+- RENUMBER the ladder so the era you play is Era 1, its catastrophe the nuclear war, and climate's era is Era 2. Matches Ben's own wording twice, and makes the catastrophe ladder and the era numbers line up.
+- KEEP ERAS.md's numbering (played era = Era 0, exit test = the war, Early Space = Era 1) and treat Ben's 'Era 1' as shorthand for the era-1 TRANSITION. Cheapest in edits; leaves the wording collision live.
+- DROP the numbers from prose entirely and name eras by their catastrophe or territory - 'the nuclear Era', 'the climate Era'. Sidesteps the collision permanently; larger doc sweep.
+
+> **Recommendation:** Answer the ARC half first - is the era/catastrophe work for the ancient live product or for the parked space arc? The numbering follows from it and is cheap either way. On the numbering itself I would take option 1: aligning the number with the catastrophe is what makes the ladder readable, and Ben has now used that scheme twice unprompted.
+
+> **RESOLVED.** ANSWERED by Ben, 2026-08-31: "We will be working on the 1960s start, so you can resolve that too."
+
+BOTH HALVES SETTLED.
+
+THE ARC: the working start is the 1960s. It is a live branch, not new work - world_params::epoch_year = 1960 selects it, era_band_for_epoch puts the registry on the industrial band, and era_minus_one.cpp skips the antiquity prehistory above 1700. It is however UNREACHABLE without editing a default, which BL-705 (selectable 1960s start) fixes. The 0 CE ancient start stays a supported configuration on the same ladder; ROADMAP.md § The two arcs still owns which is the commercial product and this resolution does not touch that.
+
+THE NUMBERING: option 1 taken. The ladder is renumbered 1-BASED so each Era's number matches its catastrophe - Era 1 Terrestrial (nuclear war), Era 2 Early Space (climate collapse), Era 3 Dimensional, Era 4 Megastructure. This is Ben's own scheme, used three times unprompted.
+
+WHAT MOVED: ERAS.md (the ladder, every heading, the gates), CONCEPT.md, CLIMATE.md, GLOSSARY.md, SYSTEMS.md, PRODUCTION.md, RESOURCES.md, PLANETOLOGY.md, HISTORY.md.
+
+WHAT DELIBERATELY DID NOT MOVE, and this is the important half: the renumber is the DOCUMENT's Era axis only. `era_band` (any/ancient/industrial), `condition_subject::era` (1 for a corp owning a launchpad), and every E0-/E1- technology id are untouched, because ERAS.md § Three things that say era in code already establishes them as separate axes. NOTHING IN src/ MOVED. That section now carries a note that the launchpad proxy reads one Era later than its name suggests.
+
+ONE KNOWN DIVERGENCE CREATED, tracked as NR-751.
+
+*Files: `docs/economy/ERAS.md`, `docs/CONCEPT.md`, `docs/CLIMATE.md`, `docs/development/ROADMAP.md`, `docs/research/ERA1_TECH_LANDSCAPE.md`*
 
