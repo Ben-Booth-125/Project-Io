@@ -1,81 +1,238 @@
 # Project Io — REFINED (active worklist)
 
-**Sprint 26 (watch the AI play) — BATCH DELIVERY, opened 2026-08-31.**
+*Empty between work blocks.*
 
-Goal, Ben's words: *"ensure spectator mode works, and visibly watch AI play in order to further
-develop the meta."* Nine items, three waves. Barrier semantics per `DELIVERY.md` § Batch Delivery —
-every item clears step *N* before any starts *N+1*, with one `verifier-review` pass over the whole
-integrated set at step 4a.
+**Sprint 26 (watch the AI play) CLOSED 2026-08-31 AT WAVE 1 — goal met.** Spectator mode works
+(), the god-view control was already there, the decision feed reports real scores and
+reasons, a composite standing index exists, and the 1960s start is selectable. Five items landed,
+one closed unbuilt, four build-wiring breaks fixed on the way.
 
-**Base:** `ef19dab7`. Note the batch opened by fixing the build — `main` had not configured since
-`cc88997c` left three CMakeLists references to files the mercenary-contract tear-out deleted.
+Wave 2 was **cancelled rather than built**, on the sprint's own measurement: every AI corp is
+insolvent 29–30 ticks of 30 on every seed, because on the industrial band  is produced
+42991.6 against total demand **0.000**. A coalition brake forms against *whoever leads*, and among
+corps that are all deeply insolvent the leader is merely the least bankrupt. NR-758 carries the
+measurement; BL-697, BL-699, BL-703, BL-704 and BL-698 carry out unbuilt and blocked on demand.
 
----
+**Sprint 27 (demand, resumed) is OPEN.** It resumes sprint 21's waves 1+ against that measurement.
+It opens on one question that is Ben's and has been open in  since BL-641:
+**should a demand channel that draws from a pool also register a market want?** Two of the three
+live channels consume goods without pricing them, so wanting a good never induces its supply —
+which is why BL-641 shipped its rates at zero after turning them on collapsed operating firms by
+92%. NR-760 puts the options; the same choice faces every channel this sprint builds.
 
-## Collision map
-
-**File layer** (a splitting heuristic; worktrees absorb overlap):
-
-| Slice | Items | Writes | Overlaps |
-|---|---|---|---|
-| **A — Spectate** | BL-695, BL-702 | `src/main.cpp`, `src/core/app.cpp`, `src/core/verify_api.cpp`, `src/ui/ui_state.hpp`, `src/ui/time_panel.cpp`, `docs/ai/ACTIONS.json` | B on `main.cpp`; C/E/F on `verify_api.cpp` |
-| **B — Epoch** | BL-705 | `src/world/hard_coded_world.hpp`, `src/world/planetology.hpp`, `src/ui/format.{hpp,cpp}`, `src/ui/tile_inspector.cpp`, `src/main.cpp` | A on `main.cpp` |
-| **C — corp_ai reads** | BL-700, BL-696 | `src/world/corp_ai.{hpp,cpp}`, `src/ui/decision_feed.cpp` | E, F |
-| **D — Harness** | BL-697 | `tools/verify/ai_skill_harness.cpp` | none |
-| **E — Coalitions** | BL-699 | `src/world/corp_ai.{hpp,cpp}` | C, F |
-| **F — Trace** | BL-704 | `src/world/corp_ai.{hpp,cpp}`, `src/core/verify_api.cpp` | C, E, A |
-| **G — Watch** | BL-703 | `docs/ai/STRATEGIES.md` | none |
-
-**Symbol layer** — the review-barrier checklist:
-
-| Task | provides | consumes |
-|---|---|---|
-| C1 (BL-700) | `corp_standing_index(w, reg, corp, params)` -> `standing_index`; `corp_ai_params::standing_weights` | — |
-| C2 (BL-696) | decision-feed reason/score stream reaching `decision_feed.cpp` | — |
-| D1 (BL-697) | spread band in `ai_skill_harness` | `corp_standing_index` |
-| E1 (BL-699) | stance scoring over the four BL-448 verbs | `corp_standing_index`, decision-feed reason stream |
-| F1 (BL-704) | per-corp decision trace | decision-feed reason stream |
-| A1 (BL-695) | a route setting `ui_state::spectating` outside `--verify` | — |
-| A2 (BL-702) | a control setting `ui_state::god_view` | A1's spectate route |
-| B1 (BL-705) | selectable `world_params::epoch_year`; epoch read from params | — |
-| G1 (BL-703) | the written finding | everything above |
-
-No unmatched `consumes`.
-
----
-
-## Wave 1 — the instruments — LANDED 2026-08-31
-
-- [x] **A1 · BL-695 (live spectate route)** — a route sets `ui_state::spectating` outside
-      `--verify`. Today `verify.spectate(on)` at `verify_api.cpp:1096` is the only assignment site
-      in the tree. Prefer entry-at-start; mid-session toggling changes who the scorer may act on
-      halfway through a run and needs its own argument. `spectator_determinism` must pass unchanged.
-- [x] **A2 · BL-702 (spectate god view control)** — a control sets `ui_state::god_view`, offered
-      only while spectating, honouring the toggle rule. Every read site already tests the pair, so
-      do not touch the gate.
-- [x] **B1 · BL-705 (selectable 1960s start)** — `epoch_year` selectable without editing a default,
-      and the UI epoch reads `world_params` rather than the hard-coded 1960 in `format.hpp:82` /
-      `planetology.hpp:275`. Both starts stay supported. Expect to find stale things on the 1960
-      path; file them, do not absorb them.
-- [x] **C1 · BL-700 (composite standing index)** — one function: net worth + `science` + summed
-      `unit_strength`. Weights in `corp_ai_params`. Deterministic read point, named and asserted.
-- [x] **C2 · BL-696 (decision feed reasons)** — fix the feed at its cause. NR-626: every row reads
-      `overridden` at 0.00.
-
-## Wave 2 — measurement and the brake (parallel, after wave 1 merges)
-
-- [ ] **D1 · BL-697 (skill harness margin metric)** — band the spread in composite standing;
-      absolute bands demote to a solvency floor; re-derive from a fresh bless with dated provenance.
-- [ ] **E1 · BL-699 (rival coalitions)** — score the four stance verbs against standing. Legibility
-      is a requirement, not a follow-up. Never reads `player_entity`. Never vetoes construction.
-
-## Wave 3 — the output
-
-- [ ] **F1 · BL-704 (rival trace export)** — optional. Check the existing world history log first.
-- [ ] **G1 · BL-703 (watch session finding)** — main session. A run watched end to end on the 1960s
-      start, written into `STRATEGIES.md`. **This is the item that stops the sprint ending with
-      working plumbing and nothing learned.**
-
----
-
-**Open work with no promoted tasks:** `node tools/session/backlog_query.js --table`.
+**Open work with no promoted tasks:** [
+ {
+  "id": "BL-636",
+  "short_name": "LIVE_CLICK_DEBT",
+  "status": "design-owed",
+  "priority": "A",
+  "version_goal": "v0.1.20"
+ },
+ {
+  "id": "BL-639",
+  "short_name": "CORP_PANEL_COLUMN_BUDGET",
+  "status": "designed",
+  "priority": "A",
+  "version_goal": "v0.1.20"
+ },
+ {
+  "id": "BL-642",
+  "short_name": "CONSTRUCTION_ACTUALLY_DRAWS",
+  "status": "designed",
+  "priority": "A",
+  "version_goal": "v0.1.21"
+ },
+ {
+  "id": "BL-644",
+  "short_name": "SPACE_PROGRAMME_BUDGET_LINE",
+  "status": "designed",
+  "priority": "A",
+  "version_goal": "v0.1.21"
+ },
+ {
+  "id": "BL-647",
+  "short_name": "ENDEMIC_LUXURY_DEMAND",
+  "status": "designed",
+  "priority": "A",
+  "version_goal": "v0.1.21"
+ },
+ {
+  "id": "BL-652",
+  "short_name": "INJECTORS_MUST_NOT_SKIP_SILENTLY",
+  "status": "designed",
+  "priority": "A",
+  "version_goal": "v0.1.21"
+ },
+ {
+  "id": "BL-653",
+  "short_name": "RETURN_EIGHTH_FIELD",
+  "status": "designed",
+  "priority": "A",
+  "version_goal": "v0.1.21"
+ },
+ {
+  "id": "BL-654",
+  "short_name": "A_CHANNEL_MUST_BID",
+  "status": "designed",
+  "priority": "A",
+  "version_goal": "v0.1.21"
+ },
+ {
+  "id": "BL-657",
+  "short_name": "A_FAILING_FIRM_FAILS",
+  "status": "design-owed",
+  "priority": "A",
+  "version_goal": "v0.1.21"
+ },
+ {
+  "id": "BL-658",
+  "short_name": "FREE_FIRM_TRAP",
+  "status": "designed",
+  "priority": "A",
+  "version_goal": "v0.1.21"
+ },
+ {
+  "id": "BL-697",
+  "short_name": "skill harness margin metric",
+  "status": "designed",
+  "priority": "A",
+  "version_goal": null
+ },
+ {
+  "id": "BL-699",
+  "short_name": "rival coalitions",
+  "status": "designed",
+  "priority": "A",
+  "version_goal": null
+ },
+ {
+  "id": "BL-703",
+  "short_name": "watch session finding",
+  "status": "designed",
+  "priority": "A",
+  "version_goal": null
+ },
+ {
+  "id": "BL-595",
+  "short_name": "NATION_STARTING_TREASURY",
+  "status": "designed",
+  "priority": "B",
+  "version_goal": "post-v0.1.15"
+ },
+ {
+  "id": "BL-622",
+  "short_name": "DENSITY_RETUNES",
+  "status": "designed",
+  "priority": "B",
+  "version_goal": "post-v0.1.19"
+ },
+ {
+  "id": "BL-629",
+  "short_name": "RIVAL_ACQUISITION",
+  "status": "designed",
+  "priority": "B",
+  "version_goal": "v0.1.20"
+ },
+ {
+  "id": "BL-643",
+  "short_name": "NETWORK_UPKEEP_DRAWS",
+  "status": "designed",
+  "priority": "B",
+  "version_goal": "v0.1.21"
+ },
+ {
+  "id": "BL-645",
+  "short_name": "RESEARCH_CONSUMES_GOODS",
+  "status": "designed",
+  "priority": "B",
+  "version_goal": "v0.1.21"
+ },
+ {
+  "id": "BL-646",
+  "short_name": "BATTLES_BURN_ORDNANCE",
+  "status": "designed",
+  "priority": "B",
+  "version_goal": "v0.1.21"
+ },
+ {
+  "id": "BL-650",
+  "short_name": "DISSOLUTION_COMPLETENESS",
+  "status": "designed",
+  "priority": "B",
+  "version_goal": "v0.1.20"
+ },
+ {
+  "id": "BL-651",
+  "short_name": "CHARTER_REACH_ON_THE_SEAM",
+  "status": "designed",
+  "priority": "B",
+  "version_goal": "v0.1.20"
+ },
+ {
+  "id": "BL-656",
+  "short_name": "PASS6_CAP_IS_THE_DESIGN",
+  "status": "design-owed",
+  "priority": "B",
+  "version_goal": "post-v0.1.21"
+ },
+ {
+  "id": "BL-677",
+  "short_name": "LABOUR_READ_HAS_NO_HOME",
+  "status": "design-owed",
+  "priority": "B",
+  "version_goal": "v0.1.23"
+ },
+ {
+  "id": "BL-694",
+  "short_name": "top-bar tracker",
+  "status": "designed",
+  "priority": "B",
+  "version_goal": null
+ },
+ {
+  "id": "BL-704",
+  "short_name": "rival trace export",
+  "status": "designed",
+  "priority": "B",
+  "version_goal": null
+ },
+ {
+  "id": "BL-619",
+  "short_name": "RESEARCH_SYSTEM",
+  "status": "open",
+  "priority": "C",
+  "version_goal": "v0.1.19"
+ },
+ {
+  "id": "BL-632",
+  "short_name": "WARM_START_PROGRESS",
+  "status": "design-owed",
+  "priority": "C",
+  "version_goal": "v0.1.20"
+ },
+ {
+  "id": "BL-698",
+  "short_name": "opt-in margin dial",
+  "status": "designed",
+  "priority": "C",
+  "version_goal": null
+ },
+ {
+  "id": "BL-661",
+  "short_name": "population regional heatmap",
+  "status": "open",
+  "priority": "medium"
+ },
+ {
+  "id": "BL-662",
+  "short_name": "scarcity takes the opportunity glyph",
+  "status": "open",
+  "priority": "medium"
+ },
+ {
+  "id": "BL-663",
+  "short_name": "lens glyph roster",
+  "status": "open",
+  "priority": "low"
+ }
+].

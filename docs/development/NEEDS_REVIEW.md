@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*111 entries — 107 open, 4 resolved.*
+*112 entries — 108 open, 4 resolved.*
 
 ---
 
@@ -1266,6 +1266,38 @@ THE COMMON SHAPE: the things that CHECK the code are themselves unchecked. Every
 > **Recommendation:** Option 2 first - it is small, it targets the specific thing that makes these dangerous rather than merely annoying, and it would have caught the spectator_determinism mask immediately. Option 1 is the real answer but is a CI question and wants Ben's call on where it runs. Filing rather than building either, since both are outside this batch's scope.
 
 *Files: `CMakeLists.txt`, `tools/verify/build_harness.js`, `build_app.bat`, `.claude/skills/verifier-headless/SKILL.md`*
+
+### NR-760 — Should a demand channel that draws from a POOL also register a market want? The question gates sprint 27
+*question · raised 2026-08-31 · from Open in scripts/economy.lua since BL-641, escalated to Ben there and never answered. Sprint 26's census made it the first question of sprint 27.*
+
+TWO OF THE THREE LIVE DEMAND CHANNELS CONSUME GOODS WITHOUT PRICING THEM. Building upkeep (run_building_upkeep) and standing-force upkeep (run_unit_upkeep) are POOL draws: they take goods from a corp's stockpile and never reach `market_component::demand`.
+
+THE DEADLOCK THAT CAUSES, in economy.lua's own words: "wanting tools does not RAISE THE PRICE of tools, no rival ever scores building a Toolmaker, and the supply that would meet the draw is never induced."
+
+IT HAS BEEN MEASURED, and the measurement is why BL-641 shipped inert. Turning the upkeep rates on without fixing this:
+
+                          RATES OFF        RATES ON
+  buildings                   584             576
+  ... complete & operating    227              19
+  ... under construction        0              47
+
+A 92% COLLAPSE IN OPERATING FIRMS over an 80-tick warm start. And the note is explicit that halving the rates only delays it, because the cause is structural: nothing in the shipped world produces tools or planks, so every draw goes unmet, the supply factor decays 50/tick to zero inside 20 ticks, output follows, and BL-079's reflex tier idles the now-loss-making firm. The shortfall rule worked exactly as designed - it was fed a good nobody makes.
+
+SO BL-641 LANDED THE SHAPE AND SHIPPED THE RATES AT ZERO, deliberately, and left this in the file: "Whether the Industry channel should also register a market WANT - as run_construction and run_processing both do, and as MARKETS.md § Demand channels arguably requires of a demand channel - is Ben's call, not this file's."
+
+THE PRECEDENT IS IN THIS CODEBASE, one layer up, and it should be read before designing the fix. BL-440 hit the identical shape in the scorer: "a processor must be RUNNING to bid a scarce input's price up, and it cannot run without that input. The deadlock is the defect." Its answer was NOT to route through the price signal - which cannot work - but to take the pull from the RECIPE GRAPH, a static deterministic world fact. That is corp_ai_params::input_demand_pull, and it is self-limiting by construction: the bonus divides by the sites already targeting the resource, so it decays as the shortage is answered.
+
+WHY IT GATES THE SPRINT: every other channel in sprint 27 faces the same choice the moment it is built. If a channel's draw does not price what it wants, it consumes supply without inducing any, and building five more of them produces five more silent sinks and a faster collapse.
+
+**Why it matters.** It is the difference between sprint 27 delivering an economy and delivering five more inert channels. BL-641 is the worked example of getting it wrong: the shape was correct, verified, era-banded, and it had to ship switched off because a channel that consumes without pricing starves the firms it draws from.
+
+- A demand channel MUST register a market want. Pool draws become market demand, so wanting a good raises its price and induces the supply that meets it. Matches what run_construction and run_processing already do, and what MARKETS.md arguably already requires.
+- Keep pool draws, and break the deadlock the BL-440 way - take the pull from the RECIPE/UPKEEP GRAPH as a static world fact rather than from the price signal. Precedent exists, is deterministic, and is self-limiting.
+- Keep pool draws and accept that upkeep channels never induce supply - they are a tax on holding assets, not a demand channel, and MARKETS.md's eight-channel register should say so.
+
+> **Recommendation:** Option 1, with option 2's self-limiting shape borrowed if the price signal proves too slow. A channel that consumes without pricing is not a demand channel in any sense MARKETS.md means - it is an upkeep tax wearing the word - and the census already lists both pool draws in a separate OFF-REGISTER column for exactly that reason, which is the document telling us the answer. Option 3 is honest but gives up the coupling that makes demand interesting: it is the choice to have sinks rather than buyers.
+
+*Files: `scripts/economy.lua`, `src/world/economy_system.cpp`, `src/world/market_clearing.cpp`, `docs/economy/MARKETS.md`*
 
 ---
 

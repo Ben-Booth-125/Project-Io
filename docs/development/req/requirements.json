@@ -4138,75 +4138,75 @@
   {
    "brief": "composite-standing-index",
    "title": "BL-700 - a corporation's standing is a composite",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-700 - Sprint 26, watch the AI play",
    "batch": "sprint-26-wave-1",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: corp_ai_harness or a new row asserting the composite responds to each component independently"
      ],
      "requirement": "A single function returns a corporation's composite standing from net worth, accumulated science, and summed unit_strength over its fielded units. All three components verified present: components.hpp:1343 (science), unit_roster.hpp (unit_strength, computed not stored).",
-     "notes": "Minted separately so BL-697 and BL-699 do not each invent their own number."
+     "notes": "Minted separately so BL-697 and BL-699 do not each invent their own number. DONE: corp_standing_index() -> standing_index{component[3], total}. NOT named corp_standing - src/world/standing.hpp already owns that for the Corporations panel. Ten R7 rows in corp_ai_harness, ALL PASS on the integrated tree."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: two runs same seed, identical state_hash"
      ],
      "requirement": "The read is deterministic: taken at a settled point in the tick and stable under the sorted-corp iteration order, so the evaluation cadence cannot become the tiebreak.",
-     "notes": "The standing rule's constraint on every scorer input. Name the read point explicitly."
+     "notes": "The standing rule's constraint on every scorer input. Name the read point explicitly. DONE: read point is the econ-tick boundary after apply_budget and clear_markets, before any corp evaluation mutates the world - named in the header and asserted. R7 proves bit-identity when w.units is rebuilt in the opposite insertion order, and that a whole-field snapshot is identical forwards or backwards."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: inspection"
      ],
      "requirement": "Component weights live in corp_ai_params, so tuning the composite is a data change.",
-     "notes": "That file's own convention - trade_hold_threshold and siblings."
+     "notes": "That file's own convention - trade_hold_threshold and siblings. DONE: corp_ai_params::standing_weights, an array indexed by the component enum, defaults {1.0, 25.0, 0.02} derived rather than tuned. R7 asserts zeroing a weight removes exactly that term."
     }
    ]
   },
   {
    "brief": "decision-feed-reasons",
    "title": "BL-696 - the AI decision feed reports the real chosen candidate",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-696 - Sprint 26, watch the AI play",
    "batch": "sprint-26-wave-1",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: live click on the AI decisions ledger"
      ],
      "requirement": "Feed rows show the chosen candidate's actual score and its named reason. A run produces rows with more than one distinct reason and at least one non-zero score.",
-     "notes": "NR-626: today every row reads 'overridden' at 0.00, so the only window onto rival reasoning is blank."
+     "notes": "NR-626: today every row reads 'overridden' at 0.00, so the only window onto rival reasoning is blank. DONE: rows now read \"3.62, uncontested\" / \"4.85 v 0.37 decisive\" / \"3.11, uncontested\" against a uniform \"3.62 v 307.02 overridden\" before."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: inspection plus the corp_ai harnesses"
      ],
      "requirement": "The cause is fixed where it lives - whether the score is not carried out of the scorer or is carried and not rendered - not patched at the render site.",
-     "notes": "corp_decision_reason already has a vocabulary (corp_ai.cpp ~285). The question is why the feed is not receiving it."
+     "notes": "corp_decision_reason already has a vocabulary (corp_ai.cpp ~285). The question is why the feed is not receiving it. DONE, and the cause was in the scorer, not the render. (1) run_corp_strategic_step counted seam-REFUSED candidates as forgone options - 160 of 249 rejections scoring above 50 were seam-refused set_recipe candidates. (2) The runner-up was one maximum across families whose scores share no scale; now per-family."
     }
    ]
   },
   {
    "brief": "skill-harness-margin-metric",
    "title": "BL-697 - the skill harness bands the spread in composite standing",
-   "status": "in-flight",
+   "status": "deferred",
    "resolved": null,
    "promoted_from": "backlog.json BL-697 - Sprint 26, watch the AI play",
-   "batch": "sprint-26-wave-2",
+   "batch": "carried out of sprint 26 - blocked on demand (NR-758)",
    "rows": [
     {
      "id": "R1",
@@ -4240,10 +4240,10 @@
   {
    "brief": "rival-coalitions",
    "title": "BL-699 - rivals score stance against standing, so coalitions form against the leader",
-   "status": "in-flight",
+   "status": "deferred",
    "resolved": null,
    "promoted_from": "backlog.json BL-699 - Sprint 26, watch the AI play",
-   "batch": "sprint-26-wave-2",
+   "batch": "carried out of sprint 26 - blocked on demand (NR-758)",
    "rows": [
     {
      "id": "R1",
@@ -4295,10 +4295,10 @@
   {
    "brief": "rival-trace-export",
    "title": "BL-704 - a run exports a per-rival decision trace",
-   "status": "in-flight",
+   "status": "deferred",
    "resolved": null,
    "promoted_from": "backlog.json BL-704 - Sprint 26, watch the AI play",
-   "batch": "sprint-26-wave-3",
+   "batch": "carried out of sprint 26 - blocked on demand (NR-758)",
    "rows": [
     {
      "id": "R1",

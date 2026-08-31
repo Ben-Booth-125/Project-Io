@@ -56,7 +56,7 @@ and/or a version goal (v0.1.1 etc.).
 ## Open now
 
 ### Sprint 21 — The other half of the economy - demand
-*Paused · opened 2026-08-26*
+*Complete · opened 2026-08-26*
 
 **Goal.** Author the demand side. The roster grew a supply chain and never grew the demand for it, so the ancient economy terminates in artisan goods nobody buys and most spawns are structurally unprofitable - not mistuned, unbought. Eight demand channels (MARKETS.md § Demand channels), of which the load-bearing ones scale with the economy rather than with an authored weight. Then MEASURE, and expect to go round more than once: Ben, 2026-08-26 - 'we will get interesting data and do a few passes over viability'. The felt goal: a world where the goods a player is meant to chase are wanted by somebody, and it is legible WHO.
 
@@ -92,7 +92,7 @@ ONE ITEM WAS RESCUED FROM THE DELETED BATCH 4 and is carried here rather than dr
 METHOD, unchanged and proven across batches 1 and 3: capture the whole class first, send it to Ben in one go, take his calls, build, re-capture, and expect the re-capture to find something the code read did not. Capture at 1920x1080 for a design review and keep the fit check at 1280x720 - the two are different questions (sprint 24b's rule).
 
 ### Sprint 26 — The world that brakes a leader - a rival worth watching
-*Open · opened 2026-08-31*
+*Complete · opened 2026-08-31*
 
 **Goal.** ENSURE SPECTATOR MODE WORKS, AND VISIBLY WATCH AI PLAY IN ORDER TO FURTHER DEVELOP THE META (Ben, 2026-08-31). That is the sprint in one sentence and everything else is subordinate to it. Spectate is today reachable only from a --verify script, and the decision feed reads ‘overridden’ at 0.00 on every row, so the two things needed to WATCH are both absent or broken - they are the sprint. Behind them sits the design the watching is meant to inform: restraint lives in the world, not the agent (AI_OPPONENT.md § Where restraint comes from), so no corp holds itself back and instead LEADING IS EXPENSIVE - coalitions form against whoever leads. The close race becomes an emergent property rather than a target any actor aims at. What is learned by watching feeds docs/ai/STRATEGIES.md, which owns the meta.
 
@@ -126,6 +126,29 @@ THE META IS A DOCUMENT AND IT SHOULD RECEIVE THE OUTPUT. docs/ai/STRATEGIES.md o
 CLIMATE LEFT THE SPRINT AND LEFT THE PROTOTYPE, 2026-08-31. Ben: "I am not against climate change being a large problem for Era 2, but our prototype works solely on Era 1 for now." CLIMATE.md is rewritten as the NEXT Era's catastrophe and is out of scope. ONE KNOCK-ON MATTERS HERE: AI_OPPONENT.md had named climate as the second systemic brake on a runaway leader, so COALITIONS NOW CARRY THAT BRAKE ALONE. If BL-699 does not brake a runaway in this sprint, nothing else will - and that is a finding about coalitions, not a reason to reach for BL-698's opt-in dial.
 
 THE LADDER IS 1-BASED AND THE START IS THE 1960s (Ben, 2026-08-31, resolving NR-749). Era 1 Terrestrial, catastrophe nuclear war - that is the era this sprint watches. Era 2 Early Space, catastrophe climate. The renumber is the DOCUMENT's Era axis only; era_band, condition_subject::era and every E0-/E1- tech id are untouched and nothing in src/ moved. One divergence created and tracked: the F9 mock viewer still labels its tabs by the old numbers (NR-751), and ACTIONS.md correctly still mirrors the viewer rather than the docs.
+
+### Sprint 27 — The other half of the economy - demand, resumed
+*Open · opened 2026-08-31*
+
+**Goal.** Give the goods a buyer. Sprint 26 measured the economy the AI actually plays: on the industrial band iron_ore is produced 42991.6 against total demand 0.000, three resources carry any household demand at all, five of the eight designed demand channels do not exist, and of the three that do Industry ships its rates at ZERO. Every AI corp is insolvent 29-30 ticks of 30 on every seed, monotonically. That is not a tuning problem and no scorer change can move it. The sprint's felt goal: a world where the goods a player is meant to chase are wanted by somebody, and it is legible WHO - and, measured, an economy where a competent corporation can end a run solvent.
+
+**Planned.**
+- THE POOL-VS-MARKET QUESTION FIRST - it is Ben's, it has been open in scripts/economy.lua since BL-641, and it gates the rest. Two demand draws (building upkeep, standing-force upkeep) consume goods WITHOUT pricing them: they are POOL draws that never reach market_component::demand. So wanting tools does not raise the price of tools, no rival ever scores a Toolmaker, and the supply that would meet the draw is never induced. Turning BL-641's rates on WITHOUT fixing this collapsed operating firms by 92% over 80 ticks - measured, in economy.lua's own note. See NR-760.
+- BL-642 (construction actually draws) - designed, in the hot backlog. The opening years build, and centres draw materials as they grow.
+- BL-644 (space programme budget line) - the State channel. Currently ABSENT: nation budget lines carry weights and spend credits, and no goods purchase exists anywhere.
+- BL-647 (endemic luxury demand) - the Endemic trade channel. Currently ABSENT: tobacco, spices, coffee and furs are authored, generated, given latitude bands, and wanted by nobody.
+- BL-643 (network upkeep draws) - the Infrastructure channel. Currently ABSENT: no material draw for roads, ports or hubs anywhere in src/world.
+- BL-646 (battles burn ordnance) - the Conflict channel. Currently ABSENT, and it is the only channel that couples the two pillars: Conflict moves Trade.
+- BL-645 (research consumes goods) - GATED on BL-619, a design session with Ben rather than a build slice. Carry, do not start.
+- VIABILITY PASSES AFTER EACH WAVE - census before, census after, deltas kept, spawn viability measured. Ben, 2026-08-26: "we will get interesting data and do a few passes over viability." The passes ARE the sprint, not an epilogue.
+
+THE MEASUREMENT THAT OPENS IT, from sprint 26 wave 1 (NR-758). ai_skill_harness, five seeds, thirty econ ticks: net worth -624100 / -997700 / -694800 / -1234354 / -1090065, solvency_below_zero 29-30 of 30, and final == min on every seed so it never recovers. demand_census on the industrial band: iron_ore produced 42991.6 demand 0.000, petroleum 6169.9 demand 0.000, timber 1224.2 demand 0.000. Only agricultural_produce, water and food_rations carry any household demand.
+
+THE DEADLOCK HAS A PRECEDENT IN THIS CODEBASE and it should be read before designing the fix. BL-440 solved the same shape one layer up, in the scorer: "a processor must be RUNNING to bid a scarce input's price up, and it cannot run without that input. The deadlock is the defect." Its answer was to take the pull from the recipe graph - a static, deterministic world fact - rather than from the price signal that cannot work. corp_ai_params::input_demand_pull is that fix. The pool-vs-market question is the same deadlock at the demand layer.
+
+SUCCESS IS MEASURABLE AND SHOULD BE STATED UP FRONT: the sprint is done when ai_skill_harness shows a field that is not monotonically insolvent - not when the channels are built. Channels built and corps still broke is the failure mode this sprint exists to avoid, and it is exactly what BL-641 produced on its own.
+
+CARRIED FROM SPRINT 26, unowned by any sprint until demand lands: BL-697 (skill harness margin metric), BL-699 (rival coalitions), BL-703 (watch session finding), BL-704 (rival trace export), BL-698 (opt-in margin dial). BL-699's weights are the whole design and would need redoing against a solvent economy, which is why they were not built against a bankrupt one.
 
 ## Where things stand
 
@@ -168,9 +191,10 @@ THE LADDER IS 1-BASED AND THE START IS THE 1960s (Ben, 2026-08-31, resolving NR-
 | 23 | UI visibility - batch 2: selection & hover | Closed 2026-08-28 - goal met. Twelve items across three waves; every planned item landed |
 | 24a | UI visibility - batch 3: ledgers | Closed 2026-08-29 - batch 3, the ledgers; goal met and exceeded, and four designed mechanisms found never to have run |
 | 24b | UI visibility - batch 3b: the ledgers not yet read | Closed 2026-08-30 - the six unread ledgers reviewed, three rebuilt, and the batch's review queue worked through rather than filed forward. |
-| 21 | The other half of the economy - demand | PAUSED 2026-08-28 with wave 0 landed - the UI batches take priority; resume at wave 1 (BL-640/641/642) |
+| 21 | The other half of the economy - demand | CLOSED 2026-08-31, wave 0 only (BL-648 guard, BL-649 census). Its remaining waves are RESUMED AS SPRINT 27 on Ben's call - "unpause demand. Let's work on this for sprint 27" - re-planned against sprint 26's census measurement rather than its own original ordering. |
 | 25 | UI visibility - batch 5: canvases & the zoom ladder | Proposed 2026-08-28 as sprint 26; RENUMBERED to 25 on 2026-08-30 when Ben retired the shell-chrome and startup batches - "Sprint 25 and 27 don't need a revisit, UI items for these are working great." |
-| 26 | The world that brakes a leader - a rival worth watching | OPENED 2026-08-31 on Ben’s central aim. REFRAMED the same day, before any build: restraint moves OUT of the agent and INTO the world - coalitions and climate - with the scorer-side dial kept only as an opt-in mode. AI_OPPONENT.md § The goal carries both the ruling and what it supersedes. |
+| 26 | The world that brakes a leader - a rival worth watching | CLOSED 2026-08-31 AT WAVE 1 on Ben's call, GOAL MET. Spectator mode works and the feed reads; the measurement that wave 1 produced then made wave 2 not worth running, and demand takes priority as sprint 27. |
+| 27 | The other half of the economy - demand, resumed | OPENED 2026-08-31 on Ben's call, resuming sprint 21's waves 1+ against sprint 26's measurement. Wave 0 (the guard, the census) already landed under 21. |
 
 **Next up.** SPRINT NUMBERING, reset by Ben on 2026-08-30: the proposed shell-chrome (old 25) and startup (old 27) batches are DELETED - "Sprint 25 and 27 don't need a revisit, UI items for these are working great" - and the canvases batch renumbered from 26 to 25. THE NEXT NEW SPRINT IS 26. Two of the six UI review batches from 2026-08-28 therefore never run, and that is a judgement that their surfaces are good enough rather than a deferral.
 
@@ -180,4 +204,4 @@ NEXT UP: sprint 25 (canvases & the zoom ladder), carrying BL-694 (top-bar tracke
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*37 sprints archived cold; 3 open/gated in the hot store.*
+*37 sprints archived cold; 4 open/gated in the hot store.*

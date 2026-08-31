@@ -219,7 +219,7 @@
    "priority": "A",
    "difficulty": 4,
    "version_goal": "v0.1.21",
-   "sprint": "21",
+   "sprint": "27",
    "written": "2026-08-26",
    "author": "Ben",
    "requires": [],
@@ -245,7 +245,7 @@
    "priority": "B",
    "difficulty": 3,
    "version_goal": "v0.1.21",
-   "sprint": "21",
+   "sprint": "27",
    "written": "2026-08-26",
    "author": "Ben",
    "requires": [],
@@ -269,7 +269,7 @@
    "priority": "A",
    "difficulty": 4,
    "version_goal": "v0.1.21",
-   "sprint": "21",
+   "sprint": "27",
    "written": "2026-08-26",
    "author": "Ben",
    "requires": [],
@@ -294,7 +294,7 @@
    "priority": "B",
    "difficulty": 3,
    "version_goal": "v0.1.21",
-   "sprint": "21",
+   "sprint": "27",
    "written": "2026-08-26",
    "author": "Ben",
    "requires": [
@@ -319,7 +319,7 @@
    "priority": "B",
    "difficulty": 3,
    "version_goal": "v0.1.21",
-   "sprint": "21",
+   "sprint": "27",
    "written": "2026-08-26",
    "author": "Ben",
    "requires": [],
@@ -343,7 +343,7 @@
    "priority": "A",
    "difficulty": 4,
    "version_goal": "v0.1.21",
-   "sprint": "21",
+   "sprint": "27",
    "written": "2026-08-26",
    "author": "Ben",
    "requires": [],
@@ -1507,8 +1507,8 @@
    "short_name": "decision feed reasons",
    "category": "AI",
    "title": "The AI decision feed reports the real chosen candidate and its score, not 'overridden' at 0.00 on every row",
-   "status": "designed",
-   "glyph": "~",
+   "status": "complete",
+   "glyph": "✓",
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
@@ -1525,7 +1525,9 @@
     "src/world/corp_ai.hpp",
     "docs/ai/AI_OPPONENT.md"
    ],
-   "design": "Raised as NR-626: every row in the AI decision feed reads 'overridden' with a chosen score of 0.00.\n\nWHY IT IS FIRST AND NOT COSMETIC. The feed is the only window onto rival reasoning, and this sprint's whole method is WATCHING the AI and tightening from what is seen. A readout that prints the same thing on every row cannot distinguish a working scorer from a broken one - so every later item in this sprint would be tuned blind through it. It is the instrument, and the instrument is reading zero.\n\nIT IS ALSO THE SURFACE THE NEW GOAL DEPENDS ON. AI_OPPONENT.md § The goal makes restraint a first-class move and calls the AI 'transparent by construction' on the strength of the decision log carrying a restrained move's REASON. A held move that prints as 'overridden, 0.00' is indistinguishable from a stall. Restraint that cannot be read looks exactly like incompetence, which is the failure mode the legibility requirement exists to prevent.\n\nSCOPE. Find why the chosen candidate is not reaching the feed - whether the score is not carried out of the scorer, or is carried and not rendered - and fix it at the cause. `corp_decision_reason` already has a named-reason vocabulary (corp_ai.cpp ~line 285 renders 'workforce margin', 'recipe margin' and siblings), so the words largely exist; the question is why the feed is not receiving them.\n\nOUT OF SCOPE: adding the 'held: already ahead' reason itself, which arrives with the margin term (BL-698, scorer margin term) and needs this fixed first to be visible at all."
+   "design": "Raised as NR-626: every row in the AI decision feed reads 'overridden' with a chosen score of 0.00.\n\nWHY IT IS FIRST AND NOT COSMETIC. The feed is the only window onto rival reasoning, and this sprint's whole method is WATCHING the AI and tightening from what is seen. A readout that prints the same thing on every row cannot distinguish a working scorer from a broken one - so every later item in this sprint would be tuned blind through it. It is the instrument, and the instrument is reading zero.\n\nIT IS ALSO THE SURFACE THE NEW GOAL DEPENDS ON. AI_OPPONENT.md § The goal makes restraint a first-class move and calls the AI 'transparent by construction' on the strength of the decision log carrying a restrained move's REASON. A held move that prints as 'overridden, 0.00' is indistinguishable from a stall. Restraint that cannot be read looks exactly like incompetence, which is the failure mode the legibility requirement exists to prevent.\n\nSCOPE. Find why the chosen candidate is not reaching the feed - whether the score is not carried out of the scorer, or is carried and not rendered - and fix it at the cause. `corp_decision_reason` already has a named-reason vocabulary (corp_ai.cpp ~line 285 renders 'workforce margin', 'recipe margin' and siblings), so the words largely exist; the question is why the feed is not receiving them.\n\nOUT OF SCOPE: adding the 'held: already ahead' reason itself, which arrives with the margin term (BL-698, scorer margin term) and needs this fixed first to be visible at all.",
+   "completed": "2026-08-31",
+   "resolved": "2026-08-31"
   },
   {
    "id": "BL-697",
@@ -1537,13 +1539,13 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "26",
+   "sprint": null,
    "written": "2026-08-31",
    "author": "Ben",
    "requires": [
     "BL-700"
    ],
-   "blocked_on": null,
+   "blocked_on": "BL-642",
    "parked": false,
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "files": [
@@ -1551,7 +1553,7 @@
     "docs/ai/AI_OPPONENT.md",
     ".claude/skills/verifier-headless/SKILL.md"
    ],
-   "design": "AI_OPPONENT.md § The goal now makes a CLOSE RACE the intended shape of a campaign, produced by the world's brakes rather than by any agent's restraint. The instrument that scores the AI cannot see that quantity at all.\n\nWHAT THE HARNESS MEASURES TODAY. Four per-seed metrics against golden bands: the net-worth curve (summed non-player balances), solvency ticks, survival fraction, and per-verb action counts. All four are absolute or aggregate. None can tell a run where every corp grew together from a run where one corp ran away - both sit inside a generous summed-net-worth band, and only the second is now a failure.\n\nTHE METRIC TO ADD. The spread between the leading corporation and the field, sampled on the existing SAMPLE_EVERY cadence. Held narrow is the pass; a widening gap is the regression. Exact form is the design call - leader-over-median and leader-over-second are both defensible, and the choice should be made against a real run's numbers rather than picked first (Rule 0b: report the observed spread with units, then choose).\n\nTHE ABSOLUTE BANDS DO NOT GO. They demote to a SOLVENCY FLOOR underneath the margin band. A world where the margin is beautifully narrow because every corp is broke is not a pass, and only the absolute figures can catch that.\n\nCARRIED DEBT, and it belongs to whoever takes this item (NR-305): the current bands were blessed 2026-08-16 and are stale against everything since - possibly the mercenary contracts, the nation grants, or the roster widening. Re-derive from a fresh bless with dated provenance in the harness's own provenance-log idiom. Goldens here are disposable by project convention; the provenance comment is not.\n\nORDERING: this lands BEFORE BL-698 (scorer margin term). Building the objective before the measurement means tuning blind.\n\nRETARGETED 2026-08-31 by Ben's systemic ruling. Two changes from the item as first minted:\n  1. The banded quantity is the spread in COMPOSITE STANDING (BL-700, composite standing index), not in cash. Balance alone misreads the game constantly - a corp that just spent its treasury on a smelter is not behind.\n  2. It is measuring whether THE WORLD'S BRAKES WORK, not whether an agent obeyed an instruction. No actor aims at the margin, so a widening spread is a finding about coalitions and climate, not about the scorer.\n\nBEN'S FIRST-CUT TARGET, 2026-08-31: a leader roughly 28% ahead of the field. Treat that as the band to aim the SYSTEM at, not as a parameter to set anywhere - nothing in the code should know the number."
+   "design": "AI_OPPONENT.md § The goal now makes a CLOSE RACE the intended shape of a campaign, produced by the world's brakes rather than by any agent's restraint. The instrument that scores the AI cannot see that quantity at all.\n\nWHAT THE HARNESS MEASURES TODAY. Four per-seed metrics against golden bands: the net-worth curve (summed non-player balances), solvency ticks, survival fraction, and per-verb action counts. All four are absolute or aggregate. None can tell a run where every corp grew together from a run where one corp ran away - both sit inside a generous summed-net-worth band, and only the second is now a failure.\n\nTHE METRIC TO ADD. The spread between the leading corporation and the field, sampled on the existing SAMPLE_EVERY cadence. Held narrow is the pass; a widening gap is the regression. Exact form is the design call - leader-over-median and leader-over-second are both defensible, and the choice should be made against a real run's numbers rather than picked first (Rule 0b: report the observed spread with units, then choose).\n\nTHE ABSOLUTE BANDS DO NOT GO. They demote to a SOLVENCY FLOOR underneath the margin band. A world where the margin is beautifully narrow because every corp is broke is not a pass, and only the absolute figures can catch that.\n\nCARRIED DEBT, and it belongs to whoever takes this item (NR-305): the current bands were blessed 2026-08-16 and are stale against everything since - possibly the mercenary contracts, the nation grants, or the roster widening. Re-derive from a fresh bless with dated provenance in the harness's own provenance-log idiom. Goldens here are disposable by project convention; the provenance comment is not.\n\nORDERING: this lands BEFORE BL-698 (scorer margin term). Building the objective before the measurement means tuning blind.\n\nRETARGETED 2026-08-31 by Ben's systemic ruling. Two changes from the item as first minted:\n  1. The banded quantity is the spread in COMPOSITE STANDING (BL-700, composite standing index), not in cash. Balance alone misreads the game constantly - a corp that just spent its treasury on a smelter is not behind.\n  2. It is measuring whether THE WORLD'S BRAKES WORK, not whether an agent obeyed an instruction. No actor aims at the margin, so a widening spread is a finding about coalitions and climate, not about the scorer.\n\nBEN'S FIRST-CUT TARGET, 2026-08-31: a leader roughly 28% ahead of the field. Treat that as the band to aim the SYSTEM at, not as a parameter to set anywhere - nothing in the code should know the number.\n\nCARRIED OUT OF SPRINT 26, 2026-08-31, unbuilt and unscheduled. Ben closed that sprint at wave 1 once its own measurement showed every AI corp insolvent 29-30 ticks of 30 on every seed, with iron_ore produced 42991.6 against demand 0.000 on the industrial band (NR-758). This item's work is not wrong, it is UNMEASURABLE until demand exists: a coalition brake forms against 'whoever leads', and among corps that are all deeply insolvent the leader is merely the least bankrupt. Its tunables are the whole design and would need re-deriving against a solvent economy. Blocked on sprint 27's demand work rather than on any symbol - BL-642 names the first of it."
   },
   {
    "id": "BL-698",
@@ -1563,13 +1565,13 @@
    "priority": "C",
    "difficulty": 5,
    "version_goal": null,
-   "sprint": "26",
+   "sprint": null,
    "written": "2026-08-31",
    "author": "Ben",
    "requires": [
     "BL-700"
    ],
-   "blocked_on": null,
+   "blocked_on": "BL-642",
    "parked": false,
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "files": [
@@ -1579,7 +1581,7 @@
     "tools/verify/corp_ai_harness.cpp",
     "docs/ai/AI_OPPONENT.md"
    ],
-   "design": "DEMOTED 2026-08-31, the same day it was minted, by Ben's systemic ruling (AI_OPPONENT.md § Where restraint comes from). It was the sprint's centrepiece for about an hour. Read that section before this item - the demotion IS the design.\n\nBEN'S OBJECTION, and it is correct: \"The angle we are taking here is a literal handicap. I prefer to consider it as always a force from within the game system.\" A term in the scorer that says 'ease off, I am ahead' is invisible, uncausable and uncounterable. The player cannot see it, provoke it, benefit from it or fight it. It also buys its slim margin by making the AI worse, which § The goal forbids.\n\nSO THIS IS NO LONGER HOW RESTRAINT HAPPENS. Coalitions (BL-699, rival coalitions) and climate (BL-701, living climate) are the foundation. This item survives ONLY as the explicit, opt-in DIFFICULTY KNOB Ben kept - \"we can keep both modes\" - and it is named as one, in the § 1 Area 4 sense of a small transparent economic handicap.\n\nTWO HARD CONSTRAINTS, both from Ben, 2026-08-31.\n  1. EVEN SCALING ACROSS EVERY CANDIDATE. Not a carve-out that discounts expansion and spares efficiency. Ben chose the even form deliberately over the surgical one.\n  2. IT MAY NEVER VETO CONSTRUCTION OR EXTENSION. \"'how far restraint goes' should never exclude extension and construction. If a player loses out, they should be able to see that the world doesn't wait for them.\" A dialled-down corp still builds, just less. A brake that freezes a leader destroys the honest consequence of falling behind, which is the thing the whole design protects.\n\nOFF BY DEFAULT. The systemic route must be able to produce a close race on its own; if this dial is needed to get one, the brakes are the thing to fix. Ships as a mode, not as a default, and the harness bands the DEFAULT world.\n\nMeasured today for the record: corp_ai.cpp scores purely absolutely, and the only mention of `world::player_entity` is to EXCLUDE the player's corp (corp_ai.cpp:566-574, 625). Tunables live in corp_ai_params, per that file's own convention."
+   "design": "DEMOTED 2026-08-31, the same day it was minted, by Ben's systemic ruling (AI_OPPONENT.md § Where restraint comes from). It was the sprint's centrepiece for about an hour. Read that section before this item - the demotion IS the design.\n\nBEN'S OBJECTION, and it is correct: \"The angle we are taking here is a literal handicap. I prefer to consider it as always a force from within the game system.\" A term in the scorer that says 'ease off, I am ahead' is invisible, uncausable and uncounterable. The player cannot see it, provoke it, benefit from it or fight it. It also buys its slim margin by making the AI worse, which § The goal forbids.\n\nSO THIS IS NO LONGER HOW RESTRAINT HAPPENS. Coalitions (BL-699, rival coalitions) and climate (BL-701, living climate) are the foundation. This item survives ONLY as the explicit, opt-in DIFFICULTY KNOB Ben kept - \"we can keep both modes\" - and it is named as one, in the § 1 Area 4 sense of a small transparent economic handicap.\n\nTWO HARD CONSTRAINTS, both from Ben, 2026-08-31.\n  1. EVEN SCALING ACROSS EVERY CANDIDATE. Not a carve-out that discounts expansion and spares efficiency. Ben chose the even form deliberately over the surgical one.\n  2. IT MAY NEVER VETO CONSTRUCTION OR EXTENSION. \"'how far restraint goes' should never exclude extension and construction. If a player loses out, they should be able to see that the world doesn't wait for them.\" A dialled-down corp still builds, just less. A brake that freezes a leader destroys the honest consequence of falling behind, which is the thing the whole design protects.\n\nOFF BY DEFAULT. The systemic route must be able to produce a close race on its own; if this dial is needed to get one, the brakes are the thing to fix. Ships as a mode, not as a default, and the harness bands the DEFAULT world.\n\nMeasured today for the record: corp_ai.cpp scores purely absolutely, and the only mention of `world::player_entity` is to EXCLUDE the player's corp (corp_ai.cpp:566-574, 625). Tunables live in corp_ai_params, per that file's own convention.\n\nCARRIED OUT OF SPRINT 26, 2026-08-31, unbuilt and unscheduled. Ben closed that sprint at wave 1 once its own measurement showed every AI corp insolvent 29-30 ticks of 30 on every seed, with iron_ore produced 42991.6 against demand 0.000 on the industrial band (NR-758). This item's work is not wrong, it is UNMEASURABLE until demand exists: a coalition brake forms against 'whoever leads', and among corps that are all deeply insolvent the leader is merely the least bankrupt. Its tunables are the whole design and would need re-deriving against a solvent economy. Blocked on sprint 27's demand work rather than on any symbol - BL-642 names the first of it."
   },
   {
    "id": "BL-699",
@@ -1591,13 +1593,13 @@
    "priority": "A",
    "difficulty": 5,
    "version_goal": null,
-   "sprint": "26",
+   "sprint": null,
    "written": "2026-08-31",
    "author": "Ben",
    "requires": [
     "BL-700"
    ],
-   "blocked_on": null,
+   "blocked_on": "BL-642",
    "parked": false,
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "files": [
@@ -1608,15 +1610,15 @@
     "docs/ai/AI_OPPONENT.md",
     "docs/politics/RELATIONS.md"
    ],
-   "design": "PROMOTED 2026-08-31 from a nice-to-have to THE PRIMARY BRAKE. Ben: \"With 7 corporations, we have plenty of room for alliances to form against leaders... I prefer if an agent's decision to slow down can be framed as usually motivated by systems.\" AI_OPPONENT.md § Where restraint comes from is the authority.\n\nTHE SHAPE. A rival's stance scoring reads WHO IS WINNING - the composite standing index from BL-700 (composite standing index). A corp near the top of the field attracts hostility; corps below it find each other worth befriending. The brake is applied TO the leader BY others, and no corp ever throttles itself. Every corporation keeps playing flat out; leading simply becomes expensive.\n\nWHY THIS IS BETTER THAN A SCORER TERM, and why it is worth the extra difficulty: a coalition has a CAUSE, it is VISIBLE, and the player can join it, split it, provoke it or be its target. It converts the brake into gameplay. It also satisfies the standing rule that every system justify itself by feeding Trade or Conflict - a margin term feeds neither; a coalition feeds both.\n\nTHE VERBS ALREADY EXIST AND ARE UNUSED. corp_command.hpp carries four stance verbs from BL-448 - declare_hostile, offer_friendship, accept_friendship, return_to_neutral - specified, validated and serialised. corp_ai.cpp names NONE of them, so every rival is permanently neutral by omission rather than by choice. This item is the scoring that issues them; no new verb is needed.\n\nTHE PERMISSION EXISTS AND IS DATED. io-standing-rules.md carries Ben's 2026-08-22 grant for a rival scoring stance toward the player's corp, on the BL-450 terms - deterministic, seeded, scored-utility, legal verbs only, never a planner - and records that hostility stays a DECLARED state a corp opts into, never acquired ambiently. NOTE the provenance: BL-450 was PURGED in the 2026-08-23 cull, not completed; its prose is REFERENCE ONLY and this is authored fresh, per the cull's own resurrection rule.\n\nTHE COALITION MUST BE LEGIBLE OR IT IS JUST A HIDDEN HANDICAP AGAIN. That is the whole point of the reframe, so it is a requirement of this item and not a follow-up: a stance change emits into the § 7 chat channel and the decision feed, with its reason. A player must be able to SEE that the field has turned on the leader - and, when the leader is them, see it coming.\n\nMUST NOT VETO EXTENSION (Ben, 2026-08-31). Coalition pressure makes leading costly; it never stops a corp building. See § The constraint on restraint.\n\nOUT OF SCOPE: lobbying (nation-grain, purged as BL-539, unowned - NR-744), nation stance gating the player (BL-540, likewise), and the Stage C dialogue layer (BL-334, likewise)."
+   "design": "PROMOTED 2026-08-31 from a nice-to-have to THE PRIMARY BRAKE. Ben: \"With 7 corporations, we have plenty of room for alliances to form against leaders... I prefer if an agent's decision to slow down can be framed as usually motivated by systems.\" AI_OPPONENT.md § Where restraint comes from is the authority.\n\nTHE SHAPE. A rival's stance scoring reads WHO IS WINNING - the composite standing index from BL-700 (composite standing index). A corp near the top of the field attracts hostility; corps below it find each other worth befriending. The brake is applied TO the leader BY others, and no corp ever throttles itself. Every corporation keeps playing flat out; leading simply becomes expensive.\n\nWHY THIS IS BETTER THAN A SCORER TERM, and why it is worth the extra difficulty: a coalition has a CAUSE, it is VISIBLE, and the player can join it, split it, provoke it or be its target. It converts the brake into gameplay. It also satisfies the standing rule that every system justify itself by feeding Trade or Conflict - a margin term feeds neither; a coalition feeds both.\n\nTHE VERBS ALREADY EXIST AND ARE UNUSED. corp_command.hpp carries four stance verbs from BL-448 - declare_hostile, offer_friendship, accept_friendship, return_to_neutral - specified, validated and serialised. corp_ai.cpp names NONE of them, so every rival is permanently neutral by omission rather than by choice. This item is the scoring that issues them; no new verb is needed.\n\nTHE PERMISSION EXISTS AND IS DATED. io-standing-rules.md carries Ben's 2026-08-22 grant for a rival scoring stance toward the player's corp, on the BL-450 terms - deterministic, seeded, scored-utility, legal verbs only, never a planner - and records that hostility stays a DECLARED state a corp opts into, never acquired ambiently. NOTE the provenance: BL-450 was PURGED in the 2026-08-23 cull, not completed; its prose is REFERENCE ONLY and this is authored fresh, per the cull's own resurrection rule.\n\nTHE COALITION MUST BE LEGIBLE OR IT IS JUST A HIDDEN HANDICAP AGAIN. That is the whole point of the reframe, so it is a requirement of this item and not a follow-up: a stance change emits into the § 7 chat channel and the decision feed, with its reason. A player must be able to SEE that the field has turned on the leader - and, when the leader is them, see it coming.\n\nMUST NOT VETO EXTENSION (Ben, 2026-08-31). Coalition pressure makes leading costly; it never stops a corp building. See § The constraint on restraint.\n\nOUT OF SCOPE: lobbying (nation-grain, purged as BL-539, unowned - NR-744), nation stance gating the player (BL-540, likewise), and the Stage C dialogue layer (BL-334, likewise).\n\nCARRIED OUT OF SPRINT 26, 2026-08-31, unbuilt and unscheduled. Ben closed that sprint at wave 1 once its own measurement showed every AI corp insolvent 29-30 ticks of 30 on every seed, with iron_ore produced 42991.6 against demand 0.000 on the industrial band (NR-758). This item's work is not wrong, it is UNMEASURABLE until demand exists: a coalition brake forms against 'whoever leads', and among corps that are all deeply insolvent the leader is merely the least bankrupt. Its tunables are the whole design and would need re-deriving against a solvent economy. Blocked on sprint 27's demand work rather than on any symbol - BL-642 names the first of it."
   },
   {
    "id": "BL-700",
    "short_name": "composite standing index",
    "category": "AI",
    "title": "A corporation's standing is a composite of economic, research and military power",
-   "status": "designed",
-   "glyph": "~",
+   "status": "complete",
+   "glyph": "✓",
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
@@ -1634,7 +1636,9 @@
     "tools/verify/ai_skill_harness.cpp",
     "docs/ai/AI_OPPONENT.md"
    ],
-   "design": "Ben, 2026-08-31, asked what quantity the margin is measured in: \"It should be an aggregate of net worth, research, military strength... Maybe others too.\" AI_OPPONENT.md § Standing is the authority.\n\nTHE PREREQUISITE FOR TWO ITEMS, which is why it is minted separately: BL-699 (rival coalitions) scores stance against it, and BL-697 (skill harness margin metric) bands its spread. Both need the same number and must not each invent one.\n\nALL THREE COMPONENTS EXIST TODAY. Verified 2026-08-31 by reading the tree, because the backlog prose elsewhere claims research does not:\n  * ECONOMIC - net worth: balance plus the assessed value of buildings and held stock.\n  * RESEARCH - `science`, the corp research accumulator (BL-332, components.hpp:1343). Stockpiled, market-invisible, never decaying; REACHED, not spent. Already readable as a condition_set value (condition_set.hpp:77).\n  * MILITARY - summed `unit_strength(world, unit_component)` over the corp's fielded units. COMPUTED, not stored: BL-459 removed the stored `strength` field in 2026-08-17, so read the function, never a field.\n\nNOTE 'maybe others too' IS DELIBERATELY LEFT OPEN by Ben. Build the aggregate so a fourth component is an addition rather than a rewrite - the weighting is data, and territory or market share are the obvious candidates if the composite reads wrong when watched.\n\nWHY NOT BALANCE ALONE, which is what everything measures today: a corp that has just spent its treasury on a smelter is not behind, and a corp hoarding cash while its rivals arm is not ahead. A cash-only index would have coalitions forming against the wrong corporation, which is the failure mode hardest to notice because it still looks like diplomacy.\n\nDETERMINISM. Read at a settled point in the tick and stable under the sorted-corp iteration order, or the evaluation cadence becomes the tiebreak. Name the read point explicitly and assert it - the standing rule's constraint on every scorer input.\n\nWEIGHTS IN corp_ai_params, per that file's convention. Expect to tune them by watching (BL-695, live spectate route), not on paper."
+   "design": "Ben, 2026-08-31, asked what quantity the margin is measured in: \"It should be an aggregate of net worth, research, military strength... Maybe others too.\" AI_OPPONENT.md § Standing is the authority.\n\nTHE PREREQUISITE FOR TWO ITEMS, which is why it is minted separately: BL-699 (rival coalitions) scores stance against it, and BL-697 (skill harness margin metric) bands its spread. Both need the same number and must not each invent one.\n\nALL THREE COMPONENTS EXIST TODAY. Verified 2026-08-31 by reading the tree, because the backlog prose elsewhere claims research does not:\n  * ECONOMIC - net worth: balance plus the assessed value of buildings and held stock.\n  * RESEARCH - `science`, the corp research accumulator (BL-332, components.hpp:1343). Stockpiled, market-invisible, never decaying; REACHED, not spent. Already readable as a condition_set value (condition_set.hpp:77).\n  * MILITARY - summed `unit_strength(world, unit_component)` over the corp's fielded units. COMPUTED, not stored: BL-459 removed the stored `strength` field in 2026-08-17, so read the function, never a field.\n\nNOTE 'maybe others too' IS DELIBERATELY LEFT OPEN by Ben. Build the aggregate so a fourth component is an addition rather than a rewrite - the weighting is data, and territory or market share are the obvious candidates if the composite reads wrong when watched.\n\nWHY NOT BALANCE ALONE, which is what everything measures today: a corp that has just spent its treasury on a smelter is not behind, and a corp hoarding cash while its rivals arm is not ahead. A cash-only index would have coalitions forming against the wrong corporation, which is the failure mode hardest to notice because it still looks like diplomacy.\n\nDETERMINISM. Read at a settled point in the tick and stable under the sorted-corp iteration order, or the evaluation cadence becomes the tiebreak. Name the read point explicitly and assert it - the standing rule's constraint on every scorer input.\n\nWEIGHTS IN corp_ai_params, per that file's convention. Expect to tune them by watching (BL-695, live spectate route), not on paper.",
+   "completed": "2026-08-31",
+   "resolved": "2026-08-31"
   },
   {
    "id": "BL-701",
@@ -1705,7 +1709,7 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "26",
+   "sprint": null,
    "written": "2026-08-31",
    "author": "Ben",
    "requires": [
@@ -1713,7 +1717,7 @@
     "BL-696",
     "BL-702"
    ],
-   "blocked_on": null,
+   "blocked_on": "BL-642",
    "parked": false,
    "authority_doc": "docs/ai/STRATEGIES.md",
    "files": [
@@ -1721,7 +1725,7 @@
     "docs/ai/AI_OPPONENT.md",
     "docs/development/NEEDS_REVIEW.json"
    ],
-   "design": "Ben, 2026-08-31: \"Our aim for sprint 26 is to ensure spectator mode works, and visibly watch AI play in order to further develop the meta.\" THIS IS THE ITEM THAT DELIVERS THE SECOND HALF OF THAT SENTENCE, and it is the reason the sprint is not just plumbing.\n\nWITHOUT IT THE SPRINT CAN END WITH A WORKING SPECTATE MODE AND NOTHING LEARNED. That is the specific failure this item exists to prevent: three instrument items land, everything is green, and no statement about rival play is any truer than it was at the start.\n\nTHE DELIVERABLE IS PROSE, NOT CODE. A run watched end to end on the 1960s start (BL-705, selectable 1960s start), with god view on, and a written finding: what the rivals actually did, in what order, what they never did, where the scorer looked competent and where it looked blind.\n\nIT LANDS IN docs/ai/STRATEGIES.md, which owns the meta and was AUTHORED AHEAD OF THE GAME - CLAUDE.md calls it \"the meta, authored ahead of the game - research, not authority\". This is the first chance to check that authored meta against what the scorer actually does. TREAT A DIVERGENCE AS A FINDING ABOUT ONE OR THE OTHER, not as a defect in the scorer by default: an authored strategy that no rival ever reaches may be a scorer gap OR a meta that was never real.\n\nWHAT TO LOOK FOR, so the watching has a spine rather than being a vibe:\n  1. Does any rival do anything that reads as a PLAN across ticks, or only locally good moves?\n  2. What does the field's spread in composite standing (BL-700) do over the run - converge, hold, or run away?\n  3. Which corp_verbs are never issued? A verb family with zero uses across a run is either dead code or an unreachable candidate.\n  4. What does the decision feed's reason vocabulary actually say, once BL-696 makes it say anything?\n  5. Where does a rival do something a human would obviously not do? That is the legibility bar from AI_OPPONENT.md § The goal.\n\nFILE WHAT IT FINDS as NEEDS_REVIEW entries and, where warranted, fresh items - do not fold defects into this item's own prose and call it done."
+   "design": "Ben, 2026-08-31: \"Our aim for sprint 26 is to ensure spectator mode works, and visibly watch AI play in order to further develop the meta.\" THIS IS THE ITEM THAT DELIVERS THE SECOND HALF OF THAT SENTENCE, and it is the reason the sprint is not just plumbing.\n\nWITHOUT IT THE SPRINT CAN END WITH A WORKING SPECTATE MODE AND NOTHING LEARNED. That is the specific failure this item exists to prevent: three instrument items land, everything is green, and no statement about rival play is any truer than it was at the start.\n\nTHE DELIVERABLE IS PROSE, NOT CODE. A run watched end to end on the 1960s start (BL-705, selectable 1960s start), with god view on, and a written finding: what the rivals actually did, in what order, what they never did, where the scorer looked competent and where it looked blind.\n\nIT LANDS IN docs/ai/STRATEGIES.md, which owns the meta and was AUTHORED AHEAD OF THE GAME - CLAUDE.md calls it \"the meta, authored ahead of the game - research, not authority\". This is the first chance to check that authored meta against what the scorer actually does. TREAT A DIVERGENCE AS A FINDING ABOUT ONE OR THE OTHER, not as a defect in the scorer by default: an authored strategy that no rival ever reaches may be a scorer gap OR a meta that was never real.\n\nWHAT TO LOOK FOR, so the watching has a spine rather than being a vibe:\n  1. Does any rival do anything that reads as a PLAN across ticks, or only locally good moves?\n  2. What does the field's spread in composite standing (BL-700) do over the run - converge, hold, or run away?\n  3. Which corp_verbs are never issued? A verb family with zero uses across a run is either dead code or an unreachable candidate.\n  4. What does the decision feed's reason vocabulary actually say, once BL-696 makes it say anything?\n  5. Where does a rival do something a human would obviously not do? That is the legibility bar from AI_OPPONENT.md § The goal.\n\nFILE WHAT IT FINDS as NEEDS_REVIEW entries and, where warranted, fresh items - do not fold defects into this item's own prose and call it done.\n\nCARRIED OUT OF SPRINT 26, 2026-08-31, unbuilt and unscheduled. Ben closed that sprint at wave 1 once its own measurement showed every AI corp insolvent 29-30 ticks of 30 on every seed, with iron_ore produced 42991.6 against demand 0.000 on the industrial band (NR-758). This item's work is not wrong, it is UNMEASURABLE until demand exists: a coalition brake forms against 'whoever leads', and among corps that are all deeply insolvent the leader is merely the least bankrupt. Its tunables are the whole design and would need re-deriving against a solvent economy. Blocked on sprint 27's demand work rather than on any symbol - BL-642 names the first of it."
   },
   {
    "id": "BL-704",
@@ -1733,13 +1737,13 @@
    "priority": "B",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "26",
+   "sprint": null,
    "written": "2026-08-31",
    "author": "Ben",
    "requires": [
     "BL-696"
    ],
-   "blocked_on": null,
+   "blocked_on": "BL-642",
    "parked": false,
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "files": [
@@ -1749,7 +1753,7 @@
     "tools/verify/ai_skill_harness.cpp",
     "docs/ai/AI_OPPONENT.md"
    ],
-   "design": "Ben, 2026-08-31, approving the proposal. Optional relative to the sprint's core - BL-703 (watch session finding) can be done by watching alone - but it is what turns a finding from a memory of watching into something that cites evidence.\n\nTHE SHAPE: a per-run, per-corp log of the scorer's decisions - the candidate chosen, its score, the runners-up, the reason, the tick. The data already exists inside the evaluation; nothing new is computed, it is a question of getting it OUT in a form that can be read after the run rather than only watched during it.\n\nTHE ADJACENT MACHINERY IS ALREADY THERE and should be reused rather than duplicated: `corp_decision_reason` is the reason vocabulary; the decision feed consumes the same stream; AI_OPPONENT.md § 8a's world history log (history_log.{hpp,cpp}) is the project's append-only tagged serialisation seam and already carries a `decision` topic. Check whether this is a NEW export or a READER over the log that already exists - the second is much the better answer if it holds.\n\nDETERMINISM: the trace is an OBSERVATION, never an input. Nothing in the scorer may read it, and its presence or absence must not change a single decision - assert that a run with tracing on and one with it off produce the same state_hash.\n\nIT ALSO PAYS FORWARD. AI_OPPONENT.md § 10d's corpus-generation direction is exactly this artifact: \"every decision is logged as an input/output pair... those pairs are the supervised fine-tuning corpus\", and § 10d notes the corpus and the replay log are the same artifact. Do not build the corpus here - but do not build something that cannot become it."
+   "design": "Ben, 2026-08-31, approving the proposal. Optional relative to the sprint's core - BL-703 (watch session finding) can be done by watching alone - but it is what turns a finding from a memory of watching into something that cites evidence.\n\nTHE SHAPE: a per-run, per-corp log of the scorer's decisions - the candidate chosen, its score, the runners-up, the reason, the tick. The data already exists inside the evaluation; nothing new is computed, it is a question of getting it OUT in a form that can be read after the run rather than only watched during it.\n\nTHE ADJACENT MACHINERY IS ALREADY THERE and should be reused rather than duplicated: `corp_decision_reason` is the reason vocabulary; the decision feed consumes the same stream; AI_OPPONENT.md § 8a's world history log (history_log.{hpp,cpp}) is the project's append-only tagged serialisation seam and already carries a `decision` topic. Check whether this is a NEW export or a READER over the log that already exists - the second is much the better answer if it holds.\n\nDETERMINISM: the trace is an OBSERVATION, never an input. Nothing in the scorer may read it, and its presence or absence must not change a single decision - assert that a run with tracing on and one with it off produce the same state_hash.\n\nIT ALSO PAYS FORWARD. AI_OPPONENT.md § 10d's corpus-generation direction is exactly this artifact: \"every decision is logged as an input/output pair... those pairs are the supervised fine-tuning corpus\", and § 10d notes the corpus and the replay log are the same artifact. Do not build the corpus here - but do not build something that cannot become it.\n\nCARRIED OUT OF SPRINT 26, 2026-08-31, unbuilt and unscheduled. Ben closed that sprint at wave 1 once its own measurement showed every AI corp insolvent 29-30 ticks of 30 on every seed, with iron_ore produced 42991.6 against demand 0.000 on the industrial band (NR-758). This item's work is not wrong, it is UNMEASURABLE until demand exists: a coalition brake forms against 'whoever leads', and among corps that are all deeply insolvent the leader is merely the least bankrupt. Its tunables are the whole design and would need re-deriving against a solvent economy. Blocked on sprint 27's demand work rather than on any symbol - BL-642 names the first of it."
   },
   {
    "id": "BL-705",
