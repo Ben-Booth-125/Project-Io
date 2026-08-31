@@ -101,6 +101,13 @@ if (isWindows) {
     die('cl not found and vcvars64.bat is not at its default path — open a Developer Prompt, or build through CMake');
   const cl = ['cl', '/nologo', '/std:c++20', '/EHsc', '/MP',
     debug ? '/Od /Zi' : '/O2', '/I', 'src', '/I', 'tools\\verify',
+    // sol2 + Lua headers. NOT because a harness wants Lua - none do - but because
+    // a src/world TU in the superset now includes scripting/lua_state.hpp, whose
+    // first line is <sol/sol.hpp>. Without these every world-superset harness dies
+    // on C1083 before a single assertion runs, which is how main sat with the whole
+    // verifier-headless tier unbuildable (2026-08-31). Third rot of this arg list;
+    // this file's own header comment already warned about the first two.
+    '/I', '_deps_cache\\sol2_src\\include', '/I', '_deps_cache\\lua_src',
     JSON.stringify(path.relative(ROOT, src)),
     ...sources.map(s => JSON.stringify(path.relative(ROOT, s))),
     `/Fo:${path.relative(ROOT, objDir)}\\`, `/Fe:${path.relative(ROOT, exe)}`].join(' ');
@@ -109,6 +116,9 @@ if (isWindows) {
   cmd = 'g++';
   args = ['-std=c++20', debug ? '-O0' : '-O2', '-g',
     '-I', path.join(ROOT, 'src'), '-I', path.join(ROOT, 'tools', 'verify'),
+    // See the MSVC branch above: a world TU reaches scripting/lua_state.hpp -> sol/sol.hpp.
+    '-I', path.join(ROOT, '_deps_cache', 'sol2_src', 'include'),
+    '-I', path.join(ROOT, '_deps_cache', 'lua_src'),
     ...(debug ? ['-fsanitize=address,undefined'] : []),
     src, ...sources, '-o', exe];
   void jobs; // g++ compiles the TU set in one invocation; --jobs is the MSVC /MP knob
