@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*154 entries — 27 gameplay · 25 canvas · 15 lens · 54 ledger · 33 chrome.*
+*155 entries — 27 gameplay · 25 canvas · 15 lens · 54 ledger · 34 chrome.*
 
 ---
 
@@ -2234,4 +2234,15 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 **Expected output.** Opens straight into the saved campaign, skipping the main menu, the New World wizard, and the world generation plus pre-game warm start that follow them (~30-45 s). A failed load falls through to the main menu with the reason printed, rather than exiting — a missing file must not look like a crash.
 
 **Reason to select.** Resume a campaign directly, or open a fixed world for a capture run without paying generation on every launch — the reason the save format exists (BL-536).
+
+### `chrome.spectate_cli` — Command line. The ONLY route into spectator mode for a human — before BL-695 the mode was reachable solely from `verify.spectate()` behind --verify, i.e. it was a headless-script capability and not something a person could do.
+
+**Press.** Launch with `ProjectIo --spectate`. Composes with --autostart-play, --autostart-windowed, --autostart, --load and --host-agent.
+
+**Valid when:**
+- Set at launch only. There is no in-game control that enters or leaves spectate — see expected_output.
+
+**Expected output.** Opens the session with NOBODY SEATED (AI_OPPONENT.md § 10i): corp_ai_params::spectating is true for every economy tick, so the scored-utility layer evaluates the corp at world::player_entity on the same staggered cadence as every rival, and that field degrades to a camera and ledger anchor carrying no ownership meaning. The watcher sees a full field of seven-plus corporations all playing flat out. Also unlocks the spectate-only God view checkbox in the system menu (chrome.sysmenu_god_view), which is rendered only while this flag is set. ENTRY AT START AND ONLY AT START: § 10i removes the standing prohibition's SUBJECT rather than excepting the rule, which is a property of the whole session — a mid-run flip would change, halfway through, which corps the scorer may legally act on, so no control clears it. Off by default: an unspectated session is unchanged, which tools/verify/spectator_determinism.cpp asserts as its load-bearing property.
+
+**Reason to select.** To WATCH the AI play rather than play against it — see what strategies the scored-utility layer actually produces, and whether coalitions brake a runaway leader (AI_OPPONENT.md § Where restraint comes from), which is a question no seated session can answer because a seated corp is excluded from the scorer.
 

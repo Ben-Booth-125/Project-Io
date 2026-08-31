@@ -74,6 +74,23 @@ public:
     /// @param path Save file to open.
     void open_save(std::string path) { m_pending_load = std::move(path); }
 
+    /// Enter the session in SPECTATOR MODE — no human seat
+    /// (AI_OPPONENT.md § 10i). Set by `--spectate`; call before run().
+    ///
+    /// ENTRY AT START, and only at start. § 10i's model is that a spectated
+    /// session has no human owner, so the standing prohibition's PRECONDITION
+    /// is absent rather than waived — which is a property of the whole
+    /// session, not a view a watcher steps into and out of. A mid-run flip
+    /// would change halfway through which corps the scorer may legally act
+    /// on, so no in-game control clears this and the only way in is at
+    /// launch. Off by default, so an ordinary played session is untouched.
+    ///
+    /// The flag lands on `m_ui.spectating` immediately: `m_ui` is a plain
+    /// member, live from construction, and nothing outside the verify API
+    /// reassigns it — so setting it here carries through the menu, the
+    /// wizard, the warm start and every campaign the session opens.
+    void spectate_session() { m_ui.spectating = true; }
+
     /// Run a non-interactive visual-verification session: set up a deterministic
     /// world (seeded, sim paused), expose the `verify` Lua API (which drives view
     /// and overlay state directly and captures named PNG frames), execute the

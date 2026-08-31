@@ -1087,6 +1087,16 @@ corp on the same staggered cadence.
 - Admitting one more corp **shifts no rival's cadence slot**, because the cadence index is
   over the sorted corp set, which does not change.
 
+**The way in is a launch flag, and only a launch flag** (BL-695, live spectate route).
+`ProjectIo --spectate` opens the session with nobody seated; it composes with the `--autostart`
+family, with `--load` and with `--host-agent`. There is deliberately **no in-game control** that
+enters or leaves the mode. The reason follows directly from the paragraph above: because the
+prohibition's *precondition* is what spectate removes, having-no-owner is a property of the
+**whole session**, not a view a watcher steps into and out of. A mid-run flip would change,
+halfway through a campaign, which corporations the scorer may legally act on — a different
+argument, and one nobody has made. Off by default, so an ordinary played session never reaches
+any of this.
+
 Two companions complete the seat: player-press affordances (construction placement, order entry,
 workforce dials) are disabled under spectate — BL-413 (spectate disables player presses) — and
 the spectated viewpoint opens on a corp worth watching rather than whichever corp the player would
