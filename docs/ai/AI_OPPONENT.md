@@ -55,22 +55,28 @@ that applies to whoever leads, the player included, and that the player can see,
 The margin is therefore an **emergent property of a healthy system, not a target any actor aims
 at**. Nothing in the scorer knows what the margin is.
 
-**The two systemic brakes.**
+**The brake in the prototype is coalitions, and it carries this alone.**
 
-1. **Coalitions form against the leader.** Seven corporations is enough room for this to be real.
-   A corp's stance scoring reads *who is winning*, so the leader accumulates enemies and the field
-   accumulates each other — the brake is applied **to** the leader **by others**, never by the
-   leader to itself. This is diplomacy doing the load-bearing work rather than decorating it, and
-   it is the reason § 7's medium matters: a coalition that forms in a channel the player can read
-   is a coalition the player can join, split, or provoke.
+**Coalitions form against the leader.** Seven corporations is enough room for this to be real. A
+corp's stance scoring reads *who is winning*, so the leader accumulates enemies and the field
+accumulates each other — the brake is applied **to** the leader **by others**, never by the leader to
+itself. This is diplomacy doing the load-bearing work rather than decorating it, and it is the reason
+§ 7's medium matters: a coalition that forms in a channel the player can read is a coalition the
+player can join, split, or provoke.
 
-2. **Climate is a commons that the biggest extractor strains most.** A world-level pressure that
-   scales with total activity and bears hardest on the largest operator. It brakes a runaway
-   without naming anyone, which is what makes it feel like weather rather than like a rule aimed at
-   the player. Authority: `docs/CLIMATE.md`, which owns the commons, its grain, and the shape of its
-   curve; this section owns only why the AI design leans on it.
+**A second brake exists in the design and is NOT available here.** Climate is a commons that the
+largest operator strains most, and it would brake a runaway without naming anyone. But climate is the
+**next Era's catastrophe** (`docs/economy/ERAS.md` § The point of an Era; designed ahead in
+`docs/CLIMATE.md`) and sits **outside prototype scope** — so nothing here may lean on it. Stated
+plainly because it changes what this design is claiming: in the prototype, if coalitions do not brake
+a runaway, **nothing else does**, and that is a finding about coalitions rather than an argument for
+reaching for the opt-in dial.
 
-Both are legible, both have causes, and both **feed Trade or Conflict** — which an objective term
+The Era's own **Alarm** scalar is a genuine second pressure and a different one — it bears on
+*nations*, not on a leading corporation, and it is a catastrophe to avoid rather than a brake on
+standing. Do not conflate them.
+
+Coalitions are legible, have a cause, and **feed Trade or Conflict** — which an objective term
 does not, and which every system in Io is required to do.
 
 ### The constraint on restraint (Ben, 2026-08-31)

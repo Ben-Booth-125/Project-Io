@@ -85,14 +85,12 @@ Exploration reveals bodies, their resource profiles, and their suitability for s
 Each body, and each subdivision of land within it, has a procedurally generated profile of resources, terrain, hazard, and habitability. Environment sets the local cost of construction, the difficulty of military operations, and extraction yields.
 
 **Climate** is the living half of that profile: a per-body commons, altered by the strain of what
-corporations extract and process on it. It runs on **planetology's own scalars — instellation,
-surface temperature, arable share, biosphere stage — unfrozen**, rather than on the tile hazard
-figure, which is the local operating-difficulty number and whose design job is the off-world
-settlement calculus. Climate is the world force that answers back to use: the systemic brake on a
-runaway leader (§ AI opponent), the precondition and the aftermath of the nuclear war that ends
-Era 0, and the reason a player has to leave a homeworld rather than merely the means. Its effects
-**relocate** value rather than only subtracting it, which is what keeps it a Trade system.
-Authority: `docs/CLIMATE.md`.
+corporations extract and process on it, running on **planetology's own scalars — instellation,
+surface temperature, arable share, biosphere stage — unfrozen**. It is the **next Era's
+catastrophe** (`docs/economy/ERAS.md` § The point of an Era) and is designed ahead in
+`docs/CLIMATE.md`; it is **outside prototype scope** and nothing in the prototype builds against it.
+Note it does not run on the tile hazard figure, which is the local operating-difficulty number and
+whose design job is the off-world settlement calculus.
 
 ### Generation (Planetology & the chain)
 The world is generated, not authored — a deterministic, seeded chain: planetology (atmosphere, chemistry, evolution history — `src/world/planetology.cpp`, BL-167 planetology) → continents → tiles → population centres → history ladder → nations → roads → markets → corporations. Each stage is a consequence of the one upstream, entered through the New World wizard. Authority: `docs/generation/GENERATION_STRATEGY.md` and `docs/generation/PLANETOLOGY.md`.

@@ -47,6 +47,88 @@ steady economy, not generated at an earlier date and advanced.
   axes must not be merged — one word with two meanings in one file is the failure the proxy note
   already guards against.
 
+## The point of an Era — a catastrophe to avoid (Ben, 2026-08-31)
+
+> *"The aim of each era is to give a catastrophe for players to avoid. Gating certain technologies
+> behind appropriate use of prior ones, and allowing mistakes to compound."*
+
+**Each Era carries one catastrophe, and the Era is about not causing it.** The catastrophe is a
+**failure state**, not a scheduled transition: passing the Era means the catastrophe did *not*
+happen, and the next Era's quest trees open. This is the frame every other statement in this
+document sits inside, and it is what makes an Era a test of skill rather than a chapter break.
+
+Three things must hold for that to be a skill rather than a mood (design drafted 2026-08-05, Ben:
+*"more advanced does not mean better... the player must be skilled at avoiding danger, in each
+dimension of play"*):
+
+1. Some attractive technologies carry a cost that is **not on their own stat line**.
+2. That cost accumulates into something the player can **watch** and **act on**.
+3. The catastrophe resolves **deterministically** from it. The standing rule forbids random
+   ruptures, and a dice-roll catastrophe would be unlearnable anyway.
+
+### The two scalars
+
+No new world object — two per-nation scalars with named consumers, the discipline BL-223 set for the
+deterrence ceiling (*"a per-nation scalar, NOT a nuclear-equivalent object"*):
+
+| Scalar | Meaning | Moved by |
+|---|---|---|
+| **Ceiling** | How much restraint this nation carries — the memory of the rupture that *was* averted | The history-ladder outcome; decays slowly as the memory ages |
+| **Alarm** | How threatened this nation feels *by others* | Others' **visible** capability, severed trade ties, posture, domestic instability |
+
+### The test
+
+The Era event arrives on its **seeded date** with a visible countdown. **The date decides when the
+test is taken, not its outcome.**
+
+- **Aggregate Alarm above aggregate Ceiling** → the catastrophe fires. The Era's selective
+  destruction lands on exactly the assets the next Era needed, so failing is not a reset — it is
+  entering the next Era crippled, which is `docs/CONCEPT.md`'s "you enter the next one
+  underprepared, and it is *hard*".
+- **Alarm below Ceiling** → averted, and the next Era's quest trees open.
+
+Two properties keep this a skill test rather than a timer. **Alarm is relievable** — it decays,
+named nodes cut it, and trade interdependence suppresses it continuously. And **the player is not
+its only source**: rival corporations and nations raise it too, so a careful player can still lose a
+world someone else wrecked, and managing *others'* alarm is a legitimate goal.
+
+### Mistakes compound — the red herrings
+
+The technologies that raise Alarm are the ones that look best. Seven kinds of trap, one danger in
+each dimension of play:
+
+| Kind | The trap | The tell |
+|---|---|---|
+| **Escalator** | Genuinely better output; the capability is dual-use | Its own dual-use description; rival alarm ticks on completion |
+| **Legibility trap** | The capability is fine — being *seen* to hold it is the cost | A large, visible, single-site facility |
+| **Interdependence severer** | Autarky looks like resilience, and cuts the trade ties holding Alarm down | Your own export routes go quiet |
+| **Brittle optimisation** | Better numbers, catastrophically worse under blockade | The input it optimises is one you import |
+| **Contextual dud** | Advanced, and wrong *here* | Its prerequisite substrate is absent on this body |
+| **Tempo trap** | A fine technology that costs you the clock | The countdown is visible and does not move |
+| **Domestic destabiliser** | Output up, unrest up — and unrest is what makes a nation reach for a foreign enemy | The unrest surface moves the same tick |
+
+**Every trap carries a tell, and the tell precedes commitment.** That is the project's tone rule —
+legible in hindsight, not locally clever — and it is the whole difference between a skill test and a
+gotcha. A player who reads the tell and takes the technology anyway has made a *decision*; a player
+who could not have known has been cheated.
+
+**One herring is inverse, deliberately.** If every menacing-looking node were a trap, "menacing"
+would become the tell and the lesson would collapse into colour-coding. At least one node must look
+aggressive and be **stabilising** — a survivable force is not a panicked one.
+
+### Gating on appropriate use
+
+Capstones are opened by **deeds** — tangible actions taken in game — not by accumulated points. That
+is what "gating certain technologies behind appropriate use of prior ones" means concretely: the
+next rung is earned by having *used* the last one, and used it in a way that did not raise Alarm past
+what the player can carry.
+
+**The per-Era catastrophe ladder** is what the Era structure is for. Only the prototype's Era is
+designed; the drafted node set and the full herring roster live in
+`docs/research/ERA1_TECH_LANDSCAPE.md` (research, not authority).
+
+---
+
 ## What moves an Era
 
 **Eras are catastrophic seeded events on the world clock** (BL-087, era tech/quest system — Ben,
@@ -60,17 +142,14 @@ Two ruptures exist and they are **distinct**: HISTORY.md Stage 5's averted ruptu
 backstory, CONCEPT.md's is ahead of the player. The backstory establishes that these powers *can*
 pull back from the brink; the Era 0 exit is the occasion they do not.
 
-**The Era 0 exit rupture is a NUCLEAR WAR** (Ben, 2026-08-31), which is what `docs/CONCEPT.md`'s
-"global-rupture-scale war" names. The boundary stays what this section describes — a seeded date, a
-visible countdown, a rupture that shocks markets and destroys infrastructure — and **climate is both
-its precondition and its aftermath** (`docs/CLIMATE.md`).
+**This Era's catastrophe is a NUCLEAR WAR** (Ben, 2026-08-31) — which is what `docs/CONCEPT.md`'s
+"global-rupture-scale war" names, and what the player is playing to **avoid**. It is the failure
+branch of § The test above, not a scheduled event: Alarm above Ceiling on the seeded date and the
+rupture goes hot; below it, and it is averted a second time.
 
-Before it, a shared per-body commons drifts under the strain of what every corporation extracts and
-processes; that drift is what makes the war a consequence rather than a scheduled event, and it is
-what makes the sentence above true rather than asserted. After it, the climate shock is the part of
-the rupture that does not end when the shooting does: instellation falls, the arable share collapses,
-and the world recovers to a permanently lower floor. That degraded homeworld is the motive for the
-space transition below.
+The two ruptures stay distinct and the pair is the point — the backstory is a near-miss that *was*
+averted, and the campaign is the second time the question is asked. The player's job is to be the
+reason the answer is the same.
 
 ---
 
@@ -104,10 +183,10 @@ This is the **keystone quest** that unlocks space access (BL-087). All three con
 2. **Launchpad constructed and staffed.** A Launchpad building exists on the home body with `workforce_assigned > 0`.
 3. **Propellant reserve met.** The home body's stockpile contains at least the minimum propellant quantity required for an initial launch. This threshold is a Lua balance value. Propellant is the product of the propellant loop (`docs/research/ERA1_TECH_LANDSCAPE.md`), not a roster resource of the ancient arc.
 
-**The gate says what leaving costs, and nothing about why anyone would.** Climate is the motive
-(`docs/CLIMATE.md` § 9): a homeworld getting worse under its own industry turns off-world extraction
-from an ambition into an exit. The three conditions above are unchanged by it — climate moves the
-reason to pass the gate, never the gate.
+**The gate says what leaving costs.** What supplies the urgency is the Era's own catastrophe:
+reaching orbit requires the lift stack that frightens everyone, so the space programme is *itself*
+the largest single contributor to Alarm (§ The point of an Era). The player cannot dodge the
+dangerous technology — the skill is buying the reassurance that lets them hold it.
 
 When all three conditions hold, space bodies become accessible to convoy dispatch, and the Ice Extractor and Assembly Plant become available for construction. The operative half of the gate in the convoy layer is launchpad presence — an inter-body convoy dispatches iff the corp holds a launchpad on the source body (`corp_has_launchpad_on`, `src/world/supply_system.cpp`; SUPPLY.md § Infrastructure gates).
 
@@ -131,13 +210,12 @@ Water (from icy bodies), iron-nickel ore (from metallic asteroids), platinum gro
 
 Ice Extractor, Surface Extractor, Assembly Plant, Orbital Port.
 
-### Climate in Era 1
+### The next Era's catastrophe is climate (Ben, 2026-08-31)
 
-Era 1 opens on the **recovery**: the war's winter lifts as aerosols settle, but the homeworld
-settles to a permanently degraded floor rather than to where it started (`docs/CLIMATE.md` § 3).
-Climate state is held per body, so spreading production across bodies is also **spreading strain**,
-and Era 1's existing strategic question acquires a second reason to answer it. The homeworld's
-damage is a fact the player carries rather than escapes.
+*"I am not against climate change being a large problem for Era 2, but our prototype works solely on
+Era 1 for now."* Each Era carries its own catastrophe (§ The point of an Era), and climate is the
+**next** one's, not this one's. It is designed ahead in `docs/CLIMATE.md` and is deliberately
+**outside prototype scope**; nothing in the prototype should be built against it.
 
 ### Era 1 → Era 2 gate
 

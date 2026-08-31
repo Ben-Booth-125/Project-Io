@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*100 entries — 98 open, 2 resolved.*
+*102 entries — 99 open, 3 resolved.*
 
 ---
 
@@ -998,7 +998,7 @@ SECOND RISK, smaller and worth naming: coalitions brake the leader, and the PLAY
 
 *Files: `docs/ai/AI_OPPONENT.md`, `docs/development/sprints.json`, `src/world/corp_ai.cpp`*
 
-### NR-747 — How far does the climate drift recover, and where does the permanent floor sit?
+### NR-747 — How much climate load is reversible, and where does the permanent floor sit? (next Era, not urgent)
 *question · raised 2026-08-31 · from Ben, 2026-08-31: "Let's design climate docs here... how the hazard affects players." CLIMATE.md § 6 is written with a recommendation and marked as his call.*
 
 Climate degrades under the strain of what corporations extract and process on a body. The question is what happens when the strain stops. It is the one open call in CLIMATE.md that changes the system's FEEL rather than its numbers, and every other open call reads differently depending on it.
@@ -1017,36 +1017,62 @@ WHAT IT DOES NOT DECIDE: the constraint that climate never vetoes construction o
 
 UPDATED 2026-08-31 after Ben named the rupture as a NUCLEAR WAR. That does not answer this question, it SHARPENS it - the war supplies a permanent floor by itself, so the live question is now specifically about the Era 0 DRIFT: how much of the pre-war industrial loading is recoverable if the field pulls back. A fully reversible drift means the war is the only thing that ever leaves a mark, and the commons stops being a stake during the era the player actually plays.
 
+RETARGETED 2026-08-31, THIRD TIME, and DEMOTED. Ben placed climate in the NEXT Era: "I am not against climate change being a large problem for Era 2, but our prototype works solely on Era 1 for now." So this question no longer gates anything in the prototype - the war framing that made it urgent is gone, because the war is this Era's catastrophe-to-avoid rather than a scheduled event leaving a climate behind. Keep it open as a design note against CLIMATE.md § 8.2; do not treat it as blocking.
+
 **Why it matters.** It decides whether climate is a pressure, a doom clock, or a commons - and therefore whether the Era 0 boundary is something the world's corporations did or something the calendar did. The build should not be minted before it is answered; building against an unsettled curve would be implementing the wrong feel efficiently.
 
 - Floored - reversible up to a threshold, then a permanent floor that each breach raises. RECOMMENDED, and already written into CLIMATE.md § 6 as such.
 - Reversible - a pure pressure. Simplest, and the safest if climate turns out to be annoying rather than interesting; loses the Era boundary job.
 - Ratcheting - a pure doom clock. Strongest era arc, weakest agency; also contradicts ERAS.md's existing backstory sentence.
 
-> **Recommendation:** Floored, and the nuclear shock makes the case stronger rather than weaker: the war already guarantees a permanent floor, so a drift that recovers completely would mean nothing a corporation does before the war matters, and the AI brake would have nothing to bite on during Era 0 - which is the era the live product is played in.
+> **Recommendation:** Leave open and unhurried. Recommended shape unchanged - recoverable up to a threshold, then a floor each further breach raises - because a load that fully recovers means nothing a corporation does before the test matters. Answer it when the climate Era is actually designed, not now.
 
 *Files: `docs/CLIMATE.md`, `docs/economy/ERAS.md`, `docs/CONCEPT.md`*
 
-### NR-748 — I read "Era 1 is actually nuclear war" as the Era 0 -> Era 1 BOUNDARY, and edited CONCEPT.md on that reading
-*decision taken on your behalf · raised 2026-08-31 · from Ben, 2026-08-31: "My mistake with the word choice. Era 1 is actually nuclear war."*
+### NR-749 — Three Era numbering schemes are live in the corpus, and they disagree by one
+*question · raised 2026-08-31 · from Ben, 2026-08-31: "My mistake with the word choice. Era 1 is actually nuclear war... our prototype works solely on Era 1 for now."*
 
-Flagged because the sentence has two readings, because I picked one without asking, and because acting on it edited CONCEPT.md - a doc whose framing is Ben's.
+THE UNCLEAR THING, raised because Ben invited it and because I cannot write the era docs precisely without it. The CONCEPTS are now settled and consistent; only the NUMBERS disagree.
 
-THE TWO READINGS.
-  (a) THE BOUNDARY. The Era 0 -> Era 1 rupture is a nuclear war. Era 1 itself remains Early Space and opens on the aftermath.
-  (b) THE ERA. Era 1 as a PERIOD is characterised by nuclear war - i.e. the ladder's naming is wrong and Era 1 is not Early Space at all.
+THREE SCHEMES, all currently in the tree.
+  (1) ERAS.md / CONCEPT.md: **Era 0 = Terrestrial** (Cold War / Information Age footing), **Era 1 = Early Space**, **Era 2 = Dimensional**. The era you play is Era 0 and its EXIT is the war.
+  (2) BL-087 and docs/research/ERA1_TECH_LANDSCAPE.md prose: "**Era 1 failure (WW3)**" - the era you play is Era 1 and its catastrophe is the war. Ben's own 2026-08-05 wording, and the wording he used again today.
+  (3) The same research doc's NODE IDS, and the live tech ids in code: **E0-**HEAVY, E0-ELEC, E0-ROCKET; and shipped ancient-arc ids E0-EC-01 (Toolmaker), E1-EC-01 (Bessemer Converter), E0-ML-01. Here E0/E1 are era BANDS on the ancient arc, a third meaning again.
 
-I TOOK (a). Reasons: CONCEPT.md § Eras already had the Era 0 exit as "a global-rupture-scale war" that reshapes the world enough for rapid space expansion, so (a) NAMES something already designed rather than overturning it; ERAS.md § What moves an Era already makes the boundary a catastrophic seeded event that shocks markets and destroys infrastructure, which is the shape of a war; and Ben's own sentence was a correction of MY word choice, which suggests a clarification rather than a redesign of the ladder.
+So "Era 1" means the space era in (1), the nuclear era in (2), and an ancient tech band in (3). Note ERAS.md ALREADY warns about exactly this class of collision in its section 'Three things that say era in code, and which one this is' - era_band, condition_subject::era, and the Era of that document. This is a fourth.
 
-WHAT I WROTE ON IT. CONCEPT.md § Eras now says the rupture is nuclear and names climate as what makes the space expansion plausible. ERAS.md § What moves an Era says the same and splits climate into a pre-war drift and a post-war aftermath. CLIMATE.md § 1 and § 3 are built on it throughout.
+WHAT I DID, and it is deliberately number-light: I wrote the corrections using RELATIVE language - 'this Era's catastrophe', 'the next Era's catastrophe', 'the prototype Era' - wherever the number is contested, so nothing needs rewriting whichever way this goes. CLIMATE.md § 8.1 names the open number explicitly.
 
-IF (b) IS WHAT HE MEANT, the correction is real but contained: the era NAMES and the ladder change, and CLIMATE.md's two-regime model survives unaltered, because it is anchored to 'before the war' and 'after the war' rather than to an era number.
+THE SECOND HALF OF THE QUESTION, and possibly the bigger one: "our prototype works solely on Era 1 for now" sits oddly against ROADMAP.md § The two arcs, which says the LIVE product is the ANCIENT arc at 0 CE with the player as a mercenary company, and that the industrial/space arc (v0.2.0-v1.0.0) is PARKED for DLC. Under scheme (1) the prototype is Era 0 of the ancient arc. Under scheme (2) the prototype is the Cold-War-footing era, which is the SPACE arc's first rung - a parked product. These cannot both be true, and I do not know which one moved.
 
-**Why it matters.** It is now written into CONCEPT.md, ERAS.md and CLIMATE.md as settled, and CONCEPT.md is the doc that owns what the game is about. A wrong reading propagating from there is expensive to unpick later, and cheap to correct today.
+**Why it matters.** Era numbers appear in ERAS.md, CONCEPT.md, CLIMATE.md, the research draft, the tech ids in code, and now in sprint planning. A silent off-by-one across those is the exact failure ERAS.md already has a section warning about, and it gets more expensive with every doc that cites a number. The arc question is larger still: it decides whether the era work being designed is for the live product or for a parked one.
 
-> **Recommendation:** Confirm or correct in one line. If (a) is right, nothing to do. If (b), tell me and I will re-cut the ladder - the climate model itself does not move either way.
+- RENUMBER the ladder so the era you play is Era 1, its catastrophe the nuclear war, and climate's era is Era 2. Matches Ben's own wording twice, and makes the catastrophe ladder and the era numbers line up.
+- KEEP ERAS.md's numbering (played era = Era 0, exit test = the war, Early Space = Era 1) and treat Ben's 'Era 1' as shorthand for the era-1 TRANSITION. Cheapest in edits; leaves the wording collision live.
+- DROP the numbers from prose entirely and name eras by their catastrophe or territory - 'the nuclear Era', 'the climate Era'. Sidesteps the collision permanently; larger doc sweep.
 
-*Files: `docs/CONCEPT.md`, `docs/economy/ERAS.md`, `docs/CLIMATE.md`*
+> **Recommendation:** Answer the ARC half first - is the era/catastrophe work for the ancient live product or for the parked space arc? The numbering follows from it and is cheap either way. On the numbering itself I would take option 1: aligning the number with the catastrophe is what makes the ladder readable, and Ben has now used that scheme twice unprompted.
+
+*Files: `docs/economy/ERAS.md`, `docs/CONCEPT.md`, `docs/CLIMATE.md`, `docs/development/ROADMAP.md`, `docs/research/ERA1_TECH_LANDSCAPE.md`*
+
+### NR-750 — The Era catastrophe model was promoted from a research doc into ERAS.md, and its owner BL-087 is purged
+*observation · raised 2026-08-31 · from Sprint 26 doc correction, 2026-08-31.*
+
+ERAS.md § The point of an Era is NEW and it is a PROMOTION, not an authoring. The Ceiling/Alarm scalars, the test, the seven red-herring kinds, the tell-before-commitment rule and the inverse herring were all drafted 2026-08-05 in docs/research/ERA1_TECH_LANDSCAPE.md on Ben's steer, and have been sitting there since.
+
+THAT DOC IS EXPLICITLY NOT AUTHORITY. CLAUDE.md lists docs/research/*.md as "research scaffolding. Not authority." So the design defining what an Era IS - the thing CONCEPT.md calls the gear shift and the thing every quest tree hangs off - was in a file no session is required to read and no doc is required to agree with. ERAS.md even said so at the site: the old text noted the reframe "lives here until work lands" and that ERAS.md was "deliberately not edited yet".
+
+IT IS NOW IN ERAS.md, which is where a reader looking for the Era model would go.
+
+THE OWNER IS GONE. BL-087 (era tech/quest system) carried this and was PURGED in the 2026-08-23 cull - not completed. So the model now has authority and no work item, and the drafted Era tree (five sectors x three rings, ~45 objects, four keystones each opened by a DEED) plus the `deed` condition primitive (NR-067) and the Alarm scalar (NR-068) are all unowned.
+
+SAME SHAPE AS NR-744, which found three other purged AI items whose dated grants still stand. This is the fourth instance of one pattern: the cull removed work items whose DESIGNS remained load-bearing.
+
+**Why it matters.** Two live consequences. The catastrophe model is now authority, so anything contradicting it is a defect rather than a difference of drafts - which is the point of promoting it. And the tech/quest system that implements it has no owner, so the moment the era work is scheduled there is nothing to schedule.
+
+> **Recommendation:** Mint a fresh owner for the era tech/quest system when the era work is actually next, authored against the current docs per the cull's resurrection rule - not now, since sprint 26 is about watching the AI. Worth doing at the same time as NR-744's three, since all four are the same cull and the same shape.
+
+*Files: `docs/economy/ERAS.md`, `docs/research/ERA1_TECH_LANDSCAPE.md`, `docs/development/backlog.json`*
 
 ---
 
@@ -1115,4 +1141,35 @@ docs/CLIMATE.md is top-level, alongside EVENTS.md and META_LAYER.md, NOT a secti
 The novelty is therefore CHOSEN rather than accreted, which is what the flag existed to secure. What remains is not novelty but ordinary open design - CLIMATE.md § 11 lists it, and the one call that changes the feel of the system is raised separately as NR-747.
 
 *Files: `docs/generation/PLANETOLOGY.md`, `docs/SYSTEMS.md`, `docs/ai/AI_OPPONENT.md`, `docs/economy/TILES.md`*
+
+### NR-748 — I read "Era 1 is actually nuclear war" as the Era 0 -> Era 1 BOUNDARY, and edited CONCEPT.md on that reading
+*decision taken on your behalf · raised 2026-08-31 · from Ben, 2026-08-31: "My mistake with the word choice. Era 1 is actually nuclear war."*
+
+Flagged because the sentence has two readings, because I picked one without asking, and because acting on it edited CONCEPT.md - a doc whose framing is Ben's.
+
+THE TWO READINGS.
+  (a) THE BOUNDARY. The Era 0 -> Era 1 rupture is a nuclear war. Era 1 itself remains Early Space and opens on the aftermath.
+  (b) THE ERA. Era 1 as a PERIOD is characterised by nuclear war - i.e. the ladder's naming is wrong and Era 1 is not Early Space at all.
+
+I TOOK (a). Reasons: CONCEPT.md § Eras already had the Era 0 exit as "a global-rupture-scale war" that reshapes the world enough for rapid space expansion, so (a) NAMES something already designed rather than overturning it; ERAS.md § What moves an Era already makes the boundary a catastrophic seeded event that shocks markets and destroys infrastructure, which is the shape of a war; and Ben's own sentence was a correction of MY word choice, which suggests a clarification rather than a redesign of the ladder.
+
+WHAT I WROTE ON IT. CONCEPT.md § Eras now says the rupture is nuclear and names climate as what makes the space expansion plausible. ERAS.md § What moves an Era says the same and splits climate into a pre-war drift and a post-war aftermath. CLIMATE.md § 1 and § 3 are built on it throughout.
+
+IF (b) IS WHAT HE MEANT, the correction is real but contained: the era NAMES and the ladder change, and CLIMATE.md's two-regime model survives unaltered, because it is anchored to 'before the war' and 'after the war' rather than to an era number.
+
+**Why it matters.** It is now written into CONCEPT.md, ERAS.md and CLIMATE.md as settled, and CONCEPT.md is the doc that owns what the game is about. A wrong reading propagating from there is expensive to unpick later, and cheap to correct today.
+
+> **Recommendation:** Confirm or correct in one line. If (a) is right, nothing to do. If (b), tell me and I will re-cut the ladder - the climate model itself does not move either way.
+
+> **RESOLVED.** ANSWERED by Ben, 2026-08-31: "The aim of each era is to give a catastrophe for players to avoid."
+
+NEITHER of the two readings the entry offered was right. It asked whether the nuclear war is the BOUNDARY between two eras or a RENAMING of Era 1. It is neither: it is the CATASTROPHE OF ITS ERA, and the player plays to AVOID it. Passing the Era means the war did not happen and the next Era's quest trees open; failing means it did, and the destruction lands on exactly the assets the next Era needed.
+
+So the entry's own framing was the error - it assumed the rupture fires and asked only where to file it. The pre-existing design in docs/research/ERA1_TECH_LANDSCAPE.md (2026-08-05, drafted on Ben's steer) had the answer the whole time: Alarm above Ceiling on the seeded date and it goes hot, below and it is averted a second time. The date decides WHEN THE TEST IS TAKEN, not the outcome.
+
+CORRECTED IN: ERAS.md (§ The point of an Era, new, and § What moves an Era), CONCEPT.md (the exit is a test with a failure branch), CLIMATE.md (rewritten as the next Era's catastrophe), SYSTEMS.md and AI_OPPONENT.md.
+
+WHAT REMAINS OPEN is only the numbering, which is a separate and narrower question - NR-749.
+
+*Files: `docs/CONCEPT.md`, `docs/economy/ERAS.md`, `docs/CLIMATE.md`*
 
