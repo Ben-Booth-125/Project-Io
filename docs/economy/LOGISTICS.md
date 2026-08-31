@@ -105,6 +105,33 @@ cannot be used twice while the first hub is still building.
 unreachable"** — a distinction a UI holding a `const world&` needs, because it must not trigger the
 Dijkstra itself.
 
+### 3a. Power rides this network (Ben, 2026-08-31)
+
+**Power is transmitted on the road network, and it needs no new graph.** Ben: *"Power travels via
+road infrastructure, although it is different from a convoy, it has a 1 qtr travel time."*
+
+Three properties, and each one reuses something already here:
+
+1. **Connectivity, not distance.** A building can draw from a generator if a path exists at all.
+   That is exactly `tile_reach_cost` read as a boolean — **finite means connected, infinity means
+   not** — so the multi-source Dijkstra of § 3 already answers the question and no second field is
+   needed.
+2. **Flat latency: one tick, regardless of distance.** Power is not priced by traversal cost the way
+   cargo is; a connection either exists or it does not, and if it does the power is available on the
+   next tick. This is what makes it *unlike* a convoy despite sharing the road.
+3. **Interdiction cuts it, for free.** § 7's rule already lets a hostile unit sever the network. A
+   cut that strands a market from its generation is now a cut that turns the lights off there —
+   Conflict reaching Trade through infrastructure rather than through a special case.
+
+The design consequence worth stating: **roads become dual-purpose.** A road built for convoys also
+carries power, so the network's value is no longer only throughput, and a region's power is a fact
+about its *connectedness* rather than about its ground. That is a supply asymmetry with a cause a
+player can read and change, which is what `docs/generation/GENERATION_STRATEGY.md` § Asymmetry is the
+deliverable asks generation to produce.
+
+`docs/economy/PRODUCTION.md` § Power owns the generation buildings, the upkeep draw and the
+shortfall rule; this section owns only the transmission.
+
 ### 4. Roads — generated, then extended by hand
 
 Generated per nation after population, deterministically from the campaign seed (BL-146 /

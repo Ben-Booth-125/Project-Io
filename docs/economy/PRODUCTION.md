@@ -479,7 +479,103 @@ Extraction and processing outputs accrue into a shared stockpile pool held per `
 
 ---
 
-## Construction pacing
+## Power (Ben, 2026-08-31)
+
+**Power is not a traded good and not a per-body pool. It is a grid.** Ben's ruling:
+
+> *"Power travels via road infrastructure, although it is different from a convoy, it has a 1 qtr
+> travel time or weight. So if there is a connection from a power source to the player's HQ, they
+> will be able to use the power on the next tick. Power can be stockpiled, but not infinitely."*
+
+### What it is
+
+A **generation building** converts fuel into power. Power is then drawn as **upkeep** by the
+buildings connected to it. It is:
+
+- **Not cargo.** It never enters the order book, never rides a convoy, and has no market price.
+- **Not a pool.** Connection decides who can draw it — a generator serves what it is wired to, not
+  everything on the body.
+- **Stockpiled, with a ceiling.** Unlike every other good, its store is capped. A generator running
+  into a full store is producing nothing anyone will ever use, which is a real decision rather than
+  an accounting detail.
+
+### Why this closes the fuel chain
+
+`coal` and `petroleum` are on the census's *extractable, no market sink* list — petroleum produced
+6169.9 against demand **0.000** in the industrial band. Power gives them the endpoint they never had,
+and it does so **without** power itself needing to be traded: the generation building buys its fuel
+**on the market, as an ordinary processing input**, which already bids (MARKETS.md § Three
+properties, 3). The chain is `fuel → generator → power → building upkeep`, and it terminates in
+upkeep, which is a terminal sink under property 4.
+
+So the market demand this creates is demand for **fuel**, priced normally, induced by however much
+generation the world has built. That is property 1 — it scales with the economy — without power
+being a market good at all.
+
+### The shortfall rule, and the lesson it inherits
+
+A building short of power **scales its output down**; it is not idled. This is not a preference, it
+is the BL-641 lesson applied before the fact: an upkeep draw that idles a firm kills the buyer that
+would have induced the supply, and the measured result was operating firms collapsing **227 → 19**.
+A firm that survives on reduced output keeps bidding for fuel, and the generation that answers it
+gets built.
+
+### Band
+
+**Industrial band only** (Ben, 2026-08-31). The ancient band gets no power analogue: `charcoal`
+already carries real household demand there and is not an orphan, so a second design against a band
+the prototype does not open on would be work without a reading behind it.
+
+---
+
+## Construction as a rate (Ben, 2026-08-31)
+
+**Construction becomes a sector with a throughput, not a per-building lump sum.** A **construction
+building** exists, runs a **production method**, draws that method's goods as upkeep, and produces
+construction capacity. Building projects consume that capacity.
+
+Ben's reason, and it is the strongest argument for the change:
+
+> *"This makes it easy to start with some construction of a certain method, and gives us an initial
+> demand for those construction goods."*
+
+### The channel it fixes
+
+Construction demand in the industrial band measures **0.000**, because `run_construction` fires only
+where something is actively building. It is episodic: nothing under construction, no demand. A sector
+makes it **continuous and economy-scaled** — capacity exists, draws its inputs every tick, and grows
+with the world. That is MARKETS.md property 1 satisfied by construction rather than asserted of it.
+
+And because generation can **seed construction capacity**, the demand for its inputs is non-zero from
+tick 0, in every market that has any. That is MARKETS.md property 5's *"every chain terminates in
+every market"* delivered by the generator rather than by authoring a basket.
+
+### The methods
+
+Five, era-banded exactly as recipes are (property 2):
+
+| Method | Band | Draws |
+|---|---|---|
+| Timber frame | ancient | timber, planks |
+| Stone and brick | ancient | stone, dressed stone, clay |
+| Iron frame | industrial | iron, timber |
+| Steel frame | industrial | steel |
+| Reinforced concrete | industrial | steel, stone, sand |
+
+Exact baskets and rates are a balance question and are **measured against the census**, never
+guessed. The ladder deliberately spans both bands, so the ancient band gains continuous construction
+demand too — it currently measures 56.3, better than industrial's zero and still episodic.
+
+### What it touches, and the debt it must clear
+
+This is a structural change, not an additive one: it reaches `construct_building`, placement, the
+build door, and **the AI scorer's capex model**.
+
+**NR-592 gets fixed here, on Ben's call.** `corp_ai.cpp` never prices `resource_build_cost` when
+scoring a build — a candidate scores on cash alone, and the seam refuses it at apply time if the
+materials are absent. Under a lump-sum model that is a missed opportunity. Under a **shared capacity
+pool it becomes a correctness problem**, because capacity is contended: a scorer that cannot see it
+will propose builds the pool cannot serve, every evaluation, for as long as the pool is short.
 
 Construction is a **market-gated, pay-as-you-build** process, not an instant purchase (BL-095,
 construction pacing). Placing a building gates only on affordability (the corp must be able to

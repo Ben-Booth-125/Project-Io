@@ -1835,6 +1835,66 @@
     "docs/economy/MARKETS.md"
    ],
    "design": "MEASURED 2026-08-31 with demand_census, ancient band, and it is a DIFFERENT failure from the industrial band's. Filed separately for that reason - the two bands need different fixes and conflating them is how one gets applied to the other.\n\nTHE ANCIENT BAND'S ENDPOINTS LARGELY WORK. BL-640's era-banded basket did what MARKETS.md property 2 asked: ceramics, dressed_stone, planks, leather, cloth and charcoal all carry real household demand. That half is not the problem.\n\nTHE MIDDLE IS. The chain does not convert:\n  fibre    produced 27613.5   demand   89.7   price 0.756x base (near floor)\n  leather  produced     6.8   demand   87.1   price 9.97x base, CEILED in 13 of 14 markets\n  cloth    produced  4245.5   demand  178.6   price 8.87x base, ceiled in 11 of 14\n  ceramics produced    63.5   demand  117.4   price 9.24x base, ceiled in 12 of 14\n\nRaw inputs pile up at the floor; the finished goods the household actually wants are produced in single digits and price at the ceiling in almost every market. The demand exists, the input exists, and the conversion between them does not happen.\n\nWHY IT MATTERS MORE THAN A TUNING NOTE: a good ceiled in 13 of 14 markets is not a shortage, it is an absent industry. Something is stopping firms from being built on a conversion whose output sells at ten times base with unmet demand - which on the face of it is the most profitable thing available in the band. That is a question about the scorer's build candidates, placement rules, or the recipe graph, and it should be diagnosed before it is tuned.\n\nCANDIDATE CAUSES, none confirmed - diagnose first: the input_demand_pull that BL-440 added may not reach these chains; placement rules may refuse the sites; the recipe may want an input that is itself unavailable; or the background-firm calibration (~90% of real demand, GENERATION_STRATEGY.md § The economic premise) may be seeding the world without the converting firms and the scorer may not be adding them.\n\nDO NOT FIX BY RAISING THE PRICE CEILING. The ceiling is doing its job by reporting the shortage; moving it hides the reading. Same reasoning as the project's refusal of clamps."
+  },
+  {
+   "id": "BL-708",
+   "short_name": "power as a grid",
+   "category": "Economy",
+   "title": "Power - generation buildings, an upkeep draw, and transmission on the road network",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 5,
+   "version_goal": null,
+   "sprint": "27",
+   "written": "2026-08-31",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/world/components.hpp",
+    "src/world/economy_system.cpp",
+    "src/world/logistics.cpp",
+    "scripts/economy.lua",
+    "scripts/recipes.lua",
+    "docs/economy/PRODUCTION.md",
+    "docs/economy/LOGISTICS.md",
+    "docs/economy/MARKETS.md"
+   ],
+   "design": "Ben, 2026-08-31: \"We should add upkeep costs of electricity, and power generation buildings.\" PRODUCTION.md § Power is the authority; LOGISTICS.md § 3a owns the transmission half.\n\nPOWER IS A GRID, NOT A GOOD AND NOT A POOL. Ben's ruling on how it moves: \"Power travels via road infrastructure, although it is different from a convoy, it has a 1 qtr travel time or weight. So if there is a connection from a power source to the player's HQ, they will be able to use the power on the next tick. Power can be stockpiled, but not infinitely.\"\n\nSo: never on the order book, never on a convoy, no market price. Connection decides who can draw it. Stockpiled with a CEILING, which is its one genuinely novel property against every other good in the model.\n\nIT NEEDS NO NEW GRAPH, and this is what makes it cheap rather than a second logistics layer. Connectivity is `tile_reach_cost` read as a boolean - FINITE means connected, INFINITY means not - so § 3's existing multi-source Dijkstra from supply anchors already answers the question. Latency is FLAT one tick regardless of distance, which is what makes it unlike a convoy despite sharing the road. And § 7's interdiction already severs the network, so cutting roads turns the lights off with no special case written.\n\nWHY IT CLOSES THE FUEL CHAIN, which is the reason it is worth building now. coal and petroleum are both on demand_census's 'extractable, NO market sink' list - petroleum produced 6169.9 against demand 0.000 in the industrial band. The generator buys its fuel ON THE MARKET as an ordinary processing input, which already bids. So the chain is fuel -> generator -> power -> building upkeep, terminating in upkeep, and the market demand created is demand for FUEL, priced normally and scaling with however much generation exists. Power itself never needs a channel.\n\nTHE SHORTFALL RULE IS THE BL-641 LESSON APPLIED BEFORE THE FACT: a building short of power SCALES ITS OUTPUT DOWN, it is not idled. An upkeep draw that idles a firm kills the buyer that would have induced the supply, and the measured cost of learning that was operating firms collapsing 227 -> 19. A firm on reduced output keeps bidding for fuel, and the generation that answers it gets built.\n\nINDUSTRIAL BAND ONLY (Ben, 2026-08-31). The ancient band gets no analogue - charcoal already carries real household demand there and is not an orphan.\n\nOPEN, AND FLAGGED RATHER THAN ASSUMED (NR-761): whether a corp can SELL power to another corp. This design says no - you generate for your own connected network - which is the reading of \"not a resource\". Selling is a natural later extension and the cleanest shape for it is a contract rather than a market good, since it is a standing relationship over a connection rather than a spot trade."
+  },
+  {
+   "id": "BL-709",
+   "short_name": "construction as a rate",
+   "category": "Economy",
+   "title": "Construction becomes a sector with a throughput and a production method, not a per-building lump sum",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 6,
+   "version_goal": null,
+   "sprint": "27",
+   "written": "2026-08-31",
+   "author": "Ben",
+   "requires": [
+    "BL-708"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/world/components.hpp",
+    "src/world/economy_system.cpp",
+    "src/world/corp_ai.cpp",
+    "src/world/placement_rules.cpp",
+    "src/ui/build_door.cpp",
+    "scripts/economy.lua",
+    "docs/economy/PRODUCTION.md",
+    "docs/economy/MARKETS.md"
+   ],
+   "design": "Ben, 2026-08-31: \"we should parameterize construction. We can use construction as a rate, and pay upkeep on construction buildings which costs (depending on production method). The costs can be wood, iron, steel, e.t.c. Very similar to Victoria 3 in my mind.\" PRODUCTION.md § Construction as a rate is the authority.\n\nTHE CHANNEL IT FIXES. Construction demand measures 0.000 in the industrial band because run_construction fires only where something is actively building - it is episodic, and when nothing is under construction the channel is silent. A sector makes it CONTINUOUS and ECONOMY-SCALED: capacity exists, draws its method's goods as upkeep every tick, and grows with the world. MARKETS.md property 1 satisfied by construction rather than asserted of it.\n\nBEN'S OWN REASON IS THE STRONGEST PART: \"This makes it easy to start with some construction of a certain method, and gives us an initial demand for those construction goods.\" Seeded capacity gives non-zero demand from TICK 0 in every market that has any - which is MARKETS.md property 5's 'every chain terminates in every market' delivered by the generator rather than by authoring a basket. It is also an asymmetry lever: a region seeded on timber frame wants different goods, and is differently capable, from one seeded on steel.\n\nFIVE METHODS, era-banded exactly as recipes are: timber frame and stone-and-brick (ancient); iron frame, steel frame and reinforced concrete (industrial). Baskets and rates are MEASURED against the census, never guessed. The ladder spans both bands deliberately, so the ancient band gains continuous construction demand too - it currently measures 56.3, better than zero and still episodic.\n\nIT IS STRUCTURAL, NOT ADDITIVE, and that is why it sits after BL-708 (power as a grid) rather than beside it. It reaches construct_building, placement rules, the build door, and the AI scorer's capex model.\n\nNR-592 IS FIXED HERE, on Ben's call (\"With the construction change - it must reason about a shared pool\"). corp_ai.cpp never prices resource_build_cost when scoring a build; a candidate scores on cash alone and the seam refuses it at apply time. Under a lump-sum model that is a missed opportunity. Under a SHARED CAPACITY POOL it becomes a correctness problem, because capacity is CONTENDED: a scorer blind to it will propose builds the pool cannot serve, every evaluation, for as long as the pool is short - which is the same thrash shape BL-696 just measured in the recipe margin-chase.\n\nMEASURE BETWEEN THE TWO ITEMS. Run demand_census after BL-708 and again after this, so what power did and what construction did can be told apart."
   }
  ]
 }

@@ -1779,6 +1779,27 @@
     "docs/economy/MARKETS.md"
    ],
    "resolution": "WITHDRAWN. The question was already settled and already owned, and I filed it anyway.\n\nBL-654 (a channel must bid) exists, is status `designed`, and carries Ben's ruling from 2026-08-26: \"Buy on the market, but at a threshold, buying is not allowed. This goes hand in hand with maximum and minimum prices for goods.\" ONE RULE FOR EVERY GOODS DRAW - unit upkeep takes the same shape, not a second one. It is written into MARKETS.md § Settled.\n\nTHE WORK, per that item: a short pool bids the shortfall into market_component::demand and PAYS for what it gets; above a reservation ceiling it does not bid at all and the existing shortfall rule weakens the building or unit instead. The ceiling is authored in the PRICE BAND family beside floor_mult/ceil_mult - a statement about what a good is worth paying, not about who is buying - and its value is MEASURED against the census and the operating-firm count, never guessed. It is the exact mirror of BL-386's seller-side floor_price: both sides may decline a trade, neither may dictate one.\n\nBL-654 also already anticipated the sharper half of the question I was going to ask: whether a short pool BUYS (spending credits, making upkeep a market participant) or merely SIGNALS (raising price without a transaction). Its own note calls the second \"a thumb on the scale [that] should probably be refused on the same grounds the project refuses clamps\", and Ben's ruling took the first.\n\nHOW I GOT HERE, recorded because it is a repeatable mistake. I read the open question in scripts/economy.lua's BL-641 comment - which is genuine and correctly says the call is Ben's - and filed it without running backlog_query first. The comment was written BEFORE the ruling and was never updated, so the file still reads as open while the backlog has the answer. Both my own memory and CLAUDE.md say to check the owning store before trusting a filed premise; I checked the code and not the store.\n\nNOTHING IS LOST: the analysis stands and is reproduced in BL-654's own prose. The only cost was a redundant entry and a wrong first line in sprint 27's plan, both corrected."
+  },
+  {
+   "id": "NR-761",
+   "kind": "question",
+   "status": "open",
+   "raised": "2026-08-31",
+   "title": "Can a corporation SELL power to another corporation?",
+   "source": "Sprint 27 design session on power, 2026-08-31. Ben answered how power MOVES; this is the half his answer leaves open.",
+   "what": "Ben settled that power is \"not a resource\" and that it travels on the road network with a flat one-tick latency to anything connected. What that leaves open is whether power is ever SOLD.\n\nTHE DESIGN AS WRITTEN SAYS NO: a corp generates for its own connected network, and the market demand power creates is the generator's FUEL purchase, not a trade in power itself. That reading is what makes \"not a resource\" coherent - no order book entry, no price, no convoy.\n\nIT IS ALSO A REAL CONSTRAINT ON THE PLAYER, which may be exactly right or may be too harsh. A corp with no fuel access and no generation is simply short of power, and cannot buy its way out. That is asymmetry with a cause, which GENERATION_STRATEGY.md § Asymmetry is the deliverable actively wants. But selling power is also an obvious business, and a world where nobody can is a world missing a firm type.\n\nTHE SHAPE IF THE ANSWER IS YES, and it is not a market good: power is a standing relationship over a CONNECTION, not a spot trade in a fungible cargo - so the natural home is a CONTRACT (docs/economy/CONTRACTS.md, the BL-350 procurement seam) rather than the order book. A supply agreement between two corps whose networks touch, priced per tick, terminable. That keeps power off the market while making it sellable, and it reuses a seam that exists.\n\nNOT URGENT. BL-708 (power as a grid) is coherent and buildable without it, and the fuel-chain endpoint - which is the whole reason power is being built this sprint - does not depend on the answer either way.",
+   "why_it_matters": "It decides whether power is infrastructure a corp builds for itself or a commodity with a market. The first is simpler and creates sharper regional asymmetry; the second adds a firm type and a reason to build generation beyond your own needs. Cheap to answer now, and awkward once generation buildings are tuned against one assumption.",
+   "options": [
+    "NO - power is infrastructure you build for yourself. Simplest, sharpest asymmetry, and what the design as written assumes.",
+    "YES, via CONTRACT - a standing supply agreement between connected corps through the existing procurement seam. Keeps power off the order book while making it sellable.",
+    "YES, as a market good - overturns \"not a resource\" and needs power to acquire a price, a reach model for trading it, and an answer to what a convoy carrying electricity means."
+   ],
+   "recommendation": "Build BL-708 on option 1 and leave the question open - the item is coherent without it and nothing about the fuel endpoint depends on it. If it turns out that power-poor regions feel stuck rather than challenged when watched, option 2 is the answer and the contract seam already exists to carry it. Option 3 should probably be refused: it reintroduces every question 'not a resource' was chosen to avoid.",
+   "files": [
+    "docs/economy/PRODUCTION.md",
+    "docs/economy/CONTRACTS.md",
+    "docs/economy/LOGISTICS.md"
+   ]
   }
  ]
 }

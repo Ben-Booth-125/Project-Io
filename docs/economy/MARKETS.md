@@ -283,6 +283,21 @@ So the second half is **suppositional**: self-sufficiency is expected to be poss
 unevenly distributed. What generation owes is the **spread**, not the floor. See
 `docs/generation/GENERATION_STRATEGY.md` § Asymmetry is the deliverable.
 
+**6. Two channels are settled by the power and construction design** (Ben, 2026-08-31), and both
+are worth naming here because they change what the register measures.
+
+**Construction stops being episodic.** It becomes a *sector* with a throughput that draws its
+method's goods as upkeep every tick, rather than a per-project lump that fires only while something
+is building — which is why the channel currently measures 0.000 in the industrial band. Seeded
+capacity gives it a non-zero reading from tick 0. `docs/economy/PRODUCTION.md` § Construction as a
+rate owns it.
+
+**Power is deliberately NOT a channel, and that is the point.** Electricity is a grid quantity, not a
+traded good: it never enters the order book and has no market price. What reaches the market is the
+**generator's fuel purchase**, as an ordinary processing input — so `coal` and `petroleum`, both
+currently on the *extractable, no market sink* list, gain a buyer without power itself needing a
+channel. `docs/economy/PRODUCTION.md` § Power and `docs/economy/LOGISTICS.md` § 3a own it.
+
 ### Settled: a short pool BUYS, up to a reservation ceiling
 
 Ben's ruling, 2026-08-26 (BL-654): *"Buy on the market, but at a threshold, buying is not allowed.
