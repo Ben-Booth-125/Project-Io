@@ -4101,37 +4101,37 @@
   {
    "brief": "selectable-1960s-start",
    "title": "BL-705 - the 1960s start is selectable and the epoch reads world_params",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-705 - Sprint 26, watch the AI play",
    "batch": "sprint-26-wave-1",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: a world-generation harness run at 1960"
      ],
      "requirement": "A campaign can be started with world_params::epoch_year = 1960 without editing a source default, and it generates: era_band_for_epoch puts the registry on the industrial band and the antiquity prehistory is skipped.",
-     "notes": "The branch is live today and simply unreachable - nothing in src/ sets epoch_year."
+     "notes": "The branch is live today and simply unreachable - nothing in src/ sets epoch_year. DONE: --epoch <year>, applied at all four app construction sites, validated as the value that lands. Verified live: --autostart --epoch 1960 exits 0, setup_world 0 ms (antiquity prehistory correctly skipped)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: the time panel and the AI decision feed, one capture per start"
      ],
      "requirement": "The displayed campaign year derives from world_params::epoch_year, not from a hard-coded constant. A 0 CE campaign renders 0 CE dates and a 1960 campaign renders 1960 dates.",
-     "notes": "Today campaign_epoch_year is a hard-coded 1960 in format.hpp:82 AND planetology.hpp:275, tied by a static_assert in tile_inspector.cpp, and no UI site reads world_params. A 1960s start makes the constant ACCIDENTALLY correct - fix it anyway."
+     "notes": "Today campaign_epoch_year is a hard-coded 1960 in format.hpp:82 AND planetology.hpp:275, tied by a static_assert in tile_inspector.cpp, and no UI site reads world_params. A 1960s start makes the constant ACCIDENTALLY correct - fix it anyway. DONE, and the fix was larger than the row assumed: the constant existed TWICE under one name. ::history_datum_year (serialised, stays constexpr) split from ui::fmt::campaign_epoch_year() (dynamic, published from live world_params). The static_assert was retired, not replaced - it had nothing left to guard."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: the existing generation harness set"
      ],
      "requirement": "The 0 CE start still generates and still passes the generation harnesses. Both starts remain supported.",
-     "notes": "Non-regression. ERAS.md § Where the ladder starts keeps both."
+     "notes": "Non-regression. ERAS.md § Where the ladder starts keeps both. DONE: era_world_harness rebuilt under the pinned MSVC toolchain on the MERGED tree - 13 passed, 0 failed, including its R4 0 CE determinism row and its R5 1960 rows. world_determinism digests unmoved."
     }
    ]
   },

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*107 entries — 103 open, 4 resolved.*
+*109 entries — 105 open, 4 resolved.*
 
 ---
 
@@ -1148,6 +1148,48 @@ The sibling problem in build_harness.js was FIXED at source this session (commit
 > **Recommendation:** Cheapest useful fix: have build_app.bat cold-configure when build/ is absent, using the same generator it always uses. Failing that, add the bootstrap command to the saved agent definitions so every agent uses the SAME toolchain rather than improvising one. Worth doing before wave 2 if it is quick.
 
 *Files: `build_app.bat`, `.claude/agents/ui-dev.md`, `.claude/agents/economy-dev.md`, `.claude/agents/generation-dev.md`*
+
+### NR-756 — campaign_epoch_year was one name over two quantities; the static_assert was retired rather than replaced
+*decision taken on your behalf · raised 2026-08-31 · from Sprint 26 wave 1, BL-705. Found by the slice-B agent, verified at the save seam by the main session.*
+
+The brief said "replace the static_assert with whatever keeps the two clocks honest once the value is dynamic". The agent concluded there is NOTHING LEFT TO GUARD, which is a stronger claim than the brief invited, and it is correct.
+
+THE TWO QUANTITIES, which shared a name and a static_assert:
+  - `::history_datum_year` (was `::campaign_epoch_year`, planetology.hpp) - the FIXED datum `history_event::years_before_epoch` counts back from. It is SERIALISED: save_game.cpp:127 writes years_before_epoch with w_i64. So it must stay constexpr - make it dynamic and a save reinterprets its own recorded history when loaded into a campaign with a different epoch.
+  - `ui::fmt::campaign_epoch_year()` - the year the LIVE campaign opens, published from world_params at the two sites that assign m_active_world_params. Display only; never enters `world`, never reaches the save seam.
+
+Welding them with a static_assert is precisely what pinned the tick calendar at 1960 while every default campaign generated at 0 CE. One name over two quantities is what kept it wrong, and no amount of making 'the value' dynamic would have fixed it while both readings shared the name.
+
+I VERIFIED THE SERIALISATION CLAIM MYSELF at save_game.cpp before accepting a static_assert removal - that is the class of change that is cheap to wave through and expensive to be wrong about.
+
+WHAT WAS GIVEN UP: nothing measurable. format_history_date renders recorded history as an absolute calendar year (history_datum_year - y), correct at any epoch, and its >= 10 kyr branch is the geological before-present convention whose datum is fixed by design. planetology_harness's R14 assertion changed LABEL only ('the campaign epoch is year zero' -> 'the history datum is year zero'), not value.
+
+**Why it matters.** A retired check is a check nobody re-derives later. This entry is the argument for why the guard was wrong rather than merely inconvenient, so a future reader finding an unguarded pair does not reinstate it.
+
+> **Recommendation:** No action. Recorded as the reasoning behind a removal. If anything, the lesson generalises: a static_assert between two values is only meaningful if they are the same QUANTITY, and this one asserted an identity between a display value and a serialisation datum that were never required to agree.
+
+*Files: `src/world/planetology.hpp`, `src/ui/format.hpp`, `src/ui/format.cpp`, `src/core/save_game.cpp`*
+
+### NR-757 — There is no scripted capture of a 1960s world - --epoch deliberately does not reach --verify
+*observation · raised 2026-08-31 · from Sprint 26 wave 1, BL-705, flagged by the slice-B agent and confirmed at merge.*
+
+--epoch is parsed BELOW the --verify / --verify-all / --serve dispatch, so those three never see it. That is deliberate and correct as far as it goes: every golden and every pinned band in the verify suite is taken against the default world, and giving --verify a second epoch means a second golden set.
+
+THE CONSEQUENCE IS REAL THOUGH: there is currently NO WAY to take a scripted visual capture of a 1960s world. Every scripts/verify/*.lua check runs at 0 CE.
+
+IT LANDS ON BL-703 (watch session finding), which is this sprint's actual deliverable. That item watches a 1960s world through the live app, and it now has no scripted capture available as a fallback or as evidence - the finding will rest on live observation and on whatever BL-704's trace export produces.
+
+Worth knowing BEFORE that item starts rather than discovering it inside it.
+
+**Why it matters.** The sprint's stated goal is to WATCH the AI play on the 1960s start. Half the project's verification culture - the visual tier - cannot see that world at all, so any regression there is invisible to the automated suite.
+
+- Leave it. The 1960s start is new and unproven; a second golden set for a world still being shaped would be re-blessed constantly.
+- Wire --epoch to --verify and bless a SMALL 1960s capture set - just the surfaces BL-703 needs to read (decision feed, time panel, a body canvas), not the whole suite.
+- Wire it and take captures WITHOUT blessing them - capture-and-look, no goldens. Gets evidence into the sprint without committing to maintaining a second set.
+
+> **Recommendation:** Option 3 for this sprint. It gets BL-703 real artifacts to point at with no golden-maintenance cost, and it defers the option-2 question until the 1960s world has stopped moving. Option 1 is defensible if BL-703's live watch turns out to be enough on its own.
+
+*Files: `src/main.cpp`, `scripts/verify/`, `docs/development/DEVELOPMENT_PRACTICES.md`*
 
 ---
 

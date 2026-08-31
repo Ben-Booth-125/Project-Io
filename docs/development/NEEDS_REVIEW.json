@@ -1674,6 +1674,44 @@
     ".claude/agents/economy-dev.md",
     ".claude/agents/generation-dev.md"
    ]
+  },
+  {
+   "id": "NR-756",
+   "kind": "decision-taken",
+   "status": "open",
+   "raised": "2026-08-31",
+   "title": "campaign_epoch_year was one name over two quantities; the static_assert was retired rather than replaced",
+   "source": "Sprint 26 wave 1, BL-705. Found by the slice-B agent, verified at the save seam by the main session.",
+   "what": "The brief said \"replace the static_assert with whatever keeps the two clocks honest once the value is dynamic\". The agent concluded there is NOTHING LEFT TO GUARD, which is a stronger claim than the brief invited, and it is correct.\n\nTHE TWO QUANTITIES, which shared a name and a static_assert:\n  - `::history_datum_year` (was `::campaign_epoch_year`, planetology.hpp) - the FIXED datum `history_event::years_before_epoch` counts back from. It is SERIALISED: save_game.cpp:127 writes years_before_epoch with w_i64. So it must stay constexpr - make it dynamic and a save reinterprets its own recorded history when loaded into a campaign with a different epoch.\n  - `ui::fmt::campaign_epoch_year()` - the year the LIVE campaign opens, published from world_params at the two sites that assign m_active_world_params. Display only; never enters `world`, never reaches the save seam.\n\nWelding them with a static_assert is precisely what pinned the tick calendar at 1960 while every default campaign generated at 0 CE. One name over two quantities is what kept it wrong, and no amount of making 'the value' dynamic would have fixed it while both readings shared the name.\n\nI VERIFIED THE SERIALISATION CLAIM MYSELF at save_game.cpp before accepting a static_assert removal - that is the class of change that is cheap to wave through and expensive to be wrong about.\n\nWHAT WAS GIVEN UP: nothing measurable. format_history_date renders recorded history as an absolute calendar year (history_datum_year - y), correct at any epoch, and its >= 10 kyr branch is the geological before-present convention whose datum is fixed by design. planetology_harness's R14 assertion changed LABEL only ('the campaign epoch is year zero' -> 'the history datum is year zero'), not value.",
+   "why_it_matters": "A retired check is a check nobody re-derives later. This entry is the argument for why the guard was wrong rather than merely inconvenient, so a future reader finding an unguarded pair does not reinstate it.",
+   "recommendation": "No action. Recorded as the reasoning behind a removal. If anything, the lesson generalises: a static_assert between two values is only meaningful if they are the same QUANTITY, and this one asserted an identity between a display value and a serialisation datum that were never required to agree.",
+   "files": [
+    "src/world/planetology.hpp",
+    "src/ui/format.hpp",
+    "src/ui/format.cpp",
+    "src/core/save_game.cpp"
+   ]
+  },
+  {
+   "id": "NR-757",
+   "kind": "observation",
+   "status": "open",
+   "raised": "2026-08-31",
+   "title": "There is no scripted capture of a 1960s world - --epoch deliberately does not reach --verify",
+   "source": "Sprint 26 wave 1, BL-705, flagged by the slice-B agent and confirmed at merge.",
+   "what": "--epoch is parsed BELOW the --verify / --verify-all / --serve dispatch, so those three never see it. That is deliberate and correct as far as it goes: every golden and every pinned band in the verify suite is taken against the default world, and giving --verify a second epoch means a second golden set.\n\nTHE CONSEQUENCE IS REAL THOUGH: there is currently NO WAY to take a scripted visual capture of a 1960s world. Every scripts/verify/*.lua check runs at 0 CE.\n\nIT LANDS ON BL-703 (watch session finding), which is this sprint's actual deliverable. That item watches a 1960s world through the live app, and it now has no scripted capture available as a fallback or as evidence - the finding will rest on live observation and on whatever BL-704's trace export produces.\n\nWorth knowing BEFORE that item starts rather than discovering it inside it.",
+   "why_it_matters": "The sprint's stated goal is to WATCH the AI play on the 1960s start. Half the project's verification culture - the visual tier - cannot see that world at all, so any regression there is invisible to the automated suite.",
+   "options": [
+    "Leave it. The 1960s start is new and unproven; a second golden set for a world still being shaped would be re-blessed constantly.",
+    "Wire --epoch to --verify and bless a SMALL 1960s capture set - just the surfaces BL-703 needs to read (decision feed, time panel, a body canvas), not the whole suite.",
+    "Wire it and take captures WITHOUT blessing them - capture-and-look, no goldens. Gets evidence into the sprint without committing to maintaining a second set."
+   ],
+   "recommendation": "Option 3 for this sprint. It gets BL-703 real artifacts to point at with no golden-maintenance cost, and it defers the option-2 question until the 1960s world has stopped moving. Option 1 is defensible if BL-703's live watch turns out to be enough on its own.",
+   "files": [
+    "src/main.cpp",
+    "scripts/verify/",
+    "docs/development/DEVELOPMENT_PRACTICES.md"
+   ]
   }
  ]
 }
