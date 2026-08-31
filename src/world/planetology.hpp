@@ -265,14 +265,28 @@ bool resolve_checkpoint(chain_stage stage_id, uint32_t seed, uint32_t stage_tag,
     return false;
 }
 
-/// The calendar year the campaign opens in — 1 January 1960 (ERAS.md § Era 0),
-/// and the zero point every `history_event` counts backwards from.
+/// The fixed reference year every `history_event::years_before_epoch` counts
+/// backwards from. A datum, NOT the campaign's start year.
 ///
-/// `ui::fmt::campaign_epoch_year` (src/ui/format.hpp) is the same year for the
-/// tick calendar; the two must agree, and tile_inspector.cpp static_asserts it
-/// where both are in scope. It is duplicated rather than shared because the
-/// world layer cannot include a UI header.
-constexpr int64_t campaign_epoch_year = 1960;
+/// RENAMED 2026-08-31 (BL-705), from `campaign_epoch_year`. Under that name it
+/// looked like a second copy of the campaign epoch, and `tile_inspector.cpp`
+/// static_asserted it equal to `ui::fmt::campaign_epoch_year` — which pinned
+/// the tick calendar to 1960 even though `world_params::epoch_year` had
+/// defaulted to 0 since the ancient refocus (NR-177). Two different quantities
+/// wearing one name is what kept that wrong.
+///
+/// It is deliberately a CONSTANT and must stay one: `years_before_epoch` is a
+/// stored, serialised field, so the datum it is measured against cannot move
+/// with the campaign's start year without invalidating every save and golden.
+/// Nothing is lost by fixing it — `format_history_date` renders recorded
+/// history as an absolute calendar year (`history_datum_year - y`), which is
+/// correct at any epoch, and the "N years ago" branch it takes above 10 kyr is
+/// the geological before-present convention, whose datum is fixed by design.
+///
+/// The campaign's own start year is `world_params::epoch_year`
+/// (world/hard_coded_world.hpp); the tick calendar reads it via
+/// `ui::fmt::campaign_epoch_year()`.
+constexpr int64_t history_datum_year = 1960;
 
 /// Convert deep time in billions of years to the stored representation.
 ///
@@ -290,7 +304,7 @@ constexpr int64_t years_from_gya(float gya)
 /// stored representation. The historical ladder's entry point.
 constexpr int64_t years_from_calendar_year(int64_t year)
 {
-    return campaign_epoch_year - year;
+    return history_datum_year - year;
 }
 
 /// One dated line of a body's history. `event` is the left column (what
