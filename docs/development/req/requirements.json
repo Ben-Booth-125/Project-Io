@@ -4023,6 +4023,302 @@
    "promoted_from": "backlog.json BL-666 (owner ledger destinations) - Sprint 23, UI visibility batch 2",
    "batch": "sprint-23-wave-1",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "live-spectate-route",
+   "title": "BL-695 - spectator mode is reachable from the running game",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-695 - Sprint 26, watch the AI play",
+   "batch": "sprint-26-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: spectator_determinism"
+     ],
+     "requirement": "A session started in spectator mode has ui_state::spectating true without any --verify script running, and run_economy_step receives it: every corp including world::player_entity evaluates on the staggered cadence.",
+     "notes": "The entry route is the item's design call (CLI flag first cut; wizard is the question). What this row asserts is that the route ARRIVES at the flag."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: spectator_determinism"
+     ],
+     "requirement": "spectator_determinism passes unchanged: the flag still DEFAULTS FALSE so an ordinary played session is byte-identical, and admitting one more corp shifts no rival's cadence slot.",
+     "notes": "The two properties the standing rule names. Do NOT re-bless its constant to make a change fit - a failure here is the change being wrong."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "visual: live click"
+     ],
+     "requirement": "Live: start the app in spectate, watch at least one economy tick resolve, and confirm rival corps act while no seat is held.",
+     "notes": "Interactive surface - a capture is not sufficient (DELIVERY.md step 4)."
+    }
+   ]
+  },
+  {
+   "brief": "spectate-god-view-control",
+   "title": "BL-702 - god view has a control under spectate",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-702 - Sprint 26, watch the AI play",
+   "batch": "sprint-26-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: live click"
+     ],
+     "requirement": "A control sets ui_state::god_view, is offered ONLY while spectating, and follows the toggle rule (clicking it while active turns it off).",
+     "notes": "time_panel.cpp:344-350 already has the offered-only-while-spectating shape."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "visual: a capture with the pair on, against one with god_view off"
+     ],
+     "requirement": "With the pair spectating && god_view true, a rival building's hover card and Selection page show its internals, and the survey mask lifts on the body canvas.",
+     "notes": "The read sites are body_surface_canvas.cpp, hover_content.cpp, selection_panel.cpp - all already gated on the pair."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: assertion or inspection of the read sites"
+     ],
+     "requirement": "god_view has no effect in a seated session: every read site tests the PAIR, so setting god_view without spectating changes nothing.",
+     "notes": "The safety property. It is already written this way; this row stops the control breaking it."
+    }
+   ]
+  },
+  {
+   "brief": "selectable-1960s-start",
+   "title": "BL-705 - the 1960s start is selectable and the epoch reads world_params",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-705 - Sprint 26, watch the AI play",
+   "batch": "sprint-26-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: a world-generation harness run at 1960"
+     ],
+     "requirement": "A campaign can be started with world_params::epoch_year = 1960 without editing a source default, and it generates: era_band_for_epoch puts the registry on the industrial band and the antiquity prehistory is skipped.",
+     "notes": "The branch is live today and simply unreachable - nothing in src/ sets epoch_year."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "visual: the time panel and the AI decision feed, one capture per start"
+     ],
+     "requirement": "The displayed campaign year derives from world_params::epoch_year, not from a hard-coded constant. A 0 CE campaign renders 0 CE dates and a 1960 campaign renders 1960 dates.",
+     "notes": "Today campaign_epoch_year is a hard-coded 1960 in format.hpp:82 AND planetology.hpp:275, tied by a static_assert in tile_inspector.cpp, and no UI site reads world_params. A 1960s start makes the constant ACCIDENTALLY correct - fix it anyway."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: the existing generation harness set"
+     ],
+     "requirement": "The 0 CE start still generates and still passes the generation harnesses. Both starts remain supported.",
+     "notes": "Non-regression. ERAS.md § Where the ladder starts keeps both."
+    }
+   ]
+  },
+  {
+   "brief": "composite-standing-index",
+   "title": "BL-700 - a corporation's standing is a composite",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-700 - Sprint 26, watch the AI play",
+   "batch": "sprint-26-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: corp_ai_harness or a new row asserting the composite responds to each component independently"
+     ],
+     "requirement": "A single function returns a corporation's composite standing from net worth, accumulated science, and summed unit_strength over its fielded units. All three components verified present: components.hpp:1343 (science), unit_roster.hpp (unit_strength, computed not stored).",
+     "notes": "Minted separately so BL-697 and BL-699 do not each invent their own number."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: two runs same seed, identical state_hash"
+     ],
+     "requirement": "The read is deterministic: taken at a settled point in the tick and stable under the sorted-corp iteration order, so the evaluation cadence cannot become the tiebreak.",
+     "notes": "The standing rule's constraint on every scorer input. Name the read point explicitly."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: inspection"
+     ],
+     "requirement": "Component weights live in corp_ai_params, so tuning the composite is a data change.",
+     "notes": "That file's own convention - trade_hold_threshold and siblings."
+    }
+   ]
+  },
+  {
+   "brief": "decision-feed-reasons",
+   "title": "BL-696 - the AI decision feed reports the real chosen candidate",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-696 - Sprint 26, watch the AI play",
+   "batch": "sprint-26-wave-1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: live click on the AI decisions ledger"
+     ],
+     "requirement": "Feed rows show the chosen candidate's actual score and its named reason. A run produces rows with more than one distinct reason and at least one non-zero score.",
+     "notes": "NR-626: today every row reads 'overridden' at 0.00, so the only window onto rival reasoning is blank."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: inspection plus the corp_ai harnesses"
+     ],
+     "requirement": "The cause is fixed where it lives - whether the score is not carried out of the scorer or is carried and not rendered - not patched at the render site.",
+     "notes": "corp_decision_reason already has a vocabulary (corp_ai.cpp ~285). The question is why the feed is not receiving it."
+    }
+   ]
+  },
+  {
+   "brief": "skill-harness-margin-metric",
+   "title": "BL-697 - the skill harness bands the spread in composite standing",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-697 - Sprint 26, watch the AI play",
+   "batch": "sprint-26-wave-2",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: ai_skill_harness"
+     ],
+     "requirement": "ai_skill_harness samples the spread in composite standing across the field on the existing SAMPLE_EVERY cadence and asserts it against a band.",
+     "notes": "Consumes BL-700's composite. Exact form (leader-over-median vs leader-over-second) is a design call to make against a real run's numbers, per Rule 0b."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: ai_skill_harness"
+     ],
+     "requirement": "The absolute net-worth bands survive as a SOLVENCY FLOOR beneath the spread band - a narrow spread achieved by everyone being broke is not a pass.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: ai_skill_harness"
+     ],
+     "requirement": "Bands re-derived from a fresh bless with dated provenance in the harness's own provenance-log idiom.",
+     "notes": "NR-305: the 2026-08-16 bands are stale against everything since. Re-derive, do not stretch."
+    }
+   ]
+  },
+  {
+   "brief": "rival-coalitions",
+   "title": "BL-699 - rivals score stance against standing, so coalitions form against the leader",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-699 - Sprint 26, watch the AI play",
+   "batch": "sprint-26-wave-2",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: corp_ai_harness"
+     ],
+     "requirement": "corp_ai scores the four BL-448 stance verbs (declare_hostile, offer_friendship, accept_friendship, return_to_neutral) and issues them through the corp-command seam. A run produces at least one stance change.",
+     "notes": "The verbs exist and the scorer names none of them today. No new verb is needed."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: a harness row over a run where one corp leads"
+     ],
+     "requirement": "Stance scoring reads composite standing, so hostility concentrates on the leading corporation and friendship on the field - and it reads no player seat.",
+     "notes": "Uniform by construction. It must NOT read world::player_entity."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "visual: live click on the AI decisions ledger"
+     ],
+     "requirement": "A stance change is legible: it emits into the decision feed with its reason. A coalition the player cannot see is the hidden handicap the whole design rejects.",
+     "notes": "A requirement of this item, not a follow-up."
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: build counts do not fall to zero for a corp under coalition pressure"
+     ],
+     "requirement": "Coalition pressure never vetoes construction or extension - a pressured corp still builds (Ben, 2026-08-31).",
+     "notes": "AI_OPPONENT.md § The constraint on restraint."
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: ai_skill_harness R0"
+     ],
+     "requirement": "Deterministic: pure, seeded, replayable; two runs on one seed produce an identical state_hash.",
+     "notes": "The standing rule's condition for the whole grant."
+    }
+   ]
+  },
+  {
+   "brief": "rival-trace-export",
+   "title": "BL-704 - a run exports a per-rival decision trace",
+   "status": "in-flight",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-704 - Sprint 26, watch the AI play",
+   "batch": "sprint-26-wave-3",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: run and inspect the artifact"
+     ],
+     "requirement": "A run produces a readable per-corp trace of chosen candidate, score, runners-up, reason and tick.",
+     "notes": "FIRST check whether the existing world history log (history_log.{hpp,cpp}, decision topic) already carries this - a reader over it beats a new export."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: ai_skill_harness R0 with tracing toggled"
+     ],
+     "requirement": "The trace is an observation and never an input: a run with tracing on and one with it off produce the same state_hash.",
+     "notes": "Non-negotiable."
+    }
+   ]
   }
  ]
 }
