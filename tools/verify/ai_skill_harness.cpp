@@ -46,6 +46,7 @@
 #include "harness_params.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/survey_system.hpp" // init_survey_states - the app runs it, this harness did not
 #include "world/tech_gate.hpp" // BL-325 S2: advance_tech_gates must run for military_base to ever unlock
 #include "world/world.hpp"
 
@@ -258,6 +259,13 @@ rollout_metrics run_rollout(uint32_t seed, int ticks)
     world_params params;
     params.seed = seed;
     world w = make_hard_coded_world(no_prehistory(params));
+    // EXPERIMENT 2026-08-31: the app calls init_survey_states at campaign start
+    // (app.cpp) and this harness never did, so every body - HOME INCLUDED - stayed
+    // `hidden`, and rank_extraction_sites returns an empty candidate list on a
+    // hidden body. Same class as the default-recipe gap named below: a pass the
+    // app runs that the benchmark did not, so the benchmark measured a world the
+    // game never produces.
+    init_survey_states(w);
     const recipe_registry reg = make_registry();
     // The default-recipe pass (2026-08-17). This harness never ran it, so every
     // GENERATED processor in the benchmark carried no_recipe for all 300 ticks —

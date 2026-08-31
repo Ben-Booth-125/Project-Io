@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*113 entries — 107 open, 6 resolved.*
+*114 entries — 108 open, 6 resolved.*
 
 ---
 
@@ -1191,7 +1191,7 @@ Worth knowing BEFORE that item starts rather than discovering it inside it.
 
 *Files: `src/main.cpp`, `scripts/verify/`, `docs/development/DEVELOPMENT_PRACTICES.md`*
 
-### NR-758 — Every AI corp goes bankrupt on every seed, and the cause is measured: five of eight demand channels do not exist
+### NR-758 — AI corps end most runs deeply insolvent - CORRECTED 2026-08-31, the original figures came from a world the game never produces
 *question · raised 2026-08-31 · from Sprint 26 wave 1 baseline. Measured by the main session with ai_skill_harness and demand_census, 2026-08-31.*
 
 THE OBSERVATION, from ai_skill_harness on the merged wave-1 tree. Five seeds, thirty econ ticks:
@@ -1228,13 +1228,34 @@ SO THE AI IS NOT PLAYING BADLY. It is playing a game with no demand side. A corp
 
 SPRINT 21 ALREADY KNOWS THIS and says so in its own goal: 'the ancient economy terminates in artisan goods nobody buys and most spawns are structurally unprofitable - not mistuned, UNBOUGHT'. It is PAUSED at wave 0, with the UI batches having taken priority.
 
+=== CORRECTION, 2026-08-31, SAME DAY. THE ORIGINAL FIGURES WERE MEASURED ON A WORLD THE GAME NEVER PRODUCES. ===
+
+Found by the BL-707 slice and verified in the main session: `init_survey_states` is called from `src/core/app.cpp` at campaign start and from `survey_harness.cpp`, and FROM NOWHERE ELSE. `make_hard_coded_world` does not call it. So every harness that builds a world through it - ai_skill_harness included - ran with EVERY BODY `hidden`, home included, and `rank_extraction_sites` returns an empty candidate list on a hidden body.
+
+Re-measured with `init_survey_states(w)` added to ai_skill_harness, five seeds, thirty ticks:
+
+  seed   BEFORE (hidden world)              AFTER (the app's world)
+  0      -624100.1  29/30  surv 0.71        -865882.7  29/30  surv 0.86
+  1      -997700.4  30/30  surv 0.86        -421331.0  27/30  surv 1.00
+  2      -694799.6  29/30  surv 0.86       -1064162.9  27/30  surv 1.00
+  3     -1234353.5  30/30  surv 0.86        -153923.5  28/30  surv 1.00
+  4     -1090065.2  29/30  surv 1.00        +60873.0  29/30  surv 1.00   <-- SOLVENT
+
+WHAT CHANGES. Seed 4 is now POSITIVE and its min is +5083.1 - net worth never goes below zero and it RECOVERS, so `final == min` is no longer universal. Seed 3 improved eight-fold. Survival is 1.00 on four of five seeds. The world the app produces is materially healthier than the world the benchmark measured.
+
+WHAT SURVIVES, and it is still the sprint's premise. Four of five seeds end deeply negative, every seed is insolvent 27-29 ticks of 30, and the demand_census finding is untouched: iron_ore produced 42991.6 against total demand 0.000 on the industrial band, five of eight channels absent, Industry shipping at zero. Demand is still the problem and no scorer change moves it.
+
+WHAT I GOT WRONG, plainly: I wrote 'every AI corp goes bankrupt on every seed' and built sprint 26's close-out and sprint 27's premise on it. The DIRECTION was right and the MAGNITUDE was overstated - one seed in five is solvent on the real world. The decision to close sprint 26 at wave 1 still holds on the surviving evidence (a coalition brake tuned against a field that is insolvent 28 ticks in 30 would still be tuned against noise), but the sentence 'every corp on every seed' should not be repeated.
+
+The band failure count moved 21 -> 25 with the fix, which is expected: the bands were already stale by 16 world-changing commits (NR-752) and this adds a real behavioural change on top.
+
 **Why it matters.** It decides what the rest of sprint 26 is worth. BL-699's coalitions form against 'whoever leads' - among corps at -624k to -1.2M the leader is the least bankrupt, so the brake has nothing meaningful to bite on and tuning it would be tuning against noise. BL-697's spread band would measure the distance between failures. And BL-703, the sprint's actual deliverable, would watch seven corporations go broke and call it the meta.
 
 - BUILD wave 2's mechanisms, do not tune or bless them. BL-699 lands as scored stance with its determinism and legibility rows green; BL-697 lands the spread metric with its band deliberately unblessed and a note saying why. BL-703 then reports on a bankrupt field, which is itself the most useful finding available.
 - PAUSE sprint 26 here and unpause sprint 21 (demand). The instruments now work - spectate, the feed, the standing index, the 1960s start - which was the sprint's stated goal. Resume the AI work against an economy where standing means something.
 - Do both in sequence: close sprint 26 at wave 1 as an instruments sprint, take demand next, and re-open the coalition work after.
 
-> **Recommendation:** Option 3, which is option 2 with the bookkeeping made honest. Wave 1 delivered exactly what the sprint goal named - spectator mode works and the feed reads - and that is a complete, defensible sprint. Building a coalition brake now means tuning its weights against a field whose standing is noise, and those weights are the whole design; they would need redoing the moment demand lands. The one thing I would still take from wave 2 is BL-697's spread METRIC without its band, since it is the instrument that will show demand working when it does.
+> **Recommendation:** Unchanged in direction: sprint 27 takes demand. But re-run this measurement after BL-654 lands rather than quoting the pre-correction figures, and treat NR-762 as the reason to distrust any harness-derived economic number taken before today.
 
 *Files: `tools/verify/ai_skill_harness.cpp`, `tools/verify/demand_census.cpp`, `docs/economy/MARKETS.md`, `docs/development/sprints.json`*
 
@@ -1266,6 +1287,33 @@ THE COMMON SHAPE: the things that CHECK the code are themselves unchecked. Every
 > **Recommendation:** Option 2 first - it is small, it targets the specific thing that makes these dangerous rather than merely annoying, and it would have caught the spectator_determinism mask immediately. Option 1 is the real answer but is a CI question and wants Ben's call on where it runs. Filing rather than building either, since both are outside this batch's scope.
 
 *Files: `CMakeLists.txt`, `tools/verify/build_harness.js`, `build_app.bat`, `.claude/skills/verifier-headless/SKILL.md`*
+
+### NR-762 — About thirty harnesses build a world the app never produces - nothing owns which app-start passes a harness must replicate
+*novel-work · raised 2026-08-31 · from Found by the BL-707 slice agent, 2026-08-31; verified and quantified in the main session.*
+
+`init_survey_states` is called from `src/core/app.cpp:1341` at campaign start, and from `tools/verify/survey_harness.cpp`. NOWHERE ELSE. `make_hard_coded_world` does not call it.
+
+So every harness building a world through `make_hard_coded_world` and not calling it by hand runs with EVERY BODY `hidden` - home included. `rank_extraction_sites` returns an empty candidate list on a hidden body, so no rival can site a mine anywhere, for any resource.
+
+COUNTED: about thirty harnesses. acquisition_viability, ai_skill_harness, build_spree_harness, convoy_cargo_census, corp_terrain_matrix, debt_decomposition, demand_census, determinism_harness, era_world_harness, haulage_measure, material_floor, ownership_class, population_demand_harness, pregame_balance_harness, province_capacity_probe and more.
+
+MEASURED CONSEQUENCE on ai_skill_harness alone (see NR-758): with survey initialised, one of five seeds flips from -1090065 to +60873 and never goes below zero, another improves eight-fold, and survival reaches 1.00 on four of five. The chain_conversion_probe shows iron_ore extraction sites going 30 -> 124 with survey on, against 30 -> 30 without.
+
+THIS IS THE SECOND INSTANCE OF THE CLASS IN THIS ONE FILE. ai_skill_harness.cpp already carries a comment about the first: the default-recipe pass, which 'this harness never ran, so every GENERATED processor in the benchmark carried no_recipe for all 300 ticks - paying maintenance, never producing, and reporting as ordinary idleness.' Same shape, same file, found months apart.
+
+THE NOVELTY, and why it is filed as one: NO DOC OWNS the question 'which app-start passes must a world-building harness replicate'. `make_hard_coded_world` builds a world; `app::start_new_game` then runs a tail of passes on it; and the boundary between them is defined by nothing except which passes somebody remembered. Every harness re-answers it independently, silently, and wrongly by default.
+
+THE DANGEROUS PROPERTY is that the failure is INVISIBLE AND GREEN. A harness measuring the wrong world does not fail - it reports confidently on a world that does not exist, and its goldens then encode that world. This is the same class as the stale-prebuilt-exe problem (NR-759) and has the same cost: a green result nobody can trust.
+
+**Why it matters.** Every economic conclusion this project has drawn from a harness may be measuring a world with no mines. That includes BL-634's acquisition viability, BL-635's spawn diagnosis, the haulage baseline, and the bankruptcy figure this sprint's whole premise rested on - which moved materially when corrected.
+
+- A shared `harness_world()` helper that runs make_hard_coded_world PLUS every app-start tail pass, which every harness uses instead of calling make_hard_coded_world directly. One definition, one place to fix the next time a pass is added.
+- Fix ai_skill_harness and demand_census now (the two this sprint depends on) and file the rest as a sweep.
+- Audit first: run the ~30 harnesses with and without and report which ones actually move, before changing any.
+
+> **Recommendation:** Option 1 is the real answer and it is the shape `no_prehistory()` already establishes - a shared helper in harness_params.hpp that harnesses call instead of hand-rolling their world setup. But it moves every golden in the project at once, so it wants to be its own item with Ben's timing, not a thing this batch absorbs. Option 3 first would tell us how big option 1 actually is, and is cheap: the probe to do it now exists.
+
+*Files: `tools/verify/harness_params.hpp`, `tools/verify/ai_skill_harness.cpp`, `tools/verify/demand_census.cpp`, `src/core/app.cpp`, `src/world/hard_coded_world.cpp`*
 
 ---
 
