@@ -553,10 +553,27 @@ threshold, never a duplicate, and never on the player's own corp.
 **The decision record.** Each applied command is a `corp_decision` — `{tick, corp, command,
 winning_score, runner_up, reason}` — in `corp_decision_ring`, a 256-entry ring that is derived
 observability, not save-format state. `runner_up` is **the best candidate the corp did not take**
-in that evaluation (rejected by a budget, the one-touch rule, the solvency gate or the seam), the
-same value on every decision from one evaluation — the foregone option belongs to the evaluation,
-not the command (NR-232). Because candidates sort by bucket before score, `runner_up` can
-legitimately exceed `winning_score` (NR-226); aggregators must not treat the two as a contest.
+in that evaluation (rejected by a budget, the one-touch rule or the solvency gate) — the foregone
+option belongs to the evaluation, not the command (NR-232).
+
+**A command the seam refused is not a foregone option.** `apply_corp_command` mutates nothing on
+refusal, so a refused candidate was never available to take, and it belongs in no counterfactual.
+This is not a corner case: the recipe margin-chase is deliberately enumerated without the switch
+cost and without the cooldown the seam applies, so the same high-scoring chases are proposed and
+refused every evaluation — enough, on the shipped world, to make the top refusal the runner-up of
+every decision a corp took.
+
+**Scored within one budget family, never across.** The candidate families — build, dial, survey,
+hire, trade, dispatch — are the six action budgets above, and each is scored by **one formula in
+one unit**: a build by `net² / capex`, a dial by the estimator's modelled per-tick gain, a trade
+by `quantity × floor`, a dispatch by `revenue − leg cost`. Those scales are unrelated, so a
+comparison across families states nothing, and an evaluation-wide maximum makes
+`runner_up ≥ winning_score` the ordinary case — which is a decision surface that reports the same
+thing about every decision. The runner-up is therefore **the best option foregone in the winner's
+own family**: the competition this command actually won. Because candidates sort by bucket before
+score, `runner_up` can still legitimately exceed `winning_score` within a family (NR-226) —
+a Must-Have idle displacing a higher-scoring Should-Have dial; aggregators must not treat the two
+as a contest.
 
 ---
 

@@ -195,6 +195,54 @@ struct candidate
     corp_priority_bucket  bucket = corp_priority_bucket::nice_to_have;
 };
 
+/// The BUDGET CLASS a candidate competes in — and, by construction, the only
+/// grouping in which two candidate scores are COMPARABLE (BL-696).
+///
+/// Each family is scored by ONE formula in ONE unit: a build by `net^2 / capex`
+/// (capital efficiency), a dial by the estimator's modelled `gain` (credits per
+/// tick), a trade by `quantity x floor` (credits), a dispatch by
+/// `revenue - leg cost` (credits), a survey by `area / cost`, a hire by the
+/// roster row's weight. Those numbers live on wildly different scales — a
+/// listing of accumulated stock routinely scores in the hundreds while a
+/// perfectly good workforce dial scores 3 — so a comparison ACROSS families
+/// states nothing. Each family also has its own action budget below, which is
+/// what makes this the grouping a candidate genuinely competed in.
+///
+/// The classification mirrors the per-candidate booleans the selection loop
+/// already used, and is now their single definition so the two cannot drift.
+enum class candidate_family : uint8_t
+{
+    build = 0, ///< `construct_building` — one per evaluation (`max_builds`).
+    dial,      ///< recipe / workforce / idle / resume — `max_dials` per evaluation.
+    survey,    ///< paid discovery — one per evaluation.
+    hire,      ///< `hire_unit` — one per evaluation.
+    trade,     ///< order-book commands — `max_trades` per evaluation.
+    dispatch,  ///< directed convoys — `max_dispatches` per evaluation.
+};
+
+inline constexpr std::size_t candidate_family_count =
+    static_cast<std::size_t>(candidate_family::dispatch) + 1;
+
+/// The family a command competes in. `dial` is the default arm deliberately:
+/// it is the "acts on one of my own buildings" case, which is what every verb
+/// not named below is, and what the one-touch-per-building rule keys off.
+candidate_family family_of(const corp_command& cmd)
+{
+    switch (cmd.verb)
+    {
+        case corp_verb::build:             return candidate_family::build;
+        case corp_verb::survey:            return candidate_family::survey;
+        case corp_verb::hire_unit:         return candidate_family::hire;
+        // A trade's subject is a BODY and a dispatch's is a MARKET, so neither
+        // takes a dial slot nor records a building cooldown — see the selection
+        // loop, where that reasoning is spelt out.
+        case corp_verb::place_sell_order:
+        case corp_verb::remove_sell_order: return candidate_family::trade;
+        case corp_verb::dispatch_convoy:   return candidate_family::dispatch;
+        default:                           return candidate_family::dial;
+    }
+}
+
 /// Deterministic ordering: bucket asc FIRST (a lower bucket may never starve
 /// a higher one — AI_OPPONENT.md §2B), then score desc, then verb, subject,
 /// tile as the existing BL-202 tie-break.
@@ -1741,9 +1789,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         //
         // It now records **the best option this corp did NOT take** — the
         // highest-scoring candidate rejected anywhere in the walk, by an action
-        // budget, the one-touch rule, the solvency gate, or the seam itself.
-        // That is what the field's name always claimed, and it is the
-        // counterfactual a reader actually wants: "what did it pass up?"
+        // budget, the one-touch rule or the solvency gate. That is what the
+        // field's name always claimed, and it is the counterfactual a reader
+        // actually wants: "what did it pass up?"
+        //
+        // "or the seam itself" was in that list until BL-696 and is now
+        // deliberately absent — a command the seam refuses was never an option
+        // to pass up. See the refusal branch below, which is where the whole
+        // argument lives.
         //
         // Consequences, both deliberate:
         //  - It is knowable only once the WHOLE list has been walked (a
@@ -1752,39 +1805,74 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         //    application order. The ring and the history log are still written
         //    one-for-one in that same order, so the feed's positional pairing
         //    between them is unchanged.
-        //  - Every decision from one evaluation therefore carries the SAME
-        //    runner-up. That is honest: the foregone option belongs to the
-        //    evaluation, not to the individual command.
+        //  - Every decision from one evaluation carried the SAME runner-up.
+        //    That much is now qualified by BL-696 below: the value is per
+        //    FAMILY, so two decisions from one evaluation share a runner-up
+        //    only when they competed for the same budget. The foregone option
+        //    still belongs to the evaluation rather than to the individual
+        //    command — it just belongs to one competition within it.
         //
         // Zero still means "nothing was passed up" — every enumerated candidate
-        // was acted on — which the feed renders as "uncontested".
+        // of that family was acted on — which the feed renders as "uncontested".
+        //
+        // BL-696 (the decision feed reads zero) narrows the field ONE further
+        // step, and the narrowing is what makes it mean anything at all. It was
+        // a single scalar broadcast onto every decision from the evaluation —
+        // the best foregone candidate of ANY family — and the feed divides the
+        // pair (`win / (win + run)`, decision_feed.cpp § read_margin) to draw a
+        // conviction bar. That division is only defined if the two numbers share
+        // a scale, and across families they do not: a foregone sell order scores
+        // in the hundreds of credits while a good workforce dial scores 3. So
+        // `runner_up >= winning_score` became the ORDINARY case, every row read
+        // "overridden", every bar pinned to zero, and the one surface onto rival
+        // reasoning stated nothing. Measured on the shipped world (24 quarters,
+        // spectated): every dial row read `3.62 v 307.02` / `8.93 v 328.16`,
+        // the same runner-up on each, because one listing dominated the whole
+        // evaluation.
+        //
+        // The runner-up is therefore now PER FAMILY (`candidate_family` above):
+        // the best candidate this corp passed up IN THE COMPETITION THIS ONE
+        // WON. It is still NR-232's counterfactual — the best option not taken,
+        // rejected by a budget, the one-touch rule, the solvency gate or the
+        // seam — with the qualifier that was missing and load-bearing. NR-226
+        // still holds: a runner-up may legitimately exceed its winner, because
+        // candidates sort by BUCKET before score, so a Must-Have idle can
+        // displace a higher-scoring Should-Have dial in the same family.
+        //
+        // Nothing about SELECTION changes. `best_rejected` is written and read
+        // for the record only; the greedy walk never consults it, so the world
+        // this scorer produces is byte-identical either side of this change and
+        // only the logged margin moves.
         struct pending_decision { corp_decision d; entity_id log_body; };
         std::vector<pending_decision> pending;
-        float best_rejected = 0.0f;
+        std::array<float, candidate_family_count> best_rejected{}; // value-initialised: all 0
         const auto forgo = [&best_rejected](const candidate& cand) {
-            best_rejected = std::max(best_rejected, cand.score);
+            float& slot = best_rejected[static_cast<std::size_t>(family_of(cand.cmd))];
+            slot = std::max(slot, cand.score);
         };
         for (std::size_t i = 0; i < cands.size(); ++i)
         {
             const candidate& c = cands[i];
-            const bool is_build  = (c.cmd.verb == corp_verb::build);
-            const bool is_survey = (c.cmd.verb == corp_verb::survey);
-            const bool is_hire   = (c.cmd.verb == corp_verb::hire_unit);
+            // One classification, used by the budgets, the one-touch rule, the
+            // cooldown and the runner-up alike (BL-696 hoisted it into
+            // `family_of` so a seventh verb family cannot be added to one of
+            // those and forgotten in another).
+            //
             // Trade gets its own budget rather than sharing the dial budget: its
             // subject is a BODY, not a building, so neither the dial cap nor the
             // one-touch-per-building rule below means anything for it, and folding
             // it in would let a listing consume a dial slot a loss-maker needed.
             // Hire is excluded from the dial budget for the same reason (its
             // subject is a tile), and capped at one per evaluation besides.
-            const bool is_trade  = (c.cmd.verb == corp_verb::place_sell_order ||
-                                    c.cmd.verb == corp_verb::remove_sell_order);
-            // Directed dispatch (BL-600) is excluded from the dial budget for
-            // the identical reason trade is: its subject is a MARKET, not a
-            // building, so neither the dial cap nor the one-touch-per-building
-            // rule below means anything for it. Its own cap, same shape as
-            // hire's.
-            const bool is_dispatch = (c.cmd.verb == corp_verb::dispatch_convoy);
-            const bool is_dial   = !is_build && !is_survey && !is_hire && !is_trade && !is_dispatch;
+            // Directed dispatch (BL-600) is excluded for the identical reason:
+            // its subject is a MARKET. Its own cap, same shape as hire's.
+            const candidate_family fam = family_of(c.cmd);
+            const bool is_build    = (fam == candidate_family::build);
+            const bool is_survey   = (fam == candidate_family::survey);
+            const bool is_hire     = (fam == candidate_family::hire);
+            const bool is_trade    = (fam == candidate_family::trade);
+            const bool is_dispatch = (fam == candidate_family::dispatch);
+            const bool is_dial     = (fam == candidate_family::dial);
             // Every `continue` below is a FOREGONE candidate, and each one calls
             // forgo() so it can compete to be the decision log's runner-up.
             // A budget-capped candidate is the purest case of the thing the
@@ -1856,7 +1944,36 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             entity_id built = null_entity;
             if (apply_corp_command(w, reg, c.cmd, &built) != corp_command_result::applied)
             {
-                forgo(c);
+                // A SEAM REFUSAL IS NOT A FOREGONE OPTION, and this line is
+                // BL-696's actual cause (it called forgo(c) until 2026-08-31).
+                //
+                // NR-232's definition folded "rejected by the seam" in with
+                // "rejected by a budget or the solvency gate", and the three are
+                // not the same fact. A budget-capped candidate is an option the
+                // corp HAD and did not take — the counterfactual the feed's
+                // margin column exists to show. A seam-refused one was never
+                // available to take at all: `apply_corp_command` mutates nothing
+                // on refusal, and the corp made no choice about it.
+                //
+                // It matters because refusals are not rare, they are STRUCTURAL,
+                // and they carry the largest scores in the list. The recipe
+                // margin-chase (above) is deliberately enumerated WITHOUT the
+                // switch cost and WITHOUT the cooldown the seam enforces at
+                // apply time — BL-430's stated call — so the same handful of
+                // high-scoring chases are proposed and refused every evaluation.
+                // Measured on the shipped world (24 quarters, spectated):
+                // 160 of 249 rejections scoring over 50 were seam-refused
+                // `set_recipe` candidates, so the top refused chase became the
+                // runner-up on EVERY decision that corp took, every row in the
+                // feed read "overridden", and the conviction bar sat at zero on
+                // all of them. The one surface onto rival reasoning reported the
+                // same thing about every decision, which is the same as
+                // reporting nothing.
+                //
+                // Not counting a refusal is therefore the fix at the cause. The
+                // refusal itself is unchanged and still benign (see the
+                // apply-then-count note below): the candidate consumes no action
+                // slot and the next-best candidate is still tried.
                 continue; // a seam rejection mutates nothing; just skip it
             }
 
@@ -2012,7 +2129,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // decision with its agency event must match on fields, not on adjacency.
         for (pending_decision& pd : pending)
         {
-            pd.d.runner_up = best_rejected;
+            // BL-696: the best option foregone IN THIS DECISION'S OWN FAMILY —
+            // the only comparison that is on one scale (see `candidate_family`).
+            pd.d.runner_up =
+                best_rejected[static_cast<std::size_t>(family_of(pd.d.command))];
             w.ai_decisions.push(pd.d);
 
             world_history_entry log_entry;
