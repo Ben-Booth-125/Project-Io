@@ -285,7 +285,7 @@ int app::run(autostart_mode autostart)
     // headless --autostart passes; this covers what it cannot: the ImGui frames.
     if (windowed_autostart)
     {
-        m_pending_world_params = world_params{};
+        m_pending_world_params = fresh_world_params();
         open_new_world_wizard();
         m_autostart_wizard = 0; // the wizard's own draw advances rounds + presses Begin
         std::printf("[autostart-%s] walking the wizard, then Begin\n",
@@ -1178,9 +1178,22 @@ void app::step_economy()
     lap(8); // history recorders
 }
 
+world_params app::fresh_world_params() const
+{
+    world_params p{};
+    if (m_epoch_year_set) p.epoch_year = m_epoch_year_override;
+    return p;
+}
+
 void app::setup_world(world_params params)
 {
     m_active_world_params = params;          // remember the descriptor the live world was built from
+
+    // BL-705: the tick calendar counts from the year the world was GENERATED at,
+    // not from a constant. This and the load path below are the only two places
+    // m_active_world_params is assigned, so they are the two places that publish
+    // it. Display only — nothing simulated reads it back.
+    ui::fmt::set_campaign_epoch_year(static_cast<int>(params.epoch_year));
 
     // Capture the Planetology report alongside the world (BL-167). This is the one
     // call site, so filling it here gives both run() and run_verify() a report to
@@ -1590,6 +1603,9 @@ bool app::load_game_from(const std::string& path)
     m_world               = std::move(w);
     m_generation_report   = std::move(env.report);
     m_active_world_params = env.params;
+    // BL-705: a save carries the epoch its world was generated at, so the
+    // calendar follows the loaded world rather than the process's --epoch flag.
+    ui::fmt::set_campaign_epoch_year(static_cast<int>(env.params.epoch_year));
 
     m_sim_loop.restore(env.sim_tick, env.day_tick, env.econ_tick, env.elapsed_days, env.speed);
     m_prev_speed     = (env.speed > 0) ? env.speed : 1;

@@ -598,6 +598,10 @@
    "Command line. The ONLY route into spectator mode for a human — before BL-695 the mode was reachable solely from `verify.spectate()` behind --verify, i.e. it was a headless-script capability and not something a person could do."
   ],
   [
+   "chrome.epoch_cli",
+   "Command line. The only route to a start other than the default 0 CE one — the 1960s branch was live in world_params but reachable solely by editing a source default (BL-705)."
+  ],
+  [
    "canvas.border_band_select",
    "The national border band on the Planetary canvas — always-on chrome, not a lens. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths."
   ],

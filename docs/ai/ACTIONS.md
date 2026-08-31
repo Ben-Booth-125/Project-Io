@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*155 entries — 27 gameplay · 25 canvas · 15 lens · 54 ledger · 34 chrome.*
+*156 entries — 27 gameplay · 25 canvas · 15 lens · 54 ledger · 35 chrome.*
 
 ---
 
@@ -2245,4 +2245,20 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 **Expected output.** Opens the session with NOBODY SEATED (AI_OPPONENT.md § 10i): corp_ai_params::spectating is true for every economy tick, so the scored-utility layer evaluates the corp at world::player_entity on the same staggered cadence as every rival, and that field degrades to a camera and ledger anchor carrying no ownership meaning. The watcher sees a full field of seven-plus corporations all playing flat out. Also unlocks the spectate-only God view checkbox in the system menu (chrome.sysmenu_god_view), which is rendered only while this flag is set. ENTRY AT START AND ONLY AT START: § 10i removes the standing prohibition's SUBJECT rather than excepting the rule, which is a property of the whole session — a mid-run flip would change, halfway through, which corps the scorer may legally act on, so no control clears it. Off by default: an unspectated session is unchanged, which tools/verify/spectator_determinism.cpp asserts as its load-bearing property.
 
 **Reason to select.** To WATCH the AI play rather than play against it — see what strategies the scored-utility layer actually produces, and whether coalitions brake a runaway leader (AI_OPPONENT.md § Where restraint comes from), which is a question no seated session can answer because a seated corp is excluded from the scorer.
+
+### `chrome.epoch_cli` — Command line. The only route to a start other than the default 0 CE one — the 1960s branch was live in world_params but reachable solely by editing a source default (BL-705).
+
+**Press.** Launch with `ProjectIo --epoch <year>`. Composes with --autostart-play, --autostart-windowed, --autostart, --spectate and --host-agent.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `year` | `int` | undefined |
+
+**Valid when:**
+- Applies to a NEW world only. --load carries the save's own epoch, which overrides this flag.
+- Does NOT reach --verify, --verify-all or --serve: those dispatch above the parse and their goldens are all taken against the default world.
+
+**Expected output.** Sets world_params::epoch_year for every world this process generates. Below 1700 takes the antiquity branch and runs the Era −1 prehistory sim; at or above it the prehistory is skipped and era_band_for_epoch puts the recipe registry on the industrial band. 1960 is the industrial start (docs/economy/ERAS.md § Where the ladder starts); 0 is the default 0 CE ancient start. Both are supported and produce materially different worlds — measured at 1960: 40 nations / 104 corps / 9 markets, against 0 CE: 43 / 88 / 14. The UI calendar follows it: ui::fmt::campaign_epoch_year() is published from the live world_params, so a 1960 campaign renders 1960-based dates and a 0 CE campaign renders 0 CE ones. That is display only and never enters `world` — the serialised history datum (::history_datum_year) is a separate fixed constant and does not move with the epoch.
+
+**Reason to select.** To play or watch the era whose catastrophe is nuclear war (docs/economy/ERAS.md § The point of an Era) rather than the 0 CE ancient start. Ben, 2026-08-31: "we will be working on the 1960s start."
 

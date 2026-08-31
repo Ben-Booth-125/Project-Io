@@ -617,7 +617,7 @@ std::string format_history_date(int64_t years_before_epoch)
 
     // Recorded history: a calendar year, astronomical numbering (negative for
     // BCE), which is what the historical ladder's own lines want to read as.
-    const int64_t year = campaign_epoch_year - y;
+    const int64_t year = history_datum_year - y;
     std::snprintf(buf, sizeof buf, "%lld", static_cast<long long>(year));
     return buf;
 }

@@ -725,8 +725,8 @@ int main()
               "R14 a value needing round-half-up converts to the nearer year");
         check(years_from_gya(-1.0e-6f) == -1000LL,
               "R14 the negative branch of the rounding is symmetric");
-        check(years_from_calendar_year(campaign_epoch_year) == 0,
-              "R14 the campaign epoch is year zero");
+        check(years_from_calendar_year(history_datum_year) == 0,
+              "R14 the history datum is year zero");
         check(years_from_calendar_year(1687) == 273,
               "R14 a historical year converts to years-before-epoch");
         check(years_from_calendar_year(-3200) == 5160,

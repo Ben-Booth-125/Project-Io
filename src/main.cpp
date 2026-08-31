@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
@@ -519,6 +520,50 @@ int main(int argc, char* argv[])
             if (std::string(argv[i]) == "--spectate")
                 spectate = true;
 
+        // --epoch <year>  (BL-705): the calendar year every world this process
+        // generates BEGINS at — world_params::epoch_year. Below 1700 takes the
+        // antiquity branch (0 is the default 0 CE start); 1960 selects the
+        // industrial one, which puts the recipe registry on the industrial band
+        // and skips the Era -1 antiquity prehistory. Both starts are supported
+        // (docs/economy/ERAS.md § Where the ladder starts); before this flag the
+        // 1960s branch was live but reachable only by editing a source default.
+        //
+        // Applies to a NEW world. --load carries the save's own epoch. It is
+        // parsed here, below the --verify / --verify-all / --serve dispatch, so
+        // it does NOT reach those: their goldens and pinned bands are all taken
+        // against the default world, and giving them a second epoch would mean
+        // a second golden set. Deliberate, not an oversight.
+        bool         epoch_set  = false;
+        std::int64_t epoch_year = 0;
+        for (int i = 1; i < argc; ++i)
+        {
+            if (std::string(argv[i]) != "--epoch")
+                continue;
+            if (i + 1 >= argc)
+            {
+                std::fprintf(stderr, "ProjectIo: --epoch needs a calendar year\n");
+                return 1;
+            }
+            // Validated as the value that LANDS, not as a convenient parse: a
+            // bare atoll would read "--epoch nineteen-sixty" as 0 and silently
+            // generate the wrong world. Negative years are legitimate (BCE,
+            // astronomical numbering), so the band is symmetric.
+            const std::string  arg = argv[i + 1];
+            std::size_t        used = 0;
+            long long          y    = 0;
+            try                       { y = std::stoll(arg, &used); }
+            catch (const std::exception&) { used = 0; }
+            if (used != arg.size() || y < -100000 || y > 100000)
+            {
+                std::fprintf(stderr,
+                             "ProjectIo: --epoch expects a calendar year in "
+                             "-100000..100000 (got \"%s\")\n", arg.c_str());
+                return 1;
+            }
+            epoch_year = y;
+            epoch_set  = true;
+        }
+
         // --autostart: boot straight into a new campaign, headlessly, and exit.
         // Added 2026-08-12 to reproduce a crash that appears ONLY on the
         // interactive path: --verify calls setup_world directly and therefore
@@ -531,6 +576,7 @@ int main(int argc, char* argv[])
                 a.host_agent(agent_port);
                 if (spectate)
                     a.spectate_session();
+                if (epoch_set) a.set_epoch_year(epoch_year);
                 return a.run(app::autostart_mode::smoke);
             }
 
@@ -547,6 +593,7 @@ int main(int argc, char* argv[])
                 a.host_agent(agent_port);
                 if (spectate)
                     a.spectate_session();
+                if (epoch_set) a.set_epoch_year(epoch_year);
                 return a.run(app::autostart_mode::play);
             }
 
@@ -559,6 +606,7 @@ int main(int argc, char* argv[])
                 a.host_agent(agent_port);
                 if (spectate)
                     a.spectate_session();
+                if (epoch_set) a.set_epoch_year(epoch_year);
                 return a.run_autostart();
             }
 
@@ -575,6 +623,7 @@ int main(int argc, char* argv[])
             a.host_agent(agent_port);
             if (spectate)
                 a.spectate_session();
+            if (epoch_set) a.set_epoch_year(epoch_year);
             if (!load_path.empty())
                 a.open_save(load_path);
             return a.run();

@@ -281,7 +281,7 @@ int app::run_autostart()
 
     std::printf("[autostart] step 1: generating world (this is the ~25s one)\n");
     std::fflush(stdout);
-    m_pending_world_params = world_params{};
+    m_pending_world_params = fresh_world_params();
 
     // Mirror the INTERACTIVE path, not a convenient synchronous stand-in.
     // The wizard leaves its own surface build in flight when the player presses
@@ -494,7 +494,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // ~38 s on the Debug build, which is the entire reason batch mode exists. The
     // pristine snapshot taken after setup is what makes once safe: it is restored
     // before every script, so script order cannot leak state.
-    setup_world();
+    setup_world(fresh_world_params());
     load_economy();
 
     // BL-365's background firms belong in the verified world too (added 2026-08-13).
