@@ -803,6 +803,35 @@ target_link_libraries(acquisition_viability PRIVATE io_world_obj lua54)
 target_compile_features(acquisition_viability PRIVATE cxx_std_20)
 target_compile_options(acquisition_viability PRIVATE ${IO_WARNING_FLAGS})
 
+# demand_census (BL-649) is a FOURTH Lua-linked harness and was never declared
+# as one. It is the instrument Sprint 21 names for its own measurement - "per
+# resource, per band, who actually wants it" - and it calls lua_state,
+# recipe_registry::load_from_lua and world_gen_config::load_from_lua directly,
+# so the generic glob below (io_world_obj alone) leaves six unresolved externals
+# at link. It has therefore never built from a clean tree, and the failure is
+# invisible unless someone asks for this target by name: the glob loop declares
+# it and ctest registers it, and it dies only when linked.
+#
+# Found 2026-08-31 while trying to confirm WHY every AI corp in ai_skill_harness
+# ends five figures under water - i.e. the one question the harness exists to
+# answer could not be asked with the tool built to answer it.
+#
+# Same shape and same reason as acquisition_viability immediately above.
+add_executable(demand_census
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/demand_census.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(demand_census PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(demand_census PRIVATE io_world_obj lua54)
+target_compile_features(demand_census PRIVATE cxx_std_20)
+target_compile_options(demand_census PRIVATE ${IO_WARNING_FLAGS})
+
 # province_capacity_probe (2026-08-20) — live-Lua for exactly substrate_census's
 # reason above: it measures the world AFTER generate_background_firms, so every
 # authored input must be the real one or it reports a world the game never builds.

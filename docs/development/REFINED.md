@@ -30,10 +30,10 @@ integrated set at step 4a.
 
 | Task | provides | consumes |
 |---|---|---|
-| C1 (BL-700) | `corp_standing(world, corp)` composite; `corp_ai_params` component weights | — |
+| C1 (BL-700) | `corp_standing_index(w, reg, corp, params)` -> `standing_index`; `corp_ai_params::standing_weights` | — |
 | C2 (BL-696) | decision-feed reason/score stream reaching `decision_feed.cpp` | — |
-| D1 (BL-697) | spread band in `ai_skill_harness` | `corp_standing` |
-| E1 (BL-699) | stance scoring over the four BL-448 verbs | `corp_standing`, decision-feed reason stream |
+| D1 (BL-697) | spread band in `ai_skill_harness` | `corp_standing_index` |
+| E1 (BL-699) | stance scoring over the four BL-448 verbs | `corp_standing_index`, decision-feed reason stream |
 | F1 (BL-704) | per-corp decision trace | decision-feed reason stream |
 | A1 (BL-695) | a route setting `ui_state::spectating` outside `--verify` | — |
 | A2 (BL-702) | a control setting `ui_state::god_view` | A1's spectate route |
@@ -44,22 +44,22 @@ No unmatched `consumes`.
 
 ---
 
-## Wave 1 — the instruments (parallel, worktree agents)
+## Wave 1 — the instruments — LANDED 2026-08-31
 
-- [ ] **A1 · BL-695 (live spectate route)** — a route sets `ui_state::spectating` outside
+- [x] **A1 · BL-695 (live spectate route)** — a route sets `ui_state::spectating` outside
       `--verify`. Today `verify.spectate(on)` at `verify_api.cpp:1096` is the only assignment site
       in the tree. Prefer entry-at-start; mid-session toggling changes who the scorer may act on
       halfway through a run and needs its own argument. `spectator_determinism` must pass unchanged.
-- [ ] **A2 · BL-702 (spectate god view control)** — a control sets `ui_state::god_view`, offered
+- [x] **A2 · BL-702 (spectate god view control)** — a control sets `ui_state::god_view`, offered
       only while spectating, honouring the toggle rule. Every read site already tests the pair, so
       do not touch the gate.
-- [ ] **B1 · BL-705 (selectable 1960s start)** — `epoch_year` selectable without editing a default,
+- [x] **B1 · BL-705 (selectable 1960s start)** — `epoch_year` selectable without editing a default,
       and the UI epoch reads `world_params` rather than the hard-coded 1960 in `format.hpp:82` /
       `planetology.hpp:275`. Both starts stay supported. Expect to find stale things on the 1960
       path; file them, do not absorb them.
-- [ ] **C1 · BL-700 (composite standing index)** — one function: net worth + `science` + summed
+- [x] **C1 · BL-700 (composite standing index)** — one function: net worth + `science` + summed
       `unit_strength`. Weights in `corp_ai_params`. Deterministic read point, named and asserted.
-- [ ] **C2 · BL-696 (decision feed reasons)** — fix the feed at its cause. NR-626: every row reads
+- [x] **C2 · BL-696 (decision feed reasons)** — fix the feed at its cause. NR-626: every row reads
       `overridden` at 0.00.
 
 ## Wave 2 — measurement and the brake (parallel, after wave 1 merges)

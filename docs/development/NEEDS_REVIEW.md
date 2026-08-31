@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*109 entries — 105 open, 4 resolved.*
+*111 entries — 107 open, 4 resolved.*
 
 ---
 
@@ -1190,6 +1190,82 @@ Worth knowing BEFORE that item starts rather than discovering it inside it.
 > **Recommendation:** Option 3 for this sprint. It gets BL-703 real artifacts to point at with no golden-maintenance cost, and it defers the option-2 question until the 1960s world has stopped moving. Option 1 is defensible if BL-703's live watch turns out to be enough on its own.
 
 *Files: `src/main.cpp`, `scripts/verify/`, `docs/development/DEVELOPMENT_PRACTICES.md`*
+
+### NR-758 — Every AI corp goes bankrupt on every seed, and the cause is measured: five of eight demand channels do not exist
+*question · raised 2026-08-31 · from Sprint 26 wave 1 baseline. Measured by the main session with ai_skill_harness and demand_census, 2026-08-31.*
+
+THE OBSERVATION, from ai_skill_harness on the merged wave-1 tree. Five seeds, thirty econ ticks:
+
+  seed 0: net_worth final=-624100.1   min=-624100.1   solvency_below_zero=29/30  survival=0.71
+  seed 1: net_worth final=-997700.4   min=-997700.4   solvency_below_zero=30/30  survival=0.86
+  seed 2: net_worth final=-694799.6   min=-694799.6   solvency_below_zero=29/30  survival=0.86
+  seed 3: net_worth final=-1234353.5  min=-1234353.5  solvency_below_zero=30/30  survival=0.86
+  seed 4: net_worth final=-1090065.2  min=-1090065.2  solvency_below_zero=29/30  survival=1.00
+
+`final == min` on EVERY seed: net worth declines monotonically and never recovers. The rivals are not competing, they are collapsing, and they do it identically on all five seeds. Survival stays high (0.71-1.00) because survival counts buildings still standing, not solvency.
+
+NOT CAUSED BY THIS BATCH, confirmed from both ends: the slice-C agent stashed its own corp_ai change and got the same figures to the digit, and an independent baseline run on the merged tree WITHOUT slice C reproduced the same 21 band failures.
+
+THE CAUSE, measured with demand_census on the INDUSTRIAL band (epoch 1960 - the band this sprint's 1960s start uses):
+
+  iron_ore      produced 42991.6   demand 0.000 across every channel
+  petroleum     produced  6169.9   demand 0.000
+  copper_ore    produced  2213.5   demand 122.4 (processing inputs only)
+  timber        produced  1224.2   demand 0.000
+
+Only THREE resources carry any household demand at all: agricultural_produce (109.6), water (230.7), food_rations (244.5). Everything else is bought by nobody, or bought only as an input to make something else nobody buys.
+
+FIVE OF THE EIGHT DESIGNED DEMAND CHANNELS DO NOT EXIST (MARKETS.md § Demand channels; demand_census R1a names each absent one and its unbuilt owner):
+  Infrastructure - ABSENT (BL-643). No material draw for roads/ports/hubs anywhere in src/world.
+  State          - ABSENT (BL-644). Nation budget lines spend credits; no goods purchase exists.
+  Research       - ABSENT (BL-645). research_institute credits science; nothing draws goods.
+  Conflict       - ABSENT (BL-646). Battle resolution consumes no goods.
+  Endemic trade  - ABSENT (BL-647). Nothing wants tobacco, spices, coffee or furs.
+
+And of the three that DO exist, Industry - the largest structural sink - ships its rates at ZERO: 'industry: 156 of 317 buildings eligible to draw upkeep; 0 of those carry an authored basket in this band'.
+
+SO THE AI IS NOT PLAYING BADLY. It is playing a game with no demand side. A corp digs 43,000 units of iron ore, pays wages to do it, and there is no buyer at any price. Monotonic bankruptcy is the arithmetically inevitable result, and no scorer improvement can change it.
+
+SPRINT 21 ALREADY KNOWS THIS and says so in its own goal: 'the ancient economy terminates in artisan goods nobody buys and most spawns are structurally unprofitable - not mistuned, UNBOUGHT'. It is PAUSED at wave 0, with the UI batches having taken priority.
+
+**Why it matters.** It decides what the rest of sprint 26 is worth. BL-699's coalitions form against 'whoever leads' - among corps at -624k to -1.2M the leader is the least bankrupt, so the brake has nothing meaningful to bite on and tuning it would be tuning against noise. BL-697's spread band would measure the distance between failures. And BL-703, the sprint's actual deliverable, would watch seven corporations go broke and call it the meta.
+
+- BUILD wave 2's mechanisms, do not tune or bless them. BL-699 lands as scored stance with its determinism and legibility rows green; BL-697 lands the spread metric with its band deliberately unblessed and a note saying why. BL-703 then reports on a bankrupt field, which is itself the most useful finding available.
+- PAUSE sprint 26 here and unpause sprint 21 (demand). The instruments now work - spectate, the feed, the standing index, the 1960s start - which was the sprint's stated goal. Resume the AI work against an economy where standing means something.
+- Do both in sequence: close sprint 26 at wave 1 as an instruments sprint, take demand next, and re-open the coalition work after.
+
+> **Recommendation:** Option 3, which is option 2 with the bookkeeping made honest. Wave 1 delivered exactly what the sprint goal named - spectator mode works and the feed reads - and that is a complete, defensible sprint. Building a coalition brake now means tuning its weights against a field whose standing is noise, and those weights are the whole design; they would need redoing the moment demand lands. The one thing I would still take from wave 2 is BL-697's spread METRIC without its band, since it is the instrument that will show demand working when it does.
+
+*Files: `tools/verify/ai_skill_harness.cpp`, `tools/verify/demand_census.cpp`, `docs/economy/MARKETS.md`, `docs/development/sprints.json`*
+
+### NR-759 — Four build-wiring breaks in one session, none caught by any test, two of them masked by stale binaries that PASS
+*observation · raised 2026-08-31 · from Sprint 26 batch delivery, 2026-08-31.*
+
+Four separate pieces of build wiring were broken on main when this batch opened. None was caused by this sprint, none was caught by any test, and the sprint spent a material share of its time on them before reaching its own work.
+
+1. CMAKELISTS - main had not CONFIGURED since cc88997c (eight commits). The mercenary-contract tear-out deleted src/world/contract_template.cpp and tools/verify/contract_dispatch_harness.cpp and left three references. CMake's generate step failed before a single TU compiled. Fixed: ef19dab7.
+
+2. build_harness.js - the ENTIRE verifier-headless tier could not compile. A src/world TU now reaches scripting/lua_state.hpp -> <sol/sol.hpp>, and the script passed only -I src -I tools/verify. Fixed: b7389013.
+
+3. build_app.bat - hard-failed in any fresh worktree (build/ is gitignored and it did not cold-configure). Every worktree agent improvised its own configure, and one reached for a DIFFERENT GENERATOR, which is what forced an independent re-verification of a state_hash result. Fixed: 2eb15030.
+
+4. demand_census - has never linked. Glob-declared against io_world_obj alone while calling lua_state, recipe_registry::load_from_lua and world_gen_config::load_from_lua. Six unresolved externals. Fixed by hand-declaring it beside its three siblings.
+
+TWO OF THE FOUR WERE MASKED BY STALE BINARIES THAT PASS, which is the part worth the entry. build_gen/ holds prebuilt harness exes compiled from older trees. spectator_determinism's prebuilt exe PASSES its byte-identity golden; a fresh build of the same source FAILS it. A stale harness that passes is strictly worse than one that fails - it reports, in the affirmative, on a world that no longer exists.
+
+CMAKELISTS ALREADY KNOWS THIS FAILURE MODE and says so in its own comment about the sibling include-path rot: 'An existing build tree kept passing on stale objects, which is why it survived a release cut.' The same sentence would serve for two of the four above.
+
+THE COMMON SHAPE: the things that CHECK the code are themselves unchecked. Every one of these is a build-wiring fact that only surfaces when someone asks for that exact target from a clean state, and nothing in the project ever does.
+
+**Why it matters.** A release was cut over at least one of these. Two of them make green results untrustworthy rather than merely absent, which is the more expensive failure - a session can read a stale PASS and conclude something false about the world.
+
+- A clean-tree CI target: configure from scratch, build every harness target by name, run them. Catches all four classes and nothing else does.
+- Cheaper stopgap: have build_harness.js and the verify skills REFUSE to run a prebuilt exe older than its newest source input, so a stale binary reports staleness instead of passing.
+- Leave it and fix instances as they appear, which is what has happened so far.
+
+> **Recommendation:** Option 2 first - it is small, it targets the specific thing that makes these dangerous rather than merely annoying, and it would have caught the spectator_determinism mask immediately. Option 1 is the real answer but is a CI question and wants Ben's call on where it runs. Filing rather than building either, since both are outside this batch's scope.
+
+*Files: `CMakeLists.txt`, `tools/verify/build_harness.js`, `build_app.bat`, `.claude/skills/verifier-headless/SKILL.md`*
 
 ---
 
