@@ -4323,14 +4323,14 @@
   {
    "brief": "a-channel-must-bid",
    "title": "BL-654 - a short pool buys on the market, up to a reservation ceiling",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-654 - Sprint 27, demand",
    "batch": "sprint-27-wave-1",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: a harness asserting the bid reaches market demand and the credits leave the buyer"
      ],
@@ -4339,7 +4339,7 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: a harness row at both sides of the ceiling"
      ],
@@ -4348,7 +4348,7 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: demand_census before/after plus the operating-firm count"
      ],
@@ -4357,7 +4357,7 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: ai_skill_harness R0 or equivalent"
      ],
@@ -4369,14 +4369,14 @@
   {
    "brief": "injectors-must-not-skip-silently",
    "title": "BL-652 - an injector that cannot price a basket entry must say so",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-652 - Sprint 27, demand",
    "batch": "sprint-27-wave-1",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: run with a deliberately unpriced basket entry and observe the diagnostic"
      ],
@@ -4385,7 +4385,7 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: the new row, red against a seeded fault and green otherwise"
      ],
@@ -4397,14 +4397,14 @@
   {
    "brief": "chain-completeness-read",
    "title": "BL-706 - measure chain completeness per region and its spread",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-706 - Sprint 27, demand",
    "batch": "sprint-27-wave-1",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: demand_census"
      ],
@@ -4413,7 +4413,7 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: demand_census"
      ],
@@ -4422,7 +4422,7 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: inspection plus demand_census"
      ],
@@ -4434,14 +4434,14 @@
   {
    "brief": "ancient-chain-does-not-convert",
    "title": "BL-707 - diagnose why raw inputs glut while finished goods starve",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-707 - Sprint 27, demand",
    "batch": "sprint-27-wave-1",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: whatever instrument the diagnosis rests on, cited"
      ],
@@ -4450,7 +4450,7 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: demand_census before/after, if a fix lands"
      ],
