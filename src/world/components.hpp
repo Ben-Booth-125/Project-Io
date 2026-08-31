@@ -198,7 +198,34 @@ enum class resource_type : uint8_t
     leather                = 44, ///< Tannery, from hides. Terminal — sold, not reprocessed.
     cloth                  = 45, ///< Weaver, from fibre. Consumed by the Shipwright.
     rigging                = 46, ///< Shipwright, from planks + cloth. Ancient depth 2. Terminal — sold, not reprocessed.
-    count                  = 47
+    // --- The grid good (BL-708, 2026-08-31) ---
+    //
+    // POWER, and it is the roster's first good whose MOVEMENT and MARKET are
+    // separate questions (docs/economy/PRODUCTION.md § Power, and
+    // docs/economy/LOGISTICS.md § 3a Power rides this network). It has a price
+    // and it clears like any other good; what it never does is ride a convoy —
+    // transmission is the road network itself, read as a boolean through
+    // `tile_reach_cost`, at a flat one-tick latency regardless of distance.
+    //
+    // Admission rule (PRODUCTION.md / BL-340) satisfied on both ends, which is
+    // the only reason it is admissible: PRODUCED by the two authored generation
+    // recipes (recipes.lua — coal-fired and oil-fired, INDUSTRIAL band only),
+    // and CONSUMED as the per-tick upkeep draw of every extraction site and
+    // processing facility in that band (economy.building_upkeep.goods). Neither
+    // link is a pool draw, so both BID: `fuel -> generator -> power -> upkeep`
+    // is a chain that prices at every step, which is what finally gives `coal`
+    // and `petroleum` an endpoint the market can see.
+    //
+    // TWO PROPERTIES SET IT APART from every value above, and both are carried
+    // as authored DATA in `grid_goods_params` (recipe_registry.hpp) rather than
+    // as a branch on this enumerator anywhere in logic:
+    //   * it is CONNECTION-GATED — it only reaches a tile the network reaches;
+    //   * its stockpile has a CEILING — a generator running into a full store is
+    //     producing nothing anyone will ever buy.
+    //
+    // world_save_version bumped 20 -> 21 for this append (world_save.hpp).
+    power                  = 47, ///< Power Plant, from coal or petroleum. Industrial band only. Drawn per-tick as building upkeep; never cargo.
+    count                  = 48
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);

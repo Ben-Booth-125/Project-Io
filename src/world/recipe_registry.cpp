@@ -346,6 +346,47 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_price_band = pb;
     }
 
+    // BL-708 grid goods (economy.grid_goods) — docs/economy/PRODUCTION.md § Power,
+    // docs/economy/LOGISTICS.md § 3a.
+    //
+    // ABSENT TABLE = no good is a grid good and no store is capped = the
+    // pre-BL-708 behaviour exactly, the same tolerance economy.price_band's
+    // reservation_mult and economy.building_upkeep's rates both carry.
+    //
+    // Keyed by RESOURCE NAME, and an unknown name THROWS rather than being
+    // skipped — read_resource_map's own contract, applied here by hand because
+    // the value is a sub-table rather than a number. A typo'd `powr` would
+    // otherwise author a grid rule nothing ever reads, which is the
+    // silent-nothing this authoring seam must not do.
+    sol::optional<sol::table> grid = (*econ)["grid_goods"];
+    if (grid)
+    {
+        grid_goods_params gg;
+        for (const auto& kv : *grid)
+        {
+            const std::string rkey = kv.first.as<std::string>();
+            bool ok = false;
+            const resource_type rt = resource_names::resource_from_name(rkey, ok);
+            if (!ok)
+                throw std::runtime_error("recipe_registry: economy.grid_goods names an unknown "
+                                         "resource '" + rkey + "'");
+            const std::size_t ri = static_cast<std::size_t>(rt);
+
+            sol::table row = kv.second.as<sol::table>();
+            gg.is_grid[ri] = row.get_or("transmitted", false);
+            const float ceiling = row.get_or("stockpile_ceiling", 0.0f);
+            // Rejected by name rather than clamped — the untrusted-input rule at
+            // the authoring boundary. A negative ceiling would make every store
+            // permanently over-full and silently stop every generator in the
+            // world; a non-finite one would poison the min() that applies it.
+            if (!std::isfinite(ceiling) || ceiling < 0.0f)
+                throw std::runtime_error("recipe_registry: economy.grid_goods." + rkey
+                                         + ".stockpile_ceiling must be finite and >= 0");
+            gg.stockpile_ceiling[ri] = ceiling;
+        }
+        m_grid_goods = gg;
+    }
+
     // BL-263 spontaneous-market-emergence tunables (economy.market_emergence).
     sol::optional<sol::table> market_emergence = (*econ)["market_emergence"];
     if (market_emergence)
