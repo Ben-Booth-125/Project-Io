@@ -159,8 +159,22 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
         return;
     }
     const double period   = g.gw * kSqrt3;
-    const double R        = p.blend_radius;
-    const double R2       = R * R;
+    // Resolution-adaptive character (wave 2). The interpolation radius and the
+    // detail amplitudes are CANONICAL-scale, so the same numbers that read as
+    // painterly at the 24 px tier read as plain blur at 48/96 — a colour field
+    // 1.4 tiles soft is 70 px soft up close. As the bake resolution grows past
+    // the play tier, tighten the field and lift the detail: res_t is 0 at
+    // 24 px/r and 1 at 96.
+    const float  res_t = static_cast<float>(std::clamp((g.s - 24.0) / 48.0, 0.0, 1.0));
+    const double R     = p.blend_radius * (1.0 - 0.22 * res_t); // stays > 1 (corner coverage)
+    const double R2    = R * R;
+    const float  detail_mul = 1.0f + 1.1f * res_t;
+    const float  noise_mul  = 1.0f + 1.2f * res_t;
+    // Weight EXPONENT sharpening: the coverage radius cannot drop below one
+    // tile, so patch crispness at the close tiers comes from steepening the
+    // falloff instead — a higher power hands the pixel to its nearest centre
+    // and the colour field stops reading as mist without losing coverage.
+    const int wpow = 2 + static_cast<int>(std::lround(5.0f * res_t));
     // Light from the north-west, the hillshade convention every panel-C read
     // leans on (and the same warm-up/cool-down direction the relief tint set).
     const float Lx = -0.554700196f, Ly = -0.832050323f;
@@ -182,6 +196,12 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
     const double warp_cell2   = periodic_cell(p.warp_cell * 0.29, warp_cells2);
     const double detail_cell  = periodic_cell(p.detail_cell, detail_cells);
     const double detail_cell2 = periodic_cell(p.detail_cell * 0.41, detail_cells2);
+    // Close-tier grain: at high bake resolutions (the 48/96 px zoom tiers) the
+    // standard octaves span many texels and the ground reads under-detailed up
+    // close — one finer octave keys in on resolution alone.
+    int fine_cells = 1;
+    const double fine_cell = periodic_cell(0.155, fine_cells);
+    const bool   fine_on   = g.s >= 40.0;
 
     for (int py = 0; py < ph; ++py)
     {
@@ -252,8 +272,11 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
                     if (src.cls[i] == static_cast<std::uint8_t>(bake_source::tile_class::void_))
                         continue;
                     const double t = R2 - d2;
+                    double wgt = t * t;
+                    for (int e = 2; e < wpow; ++e)
+                        wgt *= t;
                     if (ncand < 24)
-                        cands[ncand++] = { i, t * t };
+                        cands[ncand++] = { i, wgt };
                     if (d2 < best_d2)
                     {
                         best_d2 = d2;
@@ -320,8 +343,8 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
                 // finite-difference gradient of the detail field), which is
                 // what gives the ground painterly terrain texture at sub-tile
                 // scale instead of a per-hex mosaic.
-                const float amp = p.detail_amp * (0.25f + p.landform_accent * std::fabs(bias)
-                                                   + 0.35f * h);
+                const float amp = p.detail_amp * detail_mul
+                                * (0.25f + p.landform_accent * std::fabs(bias) + 0.35f * h);
                 // The GRADIENT reads the low octave only, central-differenced
                 // at half a cell: a fine octave in the slope is per-pixel
                 // speckle, not terrain. The fine octave still contributes to
@@ -352,7 +375,12 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
                 // now), then fine grain.
                 lum += jtt * p.jitter;
                 const float n2 = value_noise(x0_, uy, noise_cell_b, noise_cells_b, 0xFAB1u);
-                lum += (n2 - 0.5f) * 2.0f * p.noise_strength;
+                lum += (n2 - 0.5f) * 2.0f * p.noise_strength * noise_mul;
+                if (fine_on)
+                {
+                    const float n3 = value_noise(x0_, uy, fine_cell, fine_cells, 0x51D3u);
+                    lum += (n3 - 0.5f) * (1.2f + 2.2f * res_t) * p.noise_strength;
+                }
             }
             else
             {
@@ -363,6 +391,19 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
                 lum += (h - 0.45f) * 0.06f;
             }
             r_ *= lum; g_ *= lum; b_ *= lum;
+
+            if (land)
+            {
+                // Colour mottle: a mid-frequency warm/cool swing so ground
+                // varies in HUE as well as luminance — luminance noise alone
+                // reads as mist over the smooth colour field, most of all at
+                // the close tiers (hence the res_t growth).
+                const float mot = (value_noise(x0_, uy, noise_cell_a, noise_cells_a, 0xC01Au)
+                                   - 0.5f) * (0.6f + 0.9f * res_t);
+                r_ *= 1.0f + mot * 0.14f;
+                g_ *= 1.0f + mot * 0.04f;
+                b_ *= 1.0f - mot * 0.10f;
+            }
 
             if (p.grade_enabled)
             {

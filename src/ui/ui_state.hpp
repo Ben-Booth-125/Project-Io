@@ -322,27 +322,26 @@ struct ground_chunk_view
     void* tex = nullptr;
 };
 
-/// Everything the canvas needs to draw the baked ground for one body.
+/// Everything the canvas needs to draw the baked ground for one body: the far
+/// page under everything, plus the ACTIVE zoom tier's ready chunks over it
+/// (the tier pairing with the stepped x2 zoom ladder — RENDERING.md § LOD).
 struct ground_view
 {
     entity_id body = null_entity;    ///< Body the bake describes; canvas ignores a mismatch.
-    double    s    = 1.0;            ///< Full-res bake: pixels per canonical unit.
-    double    y_min = -1.0;          ///< Canonical y of bake pixel row 0.
-    int       chunk_px = 512;        ///< Full-res chunk size, px.
-    int       cw = 0, ch = 0;        ///< Chunk grid dimensions.
-    std::vector<std::uint8_t> ready; ///< cw*ch coverage mask (1 = chunk baked).
-    std::vector<ground_chunk_view> chunks; ///< The ready chunks, drawable.
+    double    tier_ppr = 0.0;        ///< Active tier's baked px per hex circumradius (0 = far only).
+    std::vector<ground_chunk_view> chunks; ///< The active tier's ready chunks.
     ground_chunk_view far;           ///< Low-res whole-body page (tex null until baked).
     bool far_ready = false;
 };
 
-/// The canvas's bake request: the canonical-space rect visible this frame.
-/// Read by ground_layer next frame — one frame of latency, covered by the
-/// vector fallback (fallback-by-coverage, RENDERING.md).
+/// The canvas's bake request: the canonical-space rect visible this frame plus
+/// the drawn hex radius (which picks the tier). Read by ground_layer next
+/// frame — one frame of latency, covered by the far page / vector fallback.
 struct ground_request
 {
     entity_id body = null_entity;
     float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+    float draw_r = 0;                ///< Drawn hex circumradius, screen px.
     bool  valid = false;
 };
 
@@ -361,6 +360,10 @@ struct ui_state
     /// capture shows the bake bare (BL-732 R1; the band's weight over painterly
     /// ground is BL-734's open call). No player control sets this.
     bool dbg_hide_border_band = false;
+    /// Wheel accumulator for the stepped Planetary zoom: precision wheels and
+    /// trackpads deliver fractional deltas per event, and each must NOT fire a
+    /// full x2 rung — deltas accumulate here and a step fires per whole notch.
+    float planetary_wheel_accum = 0.0f;
 
     entity_id    active_body   = null_entity;         ///< Navigation anchor: drives the lower rungs (circumplanetary anchor and surface). Changed by *navigation* (double-click / focus), not by selection. null_entity = no anchor.
     entity_id    selected_entity = null_entity;       ///< The entity the player single-clicked to inspect — drives the Selection info element. Distinct from the active_* anchors: selecting never moves the canvas. null_entity = nothing selected. See SELECTION.md, ui/selection.hpp.

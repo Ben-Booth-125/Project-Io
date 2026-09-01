@@ -53,6 +53,11 @@ constexpr float kMaxViewScale    = 0.7f;
 constexpr float kMaxZoom         = 20.0f;
 constexpr float kMinZoom         = 1.0f / (kMaxViewScale * kMinZoomHeadroom * kFitMargin); // ~1.253
 
+/// Rungs on the stepped x2 zoom ladder (Ben, 2026-09-01): kMinZoom * 2^k for
+/// k = 0..k_zoom_rungs-1. kMinZoom * 16 ≈ 20.05, so the top rung clamps to
+/// kMaxZoom and the ladder spans exactly the old continuous range in 5 steps.
+constexpr int k_zoom_rungs = 5;
+
 // terrain_colour, hex_vertices, and hex_local_centre now live in ui/hex_render.hpp
 // (shared with the Selection band's zoomed tile-neighbourhood view, BL-194) so both
 // surfaces draw from one terrain palette and one hex geometry rather than diverging.
@@ -142,11 +147,37 @@ constexpr float k_land_blend_strength = 0.35f;
 
 /// Depth of the inward band, in tiles. Depth 0 is a tile touching a foreign
 /// owner — another nation, or unclaimed ground, so a coastline is a border too.
-constexpr int k_border_band_tiles = 3;
+///
+/// ONE TILE (Ben, 2026-09-01, judging the baked ground): the three-ring falloff
+/// was tuned against flat saturated hexes; over the muted painterly bake the
+/// band inverted its contrast relationship with the ground and became the
+/// loudest mark on the map. "A 1 tile glow, rather than the current 2/3 tile
+/// glow" — the frontier ring alone, in a muted colour (below).
+constexpr int k_border_band_tiles = 1;
 
-/// Wash opacity by depth. Falls off steeply so the band reads as an edge effect
-/// rather than as a tint: past the third ring the ground is plain again.
-constexpr float k_border_band_alpha[k_border_band_tiles] = { 0.50f, 0.26f, 0.11f };
+/// Wash opacity by depth — the single frontier ring.
+constexpr float k_border_band_alpha[k_border_band_tiles] = { 0.35f };
+
+/// How far the band's colour is pulled toward its own luma before drawing —
+/// the "muted colour palette" half of the same 2026-09-01 ruling. Applied to
+/// the wash AND the stroke; the border-corridor hover label keeps the full
+/// identity colour, because a label must be read, not weighed.
+constexpr float k_border_mute = 0.55f;
+
+/// Mute a nation identity colour for the band: desaturate toward its own luma
+/// by k_border_mute and sit it down slightly, so the ring reads as a claim on
+/// the ground rather than as chrome over it.
+inline ImU32 muted_nation_colour(ImU32 nc)
+{
+    const float r = static_cast<float>((nc >> IM_COL32_R_SHIFT) & 0xFFu);
+    const float g = static_cast<float>((nc >> IM_COL32_G_SHIFT) & 0xFFu);
+    const float b = static_cast<float>((nc >> IM_COL32_B_SHIFT) & 0xFFu);
+    const float luma = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+    auto ch = [&](float v) {
+        return static_cast<int>((v + (luma - v) * k_border_mute) * 0.92f);
+    };
+    return IM_COL32(ch(r), ch(g), ch(b), 255);
+}
 
 /// Scale applied to the whole treatment — wash AND stroke — where the frontier
 /// faces UNCLAIMED ground rather than another nation (Ben, 2026-08-24: "reduce
@@ -2261,12 +2292,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     {
         const float x0c = ((visible_left  - view_origin.x) / zoom + grid_cx) / hex_size;
         const float x1c = ((visible_right - view_origin.x) / zoom + grid_cx) / hex_size;
-        state.ground_req.body  = state.active_body;
-        state.ground_req.x0    = x0c;
-        state.ground_req.x1    = x1c;
-        state.ground_req.y0    = 1.5f * static_cast<float>(row_lo) - 1.0f;
-        state.ground_req.y1    = 1.5f * static_cast<float>(row_hi) + 1.0f;
-        state.ground_req.valid = raster_ok;
+        state.ground_req.body   = state.active_body;
+        state.ground_req.x0     = x0c;
+        state.ground_req.x1     = x1c;
+        state.ground_req.y0     = 1.5f * static_cast<float>(row_lo) - 1.0f;
+        state.ground_req.y1     = 1.5f * static_cast<float>(row_hi) + 1.0f;
+        state.ground_req.draw_r = draw_r; ///< Picks the bake tier (stepped ladder).
+        state.ground_req.valid  = raster_ok;
     }
     if (ground_on)
     {
@@ -3068,7 +3100,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const entity_id nat = nation_of(id);
                 if (nat != null_entity)
                 {
-                    const ImU32 nc = palette::nation_colour(nat);
+                    // Muted (2026-09-01): the identity colour desaturated for
+                    // the band, so the claim reads without shouting over the
+                    // painterly ground.
+                    const ImU32 nc = muted_nation_colour(palette::nation_colour(nat));
                     const float scale = border_political[shade_idx]
                                         ? 1.0f : k_border_unclaimed_scale;
                     const int   a  = static_cast<int>(k_border_band_alpha[depth] * scale * 255.0f);
@@ -3302,7 +3337,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const entity_id own_nation = nation_of(id);
                 if (own_nation != null_entity)
                 {
-                    const ImU32 border_col = palette::nation_colour(own_nation);
+                    // Muted like the wash (2026-09-01) — the pair must read as
+                    // one treatment.
+                    const ImU32 border_col = muted_nation_colour(palette::nation_colour(own_nation));
 
                     // Standard odd-r neighbour offsets (col, row deltas; canonical table, BL-363).
                     const int (*off)[2] = hex_neighbors::offsets(tile.grid_y);
@@ -4894,8 +4931,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             state.planetary_pan_x = std::fmod(state.planetary_pan_x, period_px);
 
         if (io.MouseWheel != 0.0f)
+            state.planetary_wheel_accum += io.MouseWheel;
+        // STEPPED (Ben, 2026-09-01): one wheel NOTCH = one x2 ladder rung, so
+        // each zoom level pairs with a bake tier and the ground stays crisp at
+        // every step. Deltas accumulate first — a notched mouse sends ±1 and
+        // steps immediately; a precision wheel/trackpad sends fractions that
+        // must add up to a notch before a rung fires (review fleet,
+        // 2026-09-01). A fast multi-notch burst still steps one rung per
+        // frame, deliberately: rungs are x2 apart and skipping two in one
+        // frame reads as a teleport. The cursor-anchor math is unchanged.
+        if (std::fabs(state.planetary_wheel_accum) >= 0.99f)
         {
-            const float new_zoom = std::clamp(zoom * std::pow(1.1f, io.MouseWheel), kMinZoom, kMaxZoom);
+            const int dir = state.planetary_wheel_accum > 0.0f ? +1 : -1;
+            state.planetary_wheel_accum = 0.0f;
+            const float new_zoom = planetary_zoom_stepped(zoom, dir);
             // World point under the cursor, kept fixed across the zoom change.
             const ImVec2 wp = { (mouse.x - view_origin.x) / zoom + grid_cx,
                                 (mouse.y - view_origin.y) / zoom + grid_cy };
@@ -4904,6 +4953,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             state.planetary_zoom  = new_zoom;
         }
     }
+}
+
+float planetary_zoom_stepped(float current, int direction)
+{
+    // A zoom that sits between rungs (verify's free-form set_zoom, an old
+    // save's value) steps to the next rung IN THE DIRECTION OF TRAVEL, never
+    // rounds first — stepping down from 3.0 lands on 2.5, not 1.25.
+    constexpr float eps = 0.01f;
+    const float k_exact = std::log2(std::max(current, kMinZoom) / kMinZoom);
+    const int   k = direction > 0
+        ? static_cast<int>(std::floor(k_exact + eps)) + 1
+        : static_cast<int>(std::ceil (k_exact - eps)) - 1;
+    const int   kc = std::clamp(k, 0, k_zoom_rungs - 1);
+    return std::min(kMinZoom * static_cast<float>(1 << kc), kMaxZoom);
 }
 
 } // namespace ui

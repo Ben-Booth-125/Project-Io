@@ -187,6 +187,7 @@ CHECK BEFORE STARTING: BL-712 (recipe choice is scale-blind) in sprint 27 fixes 
 - BL-732 (ground bake renderer) - chunk bake + cache + invalidation, no-grid rule, installation stamps, grade pass, animated overlays, verify pinning. Buildable procedural-first.
 - BL-733 (biome brush art pipeline) - authored C-F brushes and structure stamps, judged against it3 C-F. Unblocked.
 - BL-734 (ground/chrome layer contract) - the surviving analytic channels over painterly ground; lands as PLANETARY/CANVASES/LENSES/ICONS edits.
+- BL-735 (ground wave 2) - stepped x2 zoom ladder pairing bake tiers {6,12,24,48,96 px/r}, all baking on a worker thread, border band muted to a single frontier ring. Ben rulings 2026-09-01 evening.
 
 ## Where things stand
 
@@ -234,7 +235,7 @@ CHECK BEFORE STARTING: BL-712 (recipe choice is scale-blind) in sprint 27 fixes 
 | 26 | The world that brakes a leader - a rival worth watching | CLOSED 2026-08-31 AT WAVE 1 on Ben's call, GOAL MET. Spectator mode works and the feed reads; the measurement that wave 1 produced then made wave 2 not worth running, and demand takes priority as sprint 27. |
 | 27 | The other half of the economy - demand, resumed | OPENED 2026-08-31 on Ben's call, resuming sprint 21's waves 1+ against sprint 26's measurement. Wave 0 (the guard, the census) already landed under 21. |
 | 28 | The AI that holds back - the brake, once standing means something | PROPOSED 2026-08-31 on Ben's call, taking the three sprint-26 items whose tuning is blocked on demand. NOT open: it starts when sprint 27 has given standing a meaning. |
-| 29 | The world gets a face - detailed canvas rendering | OPENED 2026-09-01 in a parallel worktree while sprint 28 runs. Research done, BOTH design forms ruled (mechanism re-ruled to baked chunks against the map/it1-it3 references), C-F ratified, RENDERING.md landed, design docs merged from Ui-Development. BL-732/733/734 all unblocked. |
+| 29 | The world gets a face - detailed canvas rendering | OPENED 2026-09-01. Design forms ruled, RENDERING.md landed, BL-732 (ground bake renderer) DELIVERED same day; Ben judged the first bake live and ruled wave 2 - stepped x2 zoom with bake tiers, threaded bake, muted 1-tile borders (BL-735, in flight). |
 
 **Next up.** SPRINT NUMBERING, reset by Ben on 2026-08-30: the proposed shell-chrome (old 25) and startup (old 27) batches are DELETED - "Sprint 25 and 27 don't need a revisit, UI items for these are working great" - and the canvases batch renumbered from 26 to 25. THE NEXT NEW SPRINT IS 26. Two of the six UI review batches from 2026-08-28 therefore never run, and that is a judgement that their surfaces are good enough rather than a deferral.
 

@@ -65,13 +65,23 @@ ground retires only as coverage arrives.
 
 ### Chunks, cache and invalidation
 
-- Chunks are fixed tile rectangles (order 16×16 tiles); pages stay ≤ 4096².
-- **Resident set:** full-resolution chunks around the viewport, plus one low-res
-  whole-body page for far zoom. Bounded memory; no streaming subsystem.
-- **Invalidation is event-driven and narrow:** a build, a road placement, an urban
-  transform, a settlement change or a survey reveal dirties the chunks its tiles
-  intersect; dirty chunks re-bake off the critical path (budgeted per frame). Terrain
-  changes are rare by design, so re-bakes are rare.
+- Chunks are fixed pixel windows (512 px) into one whole-body bake space per
+  tier, so adjacent chunks are seamless by construction; pages stay ≤ 4096².
+- **Resident set:** the ACTIVE zoom tier's chunks around the viewport
+  (LRU-capped per tier), plus one low-res whole-body far page. Bounded memory;
+  no streaming subsystem.
+- **All baking runs on a worker thread** (Ben, 2026-09-01 — the smoothness
+  ruling): the pure bake executes against an immutable source snapshot; the
+  render thread only hashes, enqueues, uploads finished buffers and publishes
+  the view. A generation counter discards results that outlive their source or
+  body. Until a chunk lands, the far page carries the frame; until the far page
+  lands (a body switch), the vector fallback does. **Under `--verify` every
+  bake is synchronous on the main thread** — a capture must never race a
+  worker.
+- **Invalidation is content-hashed:** each chunk's job carries a hash of the
+  tile fields the bake reads (terrain, height, survey bits); an urban transform
+  or survey reveal changes the hash and the chunk re-bakes on its next sweep.
+  Terrain changes are rare by design, so re-bakes are rare.
 - The cylinder wrap draws the same chunk at multiple offsets, exactly as tiles do
   today; the seam-crossing chunk bakes with wrapped neighbour reads.
 
@@ -124,17 +134,39 @@ state — so ambience continues while paused; under `--verify` the clock is **pi
 phase 0** and a check advances it explicitly. The near-future grade applies over
 animated overlays too, so motion cannot break the grade.
 
-### Level of detail
+### Level of detail — the stepped zoom pairing
 
-Two rungs, replacing the per-tile fill LOD for the ground layer:
+**Planetary zoom is STEPPED** (Ben, 2026-09-01, judging the first bake: *"C-F is a
+detailed image… we could approximate it with stepped zoom, rather than the continuous
+zoom we currently have (2.5D)"*): the player's wheel and keyboard move through a fixed
+**×2 ladder** — `kMinZoom × 2^k`, five rungs spanning the old continuous range
+(`planetary_zoom_stepped`; verify's `set_zoom` stays free-form so scripted framings
+are unaffected). The upper canvas rungs keep continuous zoom.
 
-- **Far zoom** (at and below the whole-grid band): the low-res whole-body page —
-  one quad, mip-baked from the full-res bake so the two agree.
-- **Play zoom**: the full-res chunk set.
+Each zoom rung pairs with a **bake tier**, so the ground is near-1:1 texels at every
+step — the stepped ladder's whole point. "Near", not exact: the drawn hex radius is
+**fit-derived** (window height over grid rows, then the rung's ×2 factor), so where a
+rung lands relative to its tier moves with the window. The tier chooser takes the
+smallest tier within a **1.2× magnification headroom** (`k_tier_headroom`) — at the
+reference 1720×1080 window the rungs run ~4–14% magnified, and a tier is never
+minified past 2:1 (the ×2 spacing; `SDL_Renderer` has no mipmaps, so that bound is
+what keeps a step transition shimmer-free):
 
-The crossover sits where a full-res texel falls below screen resolution; there is no
-per-tile geometry to LOD any more. The existing 7 px vector pivot remains only in
-the fallback path.
+| Zoom rung (drawn hex radius, reference window) | Bake tier (px per hex circumradius) |
+|---|---|
+| ~6 px (whole grid) | The far page, 6 — whole-body, one texture |
+| ~13 px | 12 — chunked |
+| ~27 px | 24 — chunked |
+| ~55 px | 48 — chunked; the close-grain octave joins the bake |
+| ~110 px | 96 — chunked, close-grain |
+
+**Known bound:** past the 96 px tier there is nothing sharper, so on a much taller
+window than the reference the top rung magnifies beyond the headroom (e.g. ~2× at a
+4K-height canvas). Acceptable for the prototype's windows; a 192 px tier is the lever
+if large-display play starts to matter. **The steps are the 2.5D seam:** a later stage
+may hang per-step *art* (an oblique treatment on the close rungs) off the same ladder
+without touching the zoom model again — the staged path's next foothold, short of the
+3D milestone. The existing 7 px vector pivot remains only in the fallback path.
 
 ---
 

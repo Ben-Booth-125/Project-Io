@@ -43,6 +43,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                               const economy_report& report, const generation_report& gen,
                               ImVec2 origin, ImVec2 size, bool input_enabled);
 
+/// The Planetary rung's STEPPED zoom (Ben, 2026-09-01): player zoom moves
+/// through a fixed x2 ladder — kMinZoom * 2^k, k = 0..4, topping out at
+/// kMaxZoom — rather than a continuous factor. Each rung doubles the drawn hex
+/// radius, which is what lets the ground bake keep a texture tier per rung and
+/// stay crisp at every step (docs/ui/RENDERING.md § Level of detail). Returns
+/// the ladder zoom one step up (@p direction > 0) or down (< 0) from
+/// @p current; verify's set_zoom stays free-form, so scripted framings are
+/// unaffected.
+float planetary_zoom_stepped(float current, int direction);
+
 /// Refresh the intra-body vision model for state.active_body (BL-151/152/154). Rebuilds
 /// state.permanent_vision (radius-2 pockets around the player's building tiles + 3-wide
 /// corridors from the corp centre of operation to each market centre it operates in) and

@@ -4843,6 +4843,55 @@
     "design",
     "completed"
    ]
+  },
+  "BL-735": {
+   "status": "complete",
+   "glyph": "+",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "29",
+   "written": "2026-09-01",
+   "author": "Ben (live judgement of the first bake) + Claude",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "id": "BL-735",
+   "short_name": "GROUND_WAVE_2",
+   "title": "Ground wave 2 - stepped zoom tiers, threaded bake, muted borders",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/core/ground_layer.cpp",
+    "src/core/ground_layer.hpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/canvas_command.cpp",
+    "src/ui/ground_bake.cpp",
+    "docs/ai/ACTIONS.json"
+   ],
+   "design": "Ben, 2026-09-01, judging the first baked ground live: (1) not smooth - the game does not get enough resources; (2) too blurred - C-F is detailed, approximate with STEPPED zoom (2.5D) not continuous; (3) nation borders way too strong - muted palette, 1-tile glow. The work: Planetary zoom becomes a fixed x2 ladder (kMinZoom * 2^k, 5 rungs; wheel + keys; verify set_zoom stays free-form), each rung pairing a bake tier {far 6, 12, 24, 48, 96 px/r} so the ground is near-1:1 texels at every step (never magnified >7%); all baking moves to a worker thread against immutable source snapshots (generation-guarded, LRU-capped tiers; --verify stays synchronous); a close-grain octave joins the bake at >=40 px/r; the border band collapses to the single frontier ring at 0.35 alpha in a luma-muted colour (wash + stroke; the hover label keeps full identity) - a BL-734 partial ruling recorded in PLANETARY.md. Release build staged for play.",
+   "completed": "2026-09-01",
+   "_row_keys": [
+    "status",
+    "glyph",
+    "priority",
+    "difficulty",
+    "version_goal",
+    "sprint",
+    "written",
+    "author",
+    "requires",
+    "blocked_on",
+    "parked",
+    "category",
+    "id",
+    "short_name",
+    "title",
+    "authority_doc",
+    "files",
+    "design",
+    "completed"
+   ]
   }
  }
 }

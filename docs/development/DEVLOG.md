@@ -10,6 +10,57 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-01 (BL-735, wave 2) — The ground sharpens, steps, and stops stalling
+
+**Mode:** Full. **Runtime:** same evening as the BL-732 delivery; Ben judged the first bake
+live and ruled: not smooth enough, too blurred (approximate C-F's 3D read with STEPPED zoom —
+2.5D), borders way too strong (muted palette, 1-tile glow).
+
+### Built
+
+**Stepped zoom + tiers.** Planetary zoom is a fixed ×2 ladder (`planetary_zoom_stepped`,
+kMinZoom × 2^k, five rungs — kMinZoom×16 ≈ kMaxZoom, so the ladder spans the old continuous
+range exactly); wheel and `=`/`-` step it, upper rungs stay continuous, verify `set_zoom`
+stays free-form so scripted framings hold. Each rung pairs a bake tier {far 6, 12, 24, 48,
+96 px/r} — never magnified more than ~7%, minification capped at 2:1. ACTIONS zoom entries
+updated.
+
+**Resolution-adaptive bake.** The bake's softness was canonical-scale (1.4 tiles ≈ 70 px of
+blur at the close tiers): past the 24 px tier the interpolation weight EXPONENT steepens
+(coverage radius can't drop below one tile; crispness comes from the falloff), detail/noise
+amplitudes lift, a fine grain octave and a warm/cool colour mottle join. Diagnosed via a
+temporary tier/chunk print — the tier pipeline was correct; the mist was bake content.
+
+**Threaded bake.** All baking moved to a worker thread against immutable source snapshots
+(generation-guarded, self-contained jobs, LRU-capped tiers, far-hash once per source
+generation); the render thread hashes, enqueues, uploads, publishes. `--verify` stays fully
+synchronous. Until the far page lands after a body switch, the vector fallback carries the
+frame — a visual pop traded for zero render-thread stalls.
+
+**Muted borders (the BL-734 partial).** Band collapses to the single frontier ring at 0.35
+alpha; wash AND stroke draw the nation colour pulled 0.55 toward its own luma (the corridor
+hover label keeps full identity). PLANETARY.md's falloff table rewritten with the ruling.
+
+**Release staged for play.** The roughness Ben felt was partly the Debug build staged at the
+granted path — the Release play build now sits there instead.
+
+### Checks
+
+ground_bake_check 10/10 unchanged; ground_bake.lua regrown to per-rung captures (every tier,
+the 12 px rung included after review) with `frames(2)` settling the request latency. A
+21-agent adversarial review over the integrated diff (4 dimensions → per-finding refuters)
+confirmed 14 findings, 3 refuted; the critical family — a generation bump or failed texture
+allocation orphaning an in-flight bake with its `queued` flag stuck, bricking chunks or
+darkening the far page until a body switch — was fixed by clearing pending flags
+unconditionally in upload, re-arming the far hash on an orphaned drop, gating source refresh
+on an in-flight counter, flooring eviction at 2× the wanted set, raising tier headroom to
+1.2× (0.93 sent every rung one tier high), and accumulating fractional wheel deltas to whole
+notches. Doc fleet-catches fixed the ~7% magnification overclaim (fit-derived hex sizes; the
+top rung's large-window bound is now stated), ACTIONS' stale expected_output, R4's
+unprovable promise, and BL-734's stale remaining-work line.
+
+---
+
 ## 2026-09-01 (BL-732 delivery) — The ground bakes, and it looks like a planet
 
 **Mode:** Full. **Runtime:** one session; one cold-configure + full Debug build in the fresh

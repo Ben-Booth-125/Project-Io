@@ -346,15 +346,19 @@ honest:
 
 | Depth | Wash opacity | Reads as |
 |---|---|---|
-| 0 (on the frontier) | 0.50 | The edge itself, under the coloured rule |
-| 1 | 0.26 | The colour reaching inwards |
-| 2 | 0.11 | The last trace before plain ground |
-| 3+ | none | Terrain, texture and the active lens, untouched |
+| 0 (on the frontier) | 0.35 | The single frontier ring, under the coloured rule |
+| 1+ | none | Terrain, texture and the active lens, untouched |
 
-`k_border_band_tiles` = 3. At the **coarse-fill LOD** (`draw_r ≤ 7 px`) the band collapses to
-depth 0 alone: at the whole-grid view a single ring still draws the political outline, which is the
-whole read at that zoom, and relaxing three rings over every hex on the body is the one place the
-pass could cost real frame time.
+`k_border_band_tiles` = 1, and the band colour is **muted** — the nation identity colour
+pulled toward its own luma by `k_border_mute` (0.55) and sat down slightly, wash and stroke
+alike (the border-corridor hover label keeps the full identity colour: a label must be read,
+not weighed). Ben, 2026-09-01, judging the first baked painterly ground: the three-ring
+falloff and full-strength colour were tuned against flat saturated hexes, and over the muted
+C-F bake the band inverted its contrast relationship with the ground — it became the loudest
+mark on the map. *"Nation borders are way too strong. We should use a muted colour palette,
+and we should also make it a 1 tile glow."* The inward-falloff mechanism above remains the
+design (the depth relaxation still runs, and widening the ring is one constant) — what the
+ruling sets is its extent and its volume.
 
 The band is gated on `revealed`, like the survey mask itself: a border drawn through the survey
 mask would leak the political shape of ground the player has not paid to survey
@@ -605,7 +609,9 @@ for i in 0..5:
 - **Single-click** the surface: markers are hit-tested first, in the order **building → market → unit** (`body_surface_canvas.cpp`), so buildings, markets and units stay independently selectable. A click that misses every marker but lands in a **national border corridor** selects that nation (§ The national border band). Otherwise it selects the **province** (§ Province grain above) rather than the tile; the tile is one press away in the province card. Clicks do not change the view rung — the Planetary screen is the bottom of the ladder.
 - **Ascend:** clicking the minimap (which shows the Circumplanetary view) promotes it to primary.
 - **Middle mouse button drag:** pan. Horizontal panning is unbounded — the grid is a cylinder, so panning past the east or west edge wraps seamlessly to the opposite side. Each tile is drawn (and hit-tested) at every horizontal offset that falls within the canvas, so there is no visible seam and the column under the cursor is always correct.
-- **Scroll wheel:** zoom, anchored at the cursor position.
+- **Scroll wheel:** zoom, anchored at the cursor position — **stepped**, one ×2 ladder
+  rung per notch (Ben, 2026-09-01; [RENDERING.md](RENDERING.md) § Level of detail owns the
+  ladder and its bake-tier pairing). The `=`/`-` keys step the same ladder.
 
 The wrap seam has **no marker**: the wrap is seamless by construction and a seam indicator would
 draw attention to a boundary that does not exist for the player.

@@ -4614,6 +4614,58 @@
      "evidence": "COMPLETE 2026-09-01. Live on the built exe (launched --load into a verify-produced save, driven via computer use): click selected a tile/province (Selection panel filled, Tile [106,51] - Track), scroll zoom anchored and the wanted-chunk bake followed with no vector holes, hover showed the card (Barrens - Highland / Habitability 18% / convoy cost) with the hover hex outline. Debug-build chunk bake can jank the first seconds after a body switch (budget 2 chunks/frame, CPU bake); far page covers meanwhile - noted for a future threaded bake, not a blocker."
     }
    ]
+  },
+  {
+   "brief": "ground-wave-2",
+   "title": "BL-735 - stepped zoom tiers, threaded bake, muted borders",
+   "status": "complete",
+   "resolved": "2026-09-01",
+   "promoted_from": "backlog.json BL-735 - Sprint 29",
+   "batch": "sprint-29",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "The national border band draws as a single frontier ring at 0.35 alpha in a luma-muted nation colour, wash and stroke alike; depth 1+ tiles carry no wash.",
+     "verification": [
+      "visual: ground_bake.lua wide/play captures vs the previous 3-ring render"
+     ],
+     "notes": "The BL-734 partial ruling (Ben 2026-09-01), recorded in PLANETARY.md.",
+     "evidence": "COMPLETE 2026-09-01. ground_bake_wide/play captures + live Release session: the band is the single frontier ring at 0.35 alpha, luma-muted (k_border_mute 0.55) on wash and stroke; the coastal bead-strings are gone and the map reads as terrain first. PLANETARY.md falloff table rewritten with the ruling."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Planetary zoom steps a fixed x2 ladder (wheel and = / - keys; upper rungs stay continuous; verify set_zoom free-form), and every rung draws its ground from a bake tier that is never magnified more than ~7% - crisp at each step, including a new closest rung capture.",
+     "verification": [
+      "visual: per-rung captures at ~6/26/51/102 px hexes",
+      "live: wheel steps land on the ladder"
+     ],
+     "notes": "Tiers {far 6, 12, 24, 48, 96 px/r}.",
+     "evidence": "COMPLETE 2026-09-01. Captures at every rung (ground_bake_wide ~6px far page, play ~26px/24 tier, close ~51px/48 tier, closest ~102px/96 tier) after resolution-adaptive sharpening (weight-exponent wpow, detail/noise lift, colour mottle at the close tiers). Live on the Release build: each wheel notch doubles the drawn hex scale and the tier chunks follow (diagnostic probe confirmed draw_r 35.5 -> tier 48, 30 chunks published). Multi-notch wheel events step ONE rung (sign-only) - deliberate. Verify set_zoom stays free-form; existing script framings unchanged. POST-REVIEW: rung-1 capture (ground_bake_mid, the 12 px tier) added - the fleet caught that tier unexercised; tier headroom fixed 0.93->1.2x so rungs land on their MATCHING tier (0.93 sent every rung one tier high); fractional/multi-notch wheel input accumulates to whole notches before a rung fires."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "No ground bake executes on the render thread outside --verify: chunks and the far page bake on a worker against immutable source snapshots, generation-guarded, LRU-capped; live pan/zoom does not hitch on bakes.",
+     "verification": [
+      "code: ground_layer worker path",
+      "live: pan/zoom on the Release build"
+     ],
+     "notes": "Release build staged at the granted path for play.",
+     "evidence": "COMPLETE 2026-09-01. ground_layer.cpp: bake_region runs only in worker_main (jobs carry immutable source snapshot + geometry + params; generation counter discards stale results) and in bake_now, which only the bake_everything (--verify) path calls; the render thread hashes, enqueues (cap 6), uploads and publishes; far hash once per source generation; LRU eviction per tier. Live Release session panned and stepped zoom with no visible stalls; the Release play build is staged at the granted Start-menu path (the previous roughness was in large part the Debug build staged there). POST-REVIEW: the fleet confirmed a critical flag-wedge family (generation bump or texture-allocation failure orphaning a result left queued/m_far_queued stuck forever - bricked chunks, far page dark until body switch). Fixed: upload clears the pending flag unconditionally before any early return, the far hash re-arms on an orphaned drop, the source refresh gates on an in-flight counter (not just queue emptiness), and eviction floors its cap at 2x the wanted set."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "The bake stays pure and green: ground_bake_check 10/10 unchanged (determinism, wrap, classes, mask - the harness bakes at 24 px/r, where the adaptive dials are at rest, so P1/P2 remain exact). The close-grain octave gating (>= 40 px/r) is verified by code inspection plus the per-rung captures, NOT by the harness.",
+     "verification": [
+      "headless: ground_bake_check"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-01. ground_bake_check 10/10 after every wave-2 bake change; at the harness geometry (24 px/r) res_t=0, wpow=2, fine octave off, so the wrap/determinism checks bind exactly. Octave gate: code (ground_bake.cpp fine_on = g.s >= 40) + the close/closest captures. Reworded after the review fleet flagged the original row promising harness evidence the fixture cannot produce."
+    }
+   ]
   }
  ]
 }
