@@ -332,6 +332,36 @@ void recipe_registry::load_from_lua(lua_state& lua)
         set_background_demand(bd);
     }
 
+    // BL-647 endemic-luxury-demand model (economy.endemic_demand). The basket
+    // and era rows reuse the two siblings' readers; the scalars are VALIDATED
+    // AS THE VALUES THAT LAND and REJECTED out of range rather than clamped —
+    // a wealth-scaled channel tuned by a NaN or a negative spread is a channel
+    // nobody can replay (the read_checked / read_unit_rate precedent).
+    sol::optional<sol::table> en_demand = (*econ)["endemic_demand"];
+    if (en_demand)
+    {
+        endemic_demand_params ed;
+        sol::optional<sol::table> ed_basket = (*en_demand)["demand_basket"];
+        if (ed_basket)
+            read_resource_map(*ed_basket, ed.demand_basket, "economy.endemic_demand.demand_basket");
+        read_checked(*en_demand, "demand_elasticity", ed.demand_elasticity, 0.0, 10.0,
+                     "economy.endemic_demand");
+        read_checked(*en_demand, "elasticity_min", ed.elasticity_min, 0.0, 100.0,
+                     "economy.endemic_demand");
+        read_checked(*en_demand, "elasticity_max", ed.elasticity_max, 0.0, 100.0,
+                     "economy.endemic_demand");
+        if (ed.elasticity_min > ed.elasticity_max)
+            throw std::runtime_error("economy.endemic_demand: elasticity_min "
+                                     "exceeds elasticity_max");
+        read_checked(*en_demand, "wealth_scale", ed.wealth_scale, 0.0, 1.0,
+                     "economy.endemic_demand");
+        ed.preference_spread = read_unit_rate(*en_demand, "preference_spread",
+                                              ed.preference_spread,
+                                              "economy.endemic_demand");
+        read_era_baskets(*en_demand, ed.baskets, "economy.endemic_demand");
+        set_endemic_demand(ed);
+    }
+
     // BL-442 price band (economy.price_band) — authored once here, read by BOTH
     // resolve_price (market_clearing.cpp) and wf_target_price (economy_system.cpp).
     sol::optional<sol::table> price_band = (*econ)["price_band"];

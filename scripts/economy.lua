@@ -1136,6 +1136,49 @@ economy = {
         demand_scale      = 1.00,
     },
 
+    -- BL-647 (2026-09-01): ENDEMIC LUXURY DEMAND — the Endemic trade channel
+    -- (docs/economy/MARKETS.md § Demand channels; the goods are
+    -- docs/economy/RESOURCES.md § Mercantile). Tobacco, spices, coffee and furs
+    -- were on the roster, extractable, priced — and wanted by nothing at all.
+    -- This is the buyer they were authored for: a household pull that scales
+    -- with a nation's WEALTH (treasury + positive corp balances domiciled
+    -- there) rather than its headcount, flavoured per (nation, good) by a
+    -- seeded campaign-fixed preference so different nations crave different
+    -- luxuries. The asymmetry is the design, not a detail: it makes the trade
+    -- route directional by construction — extract where it grows, sell where
+    -- the money is. Read by inject_endemic_demand (market_clearing.cpp),
+    -- called from clear_markets beside the two baskets above.
+    --
+    -- The basket lives in the SHARED tranche: luxuries are deposits, band-
+    -- independent by construction (the same argument that puts
+    -- agricultural_produce and water in population_demand's shared tranche) —
+    -- the fur and spice trade is period in 0 CE and persists in 1960. A world
+    -- only carries the luxuries its biosphere rolled (2-3 of the four); an
+    -- absent one is priced nowhere and its weight is inert on that world.
+    --
+    -- WEIGHTS: spices and coffee lead — RESOURCES.md prices spices as the
+    -- highest value-to-mass good of the set and coffee as the scarcest/widest-
+    -- margin, so their craving weight matches their authored character; tobacco
+    -- and furs are the bulkier, broader habits. wealth_scale converts credits
+    -- of national wealth into demand units per basket-weight point: measured
+    -- on the generated fallback-priced world (endemic_demand_harness E6,
+    -- 2026-09-01), national wealth is a few thousand credits per nation, so
+    -- 0.01 puts a wealthy nation's per-luxury pull in the single-digit units —
+    -- visible beside a household staple line, nowhere near dominating it.
+    endemic_demand = {
+        demand_basket = {
+            tobacco = 0.20,
+            spices  = 0.30,
+            coffee  = 0.30,
+            furs    = 0.20,
+        },
+        demand_elasticity = 0.80, -- the population basket's elasticity shape, reused
+        elasticity_min    = 0.30,
+        elasticity_max    = 2.50,
+        wealth_scale      = 0.01, -- credits of national wealth -> demand units
+        preference_spread = 0.90, -- craving in [0.1, 1.9): near-ignore to near-double
+    },
+
     -- BL-442 (2026-08-17): THE price band. A market price is anchored to its
     -- rarity-derived base_price and pushed by the tick's supply/demand ratio
     -- (damped sqrt elasticity), then clamped to this band and eased toward it by

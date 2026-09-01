@@ -586,6 +586,47 @@ struct background_demand_params
     float demand_scale      = 1.00f; ///< global scale → demand scale.
 };
 
+/// BL-647 endemic-luxury-demand tunables, authored in scripts/economy.lua under
+/// `economy.endemic_demand`. The Endemic trade channel (MARKETS.md § Demand
+/// channels): a household pull for the endemic luxury goods (tobacco, spices,
+/// coffee, furs) that scales with a nation's WEALTH rather than its headcount,
+/// flavoured per (nation, good) by a seeded, campaign-fixed preference weight —
+/// so different nations crave different luxuries and the trade route is
+/// directional by construction. Applied at tick time by inject_endemic_demand
+/// (market_clearing.cpp), called from clear_markets alongside the population and
+/// background injectors. Same price-elastic shape as both siblings — deliberately
+/// not a second elasticity model.
+struct endemic_demand_params
+{
+    /// The SHARED (`any`) tranche: per-credit-of-national-wealth demand weight
+    /// per resource (see wealth_scale for the units), indexed by
+    /// static_cast<std::size_t>(resource_type). Unlisted resources get 0.
+    /// Luxuries are DEPOSITS — band-independent by construction, like
+    /// agricultural_produce and water in the population basket's shared tranche
+    /// — so the authored basket lives here; the era rows below exist for
+    /// symmetry with the two sibling params and for any future banded luxury.
+    /// Read the era-resolved sum through
+    /// recipe_registry::endemic_demand_basket().
+    std::array<float, resource_count> demand_basket = {};
+    /// Era-banded tranches, same fold, same mask as
+    /// population_demand_params::baskets (BL-640's mechanism, reused).
+    std::vector<era_basket> baskets;
+    float demand_elasticity = 0.80f; ///< exponent on (base_price / price).
+    float elasticity_min    = 0.30f; ///< clamp lo on the elasticity factor.
+    float elasticity_max    = 2.50f; ///< clamp hi on the elasticity factor.
+    /// Credits of national wealth → demand units, multiplied by the basket
+    /// weight: demand[r] = wealth_share × wealth_scale × basket[r] × pref ×
+    /// elastic. DEFAULTS OFF (0.0) so a hand-built harness registry — and every
+    /// pre-BL-647 golden — injects nothing; scripts/economy.lua authors the
+    /// real value (the building_upkeep zero-default precedent).
+    float wealth_scale = 0.0f;
+    /// Half-width of the per-(nation, good) preference band around 1.0:
+    /// pref ∈ [1 − spread, 1 + spread), mean 1 regardless of spread, so tuning
+    /// asymmetry never moves the channel's total. 0 = every nation craves
+    /// identically; 1 = a nation may ignore a luxury entirely or want double.
+    float preference_spread = 0.0f;
+};
+
 /// BL-095 construction-gate tunables, authored in scripts/economy.lua under
 /// `economy.construction`. Read by run_economy_step's construction step, which
 /// paces each build against the local market's recent supply of its materials.
@@ -1039,6 +1080,16 @@ public:
         return m_background_basket;
     }
 
+    /// BL-647 endemic-luxury-demand tunables (economy.endemic_demand in Lua).
+    const endemic_demand_params& endemic_demand() const { return m_endemic_demand; }
+
+    /// BL-647: the endemic luxury basket as masked by the current era.
+    /// Same fold, same caveat as population_demand_basket() above.
+    const std::array<float, resource_count>& endemic_demand_basket() const
+    {
+        return m_endemic_basket;
+    }
+
     /// BL-442 price band (economy.price_band in Lua) — the ONE authority for the
     /// [floor x, ceil x] clamp around base_price, read by both resolve_price
     /// (market_clearing.cpp) and wf_target_price (economy_system.cpp).
@@ -1270,6 +1321,11 @@ public:
         m_background_demand = b;
         rebuild_baskets();
     }
+    void set_endemic_demand(const endemic_demand_params& e)
+    {
+        m_endemic_demand = e;
+        rebuild_baskets(); // BL-647: same era-resolved fold as the two siblings.
+    }
     void set_price_band(const price_band_params& p) { m_price_band = p; }
     void set_grid_goods(const grid_goods_params& g) { m_grid_goods = g; }
     void set_market_emergence(const market_emergence_params& m) { m_market_emergence = m; }
@@ -1364,6 +1420,7 @@ private:
         };
         fold(m_population_demand.demand_basket, m_population_demand.baskets, m_population_basket);
         fold(m_background_demand.demand_basket, m_background_demand.baskets, m_background_basket);
+        fold(m_endemic_demand.demand_basket,    m_endemic_demand.baskets,    m_endemic_basket); // BL-647
     }
 
     /// BL-428: recompute chain depth over the era-allowed recipes.
@@ -1502,12 +1559,14 @@ private:
     migration_params m_migration = {};
     population_demand_params m_population_demand = {};
     background_demand_params m_background_demand = {};
-    /// BL-640: the era-resolved folds of the two above, rebuilt by
+    endemic_demand_params    m_endemic_demand    = {}; // BL-647
+    /// BL-640: the era-resolved folds of the three above, rebuilt by
     /// rebuild_baskets() on every band change and every setter. Cached rather
     /// than recomputed per read: inject_population_demand walks it once per
     /// centre per tick.
     std::array<float, resource_count> m_population_basket = {};
     std::array<float, resource_count> m_background_basket = {};
+    std::array<float, resource_count> m_endemic_basket    = {}; // BL-647
     price_band_params m_price_band = {};
     grid_goods_params m_grid_goods = {};
     market_emergence_params m_market_emergence = {};
