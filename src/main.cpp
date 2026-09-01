@@ -448,14 +448,35 @@ int main(int argc, char* argv[])
         // per script cost ~40 s x 79 launches). Checked before --verify so the
         // longer flag is not shadowed by a prefix scan; both are exact matches,
         // but the order documents the intent.
+        // --verify-budget <seconds>: the per-script wall-clock backstop (BL-714 /
+        // NR-695). 0 disables it. Parsed before the dispatch below so both --verify
+        // and --verify-all honour it.
+        double verify_budget = -1.0;
+        for (int i = 1; i + 1 < argc; ++i)
+        {
+            if (std::string(argv[i]) == "--verify-budget")
+                verify_budget = std::atof(argv[i + 1]);
+        }
+
+        // "The next argument, unless it is a flag." It used to read "unless it is
+        // --bless", which meant `--verify-all --verify-budget 60` took
+        // "--verify-budget" as the SCRIPT DIRECTORY and swept nothing. Any leading
+        // "--" is a flag; a path never starts with one.
+        const auto positional = [argc, argv](int i, const char* fallback) {
+            if (i + 1 < argc && std::string(argv[i + 1]).rfind("--", 0) != 0)
+                return std::string(argv[i + 1]);
+            return std::string(fallback);
+        };
+
+        // `app` is neither copyable nor movable, so it is built in place and the
+        // budget written onto it before the run starts.
         for (int i = 1; i < argc; ++i)
         {
             if (std::string(argv[i]) == "--verify-all")
             {
-                std::string dir = "scripts/verify";
-                if (i + 1 < argc && std::string(argv[i + 1]) != "--bless")
-                    dir = argv[i + 1];
-                return app{}.run_verify_all(dir, bless);
+                app a;
+                if (verify_budget >= 0.0) a.m_verify_script_budget_s = verify_budget;
+                return a.run_verify_all(positional(i, "scripts/verify"), bless);
             }
         }
 
@@ -463,11 +484,9 @@ int main(int argc, char* argv[])
         {
             if (std::string(argv[i]) == "--verify")
             {
-                // The script is the next non-flag argument, else the default.
-                std::string script = "scripts/verify/corporation_lens.lua";
-                if (i + 1 < argc && std::string(argv[i + 1]) != "--bless")
-                    script = argv[i + 1];
-                return app{}.run_verify(script, bless);
+                app a;
+                if (verify_budget >= 0.0) a.m_verify_script_budget_s = verify_budget;
+                return a.run_verify(positional(i, "scripts/verify/corporation_lens.lua"), bless);
             }
         }
 

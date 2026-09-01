@@ -89,6 +89,24 @@ void        set_overflow_frame(const std::string& label);
 const std::vector<text_overflow>& overflows();
 void        clear_overflows();
 std::size_t overflow_failures();                     ///< clipped + unfittable
+
+/// How many text draws the ledger MEASURED while recording — every call through
+/// `fit_text`, `wrap_text` or `add_fit_text`, whatever the outcome.
+///
+/// THE DIFFERENCE BETWEEN THIS AND `overflows()` IS THE WHOLE POINT (BL-714).
+/// A record is an overflow EVENT; an observation is a LOOK. Zero records has two
+/// completely different causes that the ledger could not previously tell apart:
+///   * nothing overflowed — the result a green check is claiming; or
+///   * nothing routed through these helpers at all, so the ledger never looked.
+/// The second is what NR-614/NR-663 hit: `expect_no_clipping` reported
+/// "0 failure(s), 0 record(s)" across a 31-capture shell pass while the
+/// Corporation dashboard visibly truncated a label mid-word, because that label
+/// is drawn with plain ImGui text and this ledger's scope never reached it.
+///
+/// So a check asserts on THIS to prove it looked, and on `overflow_failures()`
+/// for what it found. Zero observations is a vacuous pass and must be red.
+/// Reset by `clear_overflows()`, alongside the records.
+std::size_t overflow_observations();
 std::size_t write_overflow_report(const char* path); ///< returns the failure count
 
 } // namespace ui

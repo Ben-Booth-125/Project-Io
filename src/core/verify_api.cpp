@@ -1838,9 +1838,48 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         std::error_code ec;
         std::filesystem::create_directories("screenshots", ec);
         ui::write_overflow_report("screenshots/text_overflow.txt");
-        SDL_Log("verify.expect_no_clipping %s: %zu failure(s), %zu record(s) total",
-                fails == 0 ? "PASS" : "FAIL", fails, ui::overflows().size());
+
+        // BL-714 — A CHECK MUST PROVE IT LOOKED.
+        //
+        // This reported "0 failure(s), 0 record(s)" across a whole 31-capture shell
+        // pass while the Corporation dashboard visibly truncated a label mid-word
+        // and a clipped button sat on screen (NR-614 / NR-663). Nothing was wrong
+        // with the arithmetic: zero records is the correct output when nothing
+        // routed through the text_fit helpers, and that label is drawn with plain
+        // ImGui text this ledger's scope never reaches.
+        //
+        // So zero failures out of zero observations is not a pass, it is an
+        // instrument reporting on a subject it never saw — and it is strictly worse
+        // than a red row, because it is trusted. `overflow_observations()` counts the
+        // looks rather than the findings, and a check with no looks is now FAIL.
+        //
+        // This does NOT fix the coverage gap; a surface drawn outside text_fit is
+        // still invisible here. It makes the gap announce itself instead of reading
+        // as a clean bill of health, which is what lets the coverage work be scoped.
+        const std::size_t looks = ui::overflow_observations();
+        if (looks == 0)
+        {
+            ++m_verify_failures;
+            SDL_Log("verify.expect_no_clipping FAIL [%s]: VACUOUS — the overflow ledger "
+                    "measured 0 text draws, so 0 failures means it never looked, not that "
+                    "nothing clipped. Either the captured surface draws no text through "
+                    "ui::fit_text/wrap_text/add_fit_text (a coverage gap, not a pass), or "
+                    "recording was off. See BL-714.",
+                    label ? label->c_str() : "");
+            return -1;
+        }
+
+        SDL_Log("verify.expect_no_clipping %s: %zu failure(s), %zu record(s), "
+                "%zu text draw(s) measured",
+                fails == 0 ? "PASS" : "FAIL", fails, ui::overflows().size(), looks);
         return static_cast<int>(fails);
+    });
+
+    // BL-714 companion: the raw look count, so a script can assert its OWN floor
+    // ("this ledger should see at least N draws on this surface") rather than only
+    // the zero case expect_no_clipping now guards.
+    v.set_function("observations", [this]() -> int {
+        return static_cast<int>(ui::overflow_observations());
     });
 
     // === BL-113 interactive-flow acceptance primitives ======================
@@ -3256,6 +3295,64 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_golden_dir = (std::filesystem::path{script_path}.parent_path() / "golden").string();
 
         const int failures_before = m_verify_failures;
+
+        // BL-714 / NR-695 — A STALL MUST BE ONE RED ROW, NOT A DEAD SUITE.
+        //
+        // `overflow_tile_v2` swept the History ledger's TILES view, which draws a
+        // row per tile on the body. It burned CPU, collapsed memory, and STARVED
+        // NINE SCRIPTS BEHIND IT — so a single runaway check cost the whole pass,
+        // and the pass reported nothing about the nine it never reached. BL-423
+        // already decided a batch does not abort on one broken script; a script
+        // that never returns was simply outside that promise.
+        //
+        // A count hook fires between Lua instructions, so it interrupts a runaway
+        // LOOP — which is the shape this defect took. It cannot interrupt a single
+        // long C++ call (one enormous verify.capture()), and that limit is stated
+        // rather than papered over: the watchdog shortens a stall from unbounded to
+        // one capture, not to zero.
+        //
+        // WALL CLOCK IN A DETERMINISTIC HARNESS, deliberately. The budget is a
+        // BACKSTOP, not a performance assertion: it sits far above any legitimate
+        // script (the widest committed check, text_overflow_floor, runs ~60 captures
+        // well inside it), so tripping it means a genuine runaway rather than a slow
+        // machine. Nothing the scripts assert reads this clock, so a pass/fail
+        // verdict stays reproducible.
+        struct script_watchdog
+        {
+            std::chrono::steady_clock::time_point start;
+            double budget_s;
+        };
+        static script_watchdog s_watchdog;
+        s_watchdog.start    = std::chrono::steady_clock::now();
+        s_watchdog.budget_s = m_verify_script_budget_s;
+
+        lua_State* const LS = m_lua.state().lua_state();
+        lua_sethook(LS, [](lua_State* ls, lua_Debug*) {
+            const double elapsed = std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - s_watchdog.start).count();
+            if (elapsed > s_watchdog.budget_s)
+            {
+                lua_sethook(ls, nullptr, 0, 0); // do not re-trip while unwinding
+                // Pre-formatted, then passed as "%s": Lua's own lua_pushfstring
+                // accepts only a small format set and rejects a precision like
+                // "%.0f" outright — which turned the watchdog's first real trip into
+                // "invalid option '%.' to 'lua_pushfstring'" instead of the reason.
+                char msg[400];
+                std::snprintf(msg, sizeof msg,
+                              "verify watchdog: script exceeded its %.0f s wall-clock budget "
+                              "(BL-714/NR-695). A check that never returns starves every script "
+                              "behind it, so this is a red row rather than a hung suite. Narrow "
+                              "the sweep, or raise the budget with --verify-budget <seconds>.",
+                              s_watchdog.budget_s);
+                luaL_error(ls, "%s", msg);
+            }
+        }, LUA_MASKCOUNT, 100000);
+        struct hook_guard
+        {
+            lua_State* ls;
+            ~hook_guard() { lua_sethook(ls, nullptr, 0, 0); }
+        } guard{LS};
+
         try
         {
             // Auto-load the helper library (scripts/verify/lib.lua) from the

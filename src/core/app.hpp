@@ -565,6 +565,24 @@ private:
     std::string m_golden_dir;            ///< Directory holding golden reference PNGs (script dir / "golden").
     bool        m_verify_bless = false;  ///< When true, captures overwrite the golden instead of comparing.
     int         m_verify_failures = 0;   ///< Count of captures that failed their golden diff; sets the exit code.
+
+public:
+    /// Per-script wall-clock budget for a verify run, in seconds (BL-714 / NR-695).
+    ///
+    /// A BACKSTOP AGAINST A RUNAWAY, not a performance assertion. `overflow_tile_v2`
+    /// swept a row-per-tile ledger view and starved the nine scripts queued behind
+    /// it, so a stall cost a whole pass and reported nothing about what it never
+    /// reached. Exceeding this raises a Lua error, which BL-423's existing
+    /// keep-going path already turns into one red row.
+    ///
+    /// Set far above any legitimate script so tripping it means a real defect rather
+    /// than a slow machine. MEASURED, not guessed: `text_overflow_floor` — the widest
+    /// committed check, ~60 captures over every ledger, lens and wizard round — runs
+    /// in 174 s on the Debug build here, so this default is a 3.4x margin.
+    /// Override with `--verify-budget <seconds>`; 0 disables the watchdog.
+    double      m_verify_script_budget_s = 600.0;
+
+private:
     int  m_prev_speed = 1; ///< Speed remembered across a pause, so unpausing restores it.
 
     double m_last_orbit_days = 0.0; ///< elapsed_days at the previous orbit advance; gives the per-frame delta.

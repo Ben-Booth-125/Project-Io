@@ -42,6 +42,12 @@ bool                       g_recording = false;
 std::string                g_frame;
 std::vector<text_overflow> g_records;
 
+/// Every text this ledger MEASURED, whatever the outcome (BL-714). Counted
+/// separately from g_records because a record is an overflow EVENT and this is
+/// a LOOK — see text_fit.hpp @ overflow_observations for why the distinction is
+/// the difference between a real pass and a vacuous one.
+std::size_t                g_observations = 0;
+
 /// Record one overflow, deduping on (site, text) — a sixty-frame run must not
 /// flood the report. The stored record keeps the first frame label and the
 /// worst severity seen.
@@ -88,6 +94,7 @@ std::string elide(const char* text, float max_w)
 bool fit_text(text_box box, const char* site, const char* text, float max_w,
               bool disabled)
 {
+    if (g_recording) ++g_observations; // BL-714: the ledger looked here
     const float needed = ImGui::CalcTextSize(text).x;
     if (max_w > 0.0f && needed <= max_w)
     {
@@ -122,6 +129,7 @@ void wrap_text(text_box box, const char* site, const char* text, float max_w)
     // Wrap policy never elides (LAYOUT.md: wrap vs guaranteed-fit is a binary
     // choice per container). The only way a wrapping box still clips is a
     // single unbreakable token wider than the box — detect and record that.
+    if (g_recording) ++g_observations; // BL-714: the ledger looked here
     if (g_recording && max_w > 0.0f)
     {
         const char* p = text;
@@ -149,6 +157,7 @@ float add_fit_text(ImDrawList* dl, text_box box, const char* site,
                    ImVec2 pos, float max_w, ImU32 col, const char* text,
                    text_align align)
 {
+    if (g_recording) ++g_observations; // BL-714: the ledger looked here
     const float needed = ImGui::CalcTextSize(text).x;
     std::string storage;
     const char* draw = text;
@@ -192,7 +201,8 @@ void set_overflow_recording(bool on)      { g_recording = on; }
 bool overflow_recording()                 { return g_recording; }
 void set_overflow_frame(const std::string& label) { g_frame = label; }
 const std::vector<text_overflow>& overflows() { return g_records; }
-void clear_overflows()                    { g_records.clear(); }
+void clear_overflows()                    { g_records.clear(); g_observations = 0; }
+std::size_t overflow_observations()       { return g_observations; }
 
 std::size_t overflow_failures()
 {
