@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 186 entries across 2 volume(s).
+One line per session, newest first — 187 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-09-01 | [Sprint 27 block 2: two scale-blind selections, and two instruments that were lying](DEVLOG.md) | BL-417 BL-434 BL-440 BL-642 BL-709 BL-710 BL-711 BL-712 | DEVLOG.md |
 | 2026-08-29 | [Sprint 24a: every ledger rebuilt, and three deletions that took a ruling with them](DEVLOG.md) | BL-176 BL-591 BL-683 BL-693 | DEVLOG.md |
 | 2026-08-28 | [Sprint 23 closes: a lens becomes a question, and the answer stops disagreeing with itself](DEVLOG.md) | BL-636 BL-660 BL-664 BL-665 BL-666 BL-667 BL-668 BL-669 BL-670 BL-671 BL-672 BL-673 | DEVLOG.md |
 | 2026-08-26 | [Sprint 20 closes: the loop closes, and the instruments were measuring a different world](DEVLOG.md) | BL-627 BL-630 BL-632 BL-634 BL-635 BL-641 BL-654 BL-655 BL-656 BL-657 | DEVLOG.md |

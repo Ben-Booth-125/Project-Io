@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*124 entries — 117 open, 7 resolved.*
+*125 entries — 118 open, 7 resolved.*
 
 ---
 
@@ -1541,6 +1541,25 @@ Surveying gets the AI building AT ALL (335 -> 419 buildings). The four permanent
 > **Recommendation:** Kept. It is DEVELOPMENT_PRACTICES.md § A harness must build the world the application builds, applied to the file that most needs it, with an in-repo precedent from the previous session. Reversing it is deleting one line, and the dated comment says why it is there. What wants YOUR call is broader: NR-762 asks whether the other ~120 harnesses should be swept the same way, and this is now the second expensive instance of that gap in as many sessions.
 
 *Files: `tools/verify/demand_census.cpp`, `tools/verify/ai_skill_harness.cpp`, `docs/development/DEVELOPMENT_PRACTICES.md`*
+
+### NR-773 — BL-642's premise has moved under it, and its second half needs one design call before it can be built
+*question · raised 2026-09-01 · from Scoped by the sprint-27 session after BL-711 and NR-772 landed; measured, not assumed.*
+
+BL-642 has two halves. Both need a word from you before building, for different reasons.
+
+HALF (1) - 'make the opening years actually build'. The item says the construction draw NEVER FIRES during the opening years. Measured today, that is no longer the reading. `ERAS.md` settles what the phrase means: the first ~20 years ARE `app::start_new_game`'s 80-tick warm start, not a separate generation pass. And the warm start does now construct. Ancient-band construction-channel demand, blind census -> surveyed (NR-772) -> surveyed with BL-711: **93.25 -> 202.58 -> 210.08**, with timber's construct draw going 54.0 -> 118.3 and clay 0.0 -> 13.3. The AI builds 105 more buildings than the blind census could see.
+
+What REMAINS true of half (1) is narrower and sharper: the SEEDER's ~330 buildings are authored complete (`author_building` writes a default `ticks_remaining` of 0, corporation_generation.cpp) and draw nothing, ever. Fixing that literally would open the campaign with 330 half-built buildings, which is a gameplay change, not a plumbing one - so it wants your reading rather than my guess.
+
+HALF (2) - 'population centres draw construction materials as they grow' - is the half the item itself calls the one that lasts, and it is unambiguous in intent. The hook is clean and already there: economy_system.cpp's BL-616 growth block, where `pcc.population` takes a step and `++pcc.scale` promotes. What is NOT settled is whether that draw GATES growth.
+
+- A) A WANT ONLY. The centre registers demand for its materials, prices them, and grows regardless. Matches every existing injector - none of them gates - and is the safe direction: if you wanted gating, this is a subset rather than a wrong turn.
+- B) GATED, like a build. Growth stretches or pauses when the market cannot supply, exactly as run_construction stretches a build. Truest to MARKETS.md property 3 and it makes construction materials genuinely load-bearing - but a centre that stops growing for want of timber is a real gameplay change and it can deadlock a poor region.
+- C) A want now, gating later behind its own item, once the materials actually reach the shelf.
+
+> **Recommendation:** C. Half (2) as a WANT, with rates measured against the census rather than guessed, and gating filed separately - because BL-641's cliff is the standing warning here: a brand-new universal draw unmet on tick 1 collapsed operating firms 198/328 -> 33/317, and gating growth on an unmet draw is that same cliff pointed at population instead of firms. For half (1), my reading is that BL-711 and NR-772 have already delivered most of what it was reaching for, and what is left (the seeder's instant buildings) is a separate and much bigger question. Not built either way - the item is left open with this measurement attached.
+
+*Files: `src/world/economy_system.cpp`, `src/world/corporation_generation.cpp`, `scripts/economy.lua`, `docs/economy/PRODUCTION.md`, `docs/economy/MARKETS.md`*
 
 ---
 

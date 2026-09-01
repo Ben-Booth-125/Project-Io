@@ -10,6 +10,79 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-01 — Sprint 27 block 2: two scale-blind selections, and two instruments that were lying
+
+**Mode:** Full (Batch Delivery). **Sprint 27: still open — the channels remain.**
+**Runtime:** one session, main-session only, no worktree agents. Two integrating builds.
+
+Five commits. Four backlog items and the sprint's own measuring instrument.
+
+**BL-710 — save_roundtrip compiles again.** It had not since `cc88997c`, and two save-version bumps
+landed inside that window (v21 power, v22 construction), both appending to the format, neither
+verified by the harness whose whole job is that. Six regions removed by deletion, not repair. The v6
+and v7 refusal rows stay: what they assert is the version contract, which the tear-out did not
+touch. Green at v22, 63 PASS / 0 FAIL, both dead bumps carried.
+
+**BL-712 — the scorer chooses between categories.** Two argmax loops, not the one the item named.
+The build candidate took a site's highest-margin recipe, so power at net 3.98 could never out-rank
+price-ceiled electronics at net 290 and no rival ever built a plant. Now a best per `recipe::group`.
+The recipe margin-chase carried the same defect plus two of its own: it used the browse index as an
+absolute recipe id, and it proposed cross-group switches **that the seam has refused since
+2026-08-16** — Ben's own BL-434 retraction. One proposal per building per evaluation, so the refused
+proposal starved the legal within-group switch. That is the sharper finding, and it is now a doc
+section: *a scorer that proposes what its seam forbids cannot tell a refusal from an absence.*
+
+**BL-709 verified, and deliberately left open.** Three of four requirement rows land. R1 does not:
+on the ancient band `construction_capacity` is produced **0.0** over 80 warm ticks with two yards
+standing and both inputs on the shelf; on the industrial band both yards are gone by tick 80. The
+linter's false-open warning said *a partial slice can land under an item that is legitimately still
+open*, and that turned out to be the right reading rather than a formality.
+
+**BL-711 — every resource reaches the scorer.** `rank_extraction_sites` kept a global top-8 over
+deposit × affinity × demand; deposit magnitudes span three orders, so all eight rows were iron_ore
+and clay, peat, sand, hides and fibre were never *candidates*, anywhere, in any world. Now a
+per-resource top-K. **Coal goes from zero mines in any world ever to 25** — the chain NR-766 named,
+feeding the industrial band's largest recipe. This is BL-440's own trap one altitude up, which is
+why the rule now lives in `AI_OPPONENT.md` rather than in that item's comment.
+
+### The two instruments
+
+Both were found by accident, and both had been reporting confidently.
+
+`demand_census` never called `init_survey_states`. Every body stayed hidden,
+`rank_extraction_sites` gates on survey visibility, and **the corp AI built zero extraction sites in
+every census ever run.** It surfaced because BL-711 came back byte-identical there while the probe
+showed coal going 0 → 25. One line, matching `ai_skill_harness`'s own note from the previous
+session — same class, same day, same answer. It moves every reading the file produces, so the three
+runs are recorded side by side to keep the instrument effect and the item effect separable:
+coal 0.0 → 0.0 → 632.7, clay 0.0 → 0.0 → 349.1, hides 0.0 → 0.0 → 353.9, buildings 335 → 419 → 440.
+
+`ai_skill_harness` — **the sprint's stated success criterion** — is structurally blind to a
+per-category change: three recipes in its hand-built registry, `group` set on none, so all three
+fall to the default. BL-712 returned byte-identical numbers before and after, and that identity is
+the proof rather than a null result (NR-771).
+
+### Decisions taken, and what is Ben's
+
+Taken: the census survey fix (NR-772 — an in-repo precedent from the previous session, reversible in
+one line); confining the recipe chase to its own group (aligning the scorer with a ruling Ben had
+already made at the seam, not a new rule).
+
+His: **NR-769 is the one that matters.** BL-712's fix works — `Power Generation` and `Construction`
+went from zero build candidates to 168 and 430 — and they still never win, because `net²/capex` is
+itself an absolute contest. § Selection must be scale-free condemns that curve in as many words;
+§ Scoring says its retention is BL-417, his call. BL-711 left the same fingerprint independently:
+peat reaches the scorer, both slots placeable, still no site. Also NR-770 (the yards), NR-771/772/762
+(the blind instruments), NR-773 (BL-642's fork), NR-767/768.
+
+Nothing was re-blessed. `spectator_determinism` R2 moved further from its already-150-commit-stale
+golden and is reported with both hashes; `ai_skill_harness` stays at 25 known-red band failures.
+That harness moved and **not for the better on aggregate** — three seeds better, two worse — which
+is the sprint's own thesis as a number: rivals now reach the whole resource field, and reaching more
+of a world with almost no demand means building more into debt. The channels are the answer to that,
+and they are what is left.
+
+
 ## 2026-08-29 — Sprint 24a: every ledger rebuilt, and three deletions that took a ruling with them
 
 **Mode:** Design → Full (Batch Delivery, eight waves). **Sprint 24a: closed.**

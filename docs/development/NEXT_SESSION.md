@@ -1,96 +1,97 @@
-# Next session — Sprint 27: demand, and the two scale-blind selections
+# Next session — Sprint 27, block 3: the channels, and two instruments that were lying
 
-Sprint 27 is **open**. Ten items. The previous session (2026-08-31) closed sprint 26 complete and
-handed this over deliberately rather than starting it tired.
+Sprint 27 is still **open**. Block 2 (2026-09-01) closed the four items NEXT_SESSION ordered ahead
+of the channels and fixed the sprint's own primary instrument. What is left is the channels — and
+one design fork that blocks the first of them.
 
-## The sprint in one line
+## What changed under you, and it matters before you read anything else
 
-Give the goods a buyer. The economy has a supply chain and almost no demand — and the AI cannot
-reach most of what demand does exist, because two selection steps exclude whole categories before
-scoring begins.
+**Two of this sprint's instruments were blind, and both were found by accident.**
 
-**Success is NOT "the channels are built."** It is `ai_skill_harness` showing a field that is not
-monotonically insolvent. Channels built and corps still broke is exactly what BL-641 produced on its
-own, and it is the failure this sprint exists to avoid.
+1. **`demand_census` surveyed nothing.** It never called `init_survey_states`, which `app.cpp` runs
+   at campaign start. Every body — home included — stayed `hidden`, and `rank_extraction_sites`
+   gates on survey visibility, so **the corp AI built zero extraction sites in every census ever
+   run.** Not fewer. Zero. Every extraction figure the census has printed was the seeder's
+   placement, frozen. Fixed (`8fe177dc`, NR-772); it moves every reading the file produces, so any
+   census number you remember from before 2026-09-01 is not comparable.
+2. **`ai_skill_harness` cannot see a per-category change.** Its hand-built registry holds three
+   recipes and sets `group` on none, so all three fall to the default "General". BL-712 returned
+   **byte-identical** numbers before and after — that is the proof, not a null result (NR-771).
+   **The sprint's stated success criterion is this harness.** Until NR-771 is answered, read the
+   criterion as `chain_conversion_probe` + `demand_census` instead.
 
-## Read these first, in this order
+Both are NR-762's family — ~30 harnesses skipping the app's world-building tail — and that question
+is still unowned. Two expensive instances in two sessions is now the argument for taking it.
 
-| Doc | Why |
-|---|---|
-| `docs/economy/MARKETS.md` §§ Three properties · Settled: a short pool BUYS | Properties 3–6 are the sprint's whole design. Property 3 is why a pool draw starves. |
-| `docs/ai/AI_OPPONENT.md` § Selection must be scale-free | New. It is the rule BL-711 and BL-712 implement. |
-| `docs/economy/PRODUCTION.md` § A shortfall scales output; it never idles | New. Binds every channel you build. |
-| `docs/development/DEVELOPMENT_PRACTICES.md` §§ A harness must build the world the application builds · A broken check is worse than a failing one | New, and both were earned expensively. |
+## Order of work
 
-## Order of work, and why
+**1. BL-642 (construction draws) — BLOCKED ON NR-773, so read that first.**
+Its half (1) premise moved under it. `ERAS.md` settles that "the first 20 years" ARE the 80-tick
+warm start, not a separate generation pass, and the warm start now constructs: ancient-band
+construction-channel demand went 93.25 → 202.58 → 210.08 across the census fix and BL-711. What
+remains of half (1) is narrower and bigger — the seeder's ~330 buildings are authored complete and
+draw nothing, and fixing that literally opens the campaign with 330 half-built buildings. Half (2)
+(centres draw as they grow) has a clean hook in `economy_system.cpp`'s BL-616 growth block and needs
+exactly one call: does the draw **gate** growth, or only register a want. NR-773 has A/B/C and a
+recommendation.
 
-**1. BL-710 (save roundtrip does not compile) — FIRST, and it is priority A for a reason.**
-`tools/verify/save_roundtrip.cpp` has not compiled since the mercenary tear-out (`cc88997c`). It
-references `world::mercenary_offers`, `mercenary_contracts`, `next_offer_id` and
-`mercenary_contract_state`, all deleted by that commit. **Two save-version bumps landed while it was
-dead** — v21 and v22, both appending to the serialised format, neither verified by the harness whose
-job is exactly that. Flat binary serialisation is the project's chosen persistence, so this harness
-is the only thing between an append-only format and silent save corruption. The item lists all six
-regions; every one is a **deletion**, not a repair. After fixing, run it against v22 and confirm the
-two landed bumps round-trip.
+**2. BL-644 (state channel), then BL-647 (endemic luxury).**
+BL-647 carries a prerequisite the item does not name: tobacco, spices, coffee and furs are **not in
+`placement_rules::k_extractable`**, so no extraction site can target them at all. BL-586 slice 2
+recorded that gap and left it. A luxury basket naming four goods nothing can mine would be a channel
+that cannot clear.
 
-**2. BL-712 (recipe choice is scale-blind) — before BL-711 and before any new channel.**
-Smaller, contained, and it unblocks two features that landed unable to grow. A site takes its
-highest-margin recipe, so a cheap universal good never wins — which is why no rival can build a
-power plant or a construction sector. Both were designed as *economy-scaled* sinks and neither can
-scale. Fix this before building more channels onto the same scorer.
+**3. BL-643 / BL-646 / BL-645** at priority B.
 
-**3. BL-709 (construction as a rate) — MERGED BUT UNCLOSED.** The code is on `main` and builds
-green; it was never verified with a census run and its bookkeeping is still open. Verify and close
-it before starting new work, or the linter's false-open warning is telling the truth.
+**4. BL-709 R1**, once NR-770 is diagnosed.
 
-**4. BL-711 (extraction candidate list is scale-blind).** Bigger: determinism-affecting, moves every
-economy golden. `tools/verify/chain_conversion_probe.cpp` is in the tree and is the instrument that
-diagnosed it. Expect one deliberate re-bless wave with dated provenance, never a dribble.
+**Run `demand_census` before and after every item — and note it now takes ~36 s and reports a world
+where the AI actually builds.**
 
-**5. The channels**, in the sprint's own order: BL-642 (construction draws), BL-644 (state),
-BL-647 (endemic luxury), then BL-643 / BL-646 / BL-645 at priority B.
+## Traps, including two new ones
 
-**Run `demand_census` before and after every item.** The deltas are the sprint, not an epilogue.
+- **Lua-linked harnesses are a much bigger class than any list says** (NR-767). `harness_params.hpp`
+  pulls `scripting/lua_state.hpp`, so **any** harness including it needs
+  `cmd //c tools\verify\build_lua_harness.bat <name>`. `build_harness.bat` fails them with
+  `fatal error C1083: 'sol/sol.hpp'`, which reads as broken code rather than the wrong builder. Five
+  of eight harnesses reached for in one block hit this. Confirmed Lua-linked so far:
+  `save_roundtrip`, `world_determinism`, `determinism_harness`, `recipe_switch_harness`,
+  `build_spree_harness`, `decision_trace_harness`, `ai_skill_harness`, `spectator_determinism`,
+  `demand_census`, `chain_depth`, `spawn_solvency`, `chain_conversion_probe`, `upkeep_harness`.
+- **Run harness exes as `./build_gen/verify/<name>.exe`.** `cmd //c "build_gen\verify\$h.exe"` eats
+  the backslashes when `$h` is a shell variable and reports "not recognized as an internal or
+  external command", which looks like a missing build.
+- Build: `cmd //c "<repo>\build_app.bat"` — **absolute path**.
+- **Worktrees are cut from a diverged `origin/main`.** `git switch -C <branch> main`. Never
+  hard-reset to `origin/main`.
+- Source files are **CRLF in the working tree, LF in the blob**. A Python patch script that reads
+  text and rejoins on `\n` rewrites the whole file and buries a two-line change in a 1000-line diff.
+  Read/write binary and keep `\r\n`.
 
-## Tooling you will need, and traps that cost the last session real time
+## Known-red, reported and NOT re-blessed
 
-- Build: `cmd //c "<repo>\build_app.bat"` — **absolute path**, the bare name does not resolve. It
-  cold-configures when `build/` is absent, so use it rather than improvising a generator; a
-  different generator changes codegen and has already forced one re-verification.
-- Ordinary harnesses: `node tools/verify/build_harness.js <name>`, then `build_gen\verify\<name>.exe`.
-- **Lua-linked harnesses** (`demand_census`, `chain_depth`, `spawn_solvency`) need
-  `cmd //c tools\verify\build_lua_harness.bat <name>`. `build_harness.js` fails them with unresolved
-  externals; CMake needs a configure a worktree does not have.
-- **Prebuilt exes under `build_gen/` may be STALE and will PASS while reporting on an older world.**
-  Rebuild before trusting any harness result.
-- **Worktrees are cut from `origin/main`, which has DIVERGED from local `main`.** A fast-forward is
-  impossible. Branch fresh with `git switch -C <branch> main`. **Never hard-reset to `origin/main`** —
-  it would discard the local work. Six agents hit this in one session; all six handled it, none was
-  warned by anything but the brief.
-
-## Known-red, and NOT yours unless you are fixing them
-
-- `spectator_determinism` R2 byte-identity golden — stale by 150+ commits (NR-752). Re-bless is Ben's.
-- `ai_skill_harness` bands — stale since 2026-08-16 (NR-305), plus a real behavioural change on top.
+- `spectator_determinism` R2 byte-identity: `golden=E350DF2A50BF4BAA observed=90BFB27CB57CC308`.
+  Stale by 150+ commits before this block (NR-752); BL-711 moved it further. **Ben's.**
+  Determinism itself is intact — R2's own reproducibility row and all of R3 pass.
+- `ai_skill_harness` — 25 band failures, unchanged in count since 2026-08-16 (NR-305).
 - `chain_depth` — 8 pre-existing `injector::none` rows.
-- `save_roundtrip` — does not compile. That is BL-710, above.
 
-**Report, do not re-bless.** A golden re-blessed by whoever trips over it is a golden nobody reviewed.
+## Open questions carried forward
 
-## Open questions carried in, all Ben's
-
-- **NR-763** — self-sufficiency is currently the norm rather than the exception, and chain closure
-  saturates so input asymmetry does not survive into capability asymmetry. Recommended first probe:
-  vary `economy.construction.max_logistics_reach` and re-read BL-706's spread. One constant.
-- **NR-766** — the seeder sizes against consumer demand only, never processing-input demand. Upstream
-  of everything here; unowned.
-- **NR-762** — ~30 harnesses skip the app's world-building tail. Unowned.
-- **NR-765** — the argmax family; BL-711 and BL-712 are its two fixes.
+- **NR-769 is the big one.** BL-712's fix works — `Power Generation` and `Construction` went from
+  **zero** build candidates to 168 and 430 — and they still never win, because `net²/capex` is
+  itself an absolute contest (peaks: Advanced Fabrication 1884, Power Generation 31.9). The rule in
+  `AI_OPPONENT.md` § Selection must be scale-free condemns that curve in as many words; § Scoring
+  says its retention is **BL-417, Ben's call**. Four options with trade-offs are in the entry.
+  **BL-711 left the same fingerprint independently**: peat reaches the scorer, both its slots are
+  placeable, and it still gains no site.
+- **NR-770** — construction yards are removed on the industrial band and produce 0.0 on the ancient
+  one. Holds BL-709 R1 open; the ancient half is the cheaper diagnosis.
+- **NR-771, NR-772, NR-762** — the blind instruments, above.
+- **NR-763, NR-765, NR-766** — carried in from block 1. NR-765 is now answered: BL-711 and BL-712
+  are its two fixes and both have landed.
 
 ## What sprint 28 is waiting for
 
-BL-697, BL-699 and BL-698 are **proposed**, not open. They are the systemic brake, and they are
-blocked on this sprint: a coalition forms against whoever leads, and that needs a leader worth
-forming against. Read `sprints.json` § 28 before touching them — it carries two warnings its future
-self needs.
+Unchanged: BL-697, BL-699 and BL-698 are **proposed**, not open — the systemic brake needs a leader
+worth forming a coalition against. Read `sprints.json` § 28 before touching them.

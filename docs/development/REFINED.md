@@ -1,71 +1,60 @@
 # Project Io — REFINED (active worklist)
 
-**Sprint 27 (demand, resumed) — BATCH DELIVERY, opened 2026-08-31.**
+**Sprint 27 (demand) — BATCH DELIVERY, block 2, 2026-09-01.**
 
-Give the goods a buyer. On the industrial band `iron_ore` is produced 42991.6 against total demand
-**0.000**; five of the eight designed channels do not exist; every AI corp is insolvent 29–30 ticks
-of 30 on every seed. Barrier semantics per `DELIVERY.md` § Batch Delivery.
+Give the goods a buyer. Block 1 (BL-654, BL-652, BL-706, BL-707, BL-708, BL-709) landed on
+2026-08-31; this block is the prerequisites NEXT_SESSION.md ordered ahead of the channels, plus
+the channels themselves. Barrier semantics per `DELIVERY.md` § Batch Delivery.
 
 **Success is not "the channels are built"** — it is `ai_skill_harness` showing a field that is not
-monotonically insolvent. Channels built and corps still broke is exactly what BL-641 produced alone.
+monotonically insolvent. **Read NR-771 before using that criterion**: the harness's hand-built
+registry holds three recipes in one default group, so it is blind to any per-category change.
 
-**Base:** `28443671`.
+**Base:** `ece82abc`.
 
 ---
 
-## Collision map
+## Done this block
 
-| Slice | Items | Writes | Overlaps |
-|---|---|---|---|
-| **A — the bid seam** | BL-654, BL-652 | `src/world/market_clearing.cpp`, `src/world/economy_system.cpp`, `scripts/economy.lua`, `docs/economy/MARKETS.md` | B on `economy.lua` |
-| **B — ancient chain** | BL-707 | diagnostic; reads `corp_ai.cpp`, `placement_rules.cpp`, `scripts/recipes.lua` | A on `economy.lua` |
-| **C — completeness read** | BL-706 | `tools/verify/demand_census.cpp` | none |
-| **D — power** | BL-708 | `components.hpp`, `economy_system.cpp`, `logistics.cpp`, `scripts/*.lua` | A, E |
-| **E — construction** | BL-709 | `economy_system.cpp`, `corp_ai.cpp`, `placement_rules.cpp`, build door | A, D |
+- [x] **BL-710 (save roundtrip does not compile)** — six regions deleted, not repaired. Green at
+      v22, 63 PASS / 0 FAIL; v21 and v22 both round-trip. `e90841a0`
+- [x] **BL-712 (recipe choice is scale-blind)** — per-`recipe::group` build candidates, and the
+      recipe margin-chase confined to its own group (the seam has refused cross-group since
+      2026-08-16). corp_ai_harness R8, falsified before landing. `7983d5d4`
+- [x] **BL-709 verified** — R2/R3/R4 complete, **R1 pending**; the item stays open, deliberately.
+      `1c45f41f`
+- [x] **demand_census surveys the world** — it called no `init_survey_states`, so the corp AI built
+      *zero* extraction sites in every census ever run. `8fe177dc`
+- [x] **BL-711 (extraction candidate list is scale-blind)** — per-resource top-K. Coal goes from
+      0 mines in any world to 25. `1eed92e3`
 
-**Symbol layer** — the review-barrier checklist:
+---
 
-| Task | provides | consumes |
+## Next, and what each is waiting on
+
+| # | Item | State |
 |---|---|---|
-| A1 (BL-654) | the short-pool **bid path**; the reservation ceiling in the price-band family | — |
-| A2 (BL-652) | unpriced-basket-entry diagnostic + a failing harness row | — |
-| B1 (BL-707) | a written, evidenced diagnosis | — |
-| C1 (BL-706) | per-market completeness column + spread summary in `demand_census` | — |
-| D1 (BL-708) | generation building; power as a bought upkeep draw; network transmission | A1's bid path |
-| E1 (BL-709) | construction sector, five banded methods; scorer prices contended capacity | D1 |
+| 1 | **BL-642 (construction draws)** | **Blocked on NR-773.** Half (1)'s premise re-measured and largely overtaken by BL-711 + NR-772; half (2) needs one call — does centre growth *gate* on materials or only register a want. |
+| 2 | **BL-644 (state channel)** | Open. Nation budget lines spend credits; no goods purchase exists. |
+| 3 | **BL-647 (endemic luxury)** | Open. Note the prerequisite: tobacco/spices/coffee/furs are **not in `k_extractable`**, so nothing can mine them (BL-586 slice 2's own recorded gap). |
+| 4 | **BL-643 / BL-646 / BL-645** | Priority B — infrastructure, conflict, research channels. |
+| 5 | **BL-709 R1** | Re-open when NR-770 is diagnosed: yards are removed on the industrial band and produce 0.0 on the ancient one. |
 
-No unmatched `consumes`.
+## Ben's queue, newest first
 
----
+`NR-773` (BL-642's fork) · `NR-772` (the census surveyed nothing — decision taken, reversible in one
+line) · `NR-771` (ai_skill_harness is blind to per-category change) · `NR-770` (construction yards
+do not survive, and where they survive produce nothing) · `NR-769` (**the scale-blind exclusion has
+a second seat inside `net²/capex` — BL-417 is yours**) · `NR-768` · `NR-767` (Lua-linked harnesses
+are a growing class with only a hand-written list).
 
-## Wave 1 — the gate and the instruments (parallel, worktree agents)
+## Known-red, reported and NOT re-blessed
 
-- [ ] **A1 · BL-654 (a channel must bid)** — **gates the whole sprint.** A short draw bids the
-      shortfall and pays; above a reservation ceiling it does not bid and the shortfall rule weakens
-      the building instead. One rule for every goods draw, unit upkeep included.
-- [ ] **A2 · BL-652 (injectors must not skip silently)** — an injector that cannot price a basket
-      entry says so. Two bugs hid behind this silence on one day.
-- [ ] **B1 · BL-707 (the ancient chain does not convert)** — **diagnose before fixing.** Do not move
-      the price ceiling to hide the reading.
-- [ ] **C1 · BL-706 (chain completeness read)** — reports, never gates. The enemy is uniformity.
-
-## Wave 2 — power (after A1 merges)
-
-- [ ] **D1 · BL-708 (power as a grid)** — bought, sold between corps, traded across borders,
-      transmitted on the road network at flat one-tick latency. Shortfall **scales output down**,
-      never idles.
-
-## Wave 3 — construction (after D1, with a census run between)
-
-- [ ] **E1 · BL-709 (construction as a rate)** — five banded methods; seeded capacity gives the
-      channel a non-zero reading at tick 0. NR-592 fixed here.
-
-## Wave 4 — feed the findings back up (main session)
-
-- [ ] **Reconcile into the authority docs** (Ben, 2026-08-31: *"feed our findings back up to
-      authority docs"*). Every measurement this batch produces goes into the doc that owns its
-      subject — `MARKETS.md`, `PRODUCTION.md`, `LOGISTICS.md`, `RESOURCES.md`,
-      `GENERATION_STRATEGY.md` — not left in a review-queue entry or a commit message.
+- `spectator_determinism` R2 byte-identity — `golden=E350DF2A50BF4BAA observed=90BFB27CB57CC308`.
+  Already stale by 150+ commits before this block (NR-752); BL-711 moved it further. **Yours.**
+- `ai_skill_harness` bands — 25 failures, unchanged in count since 2026-08-16 (NR-305). BL-711 moved
+  the numbers; BL-712 did not move them at all, which is NR-771.
+- `chain_depth` — 8 pre-existing `injector::none` rows.
 
 ---
 
