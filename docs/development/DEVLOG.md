@@ -60,6 +60,18 @@ deliberately red on tools / rigging / trade_goods_misc.
 NR-774 (the four definitions); the player-corp supplier exclusion under spectate (BL-644's
 delegated call — the BL-409 no-subject reading says it should lift); lump sizes 25/50 first-cut.
 
+### Addendum, same session — BL-723 lands and the first film ships
+
+The campaign-lapse instrument built, T0-verified (every validity row mutation-proved red), and
+run: seed 0, shipped spawn, 120 measured quarters in 23 s. **The first baseline is the finding.**
+Valued production grows only ×1.05 over 30 years; corps in debt climb 24 → 57 of 89; convoy
+traffic thins 85 → 28; at year 30 interest is ~96% of the field's summed net loss — the debt
+spiral, not operations, is the drag. Every top climber is a processing corp; extraction and trade
+corps bleed. No runaway leader (top share 6.6%). The 33-frame time-lapse (one Corporation-lens
+frame per game-year, whole-continent framing) delivered as a GIF. Sweep priorities this reorders:
+debt dynamics (BL-726) and the insolvency-exit design look more load-bearing than prices; the
+extraction-vs-processing margin gap wants sweep 2's eye on the levy and the band.
+
 ---
 
 ## 2026-09-01 (later) — The review queue drained, and the quadratic finally went
