@@ -1,58 +1,96 @@
-# Next session — Sprint 20 batch delivery: the profitability ledger and a viable spawn
+# Next session — Sprint 27: demand, and the two scale-blind selections
 
-Sprint 20 opened 2026-08-26. The design is settled and written into the authority docs; the
-items are minted and seated. What remains is **build**, and Ben's instruction closing the
-design session was to move to **batch delivery**.
+Sprint 27 is **open**. Ten items. The previous session (2026-08-31) closed sprint 26 complete and
+handed this over deliberately rather than starting it tired.
 
 ## The sprint in one line
 
-Land the quarterly return and its surfaces, then prove the start on Ben's own criterion
-(2026-08-26): *a corporation can save up over a few economy ticks to buy another company, and
-still be making a profit afterwards.* BL-634 (acquisition viability) is the instrument that
-says whether it holds.
+Give the goods a buyer. The economy has a supply chain and almost no demand — and the AI cannot
+reach most of what demand does exist, because two selection steps exclude whole categories before
+scoring begins.
 
-## Where the design lives
+**Success is NOT "the channels are built."** It is `ai_skill_harness` showing a field that is not
+monotonically insolvent. Channels built and corps still broke is exactly what BL-641 produced on its
+own, and it is the failure this sprint exists to avoid.
 
-Read the owning doc, not the backlog prose — the items carry the work, the docs carry the design.
+## Read these first, in this order
 
-| Subject | Doc |
+| Doc | Why |
 |---|---|
-| The record, disclosure, the buyout, its price | `docs/economy/FINANCE.md` §§ The quarterly return · Disclosure · Whole-firm acquisition |
-| Ownership class, the spawn shortlist and the seat | `docs/generation/CORPORATION_GENERATION.md` §§ Pass 2b · Player corporation |
-| The screen consequences and the reorder | `docs/ui/STARTUP.md` §§ The screen state machine · Handoff · The seat |
-| Standing without bands | `docs/politics/RELATIONS.md` § Standing |
+| `docs/economy/MARKETS.md` §§ Three properties · Settled: a short pool BUYS | Properties 3–6 are the sprint's whole design. Property 3 is why a pool draw starves. |
+| `docs/ai/AI_OPPONENT.md` § Selection must be scale-free | New. It is the rule BL-711 and BL-712 implement. |
+| `docs/economy/PRODUCTION.md` § A shortfall scales output; it never idles | New. Binds every channel you build. |
+| `docs/development/DEVELOPMENT_PRACTICES.md` §§ A harness must build the world the application builds · A broken check is worse than a failing one | New, and both were earned expensively. |
 
-## Wave order, and why
+## Order of work, and why
 
-1. **BL-637 (save-version reservation) first if anything runs in parallel.** BL-626 and BL-631
-   both version the save format and both touch `world_save.cpp` + `components.hpp`. Either one
-   agent takes both, or versions are claimed before the agents split — Sprint 19's retro asked
-   for this by name after two agents claimed the same version.
-2. **Wave 1** — BL-631 (ownership class), BL-626 (quarterly return), and BL-635 (spawn
-   solvency) *diagnosis*. BL-635's diagnosis reads BL-626's own returns, so it starts after the
-   record exists and its fix lands in wave 2.
-3. **Wave 2** — BL-628 (whole-firm buyout), BL-633 (retire standing bands), BL-630 (spawn
-   shortlist).
-4. **Wave 3** — BL-629 (rival acquisition), BL-627 (profitability ledger), BL-634 (acquisition
-   viability).
+**1. BL-710 (save roundtrip does not compile) — FIRST, and it is priority A for a reason.**
+`tools/verify/save_roundtrip.cpp` has not compiled since the mercenary tear-out (`cc88997c`). It
+references `world::mercenary_offers`, `mercenary_contracts`, `next_offer_id` and
+`mercenary_contract_state`, all deleted by that commit. **Two save-version bumps landed while it was
+dead** — v21 and v22, both appending to the serialised format, neither verified by the harness whose
+job is exactly that. Flat binary serialisation is the project's chosen persistence, so this harness
+is the only thing between an append-only format and silent save corruption. The item lists all six
+regions; every one is a **deletion**, not a repair. After fixing, run it against v22 and confirm the
+two landed bumps round-trip.
 
-Integration, build and verification stay in the main session, as always. Agents that write code
-run in separate worktrees.
+**2. BL-712 (recipe choice is scale-blind) — before BL-711 and before any new channel.**
+Smaller, contained, and it unblocks two features that landed unable to grow. A site takes its
+highest-margin recipe, so a cheap universal good never wins — which is why no rival can build a
+power plant or a construction sector. Both were designed as *economy-scaled* sinks and neither can
+scale. Fix this before building more channels onto the same scorer.
 
-## Cautions carried
+**3. BL-709 (construction as a rate) — MERGED BUT UNCLOSED.** The code is on `main` and builds
+green; it was never verified with a census run and its bookkeeping is still open. Verify and close
+it before starting new work, or the linter's false-open warning is telling the truth.
 
-1. **BL-635 gates the sprint's point.** The default spawn is measurably insolvent — Genom
-   Systems at Cr −1, net −627/qtr (wire test, 2026-08-25). A corp that bleeds every quarter never
-   saves up for anything, so BL-634's loop cannot start until this is fixed at its cause. Do not
-   clamp the balance and do not hand out a subsidy.
-2. **One golden re-bless wave, at the end, with provenance.** BL-630 moves the warm start ahead
-   of seating, so every seed's opening changes. Never a dribble (the NR-596 precedent).
-3. **BL-627 is design-owed and stays that way** until Ben writes its `question_log.json` pair —
-   required on every surface, and the wording is his.
-4. **Two open questions can move the sprint.** NR-647: does the *operational* fog go too, or only
-   the financial banding — `DISCOVERY.md` is deliberately unedited pending it. NR-649: should the
-   spawn shortlist carry a **depth** criterion as well as viability, since a shallow
-   pure-extraction corp clears a profitability floor every time.
-5. **Owed regardless.** BL-636 (live-click debt) — the dispatch form and Throughput lens, three
-   sprints running, blocked on NR-622's environment problem rather than on design. The v0.1.18
-   tag is still uncut; a release is Ben's to call.
+**4. BL-711 (extraction candidate list is scale-blind).** Bigger: determinism-affecting, moves every
+economy golden. `tools/verify/chain_conversion_probe.cpp` is in the tree and is the instrument that
+diagnosed it. Expect one deliberate re-bless wave with dated provenance, never a dribble.
+
+**5. The channels**, in the sprint's own order: BL-642 (construction draws), BL-644 (state),
+BL-647 (endemic luxury), then BL-643 / BL-646 / BL-645 at priority B.
+
+**Run `demand_census` before and after every item.** The deltas are the sprint, not an epilogue.
+
+## Tooling you will need, and traps that cost the last session real time
+
+- Build: `cmd //c "<repo>\build_app.bat"` — **absolute path**, the bare name does not resolve. It
+  cold-configures when `build/` is absent, so use it rather than improvising a generator; a
+  different generator changes codegen and has already forced one re-verification.
+- Ordinary harnesses: `node tools/verify/build_harness.js <name>`, then `build_gen\verify\<name>.exe`.
+- **Lua-linked harnesses** (`demand_census`, `chain_depth`, `spawn_solvency`) need
+  `cmd //c tools\verify\build_lua_harness.bat <name>`. `build_harness.js` fails them with unresolved
+  externals; CMake needs a configure a worktree does not have.
+- **Prebuilt exes under `build_gen/` may be STALE and will PASS while reporting on an older world.**
+  Rebuild before trusting any harness result.
+- **Worktrees are cut from `origin/main`, which has DIVERGED from local `main`.** A fast-forward is
+  impossible. Branch fresh with `git switch -C <branch> main`. **Never hard-reset to `origin/main`** —
+  it would discard the local work. Six agents hit this in one session; all six handled it, none was
+  warned by anything but the brief.
+
+## Known-red, and NOT yours unless you are fixing them
+
+- `spectator_determinism` R2 byte-identity golden — stale by 150+ commits (NR-752). Re-bless is Ben's.
+- `ai_skill_harness` bands — stale since 2026-08-16 (NR-305), plus a real behavioural change on top.
+- `chain_depth` — 8 pre-existing `injector::none` rows.
+- `save_roundtrip` — does not compile. That is BL-710, above.
+
+**Report, do not re-bless.** A golden re-blessed by whoever trips over it is a golden nobody reviewed.
+
+## Open questions carried in, all Ben's
+
+- **NR-763** — self-sufficiency is currently the norm rather than the exception, and chain closure
+  saturates so input asymmetry does not survive into capability asymmetry. Recommended first probe:
+  vary `economy.construction.max_logistics_reach` and re-read BL-706's spread. One constant.
+- **NR-766** — the seeder sizes against consumer demand only, never processing-input demand. Upstream
+  of everything here; unowned.
+- **NR-762** — ~30 harnesses skip the app's world-building tail. Unowned.
+- **NR-765** — the argmax family; BL-711 and BL-712 are its two fixes.
+
+## What sprint 28 is waiting for
+
+BL-697, BL-699 and BL-698 are **proposed**, not open. They are the systemic brake, and they are
+blocked on this sprint: a coalition forms against whoever leads, and that needs a leader worth
+forming against. Read `sprints.json` § 28 before touching them — it carries two warnings its future
+self needs.
