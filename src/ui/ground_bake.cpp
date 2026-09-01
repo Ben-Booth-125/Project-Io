@@ -100,6 +100,8 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all)
     s.grad_y.assign(n, 0.0f);
     s.relief_bias.assign(n, 0.0f);
     s.jitter.assign(n, 0.0f);
+    s.cover.assign(n, static_cast<std::uint8_t>(terrain_cover::none));
+    s.density.assign(n, 0);
 
     for (const auto& [id, t] : w.tiles)
     {
@@ -131,6 +133,8 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all)
         s.height[i] = t.height;
         s.relief_bias[i] = palette::relief_amount(t.landform);
         s.jitter[i] = hash01(t.grid_x, t.grid_y, 0xB732u) * 2.0f - 1.0f;
+        s.cover[i]   = static_cast<std::uint8_t>(t.cover);
+        s.density[i] = t.cover_density;
     }
 
     // Height gradient from neighbour differences — symmetric central
@@ -150,6 +154,118 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all)
     return s;
 }
 
+namespace {
+
+/// Stamp individual tree canopies over the baked ground (the close tiers'
+/// "individual trees"). Forest and scrub tiles scatter hash-positioned
+/// canopies — count from cover density, positions/sizes/tints per-tile-hashed
+/// so every wrap copy and every chunk agrees; the window is walked with a
+/// margin so a canopy spanning a chunk edge renders identically in both
+/// chunks. Each tree is a soft drop shadow toward the SE plus a canopy blob
+/// lit from the NW — the same light every other pass uses. Stamps respect the
+/// tag buffer: a lock-fill or transparent pixel is never painted, so nothing
+/// leaks through the survey mask.
+void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p,
+                 int px0, int py0, int pw, int ph, std::uint32_t* out,
+                 const std::uint8_t* tag)
+{
+    const auto blob = [&](float bx, float by, float br,
+                          float cr2, float cg2, float cb2, float alpha, bool lit)
+    {
+        const int x0i = std::max(0, static_cast<int>(std::floor(bx - br - 1.0f)));
+        const int x1i = std::min(pw - 1, static_cast<int>(std::ceil(bx + br + 1.0f)));
+        const int y0i = std::max(0, static_cast<int>(std::floor(by - br - 1.0f)));
+        const int y1i = std::min(ph - 1, static_cast<int>(std::ceil(by + br + 1.0f)));
+        for (int py_ = y0i; py_ <= y1i; ++py_)
+            for (int px_ = x0i; px_ <= x1i; ++px_)
+            {
+                const std::size_t idx = static_cast<std::size_t>(py_) * pw + px_;
+                if (!tag[idx])
+                    continue; // lock fill / transparent margin stays untouched
+                const float dx = px_ + 0.5f - bx, dy = py_ + 0.5f - by;
+                const float d  = std::sqrt(dx * dx + dy * dy);
+                if (d >= br + 0.8f)
+                    continue;
+                const float a = alpha * std::clamp((br + 0.8f - d) / 1.6f, 0.0f, 1.0f);
+                float rr = cr2, gg = cg2, bb = cb2;
+                if (lit)
+                {
+                    // Highlight offset toward the NW light, shadowed SE rim.
+                    const float lx = dx + br * 0.35f, ly = dy + br * 0.35f;
+                    const float lt = std::clamp(
+                        1.28f - 0.75f * std::sqrt(lx * lx + ly * ly) / br, 0.55f, 1.28f);
+                    rr *= lt; gg *= lt; bb *= lt;
+                }
+                std::uint32_t& dst = out[idx];
+                const float ir = static_cast<float>(palette::col_r(dst));
+                const float ig = static_cast<float>(palette::col_g(dst));
+                const float ib = static_cast<float>(palette::col_b(dst));
+                dst = palette::col32(
+                    std::clamp(static_cast<int>(ir + (rr - ir) * a + 0.5f), 0, 255),
+                    std::clamp(static_cast<int>(ig + (gg - ig) * a + 0.5f), 0, 255),
+                    std::clamp(static_cast<int>(ib + (bb - ib) * a + 0.5f), 0, 255), 255);
+            }
+    };
+
+    const double margin = 0.6; // max canopy + shadow reach, canonical units
+    const double wx0 = px0 / g.s - margin, wx1 = (px0 + pw) / g.s + margin;
+    const double wy0 = py0 / g.s + g.y_min - margin;
+    const double wy1 = (py0 + ph) / g.s + g.y_min + margin;
+    const int r_lo = std::max(0, static_cast<int>(std::floor(wy0 / 1.5)));
+    const int r_hi = std::min(src.gh - 1, static_cast<int>(std::ceil(wy1 / 1.5)));
+    for (int r = r_lo; r <= r_hi; ++r)
+    {
+        const double odd = (r & 1) ? 0.5 : 0.0;
+        const int c_lo = static_cast<int>(std::floor(wx0 / kSqrt3 - odd)) - 1;
+        const int c_hi = static_cast<int>(std::ceil (wx1 / kSqrt3 - odd)) + 1;
+        for (int c = c_lo; c <= c_hi; ++c)
+        {
+            const int cw = ((c % src.gw) + src.gw) % src.gw;
+            const std::size_t i = static_cast<std::size_t>(r) * src.gw + cw;
+            if (src.cls[i] != static_cast<std::uint8_t>(bake_source::tile_class::land))
+                continue;
+            const auto cov = static_cast<terrain_cover>(src.cover[i]);
+            const bool forest = cov == terrain_cover::forest;
+            const bool scrub  = cov == terrain_cover::scrub;
+            if (!forest && !scrub)
+                continue;
+            const float dens = src.density[i] / 255.0f;
+            const int   n = static_cast<int>(std::lround(
+                (forest ? 6.0f + 13.0f * dens : 2.0f + 4.0f * dens) * p.tree_density));
+            // Hashes key on the WRAPPED coordinate, positions on the unwrapped
+            // centre: every wrap copy grows the same trees in the same places.
+            const double hx = kSqrt3 * (c + odd);
+            const double hy = 1.5 * r;
+            const std::uint32_t tc = src.colour[i];
+            for (int k = 0; k < n; ++k)
+            {
+                const float a1 = hash01(cw, r, 0x7E00u + static_cast<std::uint32_t>(k) * 3u);
+                const float a2 = hash01(cw, r, 0x7E01u + static_cast<std::uint32_t>(k) * 3u);
+                const float a3 = hash01(cw, r, 0x7E02u + static_cast<std::uint32_t>(k) * 3u);
+                const double ang = a1 * 6.283185307;
+                const double rad = 0.82 * std::sqrt(a2);
+                const double tx  = hx + rad * std::cos(ang);
+                const double ty  = hy + rad * std::sin(ang) * 0.9;
+                const float  cr  = (0.085f + 0.055f * a3) * (forest ? 1.0f : 0.62f);
+                const float  pxc = static_cast<float>(tx * g.s - px0);
+                const float  pyc = static_cast<float>((ty - g.y_min) * g.s - py0);
+                const float  pr  = cr * static_cast<float>(g.s);
+                // Canopy ink: the tile's own colour pushed toward deep leaf,
+                // varied per tree so a wood is a crowd, not a pattern.
+                const float vr = 0.86f + 0.28f * hash01(cw, r, 0x7F00u + static_cast<std::uint32_t>(k));
+                const float cr_ = (palette::col_r(tc) * 0.45f + 20.0f * 0.55f) * vr;
+                const float cg_ = (palette::col_g(tc) * 0.45f + 62.0f * 0.55f) * vr;
+                const float cb_ = (palette::col_b(tc) * 0.45f + 26.0f * 0.55f) * vr;
+                blob(pxc + pr * 0.45f, pyc + pr * 0.42f, pr * 1.0f,
+                     10.0f, 14.0f, 10.0f, 0.30f, false);           // drop shadow, SE
+                blob(pxc, pyc, pr, cr_, cg_, cb_, 0.94f, true);    // canopy, lit NW
+            }
+        }
+    }
+}
+
+} // namespace
+
 void bake_region(const bake_source& src, const geometry& g, const bake_params& p,
                  int px0, int py0, int pw, int ph, std::uint32_t* out)
 {
@@ -158,6 +274,11 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
         std::memset(out, 0, static_cast<std::size_t>(pw) * ph * 4u);
         return;
     }
+    // Grade-eligibility tags: 1 = a terrain pixel the final grade sweep (and
+    // the feature stamps) may touch; 0 = transparent margin or the survey
+    // lock fill, which must stay EXACT — a graded or stamped-over lock pixel
+    // would leak what the mask exists to hide.
+    std::vector<std::uint8_t> tag(static_cast<std::size_t>(pw) * ph, 0u);
     const double period   = g.gw * kSqrt3;
     // Resolution-adaptive character (wave 2). The interpolation radius and the
     // detail amplitudes are CANONICAL-scale, so the same numbers that read as
@@ -319,6 +440,7 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
             {
                 const std::uint32_t col = src.colour[static_cast<std::size_t>(owner)];
                 row_out[px] = col;
+                tag[static_cast<std::size_t>(py) * pw + px] = 1;
                 continue;
             }
             const double inv = 1.0 / wsum;
@@ -349,9 +471,21 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
                 // at half a cell: a fine octave in the slope is per-pixel
                 // speckle, not terrain. The fine octave still contributes to
                 // the VALUE below, where it reads as surface variation.
+                //
+                // RIDGED MIX (the "sharper hills" ruling, Ben 2026-09-01): on
+                // strongly-biased landforms the smooth field folds toward
+                // ridged noise (0.25 − |n − 0.5|), whose |·| kink puts a hard
+                // crease at every crest — a range then shades as ridge lines
+                // instead of soft blobs. The finite differences pick the
+                // crease up for free.
+                const float ridge_w = std::min(1.0f, std::fabs(bias) * p.landform_accent)
+                                    * p.ridge_strength;
                 const auto detail_lo = [&](double sx, double sy) -> float
                 {
-                    return value_noise(sx, sy, detail_cell, detail_cells, 0xD371u) - 0.5f;
+                    const float n = value_noise(sx, sy, detail_cell, detail_cells, 0xD371u);
+                    const float smooth = n - 0.5f;
+                    const float ridged = (0.25f - std::fabs(n - 0.5f)) * 2.0f;
+                    return smooth + (ridged - smooth) * ridge_w;
                 };
                 const double eps = detail_cell * 0.5;
                 const float ddx = (detail_lo(x0_ + eps, uy) - detail_lo(x0_ - eps, uy))
@@ -363,10 +497,27 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
 
                 // Two shade terms with their own scales: tile slopes are tiny
                 // (heights are 0-1 across a whole continent) and take the big
-                // gain; the detail slope is order-1 and takes amp alone.
+                // gain; the detail slope is order-1 and takes amp alone. The
+                // clamp widens with resolution — a close tier is allowed
+                // deeper shadow.
+                const float tgx = gxx + ddx * amp;
+                const float tgy = gyy + ddy * amp;
                 const float shade = (gxx * Lx + gyy * Ly) * p.relief_gain
                                   + (ddx * Lx + ddy * Ly) * amp * 0.75f;
-                lum += std::clamp(shade, -0.60f, 0.60f);
+                lum += std::clamp(shade, -(0.60f + 0.15f * res_t), 0.60f + 0.15f * res_t);
+
+                // Slope rock exposure: steep ground sheds its cover colour
+                // toward bare rock, which is what makes a hillside read as a
+                // HILL rather than as shaded grass. Strongest at close tiers.
+                const float slope = std::sqrt(tgx * tgx + tgy * tgy);
+                const float rock_t = std::clamp((slope - 0.55f) * 1.2f, 0.0f, 1.0f)
+                                   * p.rock_exposure * (0.35f + 0.65f * res_t);
+                if (rock_t > 0.0f)
+                {
+                    r_ += (122.0f - r_) * rock_t;
+                    g_ += (112.0f - g_) * rock_t;
+                    b_ += (100.0f - b_) * rock_t;
+                }
                 // Altitude lift, the landform's own signed bias, and the detail
                 // field's own value (a crag's top is lit even side-on).
                 lum += (h - 0.45f) * p.altitude_gain + bias * 0.30f + d0 * amp * 0.8f;
@@ -405,24 +556,51 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
                 b_ *= 1.0f - mot * 0.10f;
             }
 
-            if (p.grade_enabled)
-            {
-                // The separable near-future grade (round-2 confirmed finding):
-                // desaturate, cool, lift toward the haze floor, mild contrast.
-                const float luma = 0.2126f * r_ + 0.7152f * g_ + 0.0722f * b_;
-                r_ = r_ + (luma - r_) * p.grade_desat;
-                g_ = g_ + (luma - g_) * p.grade_desat;
-                b_ = b_ + (luma - b_) * p.grade_desat;
-                r_ *= p.grade_cool[0]; g_ *= p.grade_cool[1]; b_ *= p.grade_cool[2];
-                r_ = r_ + (haze_r - r_) * p.grade_lift;
-                g_ = g_ + (haze_g - g_) * p.grade_lift;
-                b_ = b_ + (haze_b - b_) * p.grade_lift;
-                r_ = (r_ - 128.0f) * p.grade_contrast + 128.0f;
-                g_ = (g_ - 128.0f) * p.grade_contrast + 128.0f;
-                b_ = (b_ - 128.0f) * p.grade_contrast + 128.0f;
-            }
-
+            // UNGRADED write: the near-future grade moved to a final buffer
+            // sweep (below) so the feature stamps drawn between base and
+            // grade take the grade exactly as the ground under them does —
+            // the grade stays a separable pass, per the settled ruling.
             row_out[px] = palette::col32(
+                std::clamp(static_cast<int>(r_ + 0.5f), 0, 255),
+                std::clamp(static_cast<int>(g_ + 0.5f), 0, 255),
+                std::clamp(static_cast<int>(b_ + 0.5f), 0, 255), 255);
+            tag[static_cast<std::size_t>(py) * pw + px] = 1;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Close-tier feature stamps (Ben, 2026-09-01: "we should be able to
+    // render individual trees"). Active only at the 48/96 px tiers.
+    // ------------------------------------------------------------------
+    if (g.s >= 40.0 && p.tree_density > 0.0f)
+        stamp_trees(src, g, p, px0, py0, pw, ph, out, tag.data());
+
+    // ------------------------------------------------------------------
+    // The separable near-future grade, as one sweep over every terrain
+    // pixel — stamps included, lock fill and transparent margin excluded.
+    // ------------------------------------------------------------------
+    if (p.grade_enabled)
+    {
+        const std::size_t n_px = static_cast<std::size_t>(pw) * ph;
+        for (std::size_t i = 0; i < n_px; ++i)
+        {
+            if (!tag[i])
+                continue;
+            float r_ = static_cast<float>(palette::col_r(out[i]));
+            float g_ = static_cast<float>(palette::col_g(out[i]));
+            float b_ = static_cast<float>(palette::col_b(out[i]));
+            const float luma = 0.2126f * r_ + 0.7152f * g_ + 0.0722f * b_;
+            r_ = r_ + (luma - r_) * p.grade_desat;
+            g_ = g_ + (luma - g_) * p.grade_desat;
+            b_ = b_ + (luma - b_) * p.grade_desat;
+            r_ *= p.grade_cool[0]; g_ *= p.grade_cool[1]; b_ *= p.grade_cool[2];
+            r_ = r_ + (haze_r - r_) * p.grade_lift;
+            g_ = g_ + (haze_g - g_) * p.grade_lift;
+            b_ = b_ + (haze_b - b_) * p.grade_lift;
+            r_ = (r_ - 128.0f) * p.grade_contrast + 128.0f;
+            g_ = (g_ - 128.0f) * p.grade_contrast + 128.0f;
+            b_ = (b_ - 128.0f) * p.grade_contrast + 128.0f;
+            out[i] = palette::col32(
                 std::clamp(static_cast<int>(r_ + 0.5f), 0, 255),
                 std::clamp(static_cast<int>(g_ + 0.5f), 0, 255),
                 std::clamp(static_cast<int>(b_ + 0.5f), 0, 255), 255);
@@ -454,6 +632,8 @@ std::uint64_t region_hash(const bake_source& src, const geometry& g,
             const std::size_t i = static_cast<std::size_t>(r) * src.gw + cw;
             mix(src.cls[i]);
             mix(src.colour[i]);
+            mix(src.cover[i]);   // the feature stamps read these two, so a
+            mix(src.density[i]); // cover change must move the hash
             std::uint32_t hb; static_assert(sizeof(float) == 4);
             std::memcpy(&hb, &src.height[i], 4);       mix(hb);
             std::memcpy(&hb, &src.relief_bias[i], 4);  mix(hb);

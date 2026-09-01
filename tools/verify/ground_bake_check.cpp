@@ -222,6 +222,39 @@ int main()
         check(h0 != h1, "P7", "region_hash moves when a covered tile's colour moves");
     }
 
+    // P8 — the close tiers stay pure with every close-only pass active
+    // (feature stamps, ridged detail, res_t dials, the fine octave): at
+    // 48 px/r the same window bakes byte-identical twice and one wrap period
+    // east bakes byte-identical. Aimed at a forest tile so the tree stamps
+    // actually run in-window rather than passing vacuously.
+    {
+        const geometry g48 = make_geometry(hb.grid_width, hb.grid_height, 48.0);
+        int forest_i = land_i;
+        for (int i = 0; i < static_cast<int>(src.cover.size()); ++i)
+            if (src.cls[i] == static_cast<std::uint8_t>(bake_source::tile_class::land)
+                && static_cast<terrain_cover>(src.cover[i]) == terrain_cover::forest)
+            {
+                forest_i = i;
+                break;
+            }
+        check(static_cast<terrain_cover>(src.cover[forest_i]) == terrain_cover::forest,
+              "P8", "found a forest tile for the stamp window");
+        const int fr = forest_i / src.gw, fc = forest_i % src.gw;
+        const double fx = 1.7320508075688772 * (fc + ((fr & 1) ? 0.5 : 0.0));
+        const double fy = 1.5 * fr;
+        const int side = 128;
+        const int px0 = static_cast<int>(fx * g48.s) - side / 2;
+        const int py0 = std::clamp(static_cast<int>((fy - g48.y_min) * g48.s) - side / 2,
+                                   0, std::max(0, g48.H - side));
+        std::vector<std::uint32_t> a48(static_cast<std::size_t>(side) * side);
+        std::vector<std::uint32_t> b48(a48.size()), e48(a48.size());
+        bake_region(src, g48, p, px0, py0, side, side, a48.data());
+        bake_region(src, g48, p, px0, py0, side, side, b48.data());
+        bake_region(src, g48, p, px0 + g48.W, py0, side, side, e48.data());
+        check(a48 == b48, "P8", "48 px tier bakes byte-identical twice (stamps + ridged active)");
+        check(a48 == e48, "P8", "48 px tier wraps byte-identical one period east");
+    }
+
     // ------------------------------------------------------------------
     // Look previews (not a check): bake one interesting window under several
     // parameter variants and write PNGs, so a C-F tuning pass costs ONE world
@@ -292,6 +325,30 @@ int main()
             write_png_rgba(path, PW, PH,
                            reinterpret_cast<const unsigned char*>(buf.data()), PW * 4);
             std::printf("preview: %s\n", path);
+        }
+
+        // Close-tier preview: a forest window at 48 px/r — trees, ridges and
+        // rock exposure at the resolution the closest zoom rungs actually see.
+        {
+            const geometry g48 = make_geometry(hb.grid_width, hb.grid_height, 48.0);
+            int forest_i = land_i;
+            for (int i = 0; i < static_cast<int>(src.cover.size()); ++i)
+                if (src.cls[i] == static_cast<std::uint8_t>(bake_source::tile_class::land)
+                    && static_cast<terrain_cover>(src.cover[i]) == terrain_cover::forest)
+                {
+                    forest_i = i;
+                    break;
+                }
+            const int fr = forest_i / src.gw, fc = forest_i % src.gw;
+            const double fx = 1.7320508075688772 * (fc + ((fr & 1) ? 0.5 : 0.0));
+            const double fy = 1.5 * fr;
+            const int fpx0 = static_cast<int>(fx * g48.s) - PW / 2;
+            const int fpy0 = std::clamp(static_cast<int>((fy - g48.y_min) * g48.s) - PH / 2,
+                                        0, std::max(0, g48.H - PH));
+            bake_region(src, g48, p, fpx0, fpy0, PW, PH, buf.data());
+            write_png_rgba("ground_preview_v7_forest48.png", PW, PH,
+                           reinterpret_cast<const unsigned char*>(buf.data()), PW * 4);
+            std::printf("preview: ground_preview_v7_forest48.png\n");
         }
     }
 

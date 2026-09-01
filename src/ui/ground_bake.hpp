@@ -69,6 +69,12 @@ struct bake_params
     float detail_cell     = 0.46f;  ///< Fractal detail cell size, canonical units.
     float jitter          = 0.02f;  ///< Per-tile luminance jitter. Small ON PURPOSE — this is the hex-mosaic dial.
     float noise_strength  = 0.05f;  ///< Fine grain amplitude.
+    // Close-tier feature stamps (the "individual trees" ruling, Ben
+    // 2026-09-01: the closest rungs must render individual trees and sharper
+    // hills). Active at bake resolutions >= 40 px/r, i.e. the 48/96 tiers.
+    float tree_density    = 1.0f;   ///< Global multiplier on per-tile tree counts.
+    float ridge_strength  = 0.75f;  ///< How far mountain detail mixes toward ridged noise.
+    float rock_exposure   = 0.5f;   ///< Slope-driven rock colour on steep ground.
     // Water.
     float water_noise     = 0.03f;
     // Near-future grade (the separable pass).
@@ -92,6 +98,8 @@ struct bake_source
     std::vector<float> grad_x, grad_y;  ///< Height gradient (neighbour differences).
     std::vector<float> relief_bias;     ///< palette::relief_amount, landform accent input.
     std::vector<float> jitter;          ///< Per-tile hash jitter in [-1, 1].
+    std::vector<std::uint8_t> cover;    ///< terrain_cover per tile — feeds the close-tier feature stamps.
+    std::vector<std::uint8_t> density;  ///< cover_density per tile.
 };
 
 /// Build the source arrays for @p body. Reads tile fields and the survey mask

@@ -58,6 +58,17 @@ untouched by construction):
 **Brush placement is hashed from tile grid coordinates**, never screen position — the
 established rule (wrap copies of one tile must agree; no crawl under pan).
 
+**The close tiers carry feature stamps and sharpened relief** (Ben, 2026-09-01: *"we
+should be able to render individual trees, and sharper hills"*). At bake resolutions
+≥ 40 px per hex (the 48/96 tiers): forest and scrub tiles scatter **individual tree
+canopies** — hash-positioned, density-counted, NW-lit with an SE drop shadow, drawn
+before the grade so they take it exactly as the ground does, and never painted over
+the survey lock fill; mountain-biased detail noise folds toward a **ridged** variant
+whose creases shade as ridge lines; and steep slopes shed cover colour toward bare
+**rock**. All deterministic and wrap-exact (`ground_bake_check` P8). These are the
+procedural stand-ins the authored brushes of the asset pipeline will replace or
+augment, on the same stamp seam.
+
 **Fallback by coverage.** A pass whose brushes are not yet authored bakes from the
 current vector-fill logic instead (`ui::terrain_colour` becomes the base-ground
 fallback). The app runs and every capture passes with a partial brush set; the vector
