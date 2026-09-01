@@ -446,6 +446,53 @@ The candidate exposes the economy it runs in: processors realise far less than t
 predicts on the same buildings, which is a substrate defect owned by BL-436 (processing
 under-earns extraction) and deliberately not hidden by the scorer.
 
+### Selection must be scale-free (Ben, 2026-08-31)
+
+**A pre-selection step that ranks candidates by an absolute quantity, in a domain whose values span
+orders of magnitude, is a category exclusion rather than a ranking.**
+
+Every quantity the scorer might pre-rank on — deposit magnitude, net margin, price — is long-tailed,
+and for reasons unrelated to desirability. Ore deposits are physically larger numbers than clay
+deposits. A high-value low-volume good carries a fatter margin than a cheap universal one. Neither
+difference means *the world needs more of this*.
+
+So an argmax or a global top-M over such a quantity does not rank the field; it deletes most of it
+before scoring begins. The scorer then appears to be choosing correctly while never having been
+offered a real choice, and the symptom surfaces far downstream — as processors built on inputs
+nobody mines, or as a building type no rival ever constructs.
+
+**The rule:** a pre-filter may narrow *within* a category; it may not decide *between* categories.
+Rank scale-free — normalise within resource, within recipe family, within building class — or take a
+per-category top-K rather than a global top-M, so every category reaches the scorer and **the scorer
+decides**. That is what the scorer is for.
+
+**A cheap good can never win an absolute contest, however badly the world needs it.** A good wanted
+by every building on the map is precisely the profile of one with a thin per-unit margin, so any
+selection that ranks on margin alone will refuse to produce exactly the goods the economy most
+depends on.
+
+This is the trap BL-440's own comment named — *"pre-selecting the richest was a TILE-LOCAL heuristic
+answering a WORLD-level question"* — and the reason it is stated here as a rule rather than left as
+that item's note is that fixing one instance does not prevent the next: the same sentence written at
+a different altitude is the same defect.
+
+### One dial, one owner (Ben, 2026-08-31)
+
+**No two agency tiers may write the same building state.** The reflex tier (§ the BL-079 grant) and
+the strategic scorer both act on buildings, and where their authority overlaps on a single dial —
+an operating/idle flag most obviously — neither can see what the other did, and the pair oscillates:
+one tier switches a building off on its own criterion, the other switches it back on for its own,
+indefinitely.
+
+The cost is not only the churn. The strategic tier's action budget is finite, so decisions spent
+undoing another layer's work are decisions not spent playing, and the oscillation is **invisible in
+the decision log** — the reflex tier is not a scored decision and leaves no row, so the log shows
+only the half that reverses it and reads as inexplicable indecision.
+
+**The rule:** every dial has exactly one owner. Where both tiers have a legitimate interest, the
+reflex tier's action must be a *state the strategic tier can read and respect*, not a silent write
+it must discover by consequence.
+
 ### Scoring
 
 The design intent is `score(action) = expected_net_per_tick / payback_ticks × strategy_weight`,

@@ -10,6 +10,48 @@ Tests are **headless C++ harnesses**, not a unit-test framework. Each `tools/ver
 
 Tests are written alongside the layer they cover, not deferred to the end — alongside, the check catches the quietly-wrong while the layer is still fresh in the head. Each milestone in `ROADMAP.md` should have a harness for its core logic before the next begins.
 
+### A harness must build the world the application builds (Ben, 2026-08-31)
+
+`make_hard_coded_world` produces a world; the application then runs a **tail of passes** over it
+before play begins. A harness that calls the former and skips the latter is measuring a world the
+game never produces — and it does so **silently and in the affirmative**, because nothing about the
+omission fails.
+
+That is the expensive property. A harness with a missing pass does not error; it reports confident
+numbers about a world that does not exist, and its goldens then encode that world, so the fiction
+becomes the baseline every later change is judged against.
+
+**The rule:** a harness's world-building step is a shared definition, not a per-harness judgement
+call. Where a harness deliberately omits a pass — a generation probe that wants the pre-settlement
+state, say — the omission is stated at the site with its reason, so a reader can tell a choice from
+an oversight. The default is the application's world.
+
+**The general form, and the reason this sits above the tuning rules below:** every one of those
+rules assumes the thing being measured is the thing that ships. Where it is not, careful measurement
+produces confident wrong answers faster.
+
+### A broken check is worse than a failing one (Ben, 2026-08-31)
+
+A check that **fails** is doing its job. A check that **cannot run** — a harness that no longer
+compiles, a target the build wiring never declares, a script whose dependency list has rotted — is
+absent, and absence is invisible.
+
+Worse than either is a check that **passes without running the current code**. Prebuilt binaries
+outlive their sources: an executable compiled from an older tree still runs, still prints `PASS`,
+and still reports on a world that no longer exists. A green result from a stale artifact is not
+weaker evidence than a red one — it is *false* evidence, and it is trusted.
+
+Three consequences worth holding:
+
+- **Rebuild before believing.** A harness result is evidence only about the source it was compiled
+  from. Where that is not obviously current, it is not evidence.
+- **Verification tooling is code, and nothing checks it.** Build wiring, harness declarations and
+  the scripts that drive them are the one layer with no layer beneath it. A defect there is silent
+  by construction.
+- **A tear-out is where this hides.** Removing a feature correctly deletes its sources; what remains
+  is the wiring that referenced them, and wiring fails only when something asks for it. The deletion
+  looks complete because the thing deleted is gone.
+
 ### Measuring a generated system
 
 Five rules, each earned by getting it wrong first (the earth-like battery, 2026-08-04). They apply

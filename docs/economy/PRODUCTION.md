@@ -479,6 +479,30 @@ Extraction and processing outputs accrue into a shared stockpile pool held per `
 
 ---
 
+## A shortfall scales output; it never idles (Ben, 2026-08-31)
+
+**Any upkeep draw a building cannot meet reduces what that building produces. It does not switch the
+building off.** This holds for every goods draw — materials, power, whatever a later channel adds —
+and it is a rule about the *economy*, not about any one channel.
+
+The reason is a loop, and it is why the rule is absolute rather than a default. A building idled for
+want of an input stops buying that input. It was a **buyer**, and the price it was willing to pay is
+the signal that would have called forth the supply. Idle it and the signal disappears, so the supply
+is never built, so the draw stays unmet, so the next building idles too. A new universal draw is
+unmet everywhere at once on the tick it is introduced, which turns that loop into a cliff rather
+than a slope — and halving the rate only delays it, because the cause is structural rather than one
+of magnitude.
+
+A building on reduced output keeps bidding. That is the whole difference: it stays a participant in
+the market that has to supply it.
+
+**The corollary for authoring:** a channel's rates may ship at zero while its shape ships complete.
+A draw for a good the world does not yet make is not a channel that needs tuning down — it is a
+channel whose supply has not been induced yet, and the honest response is to ship it inert and turn
+it on when the good exists.
+
+---
+
 ## Power (Ben, 2026-08-31)
 
 **Power is not a traded good and not a per-body pool. It is a grid.** Ben's ruling:
