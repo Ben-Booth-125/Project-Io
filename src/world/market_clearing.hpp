@@ -50,6 +50,35 @@ void inject_population_demand(world& w, const recipe_registry& reg);
 /// @param w World; market demand arrays are mutated in place.
 void inject_background_demand(world& w, const recipe_registry& reg);
 
+/// BL-647: inject endemic-luxury demand into nation-anchored markets — the
+/// Endemic trade channel (docs/economy/MARKETS.md § Demand channels; the design
+/// is docs/economy/RESOURCES.md § Mercantile). A pure demand-side pull for the
+/// endemic goods (tobacco, spices, coffee, furs) that scales with a nation's
+/// WEALTH rather than its headcount — so it rewards a player who has made
+/// somewhere rich — flavoured per (nation, good) by a seeded, campaign-fixed
+/// preference weight so different nations crave different luxuries and the
+/// trade route is directional by construction: extract where it grows, sell
+/// where the money is.
+///
+/// Wealth is the nation's treasury plus the summed positive balances of the
+/// corporations domiciled in it, split evenly across the markets anchored in
+/// the nation's territory (tile_to_nation over market_component::centre_tile)
+/// so a nation's total pull is independent of how many markets BL-096 carved
+/// it into. A market with no owning nation — an off-world outpost — receives
+/// nothing here; the home body's luxury shortfall reaches outposts through
+/// inject_interbody_demand like every other unmet want.
+///
+/// Same price-elastic shape as the two injectors above (deliberately not a
+/// second elasticity model). Called from clear_markets after them, before
+/// inject_interbody_demand. Deterministic — no RNG at tick time: the
+/// preference weight is a pure hash of the nation's generated identity, and
+/// the per-nation wealth sum accumulates over sorted corp ids. Tunables in
+/// `scripts/economy.lua` § `endemic_demand`; wealth_scale defaults 0 so a
+/// hand-built registry injects nothing.
+///
+/// @param w World; market demand arrays are mutated in place.
+void inject_endemic_demand(world& w, const recipe_registry& reg);
+
 /// BL-652 — one basket entry the injectors CANNOT price, named.
 struct unpriced_basket_entry
 {
