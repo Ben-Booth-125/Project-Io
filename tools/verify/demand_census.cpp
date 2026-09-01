@@ -1514,6 +1514,7 @@ int main(int argc, char** argv)
     int      warm_ticks = 80;
     bool     prehistory = true;
     std::string bands   = "both";
+    float    reach_override = -1.0f;   ///< NR-763 probe; < 0 = use the authored value.
 
     for (int i = 1; i < argc; ++i)
     {
@@ -1525,6 +1526,17 @@ int main(int argc, char** argv)
             warm_ticks = std::max(0, std::atoi(argv[++i]));
         else if (std::strcmp(argv[i], "--band") == 0 && i + 1 < argc)
             bands = argv[++i];
+        // NR-763 PROBE KNOB. `economy.construction.max_logistics_reach` is the
+        // clause R5 measures chain completeness against, and NR-763 asks whether
+        // the shipped 24.0 is why self-sufficiency is the NORM rather than the
+        // exception: market 48706 has a 493-tile catchment and ALL 493 are in
+        // reach. Ben's own recommended first probe is "vary this one constant and
+        // re-read the spread", so it is a FLAG rather than an edit-and-revert of
+        // a shipped value - the probe is repeatable and the authored constant is
+        // never touched. Absent, the registry's authored value stands and every
+        // reading is unchanged.
+        else if (std::strcmp(argv[i], "--reach") == 0 && i + 1 < argc)
+            reach_override = static_cast<float>(std::atof(argv[++i]));
     }
 
     // The real data layer, loaded as app::load_economy loads it. A restated
@@ -1541,6 +1553,18 @@ int main(int argc, char** argv)
     reg.load_from_lua(lua);
     world_gen_config gen_cfg;
     gen_cfg.load_from_lua(lua);
+
+    // NR-763: applied AFTER load_from_lua so the override is the last word, and
+    // echoed in the header below so a saved run always says which budget produced
+    // it. R5 already prints `reach_budget` off the registry, so the per-band
+    // tables carry it too - there is no way to read a probe run and mistake it
+    // for a shipped one.
+    if (reach_override >= 0.0f)
+    {
+        construction_params cp = reg.construction();
+        cp.max_logistics_reach = reach_override;
+        reg.set_construction(cp);
+    }
 
     // Vacuity guard (the standing lesson from interbody_pull_harness): an empty
     // registry would print every resource as equally unwanted and diagnose nothing.
@@ -1568,10 +1592,11 @@ int main(int argc, char** argv)
     }
 
     std::printf("demand_census — BL-649, requirement group `demand-census` R1-R6\n");
-    std::printf("  seed %u | warm ticks %d | prehistory %s | bands %s\n",
+    std::printf("  seed %u | warm ticks %d | prehistory %s | bands %s | reach %.1f%s\n",
                 seed, warm_ticks,
                 prehistory ? "ON (the shipped spawn)" : "OFF (--fast, NOT the spawn)",
-                bands.c_str());
+                bands.c_str(), reg.construction().max_logistics_reach,
+                reach_override >= 0.0f ? " (--reach OVERRIDE, NR-763 probe)" : " (authored)");
     std::printf("  IT REPORTS. No row below fails on a magnitude; see the file header.\n");
 
     // -----------------------------------------------------------------------

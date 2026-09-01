@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*125 entries — 118 open, 7 resolved.*
+*125 entries — 117 open, 8 resolved.*
 
 ---
 
@@ -1294,13 +1294,23 @@ THE NOVELTY, and why it is filed as one: NO DOC OWNS the question 'which app-sta
 
 THE DANGEROUS PROPERTY is that the failure is INVISIBLE AND GREEN. A harness measuring the wrong world does not fail - it reports confidently on a world that does not exist, and its goldens then encode that world. This is the same class as the stale-prebuilt-exe problem (NR-759) and has the same cost: a green result nobody can trust.
 
+COUNTED EXACTLY 2026-09-01, replacing the 'about thirty' estimate — and it is worse, with one qualification that makes it more actionable rather than less.
+
+**48 of the 51** harnesses that build a world through `make_hard_coded_world` never call `init_survey_states`. Only three do: `ai_skill_harness`, `survey_harness` and `chain_conversion_probe` (the last two being the ones that had to).
+
+**Of those 48, 22 also run the economy tick**, so the corp AI is live in a world where no body is surveyed and no rival can site a mine anywhere: acquisition_viability, cadence_schedule, convoy_cargo_census, data_creep_harness, debt_decomposition, decision_trace_harness, haulage_measure, history_log_harness, interbody_pull_harness, material_floor, nation_wiring, player_seed_sweep, population_demand_harness, population_mvp, pregame_balance_harness, quarterly_return, spawn_solvency, spectator_determinism, tech_effect_union_harness, tick_profile, tier_margin, whole_firm_buyout. The other 26 do not run the AI, so the pass does not bite them TODAY — which is a reprieve, not a fix, since any of them could grow an economy tick.
+
+That 22 is the list that matters, and it contains most of this project's economic instruments — the haulage baseline, the bankruptcy figure, spawn solvency, the debt decomposition, the tier margins, acquisition viability. `demand_census` was the 23rd until 2026-09-01 (NR-772).
+
+THIRD INSTANCE OF THE CLASS, and the first one that cost a wrong conclusion inside a live sprint: sprint 27 ran demand_census before and after every item as its stated method, and for every item touching what the AI BUILDS the instrument could not see the work. BL-711 came back byte-identical there while the probe showed coal going 0 -> 25.
+
 **Why it matters.** Every economic conclusion this project has drawn from a harness may be measuring a world with no mines. That includes BL-634's acquisition viability, BL-635's spawn diagnosis, the haulage baseline, and the bankruptcy figure this sprint's whole premise rested on - which moved materially when corrected.
 
 - A shared `harness_world()` helper that runs make_hard_coded_world PLUS every app-start tail pass, which every harness uses instead of calling make_hard_coded_world directly. One definition, one place to fix the next time a pass is added.
 - Fix ai_skill_harness and demand_census now (the two this sprint depends on) and file the rest as a sweep.
 - Audit first: run the ~30 harnesses with and without and report which ones actually move, before changing any.
 
-> **Recommendation:** Option 1 is the real answer and it is the shape `no_prehistory()` already establishes - a shared helper in harness_params.hpp that harnesses call instead of hand-rolling their world setup. But it moves every golden in the project at once, so it wants to be its own item with Ben's timing, not a thing this batch absorbs. Option 3 first would tell us how big option 1 actually is, and is cheap: the probe to do it now exists.
+> **Recommendation:** Option 1 (a shared world-setup helper in harness_params.hpp, the shape `no_prehistory()` already establishes) is still the real answer, and the exact list above makes it schedulable rather than open-ended: 22 harnesses need the pass and will move their numbers, 26 need it eventually and will not move today. Two sessions running have now paid for this gap — and the failure mode is the worst available, since a harness measuring the wrong world reports confidently rather than going red. Recommend taking it as its own item BEFORE the remaining sprint-27 channels, so the channels are measured against instruments that work; the 26 quiet ones can follow in the same item at no extra risk.
 
 *Files: `tools/verify/harness_params.hpp`, `tools/verify/ai_skill_harness.cpp`, `tools/verify/demand_census.cpp`, `src/core/app.cpp`, `src/world/hard_coded_world.cpp`*
 
@@ -1338,6 +1348,21 @@ Twelve raws already closes twelve chains; going from 13 to 17 buys ONE more. So 
 
 That is a threshold effect, not a tuning miss, and it will not be fixed by varying deposits more.
 
+OPTION 2 IS MEASURED AND DEAD (2026-09-01). The recommended first probe was 'vary `max_logistics_reach` and re-read the spread'. `demand_census` now carries a `--reach` flag for exactly this (a knob, not an edit-and-revert of a shipped constant), and the sweep is conclusive:
+
+    reach   in-reach   ancient SPREAD
+    24      73%        min 0.3750  p25 0.8750  median 0.9375  p75 0.9375  max 1.0000
+    16      63%        min 0.3750  p25 0.8750  median 0.9375  p75 0.9375  max 1.0000
+    12      58%        min 0.3750  p25 0.8750  median 0.9375  p75 0.9375  max 1.0000
+     8      52%        min 0.3750  p25 0.8750  median 0.9375  p75 0.9375  max 1.0000
+     4      44%        min 0.3750  p25 0.8750  median 0.9375  p75 0.9375  max 1.0000
+
+Industrial is identical at every step too (min 0.6154, median 1.0000). Cutting the budget from 24 to 4 removes 40% of every market's reachable ground — market 48711 goes from 2510 in-reach tiles to 1240, a 51% loss — and NOT ONE MARKET'S COMPLETENESS MOVES, on either band, to four decimal places. The flag is verified to be biting: the R5 header echoes the overridden budget and the in-reach counts collapse as expected.
+
+WHY, and it sharpens the original finding rather than contradicting it: the raws a market needs to close its chains are all in its INNER catchment. The ground a tighter budget takes away is the far ground, and the far ground carries duplicates of resources the market already reaches. So geography does not bite because there is nothing distinctive at the edge to lose.
+
+By the entry's own reasoning that leaves the saturation STRUCTURAL, and option 1 (deeper or narrower chains) as the real answer — or option 4, accepting it and sourcing trade from price and scale rather than capability.
+
 **Why it matters.** Trade is one of the game's two pillars and it needs a reason to exist. If most markets can close most chains locally, the reason is thin - and the 1960s start, which is what the prototype opens on, is the worse of the two bands. It also means BL-706's spread is currently reporting a world that fails the design's own intent, which is exactly what the instrument was built to be able to say.
 
 - DEEPER OR NARROWER CHAINS. If closing a chain needed more distinct inputs, fewer markets would clear the threshold and the middle would spread out. Touches the recipe graph, and it is the change that attacks the saturation directly.
@@ -1345,7 +1370,7 @@ That is a threshold effect, not a tuning miss, and it will not be fixed by varyi
 - RARER INPUTS. Make some raws genuinely scarce rather than merely varied, so a market missing one is missing it badly. Touches planetology's endowment.
 - ACCEPT IT. Self-sufficiency being common is a legitimate world if trade comes from something other than necessity - price, scale, or specialisation rather than capability.
 
-> **Recommendation:** Option 2 first, because it is one authored constant and it is measurable the same day: re-run BL-706's spread at a few reach budgets and see whether the middle of the distribution opens up. If it does not, the saturation is structural and option 1 is the real answer. I would not reach for option 3 - varying deposits more is exactly what the measurement says does not help, since the generator already produces a 7-to-17 range that closure flattens.
+> **Recommendation:** Option 2 is eliminated by measurement — do not spend more on it. Between the two survivors: option 1 (deeper or narrower chains) attacks the mechanism directly and the measurement says why it would work — twelve raws already closes twelve chains, so the threshold is what is flat, not the endowment. Option 4 is a legitimate world and cheaper, but it needs trade to come from somewhere, and sprint 27's whole finding is that there is barely any demand to trade INTO yet. My read: option 1, but AFTER the demand channels land — a deeper recipe graph in an economy with no buyers just makes more things nobody wants. Option 3 stays ruled out for the reason already recorded: the generator already produces a 7-to-17 raw range and closure flattens it.
 
 *Files: `tools/verify/demand_census.cpp`, `scripts/economy.lua`, `docs/generation/GENERATION_STRATEGY.md`, `docs/economy/MARKETS.md`*
 
@@ -1367,35 +1392,6 @@ BOTH ARE CONTAINED. If Ben wants province grain instead of market catchment, or 
 > **Recommendation:** Both calls look right to me and I would keep them. The reach one is the load-bearing half: it is composed from the game's own placement rule against an authored constant, so the instrument measures what a corporation could actually DO rather than an abstract connectivity. That is the property that makes NR-763's option 2 a legitimate experiment rather than a circular one.
 
 *Files: `tools/verify/demand_census.cpp`, `docs/economy/LOGISTICS.md`, `docs/economy/MARKETS.md`*
-
-### NR-765 — THE SAME DEFECT, THREE TIMES: an argmax on an absolute quantity, in a domain whose values span orders of magnitude
-*observation · raised 2026-08-31 · from Sprint 27 waves 1 and 2. BL-707 diagnosed one instance; BL-708 hit a second building on top of it; BL-440 had already fixed a third.*
-
-Three separate symptoms this sprint traced to one shape. Naming it once is worth more than three fixes.
-
-THE SHAPE: a pre-selection step ranks candidates by ONE ABSOLUTE QUANTITY and truncates. Where that quantity's values span orders of magnitude, the truncation is not a ranking - it is a CATEGORY EXCLUSION. Everything below the top band never reaches scoring at all, so the scorer looks correct while never having been offered a real choice.
-
-INSTANCE 1 - BL-440, already fixed, and it named the trap in its own comment. Extraction site selection pre-picked a tile's RICHEST deposit. Its fix comment reads: "Pre-selecting the richest was a TILE-LOCAL heuristic answering a WORLD-level question."
-
-INSTANCE 2 - BL-707, diagnosed this sprint. `rank_extraction_sites` enumerates every deposit per tile (BL-440's fix working) and then truncates to a GLOBAL `top_m_sites = 8` by deposit x affinity x demand_weight. All eight slots are iron_ore, cut-off 7847.5, against clay's best 205.7 and peat's 75.0 - a 60x gap that `input_demand_pull` (bounded ~9x) cannot close. So BL-440 fixed the tile-local version and RE-SET THE IDENTICAL TRAP ONE ALTITUDE UP.
-
-INSTANCE 3 - found by BL-708 while building power. `corp_ai.cpp:1071` picks the max net margin per site: `if (n > best_net ...)`. Power's net is 3.98; price-ceiled electronics is 290. **The corp AI can never build a power plant**, in any world, at any time. The first attempt at BL-708 collapsed the industrial band to 25 of 407 operating firms with power produced 0.0, purely because of this.
-
-WHY IT KEEPS RECURRING, and this is the part worth carrying: each instance is locally reasonable. "Take the richest tile", "take the top 8 sites", "take the best-margin recipe" are all sensible sentences. The defect is invisible until you ask what the DISTRIBUTION of the ranked quantity looks like - and in this economy it is always long-tailed, because deposit magnitudes, margins and prices all span three orders.
-
-A CHEAP GOOD CAN NEVER WIN AN ABSOLUTE-MARGIN CONTEST, however badly the world needs it. Power is the clearest case: it is wanted by every building on the map and it is worth 3.98 a unit.
-
-THE FIXES ARE THE SAME SHAPE TOO: rank scale-free (normalise within resource or within category), or take a per-category top-K instead of a global top-M, so every category is represented in the candidate list and the SCORER decides - which is what the scorer is for.
-
-**Why it matters.** It is the root cause of two of this sprint's three biggest findings, and it will silently break the next channel too. Power only works today because the SEEDER places plants; the AI cannot add one, so power supply never grows with the world - which defeats the economy-scaled sink the channel was built to be.
-
-- One item fixing the shape wherever it appears - per-category top-K in the extraction pre-filter AND scale-free recipe selection. Determinism-affecting and moves every economy golden, so it wants its own sprint slot.
-- Fix only the recipe-selection instance now, since it is what makes BL-708's power supply unable to grow, and carry the extraction one as BL-707's handover already proposes.
-- Carry both as documented debt with the shape recorded here, and fix when a measurement shows it costing something beyond what is already measured.
-
-> **Recommendation:** Option 2, then 1. The recipe-selection instance is the one that makes a LANDED feature structurally incomplete rather than merely suboptimal - power exists in the world only because generation placed it, and no rival will ever build another. That is worth fixing before the sprint's own construction item lands on the same scorer. The extraction instance is bigger and already has a handover.
-
-*Files: `src/world/corp_ai.cpp`, `src/world/corp_ai.hpp`, `tools/verify/chain_conversion_probe.cpp`*
 
 ### NR-766 — The world seeder sizes against consumer demand only, never against processing-input demand
 *novel-work · raised 2026-08-31 · from Found by the BL-708 slice while making power plants get built at all.*
@@ -1791,4 +1787,43 @@ INTERNATIONAL TRADE NEEDS NO NEW MACHINERY. MARKETS.md section Tariffs already r
 AND IT REACHES THE ERA CATASTROPHE. ERAS.md section The point of an Era scores Era 1 on Alarm, and its danger table names cross-border trade as the cheapest Alarm suppressant in the game, with Autarkic Substitution as the herring that cuts those ties. A nation whose lights depend on a neighbours generation has a reason not to escalate; severing that tie is a visible causal step toward the rupture. Power now feeds Trade and Conflict at once, which is the SYSTEMS.md test and very few systems pass it on both sides.
 
 *Files: `docs/economy/PRODUCTION.md`, `docs/economy/CONTRACTS.md`, `docs/economy/LOGISTICS.md`*
+
+### NR-765 — THE SAME DEFECT, THREE TIMES: an argmax on an absolute quantity, in a domain whose values span orders of magnitude
+*observation · raised 2026-08-31 · from Sprint 27 waves 1 and 2. BL-707 diagnosed one instance; BL-708 hit a second building on top of it; BL-440 had already fixed a third.*
+
+Three separate symptoms this sprint traced to one shape. Naming it once is worth more than three fixes.
+
+THE SHAPE: a pre-selection step ranks candidates by ONE ABSOLUTE QUANTITY and truncates. Where that quantity's values span orders of magnitude, the truncation is not a ranking - it is a CATEGORY EXCLUSION. Everything below the top band never reaches scoring at all, so the scorer looks correct while never having been offered a real choice.
+
+INSTANCE 1 - BL-440, already fixed, and it named the trap in its own comment. Extraction site selection pre-picked a tile's RICHEST deposit. Its fix comment reads: "Pre-selecting the richest was a TILE-LOCAL heuristic answering a WORLD-level question."
+
+INSTANCE 2 - BL-707, diagnosed this sprint. `rank_extraction_sites` enumerates every deposit per tile (BL-440's fix working) and then truncates to a GLOBAL `top_m_sites = 8` by deposit x affinity x demand_weight. All eight slots are iron_ore, cut-off 7847.5, against clay's best 205.7 and peat's 75.0 - a 60x gap that `input_demand_pull` (bounded ~9x) cannot close. So BL-440 fixed the tile-local version and RE-SET THE IDENTICAL TRAP ONE ALTITUDE UP.
+
+INSTANCE 3 - found by BL-708 while building power. `corp_ai.cpp:1071` picks the max net margin per site: `if (n > best_net ...)`. Power's net is 3.98; price-ceiled electronics is 290. **The corp AI can never build a power plant**, in any world, at any time. The first attempt at BL-708 collapsed the industrial band to 25 of 407 operating firms with power produced 0.0, purely because of this.
+
+WHY IT KEEPS RECURRING, and this is the part worth carrying: each instance is locally reasonable. "Take the richest tile", "take the top 8 sites", "take the best-margin recipe" are all sensible sentences. The defect is invisible until you ask what the DISTRIBUTION of the ranked quantity looks like - and in this economy it is always long-tailed, because deposit magnitudes, margins and prices all span three orders.
+
+A CHEAP GOOD CAN NEVER WIN AN ABSOLUTE-MARGIN CONTEST, however badly the world needs it. Power is the clearest case: it is wanted by every building on the map and it is worth 3.98 a unit.
+
+THE FIXES ARE THE SAME SHAPE TOO: rank scale-free (normalise within resource or within category), or take a per-category top-K instead of a global top-M, so every category is represented in the candidate list and the SCORER decides - which is what the scorer is for.
+
+**Why it matters.** It is the root cause of two of this sprint's three biggest findings, and it will silently break the next channel too. Power only works today because the SEEDER places plants; the AI cannot add one, so power supply never grows with the world - which defeats the economy-scaled sink the channel was built to be.
+
+- One item fixing the shape wherever it appears - per-category top-K in the extraction pre-filter AND scale-free recipe selection. Determinism-affecting and moves every economy golden, so it wants its own sprint slot.
+- Fix only the recipe-selection instance now, since it is what makes BL-708's power supply unable to grow, and carry the extraction one as BL-707's handover already proposes.
+- Carry both as documented debt with the shape recorded here, and fix when a measurement shows it costing something beyond what is already measured.
+
+> **Recommendation:** Option 2, then 1. The recipe-selection instance is the one that makes a LANDED feature structurally incomplete rather than merely suboptimal - power exists in the world only because generation placed it, and no rival will ever build another. That is worth fixing before the sprint's own construction item lands on the same scorer. The extraction instance is bigger and already has a handover.
+
+> **RESOLVED.** RESOLVED 2026-09-01 — all three instances are fixed and the shape is now a written rule rather than a recurring surprise.
+
+Instance 1, BL-440 (tile-local richest): already fixed before this entry was filed.
+Instance 2, BL-711 (global top-M extraction list): `rank_extraction_sites` keeps a per-resource top-K. Coal went from 0 mines in any world ever to 25 on the industrial band; clay, hides and sand went from `produced 0.0` to 349.1 / 353.9 / 35.8 on the ancient band.
+Instance 3, BL-712 (max-net-margin recipe): the build candidate keeps a best per `recipe::group`. `Power Generation` and `Construction` went from ZERO build candidates to 168 and 430.
+
+THE ENTRY'S REAL ASK — 'naming it once is worth more than three fixes' — is met: the shape is written into `docs/ai/AI_OPPONENT.md` § Selection must be scale-free, as a rule with its own reasoning, so the next instance is a rule violation rather than a fresh discovery. BL-712 also added a fourth sibling the entry did not know about: the recipe margin-chase, which carried the same argmax AND proposed cross-group switches the seam has refused since 2026-08-16 — that one is written up beside the rule as 'a scorer that proposes what its seam forbids cannot tell a refusal from an absence'.
+
+WHAT DID NOT GET FIXED, and it is filed rather than folded in: NR-769. Both fixes put the excluded categories in front of the scorer and the scorer still refuses them, because `net^2/capex` is itself an absolute contest — the entry's own sentence, 'a cheap good can never win an absolute-margin contest', applies one level below where it was aimed. That is BL-417 and Ben's.
+
+*Files: `src/world/corp_ai.cpp`, `src/world/corp_ai.hpp`, `tools/verify/chain_conversion_probe.cpp`*
 
