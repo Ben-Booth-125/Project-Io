@@ -4529,34 +4529,38 @@
       "headless: demand_census showing the construction channel non-zero when nothing is actively building"
      ],
      "requirement": "A construction building runs a production method, draws that method goods as upkeep every tick, and produces construction capacity that building projects consume.",
-     "notes": "The channel measures 0.000 in the industrial band today because run_construction fires only while something is building."
+     "notes": "The channel measures 0.000 in the industrial band today because run_construction fires only while something is building.",
+     "evidence": "PENDING, verified 2026-09-01 and NOT met. The mechanism is coded — a Construction-group recipe runs on a processing_facility, draws its method's goods as ordinary recipe inputs each tick, and `capacity_per_build_tick` makes a live project consume the capacity. But the stated verification (the channel non-zero when nothing is actively building) is not demonstrable and two measurements run against it. (a) demand_census, ancient band: `construction_capacity` PRODUCED = 0.0 across an 80-tick warm start despite two timber-frame yards standing, with timber (5359.1) and planks (635.8) both available — the yards exist and make nothing. (b) chain_conversion_probe, industrial band: both seeded yards are GONE by tick 80, by removal rather than by switching. The `construct` column the census reports is still driven by live projects, which is the episodic behaviour this row exists to replace. NR-770 owns the diagnosis; scripts/economy.lua records that the per-tick universal upkeep draw was tried and MEASURED to collapse operating firms 198/328 -> 33/317, so this is a known-hard row and not an oversight."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: demand_census per band"
      ],
      "requirement": "Five methods, era-banded as recipes are: timber frame and stone-and-brick (ancient); iron frame, steel frame, reinforced concrete (industrial).",
-     "notes": "Baskets and rates MEASURED against the census, never guessed."
+     "notes": "Baskets and rates MEASURED against the census, never guessed.",
+     "evidence": "COMPLETE, verified 2026-09-01. Five methods, era-banded, all group \"Construction\": timber_frame_construction + stone_and_brick_construction (ancient), iron_frame_construction + steel_frame_construction + reinforced_concrete_construction (industrial) — scripts/recipes.lua 827/842/857/874/889. demand_census confirms the band split from the other side: the ancient band's roster admits the two ancient methods and the industrial band's the three industrial ones."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: demand_census at tick 0"
      ],
      "requirement": "Seeded capacity gives the channel a non-zero reading at TICK 0 in every market that has any.",
-     "notes": "Ben's own reason for the change, and MARKETS.md property 5 delivered by the generator rather than an authored basket."
+     "notes": "Ben's own reason for the change, and MARKETS.md property 5 delivered by the generator rather than an authored basket.",
+     "evidence": "COMPLETE, verified 2026-09-01. demand_census: `construction_capacity` is in the TERMINAL SET of BOTH bands and is priced in 14 of 14 ancient markets and 9 of 9 industrial — 0 floored, verdict `in band` in both. That is MARKETS.md property 5 (\"every chain terminates in every market\") delivered by the generator rather than by an authored basket, which is exactly the claim."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: corp_ai_harness plus a thrash check"
      ],
      "requirement": "The AI scorer prices construction capacity as a contended shared resource - NR-592 is fixed here.",
-     "notes": "Under a lump sum a blind scorer is a missed opportunity; under a contended pool it proposes builds the pool cannot serve, every evaluation, for as long as the pool is short."
+     "notes": "Under a lump sum a blind scorer is a missed opportunity; under a contended pool it proposes builds the pool cannot serve, every evaluation, for as long as the pool is short.",
+     "evidence": "COMPLETE, verified 2026-09-01. `build_material_cost` is priced into the capex of BOTH build candidates — corp_ai.cpp:951 (extraction) and :1202 (processing) — so the score AND the solvency spend carry the material basket, keyed by recipe per BL-590. NR-592 marked resolved on this evidence. corp_ai_harness green, including BL-712's new R8; the thrash check is corp_ai_harness R2's action-budget rows, also green."
     }
    ]
   }

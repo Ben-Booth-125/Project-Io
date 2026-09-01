@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*123 entries — 117 open, 6 resolved.*
+*123 entries — 116 open, 7 resolved.*
 
 ---
 
@@ -82,17 +82,6 @@ scripts/tech_tree.lua opens with "DATA ONLY — the tech system is post-prototyp
 > **Recommendation:** Either author BL-588's first gates against a small, deliberately-chosen set of Era 0 node ids, or let the gate table name its own ids and reconcile with tech_tree.lua later. State which at promotion; do not let the Lua node list become authoritative by accident.
 
 *Files: `scripts/tech_tree.lua`, `src/world/tech_gate.cpp`, `src/world/tech_gate.hpp`*
-
-### NR-592 — corp_ai.cpp never prices resource_build_cost when scoring a build candidate — pre-existing, not caused by BL-590
-*observation · raised 2026-08-24 · from Measured while authoring BL-590 (per-building materials): the build-candidate loops price only building_economics::build_cost (ex.build_cost / pe.build_cost / mex.build_cost), never resource_build_cost.*
-
-BL-590 gave named buildings materially different resource_build_cost baskets (ancient buildings now cost timber/stone, not steel). The AI scorer's capex estimate never priced that array before this item and still does not after it — a candidate scores on cash alone, so a rival can propose a build whose MATERIALS it cannot actually reach even with sufficient cash. construct_building's own affordability gate refuses it cleanly at apply time (no mutation), so this is a missed-opportunity gap for the scorer, not a correctness bug: the seam already enforces the real cost, same shape as the recipe-switch scorer's own documented gap (NR-242, PRODUCTION.md § Alternate production methods).
-
-**Why it matters.** Was already true before BL-590 (every type shared one steel basket, so the gap was invisible — steel is cheap and plentiful for most rivals). BL-590 makes it visible for the first time: an ancient rival with no timber stockpile could now score a Sawmill it cannot actually place. Not urgent (the gate protects correctness), but worth knowing before BL-589's start-gate audit or BL-594's playthrough, in case a rival's build thrash traces back to this rather than to something either of those items would otherwise suspect.
-
-> **Recommendation:** Leave as documented debt unless BL-589/BL-594 measure it costing something real (excess refused-build churn, a rival stalling on a candidate it can never place). If so, pricing resource_build_cost_for into the scorer's capex estimate is a small, contained addition — the same shape corp_ai.cpp already applies to build_cost.
-
-*Files: `src/world/corp_ai.cpp`, `docs/economy/PRODUCTION.md`*
 
 ### NR-593 — BL-591's growth-track readout is render-confirmed, not click-confirmed — no computer-use access this session
 *decision taken on your behalf · raised 2026-08-24 · from Ben, 2026-08-24, asked directly: how to close BL-591 given no computer-use access this session. Answered: accept the render proof, file this entry.*
@@ -1490,7 +1479,7 @@ WHY THIS WAS NOT JUST FIXED. AI_OPPONENT.md § Scoring says the quadratic's marg
 
 *Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
 
-### NR-770 — Both construction yards vanish inside 80 ticks and it is NOT the recipe chase
+### NR-770 — Construction yards do not survive, and where they do survive they produce nothing
 *observation · raised 2026-09-01 · from Measured by BL-712 with chain_conversion_probe, industrial band, before and after the fix.*
 
 `steel -> construction_capacity` reads 2 facilities at spawn and **0** after an 80-tick warm start. That is unchanged by BL-712: with the chase now confined to a facility's own group, a yard can only move to another Construction method, and no other Construction row appears in the probe at all. So the two yards are not being switched — they are being removed.
@@ -1499,9 +1488,13 @@ WHAT BL-712 DID FIX NEARBY, for contrast, so the two are not confused: `silica -
 
 THE LIKELY CAUSE, unverified and deliberately not chased here: `economy.lua` authors `construction_capacity` upkeep at **0.0 in both bands** (lines 494-499, the BL-641 zero-rate note). Its only demand is the construction draw itself, so a yard's revenue depends entirely on something being built within reach of it. That makes it a persistently loss-making building, which is exactly what the BL-079 reflex tier idles.
 
+THE ANCIENT BAND IS THE SHARPER HALF, found closing BL-709 the same day. There the two `timber+planks -> construction_capacity` yards DO survive the 80-tick warm start — chain_conversion_probe reads 2 at spawn and 2 at the end — and demand_census reads `construction_capacity` PRODUCED = 0.0. Both inputs are on the shelf in quantity (timber 5359.1, planks 635.8). So this is not one failure mode but two: industrial yards are removed, and ancient yards stand idle. A yard that is idled for want of revenue and a yard that is idled for want of a reachable input look the same from outside, and neither has been separated yet.
+
+This is what holds BL-709's R1 open — 'capacity exists, draws its inputs every tick, and grows with the world' is the requirement, and the world does none of the three.
+
 **Why it matters.** BL-709 landed construction as an economy-scaled sector and the economy is removing it. This is upstream of BL-642 (construction draws) and probably the same fact from the other side.
 
-> **Recommendation:** Hand it to BL-642 as the first thing that item measures: it already owns the construction draw, and 'the yard has no revenue' and 'the draw does not reach the market' are likely one finding. Do not fix it inside BL-712 — a yard that the reflex tier is right to idle is not an AI-selection defect.
+> **Recommendation:** Hand it to BL-642 as the first thing that item measures: it already owns the construction draw, and 'the yard has no revenue' and 'the draw does not reach the market' are likely one finding. Do not fix it inside BL-712 — a yard that the reflex tier is right to idle is not an AI-selection defect. The ancient half is the cheaper diagnosis and should go first: two yards, on a body whose inputs are demonstrably present, producing zero. Whatever gates them is likely the same gate the industrial yards fail on before they are removed.
 
 *Files: `scripts/economy.lua`, `src/world/economy_system.cpp`, `tools/verify/chain_conversion_probe.cpp`*
 
@@ -1528,6 +1521,19 @@ This is DEVELOPMENT_PRACTICES.md § A harness must build the world the applicati
 
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
+
+### NR-592 — corp_ai.cpp never prices resource_build_cost when scoring a build candidate — pre-existing, not caused by BL-590
+*observation · raised 2026-08-24 · from Measured while authoring BL-590 (per-building materials): the build-candidate loops price only building_economics::build_cost (ex.build_cost / pe.build_cost / mex.build_cost), never resource_build_cost.*
+
+BL-590 gave named buildings materially different resource_build_cost baskets (ancient buildings now cost timber/stone, not steel). The AI scorer's capex estimate never priced that array before this item and still does not after it — a candidate scores on cash alone, so a rival can propose a build whose MATERIALS it cannot actually reach even with sufficient cash. construct_building's own affordability gate refuses it cleanly at apply time (no mutation), so this is a missed-opportunity gap for the scorer, not a correctness bug: the seam already enforces the real cost, same shape as the recipe-switch scorer's own documented gap (NR-242, PRODUCTION.md § Alternate production methods).
+
+**Why it matters.** Was already true before BL-590 (every type shared one steel basket, so the gap was invisible — steel is cheap and plentiful for most rivals). BL-590 makes it visible for the first time: an ancient rival with no timber stockpile could now score a Sawmill it cannot actually place. Not urgent (the gate protects correctness), but worth knowing before BL-589's start-gate audit or BL-594's playthrough, in case a rival's build thrash traces back to this rather than to something either of those items would otherwise suspect.
+
+> **Recommendation:** Leave as documented debt unless BL-589/BL-594 measure it costing something real (excess refused-build churn, a rival stalling on a candidate it can never place). If so, pricing resource_build_cost_for into the scorer's capex estimate is a small, contained addition — the same shape corp_ai.cpp already applies to build_cost.
+
+> **RESOLVED.** FIXED by BL-709 (construction as a rate), verified 2026-09-01. `build_material_cost` is priced into the capex of BOTH build candidates — corp_ai.cpp:951 (extraction) and :1202 (processing) — so a candidate's score and its solvency spend now carry the material basket, not the flat build_cost alone. The recipe travels into the lookup, because since BL-590 the basket is keyed by it: a Sawmill and a Smithy do not cost the same to build. Ben's call as recorded in PRODUCTION.md § Construction as a rate — under a shared contended capacity pool this stopped being a missed opportunity and became a correctness problem.
+
+*Files: `src/world/corp_ai.cpp`, `docs/economy/PRODUCTION.md`*
 
 ### NR-743 — The margin is measured against the strongest corporation, uniformly - not against the player specifically
 *decision taken on your behalf · raised 2026-08-31 · from Sprint 26 opening. Ben, 2026-08-31: "trying to match the skill of their opponent, and beating them by a slim margin."*
