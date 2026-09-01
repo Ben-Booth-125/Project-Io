@@ -10,6 +10,58 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-01 (success-lever session) — The two buyers come back, and the sweeps get their design
+
+**Mode:** Design → Full (two worktree agents) → integration. **Runtime:** one session; one full
+build; ~10 harness builds. Sub-agents: two economy-dev builders + two cold reviewers.
+
+The brief: design tests that inform each tuning lever for player success (target: 0 research
+points, a functioning economy, influence around spawn, measured as GDP and net-income trend), with
+a working spectator mode and time-lapses. A 12-agent corpus sweep produced the lever inventory;
+Ben then ordered the two missing buyers built first.
+
+### Built
+
+**BL-644 (state channel).** The tenth budget line `space_programme`: whole-or-nothing lumps of
+spacecraft_components + propellant, priced at the supplier's market (base_price fallback),
+conservation-exact, consumed on settlement. Save v22→23. Cold review found no correctness defect;
+integration added the missing coverage — R7k pricing twin, R7l rogue-claim claw-back (the claim
+vector is wire-reachable), and R8, an end-to-end `run_nation_step` row red-proved by severing the
+wiring. `nation_budget_harness` 49→62/62.
+
+**BL-647 (endemic luxury).** `inject_endemic_demand`: wealth-scaled (treasury + positive domiciled
+balances), nation-flavoured by a pure seeded hash (a real FNV diffusion defect caught by the
+harness's own asymmetry row, fixed with fmix64), the four luxuries into `k_extractable`. 29/29,
+every row mutation-proved. Census after: luxuries carry demand and price 3.4–4.0× base in band;
+rivals extract and sell into the pull end to end.
+
+**Integration.** demand_census gains the two channels honestly (END market bid; `st` paid pool
+draw on its own line), endemic + state/pl columns; chain_depth gains both injectors — the
+names-no-pass list shrinks 8→3, all owned; `read_resource_map` rejects NaN/negative weights.
+
+### Filed
+
+BL-723 (campaign lapse instrument) + BL-724…729 (the sweep battery: spawn distribution, price
+levers, debt dynamics, scarcity geography, demand composition, interactions), BL-730
+(trade_goods_misc buyer), BL-731 (nation_scorer_harness rot). NR-774 carries the four
+definitional calls (GDP := valued production; influence := market share + footprint + routes;
+band := industrial 1960; proxy := corp AI with stated brackets) for ratification.
+
+### Found, not fixed
+
+The ceiling derivation has drifted: `haulage_measure` now demands ceil > 14.07 at the binding
+case against the authored 10.0 (p90 haul 5.65 vs the 1.67 the 10.0 was derived from). Trade is
+healthy (1,481 dispatches vs the 1055 baseline) — but the worst-tail pair is unservable at any
+scarcity. Sweep 2 (BL-725) owns re-deriving it. chain_depth's named-list guard stays
+deliberately red on tools / rigging / trade_goods_misc.
+
+### Open calls
+
+NR-774 (the four definitions); the player-corp supplier exclusion under spectate (BL-644's
+delegated call — the BL-409 no-subject reading says it should lift); lump sizes 25/50 first-cut.
+
+---
+
 ## 2026-09-01 (later) — The review queue drained, and the quadratic finally went
 
 **Mode:** Design → Full → Corpus. **Sprint 27: still open.**
