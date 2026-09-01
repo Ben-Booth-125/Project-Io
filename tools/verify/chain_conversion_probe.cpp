@@ -238,13 +238,20 @@ int main(int argc, char** argv)
         std::printf("  %-30s %8d %8d %+7d\n", label.c_str(), a, b, b - a);
     }
 
-    // --- what corp_ai's GLOBAL top-M site pre-filter actually contains --------
+    // --- what corp_ai's PER-RESOURCE top-K site pre-filter contains -----------
     // rank_extraction_sites (corp_ai.cpp, anonymous namespace) is replicated here
     // formula-for-formula: suitability = deposit * affinity * demand_weight, then
-    // a partial_sort truncated to corp_ai_params::top_m_sites over EVERY surveyed
-    // land tile in the world. This is the list every corp scores its extraction
-    // build candidate from, so a resource absent from it cannot be mined by the AI
-    // however starved its consumers are.
+    // the best `corp_ai_params::top_k_sites_per_resource` OF EACH RESOURCE over
+    // every surveyed land tile in the world. This is the list every corp scores
+    // its extraction build candidate from, so a resource absent from it cannot be
+    // mined by the AI however starved its consumers are.
+    //
+    // BL-711 CHANGED THIS SHAPE, and the report below is kept in BOTH shapes
+    // deliberately. The per-resource list is what the scorer now sees; the global
+    // ranking underneath it is what the scorer USED to see, and printing the two
+    // together is the whole diagnosis on one screen - it shows at a glance that
+    // the global order is still overwhelmingly one resource, which is exactly why
+    // truncating on it was a category exclusion rather than a ranking.
     {
         corp_ai_params ap;
         std::array<int, resource_count> wanted{};
@@ -309,13 +316,47 @@ int main(int argc, char** argv)
             return a.tile < b.tile;
         });
 
-        std::printf("\n--- corp_ai's GLOBAL top-%d extraction-site pre-filter (replicated) ---\n",
-                    ap.top_m_sites);
+        // THE LIST THE SCORER ACTUALLY GETS (BL-711): best K of each resource,
+        // buckets in ascending resource index, exactly as rank_extraction_sites
+        // emits them.
+        std::printf("\n--- corp_ai's PER-RESOURCE top-%d extraction-site pre-filter (replicated) ---\n",
+                    ap.top_k_sites_per_resource);
         std::printf("  input_demand_pull = %.2f; %zu candidate (tile,resource) pairs world-wide\n\n",
                     ap.input_demand_pull, all.size());
+        std::printf("  %4s %-22s %12s   %s\n", "slot", "target", "suitability", "can_place_in_world");
+        const std::size_t kk =
+            static_cast<std::size_t>(std::max(0, ap.top_k_sites_per_resource));
+        std::size_t emitted = 0, placeable = 0;
+        for (std::size_t r2 = 0; r2 < resource_count; ++r2)
+        {
+            std::size_t taken = 0;
+            for (const cand& c : all) // `all` is already in global suitability order
+            {
+                if (static_cast<std::size_t>(c.target) != r2) continue;
+                if (taken >= kk) break;
+                ++taken; ++emitted;
+                const auto res = placement_rules::can_place_in_world(
+                    w, c.tile, building_type::extraction_site, c.target);
+                if (res) ++placeable;
+                std::printf("  %4zu %-22s %12.1f   %s\n", taken, rname(r2).c_str(), c.suit,
+                            res ? "ok" : placement_reason_text(res.reason));
+            }
+        }
+        std::printf("\n  %zu site(s) reach the scorer, %zu of them placeable right now.\n",
+                    emitted, placeable);
+        std::printf("  EVERY resource with a deposit anywhere is represented - that is the"
+                    " property BL-711 buys.\n");
+
+        // THE OLD SHAPE, kept as the diagnosis rather than deleted. This is what
+        // the scorer saw before BL-711, and the reading IS the argument: the
+        // global order is one resource all the way down, so any truncation of it
+        // is a category exclusion rather than a ranking.
+        const int  legacy_m = 8; // the retired corp_ai_params::top_m_sites default
+        std::printf("\n--- WHAT A GLOBAL top-%d WOULD HAVE SHOWN (the BL-711 diagnosis, retained) ---\n",
+                    legacy_m);
         std::printf("  %4s %-22s %12s   %s\n", "rank", "target", "suitability", "can_place_in_world");
         const std::size_t show = std::min<std::size_t>(all.size(),
-                                     static_cast<std::size_t>(std::max(0, ap.top_m_sites)));
+                                     static_cast<std::size_t>(legacy_m));
         for (std::size_t i = 0; i < show; ++i)
         {
             const auto res = placement_rules::can_place_in_world(
@@ -327,9 +368,9 @@ int main(int argc, char** argv)
         }
 
         const float cutoff = show > 0 ? all[show - 1].suit : 0.0f;
-        std::printf("\n  cut-off suitability to enter the top-%d: %.1f\n", ap.top_m_sites, cutoff);
+        std::printf("\n  cut-off suitability to enter that top-%d: %.1f\n", legacy_m, cutoff);
         std::printf("  BEST suitability any tile can offer, per resource, vs that cut-off:\n");
-        std::printf("  %-22s %12s  %s\n", "resource", "best suit", "reaches top-M?");
+        std::printf("  %-22s %12s  %s\n", "resource", "best suit", "would reach top-M?");
         for (const resource_type rt : placement_rules::k_extractable)
         {
             const std::size_t r = static_cast<std::size_t>(rt);

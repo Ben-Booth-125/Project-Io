@@ -75,7 +75,22 @@ const char* standing_component_name(standing_component c);
 struct corp_ai_params
 {
     int   cadence_k       = 4;     ///< Corp c evaluates when tick % k == index(c) % k.
-    int   top_m_sites     = 8;     ///< Build-site pre-filter width (bounded enumeration).
+    /// BL-711: build-site pre-filter width, PER RESOURCE - not a global cap.
+    ///
+    /// It was `top_m_sites = 8`, a global top-M over deposit x affinity x
+    /// demand_weight. Deposit magnitudes span three orders, so all 8 rows came
+    /// back iron_ore and clay, peat, sand, hides and fibre were never candidates
+    /// anywhere, for any corp, in any world (AI_OPPONENT.md - Selection must be
+    /// scale-free). Per-resource, every extractable reaches the scorer and the
+    /// scorer decides, which is what the scorer is for.
+    ///
+    /// 2 rather than 1 deliberately: one site per resource is a single point of
+    /// failure against the placement and glut vetoes downstream, so a resource
+    /// whose best tile is unbuildable would silently lose its whole category
+    /// again - the same second-chance argument as BL-712's per-group build
+    /// candidates. Upper bound on the returned list is K x extractables, ~36
+    /// today against the old flat 8. 0 disables enumeration entirely.
+    int   top_k_sites_per_resource = 2;
     /// BL-440: how hard an UNMET RECIPE INPUT pulls a site's suitability up.
     ///
     /// A tile offers every extractable deposit it carries as a candidate target,

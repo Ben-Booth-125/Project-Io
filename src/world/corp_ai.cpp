@@ -727,7 +727,40 @@ std::array<float, resource_count> input_demand_weights(const world& w,
     return weight;
 }
 
-std::vector<extraction_site> rank_extraction_sites(const world& w, int top_m,
+/// Rank the world's buildable extraction sites, keeping the best K OF EACH
+/// RESOURCE (BL-711; AI_OPPONENT.md - Selection must be scale-free).
+///
+/// This used to keep a global top-M over `deposit x affinity x demand_weight`.
+/// Deposit magnitudes span three orders for reasons that have nothing to do
+/// with desirability - ore is physically a larger number than clay - so that
+/// truncation did not rank the field, it deleted most of it. Measured on the
+/// ancient band: all 8 surviving rows were iron_ore, from 12287.6 down to a
+/// 7859.8 cut-off, against a best-in-world of 297.2 for clay, 75.0 for peat and
+/// 507.2 for hides. Those resources were not rarely chosen; they were never
+/// CANDIDATES, anywhere, for any corp, in any world.
+///
+/// The symptom surfaced far downstream and looked like a different bug entirely:
+/// 30 Peat Kilns standing against 0 peat mines, 22 Potter's Kilns against 0 clay
+/// mines. The scorer was not wrong - it correctly declined every candidate it
+/// was shown, and the only resource it was ever shown was the glutted one.
+///
+/// `input_demand_pull` (BL-440) fires here and cannot fix it: bounded at
+/// 1 + pull x wanted/(1 + sites), it reached 9x for clay and could not close a
+/// 60x gap. A bounded multiplier cannot rescue an unbounded ordering.
+///
+/// THIS IS BL-440's OWN TRAP, ONE ALTITUDE UP. That item fixed the TILE-LOCAL
+/// version - a tile used to offer only its richest deposit - and its comment
+/// named the shape exactly: pre-selecting the richest was a TILE-LOCAL
+/// heuristic answering a WORLD-level question. The world-level truncation was
+/// left standing, which is the identical defect written at a different
+/// altitude. Hence the rule now sits in AI_OPPONENT.md rather than in a comment.
+///
+/// Buckets walk in ASCENDING RESOURCE INDEX, not in `k_extractable` order, so
+/// the returned order is a function of the resource enum rather than of a
+/// list's authoring order - registering a new extractable appends, it does not
+/// reshuffle. Within a bucket the comparator is the one the global sort used,
+/// tile-id tie-break included.
+std::vector<extraction_site> rank_extraction_sites(const world& w, int top_k_per_resource,
                                                    const std::array<float, resource_count>& demand_weight)
 {
     std::vector<extraction_site> sites;
@@ -783,21 +816,39 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_m,
             sites.push_back({tid, rich * affinity * demand_weight[ri], rt});
         }
     }
-    // PARTIAL SORT, not a full one (2026-08-12). Only the top M survive the
-    // resize below, so sorting all ~18,000 qualifying sites to discard all but
-    // ~64 of them was work thrown away. `std::partial_sort` orders exactly the
-    // first M under the same comparator and leaves the tail unspecified — which
-    // is precisely what `resize` then discards, so the returned list is
-    // BIT-IDENTICAL to sort-then-resize. No golden moves.
+    // PARTIAL SORT within each bucket, not a full one (the 2026-08-12 reason,
+    // unchanged): only the first K survive, and `std::partial_sort` orders
+    // exactly those under the same comparator while leaving the tail
+    // unspecified - which is precisely what is then discarded.
     const auto cmp = [](const extraction_site& a, const extraction_site& b) {
         if (a.suitability != b.suitability) return a.suitability > b.suitability;
         return a.tile < b.tile;
     };
-    const std::size_t keep = std::min(sites.size(), static_cast<std::size_t>(std::max(0, top_m)));
-    std::partial_sort(sites.begin(), sites.begin() + static_cast<std::ptrdiff_t>(keep),
-                      sites.end(), cmp);
-    sites.resize(keep);
-    return sites;
+    const std::size_t k = static_cast<std::size_t>(std::max(0, top_k_per_resource));
+    if (k == 0)
+        return {}; // enumeration disabled; no site is a candidate anywhere
+
+    // One pass to bucket, then K out of each. Bucketing by the target's own
+    // index rather than by a search per resource keeps this O(sites), which
+    // matters: the ancient band offers ~36,700 (tile, resource) pairs and this
+    // runs once per tick.
+    std::array<std::vector<extraction_site>, resource_count> by_target;
+    for (const extraction_site& s : sites)
+        by_target[static_cast<std::size_t>(s.target)].push_back(s);
+
+    std::vector<extraction_site> out;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        std::vector<extraction_site>& bucket = by_target[r];
+        const std::size_t keep = std::min(bucket.size(), k);
+        if (keep == 0)
+            continue;
+        std::partial_sort(bucket.begin(), bucket.begin() + static_cast<std::ptrdiff_t>(keep),
+                          bucket.end(), cmp);
+        out.insert(out.end(), bucket.begin(),
+                   bucket.begin() + static_cast<std::ptrdiff_t>(keep));
+    }
+    return out;
 }
 } // namespace
 
@@ -855,7 +906,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
     // site ranking they feed, not once per due corp — the same BL-253 hoist.
     const std::array<float, resource_count> demand_weight = input_demand_weights(w, reg, p);
     const std::vector<extraction_site> ranked_sites =
-        rank_extraction_sites(w, p.top_m_sites, demand_weight);
+        rank_extraction_sites(w, p.top_k_sites_per_resource, demand_weight);
 
     for (std::size_t index = 0; index < corp_ids.size(); ++index)
     {
