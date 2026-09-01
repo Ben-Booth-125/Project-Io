@@ -10,6 +10,75 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-01 (later) — The review queue drained, and the quadratic finally went
+
+**Mode:** Design → Full → Corpus. **Sprint 27: still open.**
+**Runtime:** continuation of the same session. Two integrating builds.
+
+Ben answered five open calls and then made a sixth, larger one: *"Really we are relying on the fact
+there is a review queue too much. Use judgment on things that seem obvious in hindsight, and close
+all the remaining items - then archive."*
+
+### The five rulings
+
+**BL-417 taken (NR-769, option A).** The build score is `net / capex` — return on capital per tick —
+at all three curve sites, including the road, which is priced *under* the build curve by
+construction and would have outscored the site it exists to reach by two orders had it stayed
+quadratic. What settled it was that two independent fixes hit the same wall one level down: BL-712
+put Power Generation and Construction in front of the scorer for the first time and the scorer
+refused them anyway; BL-711 gave the same shape from the other side with peat. `AI_OPPONENT.md`'s
+own rule condemns an absolute contest in as many words, and `net²/capex` was one — the rule applied
+to everything except the score.
+
+Measured before reshaping: 15,549 candidates, quadratic median 13.54 / max 1884, linear median
+0.106 / max 2.81. That puts builds in the same band as survey and hire, which is an incomparability
+the quadratic was masking rather than resolving. **No fudge scale was added** to restore the old
+ordering — that would be taking the change and cancelling it.
+
+**`spectator_determinism`'s byte-identity row retired (NR-752).** It asserted world-content
+stability, which is not what the harness is for; it had been re-blessed ten times and not one of
+those moves was a spectator-mode fact. The provenance log is kept as the *argument* for the
+retirement. The harness is ALL PASS for the first time in weeks with both real invariants intact.
+
+**BL-713 scheduled after sprint 27** (NR-762), **BL-642's centre growth gated** (NR-773, Ben taking
+the deeper option over the recommendation), and **NR-763 answered** — deeper chains, after the
+demand channels.
+
+### The probe that came back dead
+
+NR-763's recommended first move was to vary `max_logistics_reach` and re-read the completeness
+spread. `demand_census` gained a `--reach` flag for it, and the sweep 24 → 4 removes **40% of every
+market's reachable ground** — market 48711 loses 51% of its in-reach tiles — and **not one market's
+completeness moves**, on either band, to four decimal places. The raws a market needs are all in its
+inner catchment; the ground a tighter budget removes carries duplicates. Geography cannot bite
+because there is nothing distinctive at the edge to lose. That leaves the saturation structural.
+
+### The drain
+
+**117 open → 0.** The finding that matters is *why* there were 117: most entries named **work**, not
+a judgement. The queue had become a shadow backlog, and a backlog nobody reads is not a record.
+
+Ten items now carry the real content — **BL-713** (harnesses build the app's world; 48 of 51 skip
+the app-start tail, 22 of those run the AI in an unsurveyed world), **BL-714** (instruments that
+cannot see their subject), **BL-715** (the save seam past the world), **BL-716** (the tech tree is
+inert and its gate ids are wrong), **BL-717** (designed but silent), **BL-718** (the name column is
+one character — a class, not three instances), **BL-719** (shell defects), **BL-720** (the seeder
+cannot see processing demand), **BL-721** (paid for outcomes has no mechanism), **BL-722** (the
+live-click debt). Every one of the 125 entries is archived with a resolution saying where it went.
+
+`CLAUDE.md` Rule 0c gained the discipline that keeps it drained: a call only Ben can make goes in
+the queue; work goes in the backlog; a fact worth remembering goes in the comment next to the code.
+
+### One red, fixed rather than papered over
+
+`decision_trace_harness` T2's anti-vacuity guard went red under the linear score: the calmer scorer
+stopped overflowing the 256-entry ring (269 → 207 pushed). The guard was right and the tick count
+was the problem — 269 against 256 is five percent of headroom, and the decision rate is a property
+of the **scorer**, not of that file. Re-measured (2400/207, 3600/267, 4800/327, 6000/387), re-sized
+to 6000 for 51% headroom, with a `--ticks` flag so the next scorer change re-measures instead of
+guessing.
+
+
 ## 2026-09-01 — Sprint 27 block 2: two scale-blind selections, and two instruments that were lying
 
 **Mode:** Full (Batch Delivery). **Sprint 27: still open — the channels remain.**

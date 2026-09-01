@@ -212,9 +212,10 @@
     "tools/verify/",
     "docs/economy/MARKETS.md"
    ],
-   "design": "THE MECHANISM THAT MADE TWO SEPARATE BUGS INVISIBLE ON THE SAME DAY, which is why it is an item rather than a note. inject_population_demand and inject_background_demand both SKIP a basket entry whose resource carries no market base price - silently, with no warning and no row anywhere. Consequences observed 2026-08-26: (1) BL-649's census read as having no background demand at all on its first run, and (2) tools/verify/spawn_solvency.cpp - whose own header says it loads world_gen.lua and did not - measured BL-635's entire spawn diagnosis in a world where background demand did not exist. Neither failed. Both just quietly answered a question about a different world. THE WORK: an injector that cannot price a basket entry must report it - a named diagnostic on the first occurrence, and a harness row that FAILS on a basket naming an unpriced good, since that combination is always either a missing script or an authoring error and is never intended. A basket entry is a STATEMENT that somebody wants the good; silently dropping it turns a design statement into a no-op. Cheap, and it protects every measurement the rest of Sprint 21 depends on.",
    "completed": "2026-08-31",
-   "resolved": "2026-08-31"
+   "resolved": "2026-08-31",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-654",
@@ -241,9 +242,10 @@
     "docs/economy/MARKETS.md",
     "docs/economy/FINANCE.md"
    ],
-   "design": "THE BLOCKER UNDER BL-641, AND PROBABLY UNDER FOUR MORE CHANNELS. Measured 2026-08-26: with building upkeep rates on, operating firms went 227 -> 19, because the goods drawn are produced 0.0 in band and a POOL DRAW never reaches market_component::demand - so the want never becomes a price, no rival scores the building that would supply it, and the sink starves itself. run_construction and run_processing already bid; run_unit_upkeep does not and carries the same latent defect. DESIGN-OWED, and the open question is Ben's because it widens FINANCE.md: should a goods draw place real demand on the market when the pool is short - and if so, does it BUY (spending credits, which makes upkeep a market participant) or merely SIGNAL (raising price without a transaction, which is cheaper but invents demand nobody pays for)? The first is coherent and expensive; the second is a thumb on the scale and should probably be refused on the same grounds the project refuses clamps. Until this is settled, BL-641's rates stay at 0.0 and every remaining channel (BL-643 infrastructure, BL-644 state, BL-645 research, BL-646 conflict) should be checked against property 3 before it is built, not after. SETTLED (Ben, 2026-08-26): 'Buy on the market, but at a threshold, buying is not allowed. This goes hand in hand with maximum and minimum prices for goods.' And ONE RULE FOR EVERY GOODS DRAW - unit upkeep takes the same shape, not a second one. Written into MARKETS.md section Settled: a short pool BUYS, up to a reservation ceiling. THE WORK: a short pool bids the shortfall into market_component::demand and pays for what it gets; above the ceiling it does not bid at all and the existing shortfall rule weakens the building (or unit) instead. The ceiling is authored in the PRICE BAND family beside floor_mult/ceil_mult, not in upkeep - it is a statement about what a good is worth paying, not about who is buying - and its value is MEASURED against the census and the operating-firm count, never guessed. It is the exact mirror of BL-386's seller-side floor_price: both sides may decline a trade, neither may dictate one. Turning BL-641's rates non-zero is gated on this landing.",
    "completed": "2026-08-31",
-   "resolved": "2026-08-31"
+   "resolved": "2026-08-31",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-659",
@@ -1067,9 +1069,10 @@
     "docs/ui/TIME_CONTROLS.md",
     "docs/ai/ACTIONS.json"
    ],
-   "design": "Ben, 2026-08-31: \"hopefully by the end of this sprint we can use a spectator mode to view AI playing in real time, and tighten core gameplay loops.\" This item is the route that makes that sentence possible; every other item in the sprint is watched THROUGH it.\n\nTHE GAP, MEASURED. `ui_state::spectating` has exactly ONE assignment site in the whole tree: `verify.spectate(on)` at src/core/verify_api.cpp:1096, bound behind --verify. There is no CLI flag and no in-game control. So spectate is today a headless-script capability only - the mode exists, is carried through to `corp_ai_params::spectating`, has a determinism harness guarding it (tools/verify/spectator_determinism.cpp), and cannot be entered by a person sitting in front of the game.\n\nWHAT IT NEEDS. A route in, and honest behaviour once in. Two halves:\n  1. ENTRY. A --spectate CLI flag is the cheap half and pairs with the existing --autostart family in main.cpp. Whether it ALSO wants a menu / new-game control is the design question - STARTUP.md owns the screen state machine, and a mode chosen at world creation is a different thing from one toggled mid-session. Toggling mid-session is the harder claim: BL-409's grant is written as a property of the SESSION (nobody seated), and flipping it live changes who the scorer may act on halfway through a run. Prefer entry-at-start unless mid-session toggling is separately argued.\n  2. THE VIEW. `god_view` is the second flag and is the one that makes watching worth doing - it lifts the survey mask and opens rival internals (BL-408; read sites in body_surface_canvas.cpp, hover_content.cpp, selection_panel.cpp). It is gated on the PAIR `spectating && god_view` at every read site, so it is already safe; it needs its own control, offered only while spectating - time_panel.cpp:344-350 already has the shape.\n\nDETERMINISM IS THE CONSTRAINT AND IT IS ALREADY PAID FOR. spectator_determinism.cpp asserts the two properties the standing rule names - the flag DEFAULTS FALSE so an ordinary played session is byte-identical, and admitting one more corp shifts no rival's cadence slot. Adding a route must not touch either. Re-run that harness as the verification, and do not re-bless its constant to make a change fit.\n\nACTIONS.json: any new control gets its entry, per the standing rule that a control change updates the dictionary.",
    "completed": "2026-08-31",
-   "resolved": "2026-08-31"
+   "resolved": "2026-08-31",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-696",
@@ -1094,9 +1097,10 @@
     "src/world/corp_ai.hpp",
     "docs/ai/AI_OPPONENT.md"
    ],
-   "design": "Raised as NR-626: every row in the AI decision feed reads 'overridden' with a chosen score of 0.00.\n\nWHY IT IS FIRST AND NOT COSMETIC. The feed is the only window onto rival reasoning, and this sprint's whole method is WATCHING the AI and tightening from what is seen. A readout that prints the same thing on every row cannot distinguish a working scorer from a broken one - so every later item in this sprint would be tuned blind through it. It is the instrument, and the instrument is reading zero.\n\nIT IS ALSO THE SURFACE THE NEW GOAL DEPENDS ON. AI_OPPONENT.md § The goal makes restraint a first-class move and calls the AI 'transparent by construction' on the strength of the decision log carrying a restrained move's REASON. A held move that prints as 'overridden, 0.00' is indistinguishable from a stall. Restraint that cannot be read looks exactly like incompetence, which is the failure mode the legibility requirement exists to prevent.\n\nSCOPE. Find why the chosen candidate is not reaching the feed - whether the score is not carried out of the scorer, or is carried and not rendered - and fix it at the cause. `corp_decision_reason` already has a named-reason vocabulary (corp_ai.cpp ~line 285 renders 'workforce margin', 'recipe margin' and siblings), so the words largely exist; the question is why the feed is not receiving them.\n\nOUT OF SCOPE: adding the 'held: already ahead' reason itself, which arrives with the margin term (BL-698, scorer margin term) and needs this fixed first to be visible at all.",
    "completed": "2026-08-31",
-   "resolved": "2026-08-31"
+   "resolved": "2026-08-31",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-697",
@@ -1205,9 +1209,10 @@
     "tools/verify/ai_skill_harness.cpp",
     "docs/ai/AI_OPPONENT.md"
    ],
-   "design": "Ben, 2026-08-31, asked what quantity the margin is measured in: \"It should be an aggregate of net worth, research, military strength... Maybe others too.\" AI_OPPONENT.md § Standing is the authority.\n\nTHE PREREQUISITE FOR TWO ITEMS, which is why it is minted separately: BL-699 (rival coalitions) scores stance against it, and BL-697 (skill harness margin metric) bands its spread. Both need the same number and must not each invent one.\n\nALL THREE COMPONENTS EXIST TODAY. Verified 2026-08-31 by reading the tree, because the backlog prose elsewhere claims research does not:\n  * ECONOMIC - net worth: balance plus the assessed value of buildings and held stock.\n  * RESEARCH - `science`, the corp research accumulator (BL-332, components.hpp:1343). Stockpiled, market-invisible, never decaying; REACHED, not spent. Already readable as a condition_set value (condition_set.hpp:77).\n  * MILITARY - summed `unit_strength(world, unit_component)` over the corp's fielded units. COMPUTED, not stored: BL-459 removed the stored `strength` field in 2026-08-17, so read the function, never a field.\n\nNOTE 'maybe others too' IS DELIBERATELY LEFT OPEN by Ben. Build the aggregate so a fourth component is an addition rather than a rewrite - the weighting is data, and territory or market share are the obvious candidates if the composite reads wrong when watched.\n\nWHY NOT BALANCE ALONE, which is what everything measures today: a corp that has just spent its treasury on a smelter is not behind, and a corp hoarding cash while its rivals arm is not ahead. A cash-only index would have coalitions forming against the wrong corporation, which is the failure mode hardest to notice because it still looks like diplomacy.\n\nDETERMINISM. Read at a settled point in the tick and stable under the sorted-corp iteration order, or the evaluation cadence becomes the tiebreak. Name the read point explicitly and assert it - the standing rule's constraint on every scorer input.\n\nWEIGHTS IN corp_ai_params, per that file's convention. Expect to tune them by watching (BL-695, live spectate route), not on paper.",
    "completed": "2026-08-31",
-   "resolved": "2026-08-31"
+   "resolved": "2026-08-31",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-701",
@@ -1234,9 +1239,10 @@
     "docs/ai/AI_OPPONENT.md",
     "CLAUDE.md"
    ],
-   "design": "DOCUMENTATION ONLY, per Ben 2026-08-31: \"Move BL-701 to just documentation - it's not the focus here.\" Filed the same day at difficulty 8 as a system build; it is not that, and nothing here builds climate.\n\nIT TOOK THREE PASSES IN ONE SESSION AND THE CORRECTIONS ARE THE VALUE. Recorded so the reasoning is not re-derived:\n\nPASS 1 proposed running climate through `tile_component.hazard_level` - static (written once at tile_generation.cpp:1962), already carried by the production formula's (1 - hazard) multiplier. REJECTED by Ben: \"we will use a more detailed surface than hazard. Hazard is mostly just a tangible benefit for larger settlements on other bodies.\" One number per tile with one meaning cannot carry a body-scale state with several.\n\nPASS 2 found the right surface - `planetology_state` unfrozen. Io already runs a physically grounded climate model at generation (the carbonate-silicate thermostat, the greenhouse budget, insolation, oxygenation, the arable calculation) and freezes the result. Climate change is a defined subset of those scalars moving: instellation, surface_temp_k, arable_share, life_stage, o2_fraction slowly. Fixed: endowment and the planetary facts. THIS SURVIVES. The dividing line is that climate moves what a world can SUPPORT, never what it is MADE OF.\n\nPASS 2 ALSO got the era placement wrong, treating the nuclear war as a scheduled boundary event and climate as its aftermath. REJECTED by Ben: \"The aim of each era is to give a catastrophe for players to avoid... I am not against climate change being a large problem for Era 2, but our prototype works solely on Era 1 for now.\"\n\nPASS 3, WHICH STANDS. Every Era carries ONE CATASTROPHE THE PLAYER PLAYS TO AVOID, resolved deterministically from a watched scalar. The prototype Era's catastrophe is a nuclear war and its scalar is ALARM. Climate is the NEXT Era's catastrophe and its scalar is LOAD. CLIMATE.md is now written as that parallel, so the machinery built for the first rung - watched scalar, seeded test, red herrings with tells, deed-gated capstones - is what the second rung reuses. That parallel is what makes the Era ladder a system rather than a series of set-pieces.\n\nTHE ERA MODEL ITSELF WAS PROMOTED OUT OF RESEARCH in the same pass. ERAS.md § The point of an Era now carries the Ceiling/Alarm model, the test, the seven red-herring kinds, the tell-before-commitment rule and the inverse herring - drafted 2026-08-05 in docs/research/ERA1_TECH_LANDSCAPE.md and owned by BL-087, which the 2026-08-23 cull PURGED. The design was sitting in a research doc that is explicitly not authority. See NR-750.\n\nKNOCK-ON, and it is the one that changes another design: AI_OPPONENT.md had named climate as the SECOND systemic brake on a runaway leader. Climate is out of prototype scope, so coalitions now carry that brake ALONE, and the doc says so plainly rather than leaning on an unavailable system.",
    "completed": "2026-08-31",
-   "resolved": "2026-08-31"
+   "resolved": "2026-08-31",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-702",
@@ -1264,9 +1270,10 @@
     "docs/ai/ACTIONS.json",
     "docs/ui/TIME_CONTROLS.md"
    ],
-   "design": "CLOSED 2026-08-31 WITHOUT A LINE OF CODE. The item's premise was wrong and the control already existed.\n\nWHAT IS ACTUALLY THERE, on main before this sprint: `src/ui/time_panel.cpp:353` carries `ImGui::Checkbox(\"God view\", &st.god_view)` inside an `if (st.spectating)` block, landed by BL-408 in commit 701cba55. It has its `chrome.sysmenu_god_view` ACTIONS entry, its `god_view_toggle` question-log entry, a `ui_elements.json` entry, and a visual check at `scripts/verify/spectator_god_view.lua`. Offered only while spectating, and a checkbox is a toggle by construction. Every requirement this item wrote was already met.\n\nHOW THE ITEM WAS FILED WRONG, recorded because the mistake is reusable. The claim was \"god_view is written in exactly one place, verify_api.cpp:1103\". That came from grepping for `god_view\\s*=` — an ASSIGNMENT. ImGui writes through a pointer: `&st.god_view`. So the grep was structurally incapable of finding the real control, and the absence it reported was an absence of a syntax, not of a feature.\n\nTHE LESSON, and it generalises past this item: a grep for `x =` does not find writes to x. For a C++ codebase specifically it misses address-of arguments, references, and member functions that mutate. Where the question is \"does anything set this\", the honest checks are the address-of form and the type's mutating surface, or a look at the one file most likely to own the control.\n\nThe slice agent found this in minutes by reading time_panel.cpp rather than trusting the brief, which is the behaviour the sub-agent discipline is meant to produce.",
    "completed": "2026-08-31",
-   "resolved": "2026-08-31"
+   "resolved": "2026-08-31",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-703",
@@ -1294,9 +1301,10 @@
     "docs/ai/AI_OPPONENT.md",
     "docs/development/NEEDS_REVIEW.json"
    ],
-   "design": "Ben, 2026-08-31: \"Our aim for sprint 26 is to ensure spectator mode works, and visibly watch AI play in order to further develop the meta.\" THIS IS THE ITEM THAT DELIVERS THE SECOND HALF OF THAT SENTENCE, and it is the reason the sprint is not just plumbing.\n\nWITHOUT IT THE SPRINT CAN END WITH A WORKING SPECTATE MODE AND NOTHING LEARNED. That is the specific failure this item exists to prevent: three instrument items land, everything is green, and no statement about rival play is any truer than it was at the start.\n\nTHE DELIVERABLE IS PROSE, NOT CODE. A run watched end to end on the 1960s start (BL-705, selectable 1960s start), with god view on, and a written finding: what the rivals actually did, in what order, what they never did, where the scorer looked competent and where it looked blind.\n\nIT LANDS IN docs/ai/STRATEGIES.md, which owns the meta and was AUTHORED AHEAD OF THE GAME - CLAUDE.md calls it \"the meta, authored ahead of the game - research, not authority\". This is the first chance to check that authored meta against what the scorer actually does. TREAT A DIVERGENCE AS A FINDING ABOUT ONE OR THE OTHER, not as a defect in the scorer by default: an authored strategy that no rival ever reaches may be a scorer gap OR a meta that was never real.\n\nWHAT TO LOOK FOR, so the watching has a spine rather than being a vibe:\n  1. Does any rival do anything that reads as a PLAN across ticks, or only locally good moves?\n  2. What does the field's spread in composite standing (BL-700) do over the run - converge, hold, or run away?\n  3. Which corp_verbs are never issued? A verb family with zero uses across a run is either dead code or an unreachable candidate.\n  4. What does the decision feed's reason vocabulary actually say, once BL-696 makes it say anything?\n  5. Where does a rival do something a human would obviously not do? That is the legibility bar from AI_OPPONENT.md § The goal.\n\nFILE WHAT IT FINDS as NEEDS_REVIEW entries and, where warranted, fresh items - do not fold defects into this item's own prose and call it done.\n\nCARRIED OUT OF SPRINT 26, 2026-08-31, unbuilt and unscheduled. Ben closed that sprint at wave 1 once its own measurement showed every AI corp insolvent 29-30 ticks of 30 on every seed, with iron_ore produced 42991.6 against demand 0.000 on the industrial band (NR-758). This item's work is not wrong, it is UNMEASURABLE until demand exists: a coalition brake forms against 'whoever leads', and among corps that are all deeply insolvent the leader is merely the least bankrupt. Its tunables are the whole design and would need re-deriving against a solvent economy. Blocked on sprint 27's demand work rather than on any symbol - BL-642 names the first of it.",
    "completed": "2026-08-31",
-   "resolved": "2026-08-31"
+   "resolved": "2026-08-31",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-704",
@@ -1324,9 +1332,10 @@
     "tools/verify/ai_skill_harness.cpp",
     "docs/ai/AI_OPPONENT.md"
    ],
-   "design": "Ben, 2026-08-31, approving the proposal. Optional relative to the sprint's core - BL-703 (watch session finding) can be done by watching alone - but it is what turns a finding from a memory of watching into something that cites evidence.\n\nTHE SHAPE: a per-run, per-corp log of the scorer's decisions - the candidate chosen, its score, the runners-up, the reason, the tick. The data already exists inside the evaluation; nothing new is computed, it is a question of getting it OUT in a form that can be read after the run rather than only watched during it.\n\nTHE ADJACENT MACHINERY IS ALREADY THERE and should be reused rather than duplicated: `corp_decision_reason` is the reason vocabulary; the decision feed consumes the same stream; AI_OPPONENT.md § 8a's world history log (history_log.{hpp,cpp}) is the project's append-only tagged serialisation seam and already carries a `decision` topic. Check whether this is a NEW export or a READER over the log that already exists - the second is much the better answer if it holds.\n\nDETERMINISM: the trace is an OBSERVATION, never an input. Nothing in the scorer may read it, and its presence or absence must not change a single decision - assert that a run with tracing on and one with it off produce the same state_hash.\n\nIT ALSO PAYS FORWARD. AI_OPPONENT.md § 10d's corpus-generation direction is exactly this artifact: \"every decision is logged as an input/output pair... those pairs are the supervised fine-tuning corpus\", and § 10d notes the corpus and the replay log are the same artifact. Do not build the corpus here - but do not build something that cannot become it.\n\nCARRIED OUT OF SPRINT 26, 2026-08-31, unbuilt and unscheduled. Ben closed that sprint at wave 1 once its own measurement showed every AI corp insolvent 29-30 ticks of 30 on every seed, with iron_ore produced 42991.6 against demand 0.000 on the industrial band (NR-758). This item's work is not wrong, it is UNMEASURABLE until demand exists: a coalition brake forms against 'whoever leads', and among corps that are all deeply insolvent the leader is merely the least bankrupt. Its tunables are the whole design and would need re-deriving against a solvent economy. Blocked on sprint 27's demand work rather than on any symbol - BL-642 names the first of it.",
    "completed": "2026-08-31",
-   "resolved": "2026-08-31"
+   "resolved": "2026-08-31",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-705",
@@ -1355,9 +1364,10 @@
     "docs/economy/ERAS.md",
     "docs/ui/STARTUP.md"
    ],
-   "design": "Ben, 2026-08-31: \"We will be working on the 1960s start.\" This is what makes that sentence executable. Sprint 26 watches the AI play, and BL-703 (watch session finding) watches it on a 1960s world - which cannot currently be started.\n\nTHE BRANCH IS ALIVE AND UNREACHABLE, measured 2026-08-31. `world_params::epoch_year` defaults to 0 and its own comment says the 1960 arc is deliberately kept working: \"pass epoch_year = 1960 and it still runs, which is what keeps the parked space work buildable\". The branch is real - `era_band_for_epoch` puts the recipe registry on the industrial band, `era_minus_one.cpp` skips the antiquity prehistory above 1700, and hard_coded_world.cpp branches on the same threshold. But NOTHING EVER SETS IT. There is no CLI flag, no wizard field, and no assignment anywhere in src/. Reaching 1960 today means editing a default.\n\nTHE SECOND HALF IS A REAL BUG AND THIS ITEM INHERITS IT (raised earlier as the epoch half of the two-clocks entry). `campaign_epoch_year` is a hard-coded 1960 in BOTH src/ui/format.hpp:82 and src/world/planetology.hpp:275, tied by a static_assert in tile_inspector.cpp, and format.cpp:134 computes the displayed year as day_tick/days_per_year + that constant. NO UI SITE READS world_params::epoch_year AT ALL. So today a 0 CE campaign renders 1960-based dates - the constant is simply wrong for the default start.\n\nNOTE THE POLARITY, because it decides the order of work: moving to a 1960s start makes the hard-coded constant ACCIDENTALLY CORRECT again. That is a trap. Fix the constant to read world_params anyway - a value that is right by coincidence will silently break the moment either start is used again, and both starts remain supported (ERAS.md § Where the ladder starts).\n\nSCOPE:\n  1. epoch_year is selectable - the wizard is the natural home (STARTUP.md owns the screen state machine); a CLI flag is the cheap first cut and pairs with the --autostart family.\n  2. The UI epoch reads world_params rather than a constant, and the static_assert is replaced by whatever keeps the two clocks honest once the value is dynamic.\n  3. Whatever is stale on the 1960 path gets found by walking it - this is the first time anyone has.\n\nEXPECT TO FIND THINGS. The 0 CE start has had months of attention and the 1960 path has had none since the arc split. Treat surprises as findings to file, not as scope creep to absorb.",
    "completed": "2026-08-31",
-   "resolved": "2026-08-31"
+   "resolved": "2026-08-31",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-706",
@@ -1381,9 +1391,10 @@
     "docs/generation/GENERATION_STRATEGY.md",
     "docs/economy/MARKETS.md"
    ],
-   "design": "Ben, 2026-08-31: \"there is no reason that every start needs to be equally good and fair... If we send some of this work into generation, we should be making rules that encourage a level of asymmetry.\" GENERATION_STRATEGY.md § Asymmetry is the deliverable is the authority.\n\nWHAT IS MISSING IS A READ, NOT A MECHANISM. Generation already has everything needed to produce asymmetry: planetology_state::endowment (per-resource deposit multiplier per body, 0.0 = the body cannot carry it at all), the endemic goods' latitude band x longitude sector, and the six-pass tile pipeline's terrain and deposit passes. What nothing does is MEASURE the result in economic terms, so nothing can say whether a generated world is varied or flat.\n\nTHE MEASURABLE: for a market or region, the fraction of the chains TERMINATING there that can be sourced within reach. The deliverable is its DISTRIBUTION across the world - wide, with real tails - not any individual region's value.\n\nTHE ENEMY IS UNIFORMITY, NOT SELF-SUFFICIENCY, and this is the whole point of the item. Two failure modes that look opposite and are the same defect: every region can close its own chains (nothing needs anything, trade has no reason to exist), or no region can close any (every dependency is identical, so one trade route is as good as another). Both are FLAT. A region that closes a whole chain by itself is a strong start and a legitimate outcome.\n\nSO IT REPORTS, IT DOES NOT GATE. No start is clamped up to viability or down to fairness - that would be answering a multiplayer-ladder question this game does not ask. What it can legitimately assert is a floor on the SPREAD: a world where every region scores the same is a generation defect even when every region is individually fine.\n\nHOME: demand_census is the natural host - it already walks every market and every resource per band, and it already knows which sinks are terminal. Adding a per-market completeness column and a spread summary is cheaper than a new harness, and keeps the before/after discipline sprint 27 runs on.\n\nNOTE IT NEEDS 'WITHIN REACH' DEFINED, which is a real design question and not a detail: reach is LOGISTICS.md's, and whether completeness is measured at market grain, province grain or body grain changes what the number means. Settle that before implementing.",
    "completed": "2026-08-31",
-   "resolved": "2026-08-31"
+   "resolved": "2026-08-31",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-707",
@@ -1409,9 +1420,10 @@
     "docs/economy/PRODUCTION.md",
     "docs/economy/MARKETS.md"
    ],
-   "design": "MEASURED 2026-08-31 with demand_census, ancient band, and it is a DIFFERENT failure from the industrial band's. Filed separately for that reason - the two bands need different fixes and conflating them is how one gets applied to the other.\n\nTHE ANCIENT BAND'S ENDPOINTS LARGELY WORK. BL-640's era-banded basket did what MARKETS.md property 2 asked: ceramics, dressed_stone, planks, leather, cloth and charcoal all carry real household demand. That half is not the problem.\n\nTHE MIDDLE IS. The chain does not convert:\n  fibre    produced 27613.5   demand   89.7   price 0.756x base (near floor)\n  leather  produced     6.8   demand   87.1   price 9.97x base, CEILED in 13 of 14 markets\n  cloth    produced  4245.5   demand  178.6   price 8.87x base, ceiled in 11 of 14\n  ceramics produced    63.5   demand  117.4   price 9.24x base, ceiled in 12 of 14\n\nRaw inputs pile up at the floor; the finished goods the household actually wants are produced in single digits and price at the ceiling in almost every market. The demand exists, the input exists, and the conversion between them does not happen.\n\nWHY IT MATTERS MORE THAN A TUNING NOTE: a good ceiled in 13 of 14 markets is not a shortage, it is an absent industry. Something is stopping firms from being built on a conversion whose output sells at ten times base with unmet demand - which on the face of it is the most profitable thing available in the band. That is a question about the scorer's build candidates, placement rules, or the recipe graph, and it should be diagnosed before it is tuned.\n\nCANDIDATE CAUSES, none confirmed - diagnose first: the input_demand_pull that BL-440 added may not reach these chains; placement rules may refuse the sites; the recipe may want an input that is itself unavailable; or the background-firm calibration (~90% of real demand, GENERATION_STRATEGY.md § The economic premise) may be seeding the world without the converting firms and the scorer may not be adding them.\n\nDO NOT FIX BY RAISING THE PRICE CEILING. The ceiling is doing its job by reporting the shortage; moving it hides the reading. Same reasoning as the project's refusal of clamps.",
    "completed": "2026-08-31",
-   "resolved": "2026-08-31"
+   "resolved": "2026-08-31",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-708",
@@ -1441,9 +1453,10 @@
     "docs/economy/MARKETS.md",
     "docs/politics/NATIONS.md"
    ],
-   "design": "Ben, 2026-08-31: \"We should add upkeep costs of electricity, and power generation buildings.\" PRODUCTION.md § Power is the authority; LOGISTICS.md § 3a owns the transmission half.\n\nPOWER IS A GRID, NOT A GOOD AND NOT A POOL. Ben's ruling on how it moves: \"Power travels via road infrastructure, although it is different from a convoy, it has a 1 qtr travel time or weight. So if there is a connection from a power source to the player's HQ, they will be able to use the power on the next tick. Power can be stockpiled, but not infinitely.\"\n\nSo: never on the order book, never on a convoy, no market price. Connection decides who can draw it. Stockpiled with a CEILING, which is its one genuinely novel property against every other good in the model.\n\nIT NEEDS NO NEW GRAPH, and this is what makes it cheap rather than a second logistics layer. Connectivity is `tile_reach_cost` read as a boolean - FINITE means connected, INFINITY means not - so § 3's existing multi-source Dijkstra from supply anchors already answers the question. Latency is FLAT one tick regardless of distance, which is what makes it unlike a convoy despite sharing the road. And § 7's interdiction already severs the network, so cutting roads turns the lights off with no special case written.\n\nWHY IT CLOSES THE FUEL CHAIN, which is the reason it is worth building now. coal and petroleum are both on demand_census's 'extractable, NO market sink' list - petroleum produced 6169.9 against demand 0.000 in the industrial band. The generator buys its fuel ON THE MARKET as an ordinary processing input, which already bids. So the chain is fuel -> generator -> power -> building upkeep, terminating in upkeep, and the market demand created is demand for FUEL, priced normally and scaling with however much generation exists. Power itself never needs a channel.\n\nTHE SHORTFALL RULE IS THE BL-641 LESSON APPLIED BEFORE THE FACT: a building short of power SCALES ITS OUTPUT DOWN, it is not idled. An upkeep draw that idles a firm kills the buyer that would have induced the supply, and the measured cost of learning that was operating firms collapsing 227 -> 19. A firm on reduced output keeps bidding for fuel, and the generation that answers it gets built.\n\nINDUSTRIAL BAND ONLY (Ben, 2026-08-31). The ancient band gets no analogue - charcoal already carries real household demand there and is not an orphan.\n\nPOWER IS BOUGHT, AND SOLD INTERNATIONALLY (Ben, 2026-08-31, resolving NR-761 the same day it was raised): \"it has to be a bought good when it is taken as upkeep. Therefore corporations can buy power from each other, and background companies can produce power with a profit... Even internationally.\"\n\nSO BOTH LINKS OF THE CHAIN BID: the generator buys fuel as a processing input, every building buys power as upkeep. Neither is a pool draw, so neither severs the chain. Power upkeep is the FIRST channel built on BL-654 rule rather than an exception to it.\n\nWHAT STAYS SPECIAL IS THE MOVEMENT, NOT THE MARKET. Power has a price and no convoy: transmission is the road network, flat one-tick latency, and a buyer can only match a seller its network reaches - which keeps the price regional by construction without any rule naming a region.\n\nCROSS-BORDER NEEDS NO NEW MACHINERY: MARKETS.md section Tariffs already charges the enacted import duty on a matched trade whose buyer is domiciled outside the market jurisdiction.\n\nAND IT REACHES ERA 1 CATASTROPHE. ERAS.md danger table names cross-border trade as the cheapest Alarm suppressant in the game, with Autarkic Substitution as the herring that cuts those ties. A nation whose lights depend on a neighbours generation has a reason not to escalate. Power feeds Trade and Conflict at once.",
    "completed": "2026-08-31",
-   "resolved": "2026-08-31"
+   "resolved": "2026-08-31",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-709",
@@ -1498,10 +1511,10 @@
    "files": [
     "tools/verify/save_roundtrip.cpp"
    ],
-   "design": "tools/verify/save_roundtrip.cpp DOES NOT COMPILE and has not since cc88997c (the mercenary-contract tear-out). It references world::mercenary_offers, world::mercenary_contracts, world::next_offer_id and mercenary_contract_state, all of which that commit deleted.\n\nWHY THIS IS PRIORITY A RATHER THAN TIDY-UP: save_roundtrip is the SAVE SEAM regression check, and TWO SAVE VERSION BUMPS LANDED WHILE IT WAS DEAD. BL-708 took v21 and BL-709 took v22, both on 2026-08-31, both appending to a serialised format, and neither was verified by the harness whose entire job is to prove a snapshot restores the world it was taken from.\n\nThat is the most consequential instance yet of this session's recurring pattern (NR-759): a check that is broken rather than failing, so nothing goes red and the absence is invisible. Flat binary serialisation is the project's chosen persistence (TECH_FOUNDATIONS.md refuses SQLite for it), which makes this harness the only thing standing between an append-only format and silent save corruption.\n\nTHE WORK is mechanical but touches SIX regions, and it is a repair rather than a deletion in only one of them:\n  ~365-390  v6/v7 refusal tests whose COMMENTS reference the offers/contracts trailing sections - text only, verify they still describe the right versions\n  519-520   P11 rejected-load check on mercenary_offers/next_offer_id\n  747-748   P7 container-count rows for both containers\n  782       P7 id-counter check on next_offer_id\n  801-808   P11/P12 emptiness (inertness) checks\n  920-944   the fixture that CONSTRUCTS two offers and one contract\n  1076-1120 the field-by-field P11/P12 round-trip assertions\n\nDELETE, do not repair: every one of these guards a property of a feature that no longer exists. The untouched-on-rejection contract stays covered for live fields by P3 and P9; the container-count table keeps its other twenty-odd rows.\n\nA partial repair was started in the main session and REVERTED deliberately. This is the save seam in a 1100-line harness, at the end of a long session, mid-batch, and a subtly wrong deletion here - removing a row that was actually testing something live - is worse than the current honest breakage. It wants its own pass with attention on it.\n\nAFTER FIXING: run it against v22 and confirm BL-708 and BL-709 round-trip, which is the verification neither item got.",
    "completed": "2026-09-01",
    "resolved": "2026-09-01",
-   "summary": "Six regions deleted, not repaired: the P11 rejected-load row, the two container-count rows, the two id-counter clauses, the two inertness checks, the offers/contract fixture and the field-by-field P11/P12 assertions. The v6 and v7 refusal rows STAY -- what they assert is the version contract, which cc88997c did not touch; only their comments were put into the past tense. Builds with `cmd //c tools\u000berify\build_lua_harness.bat save_roundtrip` (NR-767: harness_params.hpp makes it Lua-linked and nothing said so). Runs green at v22: 63 PASS, 0 FAIL. Both dead bumps round-trip -- v21 (power) and v22 (construction_capacity) are resource_count widenings, 47->48->49, covered by P7's container equality and P8's byte-for-byte re-serialise, and v21 is refused by P20's symbolic `world_save_version - 1u`. That coverage is incidental rather than asserted; NR-768."
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-711",
@@ -1525,10 +1538,10 @@
     "src/world/corp_ai.hpp",
     "tools/verify/chain_conversion_probe.cpp"
    ],
-   "design": "DIAGNOSED BY BL-707, 2026-08-31, with a probe (tools/verify/chain_conversion_probe.cpp) that is in the tree. This item is the fix its handover named.\n\nTHE DEFECT. `rank_extraction_sites(w, p.top_m_sites, demand_weight)` builds ONE ranked list of the top 8 sites FOR THE WHOLE WORLD, ordered by deposit x affinity x demand_weight, and every corp picks from those 8. Deposit magnitudes span three orders, so the list is homogeneous:\n\n    1..8  iron_ore   12268.4 down to 7847.5  (the cut-off)\n    best clay        205.7   NO\n    best peat         75.0   NO\n    best hides        507    NO\n\nSo clay, peat, hides, sand and fibre are never candidates anywhere, for any corp, in any world. Measured: extraction sites for those resources move +0 across 80 ticks while iron_ore gains +94 - into a good already glutted at 0.518x base and floored in 9 of 14 markets.\n\nTHE VISIBLE SYMPTOM is downstream and looks like a different bug: 30 Peat Kilns get built against 0 peat mines, 22 Potter's Kilns against 0 clay mines. The scorer is not broken - it correctly declines every candidate it is shown, and the only resource it is ever shown is the glutted one.\n\ninput_demand_pull DOES fire (clay 9x, hides 5x) and cannot help: it is bounded at 1 + 4*wanted/(1+sites) and cannot close a 60x gap.\n\nTHE TRAP THIS RE-SET. BL-440 fixed the TILE-LOCAL version of exactly this and its own comment names it: \"Pre-selecting the richest was a TILE-LOCAL heuristic answering a WORLD-level question.\" It then left the world-level truncation in place, which is the identical defect one altitude up. See NR-765 for the third instance.\n\nTHE FIX SHAPE: rank scale-free (normalise within resource), or take a PER-RESOURCE top-K instead of a global top-M, so every resource reaches the scorer and the SCORER decides - which is what the scorer is for.\n\nDETERMINISM-AFFECTING AND IT MOVES EVERY ECONOMY GOLDEN. That is why BL-707 handed it over rather than attempting it. Expect one deliberate re-bless wave with dated provenance, not a dribble (the NR-596 precedent).",
    "completed": "2026-09-01",
    "resolved": "2026-09-01",
-   "summary": "`rank_extraction_sites` keeps the best K OF EACH RESOURCE instead of a global top-M. `corp_ai_params::top_m_sites = 8` is RETIRED and replaced by `top_k_sites_per_resource = 2` - 2 rather than 1 so a resource whose best tile is unbuildable is not silently excluded again, the same second-chance argument as BL-712's per-group build candidates. Buckets walk in ascending resource index, not `k_extractable` order, so registering a new extractable appends rather than reshuffles. One O(sites) bucketing pass; the per-bucket partial_sort keeps the old comparator, tile-id tie-break included.\n\nMEASURED, chain_conversion_probe, 80 warm ticks, extraction sites gained. BEFORE: every non-iron resource +0, iron_ore +85. AFTER, ancient: iron_ore +30, water +10, petroleum +8, silica +4, copper_ore +3, clay +2, hides +2, timber +2, rare_earth_ore +2, agricultural_produce +2, fibre +2, coal +1, sand +1. AFTER, industrial: COAL +25, against 0 coal mines in any world ever - the canonical starved chain NR-766 named, and the input to the band's largest recipe.\n\nDOWNSTREAM, demand_census (now surveyed, NR-772), ancient `produced`, surveyed-pre-BL-711 -> surveyed-with: coal 0.0 -> 632.7, clay 0.0 -> 349.1, hides 0.0 -> 353.9, sand 0.0 -> 35.8, and their converters follow - ceramics 24.5 -> 55.3, leather 8.0 -> 58.4. Four chains that were permanently zero are live. Every census assertion still passes.\n\npeat is the honest exception: it reaches the scorer and BOTH its slots are placeable, and it still gains no site. Suitability 75.0, the lowest of any extractable, losing on the net^2/capex curve - NR-769's second seat, now located precisely rather than inferred.\n\nGOLDENS. Green: corp_ai_harness, econ, corp_agency, corp_ai_predictive, construction, construction_gate, recipe_switch, build_spree, decision_trace, determinism_harness, world_determinism. Determinism itself is intact - spectator_determinism's own reproducibility rows (two independently built worlds, same hash) and all of R3 pass. The only red is R2's byte-identity against the frozen pre-BL-409 constant, which was already stale by 150+ commits (NR-752) and is BEN'S to re-bless: golden=E350DF2A50BF4BAA observed=90BFB27CB57CC308. NOT RE-BLESSED HERE.\n\nai_skill_harness moved and NOT for the better on aggregate, which is worth saying plainly. Net worth by seed, before -> after: 0 -823105.8 -> -457322.6, 1 -211696.4 -> -191399.1, 2 -1047871.7 -> -890122.9, 3 -188095.2 -> -484580.0, 4 +202611.7 -> -1089008.9. Three seeds better, two worse, aggregate worse; solvency ticks improve on three seeds and seed 0's survival goes 0.71 -> 1.00. That is the sprint's own thesis showing up as a number: rivals now REACH the whole resource field, and reaching more of a world that still has almost no demand means building more into debt. The 25 band failures are unchanged and stay known-red (NR-305)."
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-712",
@@ -1552,10 +1565,10 @@
     "tools/verify/corp_ai_harness.cpp",
     "docs/ai/AI_OPPONENT.md"
    ],
-   "design": "FOUND BY BL-708 while building power, and it is the reason that item landed structurally incomplete. NR-765 is the finding; this is its fix.\n\nTHE DEFECT. `corp_ai.cpp` picks a site's recipe by max net margin: `if (n > best_net ...)`. Margins span three orders, so the argmax is a category exclusion:\n\n    power                    net  3.98\n    price-ceiled electronics net 290\n\nTHE CORP AI CAN NEVER BUILD A POWER PLANT. Not rarely - never, in any world, at any time. BL-708's first attempt collapsed the industrial band to 25 of 407 operating firms with power produced 0.0, purely because of this.\n\nMEASURED AGAIN BY BL-709: `construction_capacity` is produced 0.0 in BOTH bands after an 80-tick warm start, while 28 ancient and 9 industrial sites stand under construction wanting it at a ceiled price. Two features landed on 2026-08-31 that the AI cannot build.\n\nWHY IT MATTERS MORE THAN IT LOOKS. Both power and construction were designed as ECONOMY-SCALED sinks - MARKETS.md property 1, demand that grows with the world. They cannot grow: they exist only where the seeder placed them, so the scaling the whole design rests on does not happen. A cheap good cannot win an absolute-margin contest however badly the world needs it, and 'wanted by every building on the map' is exactly the profile of a good with a thin per-unit margin.\n\nTHE FIX SHAPE, same family as BL-711 (extraction candidate list is scale-blind): rank scale-free, or keep a per-CATEGORY best so an infrastructure good competes against infrastructure goods rather than against price-ceiled specialities. The scorer should choose between real alternatives, not be handed one.\n\nSMALLER AND MORE CONTAINED THAN BL-711 - one comparison in one selection loop, no world-level list to restructure - and it unblocks two landed features. Worth doing FIRST of the two.\n\nVERIFY: power and construction_capacity produced > 0 after a warm start with the seeder's own dial at zero, and the operating-firm count not collapsing (198 of 328 ancient, 121 of 415 industrial are the current baselines).",
    "completed": "2026-09-01",
    "resolved": "2026-09-01",
-   "summary": "TWO argmax loops, not one. (1) The BUILD candidate now keeps a best PER `recipe::group` and emits one candidate per group, so every category reaches the scorer. Instrumented on the industrial band: `Power Generation` emitted 168 candidates and `Construction` 430, both previously ZERO. (2) The recipe margin-chase — the sibling the item did not name — carried the same defect plus two of its own: it used the BROWSE index as an ABSOLUTE recipe id (the NR-254 crossing the build door gets right), and its unrestricted argmax proposed cross-group switches that the SEAM HAS REFUSED SINCE 2026-08-16 (Ben's BL-434 retraction). One proposal per building per eval, so the refused proposal STARVED the legal within-group switch. The comparator gained target+recipe tie-breaks, since a tile can now emit several build candidates.\n\nMEASURED (chain_conversion_probe, real Lua registry, industrial band, before -> after): total processing facilities after 80 warm ticks 268 -> 282; distinct recipes in use 14 -> 17; `silica -> silicon` 16->2 becomes 16->10; the id-space fix opened `iron_nickel_ore -> steel` (+4), `regolith -> steel` (+2) and `coal -> power` (+2), none of which were reachable before. demand_census: clay processing demand 32.0 -> 96.0, peat 5.5 -> 27.2, sand 5.3 -> 40.0, hides 0.000 -> 33.6 (a chain with no demand at all now has some); every census assertion still passes.\n\nTHE VERIFY CRITERION IS NOT REACHED and NR-769 says why: the exclusion has a second seat inside `net^2/capex`, which is an absolute contest (Power Generation peaks at score 31.9 against Advanced Fabrication's 1884). That curve's retention is BL-417 and is Ben's call, so it was not taken here. NR-770: construction yards go 2 -> 0 by REMOVAL, not by switching, and that is BL-642's. NR-771: ai_skill_harness returns byte-identical numbers before and after because its hand-built registry has three recipes in one default group — the sprint's success criterion is blind to this shape of change.\n\nGreen: corp_ai_harness (new R8, both rows, second row falsified by removing the guard), econ, corp_agency, corp_ai_predictive, recipe_switch, build_spree, decision_trace, world_determinism, determinism_harness. ai_skill_harness stays at its 25 known-red band failures, unchanged and NOT re-blessed (NR-305)."
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-417",
@@ -1579,10 +1592,257 @@
     "docs/ai/AI_OPPONENT.md",
     "tools/verify/decision_trace_harness.cpp"
    ],
-   "design": "STEP 2 of BL-417, resurrected from archive/backlog-purged-2026-08-23.json where the item had sat held since 2026-08-17. Step 1 (the honest rewrite, `net^2/capex` written out as itself) landed then; step 2 - decide whether the quadratic bias is wanted - was explicitly Ben's call and is taken here.\n\nBEN'S RULING 2026-09-01 (NR-769, option A): take it now, linear metric, accept the golden reshuffle.",
    "completed": "2026-09-01",
    "resolved": "2026-09-01",
-   "summary": "`c.score = (net / capex) * focus_weight * jitter * glut` at all three curve sites - the extraction build candidate, the processing build candidate (BL-712's), and the road candidate, which is priced UNDER the build curve by construction and would have outscored the site it exists to reach by two orders had it stayed quadratic.\n\nWHY IT WAS FINALLY TAKEN: two independent fixes hit the same wall one level down. BL-712 put `Power Generation` and `Construction` in front of the scorer for the first time - 168 and 430 candidates against zero - and the scorer refused them anyway, peaking at 31.9 and 105.3 against Advanced Fabrication's 1884. BL-711 produced the same shape from the other side: peat reaches the scorer, both slots placeable, still no site. AI_OPPONENT.md's own § Selection must be scale-free condemns an absolute contest in as many words, and `net^2/capex` was one; the rule applied to everything except the score.\n\nMEASURED BEFORE RESHAPING, 15,549 build candidates over one industrial warm start: quadratic median 13.54 / max 1884.33, linear median 0.106 / max 2.81. That put builds in the same band as their Nice-to-Have siblings (survey median 0.073, max 0.107) - an incomparability the quadratic had been masking rather than resolving. NO FUDGE SCALE was added to restore the old ordering: that would have been taking the change and cancelling it.\n\nRESULT. Ancient band, extraction sites gained over 80 warm ticks: iron_ore +30 -> +13 (the glutted good stops hoovering slots) and coal +1 -> +17. ai_skill_harness net worth improves on three of five seeds and the aggregate slightly (-3.112M -> -3.041M), survival is 1.00 on all five, and the churn drops hard - resume 144 -> 60 on seed 4, 81 -> 40 on seed 0. Survey behaviour is unchanged: the feared takeover did not happen.\n\nONE HONEST RED, FIXED RATHER THAN PAPERED OVER: decision_trace_harness T2's anti-vacuity guard went red because the calmer scorer stopped overflowing the 256-entry ring (269 -> 207 pushed at 2400 ticks). The guard was right and its tick count was the problem - 269 against 256 is 5% headroom, and the rate is a property of the SCORER, not of that file. Re-measured under the linear score (2400/207, 3600/267, 4800/327, 6000/387) and re-sized to 6000 for 51% headroom, with a `--ticks` flag so the next scorer change re-measures instead of guessing.\n\nGreen: corp_ai, econ, corp_agency, corp_ai_predictive, construction, construction_gate, recipe_switch, decision_trace, determinism_harness, world_determinism, spectator_determinism (green for the first time in weeks - see NR-752). ai_skill_harness keeps its 25 known-red bands (NR-305)."
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
+  },
+  {
+   "id": "BL-713",
+   "short_name": "harnesses build the app's world",
+   "category": "Tooling",
+   "title": "A harness builds the world the application builds - one shared setup helper, not fifty independent guesses",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 5,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (review-queue drain, Ben's instruction)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/harness_params.hpp",
+    "tools/verify/build_harness.js",
+    "tools/verify/build_lua_harness.bat",
+    "tools/verify/ai_skill_harness.cpp",
+    "CMakeLists.txt",
+    "build_app.bat"
+   ],
+   "design": "BEN'S RULING 2026-09-01 (NR-762): take this AFTER sprint 27 closes, not before the remaining channels - one golden wave, after the work that would otherwise move them twice.\n\nTHE DEFECT, counted exactly rather than estimated. `make_hard_coded_world` builds a world; `app::start_new_game` then runs a TAIL of passes on it; and the boundary between them is defined by nothing except which passes somebody remembered. **48 of the 51** harnesses that build a world never call `init_survey_states`. **22 of those also run the economy tick**, so the corp AI is live in a world where no body is surveyed and no rival can site a mine anywhere: acquisition_viability, cadence_schedule, convoy_cargo_census, data_creep_harness, debt_decomposition, decision_trace_harness, haulage_measure, history_log_harness, interbody_pull_harness, material_floor, nation_wiring, player_seed_sweep, population_demand_harness, population_mvp, pregame_balance_harness, quarterly_return, spawn_solvency, spectator_determinism, tech_effect_union_harness, tick_profile, tier_margin, whole_firm_buyout. That list holds most of this project's economic instruments.\n\nTHE FAILURE MODE IS THE WORST AVAILABLE: a harness measuring the wrong world does not go red, it reports confidently, and its goldens then encode that world. Three instances are on record - the default-recipe pass (2026-08-17), init_survey_states in ai_skill_harness (2026-08-31), and demand_census (2026-09-01, NR-772), the last of which made sprint 27's own primary instrument blind to half its work.\n\nTHE SHAPE is the one `no_prehistory()` already establishes: a shared helper in `harness_params.hpp` that a harness calls instead of hand-rolling its world setup, so the app-start tail is declared once.\n\nFOLD IN, because they are the same subject - the build wiring that makes harnesses unbuildable or wrongly built:\n* NR-767 - `harness_params.hpp` pulls sol2, so the Lua-linked class is large and GROWING while the only record is a hand-written list of six. Confirmed in the class and unlisted: save_roundtrip, world_determinism, determinism_harness, recipe_switch_harness, build_spree_harness, decision_trace_harness, ai_skill_harness, spectator_determinism, upkeep_harness, chain_conversion_probe. DERIVE the routing (detect the transitive include and delegate, or fail with a one-line message naming the right builder) rather than listing it.\n* NR-617 - `build_harness.js`'s LUA_TUS exclusion list is stale; contract_template.cpp needs sol2 and is not in it.\n* NR-721 - ~30 harnesses could not compile from a clean configure since the v0.1.21 cut, and a release passed anyway.\n* NR-755 - `build_app.bat` hard-fails in a fresh worktree because `build/` is gitignored and it does not cold-configure.\n* NR-730 - no harness compiles `src/ui` or `src/core`, so a worktree agent cannot build what it changes.\n* NR-759 - four build-wiring breaks in one session, none caught by any test, two MASKED BY STALE BINARIES THAT PASSED. A stale prebuilt exe reporting green on a world that no longer exists is the same class as this whole item.\n* NR-771 - `ai_skill_harness`'s hand-built registry holds three recipes with no `group`, so it is structurally blind to any per-category change (BL-712 returned byte-identical numbers before and after). Either give it real groups or move it onto the Lua registry."
+  },
+  {
+   "id": "BL-714",
+   "short_name": "instruments that cannot see",
+   "category": "Tooling",
+   "title": "Four verification instruments pass without seeing their subject, and one hangs the suite",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (review-queue drain, Ben's instruction)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/development/REVIEW_AUTOMATION.md",
+   "files": [
+    "scripts/verify/text_overflow_floor.lua",
+    "scripts/verify/budget_ledger_ranked.lua",
+    "scripts/verify/lens_strip.lua",
+    "src/core/verify_api.cpp"
+   ],
+   "design": "A green check that cannot see its subject is worse than a red one, and five are on record. Grouped because the fix is one discipline - a check must prove it LOOKED - not five unrelated repairs.\n\n* NR-614 / NR-663 - `expect_no_clipping`'s scope is draw-list text only, so it reported '0 failure(s), 0 record(s)' over a whole 31-capture shell pass while the Corporation dashboard visibly truncated 'Workforce 76% of labour demand n' mid-word and a genuinely clipped button was on screen. ZERO RECORDS is the tell: the ledger saw nothing, so the pass is vacuous. Any check that can report zero observations must FAIL on zero, not pass.\n* NR-714 - `budget_ledger_ranked.lua` is named for the Balance ledger's top-buildings ranking and captures two frames, neither of which contains it (one scrolled past it, one with the ledger shut).\n* NR-606 / NR-623 - four verify scripts fail for pre-sprint reasons and `lens_strip`'s three goldens are stale by world drift (blessed 2026-06-17). The strip is the subject; the map behind it is not - re-point them at something world-independent or retire them to capture-only.\n* NR-695 - `overflow_tile_v2` hung the suite: the History ledger's TILES view is a row per tile on the body, so the sweep burned CPU, collapsed memory and starved nine scripts behind it. A per-script wall clock would have turned a suite-wide stall into one red row."
+  },
+  {
+   "id": "BL-715",
+   "short_name": "the save seam past the world",
+   "category": "Economy",
+   "title": "The envelope has no round-trip coverage, a loaded save does not render as the world it was saved from, and the comms log is dropped",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (review-queue drain, Ben's instruction)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
+   "files": [
+    "src/core/save_game.cpp",
+    "tools/verify/save_envelope_roundtrip.cpp",
+    "tools/verify/save_roundtrip.cpp"
+   ],
+   "design": "`save_roundtrip` covers `world`. Nothing covers the rest of the file, and three findings say so.\n\n* NR-708 - NO ENVELOPE FIELD HAS ROUND-TRIP COVERAGE, and `save_game_version` has already moved (1 -> 2) with strict-equality refusal, so every existing save became unreadable on a change nothing verified. Flat binary serialisation is the project's chosen persistence (TECH_FOUNDATIONS.md refuses SQLite for it), which makes this exactly the gap BL-710 just closed on the other half of the file.\n* NR-608 - a loaded save does not RENDER as the world it was saved from. Measured in both directions: `player_balance` returns bit-identical, but `world::state_hash` does not round-trip once any econ tick has run (7161C70488A767CA -> 62CAB4412DEDC7E0) while a zero-tick world does round-trip exactly - which localises it to the day-tick mirror being rewound rather than to the world store.\n* NR-609 - the comms log is excluded from the envelope as 'transient view state'. It is not: it is the record of what happened in the campaign, and the dock comes back empty after any load.\n* NR-768 - `save_roundtrip` verifies a `resource_count` bump only INCIDENTALLY; it never names the constant. Two of the last three save bumps were per-resource widenings, so that is now the format's most common change and the one it asserts least directly. One cheap row fixes it."
+  },
+  {
+   "id": "BL-716",
+   "short_name": "the tech tree is inert",
+   "category": "Tech",
+   "title": "The tech tree is ~150 nodes of data nothing reads, and the gates that DO resolve point at the wrong nodes",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 5,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (review-queue drain, Ben's instruction)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/economy/RESEARCH.md",
+   "files": [
+    "scripts/tech_tree.lua",
+    "src/world/tech_gate.cpp",
+    "src/world/tech_tree.cpp",
+    "src/ui/tech_tree_panel.cpp"
+   ],
+   "design": "Four findings, one subject, and the third makes it player-visible rather than merely inert.\n\n* NR-591 - `scripts/tech_tree.lua` opens with 'DATA ONLY - the tech system is post-prototype; nothing in the simulation reads this', and the simulation's gate table is authored independently of it.\n* NR-728 - THE IDS DO NOT LINE UP, so the F9 viewer shows the wrong unlock: `E0-EC-01` is the simulation's Toolmaker unlock and tech_tree.lua line 408 calls that id 'Semiconductor Fabrication'. A viewer that confidently names the wrong technology is worse than one that names none.\n* NR-594 - `tech_gate_harness` only exercises E0-ML-01; the three economy gates (E0-EC-01/02/03) are proven live only indirectly.\n* NR-751 - the Era renumber left the viewer's tab labels reading the old numbers.\n\nSequencing note from NR-750: the Era catastrophe model was PROMOTED into ERAS.md from a research doc and its original owner (BL-087) was purged, so the era/tech/quest system currently has no owner at all. This item is the nearest thing; a real era owner should be minted when that work is next, per the cull's resurrection rule."
+  },
+  {
+   "id": "BL-717",
+   "short_name": "designed but silent",
+   "category": "Military",
+   "title": "Two designed mechanisms compute their result and drop it on the floor - interception and the LP refusal",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (review-queue drain, Ben's instruction)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/supply_system.cpp",
+    "src/world/economy_system.cpp",
+    "src/ui/decision_feed.cpp"
+   ],
+   "design": "LOGISTICS.md's own clause is the test both of these fail: *announced in the same change that resolves it - silence is the wrong default* (NR-407).\n\n* NR-599 - every `interception_record` is computed and DISCARDED; the `out_cuts` sink has no production caller, so interdiction resolves invisibly. Interdiction's core landed 2026-08-21 and the narration was deleted with Sprint 25b.\n* NR-624 - `run_unit_march` COUNTS the LP refusal and drops the count. LOGISTICS.md § Refusal, surface and determinism carries two duties; BL-606 discharged the lens half and left this one. 'A refusal nobody sees is silent interdiction again' is the doc's own sentence.\n\nBoth are wiring rather than design: carry the count into `economy_report` and surface it where the player already looks at movement. The decision feed is the natural home for both."
+  },
+  {
+   "id": "BL-718",
+   "short_name": "the name column is one character",
+   "category": "UI",
+   "title": "Three surfaces truncate every name to a single character, and the mechanism is shared",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (review-queue drain, Ben's instruction)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/ui/LAYOUT.md",
+   "files": [
+    "src/ui/corporation_panel.cpp",
+    "src/ui/presentation.cpp",
+    "src/ui/balance_ledger.cpp",
+    "src/ui/tech_tree_panel.cpp"
+   ],
+   "design": "* NR-613 / NR-709 - nav slot 8's corporations table allots the NAME column roughly ten pixels, so every row reads as one letter (F, E, C, G, T, N, Y, Q, H, Z, B, S) and the header 'C' is itself the truncated word. The capture pass found the SAME defect on two more surfaces, so it is a class: the fold-out column host is ~358px and every stretch NAME column starves inside it. Fix the host, not the three tables.\n\nFOLD IN, same surfaces, same pass, and player-visible:\n* NR-612 / NR-713 - internal identifiers leak into player-facing UI: 'Policy levers - not yet wired (BL-155)' in the Budget ledger, 'BL-087 design mock - read-only.' in the Research panel, 'First cut (BL-660)' in Tectonics, 'Province #2' in Contracts, and 'Era 2 (unauthored)' offered to the player as a CHOICE. A player cannot resolve a BL- id, so the string says only that the game is unfinished.\n* NR-704 - `show_corporation_panel` drives the dashboard and `show_corporations_table` drives the panel: each `ui_state` flag names the other one's function. Not tidiness - it is a trap for anyone wiring either surface."
+  },
+  {
+   "id": "BL-719",
+   "short_name": "shell defects from the capture pass",
+   "category": "UI",
+   "title": "Seven shell and canvas defects found in the capture passes, none of them owned",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 5,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (review-queue drain, Ben's instruction)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/ui/LAYOUT.md",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/nav_pane.cpp",
+    "src/ui/menu.cpp",
+    "src/ui/lens_legend.cpp",
+    "scripts/verify/corp_choice.lua"
+   ],
+   "design": "Filed together because none is big enough to carry an item and all of them are on surfaces a player touches.\n\n* NR-597 - the corp-selection screen's per-row 'Choose' buttons DO NOT RESPOND TO CLICKS. Reproducible on corp_choice.lua's live surface; likely a handler wired to the row highlight and not the button. Ben ruled it not urgent at the time, but it is a dead control on the first screen of a new campaign.\n* NR-601 - six of the seven gradient-bar lens keys are drawn UNDERNEATH the Selection band and cannot be read.\n* NR-611 - the Selection band's resting state is ~90% empty and its action grid is six near-identical circles.\n* NR-615 - the system menu offers only Resume and Exit Game. Quick save/load exist on F5/F6 and display options exist, and none of the three is reachable, so a player who does not know the keys cannot save or discover saving.\n* NR-625 - two surfaces report different grid dimensions for the same body (Generation Ledger 180x84, canvas caption 261x121).\n* NR-723 - the nav rail's fourteenth slot puts its centre at y=746 on a 720px display, so the Contracts ledger is DRAWN AND UNREACHABLE - visible, apparently fine, inert. Invisible at 1080p, which is why nothing caught it.\n* NR-700 - a corporation-structure hit opens the PLAYER'S OWN balance ledger, so the Corporation lens's click destination is wrong under the one-tier rule.\n* NR-626 - every decision in the AI feed reads 'overridden' with a chosen score of 0.00. Re-check against the current scorer before investigating: BL-417 changed the score's magnitude entirely, so the reading may have moved or resolved."
+  },
+  {
+   "id": "BL-720",
+   "short_name": "the seeder cannot see processing demand",
+   "category": "Generation",
+   "title": "The world seeder sizes against consumer demand only, so any chain whose raw no consumer wants is never mined",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (review-queue drain, Ben's instruction)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/corporation_generation.cpp",
+    "docs/generation/CORPORATION_GENERATION.md",
+    "docs/generation/GENERATION_STRATEGY.md"
+   ],
+   "design": "NR-766, filed as novel-work by the BL-708 slice and never given an owner.\n\n`body_demand` counts household baskets plus the background stopgap. It never counts what PROCESSORS need as inputs - which is the larger half, and the difference between a world seeded to feed its own chains and one seeded to feed its households and hope.\n\nBL-708 patched the UPKEEP half (`body_upkeep_demand`, re-measured per iteration because placing a firm creates its own draw). The processing-input half is still unseen.\n\nPART OF THE PREMISE HAS SINCE BEEN ANSWERED FROM THE OTHER END, and the item should be re-measured before it is built: NR-766's headline example was that coal is produced 0.0 because nothing consumes it directly, so the seeder never sized for it and no coal mine was ever placed. BL-711 (per-resource extraction ranking) now has the AI building 25 coal mines on the industrial band and 17 on the ancient one, and coal produced 0.0 -> 632.7. So the SCORER half of that deadlock is fixed; what remains is whether GENERATION should still seed against it, which is a smaller and cleaner question than the entry was written against.\n\nIt is generation-layer work made by an economy slice whose brief did not name it - generation-dev's eyes, not an economy agent's judgement call."
+  },
+  {
+   "id": "BL-721",
+   "short_name": "paid for outcomes has no mechanism",
+   "category": "Design",
+   "title": "Retiring the mercenary contract left CONCEPT.md's core player identity with nothing behind it",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (review-queue drain, Ben's instruction)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/CONCEPT.md",
+   "files": [
+    "docs/CONCEPT.md",
+    "docs/SYSTEMS.md",
+    "docs/economy/CONTRACTS.md"
+   ],
+   "design": "NR-729. Ben retired the mercenary contract on 2026-08-29 and two authority claims lost their mechanism. Both are load-bearing rather than decorative, which is why this is a design item rather than a doc tidy.\n\n* CONCEPT.md § Player identity: *'The player is a mercenary company... it is armed and for hire... and it is PAID FOR OUTCOMES.'* Nothing now pays for an outcome. Procurement pays for GOODS DELIVERED, which is a different promise.\n* SYSTEMS.md § The progression chain has a link with no mechanism where the contract sat.\n\nEITHER re-point the identity at what the game actually rewards (delivery, standing, territory), OR mint the mechanism that pays for an outcome. The first is a doc change and an honest one; the second is a system. It is a CONCEPT-level call and it should not be settled by whoever next reads the paragraph.\n\nRelated and worth taking in the same pass: NR-744 - three purged AI items (BL-539 rival lobbying, BL-540 nation stance gates the player, BL-334 Stage C dialogue) still hold DATED STANDING-RULE GRANTS in io-standing-rules.md and have no owner, so the rules cite items that no longer exist."
+  },
+  {
+   "id": "BL-722",
+   "short_name": "the live-click debt",
+   "category": "Tooling",
+   "title": "Three UI requirements shipped render-confirmed only, because nothing in the container can approve the OS consent dialog",
+   "status": "designed",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 2,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (review-queue drain, Ben's instruction)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/development/DELIVERY.md",
+   "files": [
+    ".claude/skills/verifier-visual/SKILL.md",
+    "docs/development/DELIVERY.md"
+   ],
+   "design": "The standing rule is that a UI requirement needs a LIVE CLICK, not a scripted capture (io-standing-rules.md; DELIVERY.md step 4). Three items could not have one and said so rather than quietly marking the requirement complete - NR-593 (BL-591's growth-track readout), NR-595 (BL-593's tech-lock filter, which additionally could not scroll the tile build ledger into view), NR-622 (BL-606's Throughput lens).\n\nTHE CAUSE IS ENVIRONMENTAL, NOT PROCEDURAL: `request_access` for ProjectIo returns `notInstalled` or `user_denied` because the app is a custom .exe outside the Windows Start-Menu registry, and nothing in the container can approve the consent dialog.\n\nTWO THINGS THIS ITEM OWES. (1) A route that makes a live press possible from a session at all - a registered shortcut, a Start-Menu entry, or a documented manual step Ben performs. (2) A `scroll_panel` case for the tile build ledger, whose dynamic 'Construct [x, y]' title the existing helper cannot target. Until (1) exists the rule is unenforceable, and a rule nobody can satisfy gets quietly dropped - which is how the three above accumulated."
   }
  ]
 }

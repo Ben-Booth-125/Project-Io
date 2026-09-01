@@ -159,8 +159,13 @@ follow. Where a store has a query tool, use the tool, never load the file.
   commit)* before acting; no clarifying questions first.
 - **Rule 0b — ambiguous measurements.** Report the exact current numbers with units, then ask.
   Open the live app whenever asking Ben to weigh in on visuals.
-- **Rule 0c — log as you go.** Anything wanting Ben's judgement goes into `NEEDS_REVIEW.json`
-  *when it arises*. The closing message points at the log; it does not reproduce it.
+- **Rule 0c — log as you go, and only what needs a JUDGEMENT.** Anything wanting Ben's judgement goes
+  into `NEEDS_REVIEW.json` *when it arises*. The closing message points at the log; it does not
+  reproduce it. **The queue is not a backlog and not a notebook (Ben, 2026-09-01).** It reached 117
+  open entries and was drained in one pass; most of them were work, and work belongs in
+  `backlog.json`. Before filing, ask which of three things it is: a CALL only Ben can make → the
+  queue; WORK somebody must do → a backlog item; a fact worth remembering → the comment or doc next
+  to the code. An observation with no reader is not a record, it is a queue nobody finishes.
 - **Novelty flag.** If no doc owns the task or it would quietly grow scope, file a
   `kind: "novel-work"` entry and continue.
 - **Timestamp every new item**; newest-dated wins on conflict.

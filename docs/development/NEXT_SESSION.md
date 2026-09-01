@@ -1,95 +1,103 @@
-# Next session — Sprint 27, block 3: the channels, and two instruments that were lying
+# Next session — Sprint 27, block 3: the channels
 
-Sprint 27 is still **open**. Block 2 (2026-09-01) closed the four items NEXT_SESSION ordered ahead
-of the channels and fixed the sprint's own primary instrument. What is left is the channels — and
-one design fork that blocks the first of them.
+Sprint 27 is still **open**. Block 2 (2026-09-01) closed the four items ordered ahead of the
+channels, took BL-417, fixed the sprint's own primary instrument, and drained the review queue.
+What is left is the channels.
 
-## What changed under you, and it matters before you read anything else
+## The review queue is EMPTY, and it is meant to stay that way
 
-**Two of this sprint's instruments were blind, and both were found by accident.**
+117 open entries → **0**, on Ben's instruction: *"we are relying on the fact there is a review queue
+too much. Use judgment on things that seem obvious in hindsight, and close all the remaining
+items."* Most of them named **work**, not a judgement, so ten backlog items now carry it —
+**BL-713**…**BL-722**. Every entry is in `archive/needs-review-2026-Q3.json` with a resolution
+saying where it went.
+
+`CLAUDE.md` Rule 0c gained the discipline that keeps it drained. Before filing, ask which of three
+things you have: **a call only Ben can make** → the queue; **work somebody must do** → a backlog
+item; **a fact worth remembering** → the comment or doc next to the code. An observation with no
+reader is not a record.
+
+## What changed under you — read before trusting any older number
 
 1. **`demand_census` surveyed nothing.** It never called `init_survey_states`, which `app.cpp` runs
-   at campaign start. Every body — home included — stayed `hidden`, and `rank_extraction_sites`
-   gates on survey visibility, so **the corp AI built zero extraction sites in every census ever
-   run.** Not fewer. Zero. Every extraction figure the census has printed was the seeder's
-   placement, frozen. Fixed (`8fe177dc`, NR-772); it moves every reading the file produces, so any
-   census number you remember from before 2026-09-01 is not comparable.
-2. **`ai_skill_harness` cannot see a per-category change.** Its hand-built registry holds three
-   recipes and sets `group` on none, so all three fall to the default "General". BL-712 returned
-   **byte-identical** numbers before and after — that is the proof, not a null result (NR-771).
-   **The sprint's stated success criterion is this harness.** Until NR-771 is answered, read the
-   criterion as `chain_conversion_probe` + `demand_census` instead.
-
-Both are NR-762's family — ~30 harnesses skipping the app's world-building tail — and that question
-is still unowned. Two expensive instances in two sessions is now the argument for taking it.
+   at campaign start, so every body — home included — stayed `hidden`. `rank_extraction_sites` gates
+   on survey visibility, so **the corp AI built zero extraction sites in every census ever run.**
+   Not fewer. Zero. Fixed (`8fe177dc`): **any census number from before 2026-09-01 is not
+   comparable.**
+2. **`ai_skill_harness` is blind to per-category work.** Its hand-built registry holds three recipes
+   with `group` set on none, so all three fall to "General". BL-712 returned byte-identical numbers
+   before and after — that identity is the proof, not a null result. **The sprint's stated success
+   criterion is this harness**, so until BL-713 lands, read the criterion as
+   `chain_conversion_probe` + `demand_census` instead.
+3. **The build score is linear.** BL-417 replaced `net² / capex` with `net / capex`. Every score
+   magnitude in the AI moved by two orders; anything comparing against a remembered score is stale.
 
 ## Order of work
 
-**1. BL-642 (construction draws) — BLOCKED ON NR-773, so read that first.**
-Its half (1) premise moved under it. `ERAS.md` settles that "the first 20 years" ARE the 80-tick
-warm start, not a separate generation pass, and the warm start now constructs: ancient-band
-construction-channel demand went 93.25 → 202.58 → 210.08 across the census fix and BL-711. What
-remains of half (1) is narrower and bigger — the seeder's ~330 buildings are authored complete and
-draw nothing, and fixing that literally opens the campaign with 330 half-built buildings. Half (2)
-(centres draw as they grow) has a clean hook in `economy_system.cpp`'s BL-616 growth block and needs
-exactly one call: does the draw **gate** growth, or only register a want. NR-773 has A/B/C and a
-recommendation.
+**1. BL-642 (construction draws) — the fork is RULED, build it.**
+Ben ruled option B on NR-773: a population centre's growth **draws construction materials AND
+stretches on them**, exactly as `run_construction` stretches a build. One rule for both consumers.
+The hook is `economy_system.cpp`'s BL-616 growth block, where `pcc.population` steps and
+`++pcc.scale` promotes.
+
+**Design for the BL-641 cliff, do not discover it.** A brand-new universal draw unmet on tick 1
+collapsed operating firms 198/328 → 33/317. Two things make gating survivable here and both must
+hold: growth is **episodic** (a step every 10 qualifying ticks, not a per-tick draw), and the
+existing `max_stretch` machinery already models *slower, not dead*. Floor the behaviour at stretch
+rather than at stop, and measure against the census before authoring a non-zero rate.
+
+Half (1) is separate and still open — its premise moved. `ERAS.md` settles that "the first 20 years"
+ARE the 80-tick warm start, and the warm start now constructs: ancient construction-channel demand
+went 93.25 → 202.58 → 210.08 across the census fix and BL-711. What remains is the seeder's ~330
+buildings being authored complete, and fixing that literally opens the campaign with 330 half-built
+buildings — a gameplay change, not plumbing.
+
+BL-642 also owns **NR-770** (routed there): industrial construction yards are *removed* inside 80
+ticks and ancient ones stand idle producing 0.0 with both inputs on the shelf. The ancient half is
+the cheaper diagnosis. That is also what holds **BL-709 R1** open, so the two close together.
 
 **2. BL-644 (state channel), then BL-647 (endemic luxury).**
 BL-647 carries a prerequisite the item does not name: tobacco, spices, coffee and furs are **not in
-`placement_rules::k_extractable`**, so no extraction site can target them at all. BL-586 slice 2
-recorded that gap and left it. A luxury basket naming four goods nothing can mine would be a channel
-that cannot clear.
+`placement_rules::k_extractable`**, so no extraction site can target them at all (BL-586 slice 2
+recorded that gap and left it). A luxury basket naming four goods nothing can mine is a channel that
+cannot clear.
 
 **3. BL-643 / BL-646 / BL-645** at priority B.
 
-**4. BL-709 R1**, once NR-770 is diagnosed.
+**4. BL-713 (harnesses build the app's world) — AFTER the sprint closes**, per Ben's ruling on
+NR-762. One golden wave, after the work that would otherwise move them twice.
 
-**Run `demand_census` before and after every item — and note it now takes ~36 s and reports a world
-where the AI actually builds.**
+**Run `demand_census` before and after every item** — it takes ~36 s and now reports a world where
+the AI actually builds. `--reach` sweeps the logistics budget (NR-763's probe).
 
-## Traps, including two new ones
+## Traps
 
-- **Lua-linked harnesses are a much bigger class than any list says** (NR-767). `harness_params.hpp`
-  pulls `scripting/lua_state.hpp`, so **any** harness including it needs
+- **Lua-linked harnesses are a much bigger class than any list says.** `harness_params.hpp` pulls
+  `scripting/lua_state.hpp`, so **any** harness including it needs
   `cmd //c tools\verify\build_lua_harness.bat <name>`. `build_harness.bat` fails them with
-  `fatal error C1083: 'sol/sol.hpp'`, which reads as broken code rather than the wrong builder. Five
-  of eight harnesses reached for in one block hit this. Confirmed Lua-linked so far:
-  `save_roundtrip`, `world_determinism`, `determinism_harness`, `recipe_switch_harness`,
-  `build_spree_harness`, `decision_trace_harness`, `ai_skill_harness`, `spectator_determinism`,
-  `demand_census`, `chain_depth`, `spawn_solvency`, `chain_conversion_probe`, `upkeep_harness`.
-- **Run harness exes as `./build_gen/verify/<name>.exe`.** `cmd //c "build_gen\verify\$h.exe"` eats
-  the backslashes when `$h` is a shell variable and reports "not recognized as an internal or
-  external command", which looks like a missing build.
-- Build: `cmd //c "<repo>\build_app.bat"` — **absolute path**.
+  `fatal error C1083: 'sol/sol.hpp'`, which reads as broken code rather than the wrong builder.
+  Confirmed in the class: `save_roundtrip`, `world_determinism`, `determinism_harness`,
+  `recipe_switch_harness`, `build_spree_harness`, `decision_trace_harness`, `ai_skill_harness`,
+  `spectator_determinism`, `demand_census`, `chain_depth`, `spawn_solvency`,
+  `chain_conversion_probe`, `upkeep_harness`. BL-713 owns deriving this instead of listing it.
+- **Run harness exes as `./build_gen/verify/<name>.exe`.** `cmd //c "build_gen\verify\$h.exe"` with a
+  shell variable eats the backslashes and reports "not recognized as an internal or external
+  command", which looks like a missing build.
+- Build: `cmd //c "<repo>\build_app.bat"` — absolute path; backgrounding it is fine.
 - **Worktrees are cut from a diverged `origin/main`.** `git switch -C <branch> main`. Never
   hard-reset to `origin/main`.
-- Source files are **CRLF in the working tree, LF in the blob**. A Python patch script that reads
-  text and rejoins on `\n` rewrites the whole file and buries a two-line change in a 1000-line diff.
-  Read/write binary and keep `\r\n`.
+- Source files are **CRLF in the working tree, LF in the blob**. A Python patcher that reads text and
+  rejoins on `\n` rewrites every line ending and buries a two-line change in a 1000-line diff. Read
+  and write binary, keep `\r\n`, and check `git diff --numstat` before believing a change is small.
 
-## Known-red, reported and NOT re-blessed
+## Known-red
 
-- `spectator_determinism` R2 byte-identity: `golden=E350DF2A50BF4BAA observed=90BFB27CB57CC308`.
-  Stale by 150+ commits before this block (NR-752); BL-711 moved it further. **Ben's.**
-  Determinism itself is intact — R2's own reproducibility row and all of R3 pass.
-- `ai_skill_harness` — 25 band failures, unchanged in count since 2026-08-16 (NR-305).
+- `ai_skill_harness` — 25 band failures, stale since 2026-08-16. BL-417 improved three of five seeds
+  and the aggregate; the bands themselves are still unblessed and that is deliberate.
 - `chain_depth` — 8 pre-existing `injector::none` rows.
-
-## Open questions carried forward
-
-- **NR-769 is the big one.** BL-712's fix works — `Power Generation` and `Construction` went from
-  **zero** build candidates to 168 and 430 — and they still never win, because `net²/capex` is
-  itself an absolute contest (peaks: Advanced Fabrication 1884, Power Generation 31.9). The rule in
-  `AI_OPPONENT.md` § Selection must be scale-free condemns that curve in as many words; § Scoring
-  says its retention is **BL-417, Ben's call**. Four options with trade-offs are in the entry.
-  **BL-711 left the same fingerprint independently**: peat reaches the scorer, both its slots are
-  placeable, and it still gains no site.
-- **NR-770** — construction yards are removed on the industrial band and produce 0.0 on the ancient
-  one. Holds BL-709 R1 open; the ancient half is the cheaper diagnosis.
-- **NR-771, NR-772, NR-762** — the blind instruments, above.
-- **NR-763, NR-765, NR-766** — carried in from block 1. NR-765 is now answered: BL-711 and BL-712
-  are its two fixes and both have landed.
+- `spectator_determinism` — **green.** Its byte-identity row was retired on Ben's ruling (it asserted
+  world-content stability, not a spectator-mode property, and had been re-blessed ten times for
+  changes that were never spectator facts). Both real invariants still assert.
 
 ## What sprint 28 is waiting for
 
