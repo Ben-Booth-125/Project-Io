@@ -279,6 +279,28 @@
     "tools/verify/chain_depth.cpp"
    ],
    "design": "BL-647's design names exactly four luxury goods (tobacco, spices, coffee, furs) and shipped exactly those - but two instruments (chain_depth.cpp, demand_census.cpp) had authored comments claiming BL-647 would also buy trade_goods_misc, which that landing falsified. The comments now point here.\n\nTHE QUESTION, not yet answered: which channel wants generic trade goods? Candidates: join the endemic luxury basket (cheapest - one Lua row - but dilutes the four-good directional-asymmetry design, since trade_goods_misc has no endemic geography); a wealth-scaled row in the ordinary household basket (a prosperity good without the endemism); or retirement from the roster if nothing distinctive wants it (a good with no buyer and no geography is a name, not a resource). Decide against MARKETS.md's admission rule: a consumer is a MECHANISM, not a noun, and every resource needs a path to a terminal sink in its band."
+  },
+  {
+   "status": "open",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 2,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (BL-644 integration, cold-review finding 1)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-731",
+   "short_name": "NATION_SCORER_HARNESS_ROT",
+   "category": "Tooling",
+   "title": "nation_scorer_harness does not compile - the mercenary teardown left it behind",
+   "authority_doc": "docs/development/REVIEW_AUTOMATION.md",
+   "files": [
+    "tools/verify/nation_scorer_harness.cpp"
+   ],
+   "design": "The harness references derive_contract_offers / contract_offer_params / world::mercenary_offers (~15 sites), all deleted by cc88997c (the mercenary teardown). It has not compiled since, which means the nation scorer's term-by-term guard rows have been unrunnable through every scorer change after the teardown - including BL-644's calm_space addition, which landed with zero direct scorer verification (nation_wiring's scored ticks cover it only indirectly).\n\nTHE WORK: strip the mercenary-era rows (their subject no longer exists - deleting them is truth, not weakening), get the remaining term guards compiling and green, and add a calm_space row on the harness's own mutate-what-it-reads pattern: raise calm, watch the space_programme weight move by calm_space x delta; zero calm_space, watch it stop. A check that cannot run is worse than one that fails (DEVELOPMENT_PRACTICES: rebuild before believing)."
   }
  ]
 }

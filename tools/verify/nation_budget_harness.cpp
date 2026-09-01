@@ -68,7 +68,10 @@
 //
 // The process exits non-zero if any assertion FAILs.
 
+#include "world/economy_system.hpp"   // economy_report — R8 drives the real step
 #include "world/nation_budget.hpp"
+#include "world/nation_step.hpp"      // run_nation_step — R8, the wiring itself
+#include "world/recipe_registry.hpp"  // set_space_programme — R8's params route
 #include "world/space_programme.hpp"
 #include "world/world.hpp"
 
@@ -1313,6 +1316,93 @@ int main()
             check(identical,
                   "R7j two runs of one space fixture are bit-identical, intents "
                   "included");
+        }
+
+        // R7k: the pricing twin the add_market comment promised (cold-review
+        // finding 2). Half one: an unresolved price (0) falls back to
+        // base_price — request_quote's own reading. Half two: a body with NO
+        // market refuses the purchase outright — a zero-credit draw would be
+        // confiscation wearing a purchase's name.
+        {
+            space_fixture s = make_space_fixture(100.0f, 0.0f);
+            s.params.propellant_lump = 0.0f;
+            s.f.w.markets.at(s.market).price[k_comp]      = 0.0f;
+            s.f.w.markets.at(s.market).base_price[k_comp] = 2.0f;
+            auto [intents, t] = run_space(s);
+            (void)t;
+            const bool fallback_ok =
+                intents.size() == 1 && intents[0].funded && intents[0].completed &&
+                same(intents[0].credits, 16.0f);
+
+            space_fixture q = make_space_fixture(100.0f, 100.0f);
+            q.f.w.markets.erase(q.market); // no market on the body at all
+            const auto before = snapshot(q.f.w);
+            auto [q_intents, qt] = run_space(q);
+            check(fallback_ok && q_intents.empty() && qt.transfers.empty() &&
+                  snapshot(q.f.w) == before,
+                  "R7k the price basis: an unresolved price falls back to "
+                  "base_price (8 x 2.0 = 16.0 paid), and a body with no market "
+                  "sees no purchase at all");
+        }
+
+        // R7l: a PAID space transfer with no intent behind it. In-process the
+        // derivation is the line's only claimant, but the claim vector is an
+        // AI-facing seam (wire-reachable over --serve), so settle claws back
+        // any space transfer it cannot match — otherwise a rogue claim leaves
+        // credits on a corp with no goods drawn and no ledger row (cold-review
+        // finding 4).
+        {
+            space_fixture s = make_space_fixture(100.0f, 100.0f);
+            const double credit_before = world_credit_exact(s.f.w);
+            std::vector<space_purchase> intents = derive_space_programme_claims(
+                s.f.w, s.f.budgets, s.params, s.f.claims);
+            budget_claim rogue;
+            rogue.nation  = s.f.nation_a;
+            rogue.corp    = s.f.corp_2; // holds no stock, made no intent
+            rogue.line    = budget_priority::space_programme;
+            rogue.amount  = 4.0f;       // within the line's remaining share
+            rogue.subject = s.body_a;
+            s.f.claims.push_back(rogue);
+            national_budget_tick t;
+            run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
+            settle_space_purchases(s.f.w, intents, t);
+            check(same(s.f.w.corporations.at(s.f.corp_2).balance, 0.0f) &&
+                  same(s.f.w.corporations.at(s.f.corp_1).balance, 24.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1000.0f) &&
+                  intents.size() == 2 && intents[0].completed && intents[1].completed &&
+                  world_credit_exact(s.f.w) == credit_before,
+                  "R7l a paid space transfer with NO intent behind it is clawed "
+                  "back whole: the rogue claimant keeps nothing, the legitimate "
+                  "purchases stand, world credit conserved");
+        }
+
+        // R8: the REAL wiring (cold-review finding 1). R7a-R7l call the three
+        // functions directly; this row drives run_nation_step itself, so
+        // deleting or reordering the 2b/4b calls in nation_step.cpp goes red
+        // here and nowhere else. econ_tick 1: the single nation (index 0) is
+        // not due for re-scoring on any cadence >= 2, so the authored budget
+        // survives step 1 and the derivation reads it.
+        {
+            space_fixture s = make_space_fixture(100.0f, 100.0f);
+            s.f.w.nation_budgets[s.f.nation_a] = s.f.budgets.at(s.f.nation_a);
+            recipe_registry reg;
+            reg.set_space_programme(s.params);
+            const double credit_before = world_credit_exact(s.f.w);
+            economy_report rep;
+            run_nation_step(s.f.w, reg, rep, /*econ_tick=*/1);
+            const auto& pool =
+                s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a));
+            check(rep.space_purchases.size() == 2 &&
+                  rep.space_purchases[0].completed && rep.space_purchases[1].completed &&
+                  same(pool.quantities[k_comp], 92.0f) &&
+                  same(pool.quantities[k_prop], 84.0f) &&
+                  same(s.f.w.corporations.at(s.f.corp_1).balance, 24.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1000.0f) &&
+                  same(rep.budgets[s.f.corp_1].subsidies, 24.0f) &&
+                  world_credit_exact(s.f.w) == credit_before,
+                  "R8 run_nation_step end to end: derive -> spend -> settle -> "
+                  "fold - pools drained, supplier credited, subsidies explain "
+                  "the delta, report.space_purchases carries both completed rows");
         }
     }
 

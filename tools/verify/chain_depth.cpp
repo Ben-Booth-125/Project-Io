@@ -196,6 +196,7 @@ enum class injector
     population_demand,
     background_demand,
     endemic_demand,             ///< BL-647: inject_endemic_demand's wealth-scaled luxury pull.
+    state_purchase,             ///< BL-644: the space_programme line's lump purchase-and-consume.
     unit_upkeep_draw,
     building_upkeep_draw,       ///< BL-708: run_building_upkeep's per-type, era-banded goods draw.
     construction_material_draw,
@@ -210,6 +211,7 @@ const char* injector_label(injector i)
         case injector::population_demand:          return "inject_population_demand";
         case injector::background_demand:          return "inject_background_demand";
         case injector::endemic_demand:             return "inject_endemic_demand";
+        case injector::state_purchase:             return "space_programme lump purchase";
         case injector::unit_upkeep_draw:           return "run_unit_upkeep goods draw";
         case injector::building_upkeep_draw:       return "run_building_upkeep goods draw";
         case injector::construction_material_draw: return "construction material draw";
@@ -223,7 +225,7 @@ const char* injector_label(injector i)
 /// what each entry moves is still computed, never authored.
 constexpr injector k_injectors[] = {
     injector::population_demand, injector::background_demand,
-    injector::endemic_demand,
+    injector::endemic_demand,    injector::state_purchase,
     injector::unit_upkeep_draw,  injector::construction_material_draw,
     injector::launch_draw,
 };
@@ -250,6 +252,18 @@ bool injector_moves(const recipe_registry& reg, injector i, std::size_t r)
         // basket cases above.
         case injector::endemic_demand:
             return reg.endemic_demand_basket()[r] > 0.0f;
+        // BL-644: the space programme's authored lumps — the exact floats
+        // derive_space_programme_claims gates on. A pool draw, not a market
+        // bid: the "never on the open market" rule is the design's own.
+        case injector::state_purchase:
+        {
+            const space_programme_params& sp = reg.space_programme();
+            if (r == static_cast<std::size_t>(resource_type::spacecraft_components))
+                return std::isfinite(sp.components_lump) && sp.components_lump > 0.0f;
+            if (r == static_cast<std::size_t>(resource_type::propellant))
+                return std::isfinite(sp.propellant_lump) && sp.propellant_lump > 0.0f;
+            return false;
+        }
         case injector::unit_upkeep_draw:
             return reg.military().upkeep.goods_per_head[r] > 0.0f;
         // BL-708. Resolved through `building_upkeep_goods` — the SAME free
@@ -415,10 +429,10 @@ const exemption k_actor_consumed[] = {
     // actionable — moving a good onto a fake recipe consumer to quiet the row
     // would destroy the only record of what is owed. MARKETS.md § Demand
     // channels carries the owning item for each channel.
-    { resource_type::spacecraft_components, injector::none,
-      "BL-350 procurement contracts (terminal object) - but procurement is a "
-      "resource-agnostic transfer between two corps' pools, and nothing consumes "
-      "what it delivers; the Space-programme budget line (BL-644) owns the first real buyer" },
+    { resource_type::spacecraft_components, injector::state_purchase,
+      "the space_programme budget line (BL-644) - a nation's whole-or-nothing lump, "
+      "bought at the supplier's market price and CONSUMED on settlement; the first "
+      "buyer that is not a resource-agnostic transfer" },
     { resource_type::tobacco, injector::endemic_demand,
       "the endemic luxury basket (BL-647) - wealth-scaled, nation-flavoured household pull" },
     { resource_type::spices, injector::endemic_demand,
@@ -1002,10 +1016,10 @@ int main()
         //     medical_supplies) LEAVE the ancient red list, because the basket
         //     that wanted them is now banded industrial. Their k_known_gaps rows
         //     went with them - see below.
-        //   * spacecraft_components leaves it too, for a DIFFERENT and less
-        //     comfortable reason: no pass in the registry moves it in either
-        //     band. Its R1 row stays red and says so; this row simply stops
-        //     double-counting a want that does not exist.
+        //   * spacecraft_components is back in the wanted set since BL-644: the
+        //     space programme's lump purchase moves it in both bands, so its
+        //     ancient half is a tracked k_known_gaps row (the launch-draw
+        //     shape below), not a silence and not a strand.
         //   * Every pass that is NOT era-gated still reports band-independently,
         //     which is the honest reading of the current code: the unit-upkeep
         //     draw and the launch draw fire in both arcs, so propellant is still
@@ -1048,6 +1062,10 @@ int main()
         // industrial) route.
         static const known_gap k_known_gaps[] = {
             { resource_type::propellant, era_band::ancient, "NR-355: the per-convoy launch draw is not era-gated; no ancient producer exists" },
+            { resource_type::spacecraft_components, era_band::ancient,
+              "BL-644: the space programme's lump want is not era-gated (the same shape as the "
+              "launch draw above); no ancient producer exists, no ancient pool ever holds a lump, "
+              "so the derivation never fires there - a want that cannot fill, tracked not stranded" },
         };
         auto known_gap_tracked = [&](std::size_t r, era_band band) {
             for (const known_gap& g : k_known_gaps)

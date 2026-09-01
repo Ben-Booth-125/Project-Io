@@ -123,6 +123,7 @@
 #include "world/nation_step.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/resource_names.hpp"
+#include "world/space_programme.hpp" // BL-644: the State channel's derivation, re-run for the census
 #include "world/supply_system.hpp"
 #include "world/survey_system.hpp" // init_survey_states - the app runs it, this census did not
 #include "world/tech_gate.hpp"
@@ -249,18 +250,22 @@ const channel_row k_channels[] = {
     { "Infrastructure", ch_state::absent,
       "no material draw for roads / ports / hubs anywhere in src/world; the logistics_maintenance "
       "budget line spends credits (owner BL-643)" },
-    { "State",          ch_state::absent,
-      "nation budget lines (incl. strategic_reserve) carry weights and spend credits; no goods "
-      "purchase exists (owner BL-644)" },
+    { "State",          ch_state::present,
+      "derive_space_programme_claims / settle_space_purchases (space_programme.cpp) <- "
+      "economy.space_programme lumps, through the budget's claim/transfer machinery. A PAID POOL "
+      "PURCHASE, never a market bid ('never on the open market' is the design's own rule) — "
+      "realised purchases readable from economy_report::space_purchases; the census's state/pl "
+      "column re-derives the would-be claims" },
     { "Research",       ch_state::absent,
       "research_institute credits corporation_component::science per tick; nothing draws goods "
       "(owner BL-645)" },
     { "Conflict",       ch_state::absent,
       "battle resolution consumes no goods; the only military draw is the per-head standing-force "
       "upkeep below, which is not a battle (owner BL-646)" },
-    { "Endemic trade",  ch_state::absent,
-      "no wealth-scaled or character-flavoured luxury basket; tobacco/spices/coffee/furs are named "
-      "by no injector (owner BL-647)" },
+    { "Endemic trade",  ch_state::present,
+      "inject_endemic_demand (market_clearing.cpp) <- economy.endemic_demand basket: wealth-scaled "
+      "(nation treasury + positive domiciled balances), nation-flavoured by a pure seeded "
+      "preference hash, price-elastic like its sibling baskets" },
 };
 constexpr std::size_t k_channel_count = sizeof(k_channels) / sizeof(k_channels[0]);
 
@@ -460,6 +465,12 @@ struct classification
     // participant in the price, so these are market sinks like any other.
     bool sink_unit_upkeep = false;    ///< BL-454 unit upkeep — pool draw, then a market bid
     bool sink_industry    = false;    ///< BL-641 building upkeep — pool draw, then a market bid
+    bool sink_endemic     = false;    ///< BL-647 endemic luxury basket — a market bid, wealth-scaled
+    /// BL-644 space programme — a PAID pool purchase that never bids a market.
+    /// Lower-case in sink_word by the pre-BL-654 convention: a real consumer
+    /// with real money, invisible to the price signal by its own design
+    /// ("never on the open market"). Deliberately NOT in any_market_sink().
+    bool sink_state       = false;
 
     /// Does ANY market carry a base price for it? Both basket injectors skip a
     /// resource whose `base_price` is 0 ("untradeable -- no base price to anchor
@@ -477,7 +488,7 @@ struct classification
     bool any_market_sink() const
     {
         return sink_household || sink_background || sink_process || sink_construct
-            || sink_unit_upkeep || sink_industry;
+            || sink_unit_upkeep || sink_industry || sink_endemic;
     }
 };
 
@@ -491,6 +502,8 @@ std::string sink_word(const classification& c)
     if (c.sink_construct)   add("CONS");
     if (c.sink_unit_upkeep) add("UPK");   // BL-654: a market bid now, hence upper case
     if (c.sink_industry)    add("IND");   // BL-641 + BL-654, likewise
+    if (c.sink_endemic)     add("END");   // BL-647: a market bid, wealth-scaled
+    if (c.sink_state)       add("st");    // BL-644: pays, consumes, never bids — lower case
     if (s.empty())
         s = "NONE";
     return s;
@@ -549,12 +562,25 @@ classify(const world& w, const recipe_registry& reg)
     // band (set_era, above), so no extra state is threaded in.
     const std::array<float, resource_count>& pd_basket = reg.population_demand_basket();
     const std::array<float, resource_count>& bd_basket = reg.background_demand_basket();
+    const std::array<float, resource_count>& ed_basket = reg.endemic_demand_basket();
     for (std::size_t r = 0; r < resource_count; ++r)
     {
         if (pd_basket[r] > 0.0f)
             c[r].sink_household = true;
         if (bd_basket[r] > 0.0f)
             c[r].sink_background = true;
+        if (ed_basket[r] > 0.0f)
+            c[r].sink_endemic = true;   // BL-647: the era-resolved endemic fold
+    }
+
+    // BL-644: the State channel — the space programme's authored lumps, read
+    // from the same registry dial derive_space_programme_claims gates on.
+    {
+        const space_programme_params& sp = reg.space_programme();
+        if (std::isfinite(sp.components_lump) && sp.components_lump > 0.0f)
+            c[static_cast<std::size_t>(resource_type::spacecraft_components)].sink_state = true;
+        if (std::isfinite(sp.propellant_lump) && sp.propellant_lump > 0.0f)
+            c[static_cast<std::size_t>(resource_type::propellant)].sink_state = true;
     }
 
     // --- construction baskets, over every era-available building -----------
@@ -731,7 +757,11 @@ terminal_resources(const std::array<classification, resource_count>& cls)
     for (std::size_t r = 0; r < resource_count; ++r)
     {
         const classification& c = cls[r];
-        if (c.sink_household || c.sink_construct || c.sink_industry || c.sink_unit_upkeep)
+        // BL-647/BL-644: the endemic basket is a household-class terminal pull,
+        // and a state purchase consumes what it buys — both are TERMINAL sinks
+        // by MARKETS.md property 4's own definition.
+        if (c.sink_household || c.sink_construct || c.sink_industry || c.sink_unit_upkeep
+            || c.sink_endemic || c.sink_state)
             out.push_back(r);
     }
     return out;
@@ -951,7 +981,8 @@ struct band_result
     int   recipes_allowed = 0, recipes_authored = 0, max_depth = 0;
 
     // the census tick's attribution
-    res_row household{}, background{}, interbody{}, construction{}, processing{};
+    res_row household{}, background{}, endemic{}, interbody{}, construction{}, processing{};
+    res_row state_pl{};   ///< BL-644: the state's would-be purchases this tick (a pool draw, not market demand)
     /// BL-654: the upkeep channels' share of the want register — the shortfall a
     /// short pool actually BID on the market, read off `economy_report::
     /// upkeep_wants` rather than re-derived. Subtracted out of `processing`,
@@ -968,6 +999,7 @@ struct band_result
     bool attribution_ok = true;   ///< processing residual non-negative
     std::vector<std::string> no_sink_produced;   ///< R4's set, sorted by name
     std::vector<std::string> no_sink_raws;       ///< extractable, unwanted
+    std::vector<std::string> state_only;         ///< BL-644: bought and consumed by the state alone
     std::vector<std::string> basket_unmakeable;  ///< a basket names what the band cannot produce
     std::vector<std::string> basket_unpriced;    ///< a basket names it, no market prices it -> skipped
 
@@ -1171,11 +1203,36 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     inject_background_demand(w, reg);
     out.background = sub(sum_demand(w, mids), out.household);
 
+    // BL-647: the endemic pull, in clear_markets' own order — after the two
+    // sibling baskets, before the inter-body redistribution.
+    inject_endemic_demand(w, reg);
+    {
+        res_row after = sum_demand(w, mids);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            out.endemic[r] = after[r] - out.household[r] - out.background[r];
+    }
+
     inject_interbody_demand(w, reg, prior_supply);
     {
         res_row after = sum_demand(w, mids);
         for (std::size_t r = 0; r < resource_count; ++r)
-            out.interbody[r] = after[r] - out.household[r] - out.background[r];
+            out.interbody[r] = after[r] - out.household[r] - out.background[r]
+                             - out.endemic[r];
+    }
+
+    // BL-644: the State channel — re-derive the space programme's claims on
+    // the census tick's world state, exactly as the census re-runs the demand
+    // injections above. A pure read: the derivation mutates nothing, and the
+    // scratch claims are discarded. What it measures is the goods demand the
+    // state WOULD place this tick — a pool purchase, never market demand, so
+    // it is reported beside the pool columns and folded into no total.
+    {
+        std::vector<budget_claim> scratch;
+        const std::vector<space_purchase> intents = derive_space_programme_claims(
+            w, w.nation_budgets, reg.space_programme(), scratch);
+        for (const space_purchase& sp : intents)
+            out.state_pl[static_cast<std::size_t>(sp.resource)] +=
+                static_cast<double>(sp.quantity);
     }
 
     // The want register. `clear_markets` drops a want whose (corp, body) has no
@@ -1305,10 +1362,15 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     for (std::size_t r = 0; r < resource_count; ++r)
     {
         const classification& c = out.cls[r];
-        if (c.produced_by_recipe && !c.any_market_sink())
+        // BL-644: a state-purchased good has a real paying consumer, so it is
+        // not sinkless — but its want never reaches a price, which the
+        // separate state-only list below keeps visible.
+        if (c.produced_by_recipe && !c.any_market_sink() && !c.sink_state)
             out.no_sink_produced.emplace_back(rname(r));
-        else if (!c.produced_by_recipe && c.has_deposit && !c.any_market_sink())
+        else if (!c.produced_by_recipe && c.has_deposit && !c.any_market_sink() && !c.sink_state)
             out.no_sink_raws.emplace_back(rname(r));
+        if (c.sink_state && !c.any_market_sink())
+            out.state_only.emplace_back(rname(r));
         if ((c.sink_household || c.sink_background) && !c.produced_by_recipe && !c.has_deposit)
             out.basket_unmakeable.emplace_back(rname(r));
         if ((c.sink_household || c.sink_background) && !c.priced)
@@ -1316,6 +1378,7 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     }
     std::sort(out.no_sink_produced.begin(), out.no_sink_produced.end());
     std::sort(out.no_sink_raws.begin(), out.no_sink_raws.end());
+    std::sort(out.state_only.begin(), out.state_only.end());
     std::sort(out.basket_unmakeable.begin(), out.basket_unmakeable.end());
     std::sort(out.basket_unpriced.begin(), out.basket_unpriced.end());
 
@@ -1367,42 +1430,47 @@ void print_band(const band_result& b)
     std::printf("  BL-654: `upkeep/bd` is the shortfall a short pool BID on the market, so it is\n"
                 "  MARKET demand; `upkeep/pl` and `indust/pl` are the GROSS per-tick need with the\n"
                 "  pool-covered part included, and are not. bd <= pl + ind, always.\n");
-    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s %10s | %11s | %10s %10s | %10s | %s\n",
+    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s %10s %10s | %11s | %10s %10s %10s | %10s | %s\n",
                 "id", "resource", "prod", "d px",
-                "household", "backgrnd", "interbody", "construct", "process", "upkeep/bd",
-                "MKT TOTAL", "upkeep/pl", "indust/pl", "produced", "structural sinks");
-    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s %10s | %11s | %10s %10s | %10s | %s\n",
+                "household", "backgrnd", "endemic", "interbody", "construct", "process", "upkeep/bd",
+                "MKT TOTAL", "upkeep/pl", "indust/pl", "state/pl", "produced", "structural sinks");
+    std::printf("  %-3s %-22s %-4s %-4s | %10s %10s %10s %10s %10s %10s %10s | %11s | %10s %10s %10s | %10s | %s\n",
                 "---", "----------------------", "----", "----",
-                "----------", "----------", "----------", "----------", "----------", "----------",
-                "-----------", "----------", "----------", "----------", "----------------");
+                "----------", "----------", "----------", "----------", "----------", "----------", "----------",
+                "-----------", "----------", "----------", "----------", "----------", "----------------");
 
     for (std::size_t r = 0; r < resource_count; ++r)
     {
         const classification& c = b.cls[r];
-        const double total = b.household[r] + b.background[r] + b.interbody[r]
+        const double total = b.household[r] + b.background[r] + b.endemic[r] + b.interbody[r]
                            + b.construction[r] + b.processing[r] + b.upkeep_bid[r];
-        std::printf("  %-3zu %-22s %-4s %2d %-1s | %10.3f %10.3f %10.3f %10.3f %10.3f %10.3f | "
-                    "%11.3f | %10.3f %10.3f | %10.1f | %s\n",
+        std::printf("  %-3zu %-22s %-4s %2d %-1s | %10.3f %10.3f %10.3f %10.3f %10.3f %10.3f %10.3f | "
+                    "%11.3f | %10.3f %10.3f %10.3f | %10.1f | %s\n",
                     r, rname(r), prod_word(c), c.depth, c.priced ? "$" : "-",
-                    b.household[r], b.background[r], b.interbody[r],
+                    b.household[r], b.background[r], b.endemic[r], b.interbody[r],
                     b.construction[r], b.processing[r], b.upkeep_bid[r], total,
-                    b.upkeep_pool[r], b.industry_pool[r], b.produced[r], sink_word(c).c_str());
+                    b.upkeep_pool[r], b.industry_pool[r], b.state_pl[r], b.produced[r],
+                    sink_word(c).c_str());
     }
 
-    std::printf("  %-3s %-22s %-4s %-4s | %10.3f %10.3f %10.3f %10.3f %10.3f %10.3f | %11.3f | "
-                "%10.3f %10.3f | %10.1f |\n",
+    std::printf("  %-3s %-22s %-4s %-4s | %10.3f %10.3f %10.3f %10.3f %10.3f %10.3f %10.3f | %11.3f | "
+                "%10.3f %10.3f %10.3f | %10.1f |\n",
                 "", "TOTAL", "", "",
-                total_of(b.household), total_of(b.background), total_of(b.interbody),
+                total_of(b.household), total_of(b.background), total_of(b.endemic),
+                total_of(b.interbody),
                 total_of(b.construction), total_of(b.processing), total_of(b.upkeep_bid),
-                total_of(b.household) + total_of(b.background) + total_of(b.interbody)
+                total_of(b.household) + total_of(b.background) + total_of(b.endemic)
+                    + total_of(b.interbody)
                     + total_of(b.construction) + total_of(b.processing) + total_of(b.upkeep_bid),
-                total_of(b.upkeep_pool), total_of(b.industry_pool), total_of(b.produced));
-    std::printf("  %-3s %-22s %-4s %-4s | %10d %10d %10d %10d %10d %10d | %11s | %10d %10d | "
+                total_of(b.upkeep_pool), total_of(b.industry_pool), total_of(b.state_pl),
+                total_of(b.produced));
+    std::printf("  %-3s %-22s %-4s %-4s | %10d %10d %10d %10d %10d %10d %10d | %11s | %10d %10d %10d | "
                 "%10s |  (resources touched)\n",
                 "", "BREADTH", "", "",
-                touched_by(b.household), touched_by(b.background), touched_by(b.interbody),
+                touched_by(b.household), touched_by(b.background), touched_by(b.endemic),
+                touched_by(b.interbody),
                 touched_by(b.construction), touched_by(b.processing), touched_by(b.upkeep_bid), "",
-                touched_by(b.upkeep_pool), touched_by(b.industry_pool), "");
+                touched_by(b.upkeep_pool), touched_by(b.industry_pool), touched_by(b.state_pl), "");
 
     if (b.wants_dropped_no_market > 0.0)
         std::printf("  note: %.3f units of want were registered on bodies carrying no market and "
@@ -1446,6 +1514,8 @@ void print_band(const band_result& b)
     std::printf("\n  --- what this band cannot buy ---\n");
     std::printf("  produced in-band, NO market sink : %s\n", join(b.no_sink_produced).c_str());
     std::printf("  extractable, NO market sink      : %s\n", join(b.no_sink_raws).c_str());
+    std::printf("  state-purchased ONLY (paid pool draw, never a market bid - BL-644): %s\n",
+                join(b.state_only).c_str());
     std::printf("  a basket names it, band cannot make it or dig it: %s\n",
                 join(b.basket_unmakeable).c_str());
     std::printf("  a basket names it, NO market prices it (BL-652, asserted by R6): %s\n",
@@ -1454,10 +1524,11 @@ void print_band(const band_result& b)
     int live = 0;
     if (total_of(b.household)    > 0.0) ++live;
     if (total_of(b.background)   > 0.0) ++live;
+    if (total_of(b.endemic)      > 0.0) ++live;   // BL-647
     if (total_of(b.interbody)    > 0.0) ++live;
     if (total_of(b.construction) > 0.0) ++live;
     if (total_of(b.processing)   > 0.0) ++live;
-    std::printf("  live injecting passes this band  : %d of 5 measured\n", live);
+    std::printf("  live injecting passes this band  : %d of 6 measured\n", live);
 
     // --- BL-706 R5: chain completeness, and the spread ----------------------
     std::printf("\n  --- R5  CHAIN COMPLETENESS PER MARKET, and its SPREAD (BL-706) ---\n");
@@ -1502,8 +1573,9 @@ void print_band(const band_result& b)
         std::printf("  FLAT: every market scores identically. Generation produced no supply\n"
                     "        asymmetry at all in this band — see GENERATION_STRATEGY.md\n"
                     "        § Asymmetry is the deliverable. Reported, not asserted.\n");
-    if (total_of(b.upkeep_bid)   > 0.0) ++live;   // BL-654: the upkeep bid is a sixth
-    std::printf("  live injecting passes this band  : %d of 6 measured\n", live);
+    if (total_of(b.upkeep_bid)   > 0.0) ++live;   // BL-654: the upkeep bid
+    if (total_of(b.state_pl)     > 0.0) ++live;   // BL-644: the state's pool purchase
+    std::printf("  live injecting passes this band  : %d of 8 measured\n", live);
 }
 
 } // namespace

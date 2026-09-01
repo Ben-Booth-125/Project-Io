@@ -49,9 +49,12 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
     std::vector<space_purchase> out;
 
     // Unauthored lumps mean no programme: the pass reads no float and appends
-    // no claim, so an economy.lua without the table runs bit-identical to the
-    // pre-BL-644 build. The same inertness `run_national_budget` states for an
-    // empty budget map.
+    // no claim — THIS DERIVATION is inert without the Lua table. The build as
+    // a whole is not (cold-review finding, 2026-09-01): `calm_space` is a C++
+    // default in nation_ai_params, so every scored nation emits a ten-line
+    // normalised weight vector regardless, all nine existing lines' shares
+    // shrink, and state_hash moves on any world with scored nations. The same
+    // per-pass inertness `run_national_budget` states for an empty budget map.
     const bool any_lump = (std::isfinite(p.components_lump) && p.components_lump > 0.0f)
                        || (std::isfinite(p.propellant_lump) && p.propellant_lump > 0.0f);
     if (!any_lump || budgets.empty() || w.corp_body_pools.empty())
@@ -188,7 +191,7 @@ void settle_space_purchases(world& w,
                             std::vector<space_purchase>& purchases,
                             const national_budget_tick& tick)
 {
-    if (purchases.empty() || tick.transfers.empty())
+    if (tick.transfers.empty())
         return;
 
     for (const budget_transfer& t : tick.transfers) // the record's stored order
@@ -202,6 +205,7 @@ void settle_space_purchases(world& w,
         // on one (nation, supplier, body) with equal credits — both goods at
         // coincidentally equal lump prices — resolve in emission order, which
         // is also the transfers' stable arrival order within an equal sort key.
+        space_purchase* match = nullptr;
         for (space_purchase& sp : purchases)
         {
             if (sp.funded)
@@ -210,35 +214,55 @@ void settle_space_purchases(world& w,
                 continue;
             if (sp.credits != t.credits)
                 continue;
-
-            sp.funded = true;
-
-            const std::size_t ri  = static_cast<std::size_t>(sp.resource);
-            const auto        pit = w.corp_body_pools.find(std::make_pair(sp.supplier, sp.body));
-            if (pit != w.corp_body_pools.end() && pit->second.quantities[ri] >= sp.quantity)
-            {
-                // The terminal sink: the lump leaves the supplier's pool and
-                // is credited to nobody — the satellite launched. The credit
-                // half already landed on the supplier's balance and STAYS
-                // there; it is a sale, and run_nation_step folds it onto the
-                // corp's `subsidies` line so `net()` explains the delta.
-                pit->second.quantities[ri] -= sp.quantity;
-                sp.completed = true;
-            }
-            else
-            {
-                // The derivation's reservation makes this unreachable within
-                // one tick; defend it anyway, exactly as the failed survey
-                // earmark is defended (nation_step.cpp): reverse the transfer
-                // in the same two places the pass wrote it, so the tick's
-                // books still balance and the nation did not pay for a launch
-                // that never happened.
-                const auto cit = w.corporations.find(t.corp);
-                const auto nit = w.nations.find(t.nation);
-                if (cit != w.corporations.end()) cit->second.balance -= t.credits;
-                if (nit != w.nations.end())      nit->second.treasury += t.credits;
-            }
+            match = &sp;
             break;
+        }
+
+        if (match == nullptr)
+        {
+            // A PAID space transfer with no intent behind it. In-process the
+            // derivation is the line's only claimant, so this is unreachable —
+            // but the claim vector is an AI-facing seam (`nation_budget.hpp`:
+            // claims become wire-reachable over --serve), and a rogue claim on
+            // this line would otherwise leave credits on a corp with no goods
+            // drawn, no `subsidies` row and no `space_purchases` row: a silent
+            // transfer `net()` cannot explain (cold-review finding 4,
+            // 2026-09-01). Claw it back in the same two places the pass wrote
+            // it, exactly as the failed survey earmark is defended.
+            const auto cit = w.corporations.find(t.corp);
+            const auto nit = w.nations.find(t.nation);
+            if (cit != w.corporations.end()) cit->second.balance -= t.credits;
+            if (nit != w.nations.end())      nit->second.treasury += t.credits;
+            continue;
+        }
+
+        space_purchase& sp = *match;
+        sp.funded = true;
+
+        const std::size_t ri  = static_cast<std::size_t>(sp.resource);
+        const auto        pit = w.corp_body_pools.find(std::make_pair(sp.supplier, sp.body));
+        if (pit != w.corp_body_pools.end() && pit->second.quantities[ri] >= sp.quantity)
+        {
+            // The terminal sink: the lump leaves the supplier's pool and
+            // is credited to nobody — the satellite launched. The credit
+            // half already landed on the supplier's balance and STAYS
+            // there; it is a sale, and run_nation_step folds it onto the
+            // corp's `subsidies` line so `net()` explains the delta.
+            pit->second.quantities[ri] -= sp.quantity;
+            sp.completed = true;
+        }
+        else
+        {
+            // The derivation's reservation makes this unreachable within
+            // one tick; defend it anyway, exactly as the failed survey
+            // earmark is defended (nation_step.cpp): reverse the transfer
+            // in the same two places the pass wrote it, so the tick's
+            // books still balance and the nation did not pay for a launch
+            // that never happened.
+            const auto cit = w.corporations.find(t.corp);
+            const auto nit = w.nations.find(t.nation);
+            if (cit != w.corporations.end()) cit->second.balance -= t.credits;
+            if (nit != w.nations.end())      nit->second.treasury += t.credits;
         }
     }
 }

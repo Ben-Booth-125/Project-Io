@@ -1013,8 +1013,9 @@ int main()
                                               && r2.weights[8] == 0.3f;
             }
             check(budgets_exact,
-                  "P9 nation_budgets round-trips exactly: nine weights + reserve for two "
-                  "nations, the non-dyadic 0.3f included");
+                  "P9 nation_budgets round-trips exactly: all priority_count weights "
+                  "(ten since BL-644) + reserve for two nations, the non-dyadic 0.3f "
+                  "included");
         }
     }
 
