@@ -10,6 +10,55 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-01 (BL-732 delivery) — The ground bakes, and it looks like a planet
+
+**Mode:** Full. **Runtime:** one session; one cold-configure + full Debug build in the fresh
+worktree, ~8 incremental builds, ~4 verify runs, one live computer-use pass. **Requirements:**
+`ground-bake-renderer` R1–R4 all complete.
+
+The procedural-first half of BL-732 (ground bake renderer): the Planetary canvas ground now
+draws from CPU-baked painterly chunk textures on the plain canvas, with the classic vector
+path surviving under every lens and wherever a chunk is not yet baked.
+
+### Built
+
+`src/ui/terrain_palette.{hpp,cpp}` (pure palette extracted from hex_render, byte-identical
+delegation, compile-time layout guard); `src/ui/ground_bake.{hpp,cpp}` (pure bake: class-
+separated tile interpolation, two-octave **domain warp** for organic coastlines, fractal-
+detail **hillshade** low-octave-gradient, period-snapped noise lattices, separable near-future
+grade); `src/core/ground_layer.{hpp,cpp}` (SDL chunk cache: synchronous far page, budgeted
+512 px chunks against the canvas's ground_request, content-hash invalidation); canvas
+integration (chunk quads under everything, per-tile fill/texture skip via `on_bake`, washes
+re-expressed as translucent overlays, no-grid rule live); `tools/verify/ground_bake_check`
+(10/10 + six param-variant preview PNGs per run); `scripts/verify/ground_bake.lua` (7
+captures incl. a bare pair via the new verify-only `set_border_band` toggle).
+
+### Look iterations (the useful failures)
+
+Round 1: blend radius 1.55 → mush. Round 2: radius 1.15 → hex mosaic (per-tile jitter is the
+mosaic dial). Round 3: fractal gradient at full frequency → speckle (gradient must read the
+LOW octave only, half-cell central differences). Round 4: single-octave warp translates hex
+corners without breaking them; big warp swirls texture → two-octave warp for the boundary,
+detail/grain sampled UNWARPED. End state genuinely reads in the C-F family.
+
+### The BL-734 evidence this produced
+
+Over muted graded ground the analytic chrome inverts its old contrast relationship: the
+national border band (hex-scalloped, full-strength, on every coastline) is now the loudest
+mark on the map, and fog steps read hex-crisp over organic ground. Captured in the
+wide/play vs bare pairs — the layer-contract ruling now has its exhibits.
+
+### Notes
+
+Debug-build chunk bake can jank the first seconds after a body switch (CPU bake, 2
+chunks/frame budget; far page covers meanwhile) — a future threaded bake if it matters.
+The computer-use grant resolved to a pruned worktree's exe path (the standing trap); fixed
+by staging this build at the granted path — the Start-menu ProjectIo shortcut now runs
+this build. story_check's 55 fails and the ACTIONS/NEEDS_REVIEW mirror staleness predate
+this session and were left untouched.
+
+---
+
 ## 2026-09-01 (sprint 29 opens) — The ground gets a mechanism
 
 **Mode:** Design (research + authority docs, no code). **Runtime:** one short session, parallel

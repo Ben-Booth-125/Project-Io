@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 #include "agent_seam.hpp"
+#include "ground_layer.hpp" // BL-732: baked-ground chunk cache
 #include "sim_loop.hpp"
 #include "scripting/lua_state.hpp"
 #include "ui/ui_state.hpp"
@@ -514,6 +515,10 @@ private:
     std::chrono::steady_clock::time_point m_warm_begin; ///< Warm-start wall-clock start, for the timing report.
 
     ui_state        m_ui;
+    ground_layer    m_ground;            ///< BL-732: baked painterly ground for the Planetary canvas.
+    /// True while a --verify script drives frames: the ground cache bakes every
+    /// chunk synchronously so a capture never races the per-frame bake budget.
+    bool            m_ground_bake_all = false;
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
     works_registry  m_works;             ///< BL-321 Era -1 works table, loaded from scripts/works.lua at startup.
     tech_tree_registry m_tech_tree;      ///< BL-087 mock tech/quest tree, loaded from Lua at startup; F9 viewer only.

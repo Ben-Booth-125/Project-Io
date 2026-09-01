@@ -307,6 +307,45 @@ struct construction_controls
     entity_id levers_for = null_entity;
 };
 
+// --- Baked ground view (BL-732, docs/ui/RENDERING.md) ----------------------
+// The frame contract between the SDL-side chunk cache (core/ground_layer) and
+// the Planetary canvas. app fills `ui_state::ground` each frame from the cache;
+// the canvas draws the listed textures under everything and writes
+// `ui_state::ground_request` (the canonical-space rect it can see) for the
+// cache to bake against NEXT frame. Plain types only — no SDL in this header;
+// `tex` is the ImTextureID the SDLRenderer3 backend takes (an SDL_Texture*).
+
+/// One baked chunk, ready to draw: canonical-space rect + its texture.
+struct ground_chunk_view
+{
+    float x0 = 0, y0 = 0, x1 = 0, y1 = 0; ///< Canonical units (hex circumradius = 1).
+    void* tex = nullptr;
+};
+
+/// Everything the canvas needs to draw the baked ground for one body.
+struct ground_view
+{
+    entity_id body = null_entity;    ///< Body the bake describes; canvas ignores a mismatch.
+    double    s    = 1.0;            ///< Full-res bake: pixels per canonical unit.
+    double    y_min = -1.0;          ///< Canonical y of bake pixel row 0.
+    int       chunk_px = 512;        ///< Full-res chunk size, px.
+    int       cw = 0, ch = 0;        ///< Chunk grid dimensions.
+    std::vector<std::uint8_t> ready; ///< cw*ch coverage mask (1 = chunk baked).
+    std::vector<ground_chunk_view> chunks; ///< The ready chunks, drawable.
+    ground_chunk_view far;           ///< Low-res whole-body page (tex null until baked).
+    bool far_ready = false;
+};
+
+/// The canvas's bake request: the canonical-space rect visible this frame.
+/// Read by ground_layer next frame — one frame of latency, covered by the
+/// vector fallback (fallback-by-coverage, RENDERING.md).
+struct ground_request
+{
+    entity_id body = null_entity;
+    float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+    bool  valid = false;
+};
+
 /// Shared selection and view state for the three primary canvases.
 ///
 /// Held by app and passed by reference to the canvas drawing functions. The
@@ -315,6 +354,14 @@ struct construction_controls
 /// minimap clicks (ascend).
 struct ui_state
 {
+    // --- baked ground (BL-732) ---
+    ground_view    ground;          ///< Filled by app each frame from core/ground_layer.
+    ground_request ground_req;      ///< Written by the Planetary canvas each frame.
+    /// Verify-only: suppress the national border band so a ground-judgement
+    /// capture shows the bake bare (BL-732 R1; the band's weight over painterly
+    /// ground is BL-734's open call). No player control sets this.
+    bool dbg_hide_border_band = false;
+
     entity_id    active_body   = null_entity;         ///< Navigation anchor: drives the lower rungs (circumplanetary anchor and surface). Changed by *navigation* (double-click / focus), not by selection. null_entity = no anchor.
     entity_id    selected_entity = null_entity;       ///< The entity the player single-clicked to inspect — drives the Selection info element. Distinct from the active_* anchors: selecting never moves the canvas. null_entity = nothing selected. See SELECTION.md, ui/selection.hpp.
     canvas_level primary_level = canvas_level::solar; ///< Which canvas rung fills the window.

@@ -4563,6 +4563,57 @@
      "evidence": "COMPLETE, verified 2026-09-01. `build_material_cost` is priced into the capex of BOTH build candidates — corp_ai.cpp:951 (extraction) and :1202 (processing) — so the score AND the solvency spend carry the material basket, keyed by recipe per BL-590. NR-592 marked resolved on this evidence. corp_ai_harness green, including BL-712's new R8; the thrash check is corp_ai_harness R2's action-budget rows, also green."
     }
    ]
+  },
+  {
+   "brief": "ground-bake-renderer",
+   "title": "BL-732 - the Planetary ground renders as baked painterly chunks",
+   "status": "complete",
+   "resolved": "2026-09-01",
+   "promoted_from": "backlog.json BL-732 - Sprint 29, rendering",
+   "batch": "sprint-29",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "Item-spanning: with no lens active, the Planetary canvas draws its ground from baked chunk textures - continuous painterly terrain (no hex grid lines or per-tile gaps), hillshaded relief from the height field, the C-F near-future grade - at play zoom and at the whole-grid view, with the cylinder wrap seam invisible.",
+     "verification": [
+      "visual: scripts/verify/ground_bake.lua captures at play zoom, whole-grid, and across the wrap seam"
+     ],
+     "notes": "The acceptance gate. Judged against docs/ui/design/renders/map/it3 panel C-F for direction, not pixel identity.",
+     "evidence": "COMPLETE 2026-09-01. scripts/verify/ground_bake.lua captures: ground_bake_wide/play/close/seam plus the bare pair (border band off via the verify-only set_border_band toggle). The ground is continuous painterly terrain - no grid lines or per-tile gaps on the plain canvas, organic domain-warped coastlines, fractal-detail hillshade, C-F grade - and the wrap seam frame shows no discontinuity. Judged in-family against it3 panel C-F for direction; Ben final eye owed on the live app (left open). Known and expected: the analytic chrome (national border band above all) visually dominates the muted ground - BL-734 evidence, not a defect here."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The bake is a pure function of world state: two bakes of the same chunk are byte-identical; land and water classes do not cross-blend (coastline stays hard); survey-masked tiles bake as the lock colour and do not leak terrain into revealed neighbours; the grade pass measurably desaturates; the wrap seam columns are continuous.",
+     "verification": [
+      "headless: tools/verify/ground_bake_check.cpp over make_hard_coded_world"
+     ],
+     "notes": "Compiles ground_bake.cpp + terrain_palette.cpp with the world objects - both files must stay SDL/ImGui/Lua-free.",
+     "evidence": "COMPLETE 2026-09-01. ground_bake_check: 10/10 - determinism (byte-identical re-bake), wrap (px0+W byte-identical, noise lattices period-snapped), class separation (land/water distinct, water blue), relief responds, grade separable + desaturates, unsurveyed body bakes lock colour only, region_hash moves with a covered tile. Also emits 6 param-variant preview PNGs per run for look iteration."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The classic per-tile renderer survives as the fallback: any active lens renders through the existing per-tile path unchanged, and a tile whose chunk is not yet baked falls back to the vector fill.",
+     "verification": [
+      "visual: a lens rung in ground_bake.lua matches the pre-item lens render",
+      "code: the not-ready branch in body_surface_canvas.cpp"
+     ],
+     "notes": "Fallback-by-coverage, RENDERING.md. Lens-over-painterly is BL-734, not this item.",
+     "evidence": "COMPLETE 2026-09-01. ground_bake_lens_fallback capture: Resource lens renders the classic per-tile path (crisp water hexes, per-tile fills); ground images are not drawn under any lens (ground_on gates on overlay==none). Chunk-not-ready fallback is the same skip flag (on_bake) per tile."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "Live: on the built app, pan/zoom/hover/select work over the baked ground - hover card appears, a click selects (amber hex on the selection), progressive chunk fill does not hitch the frame.",
+     "verification": [
+      "live: open the built exe, click the thing"
+     ],
+     "notes": "The 2026-08-19 live-click rule; a capture alone does not close this row.",
+     "evidence": "COMPLETE 2026-09-01. Live on the built exe (launched --load into a verify-produced save, driven via computer use): click selected a tile/province (Selection panel filled, Tile [106,51] - Track), scroll zoom anchored and the wanted-chunk bake followed with no vector holes, hover showed the card (Barrens - Highland / Habitability 18% / convoy cost) with the hover hex outline. Debug-build chunk bake can jank the first seconds after a body switch (budget 2 chunks/frame, CPU bake); far page covers meanwhile - noted for a future threaded bake, not a blocker."
+    }
+   ]
   }
  ]
 }

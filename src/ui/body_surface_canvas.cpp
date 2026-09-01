@@ -2240,6 +2240,62 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                ((grid_area_origin.y + grid_area_size.y + hit_r - view_origin.y) / zoom + grid_cy) / row_pitch)))
         : -1;
 
+    // --- BL-732: the baked painterly ground (docs/ui/RENDERING.md) ----------
+    // With no lens active, the ground is drawn from the baked chunk textures
+    // core/ground_layer publishes into `state.ground` — the far page first
+    // (whole body, low-res, always ready after a body switch), the ready
+    // full-res chunks over it — and the per-tile loop below then SKIPS its
+    // fill and texture emit for surveyed tiles (`on_bake`): the no-grid rule,
+    // and the fallback-by-coverage rule, in one flag. Canonical space is the
+    // hex grid at circumradius 1, so canonical -> local is a scale by hex_size.
+    const ground_view& gview = state.ground;
+    const bool ground_on = state.overlay == overlay_mode::none
+                        && gview.body == state.active_body
+                        && gview.far_ready;
+    const auto canon_to_screen = [&](float gx_, float gy_) -> ImVec2 {
+        return to_screen({ gx_ * hex_size, gy_ * hex_size });
+    };
+    // Publish this frame's visible window for NEXT frame's bake pass (one
+    // frame of latency; the far page covers it). x in canonical units, wrap
+    // handled by ground_layer.
+    {
+        const float x0c = ((visible_left  - view_origin.x) / zoom + grid_cx) / hex_size;
+        const float x1c = ((visible_right - view_origin.x) / zoom + grid_cx) / hex_size;
+        state.ground_req.body  = state.active_body;
+        state.ground_req.x0    = x0c;
+        state.ground_req.x1    = x1c;
+        state.ground_req.y0    = 1.5f * static_cast<float>(row_lo) - 1.0f;
+        state.ground_req.y1    = 1.5f * static_cast<float>(row_hi) + 1.0f;
+        state.ground_req.valid = raster_ok;
+    }
+    if (ground_on)
+    {
+        // Draw one image quad per wrap copy that intersects the canvas. The
+        // image spans exactly one wrap period, so copies abut seamlessly.
+        const auto draw_ground_rect = [&](const ground_chunk_view& cv)
+        {
+            if (!cv.tex)
+                return;
+            const ImVec2 p0 = canon_to_screen(cv.x0, cv.y0);
+            const ImVec2 p1 = canon_to_screen(cv.x1, cv.y1);
+            const int k_lo = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_left  - p1.x) / period_px)) : 0;
+            const int k_hi = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil ((visible_right - p0.x) / period_px)) : 0;
+            for (int k = k_lo; k <= k_hi; ++k)
+            {
+                const float off = static_cast<float>(k) * period_px;
+                if (p1.x + off < visible_left || p0.x + off > visible_right)
+                    continue;
+                dl->AddImage((ImTextureID)(intptr_t)cv.tex,
+                             { p0.x + off, p0.y }, { p1.x + off, p1.y });
+            }
+        };
+        draw_ground_rect(gview.far);
+        for (const ground_chunk_view& cv : gview.chunks)
+            draw_ground_rect(cv);
+    }
+
     // --- BL-511: the province fill cache ------------------------------------
     // The province, not the hex, is the unit this canvas renders and the player
     // selects. Geometry stays per hex — the cull, the LOD and the wrap window are
@@ -2654,7 +2710,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // relaxation over the visible band costs nothing while a lens is up. Every
     // depth stays 0xFF, and the wash's `depth < band_depth` test then fails on
     // its own without needing a second guard.
-    const bool draw_border_band = (state.overlay == overlay_mode::none);
+    const bool draw_border_band = (state.overlay == overlay_mode::none)
+                               && !state.dbg_hide_border_band;
     if (draw_border_band && raster_ok && !w.tile_to_nation.empty())
     {
         for (int cr = band_lo; cr <= band_hi; ++cr)
@@ -2807,6 +2864,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const ImU32       fill      = shade.fill;
         const uint32_t    prov_id   = shade.province;
 
+        // BL-732: this tile's ground is carried by the baked texture drawn
+        // before the loop — skip the per-tile fill and texture emit (the
+        // no-grid rule), and re-express the washes compute_tile_fill folded
+        // into the fill as translucent overlays instead. A survey-masked tile
+        // keeps the old path (the lock fill is knowledge, not terrain), which
+        // also keeps the god-view tell byte-identical.
+        const bool on_bake = ground_on && surveyed;
+
         // Corner colours for the blend. Each hex corner is shared with two of the
         // six neighbours (k_corner_sides); a corner takes the MEAN of this tile's
         // fill and those of its corner-sharing neighbours that are in the SAME
@@ -2895,7 +2960,47 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // `hex_size * zoom` is recovered as `draw_r + 1` (draw_r is that minus the
             // 1 px border shrink), and the same 1 px is taken back off each axis so the
             // background still shows through as the grid texture the hexes give.
-            if (coarse_fill)
+            if (on_bake)
+            {
+                // The baked ground already carries terrain, relief and grain.
+                // What the fill path also carried — the player-identity wash,
+                // the construction-suitability washes, the vision fog — draws
+                // here as translucent full-radius hexes over the bake, at the
+                // same strengths compute_tile_fill blends them in at.
+                ImVec2 wash_verts[6];
+                hex_vertices(wash_verts, cx, cy, draw_r + 1.0f);
+                if (is_player_tile)
+                {
+                    const ImU32 pid = corp_identity(w.player_entity);
+                    dl->AddConvexPolyFilled(wash_verts, 6,
+                        (pid & ~IM_COL32_A_MASK) | (ImU32(77) << IM_COL32_A_SHIFT)); // 0.30
+                }
+                if (suitability_active && !selected)
+                {
+                    const bool placeable = placement_rules::can_place(
+                        tile, suitability_btype, suitability_target);
+                    if (!placeable)
+                        dl->AddConvexPolyFilled(wash_verts, 6, IM_COL32(0, 0, 0, 90)); // 0.35
+                    else if (suitability_affine_kind)
+                    {
+                        bool any_dep = false;
+                        const resource_type best =
+                            placement_rules::richest_extractable(tile, any_dep);
+                        if (any_dep && best == suitability_target)
+                            dl->AddConvexPolyFilled(wash_verts, 6,
+                                                    IM_COL32(100, 200, 100, 61)); // 0.24
+                    }
+                }
+                if (vision < 1.0f)
+                {
+                    // fog_dim's wash (lerp toward (8,10,16) by 0.5*(1-vision)),
+                    // as an alpha overlay over the baked ground.
+                    const int fa = static_cast<int>(std::lround(127.5f * (1.0f - vision)));
+                    if (fa > 0)
+                        dl->AddConvexPolyFilled(wash_verts, 6, IM_COL32(8, 10, 16, fa));
+                }
+            }
+            else if (coarse_fill)
             {
                 const float step = draw_r + 1.0f; // hex_size * zoom
                 const float hw   = kSqrt3 * step * 0.5f - 0.5f;
@@ -2920,7 +3025,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // lens wash all keep showing under the glyph.
             // Never drawn under `coarse_fill`, which is implied: coarse_fill needs
             // draw_r <= 7 and texture_strength is 0 below draw_r 14.
-            if (revealed && texture_strength > 0.0f)
+            if (revealed && texture_strength > 0.0f && !on_bake)
                 draw_tile_texture(dl, { cx, cy }, draw_r, tile.grid_x, tile.grid_y,
                                   tile.substrate, tile.cover, tile.cover_density,
                                   fill, texture_strength);
