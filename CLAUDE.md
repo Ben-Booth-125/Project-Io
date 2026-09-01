@@ -137,7 +137,7 @@ follow. Where a store has a query tool, use the tool, never load the file.
 | `docs/development/DELIVERY.md` | The method: lifecycle, design state, depth verbs, batch, worktrees. Read before Full mode. | — |
 | `docs/development/DEVELOPMENT_PRACTICES.md` | Harness testing (no unit framework), naming, doc standards, release cutting. | — |
 | `docs/development/ROADMAP.md` | Milestone sequence through v1.0.0. The only place that says *when*. | — |
-| `docs/development/backlog.json` | Open work: metadata + work prose. ~1.2 MB — **query, never load.** | `backlog_query.js` (`--status --priority --version --touches --grep --full`), `backlog_view.js`, `next_id.js`, `backlog_lint.js` |
+| `docs/development/backlog.json` | Open work: metadata, plus work prose for open items only — landed prose lives cold. ~90 KB — **query, never load.** | `backlog_query.js` (`--status --priority --version --touches --grep --full`), `backlog_view.js`, `next_id.js`, `backlog_lint.js` |
 | `docs/development/archive/backlog-design-*.json` | Landed items' prose (design, summary, completion). Amend landed prose **here**. | `archive_designs.js` |
 | `docs/development/REFINED.md` | The active worklist — promoted tasks. Empty between work blocks. | — |
 | `docs/development/req/requirements.json` | Requirements and their verification record. | `requirements_query.js`, `archive_requirements.js` |
