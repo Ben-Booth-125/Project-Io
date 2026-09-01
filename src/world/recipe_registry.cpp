@@ -13,6 +13,11 @@
 namespace {
 
 /// Read a Lua {resource_name = qty} table into a resource-indexed array.
+///
+/// Quantities are validated as the values that land: a NaN weight passes a
+/// `<= 0` guard at every basket injector (NaN compares false), so it would
+/// flow straight into `market_component::demand` and from there into price
+/// resolution. Reject, never clamp — the loader precedent (BL-647 review).
 void read_resource_map(const sol::table& src, std::array<float, resource_count>& dst,
                        const std::string& context)
 {
@@ -23,7 +28,11 @@ void read_resource_map(const sol::table& src, std::array<float, resource_count>&
         const resource_type r = resource_names::resource_from_name(rname, ok);
         if (!ok)
             throw std::runtime_error("Unknown resource '" + rname + "' in " + context);
-        dst[static_cast<std::size_t>(r)] = kv.second.as<float>();
+        const float qty = kv.second.as<float>();
+        if (!std::isfinite(qty) || qty < 0.0f)
+            throw std::runtime_error("Rejected quantity for '" + rname + "' in " + context
+                                     + " (must be finite and >= 0)");
+        dst[static_cast<std::size_t>(r)] = qty;
     }
 }
 

@@ -891,6 +891,24 @@ cmake --build build --target save_envelope_roundtrip   # from a vcvars shell
 ctest --test-dir build -R "exchange_record_harness|save_envelope_roundtrip"
 ```
 
+## `endemic_demand_harness` — the Endemic trade channel end to end (BL-647)
+
+The eighth demand channel of MARKETS.md § Demand channels: `inject_endemic_demand` pulls a
+wealth-scaled, nation-flavoured luxury basket (tobacco/spices/coffee/furs) into nation-anchored
+markets each clearing tick. Six row families, all mutation-proved red at authoring: E1 wealth
+gates the pull exactly (treasury + positive domiciled corp balances × `wealth_scale` × basket; a
+broke nation injects nothing, a debtor corp contributes zero, a two-market nation splits with a
+carve-invariant total); E2 character asymmetry is real (two nations crave measurably different
+baskets off the pure seeded preference hash); E3 determinism (`==`-identical floats across two
+same-fixture runs); E4 the BL-586 slice-2 placement gap is closed (`is_extractable` +
+`can_place` accept a luxury deposit tile, a bare tile still refuses); E5 the shared tranche
+survives both era bands and a banded row masks; E6 on the generated world the injected demand
+survives `clear_markets` into priced state.
+
+```
+node tools/verify/build_harness.js endemic_demand_harness --run
+```
+
 ## Build note (2026-08-30): the glob loop carries the sol2 + Lua INCLUDE paths
 
 Since b668434c (the v0.1.21 cut), `tools/verify/harness_params.hpp` — the shared

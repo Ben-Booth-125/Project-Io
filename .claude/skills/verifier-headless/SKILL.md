@@ -277,6 +277,17 @@ in `tools/verify/README.md`.
   broken: the econ-step stub was zeroed the same tick, never priced). Links the SDL/Lua-free
   world superset (glob minus `recipe_registry`/`tech_tree`). CMake target
   `population_demand_harness`.
+- **`endemic_demand_harness`** — BL-647 endemic luxury demand (2026-09-01): the Endemic trade
+  channel end to end. `inject_endemic_demand` pulls a wealth-scaled, nation-flavoured luxury
+  basket (tobacco/spices/coffee/furs) into nation-anchored markets — wealth gates the pull
+  exactly (E1: treasury + positive domiciled balances × `wealth_scale` × basket; a broke nation
+  injects nothing; a debtor corp contributes zero); character asymmetry is real (E2: two nations
+  crave measurably different baskets off the pure seeded preference hash); two same-fixture runs
+  deposit `==`-identical floats (E3); all four luxuries pass `is_extractable` + `can_place` on a
+  deposit tile while a bare tile still refuses (E4 — the BL-586 slice-2 gap closed); the shared
+  tranche survives both era bands and a banded row masks (E5); on the generated world the demand
+  survives `clear_markets` into priced state (E6). Every row mutation-proved red at authoring.
+  Links the world superset. Build via `node tools/verify/build_harness.js endemic_demand_harness`.
 - **`ai_skill_harness`** — AI skill-regression instrument (BL-204,
   docs/ai/AI_OPPONENT.md § 3): freezes a 5-seed benchmark set (`world_params.seed`
   0-4, spanning the generator's body/terrain/market diversity), runs 300 ticks of
@@ -388,8 +399,9 @@ in `tools/verify/README.md`.
 
   **R1 — no orphan resources, EITHER direction.** Every `resource_type` must be obtainable (a recipe
   produces it, a deposit yields it, or it is an endemic good — the second deposit route, off
-  `planetology::endemics` in `tile_generation.cpp`, which is *not* in `k_extractable` and whose
-  omission makes all four endemics read as orphans) and wanted (a recipe consumes it, or a named
+  `planetology::endemics` in `tile_generation.cpp`; since BL-647 the four endemic luxuries are
+  ALSO in `k_extractable`, so extraction can target them and the older "not in `k_extractable`"
+  reading of this row is stale) and wanted (a recipe consumes it, or a named
   actor does via an **explicit** exemption table, so an orphan cannot hide as an assumed terminal).
   **Shipped RED on eight resources when this row was authored, which was the check working** — five
   of them (grain, fodder, salt, transport_capacity, bullion) were orphaned in both directions and were

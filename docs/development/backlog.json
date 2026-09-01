@@ -256,6 +256,29 @@
     "tools/verify/campaign_lapse.cpp"
    ],
    "design": "The coupled pairs, 2x2 or 3x3 each, run after their single-axis sweeps so the marginal cells have a baseline: (a) base price x ceiling - coupled through the haulage derivation; (b) opex (material-floor / wage scalar) x demand scale - the viability knife-edge, where the 30% idle floor was measured at ~61% of the residual spawn deficit; (c) unit upkeep x extraction levy - honouring the NATIONS.md sequencing rule (anchor and upkeep first, re-measure, then the levy: both at once makes the benchmark uninterpretable), so the interaction cell runs LAST and is read against the two singles.\n\nMETHOD AUTHORITY: DEVELOPMENT_PRACTICES' measuring-emergent-systems rules - measure the OFF state always; never assert a conservation you have not summed; a 28.2-point interaction once passed every per-knob sweep, which is why this item exists.\n\nDELIVERABLE: an interaction table per pair (effect of A at each level of B) and a ruling per pair on whether future tuning sessions may treat the two knobs as independent."
+  },
+  {
+   "status": "open",
+   "glyph": "~",
+   "priority": "C",
+   "difficulty": 2,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (BL-647 integration, cold-review finding 2)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-730",
+   "short_name": "TRADE_GOODS_MISC_BUYER",
+   "category": "Economy",
+   "title": "trade_goods_misc is produced, priced, and wanted by nothing - it needs an owner",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "scripts/economy.lua",
+    "tools/verify/chain_depth.cpp"
+   ],
+   "design": "BL-647's design names exactly four luxury goods (tobacco, spices, coffee, furs) and shipped exactly those - but two instruments (chain_depth.cpp, demand_census.cpp) had authored comments claiming BL-647 would also buy trade_goods_misc, which that landing falsified. The comments now point here.\n\nTHE QUESTION, not yet answered: which channel wants generic trade goods? Candidates: join the endemic luxury basket (cheapest - one Lua row - but dilutes the four-good directional-asymmetry design, since trade_goods_misc has no endemic geography); a wealth-scaled row in the ordinary household basket (a prosperity good without the endemism); or retirement from the roster if nothing distinctive wants it (a good with no buyer and no geography is a name, not a resource). Decide against MARKETS.md's admission rule: a consumer is a MECHANISM, not a noun, and every resource needs a path to a terminal sink in its band."
   }
  ]
 }

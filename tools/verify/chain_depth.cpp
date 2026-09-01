@@ -195,6 +195,7 @@ enum class injector
     none = 0,                   ///< The claim names no pass this registry knows.
     population_demand,
     background_demand,
+    endemic_demand,             ///< BL-647: inject_endemic_demand's wealth-scaled luxury pull.
     unit_upkeep_draw,
     building_upkeep_draw,       ///< BL-708: run_building_upkeep's per-type, era-banded goods draw.
     construction_material_draw,
@@ -208,6 +209,7 @@ const char* injector_label(injector i)
         case injector::none:                       return "(names no pass)";
         case injector::population_demand:          return "inject_population_demand";
         case injector::background_demand:          return "inject_background_demand";
+        case injector::endemic_demand:             return "inject_endemic_demand";
         case injector::unit_upkeep_draw:           return "run_unit_upkeep goods draw";
         case injector::building_upkeep_draw:       return "run_building_upkeep goods draw";
         case injector::construction_material_draw: return "construction material draw";
@@ -221,6 +223,7 @@ const char* injector_label(injector i)
 /// what each entry moves is still computed, never authored.
 constexpr injector k_injectors[] = {
     injector::population_demand, injector::background_demand,
+    injector::endemic_demand,
     injector::unit_upkeep_draw,  injector::construction_material_draw,
     injector::launch_draw,
 };
@@ -242,6 +245,11 @@ bool injector_moves(const recipe_registry& reg, injector i, std::size_t r)
             return reg.population_demand_basket()[r] > 0.0f;
         case injector::background_demand:
             return reg.background_demand_basket()[r] > 0.0f;
+        // BL-647: the era-resolved endemic fold — the exact vector
+        // inject_endemic_demand multiplies by, same discipline as the two
+        // basket cases above.
+        case injector::endemic_demand:
+            return reg.endemic_demand_basket()[r] > 0.0f;
         case injector::unit_upkeep_draw:
             return reg.military().upkeep.goods_per_head[r] > 0.0f;
         // BL-708. Resolved through `building_upkeep_goods` — the SAME free
@@ -411,16 +419,18 @@ const exemption k_actor_consumed[] = {
       "BL-350 procurement contracts (terminal object) - but procurement is a "
       "resource-agnostic transfer between two corps' pools, and nothing consumes "
       "what it delivers; the Space-programme budget line (BL-644) owns the first real buyer" },
-    { resource_type::tobacco, injector::none,
-      "mercantile demand, endemic good (BL-191) - endemic luxury demand (BL-647) owns the buyer" },
-    { resource_type::spices, injector::none,
-      "mercantile demand, endemic good (BL-191) - endemic luxury demand (BL-647) owns the buyer" },
-    { resource_type::coffee, injector::none,
-      "mercantile demand, endemic good (BL-191) - endemic luxury demand (BL-647) owns the buyer" },
-    { resource_type::furs, injector::none,
-      "mercantile demand, endemic good (BL-191) - endemic luxury demand (BL-647) owns the buyer" },
+    { resource_type::tobacco, injector::endemic_demand,
+      "the endemic luxury basket (BL-647) - wealth-scaled, nation-flavoured household pull" },
+    { resource_type::spices, injector::endemic_demand,
+      "the endemic luxury basket (BL-647) - wealth-scaled, nation-flavoured household pull" },
+    { resource_type::coffee, injector::endemic_demand,
+      "the endemic luxury basket (BL-647) - wealth-scaled, nation-flavoured household pull" },
+    { resource_type::furs, injector::endemic_demand,
+      "the endemic luxury basket (BL-647) - wealth-scaled, nation-flavoured household pull" },
     { resource_type::trade_goods_misc, injector::none,
-      "mercantile demand, endemic-luxury placeholder - endemic luxury demand (BL-647) owns the buyer" },
+      "mercantile demand - BL-647 shipped exactly the four goods its design names and "
+      "deliberately left this one out; the buyer is unowned, BL-730 (trade_goods_misc "
+      "buyer) carries finding it one" },
     { resource_type::tools, injector::none,
       "mercantile demand for now; a construction-material draw (BL-590) when it lands" },
     { resource_type::rigging, injector::none,
@@ -849,15 +859,11 @@ int main()
         for (const resource_type e : placement_rules::k_extractable)
             extractable[static_cast<std::size_t>(e)] = true;
 
-        // The SECOND obtainability route, and it is not k_extractable. Endemic
-        // goods (BL-191) are deposited by tile_generation.cpp's C->D pass off a
-        // body's `planetology::endemics`, which ADDS a deposit rather than
-        // scaling one — so they never appear in the extractable table. The
-        // eligible set is the terrain switch at tile_generation.cpp:1401.
-        // Without this, all four read as orphans and the row cries wolf.
-        for (const resource_type e : { resource_type::tobacco, resource_type::spices,
-                                       resource_type::coffee,  resource_type::furs })
-            extractable[static_cast<std::size_t>(e)] = true;
+        // The endemic goods used to need a manual union here: BL-191's C->D
+        // pass deposits them off `planetology::endemics`, and they were not in
+        // k_extractable, so they read as orphans without it. Since BL-647 they
+        // ARE in k_extractable (extraction can target what the channel buys),
+        // so the loop above already carries them and the union is gone.
 
         // THE CENSUS the registry makes possible, printed before the verdict so a
         // green row is never silent about what is holding it up. Ascending
