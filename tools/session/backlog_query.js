@@ -58,7 +58,23 @@ const openOnly = has('--open');
 const backlog = JSON.parse(fs.readFileSync(BL_PATH, 'utf8'));
 const cache = new Map();
 
-let hits = backlog.items.filter((it) => {
+// LANDED WORK NO LONGER LIVES IN THE HOT FILE (archive_landed.js, 2026-09-01), so a
+// query that could match a shipped item has to union the cold store back in.
+//
+// LAZILY, because the cold store is ~1.5 MB and the common query ("what's open at
+// priority A?") cannot match a landed item by construction — the default view drops
+// terminal items a few lines below. Four cases can:
+//   --all / an explicit BL-id  — asked for everything, or for one item by name.
+//   --status complete|shipped  — asked for landed work directly.
+//   --touches <doc>            — CLAUDE.md names this as how to answer "is this
+//                                built?", which is a question ABOUT landed work.
+//   --grep                     — a search that silently skipped everything shipped
+//                                would be worse than no search.
+const wantsLanded = showAll || ids.size > 0 || !!touches || !!grep
+    || (statuses || []).some((s) => A.TERMINAL.has(s));
+const pool = wantsLanded ? A.allItems(backlog, A.ROOT) : backlog.items;
+
+let hits = pool.filter((it) => {
     if (ids.size) return ids.has(it.id);
     const terminal = A.TERMINAL.has(it.status);
     if (openOnly && terminal) return false;
@@ -83,7 +99,7 @@ const RANK = { SSS: 0, S: 1, A: 2, B: 3, C: 4, F: 5 };
 hits.sort((a, b) => (RANK[a.priority] ?? 9) - (RANK[b.priority] ?? 9) || a.id.localeCompare(b.id));
 
 if (has('--count')) {
-    console.log(JSON.stringify({ matched: hits.length, of: backlog.items.length }));
+    console.log(JSON.stringify({ matched: hits.length, of: pool.length }));
     process.exit(hits.length ? 0 : 1);
 }
 

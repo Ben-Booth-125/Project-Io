@@ -30,6 +30,28 @@ $repo        = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Pa
 $backlogPath = Join-Path $repo 'docs/development/backlog.json'
 $items       = (Get-Content -Raw -Encoding UTF8 $backlogPath | ConvertFrom-Json).items
 
+# Landed items no longer live in backlog.json at all (archive_landed.js, 2026-09-01):
+# the hot file is the live worklist. "DONE lately" is a question about exactly the rows
+# that left, so fold the cold store back in. Whole rows only — a prose-only record from
+# the earlier archive_designs pass carries no `status` and is not an item.
+$archiveDir = Join-Path $repo 'docs/development/archive'
+if (Test-Path $archiveDir) {
+    $landed = foreach ($f in Get-ChildItem -Path $archiveDir -Filter 'backlog-design-*.json') {
+        $records = (Get-Content -Raw -Encoding UTF8 $f.FullName | ConvertFrom-Json).records
+        if ($null -eq $records) { continue }
+        foreach ($p in $records.PSObject.Properties) {
+            if ($null -eq $p.Value.status) { continue }
+            $row = $p.Value
+            if ($null -eq $row.id) { $row | Add-Member -NotePropertyName id -NotePropertyValue $p.Name -Force }
+            $row
+        }
+    }
+    # Hot wins on any id held both places, matching archive_store.allItems().
+    $hotIds = [System.Collections.Generic.HashSet[string]]::new()
+    $items | ForEach-Object { [void]$hotIds.Add($_.id) }
+    $items = @($items) + @($landed | Where-Object { -not $hotIds.Contains($_.id) })
+}
+
 $terminal = @('complete', 'shipped', 'delivered')
 $priOrder = @('SSS', 'S', 'A', 'B', 'C', 'F')
 $priRank  = @{}; for ($i = 0; $i -lt $priOrder.Count; $i++) { $priRank[$priOrder[$i]] = $i }

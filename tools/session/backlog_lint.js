@@ -74,6 +74,20 @@ if (!backlog || !reqs) {
   for (const it of backlog.items || []) {
     if (!/^BL-\d+$/.test(it.id || '')) fail(`malformed id "${it.id}" (short_name ${it.short_name || '?'}) — ids must match BL-\\d+.`);
   }
+  // A hot id that is ALSO in the cold store is the eviction's own failure mode
+  // (archive_landed.js, 2026-09-01): the row was copied out and not removed, or
+  // restored and not un-archived. Two rows for one id, in two files, with the query
+  // layer preferring the hot one — so the cold copy silently rots. Not a duplicate
+  // WITHIN the file, so the scan above cannot see it.
+  // WHOLE ROWS only, not landedIds(): every landed item has a prose record from the
+  // earlier archive_designs pass, and an item that is open again after being complete
+  // legitimately keeps that prose. Only a duplicated ROW is the fault.
+  const cold = new Set(A.landedItems(A.ROOT).map((i) => i.id));
+  for (const it of backlog.items || []) {
+    if (cold.has(it.id) && !A.TERMINAL.has(it.status)) {
+      fail(`${it.id} (${it.short_name || '?'}) is OPEN in backlog.json but also holds a whole row in the cold store — a restore that did not clear the cold copy. Re-run: node tools/session/archive_landed.js --restore, then re-evict.`);
+    }
+  }
 }
 
 // ---- index the backlog items by id ----
@@ -393,7 +407,11 @@ function checkVersionInversion() {
     const m = String(v || '').match(/^v(\d+)\.(\d+)\.(\d+)$/);
     return m ? (+m[1] * 10000 + +m[2] * 100 + +m[3]) : null;
   };
-  const byId = new Map(backlog.items.map((i) => [i.id, i]));
+  // Union the cold store: most `requires` targets are LANDED, and since
+  // archive_landed.js evicted their rows a hot-only index resolves them to undefined
+  // — which this loop treats as "no dependency" and skips. The check would have gone
+  // quietly vacuous rather than failing, which is the worse of the two.
+  const byId = new Map(A.allItems(backlog, A.ROOT).map((i) => [i.id, i]));
   for (const item of backlog.items) {
     if (TERMINAL.has(item.status) || item.parked) continue;
     const mine = ORD(item.version_goal);

@@ -142,7 +142,81 @@ function coldFraction(backlog) {
     return { cold, total, fraction: total ? cold / total : 0 };
 }
 
+// --- The WHOLE-ROW eviction (Ben, 2026-09-01: "drop them") -------------------
+//
+// archive_designs.js evicts a landed item's PROSE and leaves its index behind, so
+// the hot file still answers "what shipped" and "what touches this doc". Dropping
+// the index too makes backlog.json the LIVE WORKLIST and nothing else — but it
+// also means four readers can no longer see a landed item in the hot file at all,
+// and one of them is safety-critical:
+//
+//   next_id.js      — derives the next BL-id from the max id it can see. Its own
+//                     header records BL-326..BL-333 each landing TWICE when this
+//                     defence failed open. A dropped id it cannot see is an id it
+//                     will re-mint.
+//   backlog_query   — --touches <doc> is what CLAUDE.md names as the way to answer
+//                     "is this built?". That is a question about LANDED work.
+//   backlog_lint    — resolves `requires` targets, most of which are landed.
+//   status.ps1      — "DONE lately".
+//
+// So the cold store stops being prose-only and becomes the whole record. These two
+// accessors are how a reader gets the landed half back; every one of the four calls
+// one of them.
+
+const archiveFiles = (root = ROOT) => {
+    const dir = path.join(root, ARCHIVE_DIR);
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir)
+        .filter((f) => /^backlog-design-.*\.json$/.test(f))
+        .sort()
+        .map((f) => `${ARCHIVE_DIR}/${f}`);
+};
+
+// Every id the cold store knows, whole-row or prose-only. This is the set next_id
+// and the duplicate-id scan must union with the hot file: an id is SPENT whether or
+// not its row still sits in backlog.json.
+function landedIds(root = ROOT) {
+    const out = new Set();
+    for (const rel of archiveFiles(root)) {
+        const store = loadArchive(rel, root);
+        for (const id of Object.keys((store && store.records) || {})) out.add(id);
+    }
+    return out;
+}
+
+// Every landed item the cold store holds as a WHOLE ROW, reassembled. A record
+// written by archive_designs.js alone carries prose and no `status`, so it is not an
+// item and is skipped — only rows evicted by archive_landed.js come back here.
+function landedItems(root = ROOT) {
+    const out = [];
+    for (const rel of archiveFiles(root)) {
+        const store = loadArchive(rel, root);
+        for (const [id, rec] of Object.entries((store && store.records) || {})) {
+            if (!rec || typeof rec !== 'object' || rec.status === undefined) continue;
+            // `archived` is the hot row's pointer AT its cold file, and the eviction
+            // strips it going in (inside the file it is noise). Put it back on the way
+            // out, so a row read from cold is byte-identical to the row that left and
+            // --restore is a true inverse. Verified by round-trip: without this, every
+            // restored row came back one field short.
+            // `_row_keys` is archive_landed.js's restore bookkeeping, not item data.
+            const { _row_keys, ...row } = rec;
+            out.push({ id, ...row, archived: rel });
+        }
+    }
+    return out;
+}
+
+// Hot items plus the landed rows that have left the hot file, de-duplicated with the
+// HOT ROW WINNING. Hot wins because a restore-in-progress or a hand-edit lives there,
+// and a stale cold copy must never shadow it.
+function allItems(backlog, root = ROOT) {
+    const hot = (backlog && backlog.items) || [];
+    const seen = new Set(hot.map((i) => i.id));
+    return hot.concat(landedItems(root).filter((i) => !seen.has(i.id)));
+}
+
 module.exports = {
     ROOT, ARCHIVE_DIR, NARRATIVE, INDEX_KEEP, TERMINAL,
     narrativeFieldsOf, isPointer, bucketFor, archivePath, loadArchive, newArchive, resolve, coldFraction,
+    archiveFiles, landedIds, landedItems, allItems,
 };

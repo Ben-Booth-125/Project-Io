@@ -36,6 +36,9 @@ const BACKLOG = 'docs/development/backlog.json';
 // folds these ids into the max, so two concurrent sessions can't mint the same id off a
 // stale backlog max. One JSON object per line: {id, name, ts, branch}.
 const LEDGER = 'docs/development/id_reservations.jsonl';
+// Cold store written by archive_landed.js. Landed ids no longer live in BACKLOG at
+// all, so these files are a first-class scan source rather than an optimisation.
+const ARCHIVE_DIR = 'docs/development/archive';
 
 // backlog.json is ~830 KB and growing; node's default execFile maxBuffer is 1 MB. Once it
 // crosses that line every `git show <ref>:backlog.json` starts throwing ENOBUFS — another
@@ -115,6 +118,64 @@ function itemsFromRef(ref) {
   if (!r.ok) { noteReadFailure(ref, BACKLOG, r); return []; }
   return itemsFromText(r.out, `${ref}:${BACKLOG}`);
 }
+
+// --- The cold store (2026-09-01) --------------------------------------------
+//
+// archive_landed.js evicts a LANDED item's whole row from backlog.json, so from
+// this tool's point of view a shipped id simply vanishes from the file it scans.
+// That is precisely the fail-open this tool's header exists to describe: BL-326..
+// BL-333 each landed TWICE because a defence returned a confident number from an
+// incomplete scan. An id is SPENT whether or not its row is still hot, so the cold
+// files are scanned as first-class sources — on the working tree and on every ref.
+//
+// Names are not available cold-side per-id without parsing each store, so records
+// report as "(landed)". That is enough: this scan needs the ID SET and the max, and
+// the collision report only fires on an id carrying two DIFFERENT names — a landed
+// id colliding with a live one still shows both.
+function coldIdsFromText(txt, source) {
+  let j;
+  try { j = JSON.parse(txt); } catch (e) {
+    problems.push(`unparseable cold store at ${source}: ${e.message}`);
+    return [];
+  }
+  // name: null == id only. A whole ROW evicted by archive_landed.js does carry its
+  // short_name, so it still participates in the divergence check; a prose-only
+  // record from archive_designs.js does not, and must not invent one.
+  const recs = (j && j.records) || {};
+  return Object.keys(recs).filter(isId).map((id) => ({
+    id,
+    name: recs[id] && typeof recs[id].short_name === 'string' ? recs[id].short_name : null,
+  }));
+}
+function coldFilesOnRef(ref) {
+  const r = gitTry(['ls-tree', '--name-only', `${ref}:${ARCHIVE_DIR}`]);
+  if (!r.ok) { noteReadFailure(ref, ARCHIVE_DIR, r); return []; }
+  return r.out.split('\n').filter((f) => /^backlog-design-.*\.json$/.test(f.trim()));
+}
+function coldFromRef(ref) {
+  const out = [];
+  for (const f of coldFilesOnRef(ref)) {
+    const rel = `${ARCHIVE_DIR}/${f.trim()}`;
+    const r = gitTry(['show', `${ref}:${rel}`]);
+    if (!r.ok) { noteReadFailure(ref, rel, r); continue; }
+    out.push(...coldIdsFromText(r.out, `${ref}:${rel}`));
+  }
+  return out;
+}
+function coldFromWorking() {
+  const dir = path.join(ROOT, ARCHIVE_DIR);
+  if (!fs.existsSync(dir)) return [];
+  const out = [];
+  for (const f of fs.readdirSync(dir).filter((x) => /^backlog-design-.*\.json$/.test(x))) {
+    const rel = `${ARCHIVE_DIR}/${f}`;
+    try {
+      out.push(...coldIdsFromText(fs.readFileSync(path.join(ROOT, rel), 'utf8'), `(working tree) ${rel}`));
+    } catch (e) {
+      problems.push(`could not read working-tree ${rel}: ${e.message}`);
+    }
+  }
+  return out;
+}
 function itemsFromWorking() {
   try {
     return itemsFromText(fs.readFileSync(path.join(ROOT, BACKLOG), 'utf8'), '(working tree)');
@@ -126,9 +187,15 @@ function itemsFromWorking() {
 
 // id -> Map(short_name -> Set(sources)). Divergent short_names for one id = collision.
 const byId = new Map();
+// `name === null` means ID ONLY: the id is spent and must lift the max, but it
+// contributes NO name to the divergence check. That is how the cold store reports —
+// a prose-only archive record carries no short_name, and a landed id cannot be an
+// IN-FLIGHT collision by definition. Without this the eviction turned every archived
+// id into a false positive and buried the real ones under 452 rows.
 const record = (source, items) => {
   for (const { id, name } of items) {
     if (!byId.has(id)) byId.set(id, new Map());
+    if (name === null || name === undefined) continue;
     const names = byId.get(id);
     if (!names.has(name)) names.set(name, new Set());
     names.get(name).add(source);
@@ -186,9 +253,14 @@ if (scanBroken && !allowNoRefs) {
   process.exit(1);
 }
 
-for (const r of allRefs || []) { record(r, itemsFromRef(r)); record(r + ' (ledger)', ledgerFromRef(r)); }
+for (const r of allRefs || []) {
+  record(r, itemsFromRef(r));
+  record(r + ' (ledger)', ledgerFromRef(r));
+  record(r + ' (cold)', coldFromRef(r));
+}
 record('(working tree)', itemsFromWorking());
 record('(ledger)', ledgerFromWorking());
+record('(cold store)', coldFromWorking());
 
 let max = 0, maxWhere = [];
 for (const [id, names] of byId) {
