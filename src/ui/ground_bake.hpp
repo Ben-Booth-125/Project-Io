@@ -34,18 +34,33 @@ struct world;
 namespace ui::ground {
 
 /// Pixel geometry of one whole-body bake target.
+///
+/// TILT (BL-737, the stepped 2.5D): a tilted geometry bakes the ground for an
+/// axonometric camera that will squash y by `tilt_sy` at draw time. The bake
+/// stays in GROUND coordinates — the canvas's vertex squash is the camera —
+/// but pre-compensates what a quad transform cannot do: the height field
+/// displaces content upward by `lift` canonical units per unit height (hills
+/// grow silhouettes), and upright features (tree trunks, canopies) bake with
+/// their vertical extent stretched by 1/tilt_sy so they stand correctly once
+/// squashed. Flat geometry has tilt_sy = 1, lift = 0 and behaves exactly as
+/// before.
 struct geometry
 {
     int    gw = 0, gh = 0;   ///< Grid dimensions.
     double s  = 1.0;         ///< Pixels per canonical unit (the baked hex circumradius, px).
     int    W  = 0, H = 0;    ///< Whole-image pixel size. W spans exactly one wrap period.
     double y_min = 0.0;      ///< Canonical y of pixel row 0 (top margin above row 0's hexes).
+    double tilt_sy = 1.0;    ///< cos(tilt) the camera will apply; 1 = flat.
+    double lift    = 0.0;    ///< Upward displacement per unit height, canonical units.
 };
 
 /// Derive the bake geometry for a body grid at roughly @p target_px_per_r
 /// baked pixels per hex circumradius. W is rounded to a whole pixel count and
 /// s re-derived from it, so wrap copies of the image abut exactly.
-geometry make_geometry(int gw, int gh, double target_px_per_r);
+/// @p tilt_sy < 1 makes an oblique geometry (see struct comment): lift is
+/// derived as 0.9 * tan(tilt) and the top margin grows to hold displaced
+/// peaks and standing trees.
+geometry make_geometry(int gw, int gh, double target_px_per_r, double tilt_sy = 1.0);
 
 /// Tuning constants for the bake, C-F defaults (painterly relief + near-future
 /// grade). One struct so the look is dialled in one place; the grade sub-block
@@ -75,6 +90,13 @@ struct bake_params
     float tree_density    = 1.0f;   ///< Global multiplier on per-tile tree counts.
     float ridge_strength  = 0.75f;  ///< How far mountain detail mixes toward ridged noise.
     float rock_exposure   = 0.5f;   ///< Slope-driven rock colour on steep ground.
+    // Edge passes (BL-736, the sharpness ruling: "still a general blur" — the
+    // eye reads sharpness from edges, and the interpolated field has none).
+    // All post passes run on an internal apron so they cannot seam at a chunk
+    // edge, and none touches the lock fill or the transparent margin.
+    float edge_ink        = 0.30f;  ///< Darkening where two cover classes meet (>= 20 px/r).
+    float shore_ink       = 0.42f;  ///< Darkening on the land|water boundary (stronger).
+    float unsharp_amount  = 0.50f;  ///< Unsharp-mask strength at >= 40 px/r.
     // Water.
     float water_noise     = 0.03f;
     // Near-future grade (the separable pass).

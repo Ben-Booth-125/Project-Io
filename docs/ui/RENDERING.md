@@ -174,10 +174,38 @@ what keeps a step transition shimmer-free):
 **Known bound:** past the 96 px tier there is nothing sharper, so on a much taller
 window than the reference the top rung magnifies beyond the headroom (e.g. ~2× at a
 4K-height canvas). Acceptable for the prototype's windows; a 192 px tier is the lever
-if large-display play starts to matter. **The steps are the 2.5D seam:** a later stage
-may hang per-step *art* (an oblique treatment on the close rungs) off the same ladder
-without touching the zoom model again — the staged path's next foothold, short of the
-3D milestone. The existing 7 px vector pivot remains only in the fallback path.
+if large-display play starts to matter. The existing 7 px vector pivot remains only in
+the fallback path.
+
+### The stepped tilt — the 2.5D seam, taken
+
+The top two rungs **view the land obliquely** (Ben, 2026-09-02, from the reference
+mock: *"a stepped tilt… the land at roughly 45 degrees at max zoom"*): rung 3 at
+22.5°, rung 4 at 45°, axonometric — a y-squash by cos(tilt), no perspective
+convergence — snapping with the zoom step. Tilt is a **pure function of zoom**
+(`planetary_tilt_sy`; thresholds at the rung midpoints), so verify's free-form zooms
+stay deterministic, and it applies on the **plain canvas only**: a lens is an
+analytic read and stays flat.
+
+Two halves make it:
+
+- **The camera is one vertex squash.** The canvas draws everything in flat ground
+  space; a single transform over the map-space vertex range squashes fills, strokes,
+  images and labels alike about the canvas centre, and one inverse on the cursor
+  keeps every hit test correct. Height displacement is deliberately ignored for
+  hits — a few px on mountain tops.
+- **The tilted rungs bake OBLIQUE tiers** (a tier is keyed by resolution *and*
+  tilt): the height field displaces content upward by `lift = 0.9·tan(tilt)`
+  canonical units per unit height, so hills grow real silhouettes (a masked
+  re-resolve locks, so a peak truncates at the survey mask rather than leaking);
+  trees bake as **standing sprites** — trunk, upright canopy, shadow left on the
+  ground plane — with their verticals pre-stretched by 1/cos(tilt) so the camera
+  squash returns them to true proportion. The lift stays modest, so the projection
+  is monotonic and needs no occlusion handling.
+
+The far page and the low tiers stay flat; while a tilted tier fills, the squashed
+flat bake stands in — geometry aligns, only the relief displacement arrives with the
+chunks. Deterministic and wrap-exact (`ground_bake_check` P9).
 
 ---
 

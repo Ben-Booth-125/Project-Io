@@ -31,16 +31,24 @@ verify.set_zoom(5)
 verify.frames(2)
 verify.capture("ground_bake_play")
 
--- Rung 3 (~51 px hexes): the 48 px tier, close-grain octave active. The bake's
--- own grain carries the ground; the vector texture pass must NOT be drawing.
+-- Rung 3 (~51 px hexes): the 48 px tier, close-grain octave active, TILTED
+-- 22.5 degrees (BL-737). The bake's own grain carries the ground; the vector
+-- texture pass must NOT be drawing.
 verify.set_zoom(10)
 verify.frames(2)
 verify.capture("ground_bake_close")
 
--- Rung 4 (~102 px hexes): the 96 px tier — the top of the ladder.
+-- Rung 4 (~102 px hexes): the 96 px tier — the top of the ladder, TILTED 45
+-- degrees: height-displaced hills, standing trees, squashed chrome.
 verify.set_zoom(20)
 verify.frames(2)
 verify.capture("ground_bake_closest")
+
+-- Between rungs (free-form zoom 8): tilt is a pure function of zoom, so this
+-- lands on the 22.5-degree side of the rung-2/3 midpoint deterministically.
+verify.set_zoom(8)
+verify.frames(2)
+verify.capture("ground_bake_midrung_tilt")
 
 -- Wrap: back to the play tier, panned half a period so the cylinder seam
 -- crosses mid-frame.

@@ -342,6 +342,7 @@ struct ground_request
     entity_id body = null_entity;
     float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
     float draw_r = 0;                ///< Drawn hex circumradius, screen px.
+    float sy     = 1.0f;             ///< Camera squash cos(tilt); < 1 wants an oblique tier (BL-737).
     bool  valid = false;
 };
 

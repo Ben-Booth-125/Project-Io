@@ -795,7 +795,7 @@
     "The app is in-game and no ImGui text field has keyboard focus.",
     "The current rung is not at its zoom bound in that direction."
    ],
-   "expected_output": "The view zooms about the canvas centre. On the Planetary rung a press lands on the next rung of the fixed x2 ladder (same ladder as the wheel; the baked ground swaps to that rung's texture tier); on the other rungs it is a continuous x1.1 change. No selection or lens state changes.",
+   "expected_output": "The view zooms about the canvas centre. On the Planetary rung a press lands on the next rung of the fixed x2 ladder (same ladder as the wheel; the baked ground swaps to that rung's texture tier; the top two rungs tilt the land 22.5 / 45 degrees on the plain canvas); on the other rungs it is a continuous x1.1 change. No selection or lens state changes.",
    "reason_to_select": "Zoom without the mouse — the keyboard leg of the pan/zoom pair for keyboard-only driving."
   },
   {
@@ -834,7 +834,7 @@
     "The pointer is over the primary canvas, not the minimap inset or an ImGui panel.",
     "The current rung is not already at its zoom bound in that direction (zoom is clamped per rung)."
    ],
-   "expected_output": "The view zooms about the cursor (the point under the mouse stays fixed). On the Planetary rung the zoom lands on the next rung of the fixed x2 ladder and the baked ground swaps to that rung's texture tier (briefly softer while the tier's chunks arrive, then crisp); fractional wheel deltas accumulate and a rung fires per whole notch, at most one rung per frame. On the Solar and Circumplanetary rungs zoom is continuous (x1.1 per notch). No selection or lens state changes.",
+   "expected_output": "The view zooms about the cursor (the point under the mouse stays fixed). On the Planetary rung the zoom lands on the next rung of the fixed x2 ladder and the baked ground swaps to that rung's texture tier (briefly softer while the tier's chunks arrive, then crisp). The top two rungs additionally TILT the land (22.5 / 45 degrees, plain canvas only; a lens stays flat); fractional wheel deltas accumulate and a rung fires per whole notch, at most one rung per frame. On the Solar and Circumplanetary rungs zoom is continuous (x1.1 per notch). No selection or lens state changes.",
    "reason_to_select": "Move closer to or further from a specific spot — cursor anchoring means you aim the zoom at the thing you are interested in."
   },
   {

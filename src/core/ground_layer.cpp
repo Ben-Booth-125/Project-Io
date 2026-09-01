@@ -102,6 +102,7 @@ void ground_layer::reset(entity_id body, const world& w)
     for (int t = 0; t < k_tiers; ++t)
     {
         m_tiers[t].geom_ppr = k_tier_ppr[t];
+        m_tiers[t].baked_sy = 1.0;
         m_tiers[t].geom = ui::ground::make_geometry(b.grid_width, b.grid_height, k_tier_ppr[t]);
         m_tiers[t].cw = (m_tiers[t].geom.W + k_chunk_px - 1) / k_chunk_px;
         m_tiers[t].ch = (m_tiers[t].geom.H + k_chunk_px - 1) / k_chunk_px;
@@ -355,6 +356,25 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
         if (m_active_tier >= 0)
         {
             tier_state& t = m_tiers[m_active_tier];
+            // BL-737: the tilted rungs want OBLIQUE tiers. A tilt change
+            // rebuilds this tier's geometry and drops its chunks; the tilt is
+            // rung-locked, so this fires on rung transitions only. The
+            // generation bump orphans any in-flight bake against the old
+            // projection (upload clears its flag and drops the result).
+            const double want_sy =
+                std::clamp(static_cast<double>(req.sy > 0.0f ? req.sy : 1.0f), 0.3, 1.0);
+            if (std::fabs(want_sy - t.baked_sy) > 1e-3)
+            {
+                for (auto& [k, c] : t.chunks)
+                    if (c.tex)
+                        SDL_DestroyTexture(c.tex);
+                t.chunks.clear();
+                t.geom = ui::ground::make_geometry(t.geom.gw, t.geom.gh, t.geom_ppr, want_sy);
+                t.cw = (t.geom.W + k_chunk_px - 1) / k_chunk_px;
+                t.ch = (t.geom.H + k_chunk_px - 1) / k_chunk_px;
+                t.baked_sy = want_sy;
+                ++m_gen;
+            }
             const double s = t.geom.s;
             const int ci_lo = static_cast<int>(std::floor(req.x0 * s / k_chunk_px)) - 1;
             const int ci_hi = static_cast<int>(std::ceil (req.x1 * s / k_chunk_px));

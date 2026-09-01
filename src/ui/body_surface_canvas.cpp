@@ -2160,6 +2160,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                          ? ImVec2{state.mouse.x, state.mouse.y}
                          : ImVec2{-1.0f, -1.0f}; // off-screen sentinel suppresses hover
 
+    // --- BL-737: the stepped tilt camera -----------------------------------
+    // The top zoom rungs view the land obliquely (22.5°/45°). The canvas keeps
+    // drawing entirely in FLAT ground space; one vertex-range squash at the
+    // end of the map passes is the camera, and this inverse maps the real
+    // cursor into that flat space so every existing hit test works unchanged.
+    // Tilt is a pure function of zoom (verify's free-form zooms included) and
+    // applies on the plain canvas only — a lens is an analytic read and stays
+    // flat, which also keeps its legend chrome out of the squash.
+    const float  tilt_sy    = state.overlay == overlay_mode::none
+                                  ? planetary_tilt_sy(zoom) : 1.0f;
+    const float  tilt_pivot = canvas_centre.y;
+    const ImVec2 mouse_g    = { mouse.x,
+                                tilt_pivot + (mouse.y - tilt_pivot) / tilt_sy };
+
     // Hover resolves to a single tile copy. Adjacent hexes' circular hit-tests
     // overlap, and the cylinder draws several wrap copies of each tile, so more
     // than one (tile, copy) can satisfy the hover test at once. The nearest hex
@@ -2262,13 +2276,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // visibility is the wrap-window test itself, hoisted to the top of the loop
     // body — an off-screen tile costs one bounds test and one multiply-compare.
     const float row_pitch = 1.5f * hex_size; // hex_local_centre's vertical pitch
+    // The clip edges map into GROUND space first (the camera squash shows a
+    // taller ground band than the screen band when tilted — BL-737).
+    const float clip_top_g = tilt_pivot + (grid_area_origin.y - hit_r - tilt_pivot) / tilt_sy;
+    const float clip_bot_g = tilt_pivot
+        + (grid_area_origin.y + grid_area_size.y + hit_r - tilt_pivot) / tilt_sy;
     const int row_lo = raster_ok ? std::max(
         0, static_cast<int>(std::floor(
-               ((grid_area_origin.y - hit_r - view_origin.y) / zoom + grid_cy) / row_pitch)))
+               ((clip_top_g - view_origin.y) / zoom + grid_cy) / row_pitch)))
         : 0;
     const int row_hi = raster_ok ? std::min(
         gh - 1, static_cast<int>(std::ceil(
-               ((grid_area_origin.y + grid_area_size.y + hit_r - view_origin.y) / zoom + grid_cy) / row_pitch)))
+               ((clip_bot_g - view_origin.y) / zoom + grid_cy) / row_pitch)))
         : -1;
 
     // --- BL-732: the baked painterly ground (docs/ui/RENDERING.md) ----------
@@ -2298,8 +2317,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         state.ground_req.y0     = 1.5f * static_cast<float>(row_lo) - 1.0f;
         state.ground_req.y1     = 1.5f * static_cast<float>(row_hi) + 1.0f;
         state.ground_req.draw_r = draw_r; ///< Picks the bake tier (stepped ladder).
+        state.ground_req.sy     = tilt_sy; ///< The tilted rungs want oblique tiers (BL-737).
         state.ground_req.valid  = raster_ok;
     }
+    // BL-737: everything from here to the camera squash at the end of the map
+    // passes draws in FLAT ground space; the squash over this vertex range IS
+    // the tilt. (The background rect, title and chrome above this line stay
+    // screen-space.)
+    const int v_map_start = dl->VtxBuffer.Size;
+
     if (ground_on)
     {
         // Draw one image quad per wrap copy that intersects the canvas. The
@@ -2326,6 +2352,29 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         draw_ground_rect(gview.far);
         for (const ground_chunk_view& cv : gview.chunks)
             draw_ground_rect(cv);
+
+        // BL-736: the ground-detail metric — the texel renderer's answer to a
+        // polygon count. Rides the existing frame-HUD toggle; texel:pixel is
+        // the number that says whether "blurry" is a resolution problem (it
+        // is not, when this reads ~0.85-1.0) or a content problem.
+        if (state.show_frame_hud)
+        {
+            char gbuf[96];
+            if (gview.tier_ppr > 0.0)
+                std::snprintf(gbuf, sizeof gbuf,
+                              "ground: tier %.0f px/r  ·  %.2f texel/px  ·  %d chunks",
+                              gview.tier_ppr, gview.tier_ppr / draw_r,
+                              static_cast<int>(gview.chunks.size()));
+            else
+                std::snprintf(gbuf, sizeof gbuf,
+                              "ground: far page 6 px/r  ·  %.2f texel/px",
+                              6.0f / draw_r);
+            // Foreground list: HUD text must not ride the tilt camera's squash.
+            ImGui::GetForegroundDrawList()->AddText(
+                { grid_area_origin.x + 8.0f,
+                  grid_area_origin.y + grid_area_size.y - 22.0f },
+                IM_COL32(200, 210, 220, 200), gbuf); // fit-exempt: debug HUD line
+        }
     }
 
     // --- BL-511: the province fill cache ------------------------------------
@@ -3869,8 +3918,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // lands on the copy actually under the cursor; nearest centre wins.
             if (input_enabled)
             {
-                const float dx = mouse.x - cx;
-                const float dy = mouse.y - cy;
+                const float dx = mouse_g.x - cx;
+                const float dy = mouse_g.y - cy; // ground-space cursor (BL-737)
                 const float d2 = dx * dx + dy * dy;
                 const bool in_area = mouse.x >= grid_area_origin.x &&
                                      mouse.x <= grid_area_origin.x + grid_area_size.x &&
@@ -4245,7 +4294,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     {
         structure_kind hk = structure_kind::nation;
         const entity_id hovered_structure =
-            resolve_structure_hit(state.structure_hit_zones, mouse.x, mouse.y, &hk);
+            resolve_structure_hit(state.structure_hit_zones, mouse_g.x, mouse_g.y, &hk);
         const char* label = nullptr;
         ImU32       label_col = palette::neutral;
         if (hovered_structure != null_entity && hk == structure_kind::nation)
@@ -4261,7 +4310,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             ImDrawList* fdl = ImGui::GetForegroundDrawList();
             const ImVec2 ts  = ImGui::CalcTextSize(label);
             const float  pad = 5.0f;
-            const ImVec2 tl { mouse.x + 14.0f, mouse.y + 14.0f };
+            // Positioned at the GROUND-space cursor: the camera squash maps it
+            // back onto the real one (BL-737).
+            const ImVec2 tl { mouse_g.x + 14.0f, mouse_g.y + 14.0f };
             const ImVec2 br { tl.x + ts.x + pad * 2.0f, tl.y + ts.y + pad * 2.0f };
             fdl->AddRectFilled(tl, br, IM_COL32(18, 18, 24, 235), 3.0f);
             fdl->AddRect(tl, br, label_col, 3.0f, 0, 1.5f);
@@ -4277,7 +4328,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // Resolve the highest-priority entity under the cursor (shared with the
         // click path below — resolve_marker_hit, BL-362).
         const entity_id marker_hover =
-            resolve_marker_hit(state.marker_hit_zones, mouse.x, mouse.y);
+            resolve_marker_hit(state.marker_hit_zones, mouse_g.x, mouse_g.y);
 
         // A built tile resolves to its BUILDING across the whole hex, not just inside
         // the glyph's radius: once a tile carries an installation, the installation is
@@ -4914,6 +4965,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
+    // BL-737: the camera. One squash over every map-space vertex emitted since
+    // v_map_start — fills, strokes, ground images, glyphs and labels alike —
+    // about the canvas centre. Chrome drawn before the marker, ImGui windows
+    // (hover card, ledgers) and the foreground list are untouched.
+    if (tilt_sy < 1.0f)
+    {
+        ImDrawVert* vtx = dl->VtxBuffer.Data;
+        const int   n   = dl->VtxBuffer.Size;
+        for (int vi = v_map_start; vi < n; ++vi)
+            vtx[vi].pos.y = tilt_pivot + (vtx[vi].pos.y - tilt_pivot) * tilt_sy;
+    }
+
     // Pan and zoom. Middle mouse button pans; scroll wheel zooms, anchored at
     // the cursor so the point under the mouse stays fixed.
     {
@@ -4945,11 +5008,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const int dir = state.planetary_wheel_accum > 0.0f ? +1 : -1;
             state.planetary_wheel_accum = 0.0f;
             const float new_zoom = planetary_zoom_stepped(zoom, dir);
-            // World point under the cursor, kept fixed across the zoom change.
+            // World point under the cursor, kept fixed across the zoom change —
+            // read through the OLD tilt's inverse, re-projected through the NEW
+            // tilt's (a step can cross a tilt threshold; the point under the
+            // cursor must land back under the cursor either side — BL-737).
+            const float new_sy = state.overlay == overlay_mode::none
+                                     ? planetary_tilt_sy(new_zoom) : 1.0f;
             const ImVec2 wp = { (mouse.x - view_origin.x) / zoom + grid_cx,
-                                (mouse.y - view_origin.y) / zoom + grid_cy };
+                                (mouse_g.y - view_origin.y) / zoom + grid_cy };
+            const float target_gy = tilt_pivot + (mouse.y - tilt_pivot) / new_sy;
             state.planetary_pan_x = mouse.x - (wp.x - grid_cx) * new_zoom - canvas_centre.x;
-            state.planetary_pan_y = mouse.y - (wp.y - grid_cy) * new_zoom - canvas_centre.y;
+            state.planetary_pan_y = target_gy - (wp.y - grid_cy) * new_zoom - canvas_centre.y;
             state.planetary_zoom  = new_zoom;
         }
     }
@@ -4967,6 +5036,17 @@ float planetary_zoom_stepped(float current, int direction)
         : static_cast<int>(std::ceil (k_exact - eps)) - 1;
     const int   kc = std::clamp(k, 0, k_zoom_rungs - 1);
     return std::min(kMinZoom * static_cast<float>(1 << kc), kMaxZoom);
+}
+
+float planetary_tilt_sy(float zoom)
+{
+    // Thresholds at the geometric midpoints between rungs 2/3 and 3/4, so a
+    // free-form zoom lands on the tilt of its nearest rung.
+    if (zoom >= kMinZoom * 11.31f)
+        return 0.70710678f; // 45°
+    if (zoom >= kMinZoom * 5.657f)
+        return 0.92387953f; // 22.5°
+    return 1.0f;
 }
 
 } // namespace ui

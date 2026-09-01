@@ -64,6 +64,7 @@ private:
     struct tier_state
     {
         double                geom_ppr = 0.0;
+        double                baked_sy = 1.0; ///< Tilt the tier is baked at (BL-737).
         ui::ground::geometry  geom;
         int                   cw = 0, ch = 0;
         std::unordered_map<std::uint32_t, chunk> chunks; ///< key = cj * cw + ci

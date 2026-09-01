@@ -253,6 +253,21 @@ int main()
         bake_region(src, g48, p, px0 + g48.W, py0, side, side, e48.data());
         check(a48 == b48, "P8", "48 px tier bakes byte-identical twice (stamps + ridged active)");
         check(a48 == e48, "P8", "48 px tier wraps byte-identical one period east");
+
+        // P9 — the OBLIQUE bake (BL-737): at 45 degrees the same window bakes
+        // byte-identical twice and one wrap period east; and the projection
+        // actually projects (the tilted window differs from the flat one).
+        const geometry g45 = make_geometry(hb.grid_width, hb.grid_height, 48.0, 0.70710678);
+        const int tpy0 = std::clamp(
+            static_cast<int>((fy - g45.y_min) * g45.s) - side / 2, 0, std::max(0, g45.H - side));
+        std::vector<std::uint32_t> t1(a48.size()), t2(a48.size()), t3(a48.size());
+        bake_region(src, g45, p, px0, tpy0, side, side, t1.data());
+        bake_region(src, g45, p, px0, tpy0, side, side, t2.data());
+        bake_region(src, g45, p, px0 + g45.W, tpy0, side, side, t3.data());
+        check(t1 == t2, "P9", "45-degree oblique bake is byte-identical twice");
+        check(t1 == t3, "P9", "45-degree oblique bake wraps byte-identical one period east");
+        check(g45.lift > 0.8 && g45.lift < 1.0, "P9", "45-degree lift derives to ~0.9 canonical");
+        check(t1 != a48, "P9", "the oblique projection differs from the flat bake");
     }
 
     // ------------------------------------------------------------------
@@ -349,6 +364,29 @@ int main()
             write_png_rgba("ground_preview_v7_forest48.png", PW, PH,
                            reinterpret_cast<const unsigned char*>(buf.data()), PW * 4);
             std::printf("preview: ground_preview_v7_forest48.png\n");
+
+            // The same window through the 45-degree oblique bake — standing
+            // trees, height-displaced hills — squashed by the camera factor so
+            // the PNG previews what the player will actually see.
+            const geometry g45p = make_geometry(hb.grid_width, hb.grid_height, 48.0, 0.70710678);
+            const int opy0 = std::clamp(
+                static_cast<int>((fy - g45p.y_min) * g45p.s) - PH / 2,
+                0, std::max(0, g45p.H - PH));
+            bake_region(src, g45p, p, fpx0, opy0, PW, PH, buf.data());
+            // Nearest-row squash to cos(45): sample source row py/0.7071.
+            std::vector<std::uint32_t> sq(static_cast<std::size_t>(PW) * PH, 0u);
+            for (int y = 0; y < PH; ++y)
+            {
+                const int syr = std::min(PH - 1,
+                                         static_cast<int>(std::lround(y / 0.70710678)));
+                if (syr < PH)
+                    std::memcpy(sq.data() + static_cast<std::size_t>(y) * PW,
+                                buf.data() + static_cast<std::size_t>(syr) * PW,
+                                static_cast<std::size_t>(PW) * 4u);
+            }
+            write_png_rgba("ground_preview_v8_tilt45.png", PW, PH,
+                           reinterpret_cast<const unsigned char*>(sq.data()), PW * 4);
+            std::printf("preview: ground_preview_v8_tilt45.png\n");
         }
     }
 

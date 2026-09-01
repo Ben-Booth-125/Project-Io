@@ -10,6 +10,38 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-02 (sprint 30 opens) — The ground gets its edges back, and the land tilts
+
+**Mode:** Full, batch (BL-736 + BL-737), committed as one intertwined change on Ben's
+call — he paused the pre-commit review fleet and took the improvement as-is, noting *"I
+expect we will want a different approach later on"* (the 3D milestone stays the likely
+destination; everything here — brushes, stamps, the tilt seam — carries into it).
+
+**BL-736 (ground sharpness pass).** Diagnosis first: texel:pixel is ~0.85–1.0 at every
+rung, so "still a general blur" was edge content, not resolution — the new ground HUD
+line (tier, texel/px, chunks; the texel renderer's polygon count) makes that measurable.
+The bake became an apron orchestrator (A=6, post passes can't seam at chunk edges):
+cover-boundary + shoreline INK (1 px, follows the warped organic edge for free),
+UNSHARP mask at ≥ 40 px/r (tag-gated, kernel-reach checked so the survey mask stays
+byte-exact), grade haze halves / contrast rises with resolution. The v7 forest preview
+reads like a hand-inked map.
+
+**BL-737 (stepped tilt).** The reference mock's feature, taken: rungs 3/4 view the land
+at 22.5°/45°, axonometric, tilt a pure function of zoom, plain canvas only. The camera
+is ONE vertex-range squash about the canvas centre plus one inverse on the cursor —
+every existing hit test unchanged; the tilted rungs bake OBLIQUE tiers (tier keyed
+ppr+tilt): height displaces rows into real hill silhouettes (double-gather resolve,
+masked re-resolve locks so peaks truncate at the survey mask), and trees STAND — trunk,
+upright canopy pre-stretched 1/cos(tilt), shadow left on the ground plane.
+ground_bake_check grew to 17 checks (P9: oblique determinism + wrap); live on the
+Release build: click/hover/step all correct at the tilted rungs.
+
+**Caveat recorded:** the 21-agent review fleet over this diff was stopped before its
+verdicts on Ben's instruction — this batch, unlike waves 1–2, shipped without the
+adversarial pass. The next session should treat the tilt/apron seams as unreviewed.
+
+---
+
 ## 2026-09-01 (BL-735, wave 2) — The ground sharpens, steps, and stops stalling
 
 **Mode:** Full. **Runtime:** same evening as the BL-732 delivery; Ben judged the first bake

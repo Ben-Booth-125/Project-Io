@@ -611,7 +611,10 @@ for i in 0..5:
 - **Middle mouse button drag:** pan. Horizontal panning is unbounded — the grid is a cylinder, so panning past the east or west edge wraps seamlessly to the opposite side. Each tile is drawn (and hit-tested) at every horizontal offset that falls within the canvas, so there is no visible seam and the column under the cursor is always correct.
 - **Scroll wheel:** zoom, anchored at the cursor position — **stepped**, one ×2 ladder
   rung per notch (Ben, 2026-09-01; [RENDERING.md](RENDERING.md) § Level of detail owns the
-  ladder and its bake-tier pairing). The `=`/`-` keys step the same ladder.
+  ladder and its bake-tier pairing). The `=`/`-` keys step the same ladder. The top two
+  rungs additionally **tilt the land** (22.5°/45°, plain canvas only — RENDERING.md
+  § The stepped tilt); interaction is unchanged under the tilt, with hit-testing
+  through the camera's inverse.
 
 The wrap seam has **no marker**: the wrap is seamless by construction and a seam indicator would
 draw attention to a boundary that does not exist for the player.

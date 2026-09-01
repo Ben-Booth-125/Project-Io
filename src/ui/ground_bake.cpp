@@ -67,7 +67,7 @@ inline float height_at(const bake_source& s, int c, int r)
 
 } // namespace
 
-geometry make_geometry(int gw, int gh, double target_px_per_r)
+geometry make_geometry(int gw, int gh, double target_px_per_r, double tilt_sy)
 {
     geometry g;
     g.gw = gw;
@@ -75,9 +75,16 @@ geometry make_geometry(int gw, int gh, double target_px_per_r)
     const double period = gw * kSqrt3; // canonical wrap period
     g.W = std::max(1, static_cast<int>(std::lround(period * target_px_per_r)));
     g.s = g.W / period; // re-derived so wrap copies abut exactly
+    g.tilt_sy = std::clamp(tilt_sy, 0.3, 1.0);
+    if (g.tilt_sy < 1.0)
+    {
+        const double tilt = std::acos(g.tilt_sy);
+        g.lift = 0.9 * std::tan(tilt);
+    }
     // Vertical extent: hex tops of row 0 reach y = -1, hex bottoms of the last
-    // row reach 1.5 * (gh - 1) + 1.
-    g.y_min = -1.0;
+    // row reach 1.5 * (gh - 1) + 1. A tilted bake additionally holds displaced
+    // peaks and standing trees above row 0 (lift + tree headroom).
+    g.y_min = -1.0 - (g.tilt_sy < 1.0 ? g.lift + 0.5 / g.tilt_sy : 0.0);
     const double y_max = 1.5 * (gh - 1) + 1.0;
     g.H = std::max(1, static_cast<int>(std::ceil((y_max - g.y_min) * g.s)));
     return g;
@@ -169,31 +176,39 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
                  int px0, int py0, int pw, int ph, std::uint32_t* out,
                  const std::uint8_t* tag)
 {
-    const auto blob = [&](float bx, float by, float br,
+    // An (optionally elliptical) soft blob: bry > brx bakes the pre-stretched
+    // verticals an oblique geometry needs, so a canopy squashes back to round
+    // under the camera. The distance metric scales dy into the x radius, so
+    // the AA edge stays ~1 px on every axis.
+    const auto blob = [&](float bx, float by, float brx, float bry,
                           float cr2, float cg2, float cb2, float alpha, bool lit)
     {
-        const int x0i = std::max(0, static_cast<int>(std::floor(bx - br - 1.0f)));
-        const int x1i = std::min(pw - 1, static_cast<int>(std::ceil(bx + br + 1.0f)));
-        const int y0i = std::max(0, static_cast<int>(std::floor(by - br - 1.0f)));
-        const int y1i = std::min(ph - 1, static_cast<int>(std::ceil(by + br + 1.0f)));
+        const int x0i = std::max(0, static_cast<int>(std::floor(bx - brx - 1.0f)));
+        const int x1i = std::min(pw - 1, static_cast<int>(std::ceil(bx + brx + 1.0f)));
+        const int y0i = std::max(0, static_cast<int>(std::floor(by - bry - 1.0f)));
+        const int y1i = std::min(ph - 1, static_cast<int>(std::ceil(by + bry + 1.0f)));
+        if (bry <= 0.0f || brx <= 0.0f)
+            return;
+        const float yscale = brx / bry;
         for (int py_ = y0i; py_ <= y1i; ++py_)
             for (int px_ = x0i; px_ <= x1i; ++px_)
             {
                 const std::size_t idx = static_cast<std::size_t>(py_) * pw + px_;
                 if (!tag[idx])
                     continue; // lock fill / transparent margin stays untouched
-                const float dx = px_ + 0.5f - bx, dy = py_ + 0.5f - by;
+                const float dx = px_ + 0.5f - bx;
+                const float dy = (py_ + 0.5f - by) * yscale;
                 const float d  = std::sqrt(dx * dx + dy * dy);
-                if (d >= br + 0.8f)
+                if (d >= brx + 0.8f)
                     continue;
-                const float a = alpha * std::clamp((br + 0.8f - d) / 1.6f, 0.0f, 1.0f);
+                const float a = alpha * std::clamp((brx + 0.8f - d) / 1.6f, 0.0f, 1.0f);
                 float rr = cr2, gg = cg2, bb = cb2;
                 if (lit)
                 {
                     // Highlight offset toward the NW light, shadowed SE rim.
-                    const float lx = dx + br * 0.35f, ly = dy + br * 0.35f;
+                    const float lx = dx + brx * 0.35f, ly = dy + brx * 0.35f;
                     const float lt = std::clamp(
-                        1.28f - 0.75f * std::sqrt(lx * lx + ly * ly) / br, 0.55f, 1.28f);
+                        1.28f - 0.75f * std::sqrt(lx * lx + ly * ly) / brx, 0.55f, 1.28f);
                     rr *= lt; gg *= lt; bb *= lt;
                 }
                 std::uint32_t& dst = out[idx];
@@ -207,7 +222,10 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
             }
     };
 
-    const double margin = 0.6; // max canopy + shadow reach, canonical units
+    // Max canopy + shadow reach, canonical units; a tilted bake's standing
+    // trees additionally rise by the height displacement plus their own
+    // stretched height, so the walk margin grows with them.
+    const double margin = 0.6 + (g.lift > 0.0 ? g.lift + 1.4 / g.tilt_sy : 0.0);
     const double wx0 = px0 / g.s - margin, wx1 = (px0 + pw) / g.s + margin;
     const double wy0 = py0 / g.s + g.y_min - margin;
     const double wy1 = (py0 + ph) / g.s + g.y_min + margin;
@@ -256,9 +274,30 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
                 const float cr_ = (palette::col_r(tc) * 0.45f + 20.0f * 0.55f) * vr;
                 const float cg_ = (palette::col_g(tc) * 0.45f + 62.0f * 0.55f) * vr;
                 const float cb_ = (palette::col_b(tc) * 0.45f + 26.0f * 0.55f) * vr;
-                blob(pxc + pr * 0.45f, pyc + pr * 0.42f, pr * 1.0f,
-                     10.0f, 14.0f, 10.0f, 0.30f, false);           // drop shadow, SE
-                blob(pxc, pyc, pr, cr_, cg_, cb_, 0.94f, true);    // canopy, lit NW
+                if (g.lift > 0.0)
+                {
+                    // OBLIQUE: the tree STANDS. Its ground point rides the
+                    // height displacement; the trunk and canopy bake with
+                    // verticals stretched by 1/tilt_sy so the camera squash
+                    // returns them to true proportion. Shadow stays on the
+                    // ground plane — the depth cue that sells the tilt.
+                    const float invsy = static_cast<float>(1.0 / g.tilt_sy);
+                    const float ygr   = static_cast<float>(
+                        (ty - src.height[i] * g.lift - g.y_min) * g.s - py0);
+                    const float th = pr * 1.1f * invsy; // trunk height, px
+                    blob(pxc + pr * 0.35f, ygr + pr * 0.22f, pr * 0.95f, pr * 0.62f,
+                         10.0f, 14.0f, 10.0f, 0.30f, false);         // ground shadow
+                    blob(pxc, ygr - th * 0.5f, std::max(1.2f, pr * 0.16f), th * 0.5f,
+                         46.0f, 36.0f, 26.0f, 0.90f, false);         // trunk
+                    blob(pxc, ygr - th - pr * invsy * 0.75f, pr, pr * invsy,
+                         cr_, cg_, cb_, 0.95f, true);                // canopy, upright
+                }
+                else
+                {
+                    blob(pxc + pr * 0.45f, pyc + pr * 0.42f, pr * 1.0f, pr * 1.0f,
+                         10.0f, 14.0f, 10.0f, 0.30f, false);         // drop shadow, SE
+                    blob(pxc, pyc, pr, pr, cr_, cg_, cb_, 0.94f, true); // canopy, lit NW
+                }
             }
         }
     }
@@ -266,19 +305,20 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
 
 } // namespace
 
-void bake_region(const bake_source& src, const geometry& g, const bake_params& p,
-                 int px0, int py0, int pw, int ph, std::uint32_t* out)
+namespace {
+
+/// The per-pixel base bake for one window: interpolated colour, hillshade,
+/// grain, mottle — UNGRADED, stamps and post passes are the orchestrator's
+/// (bake_region below). Fills @p tag (1 = a terrain pixel later passes may
+/// touch; 0 = transparent margin or the survey lock fill, which must stay
+/// EXACT) and @p cover_out (0 = untouchable; 100 = water; 1+cover = land
+/// cover class — the edge-ink pass reads it, and because it is resolved at
+/// the WARPED sample point, an inked boundary follows the organic edge for
+/// free).
+void bake_window(const bake_source& src, const geometry& g, const bake_params& p,
+                 int px0, int py0, int pw, int ph, std::uint32_t* out,
+                 std::uint8_t* tag, std::uint8_t* cover_out)
 {
-    if (src.gw <= 0 || src.gh <= 0)
-    {
-        std::memset(out, 0, static_cast<std::size_t>(pw) * ph * 4u);
-        return;
-    }
-    // Grade-eligibility tags: 1 = a terrain pixel the final grade sweep (and
-    // the feature stamps) may touch; 0 = transparent margin or the survey
-    // lock fill, which must stay EXACT — a graded or stamped-over lock pixel
-    // would leak what the mask exists to hide.
-    std::vector<std::uint8_t> tag(static_cast<std::size_t>(pw) * ph, 0u);
     const double period   = g.gw * kSqrt3;
     // Resolution-adaptive character (wave 2). The interpolation radius and the
     // detail amplitudes are CANONICAL-scale, so the same numbers that read as
@@ -299,8 +339,6 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
     // Light from the north-west, the hillshade convention every panel-C read
     // leans on (and the same warm-up/cool-down direction the relief tint set).
     const float Lx = -0.554700196f, Ly = -0.832050323f;
-    // Haze / lift target — the cool near-black the whole shell sits on (#0F0F14).
-    const float haze_r = 15.0f, haze_g = 15.0f, haze_b = 20.0f;
 
     // Noise lattices must divide the wrap period EXACTLY or the grain carries a
     // seam at the cylinder join: pick the cell count nearest the target size,
@@ -351,73 +389,113 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
             const double x = x0_ + wax * p.warp_amp;
             const double y = y0_ + way * p.warp_amp;
 
-            // Candidate rows: centres at 1.5 * r within blend_radius of the
-            // (warped) y. Computed per pixel because the warp moves y.
-            const int r_lo = std::max(0, static_cast<int>(std::ceil((y - R) / 1.5)));
-            const int r_hi = std::min(src.gh - 1, static_cast<int>(std::floor((y + R) / 1.5)));
-
-            // Gather tile-centre candidates within the blend radius. Weights
-            // are a Wendland-style (R² − d²)² falloff — smooth, compact, and
-            // cheap; the OWNER (nearest centre) decides the pixel's class, and
-            // only candidates of that class blend, so a coastline and a mask
-            // edge stay hard while everything inside a class is continuous.
+            // Gather tile-centre candidates within the blend radius of a
+            // sample point. Weights are a Wendland-style (R² − d²)^wpow
+            // falloff — smooth, compact, cheap; the OWNER (nearest centre)
+            // decides the pixel's class, and only candidates of that class
+            // blend, so a coastline and a mask edge stay hard while
+            // everything inside a class is continuous. A lambda because an
+            // oblique bake resolves TWICE: once flat to learn the height,
+            // then again at the height-displaced point.
             double best_d2 = 1e30;
             int    owner   = -1;
-            double wsum = 0.0, cr = 0.0, cg = 0.0, cb = 0.0;
-            double hsum = 0.0, gx = 0.0, gy = 0.0, rb = 0.0, jt = 0.0;
             std::uint8_t owner_cls = 0;
-
-            // Two passes over a small candidate set: find the owner, then
-            // accumulate its class. The set is at most ~3 rows × 3 cols.
             struct cand { std::size_t i; double w; };
             cand cands[24];
             int  ncand = 0;
-
-            for (int r = r_lo; r <= r_hi; ++r)
+            const auto gather = [&](double sx, double sy_)
             {
-                const double cy   = 1.5 * r;
-                const double dy   = y - cy;
-                const double odd  = (r & 1) ? 0.5 : 0.0;
-                const int    c0   = static_cast<int>(std::floor(x / kSqrt3 - odd));
-                for (int dc = -1; dc <= 2; ++dc)
+                best_d2 = 1e30;
+                owner   = -1;
+                ncand   = 0;
+                const int r_lo = std::max(0, static_cast<int>(std::ceil((sy_ - R) / 1.5)));
+                const int r_hi = std::min(src.gh - 1,
+                                          static_cast<int>(std::floor((sy_ + R) / 1.5)));
+                for (int r = r_lo; r <= r_hi; ++r)
                 {
-                    const int c  = c0 + dc;
-                    const double cx = kSqrt3 * (c + odd);
-                    double dx = x - cx;
-                    dx -= period * std::round(dx / period); // cylinder wrap
-                    const double d2 = dx * dx + dy * dy;
-                    if (d2 >= R2)
-                        continue;
-                    const int cw = ((c % src.gw) + src.gw) % src.gw;
-                    const std::size_t i = static_cast<std::size_t>(r) * src.gw + cw;
-                    if (src.cls[i] == static_cast<std::uint8_t>(bake_source::tile_class::void_))
-                        continue;
-                    const double t = R2 - d2;
-                    double wgt = t * t;
-                    for (int e = 2; e < wpow; ++e)
-                        wgt *= t;
-                    if (ncand < 24)
-                        cands[ncand++] = { i, wgt };
-                    if (d2 < best_d2)
+                    const double cy   = 1.5 * r;
+                    const double dy   = sy_ - cy;
+                    const double odd  = (r & 1) ? 0.5 : 0.0;
+                    const int    c0   = static_cast<int>(std::floor(sx / kSqrt3 - odd));
+                    for (int dc = -1; dc <= 2; ++dc)
                     {
-                        best_d2 = d2;
-                        owner   = static_cast<int>(i);
+                        const int c  = c0 + dc;
+                        const double cx = kSqrt3 * (c + odd);
+                        double dx = sx - cx;
+                        dx -= period * std::round(dx / period); // cylinder wrap
+                        const double d2 = dx * dx + dy * dy;
+                        if (d2 >= R2)
+                            continue;
+                        const int cw = ((c % src.gw) + src.gw) % src.gw;
+                        const std::size_t i = static_cast<std::size_t>(r) * src.gw + cw;
+                        if (src.cls[i] == static_cast<std::uint8_t>(bake_source::tile_class::void_))
+                            continue;
+                        const double t = R2 - d2;
+                        double wgt = t * t;
+                        for (int e = 2; e < wpow; ++e)
+                            wgt *= t;
+                        if (ncand < 24)
+                            cands[ncand++] = { i, wgt };
+                        if (d2 < best_d2)
+                        {
+                            best_d2 = d2;
+                            owner   = static_cast<int>(i);
+                        }
                     }
                 }
-            }
+            };
 
+            gather(x, y);
             if (owner < 0)
             {
                 row_out[px] = 0u; // outside the grid: transparent, canvas bg shows
                 continue;
             }
             owner_cls = src.cls[static_cast<std::size_t>(owner)];
-
             if (owner_cls == static_cast<std::uint8_t>(bake_source::tile_class::masked))
             {
                 row_out[px] = k_lock_colour; // flat, unblended, no leak
                 continue;
             }
+
+            // OBLIQUE (BL-737): displace by the smoothed height at this point
+            // and re-resolve — the ground the camera sees at this row is the
+            // terrain standing lift·h higher, so hills grow real silhouettes.
+            // A masked re-resolve locks (a peak truncates at the mask edge
+            // rather than leaking); the lift is modest, so the projection
+            // stays monotonic and needs no occlusion handling.
+            if (g.lift > 0.0)
+            {
+                double hw = 0.0, ww = 0.0;
+                for (int k = 0; k < ncand; ++k)
+                    if (src.cls[cands[k].i] == owner_cls)
+                    {
+                        hw += cands[k].w * src.height[cands[k].i];
+                        ww += cands[k].w;
+                    }
+                const double h_est = ww > 0.0
+                    ? hw / ww
+                    : src.height[static_cast<std::size_t>(owner)];
+                gather(x, y + h_est * g.lift);
+                if (owner < 0)
+                {
+                    row_out[px] = 0u;
+                    continue;
+                }
+                owner_cls = src.cls[static_cast<std::size_t>(owner)];
+                if (owner_cls == static_cast<std::uint8_t>(bake_source::tile_class::masked))
+                {
+                    row_out[px] = k_lock_colour;
+                    continue;
+                }
+            }
+
+            cover_out[static_cast<std::size_t>(py) * pw + px] =
+                owner_cls == static_cast<std::uint8_t>(bake_source::tile_class::water)
+                    ? 100
+                    : static_cast<std::uint8_t>(1 + src.cover[static_cast<std::size_t>(owner)]);
+            double wsum = 0.0, cr = 0.0, cg = 0.0, cb = 0.0;
+            double hsum = 0.0, gx = 0.0, gy = 0.0, rb = 0.0, jt = 0.0;
 
             for (int k = 0; k < ncand; ++k)
             {
@@ -567,45 +645,168 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
             tag[static_cast<std::size_t>(py) * pw + px] = 1;
         }
     }
+}
 
-    // ------------------------------------------------------------------
-    // Close-tier feature stamps (Ben, 2026-09-01: "we should be able to
-    // render individual trees"). Active only at the 48/96 px tiers.
-    // ------------------------------------------------------------------
-    if (g.s >= 40.0 && p.tree_density > 0.0f)
-        stamp_trees(src, g, p, px0, py0, pw, ph, out, tag.data());
-
-    // ------------------------------------------------------------------
-    // The separable near-future grade, as one sweep over every terrain
-    // pixel — stamps included, lock fill and transparent margin excluded.
-    // ------------------------------------------------------------------
-    if (p.grade_enabled)
-    {
-        const std::size_t n_px = static_cast<std::size_t>(pw) * ph;
-        for (std::size_t i = 0; i < n_px; ++i)
+/// Darken the pixel where its right/down neighbour resolves a different cover
+/// class — a deterministic 1 px ink line on every cover boundary and shoreline.
+/// Runs on the apron buffer, so a line never breaks at a chunk edge; class 0
+/// (lock fill / transparent) never inks and is never inked against.
+void edge_ink(std::uint32_t* buf, const std::uint8_t* cover, int pw, int ph,
+              float cover_k, float shore_k)
+{
+    for (int y = 0; y < ph; ++y)
+        for (int x = 0; x < pw; ++x)
         {
+            const std::size_t i = static_cast<std::size_t>(y) * pw + x;
+            const std::uint8_t id = cover[i];
+            if (!id)
+                continue;
+            float k = 0.0f;
+            const std::uint8_t right = x + 1 < pw ? cover[i + 1] : id;
+            const std::uint8_t down  = y + 1 < ph ? cover[i + pw] : id;
+            if (right && right != id)
+                k = std::max(k, (id == 100 || right == 100) ? shore_k : cover_k);
+            if (down && down != id)
+                k = std::max(k, (id == 100 || down == 100) ? shore_k : cover_k);
+            if (k <= 0.0f)
+                continue;
+            const float m = 1.0f - k;
+            buf[i] = palette::col32(
+                static_cast<int>(palette::col_r(buf[i]) * m),
+                static_cast<int>(palette::col_g(buf[i]) * m),
+                static_cast<int>(palette::col_b(buf[i]) * m), 255);
+        }
+}
+
+/// Unsharp mask: out += amount * (out − boxblur5(out)), applied only to tagged
+/// pixels whose kernel reach is itself fully tagged — the lock fill and the
+/// mask boundary stay byte-exact. Separable 5-tap box, run on the apron so
+/// chunk edges cannot halo.
+void unsharp(std::uint32_t* buf, const std::uint8_t* tag, int pw, int ph, float amount)
+{
+    const std::size_t n = static_cast<std::size_t>(pw) * ph;
+    std::vector<float> br(n), bg(n), bb(n), tr(n), tg(n), tb(n);
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        br[i] = static_cast<float>(palette::col_r(buf[i]));
+        bg[i] = static_cast<float>(palette::col_g(buf[i]));
+        bb[i] = static_cast<float>(palette::col_b(buf[i]));
+    }
+    for (int y = 0; y < ph; ++y)
+        for (int x = 0; x < pw; ++x)
+        {
+            const std::size_t i = static_cast<std::size_t>(y) * pw + x;
+            float sr = 0, sg = 0, sb = 0;
+            for (int d = -2; d <= 2; ++d)
+            {
+                const int xx = std::clamp(x + d, 0, pw - 1);
+                const std::size_t j = static_cast<std::size_t>(y) * pw + xx;
+                sr += br[j]; sg += bg[j]; sb += bb[j];
+            }
+            tr[i] = sr / 5.0f; tg[i] = sg / 5.0f; tb[i] = sb / 5.0f;
+        }
+    for (int y = 0; y < ph; ++y)
+        for (int x = 0; x < pw; ++x)
+        {
+            const std::size_t i = static_cast<std::size_t>(y) * pw + x;
             if (!tag[i])
                 continue;
-            float r_ = static_cast<float>(palette::col_r(out[i]));
-            float g_ = static_cast<float>(palette::col_g(out[i]));
-            float b_ = static_cast<float>(palette::col_b(out[i]));
+            // Kernel-reach tag check: the blur below reads ±2 in both axes.
+            const int xm = std::max(0, x - 2), xp = std::min(pw - 1, x + 2);
+            const int ym = std::max(0, y - 2), yp = std::min(ph - 1, y + 2);
+            if (!tag[static_cast<std::size_t>(y) * pw + xm]
+                || !tag[static_cast<std::size_t>(y) * pw + xp]
+                || !tag[static_cast<std::size_t>(ym) * pw + x]
+                || !tag[static_cast<std::size_t>(yp) * pw + x])
+                continue;
+            float sr = 0, sg = 0, sb = 0;
+            for (int d = -2; d <= 2; ++d)
+            {
+                const int yy = std::clamp(y + d, 0, ph - 1);
+                const std::size_t j = static_cast<std::size_t>(yy) * pw + x;
+                sr += tr[j]; sg += tg[j]; sb += tb[j];
+            }
+            const float mr = sr / 5.0f, mg = sg / 5.0f, mb = sb / 5.0f;
+            buf[i] = palette::col32(
+                std::clamp(static_cast<int>(br[i] + amount * (br[i] - mr) + 0.5f), 0, 255),
+                std::clamp(static_cast<int>(bg[i] + amount * (bg[i] - mg) + 0.5f), 0, 255),
+                std::clamp(static_cast<int>(bb[i] + amount * (bb[i] - mb) + 0.5f), 0, 255), 255);
+        }
+}
+
+} // namespace
+
+void bake_region(const bake_source& src, const geometry& g, const bake_params& p,
+                 int px0, int py0, int pw, int ph, std::uint32_t* out)
+{
+    if (src.gw <= 0 || src.gh <= 0)
+    {
+        std::memset(out, 0, static_cast<std::size_t>(pw) * ph * 4u);
+        return;
+    }
+    // APRON (BL-736): the post passes below read neighbours (ink 1 px,
+    // unsharp ±2 px), so the window bakes with a margin and crops — a chunk
+    // edge can then never seam or halo, because every chunk computed the same
+    // overlap. Below 20 px/r no post pass runs and the apron is skipped.
+    const int  A   = g.s >= 20.0 ? 6 : 0;
+    const int  apw = pw + 2 * A, aph = ph + 2 * A;
+    const std::size_t an = static_cast<std::size_t>(apw) * aph;
+    std::vector<std::uint32_t> abuf(an);
+    std::vector<std::uint8_t>  atag(an, 0u), acov(an, 0u);
+    bake_window(src, g, p, px0 - A, py0 - A, apw, aph,
+                abuf.data(), atag.data(), acov.data());
+
+    // Cover-boundary ink BEFORE the stamps: a tree may straddle an inked
+    // boundary and should occlude the line, never carry it.
+    if (A > 0)
+        edge_ink(abuf.data(), acov.data(), apw, aph, p.edge_ink, p.shore_ink);
+
+    if (g.s >= 40.0 && p.tree_density > 0.0f)
+        stamp_trees(src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data());
+
+    // The separable near-future grade. Its haze lift falls and its contrast
+    // rises with resolution (BL-736): haze is blur-adjacent, and the close
+    // tiers need their local contrast more than their atmosphere.
+    if (p.grade_enabled)
+    {
+        const float res_t = static_cast<float>(std::clamp((g.s - 24.0) / 48.0, 0.0, 1.0));
+        const float lift     = p.grade_lift * (1.0f - 0.5f * res_t);
+        const float contrast = p.grade_contrast + 0.045f * res_t;
+        const float haze_r = 15.0f, haze_g = 15.0f, haze_b = 20.0f;
+        for (std::size_t i = 0; i < an; ++i)
+        {
+            if (!atag[i])
+                continue;
+            float r_ = static_cast<float>(palette::col_r(abuf[i]));
+            float g_ = static_cast<float>(palette::col_g(abuf[i]));
+            float b_ = static_cast<float>(palette::col_b(abuf[i]));
             const float luma = 0.2126f * r_ + 0.7152f * g_ + 0.0722f * b_;
             r_ = r_ + (luma - r_) * p.grade_desat;
             g_ = g_ + (luma - g_) * p.grade_desat;
             b_ = b_ + (luma - b_) * p.grade_desat;
             r_ *= p.grade_cool[0]; g_ *= p.grade_cool[1]; b_ *= p.grade_cool[2];
-            r_ = r_ + (haze_r - r_) * p.grade_lift;
-            g_ = g_ + (haze_g - g_) * p.grade_lift;
-            b_ = b_ + (haze_b - b_) * p.grade_lift;
-            r_ = (r_ - 128.0f) * p.grade_contrast + 128.0f;
-            g_ = (g_ - 128.0f) * p.grade_contrast + 128.0f;
-            b_ = (b_ - 128.0f) * p.grade_contrast + 128.0f;
-            out[i] = palette::col32(
+            r_ = r_ + (haze_r - r_) * lift;
+            g_ = g_ + (haze_g - g_) * lift;
+            b_ = b_ + (haze_b - b_) * lift;
+            r_ = (r_ - 128.0f) * contrast + 128.0f;
+            g_ = (g_ - 128.0f) * contrast + 128.0f;
+            b_ = (b_ - 128.0f) * contrast + 128.0f;
+            abuf[i] = palette::col32(
                 std::clamp(static_cast<int>(r_ + 0.5f), 0, 255),
                 std::clamp(static_cast<int>(g_ + 0.5f), 0, 255),
                 std::clamp(static_cast<int>(b_ + 0.5f), 0, 255), 255);
         }
     }
+
+    // Unsharp last: it sees the graded, inked, stamped image — the thing the
+    // player sees — and restores the edge contrast the interpolation lacks.
+    if (g.s >= 40.0 && p.unsharp_amount > 0.0f)
+        unsharp(abuf.data(), atag.data(), apw, aph, p.unsharp_amount);
+
+    for (int y = 0; y < ph; ++y)
+        std::memcpy(out + static_cast<std::size_t>(y) * pw,
+                    abuf.data() + static_cast<std::size_t>(y + A) * apw + A,
+                    static_cast<std::size_t>(pw) * 4u);
 }
 
 std::uint64_t region_hash(const bake_source& src, const geometry& g,

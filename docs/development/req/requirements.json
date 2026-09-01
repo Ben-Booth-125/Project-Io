@@ -4666,6 +4666,89 @@
      "evidence": "COMPLETE 2026-09-01. ground_bake_check 10/10 after every wave-2 bake change; at the harness geometry (24 px/r) res_t=0, wpow=2, fine octave off, so the wrap/determinism checks bind exactly. Octave gate: code (ground_bake.cpp fine_on = g.s >= 40) + the close/closest captures. Reworded after the review fleet flagged the original row promising harness evidence the fixture cannot produce."
     }
    ]
+  },
+  {
+   "brief": "ground-sharpness",
+   "title": "BL-736 - the baked ground gets its edges back",
+   "status": "complete",
+   "resolved": "2026-09-02",
+   "promoted_from": "backlog.json BL-736 - Sprint 30",
+   "batch": "sprint-30",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "Cover-class boundaries and the shoreline carry a crisp 1px ink stroke that follows the warped (organic) boundary; the close tiers additionally pass an unsharp mask; neither pass may seam at a chunk edge (apron) nor touch the survey lock fill or the transparent margin.",
+     "verification": [
+      "visual: per-rung captures + 48px forest preview",
+      "headless: ground_bake_check P8 (48px determinism + wrap, all passes active)"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-02. ground_preview_v7_forest48 + per-rung captures: every cover patch and the coastline carries the 1px ink stroke following the warped organic boundary; unsharp bites on rock texture at 48/96. Apron A=6 around every window; both passes tag-gated (lock fill and transparent margin untouched, unsharp additionally requires kernel-reach tags). ground_bake_check P8 13->17 checks green with all passes active."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The grade haze lift falls and contrast rises with bake resolution, so the close tiers keep local contrast; the far/play tiers are visually unchanged in character.",
+     "verification": [
+      "visual: wide/play captures vs previous run"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-02. Grade sweep: lift *= (1 - 0.5*res_t), contrast += 0.045*res_t; res_t=0 at the far/12/24 tiers so their captures keep the wave-2 character."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "With the frame HUD on, the Planetary canvas reports the ground detail metric: active tier px/r, texel:pixel ratio, published chunk count.",
+     "verification": [
+      "live: toggle the HUD, read the line"
+     ],
+     "notes": "The polygon-count analogue.",
+     "evidence": "COMPLETE 2026-09-02. Canvas draws the ground line into the FOREGROUND list behind show_frame_hud: active tier px/r, texel:pixel, chunk count (far-page variant when no chunk tier is active)."
+    }
+   ]
+  },
+  {
+   "brief": "stepped-tilt",
+   "title": "BL-737 - the top rungs tilt the land",
+   "status": "complete",
+   "resolved": "2026-09-02",
+   "promoted_from": "backlog.json BL-737 - Sprint 30",
+   "batch": "sprint-30",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "Zoom rungs 3 and 4 draw the ground at 22.5 and 45 degrees: y squashed by cos(tilt), the height field displacing rows upward (hills carry silhouettes), trees as upright sprites drawn back-to-front. Lower rungs and the far page stay flat; the squashed far page carries a tier fill transitionally.",
+     "verification": [
+      "visual: rung-3/rung-4 captures",
+      "headless: ground_bake_check tilt phase (determinism + wrap at a tilted tier)"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-02. ground_bake_close (22.5 deg) and ground_bake_closest (45 deg) captures + ground_preview_v8_tilt45: height-displaced ground, standing trees (trunk, upright canopy, ground shadow), lower rungs flat. ground_bake_check P9: oblique bake byte-identical twice, wrap-exact one period east, lift derives to ~0.9, projection differs from flat."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Interaction survives the squash: hover hit-testing is elliptical (dy/sy), click selects the intended tile at both tilted rungs, the wheel anchor keeps the point under the cursor fixed across a tilt-crossing step, and the selection/hover hexes draw squashed.",
+     "verification": [
+      "live: click/hover/step at rungs 3-4"
+     ],
+     "notes": "Height displacement is deliberately ignored for hits.",
+     "evidence": "COMPLETE 2026-09-02. Live on the Release build at the tilted rung: click selected the aimed tile (Tile [124,46], squashed province outline drawn), hover card resolved the correct tile under the cursor (Scrubby Rock 27%), wheel steps crossed the tilt thresholds with the cursor anchor holding. Hit tests run in ground space via the camera inverse (mouse_g); height displacement deliberately ignored for hits."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "Tilt is a pure function of zoom (verify set_zoom included), so captures are deterministic; ACTIONS zoom entries describe the tilt at the top rungs.",
+     "verification": [
+      "code + docs/ai/ACTIONS.json",
+      "visual: capture at a free-form zoom between rungs"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-02. planetary_tilt_sy is pure in zoom (thresholds at rung midpoints); the ground_bake_midrung_tilt capture (free-form zoom 8) lands deterministically on the 22.5-deg side; ACTIONS zoom entries note the tilt at the top rungs, plain canvas only."
+    }
+   ]
   }
  ]
 }
