@@ -67,6 +67,14 @@
 //                                                is exactly how a nation turns a
 //                                                complement it HOLDS into one it
 //                                                SUPPLIES.
+//   space_programme         calm                 The state's stake in the gate
+//                                                into space (BL-644): satellite
+//                                                launches are prestige spending
+//                                                on the longest horizon of all,
+//                                                and the first line a nation
+//                                                with an army on its border
+//                                                defers — the same argument as
+//                                                schooling, further out.
 //
 // Term 3 (grudges) appears in NO row of that table, and that is the point. It
 // enters one step earlier, as a per-neighbour multiplier inside terms 1 and 2,
@@ -711,6 +719,8 @@ std::map<entity_id, nation_budget> score_national_budgets(const world& w,
             b + p.niche_works * terms.niche_fit + p.calm_works * terms.calm;
         wv[static_cast<std::size_t>(budget_priority::charters)] =
             b + p.niche_charters * terms.niche_fit;
+        wv[static_cast<std::size_t>(budget_priority::space_programme)] =
+            b + p.calm_space * terms.calm;
 
         // Normalise in the authored enum order. `nation_budget` normalises on
         // read anyway; doing it here means the vector has ONE meaning rather

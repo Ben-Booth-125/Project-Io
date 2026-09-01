@@ -93,13 +93,16 @@ struct world; // forward-declared; nation_budget.cpp reads it.
 // ---------------------------------------------------------------------------
 
 /// The lines a nation can spend on. Five are Ben's (2026-08-22); four more were
-/// proposed alongside them and accepted. The SPEND MECHANICS are generic over
-/// this enum — what a line actually BUYS is BL-538's, not this item's, so a
-/// line no consumer has yet produces no claim and is simply skipped.
+/// proposed alongside them and accepted; `space_programme` is Ben's, 2026-08-26
+/// (BL-644). The SPEND MECHANICS are generic over this enum — what a line
+/// actually BUYS is BL-538's, not this item's, so a line no consumer has yet
+/// produces no claim and is simply skipped.
 ///
 /// APPEND-ONLY once serialised: a weight vector is indexed by these values, so
 /// inserting or renumbering one would silently re-point every authored weight.
-/// Add at the end, bump `priority_count`.
+/// Add at the end, bump `priority_count` — and the weight record is
+/// fixed-width on the save seam (world_save.cpp § w_nation_budget), so the
+/// bump is a `world_save_version` bump too.
 enum class budget_priority : uint8_t
 {
     logistics_maintenance = 0, ///< Keeping the road/hub network standing (LOGISTICS.md).
@@ -112,10 +115,13 @@ enum class budget_priority : uint8_t
                                ///< which withholds CREDITS: this line spends them.
     public_works          = 7, ///< Works a corporation builds and the nation pays for.
     charters              = 8, ///< Paying a corporation to exist somewhere it otherwise would not.
+    space_programme       = 9, ///< Government satellite launches — spacecraft_components and
+                               ///< propellant, bought procurement-style and CONSUMED
+                               ///< (space_programme.hpp is the consumer; BL-644).
 };
 
 /// Number of enumerators in `budget_priority`. Every weight vector is this long.
-inline constexpr std::size_t priority_count = 9;
+inline constexpr std::size_t priority_count = 10;
 
 /// Whether a line's claims name a SUBJECT — the one thing the credit is
 /// earmarked to pay for (rule 3a). `public_exploration`'s subject is the BODY
@@ -123,6 +129,11 @@ inline constexpr std::size_t priority_count = 9;
 /// targets (BL-572, CONTRACTS.md § Where offers come from) — an offer's
 /// escrow is a request that one named province's work be paid for, not a
 /// fungible credit, exactly the earmark shape rule 3a already generalises.
+/// `space_programme`'s is the BODY the purchased goods stand on (BL-644):
+/// state demand arrives in LUMPS (NATIONS.md), and the earmark's whole-or-
+/// nothing fill is precisely what a lump is — a fraction of a launch lot
+/// dispatches nothing, the same argument NR-568 made for a fraction of a
+/// survey.
 /// A claim on such a line with a null subject is rejected whole at gather; a
 /// claim on any other line has its subject IGNORED (nulled at gather, so
 /// "earmarked" and "has a subject" stay one predicate downstream).
@@ -138,7 +149,8 @@ inline constexpr std::size_t priority_count = 9;
 inline constexpr bool line_takes_subject(budget_priority line)
 {
     return line == budget_priority::public_exploration
-        || line == budget_priority::contracted_force;
+        || line == budget_priority::contracted_force
+        || line == budget_priority::space_programme;
 }
 
 /// What a nation cares about, and how much of its treasury it refuses to touch.
@@ -166,7 +178,7 @@ struct nation_budget
 ///
 /// EVERY FIELD IS VALIDATED AT GATHER TIME, `line` included. `budget_priority`
 /// has a `uint8_t` underlying type, so every one of 0..255 is a valid VALUE while
-/// only 0..8 is a valid INDEX — a claim carrying anything else is dropped whole,
+/// only 0..9 is a valid INDEX — a claim carrying anything else is dropped whole,
 /// never clamped onto a line nobody asked for. Claims are in-process today, but
 /// the standing rule that an AI-facing seam is an untrusted input boundary makes
 /// this wire-reachable the moment one arrives over `--serve`.
