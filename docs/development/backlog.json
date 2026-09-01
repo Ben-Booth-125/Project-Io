@@ -267,16 +267,18 @@
    "category": "UI",
    "difficulty": 3,
    "id": "BL-732",
-   "short_name": "HEX_TILE_ATLAS_RENDERER",
-   "title": "Planetary ground renders from an authored hex-tile atlas",
+   "short_name": "GROUND_BAKE_RENDERER",
+   "title": "Planetary ground renders as baked painterly chunks",
    "authority_doc": "docs/ui/RENDERING.md",
    "files": [
     "src/ui/hex_render.cpp",
     "src/ui/hex_render.hpp",
     "src/ui/body_surface_canvas.cpp",
-    "assets/tiles/"
+    "src/ui/ground_bake.cpp",
+    "src/ui/ground_bake.hpp",
+    "assets/brushes/"
    ],
-   "design": "The mechanism of docs/ui/RENDERING.md: atlas pages as SDL_Textures through the SDLRenderer3 backend, one AddImageQuad per tile inside the existing culled/wrap-windowed loop; Lua manifest (terrain key -> page/cell/variants/frames/rate, with per-sheet provenance); VECTOR FILL FALLBACK on any uncovered key so the app runs and captures pass with a partial atlas; variant hash from grid coords (wrap-safe, no crawl); per-edge transition fringes, priority-ordered, survey-gated; flipbook animation off a render-side clock PINNED TO PHASE 0 under --verify; far page below the shared 7px pivot (no auto mipmaps in SDL_Renderer). Lives in hex_render so the Selection band neighbourhood view cannot drift. Checks: scripts/verify/tile_atlas.lua + a headless manifest-integrity check. Buildable against a placeholder atlas before BL-733 delivers real art."
+   "design": "The mechanism of docs/ui/RENDERING.md as re-ruled 2026-09-01 against the map/it1-it3 references (supersedes the same-day atlas shape): per-body chunk textures baked via SDL render targets - base ground interpolated between tile centres (NO cell boundary drawn), hillshade from the BL-517 height field, authored biome brushes hash-scattered by cover x density, water/rivers carved, roads painted, installations stamped as rendered geometry (canvas glyphs retire), near-future grade as a separable final pass. Frame draws visible chunk quads + a low-res whole-body page at far zoom. Event-driven invalidation (build/road/urban/settlement/survey dirties intersecting chunks; re-bake budgeted off the critical path). NO on-ground hex grid - selection/hover hex only, amber #E8A33D. Animated overlays (water shimmer, smoke) off a render-side clock PINNED to phase 0 under --verify. Fallback by coverage: unauthored passes bake from the current vector logic, so the app runs and captures pass with a partial brush set. Checks: scripts/verify/ground_bake.lua + headless chunk-invalidation and manifest-integrity checks. Buildable against procedural-only passes before BL-733 delivers brushes."
   },
   {
    "status": "open",
@@ -287,22 +289,22 @@
    "written": "2026-09-01",
    "author": "Ben + Claude (sprint 29 design form, 2026-09-01)",
    "requires": [],
-   "blocked_on": "Ben reference images (review.json)",
+   "blocked_on": null,
    "parked": false,
    "category": "UI",
    "difficulty": 2,
    "id": "BL-733",
-   "short_name": "TILE_ART_ASSET_PIPELINE",
-   "title": "Tile art asset pipeline - sheets, manifest and authoring flow from the reference images",
+   "short_name": "BIOME_BRUSH_ART_PIPELINE",
+   "title": "Biome brush and structure-stamp art pipeline (C-F direction)",
    "authority_doc": "docs/ui/RENDERING.md",
    "files": [
-    "assets/tiles/",
-    "scripts/"
+    "assets/brushes/",
+    "docs/ui/design/"
    ],
-   "design": "The first shipped raster art beyond fonts (RENDERING.md § Asset policy): assets/tiles/ resolved cwd-relative like fonts, pages capped 4096^2, manifest entries carry a provenance line per sheet. The work: define the sheet layout and cell size against the reference images, author/import the substrate x cover x density roster incrementally (fallback-by-coverage means partial delivery is shippable), and the import/packing script if hand-placement proves tedious. BLOCKED on the reference images Ben will supply - the style family, cell resolution and palette all hang on them."
+   "design": "UNBLOCKED 2026-09-01 - the reference images arrived (docs/ui/design/renders/map/, C-F ratified). The authored-asset half of RENDERING.md: painterly biome brushes (canopy, scrub, marsh, rock...) and installation structure stamps in the C-F direction, judged against the it3 C-F panel; assets/brushes/ cwd-relative like fonts, Lua manifest with a provenance line per sheet, pages <= 4096^2. Fallback-by-coverage means partial delivery is shippable - author the highest-coverage biomes first. The near-future grade is NOT authored into brushes (it is a runtime pass; round-2 confirmed finding)."
   },
   {
-   "status": "design-owed",
+   "status": "open",
    "glyph": "~",
    "priority": "A",
    "version_goal": null,
@@ -310,7 +312,7 @@
    "written": "2026-09-01",
    "author": "Ben + Claude (sprint 29 design form, 2026-09-01)",
    "requires": [],
-   "blocked_on": "Ben reference images (review.json)",
+   "blocked_on": null,
    "parked": false,
    "category": "UI",
    "difficulty": 2,
@@ -323,7 +325,7 @@
     "docs/ui/CANVASES.md",
     "docs/ui/LENSES.md"
    ],
-   "design": "Ben ruled the contract UNDECIDED until the reference images (2026-09-01 form). The call, channel by channel: which of the analytic layers - lens tints, land blend, landform relief tint + glyphs, procedural texture pass, borders, fog washes, markers - survive unchanged over authored ground, which retire as redundant (texture pass and relief tint are the obvious candidates: the art itself now carries material and relief), and which restyle. Until settled, every channel keeps its current spec; the verdicts land as edits to PLANETARY.md/CANVASES.md/LENSES.md and close this item."
+   "design": "PARTLY RULED 2026-09-01 against the references: the on-ground grid RETIRES (selection/hover hex only) and building/settlement canvas glyphs RETIRE (installations are rendered geometry) - those two are settled in RENDERING.md and are not this item. THE REMAINING WORK, channel by channel over painterly C-F ground: lens tints (a saturated categorical fill over painterly terrain reads differently than over flat hues - weight/blend mode per lens), the land blend and per-lens province reduction table (the bake interpolation replaces the blend - reconcile PLANETARY.md), landform relief tint + glyphs and the procedural texture pass (likely redundant - the art carries material and relief), national border band weight over painterly ground, fog washes and survey mask over baked chunks, and where ownership/stack/count reads move now the silhouette+ring+badge are gone (hover/selection surfaces). Lands as edits to PLANETARY.md/CANVASES.md/LENSES.md/ICONS.md and closes this item. Open in the live app against the bake before ruling weights (Rule 0b)."
   }
  ]
 }

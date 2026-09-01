@@ -158,7 +158,7 @@ goldens render identically across machines.
 *Rendering approach and view structure. Per-view detail is deferred to the UI document.*
 
 ### Rendering dimension
-The game renders in **2D**. No 3D terrain, unit models, or depth-based rendering is required. Detailed surface visualisation **is** in scope for the Planetary canvas (Ben, 2026-09-01, the sprint-29 design form — overturning this section's earlier exclusion): the ground renders from an authored raster hex-tile atlas on the existing 2D renderer, with ambient flipbook animation. Authority: `docs/ui/RENDERING.md`. The SDL3 GPU API remains the deferred ceiling, unreached by that design.
+The game renders in **2D**. No 3D terrain, unit models, or depth-based rendering is in the prototype. Detailed surface visualisation **is** in scope for the Planetary canvas (Ben, 2026-09-01, the sprint-29 design forms — overturning this section's earlier exclusion): the ground renders as **baked painterly terrain chunks** (hillshade from the height field + authored biome brushes, C-F art direction) on the existing 2D renderer, with ambient overlay animation. Authority: `docs/ui/RENDERING.md`. The staged end-state — a tilting oblique camera with terrain and structures as true geometry — is a **flagged future milestone** (2.5D pre-render vs SDL3 GPU 3D, undecided; `docs/research/CANVAS_RENDERING.md` § The end-state choice), not prototype scope; the SDL3 GPU API remains the door held open for it.
 
 ### Main views
 The main game window has two primary views:
@@ -196,7 +196,7 @@ This means ImGui panel code should be written clearly, not cleverly. It is refer
 | Military | Two resolvers — `resolve_battle` for the Era −1 sim, `resolve_campaign_battle` for `run_battles` in the economy tick — over one terrain model; muster building, hire verb, ordnance good, unit upkeep (authored rates 0.0), stance and the unit march seam. Authority: `docs/military/MILITARY.md` |
 | Tile memory | All tiles resident; flat binary structs; no per-tile Lua |
 | UI (prototype) | Dear ImGui |
-| Ground rendering | Authored raster hex-tile atlas on the 2D renderer (Planetary rung only; flipbook animation; vector fill as fallback by coverage). Authority: `docs/ui/RENDERING.md` |
+| Ground rendering | Baked painterly terrain chunks on the 2D renderer (Planetary rung only; C-F direction; no on-ground hex grid; installations as rendered geometry; overlay animation; vector bake as fallback by coverage). Authority: `docs/ui/RENDERING.md` |
 | UI (production) | Lua-driven retained layer — deferred to UI document |
 | Serialisation | Flat binary, field by field, magic + version per stream, mismatch rejected; SQLite deferred until world scale requires it |
 | Agent interface | **Out-of-process only.** `ProjectIo --serve` speaks a line protocol on stdio; `tools/mcp/` wraps it as an MCP server (Node, tooling tier). The engine ships no HTTP client, no API key, no cloud dependency. Authority: `docs/ai/AI_OPPONENT.md` § 10 |

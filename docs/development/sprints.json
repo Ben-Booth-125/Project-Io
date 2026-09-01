@@ -171,13 +171,13 @@
    "id": "29",
    "theme": "The world gets a face - detailed canvas rendering",
    "state": "open",
-   "status_line": "OPENED 2026-09-01 in a parallel worktree while sprint 28 runs. Research done (docs/research/CANVAS_RENDERING.md), mechanism ruled on the design form, authority doc landed (docs/ui/RENDERING.md). Art-facing halves blocked on Ben reference images (review.json).",
+   "status_line": "OPENED 2026-09-01 in a parallel worktree while sprint 28 runs. Research done, BOTH design forms ruled (mechanism re-ruled to baked chunks against the map/it1-it3 references), C-F ratified, RENDERING.md landed, design docs merged from Ui-Development. BL-732/733/734 all unblocked.",
    "opened_date": "2026-09-01",
-   "goal": "Move the Planetary canvas off the minimal vector style: the ground renders from an authored hex-tile atlas with ambient flipbook animation, on the existing 2D backend, with the vector fill surviving as fallback-by-coverage. Felt goal: the surface reads as terrain, not as a diagram - while every analytic read the lens system carries stays intact until BL-734 rules otherwise.",
+   "goal": "Move the Planetary canvas off the minimal vector style: the ground renders as baked painterly chunks in the ratified C-F direction (painterly relief + near-future grade) - hillshade from the height field, authored biome brushes, NO on-ground hex grid, installations as rendered geometry - on the existing 2D backend, with the vector bake surviving as fallback-by-coverage. Felt goal: the surface reads as terrain, not as a diagram. Camera stays top-down this stage; the oblique end-state (2.5D vs 3D) is a flagged future milestone.",
    "planned": [
-    "BL-732 (hex tile atlas renderer) - the mechanism: atlas quads in the existing culled loop, manifest + vector fallback, transition fringes, flipbook clock pinned under --verify, far page at the 7px pivot. Buildable now against a placeholder atlas.",
-    "BL-733 (tile art asset pipeline) - sheets, manifest, authoring flow. BLOCKED on the reference images.",
-    "BL-734 (ground/chrome layer contract) - which analytic channels survive/retire/restyle over authored ground. Ben held the call for the reference images; lands as PLANETARY/CANVASES/LENSES edits."
+    "BL-732 (ground bake renderer) - chunk bake + cache + invalidation, no-grid rule, installation stamps, grade pass, animated overlays, verify pinning. Buildable procedural-first.",
+    "BL-733 (biome brush art pipeline) - authored C-F brushes and structure stamps, judged against it3 C-F. Unblocked.",
+    "BL-734 (ground/chrome layer contract) - the surviving analytic channels over painterly ground; lands as PLANETARY/CANVASES/LENSES/ICONS edits."
    ]
   }
  ],

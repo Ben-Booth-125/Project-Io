@@ -21,11 +21,13 @@ This canvas communicates:
 
 ## Tile grid
 
-> **The ground's render mechanism is owned by [RENDERING.md](RENDERING.md)** — the
-> authored hex-tile atlas, its manifest, transitions, animation and LOD. This doc owns
-> the analytic channels above the ground; which of them survive, retire or restyle over
-> atlas art is owned by BL-734 (ground/chrome layer contract), and until that settles
-> every channel below keeps its current spec.
+> **The ground's render mechanism is owned by [RENDERING.md](RENDERING.md)** — baked
+> painterly chunks, the C-F art direction, the no-grid rule, installations as rendered
+> geometry, animation and LOD. This doc owns the analytic channels above the ground;
+> which of them survive, retire or restyle over painterly ground is owned by BL-734
+> (ground/chrome layer contract), and until that settles every channel below keeps its
+> current spec — except where RENDERING.md's rulings already retire it (the on-ground
+> grid, the building/settlement canvas glyphs).
 
 **Shape:** Pointy-top hexagons in odd-r offset coordinates. Odd rows are shifted right by half a column. Grid axes: columns (x) run left-to-right, rows (y) run top-to-bottom.
 

@@ -42,9 +42,27 @@ atlas renderer, buildable against a placeholder atlas), BL-733 (tile art asset p
 BL-734 (ground/chrome layer contract) — the latter two in review.json, blocked on the reference
 images. Sprint 29 opened in sprints.json.
 
+### Round 2 — the reference images arrive (same day)
+
+Ben pointed at `Ui-Development:docs/ui/design/renders/map/` — a whole style workstream
+(owner: Joe, `GLOBAL_STYLE_SHEET.md`) with two judged rounds. The images falsified the
+morning's atlas ruling: the direction is grid-free continuous terrain, oblique camera,
+installations as real geometry. Second form ruled: **C-F ratified** (painterly relief +
+near-future grade); mechanism **switched to baked chunks** (hillshade + authored biome
+brushes); **no on-ground grid** (selection/hover hex only, amber); **installations as
+rendered geometry, glyphs retire from the canvas**; camera **staged** — 2D bake now,
+oblique end-state (2.5D vs 3D, trade-offs in the research note § The end-state choice)
+as a future milestone; design docs **merged to main** and registered in the router.
+
+RENDERING.md rewritten to the baked-chunk mechanism; TECH_FOUNDATIONS re-amended;
+style sheet gains the Planetary-map sub-track with the ratification; BL-732 →
+GROUND_BAKE_RENDERER, BL-733 → BIOME_BRUSH_ART_PIPELINE (unblocked), BL-734 re-scoped
+to the surviving channels (both review.json blocks resolved).
+
 ### Open
 
-Reference images owed from Ben — they unblock BL-733/BL-734 and the style half of everything.
+it4 supporting frames and glyph round 5 remain with Joe; the 2.5D-vs-3D end-state call
+is Ben's, parked until the staged bake is real.
 
 ---
 

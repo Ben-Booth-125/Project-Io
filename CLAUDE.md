@@ -119,7 +119,8 @@ follow. Where a store has a query tool, use the tool, never load the file.
 |---|---|
 | `docs/ui/LAYOUT.md` | The application shell — how regions are arranged around the canvases. |
 | `docs/ui/CANVASES.md` → `SOLAR.md`, `CIRCUMPLANETARY.md`, `PLANETARY.md`, `MINIMAP.md` | The zoom-ladder canvases and the minimap chrome. |
-| `docs/ui/RENDERING.md` | Canvas ground rendering: the hex-tile atlas, asset policy, animation, LOD. |
+| `docs/ui/RENDERING.md` | Canvas ground rendering: the baked-chunk mechanism, C-F direction, grid rule, installations-as-geometry, animation, LOD. |
+| `docs/ui/design/GLOBAL_STYLE_SHEET.md` | The visual-language exploration (owner: Joe) — style verdicts, palette, render iterations in `design/renders/`. Settled values promote into the authority docs. |
 | `docs/ui/SELECTION.md` | The Selection element; the Active/Focus/Selection click model. |
 | `docs/ui/TOOLTIP.md` | The shared hover-card primitive. |
 | `docs/ui/LENSES.md` | The map-lens system and roster. |

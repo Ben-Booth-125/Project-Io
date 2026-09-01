@@ -156,7 +156,65 @@ The golden policy (curated world-independent set only) already anticipates this;
 also adds one new class of check — "chunk re-bake fires on terrain change" — which is a
 headless-testable cache invariant, not a visual one.
 
-## 6. Recommended shape (advisor's view)
+## 6. The end-state choice — fixed-oblique 2.5D vs full 3D
+
+Written 2026-09-01 at Ben's request, after the staged ruling: the C-F painterly bake
+ships under the current camera, and the project then moves toward one of these two.
+This section is the decision's briefing paper.
+
+### What each one is
+
+**Fixed-oblique 2.5D (pre-rendered).** The ground is baked in an oblique projection —
+tile positions displaced vertically by the height field, rows composited back-to-front
+— and structures/trees are pre-rendered sprites at the same fixed angle. Zoom is
+scale; the "rotate on zoom" of the references becomes a **transition between two fixed
+states** (near-orbital top-down page ↔ oblique page), a crossfade, never a free
+camera. The lineage is AoE2 / Songs of Conquest.
+
+**Full 3D (SDL3 GPU path).** Heightmesh terrain chunks, structure models (or
+billboard impostors), a real perspective camera. Continuous tilt from orbital to
+low-oblique — the it1 behaviour literally — plus real lighting, shadow, day/night,
+shader water, and the near-future grade as a post-process.
+
+### The trade-offs
+
+| Axis | 2.5D pre-rendered | Full 3D |
+|---|---|---|
+| **Camera** | Frozen angle(s); tilt is an illusion between two states; no rotation ever | The reference behaviour, continuous and free |
+| **Backend** | Current `SDL_Renderer` + ImGui unchanged | GPU API migration: new init/present/capture, ImGui backend swap (`ImGui_ImplSDLGPU3`), shader toolchain (HLSL/SPIR-V cross-compile) |
+| **Engineering scale** | Sprint-to-sprints: oblique bake + sprite compositor over the existing chunk machinery | A renderer milestone: mesh LOD, frustum, materials, shadows, NPR shading — months solo |
+| **Art burden** | High and angle-locked: every structure × owner × zoom pre-rendered at the fixed angle; terrain brushes re-authored for oblique | Different, not smaller: models or impostors + materials; but ONE authoring per asset serves every angle and zoom |
+| **Reuse from the staged bake** | Partial — top-down brushes re-drawn for oblique; the grade recipe and palette carry | Strong — brushes become textures/materials; the bake's pass structure is the material definition; grade becomes a post pass |
+| **Reuse OF it, later** | Mostly discarded if 3D follows — the oblique bake pipeline and angle-locked sprites are the throwaway | Terminal — nothing after it |
+| **Style risk** | Low: painterly is native to pre-rendering | Real: C-F painterly in 3D is deliberate NPR work (stylised shading, painted textures); the default gravity is photoreal, which round 2 already rejected (A-F "a tad too realistic") |
+| **Interaction** | Hit-testing on height-displaced ground needs an inverse-displacement walk; tractable, mildly fiddly | Standard ray-pick; cleaner than 2.5D once built |
+| **Perf envelope** | Trivial (quads) | Modest for this world size, but a real envelope to engineer on low-spec |
+| **Verification** | Captures stay machine-portable | GPU rasterisation varies by driver: pixel goldens break cross-machine; checks move to structural asserts + tolerance compare |
+| **Animation ceiling** | Flipbook overlays only | Native: shader water, particles, lit smoke, terminator |
+
+### The advisor's read
+
+**If the end-state is ever 3D, go to 3D directly and skip 2.5D.** The two share almost
+no work: 2.5D's distinctive costs (the oblique bake pipeline, angle-locked sprite
+sets) are exactly the parts 3D throws away, so taking 2.5D first pays a large
+art-and-engineering bill for a waypoint. The staged top-down bake already banks
+everything transferable (brushes, grade, palette, the swappable ground-layer seam).
+
+Choose **2.5D as the destination** only if the frozen camera is judged *sufficient
+forever* — it delivers the close-up look at the lowest engine risk, on the current
+backend, with portable captures. Choose **3D** if the reference camera behaviour
+(continuous tilt, "standing on the planet") is part of the game's identity — the
+prompts and it1 suggest it is. The one 3D risk to respect is style drift toward
+photoreal; the mitigation is authoring the NPR look first (a vertical slice judged
+against it3's C-F panel before any systems work).
+
+## 7. Recommended shape (advisor's view — superseded)
+
+*Ruled past, 2026-09-01: Ben's first form picked the hex atlas; the reference renders
+(`docs/ui/design/renders/map/`) then falsified per-tile sprites for grid-free
+continuous ground, and the second form settled on the baked-chunk mechanism this
+section originally argued for, with authored biome brushes and the C-F direction.
+`docs/ui/RENDERING.md` is the authority; kept below as the original reasoning.*
 
 **C as the sprint-29 target, B's brushes optional inside it, D explicitly deferred with
 the door held open.** Concretely: a `terrain_layer` that owns baked chunk textures per
