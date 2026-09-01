@@ -13,6 +13,55 @@
  ],
  "items": [
   {
+   "status": "designed",
+   "glyph": "x",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": "v0.1.21",
+   "sprint": "27",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-644",
+   "short_name": "SPACE_PROGRAMME_BUDGET_LINE",
+   "category": "Economy",
+   "title": "Government satellite launches - the tenth budget line, and space goods' first real buyer",
+   "authority_doc": "docs/politics/NATIONS.md",
+   "files": [
+    "src/world/nation_budget.hpp",
+    "src/world/nation_step.cpp",
+    "scripts/economy.lua",
+    "docs/politics/NATIONS.md"
+   ],
+   "design": "Ben, 2026-08-26: 'add endpoints for space goods in government issued satellite launches'. Design in NATIONS.md section A budget. THE MACHINERY EXISTS - nations hold a weighted budget over priority lines, run_national_budget has claim/transfer machinery, and strategic_reserve is already a goods-buying line that no consumer claims on. THE WORK: a tenth line, space_programme, buying spacecraft_components and propellant through the BL-350 procurement seam (never on the open market - that is strategic_reserve's own rule). APPEND-ONLY: the weight vector is indexed by the enum and serialised, so the line goes last. Why it is worth more than a sink: state demand arrives in LUMPS and follows a weight a rival can lobby to move, so it is worth playing politics over rather than merely scaling into. ALSO OWNS spacecraft_components (BL-648's measurement, 2026-08-26): the guard's red list came back with ELEVEN goods, not the ten expected, and the eleventh is this one. Its exemption claimed BL-350 procurement, but procurement is a resource-agnostic TRANSFER between two corps' pools - it moves goods without consuming them, and admitting it as an injector would substantiate the entire roster at once. src/world contains no militia, and corp_ai.cpp says outright that the scorer does not emit those verbs today, so nothing automatic buys it. This line is its first real buyer.\n\nRESTORED 2026-09-01 (Ben, this session): cancelled in the 2026-09-01 single-focus close, restored the same day - the state and endemic channels are prerequisites of the success-lever sweep sessions. The cancellation was never a verdict on the design."
+  },
+  {
+   "status": "designed",
+   "glyph": "x",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": "v0.1.21",
+   "sprint": "27",
+   "written": "2026-08-26",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-647",
+   "short_name": "ENDEMIC_LUXURY_DEMAND",
+   "category": "Economy",
+   "title": "Tobacco, spices, coffee and furs get the buyer they were authored for",
+   "authority_doc": "docs/economy/RESOURCES.md",
+   "files": [
+    "scripts/economy.lua",
+    "src/world/market_clearing.cpp",
+    "docs/economy/RESOURCES.md"
+   ],
+   "design": "MEASURED: four endemic goods are on the roster, extractable, priced - and wanted by nothing at all, in any band. They pass the orphan check by naming 'mercantile demand', which BL-648 shows does not exist. THE WORK: a household demand that scales with WEALTH rather than headcount, flavoured by NATIONAL CHARACTER so different nations crave different luxuries. That asymmetry is the design, not a detail: it makes the trade route directional by construction - extract where it grows, sell where the money is - which is the most Trade-shaped channel of the eight and the one that most directly serves the pillar. Note it is also the first demand whose SIZE is a function of prosperity, so it rewards a player who has made somewhere rich.\n\nRESTORED 2026-09-01 (Ben, this session): cancelled in the 2026-09-01 single-focus close, restored the same day - the state and endemic channels are prerequisites of the success-lever sweep sessions. The cancellation was never a verdict on the design."
+  },
+  {
    "id": "BL-714",
    "short_name": "instruments that cannot see",
    "category": "Tooling",
@@ -36,6 +85,177 @@
     "src/core/verify_api.cpp"
    ],
    "design": "A green check that cannot see its subject is worse than a red one, and five are on record. Grouped because the fix is one discipline - a check must prove it LOOKED - not five unrelated repairs.\n\n* NR-614 / NR-663 - `expect_no_clipping`'s scope is draw-list text only, so it reported '0 failure(s), 0 record(s)' over a whole 31-capture shell pass while the Corporation dashboard visibly truncated 'Workforce 76% of labour demand n' mid-word and a genuinely clipped button was on screen. ZERO RECORDS is the tell: the ledger saw nothing, so the pass is vacuous. Any check that can report zero observations must FAIL on zero, not pass.\n* NR-714 - `budget_ledger_ranked.lua` is named for the Balance ledger's top-buildings ranking and captures two frames, neither of which contains it (one scrolled past it, one with the ledger shut).\n* NR-606 / NR-623 - four verify scripts fail for pre-sprint reasons and `lens_strip`'s three goldens are stale by world drift (blessed 2026-06-17). The strip is the subject; the map behind it is not - re-point them at something world-independent or retire them to capture-only.\n* NR-695 - `overflow_tile_v2` hung the suite: the History ledger's TILES view is a row per tile on the body, so the sweep burned CPU, collapsed memory and starved nine scripts behind it. A per-script wall clock would have turned a suite-wide stall into one red row."
+  },
+  {
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (success-lever session, Ben's instruction)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-723",
+   "short_name": "CAMPAIGN_LAPSE_INSTRUMENT",
+   "category": "Tooling",
+   "title": "A spectated campaign under parameter set P becomes a per-tick CSV and a film strip",
+   "authority_doc": "docs/development/REVIEW_AUTOMATION.md",
+   "files": [
+    "tools/verify/campaign_lapse.cpp",
+    "scripts/verify/campaign_lapse.lua"
+   ],
+   "design": "The instrument every sweep below runs on. Nothing today runs \"spectate for T ticks under parameter set P and log a time series\" - every part exists, nothing joins them.\n\nPIECE 1 - tools/verify/campaign_lapse.cpp (live-Lua class, built via build_lua_harness.bat): acquisition_viability's world setup verbatim (parsed gen config, real spawn order, 80 warm ticks under spectating=true), then a measured window with spectating KEPT true - the field is the subject, nobody is seated. Emits one CSV row per econ tick per corp: the seven budget flows, net, balance, holdings, catchment market share, footprint tiles. Plus per-market rows (price, base_price, supply, demand, shortfall) and world rows: valued production (sum of building output x its market's resolved price - the session's GDP definition, NR-774), exchange-record revenue, convoy dispatches, operating/idled firm counts, corps in debt, stance/lobby verb counts (so an unbraked leader is distinguishable from a braked one). CLI: --seed, --ticks, --epoch, and parameter overrides applied AFTER load_from_lua via the registry setters - the demand_census --reach pattern (NR-763): the override is the last word and is echoed in a manifest header, so a probe run can never be mistaken for a shipped one. Output under build_gen/verify/lapse/<tag>/ (metrics.csv + manifest).\n\nPIECE 2 - scripts/verify/campaign_lapse.lua, the visual half: new_world(seed), spectate(true), god_view(true), then a loop of econ_step(4) + arm lens + capture for Corporation, Market and Scarcity. Report-only captures to a per-run directory, never goldens - on-screen normalisations are frame-relative by design, so the CSV is the data and the frames are only the film. Frames stitch to a time-lapse outside the engine.\n\nT0 VALIDITY, built in per the BL-714 discipline (a check proves it LOOKED): A/A same-seed runs byte-identical CSVs; every logged metric carries one differential row - a knob that must move it, asserted moving; a zero-observation series FAILS rather than passes; a per-run wall-clock budget so a stall is one red row, not a hung suite.\n\nWHY EXTERNAL LOGGING IS FORCED: quarterly returns retain 40 quarters and market_plot_history 64 samples - a campaign-length trend cannot be read from in-world stores.\n\nSave-the-tool rule: wrapping this as a .claude/skills entry needs Ben's permission; until granted it is a committed harness + script, run by hand."
+  },
+  {
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (success-lever session, Ben's instruction)",
+   "requires": [
+    "BL-723"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-724",
+   "short_name": "SWEEP_SPAWN_DISTRIBUTION",
+   "category": "Tooling",
+   "title": "Sweep 1 - the spread of starts: seeds x abundance, nothing else moved",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "tools/verify/campaign_lapse.cpp"
+   ],
+   "design": "8+ seeds x abundance {sparse 0.40, lean 0.65, standard 1.00} - the cleanest scarcity axis (one enum, a pure post-multiply, stream-identical at standard) - 120 ticks past warm start, no other overrides. Measures the DISTRIBUTION of opening quality, never one sample: fraction of seeds where the shortlist corp reaches trailing net >= 0 within 8 quarters; GDP-trend slope per cell; time to first positive quarter.\n\nSUCCESS SHAPE: sparse < lean < standard strictly ordered, and sparse still above the viability floor - the ambient-resource baseline (stone/timber/sand/clay/peat on every eligible tile) is the designed worst case, and this sweep is its proof or refutation. Cross-checks on the same seeds: player_seed_sweep, spawn_solvency.\n\nINTERPRETATION BOUND: the deliverable is the spread, never fairness - \"there is no reason that every start needs to be equally good and fair\" (Ben, 2026-08-31). A poor start is a legitimate outcome; a non-functional one is the defect."
+  },
+  {
+   "status": "designed",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (success-lever session, Ben's instruction)",
+   "requires": [
+    "BL-723"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-725",
+   "short_name": "SWEEP_PRICE_LEVERS",
+   "category": "Tooling",
+   "title": "Sweep 2 - base prices and the band, with the ceiling re-derived per cell",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "tools/verify/campaign_lapse.cpp"
+   ],
+   "design": "base_price scalar {0.5, 1.0, 2.0} (whole world_gen.kepler_market.base_price table) x price band {0.25/4, 0.25/10, 0.1/20}. The two levers are COUPLED, not independent: ceil_mult is derived (> 1 + max haulage / cheapest base), so every cell re-runs haulage_measure and the manifest records whether the cell's band still clears the derivation - a violating cell is measuring an unservable tail and says so rather than reporting it as tuning.\n\nWATCH: edge-pegged-good count per cell (ceiled-everywhere = absent industry, floored-everywhere = glut - the canon vocabulary, NR-676; today's baseline is exactly one, clean_water); GDP and net-income trends; convoy dispatches vs the 1055/802 haulage baseline (goldens cannot see trade collapse); rival sell-order floors, which ride base_price through trade_floor_multiple.\n\nSCOPE GUARD: the law-clamp veto (2026-07-11, a law is a modifier over the market) is honoured - this sweeps the band and the reservation prices, the legitimate min/max forms; no cell may implement a price control as law."
+  },
+  {
+   "status": "designed",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (success-lever session, Ben's instruction)",
+   "requires": [
+    "BL-723"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-726",
+   "short_name": "SWEEP_DEBT_DYNAMICS",
+   "category": "Tooling",
+   "title": "Sweep 3 - debt as dynamics: interest x opening capital, honestly bounded",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "tools/verify/campaign_lapse.cpp",
+    "src/world/budget_system.hpp"
+   ],
+   "design": "k_debt_interest_per_quarter {0.0, 0.015, 0.03} x base_capital {200, 400, 800}. THE HONEST BOUND, stated up front: no borrow verb exists and the solvency gate keeps every rival above its reserve floor, so this sweep measures spiral depth and recovery - insolvent share of the field per tick, interest as a share of total losses (baseline 43-60%), first-crossed-zero tick, recovered-corp count - and never borrowing strategy. A debt-parameter effect on the trend is a statement about the money loop, not about play.\n\nThe interest rate is judged over the 80 warm-start compoundings (x3.3 at 0.015, x4.9 at 0.02 - the FINANCE.md rule), not over one quarter. Both constants are C++ (budget_system.hpp, corporation_generation.hpp): part of this item is giving them harness-reachable setters with the authored values untouched. debt_decomposition is the per-flow cross-check but runs a hand-built registry mirror - shape confirmation only, its numbers do not move with the Lua.\n\nOUT OF SCOPE: richer debt design - credit lines, firm exit (BL-657), the free-firm trap (BL-658) - is new design, not tuning, and stays in the cold store until Ben carries it."
+  },
+  {
+   "status": "designed",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (success-lever session, Ben's instruction)",
+   "requires": [
+    "BL-723"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-727",
+   "short_name": "SWEEP_SCARCITY_GEOGRAPHY",
+   "category": "Tooling",
+   "title": "Sweep 4 - scarcity as geography: abundance x ore-field concentration",
+   "authority_doc": "docs/generation/TILE_GENERATION.md",
+   "files": [
+    "tools/verify/campaign_lapse.cpp"
+   ],
+   "design": "abundance x a global multiplier on the ore-province redistribution shares (copper 65% / petroleum 60% / iron 55% / coal 45% - sweep {0.7x, 1.0x, 1.3x}, clamped inside [0, 0.95]). Concentration is the geography half of scarcity, separate from world totals: higher shares mean spawn quality depends on being near one of 2-3 ore provinces.\n\nWATCH: chain-completeness spread per market (the demand_census R5 read - the SPREAD is the deliverable; reports, never gates); GDP trend per cell; trade volume. THE PREDICTION UNDER TEST: trade RISES with concentration, because trade arises from supply asymmetry (MARKETS.md property 5) - a cell where it falls instead is a finding about reach or the band, localisable against sweep 2. Optional third axis if runtime allows: drawdown {0, 0.5, 0.9} - thins the accessible fraction of the homeworld start."
+  },
+  {
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (success-lever session, Ben's instruction)",
+   "requires": [
+    "BL-723"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-728",
+   "short_name": "SWEEP_DEMAND_COMPOSITION",
+   "category": "Tooling",
+   "title": "Sweep 5 - whose money is it: demand channel composition",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "tools/verify/campaign_lapse.cpp",
+    "scripts/economy.lua"
+   ],
+   "design": "population_demand.demand_scale {0.5, 1, 2} x background_demand.demand_scale {0.5, 1, 2} - both already clean one-number axes in scripts/economy.lua. The background-industrial stopgap is ~70% of industrial-band demand (census 2026-09-01: 3698.9 of 5298.3 total), so this sweep prices what the world's income is actually made of, and how fragile every trend is to the stopgap's eventual retirement.\n\nOnce BL-644 (state channel) and BL-647 (endemic luxury) land, their weights join as cells, and the sweep ranks ALL live channels by effect size on GDP and net income - which also ranks every other lever's ceiling, since a price lever can only move income that some channel is paying.\n\nEXPECTED OUTCOME: this sweep dominates every other sweep's effect sizes. If it does not, that inversion is the headline finding, not a footnote."
+  },
+  {
+   "status": "designed",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (success-lever session, Ben's instruction)",
+   "requires": [
+    "BL-723",
+    "BL-725",
+    "BL-728"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-729",
+   "short_name": "SWEEP_INTERACTIONS",
+   "category": "Tooling",
+   "title": "Sweep 6 - knob x knob: the interactions one-at-a-time sweeps provably miss",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/campaign_lapse.cpp"
+   ],
+   "design": "The coupled pairs, 2x2 or 3x3 each, run after their single-axis sweeps so the marginal cells have a baseline: (a) base price x ceiling - coupled through the haulage derivation; (b) opex (material-floor / wage scalar) x demand scale - the viability knife-edge, where the 30% idle floor was measured at ~61% of the residual spawn deficit; (c) unit upkeep x extraction levy - honouring the NATIONS.md sequencing rule (anchor and upkeep first, re-measure, then the levy: both at once makes the benchmark uninterpretable), so the interaction cell runs LAST and is read against the two singles.\n\nMETHOD AUTHORITY: DEVELOPMENT_PRACTICES' measuring-emergent-systems rules - measure the OFF state always; never assert a conservation you have not summed; a 28.2-point interaction once passed every per-knob sweep, which is why this item exists.\n\nDELIVERABLE: an interaction table per pair (effect of A at each level of B) and a ruling per pair on whether future tuning sessions may treat the two knobs as independent."
   }
  ]
 }

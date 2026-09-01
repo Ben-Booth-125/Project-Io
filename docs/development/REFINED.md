@@ -1,55 +1,42 @@
 # Project Io — REFINED (active worklist)
 
-**Sprint 27 (demand) — BATCH DELIVERY, block 2, 2026-09-01.**
+**Success-lever session — 2026-09-01.** Goal: with 0 research points spent, a skilled player can
+build a functioning economy and start gaining influence around their spawn. This block lands the
+two missing buyers first, then the measurement battery designs. Sweeps run in later sessions on
+the BL-723 instrument.
 
-Give the goods a buyer. **Success is not "the channels are built"** — it is a field that is not
-monotonically insolvent. Read NR-771's finding first: `ai_skill_harness`, the sprint's stated
-criterion, is blind to per-category work until BL-713 lands, so read the criterion as
-`chain_conversion_probe` + `demand_census` in the meantime.
-
-**Base:** `ece82abc`.
+**Base:** `ca8d6476`. The review queue holds one entry (NR-774, the four definitional calls).
 
 ---
 
-## Done this block
+## In flight — worktree agents
 
-- [x] **BL-710** save_roundtrip compiles again — green at v22, both dead bumps verified. `e90841a0`
-- [x] **BL-712** per-`recipe::group` build candidates; the recipe chase confined to its own group. `7983d5d4`
-- [x] **BL-709 verified** — R2/R3/R4 land, **R1 pending**; the item stays open. `1c45f41f`
-- [x] **demand_census surveys the world** — it built *zero* extraction sites before. `8fe177dc`
-- [x] **BL-711** per-resource top-K — coal goes from 0 mines in any world to 25. `1eed92e3`
-- [x] **BL-417** the build score is `net / capex`; the quadratic is gone. `spectator_determinism`'s
-      byte-identity row retired with it, and that harness is green for the first time in weeks.
-
-## The review queue is drained
-
-**117 open → 0**, on Ben's instruction, and the reason matters more than the number: most entries
-named *work*, not a judgement. Ten items now carry it — **BL-713** … **BL-722**. Rule 0c in
-`CLAUDE.md` gained the discipline that keeps it drained: a call only Ben can make goes in the queue,
-work goes in the backlog, a fact worth remembering goes in the comment next to the code.
-
-## Next
-
-| # | Item | State |
+| Task | Branch | Verification required before merge |
 |---|---|---|
-| 1 | **BL-642** (construction draws) | Ruled: centre growth is **gated** — it stretches like a build. Design for the BL-641 cliff rather than discovering it; growth is episodic and `max_stretch` already models "slower, not dead". Also owns NR-770's yards. |
-| 2 | **BL-644** (state channel) | Open. |
-| 3 | **BL-647** (endemic luxury) | Open. **Prerequisite the item does not name:** tobacco, spices, coffee and furs are not in `k_extractable`, so nothing can mine them. |
-| 4 | **BL-643 / BL-646 / BL-645** | Priority B. |
-| 5 | **BL-709 R1** | Re-open with BL-642 — same fact from the other side. |
-| 6 | **BL-713** (harnesses build the app's world) | **After sprint 27 closes**, per Ben. One golden wave. |
+| **BL-644** (state channel) — tenth budget line `space_programme`, buying and CONSUMING spacecraft_components + propellant; append-only enum; conservation-exact transfer | `bl644-space-line` | `nation_budget_harness` rows extended, each proven able to fail; `money_conservation` green; clean full build; save-version bump via the registry if the weight vector moves the seam |
+| **BL-647** (endemic luxury) — wealth-scaled, nation-flavoured household demand for the luxury goods; adds them to `k_extractable` (the BL-586 slice-2 gap) | `bl647-endemic-luxury` | New/extended harness rows (deposit-where-wealth, differing-nation baskets, determinism, placement gap closed), each proven able to fail; `demand_census` before/after in-tree — luxuries leave the no-sink list |
 
-Then, unsequenced: BL-714 (instruments that cannot see), BL-715 (the save seam), BL-718/BL-719 (UI),
-BL-720 (seeder), BL-721 (paid for outcomes), BL-716 (tech tree), BL-717 (designed but silent),
-BL-722 (live-click debt).
+Agents build and commit on their branches; **this session merges, builds, verifies** — nothing
+self-reported is assumed. Integration owns the `demand_census` channel enumeration update (both
+new channels must read PRESENT), re-running the census + `chain_conversion_probe`, and one commit
+per item.
 
-## Known-red
+## Filed this block
 
-- `ai_skill_harness` — 25 band failures, stale since 2026-08-16 (NR-305). BL-417 improved three of
-  five seeds and the aggregate; the bands themselves have not been re-blessed.
-- `chain_depth` — 8 pre-existing `injector::none` rows.
-- `spectator_determinism` — **now green.**
+- [x] **BL-644 / BL-647 restored** from the cold store on Ben's instruction; cold copies cleared;
+      lint green.
+- [x] **BL-723** (campaign lapse instrument) — the spectated-campaign CSV + film-strip harness
+      every sweep runs on; T0 validity rows built in.
+- [x] **BL-724…BL-729** (sweep battery) — spawn distribution, price levers, debt dynamics,
+      scarcity geography, demand composition, interactions. Each carries its success shape and
+      its honest bounds in the item.
+- [x] **NR-774** — the four definitional calls (GDP, influence, band, proxy) taken to make the
+      sweeps measurable; awaiting ratification.
 
----
+## Next (after merge)
 
-**Open work with no promoted tasks:** `node tools/session/backlog_query.js --table`.
+1. Merge both branches; resolve the one expected collision (`scripts/economy.lua`).
+2. Update `demand_census` channel enumeration; full build; census + probe re-run; the luxuries and
+   space goods leave "NO market sink".
+3. One commit per item, `scoped-commit` path.
+4. Build **BL-723** and produce the first time-lapse + baseline CSV this session if time allows.

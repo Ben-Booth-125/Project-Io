@@ -24,13 +24,22 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*0 entries — 0 open, 0 resolved.*
+*1 entries — 1 open, 0 resolved.*
 
 ---
 
 ## Open
 
-*Nothing open.*
+### NR-774 — Four definitional calls taken so the success sweeps are measurable - ratify or overturn
+*decision taken on your behalf · raised 2026-09-01 · from Success-lever session, 2026-09-01: the sweep battery (BL-723..BL-729) cannot log "GDP", "influence", a band, or a proxy without someone picking each. Picked to keep the session moving; the instrument encodes them.*
+
+1. GDP := VALUED PRODUCTION - sum of building output x its market's resolved price, per tick - with net income (filed returns) and net worth logged beside it. The money loop is deliberately not closed (the market is a buyer of last resort paying with nobody's money), so no income-side aggregate is conservation-meaningful; one definition is picked and held for every comparison.
+
+2. INFLUENCE := catchment market share (standing.cpp's axis) + footprint tiles + trade-route spread, with stance/lobby verb counts logged beside them. Sentiment cannot carry it yet - eight of ten factor weights are authored at zero, so sentiment today moves only through procurement conduct.
+
+3. BAND := the industrial 1960 start (your 2026-08-31 ruling: "we will be working on the 1960s start"); ancient runs remain available per-run via --epoch. The two bands fail differently, so one sweep cannot serve both.
+
+4. PROXY := the corp AI accepted as the skilled-player stand-in, with two brackets stated in every report: cadence pessimism (one strategic batch per corp per 4 quarters vs a human acting every tick) and subsidy optimism (under spectate every corp can claim nation budget lines; a played player-corp is never a claimant).
 
 ---
 
