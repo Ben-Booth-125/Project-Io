@@ -1,0 +1,114 @@
+PROJECT IO — MENU STYLE EXPLORATION, ROUND 2
+Drafted 2026-08-30, after round-1 verdicts.
+
+ROUND 1 VERDICTS (Joe)
+- A Industrial/HMI  : too boring and flat. Rejected.
+- B Nuclear room    : liked the mood, but wrong fit for the game AND too busy —
+                      hard to find/select the settings. Rejected as a menu.
+- C Deep-space min  : works, despite being the most minimal. THE BASE.
+- D Brutalism       : wrong style for the menu. BUT shell-D rendered so well it
+                      is worth reconsidering brutalist weight for the shell.
+
+ROUND 2 DIRECTION
+All four start from C (calm, minimal, legible). Each adds ONE focal / hero
+element so minimal never tips into empty (A's failure). Settings cluster stays
+simple and obvious in every variant (B's failure). Two variants test whether B's
+warmth (M2) and D's weight (M3) can be borrowed without their downsides.
+
+=============================================================================
+FIXED (every prompt)
+=============================================================================
+- Near-black #0F0F14, faint cool tint. Flat vector. No gradients (a faint
+  vignette / low glow is allowed only where a variant says so).
+- 1280x720.
+- The real control set, laid out clean and centred (or to one side where noted):
+    * "PROJECT IO" title + one-line subtitle "Near-future corporate 4X"
+    * Seed field, "Roll" button, "Copy seed" button
+    * "Resources: Sparse / Lean / Standard" — segmented / radio, one selected
+    * "Bodies: 5 (fixed)" — inert readout
+    * "New Game" button (primary)
+    * "Quit" button (secondary)
+- Layout ref for ALL four: ~/io_shell_captures_20260830/main_menu.png
+- Style refs live in ../techtree/refs/ (extensionless — add .png to upload).
+
+=============================================================================
+M1 — OBSERVATORY, REFINED   (pure C + a hero shape)
+Style ref: ON-STYLE/mono, ON-STYLE/hexclean
+=============================================================================
+Main menu for a near-future corporate 4X titled "PROJECT IO". Deep-space
+minimalist / observatory aesthetic: near-black #0F0F14, vast negative space,
+hairline 1px strokes, thin geometric sans-serif type with generous letter-
+spacing. ONE accent only: pale gold #D9C089. Behind and slightly above the
+title, off-centre, a single large quiet hero element — a thin line-art planet
+with one hairline orbital ring, or a bare orbital-ring diagram — drawn at maybe
+40% opacity so it sits behind the controls without competing. Centred control
+column, tight and calm: small-caps "PROJECT IO" over its subtitle, a single
+thin-ruled seed field with "Roll" and "Copy seed" as text buttons, a minimal
+"Sparse / Lean / Standard" segmented control with one segment active in pale
+gold, a dim "Bodies: 5 (fixed)" line, then "New Game" and "Quit" as ghost
+buttons (text with a hairline box). No panels, no fills, no texture. The single
+hero shape is the only thing carrying visual weight. 1280x720.
+
+=============================================================================
+M2 — WARM OBSERVATORY   (C structure, B's warmth, none of B's clutter)
+Style ref: ON-STYLE/mono + ON-STYLE/pipes (for the warm-metal note only)
+=============================================================================
+Main menu for a near-future corporate 4X titled "PROJECT IO". Same calm,
+minimal, hairline observatory layout as a deep-space minimalist menu — vast
+negative space, thin sans type, obvious controls — but a WARM reactor palette
+instead of cold: primary accent amber #E8A33D, plus a single tiny radium-green
+#7DE07D micro-accent used once (the active resource-radio dot, or a status
+tick). A very faint warm vignette at the frame edges (no hard gradient). Hero
+element: a low-contrast line-art reactor-core motif — concentric circle with a
+fuel-rod cluster, or a containment-ring diagram — behind the title, off-centre,
+dim. Controls stay hairline and unmistakable: thin-ruled seed field with "Roll"
+/ "Copy seed", "Sparse / Lean / Standard" segmented control, "Bodies: 5 (fixed)"
+readout, "New Game" and "Quit" ghost buttons. Warm and quiet, not busy — the
+warmth is in the palette, not in added chrome. 1280x720.
+
+=============================================================================
+M3 — MINIMAL WITH WEIGHT   (C restraint + one heavy brutalist move)
+Style ref: ON-STYLE/mono + OFF-STYLE/3brutalistposter
+=============================================================================
+Main menu for a near-future corporate 4X titled "PROJECT IO". Mostly the calm
+deep-space minimalist treatment — near-black #0F0F14, hairline strokes, thin
+sans type, lots of negative space — but with a few DELIBERATELY heavy elements
+for contrast: "PROJECT IO" set large in a bold stencil face; a thick solid
+horizontal rule separating the title block from the controls; and a single
+solid-fill slab sitting behind the "New Game" button in one loud accent — test
+BOTH safety orange #FF5A1F and amber #E8A33D as that accent. Everything else
+stays hairline: thin-ruled seed field with "Roll" / "Copy seed", "Sparse / Lean
+/ Standard" segmented control, dim "Bodies: 5 (fixed)" line, "Quit" as a plain
+ghost button. The whole composition is quiet except for the one heavy stencil
+title and the one solid action slab — that contrast is the visual interest.
+Controls sit on the calm side of the layout, easy to scan. 1280x720.
+
+=============================================================================
+M4 — ORBITAL SCHEMATIC   (C + the space/nuclear lean the brief wants)
+Style ref: ON-STYLE/Prometheus-or-Expanse-terminals, ON-STYLE/mono
+=============================================================================
+Main menu for a near-future corporate 4X titled "PROJECT IO". Deep-space
+minimalist base — near-black #0F0F14, hairline strokes, thin sans type — with
+the hero element being a precise ORBITAL SCHEMATIC of the game's star system:
+five thin concentric orbit rings around a small central star, each ring carrying
+one small body dot, faint dashed trajectory arcs, tick marks on the rings, tiny
+labels. It reads as a real instrument diagram and owns the centre / right of the
+frame. ONE accent: pale gold #D9C089 (or test saturated cyan #3FC9E8). Title
+small, top-left. The controls form a tidy vertical column down the LEFT side so
+they never overlap the schematic: thin-ruled seed field with "Roll" / "Copy
+seed", "Sparse / Lean / Standard" segmented control, "Bodies: 5 (fixed)" (note
+how this ties to the 5 rings), "New Game" and "Quit" ghost buttons. Calm,
+technical, lore-bearing — not busy. 1280x720.
+
+=============================================================================
+NEXT
+=============================================================================
+Pick 1-2 of M1-M4 (or a blend) as the menu direction, then it graduates into
+../../GLOBAL_STYLE_SHEET.md § Iterations with the deciding render.
+
+Shell round 2 is a separate pass once the menu lands. Two constraints for it:
+  - Carry brutalist-D weight forward as one of the variants to test.
+  - EVERY shell variant must show a semi-representational map (textured terrain,
+    hexes only on hover/select). Shell-D may have won on its realistic map, not
+    its chrome — don't let the map confound the comparison again. Ties to
+    renders/map/ and the tile-rendering + camera question.

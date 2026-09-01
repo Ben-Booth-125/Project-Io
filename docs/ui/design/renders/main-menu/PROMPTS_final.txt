@@ -1,0 +1,69 @@
+PROJECT IO — MENU STYLE EXPLORATION, FINAL SYNTHESIS RENDER
+Drafted 2026-08-30, after round-3 verdicts. One render. Then this track pauses
+to discuss the spread with Ben.
+
+ROUND 3 VERDICTS (Joe)
+- CV5 (bone white + one hot accent) is the clear favourite. BUT its ember-red
+  accent contrasts the current house thinking (amber + blue). For the final
+  render: keep the whole CV5 palette EXCEPT swap the red for gold/orange.
+- Dark background #0F0F14 is essential and non-negotiable.
+- The round-3 layout reads like "an item showcase", not a menu — too much empty
+  space with one clean object in the bottom-right. The final render needs a
+  background element to fill the negative space and make it feel finished.
+- Fill it with a synthesis of two liked things, both drawn as the backdrop:
+    * mainC's "big circles and lines" (concentric orbital rings, leader lines)
+    * mainC1 / M1's "nice world" (the line-art planet)
+  Not yet decided which is stronger alone — so this render COMBINES them and we
+  judge the combination.
+
+=============================================================================
+FINAL RENDER — full prompt
+=============================================================================
+Main menu for a near-future corporate 4X strategy game titled "PROJECT IO",
+subtitle "Near-future corporate 4X". Deep-space minimalist / observatory
+aesthetic, flat vector, hairline 1px strokes, thin geometric sans-serif type,
+no gradients, no texture.
+
+PALETTE (CV5, red swapped for gold):
+  - Background: near-black #0F0F14 with a faint cool tint. Essential — no
+    lighter background.
+  - Primary text: bone white #ECE7DD.
+  - Secondary / muted text: dim grey.
+  - Single accent: warm gold / amber #E8A33D. Used ONLY on the "New Game"
+    button and the active "Resources" segment, and as the lit tile in the hex
+    cluster. Everything else is bone white or hairline grey.
+
+BACKGROUND HERO (fills the negative space — this is what makes it a menu, not a
+showcase): a large line-art planet, off-centre toward the upper right, wrapped
+by 2-3 concentric hairline orbital rings / arcs with a few small body dots on
+them, tick marks on the rings, and thin leader lines connecting a dot or two to
+tiny labels. Drawn at ~30-40% opacity in bone-white hairlines so it sits BEHIND
+the controls and bleeds across the whole frame, tying the left and right halves
+of the composition together. Quiet, precise, instrument-like — not busy.
+
+CONTROLS (left-centre, calm and unmistakable, over the backdrop):
+  - small-caps "PROJECT IO" over its subtitle
+  - a thin-ruled seed field with "Roll" and "Copy seed" as text buttons
+  - a "Sparse / Lean / Standard" segmented control, active segment in gold
+  - a dim "Bodies: 5 (fixed)" readout
+  - "New Game" as a gold ghost/outlined button (the one warm element), "Quit"
+    as a bone-white ghost button
+
+FOREGROUND CORNER: in the bottom-right, a small cluster of ~12-20 hexagonal map
+tiles in OBLIQUE projection — camera low, ~30-40 degrees above horizontal, the
+close-up game angle, NOT top-down. Slight extruded tile height so side faces
+show; a couple carry low relief (a ridge, a small building block) with
+hard-edged flat shadows. Terrain by muted desaturated grey fill; hex edges
+visible; exactly ONE tile lit in gold #E8A33D. The cluster sits low, partly
+cropped by the frame edge, ~70-80% opacity.
+
+1280x720. Layout ref: ~/io_shell_captures_20260830/main_menu.png
+Style ref: ../techtree/refs/ON-STYLE/mono, ../techtree/refs/ON-STYLE/hexclean
+
+=============================================================================
+NEXT
+=============================================================================
+This render + the round 1-3 spread go to Ben. Once a direction is picked it
+graduates into ../../GLOBAL_STYLE_SHEET.md § Iterations and § Colour guide, and
+the tilted-hex tile treatment is copied into renders/map/ as the close-up map
+starting point.

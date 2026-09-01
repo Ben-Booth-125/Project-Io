@@ -1,0 +1,150 @@
+PROJECT IO — PLANETARY MAP STYLE EXPLORATION, ROUND 1
+Drafted 2026-09-01. Breadth-first pass — find the art-direction family before
+optimising any one of them (GLOBAL_STYLE_SHEET.md process note, 2026-08-25).
+
+WHAT WE ALREADY KNOW (Joe, 2026-09-01)
+- The map must look SEMI-REALISTIC / representational — not schematic, not
+  abstract. Real-ish terrain, real-ish models.
+- NO hex grid on screen unless a tile is selected. A selected tile shows a
+  single hex outline; nothing else is gridded.
+- The camera ROTATES / TILTS as you zoom in: from near-orbital top-down out
+  wide, down to a low oblique angle up close, where you see models and terrain
+  "as if you were standing on the planet".
+- Settled house palette still applies: background #0F0F14, amber/gold #E8A33D
+  (EARNED / selection), saturated cyan #3FC9E8 (secondary). Shell chrome is the
+  settled U2 / menu-shell "final" direction — but this round is CHROME-STRIPPED,
+  terrain art only.
+
+PRIOR RENDER
+- ../map/it1 — first attempt: a 3-panel zoom triptych (wide top-down ->
+  tilted mid -> close building focus) inside an invented shell. Useful for the
+  zoom/rotation idea and the "icons at distance resolve into real geometry up
+  close" behaviour. Not judged as an art direction yet.
+
+NOTE ON REFS
+- io_shell_captures_20260830/ has NO map/canvas capture (all ledgers + panels),
+  so there is no real-layout screenshot to pin to. Layout is not the variable
+  this round anyway.
+
+=============================================================================
+ROUND 1 — 5-WAY ART-DIRECTION COMPARISON SHEET  (output: it2)
+=============================================================================
+One wide 16:9 image, 5 equal vertical panels, thin near-black (#0F0F14)
+gutters, a small stencil label (A B C D E) top-left of each panel.
+
+SHARED ACROSS ALL 5 PANELS (only the art direction changes):
+- Same patch of alien-but-earthlike planetary terrain: rolling hills, a river
+  valley, patchy conifer-like forest, exposed rock, a small industrial
+  settlement of blocky low-rise buildings with a couple of smoking stacks.
+- Same camera: low oblique, ~35-40 degrees above horizontal — the tilted
+  near-surface angle the game reaches after zooming in. NOT top-down.
+- Same lighting direction and time of day in every panel.
+- Exactly ONE terrain tile selected, marked by a single glowing amber
+  (#E8A33D) hexagon outline on the ground. No other hex grid anywhere.
+- No UI chrome, no icons, no text overlays. Dark near-black surroundings.
+  Flat, no vignette.
+
+THE 5 DIRECTIONS:
+A  Orbital orthophoto realism
+   Photoreal satellite-style terrain, natural colour, crisp, minimal
+   stylisation. The "real planet from a sat feed" look.
+
+B  Diorama / scale model
+   Terrain reads as a sculpted physical tabletop model — tactile handmade
+   materials, very slight miniature depth-of-field. Warm, tactile.
+
+C  Painterly relief
+   Hand-painted topographic look, exaggerated relief and hillshade, softened
+   detail. Old World / Humankind family.
+
+D  Arid near-future
+   Desaturated dusty palette, atmospheric haze, low sun with long shadows,
+   sparse vegetation. Reads as a colony world, not lush Earth.
+
+E  Realism + diegetic survey overlay
+   Photoreal ground like A, plus faint pale contour lines, small survey tick
+   marks and coordinate ticks baked into the ground at low opacity — a
+   corporate survey map.
+
+HOW IT WAS RENDERED
+- Joe rendered this one on GPT (free unlimited image credits at the time),
+  not Higgs. Prompt above pasted in full. Output: it2.
+
+ROUND 1 VERDICTS (2026-09-01, Joe + Claude read)
+- A  orthophoto realism — functional baseline. Legible, real-place read,
+     buildings/terrain clear. A bit generic. The safe default.
+- B  diorama — REJECTED as rendered. Miniature depth-of-field blur is
+     disqualifying for a map you read constantly (mushy foreground). Sculpted
+     tactile materials were the good part; not worth pursuing unless that look
+     is specifically wanted, and then with NO DOF.
+- C  painterly relief — STRONGEST looking. Exaggerated hillshade makes
+     topography readable at a glance, brushwork has character, still reads
+     semi-realistic, buildings stay legible. Looks like a game, not a photo.
+- D  arid near-future — mood is right and most on-theme, BUT it swapped the
+     biome for desert. Near-future is a GRADE (desaturated palette + haze +
+     low sun + long shadows) to apply over ANY biome, not a terrain type.
+- E  realism + survey overlay — overlay is tasteful (faint ticks, coord
+     labels, contours, doesn't fight the terrain) but it is just A + a layer.
+     Treat as an optional toggle on the winning base, not a base style.
+- Selected-tile amber (#E8A33D) hex glow sits convincingly on the terrain at
+  the oblique angle in all 5 panels. That treatment is confirmed.
+
+=============================================================================
+ROUND 2 — BASE FAMILY DECISION + GRADE AS A LAYER
+=============================================================================
+Goal: pick the base family (A vs C) and confirm "near-future" is a separable
+grade, not baked into the terrain.
+
+SHARED BASE (every round-2 panel):
+- Same terrain CONTENT as it2 — rolling hills, a river valley, patchy
+  conifer-like forest, exposed rock, a small blocky industrial settlement with
+  smoking stacks. TEMPERATE biome, NOT desert.
+- Same low oblique camera, ~35-40 degrees above horizontal.
+- Exactly ONE tile selected: a single glowing amber (#E8A33D) hexagon outline
+  on the ground. No other hex grid anywhere.
+- No chrome, no icons, no text overlays. Near-black (#0F0F14) surroundings.
+  Flat, no vignette. Identical composition + lighting DIRECTION across panels.
+
+--- PANEL SET 1: 2x2 GRADE MATRIX  (output: it3) ---
+One image, 4 equal panels, labelled top-left:
+  A-N  orthophoto realism, NEUTRAL grade (natural colour, high sun).
+  A-F  orthophoto realism, NEAR-FUTURE grade: desaturated, cool cast,
+       distance haze, low sun with long shadows. Same biome — only the grade
+       changes from A-N.
+  C-N  painterly relief, NEUTRAL grade.
+  C-F  painterly relief, NEAR-FUTURE grade (same grade recipe as A-F).
+Judge: which base (A or C), and whether -F earns its place or -N is enough.
+
+ROUND 2 VERDICTS (it3, 2026-09-01, Joe — PROVISIONAL, pending Ben)
+- Panels barely diverged: GPT clamped to the it2 composition and would not
+  push "painterly" far while the frame was held fixed. A-N and C-N came out
+  nearly the same. Loosen the fixed-composition constraint from here on.
+- FRONT-RUNNER: C-F (painterly relief + near-future grade). The lack of
+  saturation reads colder / more hostile / serious — the tone the game wants.
+- C-N "very nice" but too warm and inviting for the game.
+- A-F does a good job but is a tad too realistic / photoreal.
+- CONFIRMED: near-future is a separable GRADE (desaturate + haze + low sun),
+  not a biome. It can be a runtime pass over any base.
+- Base family = C (painterly relief); grade = F (near-future). Provisional.
+
+--- PANEL SET 2: SUPPORTING FRAMES  (output: it4) ---
+On the working hypothesis C + near-future grade (swap to A if it3 says so).
+One image, 3 panels:
+  1  RESTING STATE — nothing selected anywhere, zero hex grid on screen.
+     Confirm the bare map reads clean and legible with no grid.
+  2  BUILDING FOCUS — camera pushed closer and lower on the settlement;
+     buildings as real geometry with material and hard shadow. Check how much
+     model detail the style carries up close.
+  3  ZOOM PAIR — two mini-frames side by side: (left) near-orbital, camera
+     high and near top-down, terrain reads as planet surface, NO grid;
+     (right) same spot after tilting down to the ~35 deg oblique with one tile
+     selected. Tests the rotate-on-zoom transition end to end.
+
+DEFERRED TO ROUND 3
+- E survey overlay as a toggle on the chosen base.
+- Selected-hex adjacency / multi-select treatment.
+- How distant icon markers resolve into real geometry on approach (it1).
+
+NEXT
+Winner (base family + grade decision) graduates into
+../../GLOBAL_STYLE_SHEET.md as a new "Planetary map" sub-track.

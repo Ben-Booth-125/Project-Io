@@ -1,0 +1,125 @@
+PROJECT IO — GLYPH / ICON SET STYLE EXPLORATION, ROUND 2
+Drafted 2026-08-30. Lives in renders/glyphs/. Round-1 render: `1`.
+
+WHAT ROUND 1 GOT WRONG (checked against docs/ui/ICONS.md)
+- Flattened everything to outline. The real vocabulary has a semantic split that
+  must survive: a FILLED family (buildings, settlement, HQ, unit, resource pip)
+  vs a STROKE-ONLY family (landforms, convoy, market centre, survey, battle,
+  under-construction). Filled = "something is installed on this tile";
+  stroke-only = "this is the ground / an event", never a thing installed.
+- Invented glyphs that do not exist: gas field, energy node, farmland, forest,
+  standalone "ore deposit". Resources are ONE diamond pip, recoloured per
+  resource. Forest/farmland are terrain cover, not glyphs.
+- Corner-bracket frames — drop them. Glyphs draw over live terrain with no
+  backing of their own; legibility is the glyph's own job (weight / a dark
+  outline on the filled family), never a plate.
+- Spec drift: convoy is ONE rightward chevron (two strokes), not three; port is
+  a FILLED upward triangle; HQ is a ringed eight-point star (diamond over an
+  axis-aligned square, in a ring, dark centre dot).
+
+ROUND 2 SCOPE
+Four style directions (G1-G4), each rendering the SAME corrected set below on
+one sheet, same grid, so they compare like-for-like. Pick a direction, then it
+graduates into ICONS.md and the real src/ui/icons.cpp vector code.
+
+=============================================================================
+FIXED CONSTRAINTS (every sheet)
+=============================================================================
+- Background near-black #0F0F14. Single accent: gold #E8A33D (the settled menu/
+  shell accent). No second colour on the sheet — in-game the fill encodes owner
+  identity, but the style sheet shows the shapes in one colour.
+- Flat vector. No gradients, no glow, no texture, no frames/brackets.
+- Every glyph centre-anchored, designed to read inside a 2r box, legible at 16px.
+- HONOUR THE FILLED / STROKE SPLIT (see groups below). This is the round-1 miss.
+- One sheet, labelled grid, ~1536x1024, grouped by family with family headers.
+
+=============================================================================
+THE CORRECTED SET (from ICONS.md)
+=============================================================================
+FILLED family — solid gold silhouette + a 1px dark inner outline so it holds
+over any terrain:
+  - Extraction site .... faceted 8-sided ore chunk, wider than tall, corner-cut facets
+  - Processing facility . filled square
+  - Port ............... filled upward triangle
+  - Inland logistics hub  filled flat-top hexagon with a small dark centre dot
+  - Military base ...... filled shield, flat top, shoulders tapering to a point
+  - Building (none) .... filled circle / dot (also the launchpad fallback)
+  - Settlement ......... 1-5 filled towers on a baseline, middle tallest,
+                         tapering to the edges (show the 3-tower version)
+  - HQ ................ ringed eight-point star: a diamond over an axis-aligned
+                         square, enclosed by a ring, dark centre dot
+  - Unit .............. humanoid: filled circle head over a filled triangle body
+  - Resource pip ...... filled diamond, NO outline (the one filled exception)
+
+STROKE-ONLY family — no dark outline, stroke only:
+  - Under construction  crane silhouette: mast, angled boom, back-stay brace, short hook
+  - Convoy ........... ONE rightward chevron (two strokes meeting at a right point)
+  - Market centre .... circle outline with a centred cross (+), arms ~60% of radius
+  - Settlement (razed) two hollow, outline-only tower shells of unequal height on
+                       a faint rubble baseline
+  - Unknown ......... question mark (hook arc, short stem, dot)
+  - Survey badge .... magnifying glass (lens circle + diagonal handle)
+  - Activity ....... concentric pulse: a filled core ringed by a signal ring
+  - Battle ......... two crossed blades, each a stroked shaft with a short
+                     cross-guard bar near its base. NOT a bare X (the X means
+                     "dismiss" everywhere else in the chrome)
+
+LANDFORM family — stroke-only, and NO dark outline (a filled landform would read
+as "installed"). Only four; plains / highland / valley draw nothing:
+  - Mountain ....... twin peaks sharing a saddle, open at the feet, NO baseline
+  - Canyon ........ two level rim shoulders split by a narrow incision cutting below them
+  - Crater ........ a flattened bowl: wide low ellipse with a raised near-rim arc in its lower half
+  - Rift .......... a single jagged fissure running top to bottom (the only zigzag)
+
+CORP EMBLEM shapes — identity, not type; six geometric primitives:
+  circle / square / triangle / diamond / hexagon / pentagon (outline, shown as a row)
+
+LENS glyphs — the six on the minimap bar:
+  Corp / Country / Resource / Market / Population / Continent (stroke, shown as a row)
+
+=============================================================================
+G1 — TWO-WEIGHT, SPEC-FAITHFUL   (the round-1 miss, done right)
+=============================================================================
+Icon sheet for a near-future corporate 4X, background #0F0F14, single gold
+#E8A33D. Render the corrected set with the FILLED family genuinely filled —
+solid gold silhouettes each carrying a 1px near-black inner outline — and the
+STROKE and LANDFORM families as clean 2px hairline strokes with no fill and no
+dark outline. The two weights should be obviously different at a glance: a
+building reads as a solid mark, a landform as a line drawing. Flat vector,
+geometric, no frames. Grouped labelled grid, family headers, 16px-legible.
+
+=============================================================================
+G2 — HEAVIER / STAMPED   (legibility over busy terrain)
+=============================================================================
+Same corrected set and same filled/stroke split as G1, but everything heavier:
+thicker strokes (3px), bolder and slightly simplified filled shapes, tighter
+internal negative space — a "stamped into metal" weight. Tests whether the
+round-1 thin line is too delicate to read over textured oblique terrain.
+Background #0F0F14, single gold #E8A33D, flat, no frames. Labelled grid.
+
+=============================================================================
+G3 — GEOMETRIC-MINIMAL / SCHEMATIC   (matches the tech-tree HMI language)
+=============================================================================
+Same corrected set and filled/stroke split, reduced to the fewest possible
+straight lines and hard angles — curves only where a shape genuinely needs one
+(the ring on HQ, the crater bowl). Every glyph on an implied 30/60/90 grid,
+industrial-schematic / HMI feel, consistent terminal cuts. Background #0F0F14,
+single gold #E8A33D, flat, no frames. Labelled grid.
+
+=============================================================================
+G4 — ONE FACET OF DETAIL   (character without texture)
+=============================================================================
+Same corrected set and filled/stroke split as G1, but each filled glyph gains
+ONE internal facet line, notch or cut for character — the extraction chunk's
+crystal facets, a single chevron seam on the shield, one ridge line on a tower —
+still perfectly flat, no shading. Stroke family stays clean. Richer than G1
+without adding a second colour or any texture. Background #0F0F14, single gold
+#E8A33D, no frames. Labelled grid.
+
+=============================================================================
+NEXT
+=============================================================================
+Judge G1-G4. Winner's weight/detail rules graduate into ICONS.md § Shared
+conventions and drive the src/ui/icons.cpp restyle. A second pass can cover the
+named-building identity sub-family (ICONS.md § 1c — Quarry, Woodcutter's Camp,
+Sand Pit, etc.) once the base language is locked.

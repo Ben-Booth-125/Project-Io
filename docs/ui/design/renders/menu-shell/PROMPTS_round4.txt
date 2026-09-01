@@ -1,0 +1,83 @@
+PROJECT IO — IN-GAME SHELL STYLE EXPLORATION, ROUND 4
+Drafted 2026-08-30, after round-3 verdicts. Lives in renders/menu-shell/.
+
+ROUND 3 CORRECTION (Joe)
+- T1/T2/T3 missed the point. The "second colour" liked in S3 was NOT a highlight
+  accent — it was the MATERIAL TONALITY: S3 had a light-grey "concrete" surface
+  for the frame AND a darker grey for the menu panels. That tonal contrast is
+  what gave the shell a body and separated frame from content. The T-renders
+  only nudged gold/cyan highlights, so they read as no upgrade on S2.
+- Round 4: put a TWO-TONE (or three-tone) surface system on the S2 base. Matte
+  flat tonal planes with hard 1px edges — NOT brutalist grain/texture.
+- Dark background still essential: the CANVAS / void stays #0F0F14. It is the
+  shell FURNITURE that may take a lighter material.
+
+ROUND 4 SCOPE
+S2 base unchanged (hairline layout logic, bold stencil section labels, FILLED
+active nav slot, oblique hex-on-select map). The only new variable is the
+surface-tone split: which regions are light, which are dark.
+
+=============================================================================
+SHARED BASE  (identical in U1, U2, U3)
+=============================================================================
+In-game screen of a near-future corporate 4X. The map CANVAS is near-black
+#0F0F14, shown at a LOW OBLIQUE angle ~30-40 degrees (close-up game view, per
+renders/map/it1): semi-representational textured terrain, slight relief, flat
+shadows, small buildings / settlement skylines. NO hex grid except the hovered
+tile (faint bone outline) and the selected tile (gold #E8A33D outline).
+Text: bone white #ECE7DD primary, dim grey secondary; BOLD STENCIL for panel
+section labels. One accent: gold #E8A33D (selection, actions, positive figures,
+the FILLED active nav-rail slot).
+Layout (keep): 56px left icon rail, 13 slots; top-left corp emblem + name;
+top-centre "BALANCE / STOCKPILE / NET"; top-right date + speed I-V; bottom-left
+comms dock; bottom-centre Selection band (mini hex map + buildings table);
+bottom-right circular minimap + 6 lens glyphs.
+Surfaces are MATTE flat planes with a hard 1px edge between tones — no gradient,
+no visible grain, no rivets. 1280x720.
+Layout ref: ~/io_shell_captures_20260830/nav_rail_default.png
+Style refs: ../refs/ON-STYLE/mono, ../refs/OFF-STYLE/3brutalistposter (for the
+tonal-plane / concrete idea only, NOT its texture or type).
+
+=============================================================================
+U1 — LIGHT FRAME, DARK CONTENT
+=============================================================================
+The persistent shell FURNITURE is a lighter graphite / concrete plane
+(#2C2F35, matte): the left icon rail, the top data strips, the top-right time
+panel, and a visible gutter/frame band around the map canvas. Sitting IN that
+light frame, the CONTENT panels — Selection band, comms dock, and any open
+fold-out ledger — are the darkest tone #141419, clearly recessed below the
+frame plane with a hard 1px edge and a 1px bone inset line. The map canvas is
+#0F0F14. So: structure reads light and solid, data wells read dark. + SHARED BASE.
+
+=============================================================================
+U2 — DARK FRAME, LIGHT CONTENT PANELS
+=============================================================================
+Inverse of U1. The shell furniture (rail, top strips, time panel, canvas
+gutter) stays near-black #131418 with hairline edges, like S2. The CONTENT
+panels — Selection band, comms dock, open ledgers — are a lighter graphite
+plane #2C2F35 that lifts OFF the dark shell, each a raised slab with a hard 1px
+edge and a subtle 1px drop shadow. Reads like lit readout panels on a dark
+console. Map canvas #0F0F14. + SHARED BASE.
+
+=============================================================================
+U3 — THREE-TONE  (S3's concrete + dark-grey idea, fully structured)
+=============================================================================
+Three distinct matte tones, darkest to lightest:
+  - map canvas: #0F0F14
+  - persistent shell furniture (rail, top strips, time panel, canvas gutter):
+    mid graphite #24272D
+  - fold-out ledgers / modal content: a distinct lighter-and-slightly-warmer
+    tone #34353B
+The always-on content panels (Selection band, comms dock) sit at the middle
+tone with the furniture. Show one fold-out ledger OPEN down the left column so
+its lighter third tone is visible — an open menu is unmistakably its own layer.
+Hard 1px edges between all three. Gold accent + filled active nav slot as
+SHARED BASE. + SHARED BASE.
+
+=============================================================================
+NEXT
+=============================================================================
+Judge U1 / U2 / U3 against round-2 S2. This is meant to be a real step up from
+S2, not a tweak — if none is, say so and we rethink the frame. Winning tone
+system graduates into ../../GLOBAL_STYLE_SHEET.md § Iterations and § Colour
+guide (Panel / chrome row, currently Unsettled).

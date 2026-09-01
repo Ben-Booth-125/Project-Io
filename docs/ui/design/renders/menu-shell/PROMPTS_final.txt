@@ -1,0 +1,64 @@
+PROJECT IO — IN-GAME SHELL, FINAL SYNTHESIS RENDER (v2)
+Drafted 2026-08-30. Lives in renders/menu-shell/. One render.
+
+WHAT WENT WRONG IN v1
+- The colours drifted off U2 — re-pin them exactly (values below).
+- The panels got restructured into floating inset cards with margins and drop
+  shadows. WRONG. The shell bars keep their U2 / nav_rail_default.png shapes and
+  stay ANCHORED FLUSH TO THE SCREEN EDGES.
+- The ONE and ONLY change from U2 is: the map is NOT in its own separate
+  contained box. It has no gutter, no bezel, no frame. It fills the whole screen
+  behind everything, and the edge-anchored bars simply sit on top of it.
+
+=============================================================================
+FINAL SHELL RENDER v2 — full prompt
+=============================================================================
+In-game screen of a near-future corporate 4X strategy game. 1280x720.
+This is round-4 variant U2, with exactly one change (the map is no longer boxed
+— see MAP below). Everything else is U2, unchanged.
+
+PALETTE — pin these exact values (this is U2):
+  - Void / darkest (shows where terrain is dark): #0F0F14
+  - Shell FURNITURE — left nav rail, top data strip, top-right time panel:
+    near-black #131418, thin 1px hairline edges, no fill lift.
+  - CONTENT panels — comms dock, Selection band, minimap frame: lighter
+    graphite #2C2F35, a raised matte slab with a hard 1px edge and a subtle 1px
+    dark drop shadow.
+  - Text: bone white #ECE7DD primary, dim grey secondary.
+  - One accent: gold #E8A33D — selection, actions, positive figures, and the
+    FILLED active nav-rail slot (a solid gold block, not an outline).
+  - Bold STENCIL for panel section labels.
+  - No cyan, no second accent, no ember. No gradients, no grain.
+
+SHELL BARS — edge-anchored, U2 shapes, NOT floating cards:
+  - 56px left icon rail, flush to the LEFT screen edge, full height, 13 square
+    slots; active slot a filled gold block.
+  - Top data strip flush to the TOP edge, full width: top-left hexagonal corp
+    emblem + corp name; centre "BALANCE / STOCKPILE / NET"; top-right date
+    "1960 Jan 1st [Q1]" + speed buttons I-V + "Paused".
+  - Comms dock flush to the BOTTOM-LEFT corner (channel dropdown, message list,
+    input).
+  - Selection band flush along the BOTTOM-CENTRE: selected tile mini hex map +
+    buildings table.
+  - Circular minimap + a row of 6 lens glyphs flush to the BOTTOM-RIGHT corner.
+  All bars are opaque. Hard 1px edge where a bar meets the map — no bezel.
+  Positions per ~/io_shell_captures_20260830/nav_rail_default.png.
+
+MAP — the only change from U2:
+  Fills the ENTIRE frame, edge to edge, running UNDER the shell bars to all four
+  screen edges. No gutter, no containing box, no frame band around it. Drawn at
+  a LOW OBLIQUE camera angle ~30-40 degrees above the horizontal (close-up game
+  view, per renders/map/it1): semi-representational textured terrain (rock,
+  water, scrub, forest, desert), mountains/ridges with slight extruded relief
+  and hard flat shadows, small stylised buildings and settlement skylines.
+  Muted desaturated terrain palette. NO hex grid except the hovered tile (faint
+  bone outline) and the selected tile (gold #E8A33D hex outline).
+
+Style refs: ../refs/ON-STYLE/mono, ../refs/ON-STYLE/hexclean.
+
+=============================================================================
+NEXT
+=============================================================================
+This render + shell rounds 1-4 go to Ben with the menu spread. A picked
+direction graduates into ../../GLOBAL_STYLE_SHEET.md § Iterations and § Colour
+guide; LAYOUT.md owns whether the map is boxed or full-bleed under the bars.
