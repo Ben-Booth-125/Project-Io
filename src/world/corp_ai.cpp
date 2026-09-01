@@ -2,6 +2,7 @@
 
 #include "budget_system.hpp"  // compute_building_opex, body_mean_habitability
 #include "building_profit.hpp"
+#include "decision_trace.hpp"  // BL-704: opt-in streaming decision sink
 #include "economy_system.hpp"  // economy_report, agency_event, solve_workforce_target
 #include "logistics.hpp"       // body_reach_field (BL-379: warm before the reach-checked muster scan)
 #include "market_clearing.hpp" // market_for_tile
@@ -2335,6 +2336,20 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             pd.d.runner_up =
                 best_rejected[static_cast<std::size_t>(family_of(pd.d.command))];
             w.ai_decisions.push(pd.d);
+
+            // BL-704: stream the decision to the opt-in trace sink, HERE rather
+            // than by reading the ring later, because the ring wraps at 256 --
+            // and once it has, an end-of-run dump reports the tail and silently
+            // drops everything before it. (Measured on decision_trace_harness's
+            // fixture: the first wrap lands near tick 2200, later than a
+            // back-of-envelope estimate suggests but a certainty over a
+            // campaign. Streaming costs the same and removes the failure mode
+            // rather than deferring it.) Off by default; when off this
+            // is one always-false branch (decision_trace.hpp). Write-only: the
+            // sink is an observation the simulation never reads back, and
+            // `decision_trace_harness` T1 pins that by requiring an identical
+            // state_hash with tracing on and off.
+            decision_trace::record(pd.d);
 
             world_history_entry log_entry;
             log_entry.timestamp = tick;
