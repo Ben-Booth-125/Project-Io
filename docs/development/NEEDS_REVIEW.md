@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*118 entries — 112 open, 6 resolved.*
+*120 entries — 114 open, 6 resolved.*
 
 ---
 
@@ -1426,6 +1426,36 @@ NOVELTY: the change is in `corporation_generation.cpp`, which is the GENERATION 
 > **Recommendation:** File the processing-input half as its own item and give it to generation-dev, with the upkeep half that just landed as the worked pattern. It is closely related to NR-765 - both are about a selection step that cannot see a whole category of want - and the two together are probably why the ancient chain does not convert.
 
 *Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`, `docs/generation/GENERATION_STRATEGY.md`*
+
+### NR-767 — save_roundtrip is a Lua-LINKED harness and nothing says so
+*observation · raised 2026-09-01 · from Found by BL-710 while repairing the harness.*
+
+`tools/verify/save_roundtrip.cpp` includes `harness_params.hpp`, which since NR-686's fix includes `scripting/lua_state.hpp` — so it pulls sol2 and needs the Lua link. `build_harness.js` and `build_harness.bat` fail it with `fatal error C1083: Cannot open include file: 'sol/sol.hpp'`, which reads as a broken harness rather than as the wrong builder. It builds cleanly with `cmd //c toolserifyuild_lua_harness.bat save_roundtrip`.
+
+The documented Lua-linked list (build_lua_harness.bat's own header, and NEXT_SESSION.md) names pregame_balance_harness, condition_set_harness, mercenary_contract_harness, spawn_solvency, demand_census and chain_depth. It does not name save_roundtrip, and the list is a hand-maintained enumeration rather than a derived fact.
+
+THE GENERAL SHAPE: **any harness that includes `harness_params.hpp` is now Lua-linked**, and `harness_params.hpp` is the header that DEVELOPMENT_PRACTICES.md § A harness must build the world the application builds tells every harness to use. So the class is growing by design and the list will keep going stale.
+
+**Why it matters.** This is NR-759's pattern one level up: a harness that will not build looks identical to a harness that is broken, and the last session lost time to exactly that ambiguity. The failure mode is silent-absence, not red.
+
+> **Recommendation:** Derive the routing rather than list it: have `build_harness.js` detect a transitive `sol/sol.hpp` include (or simply an include of `harness_params.hpp`) and either delegate to `build_lua_harness.bat` or fail with a one-line message naming it. Cheap, and it retires the hand-maintained list.
+
+*Files: `tools/verify/build_harness.js`, `tools/verify/build_lua_harness.bat`, `tools/verify/harness_params.hpp`, `docs/development/DEVELOPMENT_PRACTICES.md`*
+
+### NR-768 — save_roundtrip verifies a resource_count bump only incidentally — it never names the constant
+*observation · raised 2026-09-01 · from Found by BL-710 while confirming v21 and v22 round-trip, which was the item's closing instruction.*
+
+BL-708 (v21, `power`) and BL-709 (v22, `construction_capacity`) are both **resource_count widenings** — 47 -> 48 -> 49 — not new containers. So the repaired harness does verify them: P7's container table and P8's byte-for-byte re-serialise of a fully populated world both run over per-resource arrays at the current length, and both pass at v22.
+
+But it verifies them by accident of coverage, not by assertion. The harness never mentions `resource_count`. There is no row that would go red if a per-resource array were written at the wrong length while the world happened not to exercise the difference, and no row that names the two bumps this item was asked to confirm.
+
+Related but distinct: the literal version-refusal ladder stops at v15 (P19b). v16 through v20 have no row at all; v21 is covered only through P20's deliberately symbolic `world_save_version - 1u`. That gap is by design per P20's own comment and is NOT being reported as a defect — it is noted only because it means the refusal side of these two bumps rests on one symbolic row.
+
+**Why it matters.** Two of the last three save bumps were per-resource widenings, so this is now the format's most common kind of change, and it is the kind the harness asserts least directly. A future append would be 'verified' the same incidental way.
+
+> **Recommendation:** Add one cheap row: assert `resource_count` equals what the populated fixture wrote, and note the current value in the harness output the way `next entity id` is noted. Not done here — BL-710 is scoped as deletions only, and adding an assertion to the save seam mid-repair is the thing that item explicitly warned against.
+
+*Files: `tools/verify/save_roundtrip.cpp`, `src/world/world_save.hpp`*
 
 ---
 

@@ -364,11 +364,12 @@ int main()
         {
             // Sprint 16, BL-572: the IMMEDIATE previous format (BL-571's v6,
             // the version this batch released before BL-572 bumped again). A
-            // v6 stream simply ENDS where the offers/next_offer_id trailing
-            // section now continues -- not a mid-record misalignment like
-            // P10's, but the read still must not accept a stream that is
-            // shorter than the reader now expects. Refused whole, same
-            // contract as every prior bump.
+            // v6 stream simply ENDED where BL-572's trailing section began --
+            // not a mid-record misalignment like P10's, but the read still
+            // must not accept a stream shorter than the reader expects.
+            // Refused whole, same contract as every prior bump. (BL-572's
+            // payload was later torn out by cc88997c; this row asserts the
+            // VERSION contract, which is unaffected.)
             std::string bad = bytes_once;
             const uint32_t v6 = 6;
             std::memcpy(&bad[4], &v6, sizeof v6);
@@ -377,10 +378,9 @@ int main()
         {
             // Sprint 16, BL-573: the IMMEDIATE previous format (BL-572's v7,
             // the version this batch released before BL-573 bumped again). A
-            // v7 stream simply ENDS where the mercenary_contracts/
-            // next_contract_id trailing section now continues -- same shape
-            // as P11 one bump up. Refused whole, same contract as every prior
-            // bump.
+            // v7 stream simply ENDED where BL-573's trailing section began --
+            // same shape as P11 one bump up. Refused whole, same contract as
+            // every prior bump. Torn out by cc88997c, same note as P11.
             std::string bad = bytes_once;
             const uint32_t v7 = 7;
             std::memcpy(&bad[4], &v7, sizeof v7);
@@ -516,8 +516,6 @@ int main()
         check(victim.nations.empty() && victim.nation_budgets.empty()
                   && victim.province_holder.empty(),
               "P9 the v4 refusal left nations, nation_budgets and province_holder untouched");
-        check(victim.mercenary_offers.empty() && victim.next_offer_id == 1,
-              "P11 every rejected load left mercenary_offers and its id counter untouched");
     }
 
     // -----------------------------------------------------------------------
@@ -732,8 +730,6 @@ int main()
             { "history_log", w.history_log.size(), loaded.history_log.size() },
             { "provinces", w.provinces.provinces.size(), loaded.provinces.provinces.size() },
             { "provinces.tile_province", w.provinces.tile_province.size(), loaded.provinces.tile_province.size() },
-            { "mercenary_offers", w.mercenary_offers.size(), loaded.mercenary_offers.size() },
-            { "mercenary_contracts", w.mercenary_contracts.size(), loaded.mercenary_contracts.size() },
             { "exchanges", w.exchanges.size(), loaded.exchanges.size() },
         };
 
@@ -766,9 +762,7 @@ int main()
         check(loaded.next_entity_id() == w.next_entity_id()
                   && loaded.next_convoy_id == w.next_convoy_id
                   && loaded.next_order_id == w.next_order_id
-                  && loaded.next_procurement_id == w.next_procurement_id
-                  && loaded.next_offer_id == w.next_offer_id
-                  && loaded.next_contract_id == w.next_contract_id,
+                  && loaded.next_procurement_id == w.next_procurement_id,
               "P7 every id counter survives, allocator cursor included");
         check(loaded.belt.inner_radius_au == w.belt.inner_radius_au
                   && loaded.belt.outer_radius_au == w.belt.outer_radius_au,
@@ -782,19 +776,6 @@ int main()
         // why it is named here.
         check(w.nation_budgets.empty() && loaded.nation_budgets.empty(),
               "P9 an EMPTY nation_budgets map round-trips as empty (the inertness state)");
-
-        // BL-572: the same inertness proof one line over -- a generated world
-        // has never funded a contracted_force share (NR-580: every nation's
-        // treasury starts at 0.0), so derive_contract_offers has never run
-        // against a live one, and this vector must be empty on both sides.
-        check(w.mercenary_offers.empty() && loaded.mercenary_offers.empty(),
-              "P11 an EMPTY mercenary_offers vector round-trips as empty (the inertness state)");
-
-        // BL-573: same inertness proof one line over -- a generated world has
-        // never had accept_offer issued against it, so this vector must be
-        // empty on both sides too.
-        check(w.mercenary_contracts.empty() && loaded.mercenary_contracts.empty(),
-              "P12 an EMPTY mercenary_contracts vector round-trips as empty (the inertness state)");
 
         // BL-685: same inertness proof one line over -- generation never clears
         // a market, so a freshly generated world has never recorded an exchange
@@ -905,33 +886,6 @@ int main()
         nb2.reserve_fraction = 0.875f;
         f.nation_budgets[n1] = nb1;
         f.nation_budgets[n2] = nb2;
-
-        // BL-572: two offers from DIFFERENT clients, DISTINCT in every field --
-        // a reader that swapped two same-typed members (target_province and
-        // deadline are both plausible mixups; both are ints in the stream)
-        // would show here. One offer's escrow already clears its fee (the
-        // "ready to accept, nobody has yet" state); the other is still
-        // filling, so both live shapes round-trip, not just one.
-        f.mercenary_offers.push_back({ /*id*/ 12, /*client*/ n1, /*target_province*/ 4001,
-                                       /*template_index*/ 0, /*fee*/ 400.0f, /*deadline*/ 999,
-                                       /*issued_tick*/ 10, /*offer_escrow*/ 400.0f });
-        f.mercenary_offers.push_back({ /*id*/ 13, /*client*/ n2, /*target_province*/ 4002,
-                                       /*template_index*/ 1, /*fee*/ 500.0f, /*deadline*/ 1080,
-                                       /*issued_tick*/ 20, /*offer_escrow*/ 125.5f });
-        f.next_offer_id = 14;
-
-        // BL-573: one open (still `active`) mercenary contract, with a
-        // PARTIAL committed force (2 of the 8 slots) so both the populated
-        // and the null_entity-padded ends of the fixed array round-trip.
-        // Distinct from either offer above in every field, same discipline.
-        mercenary_contract mc;
-        mc.id = 21; mc.client = n1; mc.contractor = c2; mc.template_index = 0;
-        mc.province = 4001; mc.fee = 400.0f; mc.deposit_paid = 100.0f;
-        mc.deadline = 999; mc.accepted_tick = 15;
-        mc.units[0] = c1; mc.units[1] = c3; // slots 2..7 stay null_entity
-        mc.state = mercenary_contract_state::active;
-        f.mercenary_contracts.push_back(mc);
-        f.next_contract_id = 22;
 
         convoy_component cv;
         cv.source_market = 101; cv.dest_market = 202; cv.mode = convoy_mode::sea;
@@ -1061,50 +1015,6 @@ int main()
             check(budgets_exact,
                   "P9 nation_budgets round-trips exactly: nine weights + reserve for two "
                   "nations, the non-dyadic 0.3f included");
-
-            // BL-572: both offers, field by field -- including the fully-
-            // funded one (offer_escrow == fee) so a reader that clamped or
-            // re-derived escrow instead of storing it would show here.
-            check(back.mercenary_offers.size() == 2 && back.next_offer_id == 14,
-                  "P11 both mercenary_offers survive, allocator cursor included");
-            if (back.mercenary_offers.size() == 2)
-            {
-                const mercenary_offer& r1 = back.mercenary_offers[0];
-                const mercenary_offer& r2 = back.mercenary_offers[1];
-                check(r1.id == 12 && r1.client == n1 && r1.target_province == 4001
-                          && r1.template_index == 0 && r1.fee == 400.0f && r1.deadline == 999
-                          && r1.issued_tick == 10 && r1.offer_escrow == 400.0f,
-                      "P11 a fully-funded offer round-trips exactly");
-                check(r2.id == 13 && r2.client == n2 && r2.target_province == 4002
-                          && r2.template_index == 1 && r2.fee == 500.0f && r2.deadline == 1080
-                          && r2.issued_tick == 20 && r2.offer_escrow == 125.5f,
-                      "P11 a still-filling offer round-trips exactly, escrow < fee included");
-            }
-
-            // BL-573: the accepted contract, field by field -- the committed
-            // force in particular, since that fixed array is this item's own
-            // save-format addition and the one a reader most plausibly gets
-            // the wrong length or the wrong padding value for.
-            check(back.mercenary_contracts.size() == 1 && back.next_contract_id == 22,
-                  "P12 the mercenary_contract survives, allocator cursor included");
-            if (back.mercenary_contracts.size() == 1)
-            {
-                const mercenary_contract& rc = back.mercenary_contracts[0];
-                check(rc.id == 21 && rc.client == n1 && rc.contractor == c2
-                          && rc.template_index == 0 && rc.province == 4001
-                          && rc.fee == 400.0f && rc.deposit_paid == 100.0f
-                          && rc.deadline == 999 && rc.accepted_tick == 15
-                          && rc.state == mercenary_contract_state::active,
-                      "P12 the contract's scalar fields round-trip exactly");
-                check(rc.units[0] == c1 && rc.units[1] == c3,
-                      "P12 the committed force's populated slots survive");
-                bool rest_null = true;
-                for (std::size_t i = 2; i < mercenary_contract_max_units; ++i)
-                    rest_null = rest_null && rc.units[i] == null_entity;
-                check(rest_null,
-                      "P12 the committed force's unused slots stay null_entity, not padding "
-                      "leaked from a neighbouring record");
-            }
         }
     }
 
