@@ -162,6 +162,22 @@ THE TWO BANDS FAIL DIFFERENTLY, measured 2026-08-31, and the sprint should not a
 
 MARKETS.md § Three properties now carries two more, both Ben's, 2026-08-31. Property 4: every resource needs a path to a TERMINAL sink, and intermediates earn DERIVED demand through the chain rather than their own channel - which is why property 3 (a channel must bid) is load-bearing, since derived demand only propagates through links that bid. Property 5: terminal demand is universal because population is everywhere, supply is regional because deposits are, and local self-sufficiency is NOT forbidden - the asymmetry is generation's to produce, not to guarantee.
 
+### Sprint 28 — The AI that holds back - the brake, once standing means something
+*Proposed · opened 2026-08-31*
+
+**Goal.** Build the systemic brake now that a corporation's standing can be trusted. Sprint 26 landed the instruments - spectate, a decision feed that reads, a composite standing index - and CANCELLED its own wave 2 on its own measurement: coalitions form against whoever leads, and among corps insolvent 27-29 ticks of 30 the leader is merely the least bankrupt. These three items are not wrong, they were UNMEASURABLE. They become measurable when sprint 27 gives the goods a buyer.
+
+**Planned.**
+- BL-697 (skill harness margin metric) - band the SPREAD in composite standing across the field; the absolute bands demote to a solvency floor beneath it. Carries NR-305 (bands stale since 2026-08-16) and NR-752 (spectator_determinism byte-identity golden stale by 150+ commits). ONE deliberate re-bless with dated provenance, not a dribble - the NR-596 precedent.
+- BL-699 (rival coalitions) - THE BRAKE, and the real deliverable. The four BL-448 stance verbs exist on the seam and the scorer issues none of them. Legibility is a REQUIREMENT of the item, not a follow-up: a coalition the player cannot see is exactly the hidden handicap the whole reframe rejects.
+- BL-698 (opt-in margin dial) - priority C, off by default. If the systemic brake needs this dial to produce a close race, the BRAKE is the thing to fix, not the dial.
+
+WHY IT WAITS. AI_OPPONENT.md § Where restraint comes from puts the brake in the world rather than in the agent - coalitions form against whoever leads. That needs a leader worth forming against. Measured 2026-08-31 with the survey-state fix applied: four of five seeds end deeply negative and every seed is insolvent 27-29 ticks of 30, so 'whoever leads' currently means 'least bankrupt'. BL-699's weights ARE its design, and tuning them against that field would mean re-deriving them the moment demand lands.
+
+CLIMATE IS NOT AVAILABLE TO THIS SPRINT, DELIBERATELY. AI_OPPONENT.md named two systemic brakes; climate is Era 2's catastrophe and out of prototype scope, so COALITIONS CARRY THE BRAKE ALONE. If BL-699 does not brake a runaway, nothing else will - and that is a finding about coalitions, not a reason to reach for BL-698.
+
+CHECK BEFORE STARTING: BL-712 (recipe choice is scale-blind) in sprint 27 fixes an argmax that stops the AI building whole categories of building. A coalition brake tuned against a field that cannot build power or construction is a brake tuned against a crippled opponent.
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -207,6 +223,7 @@ MARKETS.md § Three properties now carries two more, both Ben's, 2026-08-31. Pro
 | 25 | UI visibility - batch 5: canvases & the zoom ladder | Proposed 2026-08-28 as sprint 26; RENUMBERED to 25 on 2026-08-30 when Ben retired the shell-chrome and startup batches - "Sprint 25 and 27 don't need a revisit, UI items for these are working great." |
 | 26 | The world that brakes a leader - a rival worth watching | CLOSED 2026-08-31 AT WAVE 1 on Ben's call, GOAL MET. Spectator mode works and the feed reads; the measurement that wave 1 produced then made wave 2 not worth running, and demand takes priority as sprint 27. |
 | 27 | The other half of the economy - demand, resumed | OPENED 2026-08-31 on Ben's call, resuming sprint 21's waves 1+ against sprint 26's measurement. Wave 0 (the guard, the census) already landed under 21. |
+| 28 | The AI that holds back - the brake, once standing means something | PROPOSED 2026-08-31 on Ben's call, taking the three sprint-26 items whose tuning is blocked on demand. NOT open: it starts when sprint 27 has given standing a meaning. |
 
 **Next up.** SPRINT NUMBERING, reset by Ben on 2026-08-30: the proposed shell-chrome (old 25) and startup (old 27) batches are DELETED - "Sprint 25 and 27 don't need a revisit, UI items for these are working great" - and the canvases batch renumbered from 26 to 25. THE NEXT NEW SPRINT IS 26. Two of the six UI review batches from 2026-08-28 therefore never run, and that is a judgement that their surfaces are good enough rather than a deferral.
 
@@ -216,4 +233,4 @@ NEXT UP: sprint 25 (canvases & the zoom ladder), carrying BL-694 (top-bar tracke
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*37 sprints archived cold; 4 open/gated in the hot store.*
+*37 sprints archived cold; 5 open/gated in the hot store.*

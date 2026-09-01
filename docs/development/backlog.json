@@ -1108,7 +1108,7 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "26",
+   "sprint": "28",
    "written": "2026-08-31",
    "author": "Ben",
    "requires": [
@@ -1134,7 +1134,7 @@
    "priority": "C",
    "difficulty": 5,
    "version_goal": null,
-   "sprint": "26",
+   "sprint": "28",
    "written": "2026-08-31",
    "author": "Ben",
    "requires": [
@@ -1162,7 +1162,7 @@
    "priority": "A",
    "difficulty": 5,
    "version_goal": null,
-   "sprint": "26",
+   "sprint": "28",
    "written": "2026-08-31",
    "author": "Ben",
    "requires": [
