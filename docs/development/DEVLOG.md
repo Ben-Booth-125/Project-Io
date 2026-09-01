@@ -10,6 +10,44 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-01 (sprint 29 opens) — The ground gets a mechanism
+
+**Mode:** Design (research + authority docs, no code). **Runtime:** one short session, parallel
+worktree while sprint 28 runs.
+
+The brief: can the canvas move to much more detailed rendering — a tile renderer, the planet
+canvas view? Research first, authority docs after, questions to Ben as they arose.
+
+### Researched
+
+`docs/research/CANVAS_RENDERING.md`: the option ladder (richer vector / textured hex atlas /
+baked terrain chunks / SDL3 GPU pipeline), the finding that tiles already carry everything a
+detailed renderer eats (continuous `height` from BL-517, river edges with flow, graded cover),
+and that the current 2D backend supports textures, render targets and textured meshes unused.
+The advisor's pick was baked chunks; Ben ruled otherwise, which is what the ladder was for.
+
+### Ruled (Ben, the design form)
+
+Authored **hex-tile atlas** on the current backend; scope the **Planetary tile grid** only;
+**authored raster assets** from reference images (coming later); **ambient animation** in scope
+(flipbook); layer contract **held for the reference images**.
+
+### Landed
+
+`docs/ui/RENDERING.md` (new authority: mechanism, manifest + vector fallback-by-coverage,
+variant hash, transition fringes, verify-pinned flipbook clock, far page at the 7 px pivot,
+asset policy); TECH_FOUNDATIONS amended (the "not a prototype concern" sentence overturned,
+decision-log row added); PLANETARY.md pointer; CLAUDE.md router row. Items: BL-732 (hex tile
+atlas renderer, buildable against a placeholder atlas), BL-733 (tile art asset pipeline) and
+BL-734 (ground/chrome layer contract) — the latter two in review.json, blocked on the reference
+images. Sprint 29 opened in sprints.json.
+
+### Open
+
+Reference images owed from Ben — they unblock BL-733/BL-734 and the style half of everything.
+
+---
+
 ## 2026-09-01 (success-lever session) — The two buyers come back, and the sweeps get their design
 
 **Mode:** Design → Full (two worktree agents) → integration. **Runtime:** one session; one full

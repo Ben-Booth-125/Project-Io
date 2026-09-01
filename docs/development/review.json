@@ -20,5 +20,18 @@
     "",
     "NOT THE SAME AS NEEDS_REVIEW.json (added 2026-08-01). This file is for work that is BLOCKED on a visual artifact only Ben can produce. NEEDS_REVIEW.json is for open questions and for decisions taken on Ben's behalf — neither of which blocks anything. If an entry there turns out to need a mockup, move it here."
   ],
-  "items": []
+  "items": [
+    {
+      "id": "BL-733",
+      "short_name": "TILE_ART_ASSET_PIPELINE",
+      "filed": "2026-09-01",
+      "blocked_on_mockup": "Reference images for the sprint-29 tile art style - Ben said (2026-09-01) images are coming; the sheet layout, cell resolution and palette hang on them."
+    },
+    {
+      "id": "BL-734",
+      "short_name": "GROUND_CHROME_LAYER_CONTRACT",
+      "filed": "2026-09-01",
+      "blocked_on_mockup": "Same reference images - Ben explicitly held the layer-contract call (which analytic channels survive over atlas ground) until he can rule against them."
+    }
+  ]
 }

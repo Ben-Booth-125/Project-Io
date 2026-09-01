@@ -21,6 +21,12 @@ This canvas communicates:
 
 ## Tile grid
 
+> **The ground's render mechanism is owned by [RENDERING.md](RENDERING.md)** — the
+> authored hex-tile atlas, its manifest, transitions, animation and LOD. This doc owns
+> the analytic channels above the ground; which of them survive, retire or restyle over
+> atlas art is owned by BL-734 (ground/chrome layer contract), and until that settles
+> every channel below keeps its current spec.
+
 **Shape:** Pointy-top hexagons in odd-r offset coordinates. Odd rows are shifted right by half a column. Grid axes: columns (x) run left-to-right, rows (y) run top-to-bottom.
 
 **Target size and aspect ratio:** A body's grid is roughly **9 columns wide for every 5 rows tall** — the height is a little *under* half the width. The reasoning is geometric: the grid width spans the body's full circumference (both hemispheres), so a pole-to-pole height would be half the width; truncating the non-traversable polar caps brings it a little under half. The two planets are standardised to **180 × 84** (columns × rows); **Selene**, as a moon, uses **90 × 42** (the same ratio at half scale). The prototype world's surface bodies are **Cinder, Kepler, Selene, and Pallas** (Pallas, a notable belt asteroid, carries a small grid); **Helios** is the system star and has no surface.

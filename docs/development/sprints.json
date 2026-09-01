@@ -166,6 +166,19 @@
     "BL-698 (opt-in margin dial) - priority C, off by default. If the systemic brake needs this dial to produce a close race, the BRAKE is the thing to fix, not the dial."
    ],
    "notes": "WHY IT WAITS. AI_OPPONENT.md § Where restraint comes from puts the brake in the world rather than in the agent - coalitions form against whoever leads. That needs a leader worth forming against. Measured 2026-08-31 with the survey-state fix applied: four of five seeds end deeply negative and every seed is insolvent 27-29 ticks of 30, so 'whoever leads' currently means 'least bankrupt'. BL-699's weights ARE its design, and tuning them against that field would mean re-deriving them the moment demand lands.\n\nCLIMATE IS NOT AVAILABLE TO THIS SPRINT, DELIBERATELY. AI_OPPONENT.md named two systemic brakes; climate is Era 2's catastrophe and out of prototype scope, so COALITIONS CARRY THE BRAKE ALONE. If BL-699 does not brake a runaway, nothing else will - and that is a finding about coalitions, not a reason to reach for BL-698.\n\nCHECK BEFORE STARTING: BL-712 (recipe choice is scale-blind) in sprint 27 fixes an argmax that stops the AI building whole categories of building. A coalition brake tuned against a field that cannot build power or construction is a brake tuned against a crippled opponent."
+  },
+  {
+   "id": "29",
+   "theme": "The world gets a face - detailed canvas rendering",
+   "state": "open",
+   "status_line": "OPENED 2026-09-01 in a parallel worktree while sprint 28 runs. Research done (docs/research/CANVAS_RENDERING.md), mechanism ruled on the design form, authority doc landed (docs/ui/RENDERING.md). Art-facing halves blocked on Ben reference images (review.json).",
+   "opened_date": "2026-09-01",
+   "goal": "Move the Planetary canvas off the minimal vector style: the ground renders from an authored hex-tile atlas with ambient flipbook animation, on the existing 2D backend, with the vector fill surviving as fallback-by-coverage. Felt goal: the surface reads as terrain, not as a diagram - while every analytic read the lens system carries stays intact until BL-734 rules otherwise.",
+   "planned": [
+    "BL-732 (hex tile atlas renderer) - the mechanism: atlas quads in the existing culled loop, manifest + vector fallback, transition fringes, flipbook clock pinned under --verify, far page at the 7px pivot. Buildable now against a placeholder atlas.",
+    "BL-733 (tile art asset pipeline) - sheets, manifest, authoring flow. BLOCKED on the reference images.",
+    "BL-734 (ground/chrome layer contract) - which analytic channels survive/retire/restyle over authored ground. Ben held the call for the reference images; lands as PLANETARY/CANVASES/LENSES edits."
+   ]
   }
  ],
  "next_up": "SPRINT NUMBERING, reset by Ben on 2026-08-30: the proposed shell-chrome (old 25) and startup (old 27) batches are DELETED - \"Sprint 25 and 27 don't need a revisit, UI items for these are working great\" - and the canvases batch renumbered from 26 to 25. THE NEXT NEW SPRINT IS 26. Two of the six UI review batches from 2026-08-28 therefore never run, and that is a judgement that their surfaces are good enough rather than a deferral.\n\nOPEN AND PAUSED: sprint 24b (the ledgers not yet read) is the live one; sprint 21 (demand) stays PAUSED with wave 0 landed - its guard (BL-648) is deliberately red and its census (BL-649) is the before/after instrument for when it resumes. Sprint 20 also stays open and owns BL-634 (acquisition viability), which cannot honestly pass until sprint 21's demand channels land.\n\nNEXT UP: sprint 25 (canvases & the zoom ladder), carrying BL-694 (top-bar tracker) out of the retired batch 4.",
