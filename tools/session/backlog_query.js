@@ -71,12 +71,12 @@ const cache = new Map();
 //   --grep                     — a search that silently skipped everything shipped
 //                                would be worse than no search.
 const wantsLanded = showAll || ids.size > 0 || !!touches || !!grep
-    || (statuses || []).some((s) => A.TERMINAL.has(s));
+    || (statuses || []).some((s) => A.CLOSED.has(s));
 const pool = wantsLanded ? A.allItems(backlog, A.ROOT) : backlog.items;
 
 let hits = pool.filter((it) => {
     if (ids.size) return ids.has(it.id);
-    const terminal = A.TERMINAL.has(it.status);
+    const terminal = A.CLOSED.has(it.status);
     if (openOnly && terminal) return false;
     if (!showAll && !statuses && terminal) return false;   // default view is live work
     if (statuses && !statuses.includes(it.status)) return false;

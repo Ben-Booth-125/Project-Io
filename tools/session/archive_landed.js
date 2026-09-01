@@ -137,15 +137,15 @@ if (unknown.length) {
 
 const notLanded = [...only].filter((id) => {
     const it = backlog.items.find((i) => i.id === id);
-    return it && !A.TERMINAL.has(it.status);
+    return it && !A.CLOSED.has(it.status);
 });
 if (notLanded.length) {
     console.error(`archive_landed: refusing to evict un-landed item(s): ${notLanded.join(', ')}`);
-    console.error('An open item\'s row is the worklist. Only terminal items may leave the hot file.');
+    console.error('An open item\'s row is the worklist. Only CLOSED items — delivered or cancelled — may leave.');
     process.exit(1);
 }
 
-const moving = backlog.items.filter((i) => A.TERMINAL.has(i.status) && (!only.size || only.has(i.id)));
+const moving = backlog.items.filter((i) => A.CLOSED.has(i.status) && (!only.size || only.has(i.id)));
 if (!moving.length) {
     console.log('Nothing to evict: no landed rows in the hot file.');
     process.exit(0);

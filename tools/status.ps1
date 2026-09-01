@@ -52,12 +52,19 @@ if (Test-Path $archiveDir) {
     $items = @($items) + @($landed | Where-Object { -not $hotIds.Contains($_.id) })
 }
 
+# DELIVERED vs CLOSED. A cancelled item is off the worklist but was never built, so
+# counting it as done would inflate the one figure that says how much of the design
+# exists (archive_store.js § CLOSED). `$terminal` stays DELIVERED-only and drives the
+# done count and "DONE lately"; `$closed` is what removes something from TO DO.
 $terminal = @('complete', 'shipped', 'delivered')
+$cancelled = @('cancelled', 'purged', 'superseded')
+$closed = $terminal + $cancelled
 $priOrder = @('SSS', 'S', 'A', 'B', 'C', 'F')
 $priRank  = @{}; for ($i = 0; $i -lt $priOrder.Count; $i++) { $priRank[$priOrder[$i]] = $i }
 
-$open        = @($items | Where-Object { $_.status -notin $terminal })
+$open        = @($items | Where-Object { $_.status -notin $closed })
 $doneItems   = @($items | Where-Object { $_.status -in $terminal })
+$cancelledItems = @($items | Where-Object { $_.status -in $cancelled })
 $terminalIds = [System.Collections.Generic.HashSet[string]]::new()
 $doneItems | ForEach-Object { [void]$terminalIds.Add($_.id) }
 
@@ -93,6 +100,13 @@ if (-not $Done) {
     Head 'Project Io - backlog'
     Write-Host ("  {0} open   {1} done   {2} total   ({3}% delivered)" -f `
         $open.Count, $doneItems.Count, $total, $pct)
+    # Cancelled work is reported, never merged into "done". A backlog that shrinks
+    # because items were closed unbuilt looks identical to one that shrank because
+    # they shipped, unless this line exists to tell them apart.
+    if ($cancelledItems.Count) {
+        Write-Host ("  {0} cancelled (closed unbuilt; restore with archive_landed.js --restore)" -f `
+            $cancelledItems.Count) -ForegroundColor DarkGray
+    }
     $byStatus = $open | Group-Object status | Sort-Object Name
     Write-Host ("  open by status:   " + (($byStatus | ForEach-Object { "$($_.Name)=$($_.Count)" }) -join '  ')) -ForegroundColor DarkGray
     $byPri = $open | Group-Object priority | Sort-Object { $priRank[$_.Name] }

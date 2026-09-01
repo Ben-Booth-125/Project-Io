@@ -28,7 +28,11 @@ const REQUIREMENTS = 'docs/development/req/requirements.json';
 const BACKLOG_MD = 'docs/development/BACKLOG.md';
 
 // Terminal statuses — an item in one of these has landed; its bookkeeping must be closed.
-const TERMINAL = new Set(['complete', 'shipped']);
+// Every use of this set in this file asks the same question — "is this still open
+// work?" — so it is CLOSED, not delivered-only: a cancelled item is off the worklist
+// and must not be linted as though someone were about to build it. Delivery
+// STATISTICS are status.ps1's job and keep the narrower TERMINAL.
+const TERMINAL = A.CLOSED;
 // authority_doc values that are process docs, not subject authorities. A landed item
 // pointing here usually means the design was never propagated to its real home doc.
 // Allowlist: items whose authority genuinely is a process doc (umbrella indexes).
@@ -84,7 +88,7 @@ if (!backlog || !reqs) {
   // legitimately keeps that prose. Only a duplicated ROW is the fault.
   const cold = new Set(A.landedItems(A.ROOT).map((i) => i.id));
   for (const it of backlog.items || []) {
-    if (cold.has(it.id) && !A.TERMINAL.has(it.status)) {
+    if (cold.has(it.id) && !A.CLOSED.has(it.status)) {
       fail(`${it.id} (${it.short_name || '?'}) is OPEN in backlog.json but also holds a whole row in the cold store — a restore that did not clear the cold copy. Re-run: node tools/session/archive_landed.js --restore, then re-evict.`);
     }
   }
@@ -321,6 +325,14 @@ function checkStatusDrift() {
     // over every item rather than only those naming source paths — the bug that
     // check's own negative test caught on its first run.
     if (Array.isArray(item.superseded_by) && item.superseded_by.length) continue;
+
+    // A CANCELLED item is the same shape as a superseded one and is exempt for the
+    // same reason: it is closed without ever having been built, so the files it
+    // names were never going to be written and their absence is the expected
+    // outcome, not a false-complete. Without this the 2026-09-01 cancellation pass
+    // turned every unbuilt item into a warning — the check firing hardest exactly
+    // where it has nothing to say.
+    if (A.CANCELLED.has(item.status)) continue;
 
     const named = (item.files || []).filter((f) => typeof f === 'string')
       .flatMap(expand).filter(isSource);

@@ -65,6 +65,14 @@ function narrativeFieldsOf(item) {
 // backlog_lint.js, story_check.js, status.ps1 — `shipped` is the tolerated legacy value.
 const TERMINAL = new Set(['complete', 'shipped']);
 
+// CLOSED = no longer open work. TERMINAL = delivered. The distinction matters and is
+// not pedantry: a cancelled item is closed but was never built, so counting it in
+// "71% delivered" would inflate the one number that says how much of the design
+// exists. Use CLOSED to decide whether something is still on the worklist; use
+// TERMINAL only for delivery statistics.
+const CANCELLED = new Set(['cancelled', 'purged', 'superseded']);
+const CLOSED = new Set([...TERMINAL, ...CANCELLED]);
+
 // A `design` value of "@something" is a POINTER, not prose (backlog.json _note:
 // "design: \"@<doc>\" is also valid as a pointer to an authority doc"). Legacy items
 // carry "@BACKLOG.md"; archived items carry "@docs/development/archive/...".
@@ -216,7 +224,7 @@ function allItems(backlog, root = ROOT) {
 }
 
 module.exports = {
-    ROOT, ARCHIVE_DIR, NARRATIVE, INDEX_KEEP, TERMINAL,
+    ROOT, ARCHIVE_DIR, NARRATIVE, INDEX_KEEP, TERMINAL, CANCELLED, CLOSED,
     narrativeFieldsOf, isPointer, bucketFor, archivePath, loadArchive, newArchive, resolve, coldFraction,
     archiveFiles, landedIds, landedItems, allItems,
 };
