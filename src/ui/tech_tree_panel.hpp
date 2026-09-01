@@ -37,8 +37,14 @@ void draw_tech_tree_menu(const tech_tree_registry& tree, ui_state& s);
 /// @param w    Read-only world — BL-344: the viewer now reports whether a tech
 ///             is EARNED, and by whom, so it stops being a picture of a system.
 /// @param corp Corporation whose earned set to read (the player's).
+/// @param preview STYLE PREVIEW (ui_state::tech_tree_preview_states) — when true,
+///             node states are FICTIONAL, derived from ring + id hash instead of
+///             read from @p w, because only four of 150 techs have an authored
+///             gate and the honest render is therefore grey nearly everywhere.
+///             Presentational only: reads no world state and writes none. Every
+///             hover card under it says the state is fictional.
 void draw_tech_tree_panel(const tech_tree_registry& tree, const world& w, entity_id corp,
                            bool& open, int& view,
-                           float& pan_x, float& pan_y, float& zoom);
+                           float& pan_x, float& pan_y, float& zoom, bool preview);
 
 } // namespace ui

@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*148 entries — 29 gameplay · 25 canvas · 14 lens · 47 ledger · 33 chrome.*
+*149 entries — 29 gameplay · 25 canvas · 14 lens · 48 ledger · 33 chrome.*
 
 ---
 
@@ -1121,6 +1121,21 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 ---
 
 ## Ledgers & panels — opening and steering the information surfaces
+
+### `ledger.tech_tree_style_preview` — The 'Style preview' checkbox at the foot of the Tech Tree fold-out ledger in the shell nav column (src/ui/tech_tree_panel.cpp, draw_tech_tree_menu). The F9 constellation canvas is chrome-less by decision (BL-310 round 4), so every control for that surface lives in this ledger.
+
+**Press.** Open the Tech Tree ledger from the nav rail (or press F9), then click the 'Style preview' checkbox below the four era rows.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `enabled` | `bool` | On (the default) draws FICTIONAL node states; off draws the four real authored gates. |
+
+**Valid when:**
+- The Tech Tree ledger is open (ui_state::show_tech_tree).
+
+**Expected output.** Toggles ui_state::tech_tree_preview_states. ON (default): every node in the F9 constellation takes a fictional EARNED / LOCKED / no-gate state derived from its ring and an FNV-1a hash of its tech id, so the settled amber-EARNED / cyan-LOCKED palette is visible. OFF: node state is read from the world as BL-344 intended — only four of 150 techs have an authored gate (tech_gate.cpp), so nearly every node renders as the recessive dim-grey 'no gate authored' state. Purely presentational either way: it reads no world state and writes none, the simulation cannot observe it, and it is deterministic frame to frame and across runs. Every hover card drawn under the preview says the state is fictional.
+
+**Reason to select.** Only to judge how this surface LOOKS. An agent reading tech state must turn the preview OFF, or read w.has_tech directly — under the preview the panel's colours and hover cards report invented states, and will happily show a tech as EARNED that the corporation does not hold. It changes nothing an agent can act on.
 
 ### `ledger.budget_tax_tier` — Balance Ledger (Budget), 'Taxes' tier control
 

@@ -154,6 +154,10 @@
    "Keyboard."
   ],
   [
+   "ledger.tech_tree_style_preview",
+   "The 'Style preview' checkbox at the foot of the Tech Tree fold-out ledger in the shell nav column (src/ui/tech_tree_panel.cpp, draw_tech_tree_menu). The F9 constellation canvas is chrome-less by decision (BL-310 round 4), so every control for that surface lives in this ledger."
+  ],
+  [
    "canvas.zoom_keys",
    "Keyboard."
   ],

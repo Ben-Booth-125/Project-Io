@@ -1496,6 +1496,80 @@
     "docs/economy/FINANCE.md",
     "docs/development/DELIVERY.md"
    ]
+  },
+  {
+   "id": "NR-690",
+   "title": "wide8 is now the live F9 tech-tree treatment, while GLOBAL_STYLE_SHEET still calls it unsettled",
+   "raised": "2026-09-01",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Joe, 2026-09-01: integrate the wide8 render into the live panel; 'neither are final forms so just try to push it in the direction of the Wide8 ... dont worry about how it looks compared to the rest of the game and to the design rules - outlines over fills and any pips.'",
+   "what": "The F9 viewer's nodes changed from solid accent fills to OUTLINE-FORWARD (dark plate core, state colour as a lit stroke), gained a payoff-keyed component glyph inside the silhouette, and gained cost-tier pips. docs/ui/design/GLOBAL_STYLE_SHEET.md still records wide8 as 'Current best candidate ... Not marked SETTLED', with Joe's standing reservation that it fits the game but is not his preferred sci-fi direction. So the live surface now runs ahead of its own style authority, deliberately and with Joe's instruction, to judge the direction in-engine rather than from stills.",
+   "why_it_matters": "The standing rule is that a settled design goes into the authority doc the moment it is settled, and that docs are state-independent. This is the inverse: unsettled design shipped into code to inform the settling. That is a legitimate order of operations for a visual call, but it should be a chosen exception, not a quiet precedent. If the direction is kept, GLOBAL_STYLE_SHEET's tech-tree sub-track and the colour-guide rows for panel/button/type need promoting from candidate to SETTLED; if it is dropped, the panel reverts.",
+   "recommendation": "Treat the panel as an in-engine trial, not a promotion. Record it in GLOBAL_STYLE_SHEET as a dated trial entry rather than marking wide8 SETTLED, and settle after Ben has looked at it live.",
+   "files": [
+    "src/ui/tech_tree_panel.cpp",
+    "docs/ui/design/GLOBAL_STYLE_SHEET.md",
+    "docs/ui/design/TECHTREE.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-691",
+   "title": "Tech-node component glyphs kept local to tech_tree_panel.cpp rather than promoted into icons.hpp / ICONS.md",
+   "raised": "2026-09-01",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "The wide8 integration, 2026-09-01.",
+   "what": "Seven stroke-only payoff glyphs (gate | resource | building | recipe | efficiency | enabling | access) were authored in tech_tree_panel.cpp's anonymous namespace, NOT in src/ui/icons.{hpp,cpp} under the (dl, centre, r, colour) contract that src/ui/CLAUDE.md mandates and docs/ui/ICONS.md catalogues. Reason: wide8 is unsettled, and the real glyph language (L3 faceted constructivist, picked in glyphs round 4) has no authored full set yet - renders/glyphs/ROUND5_NOTES.txt is a handoff, not a sheet. Putting these in the shared vocabulary would claim a settlement nobody has made and would need an ICONS.md entry per mark. They are drawn with straight segments only, which at least points at the L3 criterion (minimise curves).",
+   "why_it_matters": "It is a knowing deviation from a directory-scoped rule. It is also duplicate-glyph risk: when the L3 set lands these either get replaced or quietly become a second vocabulary. Related open flag from glyphs round 4: a stylish L3 set may outgrow ICONS.md's 'hand-drawn ImGui primitives, no font, no image atlas' rule and want an SVG path set or an SDF atlas - a TECH_FOUNDATIONS-adjacent call that is Ben's.",
+   "recommendation": "Leave them local while the direction is a trial. Fold them into icons.hpp (or delete them) in the same pass that authors the L3 set, and settle the atlas-vs-primitives question first.",
+   "files": [
+    "src/ui/tech_tree_panel.cpp",
+    "src/ui/icons.hpp",
+    "docs/ui/ICONS.md",
+    "docs/ui/design/renders/glyphs/ROUND5_NOTES.txt"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-692",
+   "title": "Four of 150 techs have an authored gate, so the F9 viewer's settled palette cannot render without a fictional preview",
+   "raised": "2026-09-01",
+   "kind": "observation",
+   "status": "open",
+   "source": "The wide8 integration, 2026-09-01. Measured: tech_gate.cpp authors gates for E0-EC-01, E0-EC-03, E0-ML-01, E1-EC-01; scripts/tech_tree.lua declares 150 techs.",
+   "what": "BL-344 made the viewer honest: a tech with no authored gate renders as recessive dim grey rather than as unlocked. With 146 of 150 nodes in that state, the honest render is grey almost everywhere and the SETTLED amber-EARNED / cyan-LOCKED pair - the whole character of the surface's colour decision - never appears on screen. To make the palette judgeable, ui_state::tech_tree_preview_states was added: a render-only flag (default true, toggle in the fold-out menu) that derives a plausible state from the node's ring and an FNV-1a hash of its id instead of reading the world. It reads no world state, writes none, is deterministic, and every hover card under it says the state is fictional.",
+   "why_it_matters": "Two things. First, a default-true fictional overlay on a panel that also reports real state is a standing misreading risk, mitigated here only by the tooltip text and the menu caption. Second, the underlying gap is real: until gate coverage rises, this surface cannot be visually verified against its own settled palette without the fiction. That also means any future golden on this panel would be blessing a fiction.",
+   "options": [
+    "Keep the preview default-true while the panel is a declared design mock, and drop it when gate coverage rises.",
+    "Default it false and let the reviewer switch it on, keeping the honest view the default.",
+    "Raise gate coverage in tech_gate.cpp so the real states carry the surface (real design work, not a style task)."
+   ],
+   "recommendation": "Keep default-true for now - the panel already declares itself 'BL-087 design mock - read-only' - and revisit the default the moment this surface stops being a mock.",
+   "files": [
+    "src/ui/tech_tree_panel.cpp",
+    "src/ui/ui_state.hpp",
+    "src/world/tech_gate.cpp",
+    "scripts/verify/tech_tree_panel.lua"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-693",
+   "title": "On-canvas node labels overlap badly at real Era-1 density",
+   "raised": "2026-09-01",
+   "kind": "observation",
+   "status": "open",
+   "source": "wide8 integration captures, 2026-09-01 (build/screenshots/tech_tree_era1.png).",
+   "what": "At default zoom in the Era 1 view, always-on node titles collide: 'Orbital Port' over 'Orbital Rendezvous', 'Propellant Doctrine' over 'Sabatier Reactor', 'Surface Assembly' over the 'excludes' exclusion glyph. Pre-existing - the real1 reality-check in GLOBAL_STYLE_SHEET already named all-labels-on-canvas as the live pain point - and untouched by this change, which only pushed labels down by the pip height where pips draw. Recorded because it is now the most conspicuous defect on a surface that otherwise reads well, and Joe flagged it directly: 'we will have to check the overlap when we actually see the game.'",
+   "why_it_matters": "GLOBAL_STYLE_SHEET's wide6 entry chose always-on titles deliberately, to match CURRENT real behaviour rather than redesign the interaction model unilaterally - and explicitly logged that the hover-only-vs-always-on question is Ben's, not a style call. That question is still unraised. Any fix (hover-only titles, collision-aware placement, a zoom threshold, leader lines) picks a side of it.",
+   "recommendation": "Do not fix it inside the style trial. Raise the always-on-vs-hover interaction question with Ben first; a collision-aware placement pass is the cheapest fix that does not answer it either way.",
+   "files": [
+    "src/ui/tech_tree_panel.cpp",
+    "docs/ui/design/GLOBAL_STYLE_SHEET.md"
+   ],
+   "resolution": null
   }
  ]
 }

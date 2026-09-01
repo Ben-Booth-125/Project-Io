@@ -2448,7 +2448,8 @@ void app::render()
     // coupling.
     ui::draw_tech_tree_panel(m_tech_tree, m_world, m_world.player_entity,
                              m_ui.show_tech_tree, m_ui.tech_tree_view,
-                              m_ui.tech_tree_pan_x, m_ui.tech_tree_pan_y, m_ui.tech_tree_zoom);
+                              m_ui.tech_tree_pan_x, m_ui.tech_tree_pan_y, m_ui.tech_tree_zoom,
+                              m_ui.tech_tree_preview_states);
 
     // F11 frame-budget HUD (BL-249) — the v0.1.0 audit instrument. Drawn last so it
     // measures a full frame's worth of panels, and anchored (first use only; it is

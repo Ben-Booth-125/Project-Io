@@ -612,6 +612,21 @@ struct ui_state
     float tech_tree_pan_y = 0.0f;
     float tech_tree_zoom  = 1.0f;
 
+    /// STYLE PREVIEW — fictional node states for the F9 viewer (2026-09-01, Joe:
+    /// "this is just a mock up so more information/examples are better even if
+    /// they are fictional"). Only FOUR of 150 techs have an authored gate
+    /// (tech_gate.cpp), so the honest render is grey almost everywhere and the
+    /// settled amber-EARNED / cyan-LOCKED pair never appears — leaving the
+    /// surface's own palette impossible to judge in-engine.
+    ///
+    /// When true, `draw_constellation` derives a plausible EARNED/LOCKED/no-gate
+    /// state from the node's ring and a hash of its id INSTEAD of reading the
+    /// world. Purely presentational: it reads no world state, writes none, and
+    /// touches nothing the simulation can observe. Defaults TRUE because this
+    /// panel is a declared design mock ("BL-087 design mock - read-only"); the
+    /// fold-out menu carries a toggle back to the honest view.
+    bool tech_tree_preview_states = true;
+
     // --- drill-through disclosure (BL-214, revised BL-265) ---
     // The one idiom every dense surface obeys. BL-214's model was BINARY — folded, or
     // a full-WINDOW overlay — and this comment used to reason from it: because expanded

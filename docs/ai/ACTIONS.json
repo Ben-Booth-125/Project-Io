@@ -778,6 +778,24 @@
       "reason_to_select": "Preview the planned research structure. Do not select this expecting to act — it is a mock, not a system."
     },
     {
+      "id": "ledger.tech_tree_style_preview",
+      "family": "ledger",
+      "surface": "The 'Style preview' checkbox at the foot of the Tech Tree fold-out ledger in the shell nav column (src/ui/tech_tree_panel.cpp, draw_tech_tree_menu). The F9 constellation canvas is chrome-less by decision (BL-310 round 4), so every control for that surface lives in this ledger.",
+      "press": "Open the Tech Tree ledger from the nav rail (or press F9), then click the 'Style preview' checkbox below the four era rows.",
+      "args": [
+        {
+          "name": "enabled",
+          "type": "bool",
+          "meaning": "On (the default) draws FICTIONAL node states; off draws the four real authored gates."
+        }
+      ],
+      "preconditions": [
+        "The Tech Tree ledger is open (ui_state::show_tech_tree)."
+      ],
+      "expected_output": "Toggles ui_state::tech_tree_preview_states. ON (default): every node in the F9 constellation takes a fictional EARNED / LOCKED / no-gate state derived from its ring and an FNV-1a hash of its tech id, so the settled amber-EARNED / cyan-LOCKED palette is visible. OFF: node state is read from the world as BL-344 intended — only four of 150 techs have an authored gate (tech_gate.cpp), so nearly every node renders as the recessive dim-grey 'no gate authored' state. Purely presentational either way: it reads no world state and writes none, the simulation cannot observe it, and it is deterministic frame to frame and across runs. Every hover card drawn under the preview says the state is fictional.",
+      "reason_to_select": "Only to judge how this surface LOOKS. An agent reading tech state must turn the preview OFF, or read w.has_tech directly — under the preview the panel's colours and hover cards report invented states, and will happily show a tech as EARNED that the corporation does not hold. It changes nothing an agent can act on."
+    },
+    {
       "id": "canvas.zoom_keys",
       "family": "canvas",
       "surface": "Keyboard.",
