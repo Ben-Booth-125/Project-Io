@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*123 entries — 116 open, 7 resolved.*
+*124 entries — 117 open, 7 resolved.*
 
 ---
 
@@ -1514,6 +1514,33 @@ This is DEVELOPMENT_PRACTICES.md § A harness must build the world the applicati
 > **Recommendation:** Two options, and they are not exclusive. (a) Give the hand-built registry real `group` values and a few more recipes spanning at least three groups — cheap, keeps the harness Lua-free, and makes it able to see category-shaped work. (b) Move the harness onto the Lua registry the way demand_census and chain_conversion_probe already do, which is the § A harness must build the world the application builds answer and costs it the Lua link (NR-767). Until one of them is done, sprint 27's success criterion should be read as chain_conversion_probe + demand_census, not this.
 
 *Files: `tools/verify/ai_skill_harness.cpp`, `docs/development/DEVELOPMENT_PRACTICES.md`, `docs/development/sprints.json`*
+
+### NR-772 — demand_census surveyed nothing, so the corp AI built ZERO extraction sites in it - fixed, and it moves every reading
+*decision · raised 2026-09-01 · from Found by BL-711 when the census came back byte-identical before and after a change the probe showed as enormous.*
+
+`demand_census` never called `init_survey_states`, which `app.cpp` runs at campaign start. So every body - HOME INCLUDED - stayed `hidden`, and `rank_extraction_sites` gates on survey visibility: it returned an empty candidate list on every tick of every run. THE CORP AI BUILT ZERO EXTRACTION SITES for the entire warm start. Not fewer. Zero. Every extraction count this census has ever printed was the seeder's placement, frozen.
+
+HOW IT SURFACED: BL-711 changed the extraction candidate list from a global top-M to a per-resource top-K, which chain_conversion_probe (which DOES survey) measures as coal going from 0 mines in any world to 25. demand_census reported the two builds byte-identical, because in its world neither list is ever consulted.
+
+FIXED, one line, matching ai_skill_harness.cpp's own 2026-08-31 note verbatim in reasoning - same class, same day, same answer, and that in-repo precedent is why this was applied rather than filed. Only THREE of ~125 harnesses call `init_survey_states`: ai_skill_harness, chain_conversion_probe and survey_harness.
+
+IT MOVES EVERY READING, and here is the separation so the two effects are not confused. Ancient band, `produced`, blind census -> surveyed pre-BL-711 -> surveyed with BL-711:
+
+    coal            0.0  ->    0.0  ->  632.7
+    clay            0.0  ->    0.0  ->  349.1
+    hides           0.0  ->    0.0  ->  353.9
+    sand            0.0  ->    0.0  ->   35.8
+    ceramics       11.5  ->   24.5  ->   55.3
+    leather         4.6  ->    8.0  ->   58.4
+    buildings       335  ->    419  ->    440
+
+Surveying gets the AI building AT ALL (335 -> 419 buildings). The four permanently-zero chains are BL-711's alone - they stay at exactly 0.0 in a surveyed world without it. Every census assertion still passes in all three configurations.
+
+**Why it matters.** Sprint 27's stated method is 'run demand_census before and after every item; the deltas are the sprint'. For every item that touches what the AI BUILDS, the instrument could not see the work. This is the second blind instrument this session (NR-771 is ai_skill_harness) and it is NR-762's family - ~30 harnesses skipping the app's world-building tail - landing on the sprint's primary measurement.
+
+> **Recommendation:** Kept. It is DEVELOPMENT_PRACTICES.md § A harness must build the world the application builds, applied to the file that most needs it, with an in-repo precedent from the previous session. Reversing it is deleting one line, and the dated comment says why it is there. What wants YOUR call is broader: NR-762 asks whether the other ~120 harnesses should be swept the same way, and this is now the second expensive instance of that gap in as many sessions.
+
+*Files: `tools/verify/demand_census.cpp`, `tools/verify/ai_skill_harness.cpp`, `docs/development/DEVELOPMENT_PRACTICES.md`*
 
 ---
 

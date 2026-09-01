@@ -124,6 +124,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/resource_names.hpp"
 #include "world/supply_system.hpp"
+#include "world/survey_system.hpp" // init_survey_states - the app runs it, this census did not
 #include "world/tech_gate.hpp"
 #include "world/unit_roster.hpp"
 #include "world/world.hpp"
@@ -1019,6 +1020,27 @@ band_result run_band(const char* band_name, int64_t epoch, uint32_t seed,
     assign_default_recipes(w, reg);
     generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
     assign_default_recipes(w, reg);
+
+    // 2026-09-01, found by BL-711: the app calls init_survey_states at campaign
+    // start (app.cpp) and this census never did, so EVERY body - home included -
+    // stayed `hidden`. rank_extraction_sites gates on survey visibility, so it
+    // returned an empty list on every tick and THE CORP AI BUILT ZERO EXTRACTION
+    // SITES for the whole warm start. Not fewer: zero. Every extraction count this
+    // census has ever printed was the seeder's placement, frozen.
+    //
+    // That made the instrument blind to exactly the behaviour sprint 27 is
+    // steering by. BL-711 changed the extraction candidate list from a global
+    // top-M to a per-resource top-K, which the probe measures as coal going from
+    // 0 mines in any world to 25 - and this census reported the two builds
+    // BYTE-IDENTICAL, because in its world neither list is ever consulted.
+    //
+    // Same class, same day, same one-line answer as ai_skill_harness.cpp's own
+    // 2026-08-31 note: a pass the app runs that the benchmark did not, so the
+    // benchmark measured a world the game never produces. It is
+    // DEVELOPMENT_PRACTICES.md § A harness must build the world the application
+    // builds, and it moves every reading this file produces - deliberately, once,
+    // dated here rather than dribbled.
+    init_survey_states(w);
 
     out.recipes_authored = static_cast<int>(reg.recipe_count());
     out.recipes_allowed  = reg.recipe_count(building_type::processing_facility);
