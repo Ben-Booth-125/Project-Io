@@ -1556,6 +1556,33 @@
    "completed": "2026-09-01",
    "resolved": "2026-09-01",
    "summary": "TWO argmax loops, not one. (1) The BUILD candidate now keeps a best PER `recipe::group` and emits one candidate per group, so every category reaches the scorer. Instrumented on the industrial band: `Power Generation` emitted 168 candidates and `Construction` 430, both previously ZERO. (2) The recipe margin-chase — the sibling the item did not name — carried the same defect plus two of its own: it used the BROWSE index as an ABSOLUTE recipe id (the NR-254 crossing the build door gets right), and its unrestricted argmax proposed cross-group switches that the SEAM HAS REFUSED SINCE 2026-08-16 (Ben's BL-434 retraction). One proposal per building per eval, so the refused proposal STARVED the legal within-group switch. The comparator gained target+recipe tie-breaks, since a tile can now emit several build candidates.\n\nMEASURED (chain_conversion_probe, real Lua registry, industrial band, before -> after): total processing facilities after 80 warm ticks 268 -> 282; distinct recipes in use 14 -> 17; `silica -> silicon` 16->2 becomes 16->10; the id-space fix opened `iron_nickel_ore -> steel` (+4), `regolith -> steel` (+2) and `coal -> power` (+2), none of which were reachable before. demand_census: clay processing demand 32.0 -> 96.0, peat 5.5 -> 27.2, sand 5.3 -> 40.0, hides 0.000 -> 33.6 (a chain with no demand at all now has some); every census assertion still passes.\n\nTHE VERIFY CRITERION IS NOT REACHED and NR-769 says why: the exclusion has a second seat inside `net^2/capex`, which is an absolute contest (Power Generation peaks at score 31.9 against Advanced Fabrication's 1884). That curve's retention is BL-417 and is Ben's call, so it was not taken here. NR-770: construction yards go 2 -> 0 by REMOVAL, not by switching, and that is BL-642's. NR-771: ai_skill_harness returns byte-identical numbers before and after because its hand-built registry has three recipes in one default group — the sprint's success criterion is blind to this shape of change.\n\nGreen: corp_ai_harness (new R8, both rows, second row falsified by removing the guard), econ, corp_agency, corp_ai_predictive, recipe_switch, build_spree, decision_trace, world_determinism, determinism_harness. ai_skill_harness stays at its 25 known-red band failures, unchanged and NOT re-blessed (NR-305)."
+  },
+  {
+   "id": "BL-417",
+   "short_name": "build score is linear now",
+   "category": "AI",
+   "title": "The build candidate score becomes an explicit linear metric - return on capital per tick, not net squared over capex",
+   "status": "complete",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": "v0.1.22",
+   "sprint": "27",
+   "written": "2026-08-14",
+   "author": "Ben",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "docs/ai/AI_OPPONENT.md",
+    "tools/verify/decision_trace_harness.cpp"
+   ],
+   "design": "STEP 2 of BL-417, resurrected from archive/backlog-purged-2026-08-23.json where the item had sat held since 2026-08-17. Step 1 (the honest rewrite, `net^2/capex` written out as itself) landed then; step 2 - decide whether the quadratic bias is wanted - was explicitly Ben's call and is taken here.\n\nBEN'S RULING 2026-09-01 (NR-769, option A): take it now, linear metric, accept the golden reshuffle.",
+   "completed": "2026-09-01",
+   "resolved": "2026-09-01",
+   "summary": "`c.score = (net / capex) * focus_weight * jitter * glut` at all three curve sites - the extraction build candidate, the processing build candidate (BL-712's), and the road candidate, which is priced UNDER the build curve by construction and would have outscored the site it exists to reach by two orders had it stayed quadratic.\n\nWHY IT WAS FINALLY TAKEN: two independent fixes hit the same wall one level down. BL-712 put `Power Generation` and `Construction` in front of the scorer for the first time - 168 and 430 candidates against zero - and the scorer refused them anyway, peaking at 31.9 and 105.3 against Advanced Fabrication's 1884. BL-711 produced the same shape from the other side: peat reaches the scorer, both slots placeable, still no site. AI_OPPONENT.md's own § Selection must be scale-free condemns an absolute contest in as many words, and `net^2/capex` was one; the rule applied to everything except the score.\n\nMEASURED BEFORE RESHAPING, 15,549 build candidates over one industrial warm start: quadratic median 13.54 / max 1884.33, linear median 0.106 / max 2.81. That put builds in the same band as their Nice-to-Have siblings (survey median 0.073, max 0.107) - an incomparability the quadratic had been masking rather than resolving. NO FUDGE SCALE was added to restore the old ordering: that would have been taking the change and cancelling it.\n\nRESULT. Ancient band, extraction sites gained over 80 warm ticks: iron_ore +30 -> +13 (the glutted good stops hoovering slots) and coal +1 -> +17. ai_skill_harness net worth improves on three of five seeds and the aggregate slightly (-3.112M -> -3.041M), survival is 1.00 on all five, and the churn drops hard - resume 144 -> 60 on seed 4, 81 -> 40 on seed 0. Survey behaviour is unchanged: the feared takeover did not happen.\n\nONE HONEST RED, FIXED RATHER THAN PAPERED OVER: decision_trace_harness T2's anti-vacuity guard went red because the calmer scorer stopped overflowing the 256-entry ring (269 -> 207 pushed at 2400 ticks). The guard was right and its tick count was the problem - 269 against 256 is 5% headroom, and the rate is a property of the SCORER, not of that file. Re-measured under the linear score (2400/207, 3600/267, 4800/327, 6000/387) and re-sized to 6000 for 51% headroom, with a `--ticks` flag so the next scorer change re-measures instead of guessing.\n\nGreen: corp_ai, econ, corp_agency, corp_ai_predictive, construction, construction_gate, recipe_switch, decision_trace, determinism_harness, world_determinism, spectator_determinism (green for the first time in weeks - see NR-752). ai_skill_harness keeps its 25 known-red bands (NR-305)."
   }
  ]
 }

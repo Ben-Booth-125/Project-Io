@@ -1611,7 +1611,7 @@
   {
    "id": "NR-752",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "raised": "2026-08-31",
    "title": "spectator_determinism's byte-identity golden is stale by 16 world-changing commits - re-bless is your call",
    "source": "Sprint 26 wave 1. Found by the slice-A agent, verified independently by the main session.",
@@ -1626,7 +1626,10 @@
    "files": [
     "tools/verify/spectator_determinism.cpp",
     ".claude/rules/io-standing-rules.md"
-   ]
+   ],
+   "resolved_on": "2026-09-01",
+   "resolution": "BEN'S RULING, 2026-09-01: **option 3 — retire the row.** `spectator_determinism` R2's byte-identity check against a frozen pre-BL-409 constant asserts WORLD-CONTENT STABILITY, which is not what this harness is for and never was. The harness's own subject is the BL-409 grant, and its two real invariants both pass and stay: the flag defaults false so a played session keeps the prohibition, and admitting one more corp shifts no rival's cadence slot. Everything else it was catching was drift it never claimed to guard — the golden moved for the mercenary tear-out, opening capital, debt interest, the era-banded basket, and again for BL-711, none of which is a spectator-mode fact.\n\nThis is the NR-596 argument taken one step further, and NR-596 is the precedent: that entry retired a third check on this same harness for the same reason (bit-identical RNG-stream determinism across a content change is not in scope, because saves carry world state rather than a replay-from-seed). Determinism itself keeps its own guards — R2's two-independently-built-worlds reproducibility row and all of R3 — and those are what actually assert it.",
+   "ruling": "Retire the byte-identity row."
   },
   {
    "id": "NR-753",
@@ -1805,7 +1808,7 @@
   {
    "id": "NR-762",
    "kind": "novel-work",
-   "status": "open",
+   "status": "resolved",
    "raised": "2026-08-31",
    "title": "About thirty harnesses build a world the app never produces - nothing owns which app-start passes a harness must replicate",
    "source": "Found by the BL-707 slice agent, 2026-08-31; verified and quantified in the main session.",
@@ -1823,12 +1826,15 @@
     "tools/verify/demand_census.cpp",
     "src/core/app.cpp",
     "src/world/hard_coded_world.cpp"
-   ]
+   ],
+   "resolved_on": "2026-09-01",
+   "resolution": "BEN'S RULING, 2026-09-01: **the sweep happens after sprint 27 closes**, not before the remaining channels. The channels are built and measured against the instruments as they stand, and the shared world-setup helper (option 1, the `no_prehistory()` shape) lands as its own item once the sprint is done — one golden wave, after the work that would otherwise move them twice. The exact scope is now known rather than estimated: 48 of 51 world-building harnesses skip `init_survey_states`, 22 of those run the economy tick and are the ones whose numbers move.",
+   "ruling": "Scheduled: after sprint 27 closes."
   },
   {
    "id": "NR-763",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "raised": "2026-08-31",
    "title": "Self-sufficiency is the NORM, not the exception - chain closure saturates and destroys the endowment asymmetry generation produces",
    "source": "BL-706 (chain completeness read), first run, 2026-08-31. Measured by the slice agent, verified independently in the main session.",
@@ -1846,7 +1852,10 @@
     "scripts/economy.lua",
     "docs/generation/GENERATION_STRATEGY.md",
     "docs/economy/MARKETS.md"
-   ]
+   ],
+   "resolved_on": "2026-09-01",
+   "resolution": "BEN'S RULING, 2026-09-01: **option 1, sequenced after the demand channels.** Chain closure saturates because twelve raws already closes twelve chains, so the fix is the recipe graph's depth/width, not the endowment and not the reach budget. Option 2 was eliminated by measurement on this entry (24 -> 4 removes 40% of every market's reachable ground and the completeness spread is bit-identical on both bands); option 3 was already ruled out because the generator produces a 7-to-17 raw range that closure flattens. The sequencing is the operative half of the ruling: a deeper recipe graph in an economy with no buyers just makes more things nobody wants, so the demand channels come first.",
+   "ruling": "Option 1 — deeper or narrower chains, after the demand channels."
   },
   {
    "id": "NR-764",
@@ -1939,7 +1948,7 @@
   {
    "id": "NR-769",
    "kind": "decision",
-   "status": "open",
+   "status": "resolved",
    "raised": "2026-09-01",
    "title": "BL-712's fix is in, and the scale-blind exclusion has a SECOND seat inside the build score itself",
    "source": "Measured by BL-712 after implementing the per-category recipe selection the item designed.",
@@ -1956,7 +1965,9 @@
     "src/world/corp_ai.cpp",
     "docs/ai/AI_OPPONENT.md"
    ],
-   "resolution": null
+   "resolution": "BEN'S RULING, 2026-09-01: **option A — take BL-417 now.** `net^2/capex` is replaced by an explicit linear capital-efficiency metric, and the golden movement is accepted as one deliberate re-bless wave with dated provenance rather than avoided. That retires the § Scoring note that kept the quadratic — the bias is no longer 'retained deliberately', it is gone, and AI_OPPONENT.md says so. The measured case for it is this entry: BL-712 put `Power Generation` and `Construction` in front of the scorer for the first time (168 and 430 candidates against zero before) and the scorer refused them anyway, at peak scores of 31.9 and 105.3 against Advanced Fabrication's 1884. BL-711 left the same fingerprint independently — peat reaches the scorer, both its slots placeable, and still gains no site. § Selection must be scale-free already condemned an absolute contest in as many words; this makes the score obey its own rule.",
+   "resolved_on": "2026-09-01",
+   "ruling": "A — take BL-417 now, the linear metric."
   },
   {
    "id": "NR-770",
@@ -2012,7 +2023,7 @@
   {
    "id": "NR-773",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "raised": "2026-09-01",
    "title": "BL-642's premise has moved under it, and its second half needs one design call before it can be built",
    "source": "Scoped by the sprint-27 session after BL-711 and NR-772 landed; measured, not assumed.",
@@ -2030,7 +2041,9 @@
     "docs/economy/PRODUCTION.md",
     "docs/economy/MARKETS.md"
    ],
-   "resolution": null
+   "resolution": "BEN'S RULING, 2026-09-01: **option B — gated.** BL-642 half (2) makes a population centre's growth draw construction materials AND stretch or pause on them, exactly as `run_construction` stretches a build — one rule for both consumers, not a want for one and a gate for the other. That is MARKETS.md property 3 taken at full strength: a centre that cannot get timber does not grow, so construction materials become genuinely load-bearing rather than merely priced.\n\nThe recommendation here was C (want now, gate later) on BL-641-cliff grounds; Ben took the deeper option. THE CLIFF RISK IS REAL AND MUST BE DESIGNED FOR, not discovered: authoring a rate that is unmet on tick 1 in every market is what collapsed operating firms 198/328 -> 33/317. The difference that makes gating survivable here is that growth is EPISODIC (a step every 10 qualifying ticks) rather than a per-tick universal draw, and the existing `max_stretch` machinery already models 'slower, not dead'. Build it with the stretch path, measure against the census before authoring a non-zero rate, and floor the behaviour at stretch rather than at stop.\n\nHalf (1) is unchanged and still open: see this entry's own measurement that BL-711 and NR-772 delivered most of what it reached for.",
+   "resolved_on": "2026-09-01",
+   "ruling": "B — gated: centre growth stretches like a build."
   }
  ]
 }

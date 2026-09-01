@@ -517,16 +517,36 @@ it must discover by consequence.
 
 ### Scoring
 
-The design intent is `score(action) = expected_net_per_tick / payback_ticks × strategy_weight`,
-terms computed from **existing functions only** (`estimate_building_profit`, placement
+**A build is scored by return on capital per tick — `net / capex` — and by nothing else.**
+
+The terms are computed from **existing functions only** (`estimate_building_profit`, placement
 affinities, live market prices, wage rate, logistics cost to nearest market, build-cost
-amortisation) — no new oracles. With `payback = capex / net` the build score is **`net² / capex`**,
-and `corp_ai.cpp` writes it out that way. It reads as capital efficiency and behaves as a
-**margin bias**: doubling the margin quadruples the score, doubling the cost only halves it.
-**The bias is retained, deliberately**: `focus_weight`, `jitter` and the glut multiplier are tuned
-against this curve, and every blessed golden records a world evolved under it. Replacing it with
-an explicit linear metric is a re-tune plus a golden reshuffle — BL-417 (build score is
-quadratic), Ben's call.
+amortisation) — no new oracles. `net / capex` carries a unit: credits per tick per credit of
+capital, dimension 1/tick. A rival ranks builds by how fast capital comes back, not by how fat the
+margin is. `focus_weight`, `jitter` and the glut multiplier are unitless and multiply onto it.
+
+It was **`net² / capex`** — `expected_net_per_tick / payback_ticks` with `payback = capex / net`,
+which reads as capital efficiency and behaves as a **margin bias**: doubling the margin quadruples
+the score, doubling the cost only halves it. That is an **absolute contest**, and § Selection must
+be scale-free condemns absolute contests in as many words — *a cheap good can never win one,
+however badly the world needs it*. The rule applied to the score itself and the score was exempt
+from it, which is the only reason the exemption survived as long as it did.
+
+**What settled it was that two independent fixes hit the same wall one level down.** Per-category
+recipe selection put `Power Generation` and `Construction` in front of the scorer for the first
+time — 168 and 430 candidates against zero before — and the scorer refused them anyway, peaking at
+31.9 and 105.3 against Advanced Fabrication's 1884. Per-resource extraction ranking produced the
+same shape from the other side: peat reaches the scorer, both its slots are placeable, and it still
+never gets a site. Putting the excluded categories in front of a scorer that ranks by absolute
+margin does not un-exclude them.
+
+The change costs a **golden reshuffle**, and that cost was why it was held rather than why it was
+avoided: every previously blessed golden recorded a world evolved under the quadratic. Measured
+over one industrial warm start, 15,549 build candidates — quadratic median 13.54, max 1884.33;
+linear median 0.106, max 2.81.
+
+**A road tracks the build curve by construction** and moves with it: it is priced *under* the curve
+(`0.3 × net / build_cost`) because a road earns no revenue itself, it unlocks a future build's.
 
 The `strategy_weight` biases toward the corp's generated **industrial focus** (specialist premise,
 CORPORATION_GENERATION.md), giving distinct-but-legible personalities for free. A **solvency
@@ -659,7 +679,7 @@ every decision a corp took.
 
 **Scored within one budget family, never across.** The candidate families — build, dial, survey,
 hire, trade, dispatch — are the six action budgets above, and each is scored by **one formula in
-one unit**: a build by `net² / capex`, a dial by the estimator's modelled per-tick gain, a trade
+one unit**: a build by `net / capex`, a dial by the estimator's modelled per-tick gain, a trade
 by `quantity × floor`, a dispatch by `revenue − leg cost`. Those scales are unrelated, so a
 comparison across families states nothing, and an evaluation-wide maximum makes
 `runner_up ≥ winning_score` the ordinary case — which is a decision surface that reports the same

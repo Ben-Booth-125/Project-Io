@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*125 entries — 117 open, 8 resolved.*
+*125 entries — 112 open, 13 resolved.*
 
 ---
 
@@ -1054,37 +1054,6 @@ CONTEXT THAT LOWERS THE URGENCY: the viewer is a MOCK. ACTIONS.md says so itself
 
 *Files: `scripts/tech_tree.lua`, `docs/ai/ACTIONS.json`, `docs/ai/ACTIONS.md`, `docs/economy/ERAS.md`*
 
-### NR-752 — spectator_determinism's byte-identity golden is stale by 16 world-changing commits - re-bless is your call
-*question · raised 2026-08-31 · from Sprint 26 wave 1. Found by the slice-A agent, verified independently by the main session.*
-
-`spectator_determinism` fails one row on main, and has been failing it since before this sprint:
-
-  [FAIL] R2 byte-identity: the unspectated hash equals the pre-BL-409 golden
-     golden=E350DF2A50BF4BAA  observed=8274DFA6251C116E
-
-VERIFIED INDEPENDENTLY, not taken on the agent's word, and the verification caught something worth knowing on its own. The prebuilt exe under build_gen/ PASSES with E350DF2A50BF4BAA - which is why nobody noticed. It is stale: compiled from an older tree and still runnable. A freshly compiled harness on clean main, pinned MSVC 14.44, produces 8274DFA6251C116E, exactly matching what the agent got from its own build. So the agent's Ninja configuration was NOT the cause and the drift is real.
-
-A STALE PREBUILT HARNESS THAT PASSES IS WORSE THAN ONE THAT FAILS. It reports on a world that no longer exists, in the affirmative. Worth remembering the next time a verify exe is run without being rebuilt first.
-
-THE DRIFT IS EXPECTED AND ATTRIBUTABLE. The golden was last blessed at 1e43d696 (2026-08-26). Since then main landed a run of world-changing commits, several of which move the state hash by construction: the mercenary-contract tear-out, opening capital 0 -> 400, debt interest 2% -> 1.5%, no standing army at spawn, the era-banded household basket, ownership-closure retirement.
-
-THE TWO PROPERTIES THE STANDING RULE NAMES BOTH PASS, and they are the invariant:
-  [PASS] R1 unspectated the player corp is NEVER due, on any tick (the prohibition)
-  [PASS] R1 admitting the player shifts NO rival's cadence slot
-The rule's own words are that a state_hash constant is dated evidence, not the invariant itself.
-
-NEITHER THE AGENT NOR I RE-BLESSED IT. The NR-596 precedent is explicit: a golden re-blessed by whoever happens to trip over it is a golden nobody reviewed. This one wants a deliberate re-bless with dated provenance in the harness's own provenance log, which already records two prior instances of exactly this.
-
-**Why it matters.** It is red now and will stay red through this sprint's every harness run, which trains everyone to read a FAIL as background noise - the precise condition under which a real regression gets waved through.
-
-- Re-bless to 8274DFA6251C116E now, with a dated provenance entry naming the commits that moved it. Clears the noise before the sprint's own changes land.
-- Re-bless at the END of sprint 26, once the wave-2 corp_ai changes have moved it again - one bless instead of two.
-- Retire the byte-identity row. It asserts world-content stability, which is not what this harness is for; the two properties above are.
-
-> **Recommendation:** Option 2 - re-bless once at the sprint close. This sprint changes corp_ai (BL-700, BL-699), which will move the hash again, so blessing now buys a few days of green and a second bless. Option 3 is worth a thought at the same moment: the row keeps catching world-content drift that this harness never claimed to guard, which is the NR-596 argument one step further.
-
-*Files: `tools/verify/spectator_determinism.cpp`, `.claude/rules/io-standing-rules.md`*
-
 ### NR-753 — Worktrees are cut from origin/main, which has diverged from local main - the stale-base trap, structurally
 *observation · raised 2026-08-31 · from Sprint 26 wave 1, reported by the slice-A agent and confirmed by the main session.*
 
@@ -1277,103 +1246,6 @@ THE COMMON SHAPE: the things that CHECK the code are themselves unchecked. Every
 
 *Files: `CMakeLists.txt`, `tools/verify/build_harness.js`, `build_app.bat`, `.claude/skills/verifier-headless/SKILL.md`*
 
-### NR-762 — About thirty harnesses build a world the app never produces - nothing owns which app-start passes a harness must replicate
-*novel-work · raised 2026-08-31 · from Found by the BL-707 slice agent, 2026-08-31; verified and quantified in the main session.*
-
-`init_survey_states` is called from `src/core/app.cpp:1341` at campaign start, and from `tools/verify/survey_harness.cpp`. NOWHERE ELSE. `make_hard_coded_world` does not call it.
-
-So every harness building a world through `make_hard_coded_world` and not calling it by hand runs with EVERY BODY `hidden` - home included. `rank_extraction_sites` returns an empty candidate list on a hidden body, so no rival can site a mine anywhere, for any resource.
-
-COUNTED: about thirty harnesses. acquisition_viability, ai_skill_harness, build_spree_harness, convoy_cargo_census, corp_terrain_matrix, debt_decomposition, demand_census, determinism_harness, era_world_harness, haulage_measure, material_floor, ownership_class, population_demand_harness, pregame_balance_harness, province_capacity_probe and more.
-
-MEASURED CONSEQUENCE on ai_skill_harness alone (see NR-758): with survey initialised, one of five seeds flips from -1090065 to +60873 and never goes below zero, another improves eight-fold, and survival reaches 1.00 on four of five. The chain_conversion_probe shows iron_ore extraction sites going 30 -> 124 with survey on, against 30 -> 30 without.
-
-THIS IS THE SECOND INSTANCE OF THE CLASS IN THIS ONE FILE. ai_skill_harness.cpp already carries a comment about the first: the default-recipe pass, which 'this harness never ran, so every GENERATED processor in the benchmark carried no_recipe for all 300 ticks - paying maintenance, never producing, and reporting as ordinary idleness.' Same shape, same file, found months apart.
-
-THE NOVELTY, and why it is filed as one: NO DOC OWNS the question 'which app-start passes must a world-building harness replicate'. `make_hard_coded_world` builds a world; `app::start_new_game` then runs a tail of passes on it; and the boundary between them is defined by nothing except which passes somebody remembered. Every harness re-answers it independently, silently, and wrongly by default.
-
-THE DANGEROUS PROPERTY is that the failure is INVISIBLE AND GREEN. A harness measuring the wrong world does not fail - it reports confidently on a world that does not exist, and its goldens then encode that world. This is the same class as the stale-prebuilt-exe problem (NR-759) and has the same cost: a green result nobody can trust.
-
-COUNTED EXACTLY 2026-09-01, replacing the 'about thirty' estimate — and it is worse, with one qualification that makes it more actionable rather than less.
-
-**48 of the 51** harnesses that build a world through `make_hard_coded_world` never call `init_survey_states`. Only three do: `ai_skill_harness`, `survey_harness` and `chain_conversion_probe` (the last two being the ones that had to).
-
-**Of those 48, 22 also run the economy tick**, so the corp AI is live in a world where no body is surveyed and no rival can site a mine anywhere: acquisition_viability, cadence_schedule, convoy_cargo_census, data_creep_harness, debt_decomposition, decision_trace_harness, haulage_measure, history_log_harness, interbody_pull_harness, material_floor, nation_wiring, player_seed_sweep, population_demand_harness, population_mvp, pregame_balance_harness, quarterly_return, spawn_solvency, spectator_determinism, tech_effect_union_harness, tick_profile, tier_margin, whole_firm_buyout. The other 26 do not run the AI, so the pass does not bite them TODAY — which is a reprieve, not a fix, since any of them could grow an economy tick.
-
-That 22 is the list that matters, and it contains most of this project's economic instruments — the haulage baseline, the bankruptcy figure, spawn solvency, the debt decomposition, the tier margins, acquisition viability. `demand_census` was the 23rd until 2026-09-01 (NR-772).
-
-THIRD INSTANCE OF THE CLASS, and the first one that cost a wrong conclusion inside a live sprint: sprint 27 ran demand_census before and after every item as its stated method, and for every item touching what the AI BUILDS the instrument could not see the work. BL-711 came back byte-identical there while the probe showed coal going 0 -> 25.
-
-**Why it matters.** Every economic conclusion this project has drawn from a harness may be measuring a world with no mines. That includes BL-634's acquisition viability, BL-635's spawn diagnosis, the haulage baseline, and the bankruptcy figure this sprint's whole premise rested on - which moved materially when corrected.
-
-- A shared `harness_world()` helper that runs make_hard_coded_world PLUS every app-start tail pass, which every harness uses instead of calling make_hard_coded_world directly. One definition, one place to fix the next time a pass is added.
-- Fix ai_skill_harness and demand_census now (the two this sprint depends on) and file the rest as a sweep.
-- Audit first: run the ~30 harnesses with and without and report which ones actually move, before changing any.
-
-> **Recommendation:** Option 1 (a shared world-setup helper in harness_params.hpp, the shape `no_prehistory()` already establishes) is still the real answer, and the exact list above makes it schedulable rather than open-ended: 22 harnesses need the pass and will move their numbers, 26 need it eventually and will not move today. Two sessions running have now paid for this gap — and the failure mode is the worst available, since a harness measuring the wrong world reports confidently rather than going red. Recommend taking it as its own item BEFORE the remaining sprint-27 channels, so the channels are measured against instruments that work; the 26 quiet ones can follow in the same item at no extra risk.
-
-*Files: `tools/verify/harness_params.hpp`, `tools/verify/ai_skill_harness.cpp`, `tools/verify/demand_census.cpp`, `src/core/app.cpp`, `src/world/hard_coded_world.cpp`*
-
-### NR-763 — Self-sufficiency is the NORM, not the exception - chain closure saturates and destroys the endowment asymmetry generation produces
-*question · raised 2026-08-31 · from BL-706 (chain completeness read), first run, 2026-08-31. Measured by the slice agent, verified independently in the main session.*
-
-The instrument worked on its first run and its first finding contradicts the design assumption it was built to test.
-
-MEASURED - fraction of the band's terminal chains a market can source within reach:
-
-  ANCIENT (14 markets, 15 terminal goods)
-    min 0.400  p25 0.867  median 0.933  p75 0.933  max 1.000   sd 0.186
-    [0.4,0.5)  2 markets
-    [0.8,0.9)  3 markets
-    [0.9,1.0]  9 markets     <- and NOTHING between 0.5 and 0.8
-
-  INDUSTRIAL (9 markets, 11 terminal goods)
-    min 0.636  median 1.000  max 1.000   sd 0.134
-    SEVEN OF NINE markets close EVERY chain in the band.
-
-MARKETS.md property 5 expects self-sufficiency to be "possible, uncommon, and unevenly distributed". It is currently the NORM, most sharply in the industrial band - which is the band the 1960s start uses.
-
-THIS IS THE FLAT FAILURE MODE WE NAMED AS THE ENEMY, and it is now measured rather than feared. GENERATION_STRATEGY.md § Asymmetry is the deliverable: "every region can close its own chains -> no region needs another -> trade has no reason to exist." Nine of fourteen ancient markets and seven of nine industrial ones are effectively interchangeable.
-
-THE MECHANISM IS THE INTERESTING PART, and it is visible in the per-market table. The generator DOES produce real raw asymmetry - market 48704 reaches 7 distinct deposited resources, 48703 reaches 16, 48698 reaches 17. But CHAIN CLOSURE SATURATES:
-
-    market 48704:  7 raws -> closes  6 of 15
-    market 48706:  7 raws -> closes  6 of 15
-    market 48705: 12 raws -> closes 12 of 15
-    market 48699: 13 raws -> closes 14 of 15
-    market 48703: 16 raws -> closes 14 of 15
-    market 48698: 17 raws -> closes 15 of 15
-
-Twelve raws already closes twelve chains; going from 13 to 17 buys ONE more. So asymmetry in INPUTS does not survive into asymmetry in CAPABILITY - the middle of the distribution collapses upward and the world becomes bimodal: a large interchangeable cluster plus two genuinely poor outliers.
-
-That is a threshold effect, not a tuning miss, and it will not be fixed by varying deposits more.
-
-OPTION 2 IS MEASURED AND DEAD (2026-09-01). The recommended first probe was 'vary `max_logistics_reach` and re-read the spread'. `demand_census` now carries a `--reach` flag for exactly this (a knob, not an edit-and-revert of a shipped constant), and the sweep is conclusive:
-
-    reach   in-reach   ancient SPREAD
-    24      73%        min 0.3750  p25 0.8750  median 0.9375  p75 0.9375  max 1.0000
-    16      63%        min 0.3750  p25 0.8750  median 0.9375  p75 0.9375  max 1.0000
-    12      58%        min 0.3750  p25 0.8750  median 0.9375  p75 0.9375  max 1.0000
-     8      52%        min 0.3750  p25 0.8750  median 0.9375  p75 0.9375  max 1.0000
-     4      44%        min 0.3750  p25 0.8750  median 0.9375  p75 0.9375  max 1.0000
-
-Industrial is identical at every step too (min 0.6154, median 1.0000). Cutting the budget from 24 to 4 removes 40% of every market's reachable ground — market 48711 goes from 2510 in-reach tiles to 1240, a 51% loss — and NOT ONE MARKET'S COMPLETENESS MOVES, on either band, to four decimal places. The flag is verified to be biting: the R5 header echoes the overridden budget and the in-reach counts collapse as expected.
-
-WHY, and it sharpens the original finding rather than contradicting it: the raws a market needs to close its chains are all in its INNER catchment. The ground a tighter budget takes away is the far ground, and the far ground carries duplicates of resources the market already reaches. So geography does not bite because there is nothing distinctive at the edge to lose.
-
-By the entry's own reasoning that leaves the saturation STRUCTURAL, and option 1 (deeper or narrower chains) as the real answer — or option 4, accepting it and sourcing trade from price and scale rather than capability.
-
-**Why it matters.** Trade is one of the game's two pillars and it needs a reason to exist. If most markets can close most chains locally, the reason is thin - and the 1960s start, which is what the prototype opens on, is the worse of the two bands. It also means BL-706's spread is currently reporting a world that fails the design's own intent, which is exactly what the instrument was built to be able to say.
-
-- DEEPER OR NARROWER CHAINS. If closing a chain needed more distinct inputs, fewer markets would clear the threshold and the middle would spread out. Touches the recipe graph, and it is the change that attacks the saturation directly.
-- A TIGHTER REACH BUDGET. `economy.construction.max_logistics_reach = 24.0` is generous - market 48706's catchment is 493 tiles and ALL 493 are in reach. Cutting it makes geography bite and costs nothing but a constant.
-- RARER INPUTS. Make some raws genuinely scarce rather than merely varied, so a market missing one is missing it badly. Touches planetology's endowment.
-- ACCEPT IT. Self-sufficiency being common is a legitimate world if trade comes from something other than necessity - price, scale, or specialisation rather than capability.
-
-> **Recommendation:** Option 2 is eliminated by measurement — do not spend more on it. Between the two survivors: option 1 (deeper or narrower chains) attacks the mechanism directly and the measurement says why it would work — twelve raws already closes twelve chains, so the threshold is what is flat, not the endowment. Option 4 is a legitimate world and cheaper, but it needs trade to come from somewhere, and sprint 27's whole finding is that there is barely any demand to trade INTO yet. My read: option 1, but AFTER the demand channels land — a deeper recipe graph in an economy with no buyers just makes more things nobody wants. Option 3 stays ruled out for the reason already recorded: the generator already produces a 7-to-17 raw range and closure flattens it.
-
-*Files: `tools/verify/demand_census.cpp`, `scripts/economy.lua`, `docs/generation/GENERATION_STRATEGY.md`, `docs/economy/MARKETS.md`*
-
 ### NR-764 — Two definitions baked into the completeness instrument that other work will tune against
 *decision taken on your behalf · raised 2026-08-31 · from BL-706, flagged by the slice agent for Ben's eye.*
 
@@ -1444,37 +1316,6 @@ Related but distinct: the literal version-refusal ladder stops at v15 (P19b). v1
 
 *Files: `tools/verify/save_roundtrip.cpp`, `src/world/world_save.hpp`*
 
-### NR-769 — BL-712's fix is in, and the scale-blind exclusion has a SECOND seat inside the build score itself
-*decision · raised 2026-09-01 · from Measured by BL-712 after implementing the per-category recipe selection the item designed.*
-
-BL-712's fix shape is done: the build candidate keeps a best PER GROUP and hands every group to the scorer. It works, and it is measurable — instrumented on the industrial band, `Power Generation` emitted **168** build candidates and `Construction` **430**, where before the change both emitted **zero**, in any world, at any time.
-
-THEY STILL DO NOT WIN. Peak scores by group over one 80-tick warm start:
-
-    Advanced Fabrication   n=1375   max 1884.3
-    Electronics            n=2140   max 1234.1
-    Welfare Goods          n=1196   max  411.6
-    Metal Foundry          n=1483   max  264.0
-    Construction           n= 430   max  105.3
-    Food Processing        n=1570   max  102.2
-    Power Generation       n= 168   max   31.9
-    Refinery               n=1174   max    1.6
-
-Builds are capped per evaluation, so an 18-60x score gap is still an exclusion — just one seat further down. The score is `net^2 / capex`, which is an ABSOLUTE contest, and § Selection must be scale-free's own sentence condemns it in as many words: *a cheap good can never win an absolute contest, however badly the world needs it*.
-
-WHY THIS WAS NOT JUST FIXED. AI_OPPONENT.md § Scoring says the quadratic's margin bias is **retained deliberately** and that replacing it is a re-tune plus a golden reshuffle — BL-417 (build score is quadratic), **Ben's call**. Taking it here would have been deciding an open item on his behalf, silently, inside a different one.
-
-**Why it matters.** BL-712's stated VERIFY criterion — power and construction_capacity produced > 0 from AI builds — is not reached, and this is why. It is also the sprint's own success test in miniature: the channel is now reachable and the corp still will not build it.
-
-- A) Take BL-417 now — replace net^2/capex with an explicit linear capital-efficiency metric. One deliberate golden re-bless wave with dated provenance, which BL-711 is already going to need.
-- B) Normalise the build score WITHIN its group before the global sort, so categories are ranked comparably. Truest to the rule as written; the largest behavioural change, and it would let a lone Refinery candidate rank beside Advanced Fabrication's best.
-- C) Add a scarcity term mirroring the existing `glut` multiplier — a good the world wants and nobody makes scores UP. Systemic rather than a handicap (the standing preference), but it is new design, not a fix.
-- D) Leave it. BL-712 delivered its fix shape; the second seat becomes its own item behind BL-417.
-
-> **Recommendation:** C is the one that reads as an in-world force rather than a term inside the agent, and it composes with A rather than competing — but it is design, so it wants your call before it is built. If the sprint needs movement sooner, D plus a new item is the honest sequencing: BL-712 is not being stretched to cover BL-417.
-
-*Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
-
 ### NR-770 — Construction yards do not survive, and where they do survive they produce nothing
 *observation · raised 2026-09-01 · from Measured by BL-712 with chain_conversion_probe, industrial band, before and after the fix.*
 
@@ -1537,25 +1378,6 @@ Surveying gets the AI building AT ALL (335 -> 419 buildings). The four permanent
 > **Recommendation:** Kept. It is DEVELOPMENT_PRACTICES.md § A harness must build the world the application builds, applied to the file that most needs it, with an in-repo precedent from the previous session. Reversing it is deleting one line, and the dated comment says why it is there. What wants YOUR call is broader: NR-762 asks whether the other ~120 harnesses should be swept the same way, and this is now the second expensive instance of that gap in as many sessions.
 
 *Files: `tools/verify/demand_census.cpp`, `tools/verify/ai_skill_harness.cpp`, `docs/development/DEVELOPMENT_PRACTICES.md`*
-
-### NR-773 — BL-642's premise has moved under it, and its second half needs one design call before it can be built
-*question · raised 2026-09-01 · from Scoped by the sprint-27 session after BL-711 and NR-772 landed; measured, not assumed.*
-
-BL-642 has two halves. Both need a word from you before building, for different reasons.
-
-HALF (1) - 'make the opening years actually build'. The item says the construction draw NEVER FIRES during the opening years. Measured today, that is no longer the reading. `ERAS.md` settles what the phrase means: the first ~20 years ARE `app::start_new_game`'s 80-tick warm start, not a separate generation pass. And the warm start does now construct. Ancient-band construction-channel demand, blind census -> surveyed (NR-772) -> surveyed with BL-711: **93.25 -> 202.58 -> 210.08**, with timber's construct draw going 54.0 -> 118.3 and clay 0.0 -> 13.3. The AI builds 105 more buildings than the blind census could see.
-
-What REMAINS true of half (1) is narrower and sharper: the SEEDER's ~330 buildings are authored complete (`author_building` writes a default `ticks_remaining` of 0, corporation_generation.cpp) and draw nothing, ever. Fixing that literally would open the campaign with 330 half-built buildings, which is a gameplay change, not a plumbing one - so it wants your reading rather than my guess.
-
-HALF (2) - 'population centres draw construction materials as they grow' - is the half the item itself calls the one that lasts, and it is unambiguous in intent. The hook is clean and already there: economy_system.cpp's BL-616 growth block, where `pcc.population` takes a step and `++pcc.scale` promotes. What is NOT settled is whether that draw GATES growth.
-
-- A) A WANT ONLY. The centre registers demand for its materials, prices them, and grows regardless. Matches every existing injector - none of them gates - and is the safe direction: if you wanted gating, this is a subset rather than a wrong turn.
-- B) GATED, like a build. Growth stretches or pauses when the market cannot supply, exactly as run_construction stretches a build. Truest to MARKETS.md property 3 and it makes construction materials genuinely load-bearing - but a centre that stops growing for want of timber is a real gameplay change and it can deadlock a poor region.
-- C) A want now, gating later behind its own item, once the materials actually reach the shelf.
-
-> **Recommendation:** C. Half (2) as a WANT, with rates measured against the census rather than guessed, and gating filed separately - because BL-641's cliff is the standing warning here: a brand-new universal draw unmet on tick 1 collapsed operating firms 198/328 -> 33/317, and gating growth on an unmet draw is that same cliff pointed at population instead of firms. For half (1), my reading is that BL-711 and NR-772 have already delivered most of what it was reaching for, and what is left (the seeder's instant buildings) is a separate and much bigger question. Not built either way - the item is left open with this measurement attached.
-
-*Files: `src/world/economy_system.cpp`, `src/world/corporation_generation.cpp`, `scripts/economy.lua`, `docs/economy/PRODUCTION.md`, `docs/economy/MARKETS.md`*
 
 ---
 
@@ -1709,6 +1531,41 @@ ONE KNOWN DIVERGENCE CREATED, tracked as NR-751.
 
 *Files: `docs/economy/ERAS.md`, `docs/CONCEPT.md`, `docs/CLIMATE.md`, `docs/development/ROADMAP.md`, `docs/research/ERA1_TECH_LANDSCAPE.md`*
 
+### NR-752 — spectator_determinism's byte-identity golden is stale by 16 world-changing commits - re-bless is your call
+*question · raised 2026-08-31 · from Sprint 26 wave 1. Found by the slice-A agent, verified independently by the main session.*
+
+`spectator_determinism` fails one row on main, and has been failing it since before this sprint:
+
+  [FAIL] R2 byte-identity: the unspectated hash equals the pre-BL-409 golden
+     golden=E350DF2A50BF4BAA  observed=8274DFA6251C116E
+
+VERIFIED INDEPENDENTLY, not taken on the agent's word, and the verification caught something worth knowing on its own. The prebuilt exe under build_gen/ PASSES with E350DF2A50BF4BAA - which is why nobody noticed. It is stale: compiled from an older tree and still runnable. A freshly compiled harness on clean main, pinned MSVC 14.44, produces 8274DFA6251C116E, exactly matching what the agent got from its own build. So the agent's Ninja configuration was NOT the cause and the drift is real.
+
+A STALE PREBUILT HARNESS THAT PASSES IS WORSE THAN ONE THAT FAILS. It reports on a world that no longer exists, in the affirmative. Worth remembering the next time a verify exe is run without being rebuilt first.
+
+THE DRIFT IS EXPECTED AND ATTRIBUTABLE. The golden was last blessed at 1e43d696 (2026-08-26). Since then main landed a run of world-changing commits, several of which move the state hash by construction: the mercenary-contract tear-out, opening capital 0 -> 400, debt interest 2% -> 1.5%, no standing army at spawn, the era-banded household basket, ownership-closure retirement.
+
+THE TWO PROPERTIES THE STANDING RULE NAMES BOTH PASS, and they are the invariant:
+  [PASS] R1 unspectated the player corp is NEVER due, on any tick (the prohibition)
+  [PASS] R1 admitting the player shifts NO rival's cadence slot
+The rule's own words are that a state_hash constant is dated evidence, not the invariant itself.
+
+NEITHER THE AGENT NOR I RE-BLESSED IT. The NR-596 precedent is explicit: a golden re-blessed by whoever happens to trip over it is a golden nobody reviewed. This one wants a deliberate re-bless with dated provenance in the harness's own provenance log, which already records two prior instances of exactly this.
+
+**Why it matters.** It is red now and will stay red through this sprint's every harness run, which trains everyone to read a FAIL as background noise - the precise condition under which a real regression gets waved through.
+
+- Re-bless to 8274DFA6251C116E now, with a dated provenance entry naming the commits that moved it. Clears the noise before the sprint's own changes land.
+- Re-bless at the END of sprint 26, once the wave-2 corp_ai changes have moved it again - one bless instead of two.
+- Retire the byte-identity row. It asserts world-content stability, which is not what this harness is for; the two properties above are.
+
+> **Recommendation:** Option 2 - re-bless once at the sprint close. This sprint changes corp_ai (BL-700, BL-699), which will move the hash again, so blessing now buys a few days of green and a second bless. Option 3 is worth a thought at the same moment: the row keeps catching world-content drift that this harness never claimed to guard, which is the NR-596 argument one step further.
+
+> **RESOLVED.** BEN'S RULING, 2026-09-01: **option 3 — retire the row.** `spectator_determinism` R2's byte-identity check against a frozen pre-BL-409 constant asserts WORLD-CONTENT STABILITY, which is not what this harness is for and never was. The harness's own subject is the BL-409 grant, and its two real invariants both pass and stay: the flag defaults false so a played session keeps the prohibition, and admitting one more corp shifts no rival's cadence slot. Everything else it was catching was drift it never claimed to guard — the golden moved for the mercenary tear-out, opening capital, debt interest, the era-banded basket, and again for BL-711, none of which is a spectator-mode fact.
+
+This is the NR-596 argument taken one step further, and NR-596 is the precedent: that entry retired a third check on this same harness for the same reason (bit-identical RNG-stream determinism across a content change is not in scope, because saves carry world state rather than a replay-from-seed). Determinism itself keeps its own guards — R2's two-independently-built-worlds reproducibility row and all of R3 — and those are what actually assert it.
+
+*Files: `tools/verify/spectator_determinism.cpp`, `.claude/rules/io-standing-rules.md`*
+
 ### NR-760 — Should a pool draw also bid on the market? ALREADY SETTLED - I filed this without querying the backlog
 *question · raised 2026-08-31 · from Open in scripts/economy.lua since BL-641, escalated to Ben there and never answered. Sprint 26's census made it the first question of sprint 27.*
 
@@ -1788,6 +1645,107 @@ AND IT REACHES THE ERA CATASTROPHE. ERAS.md section The point of an Era scores E
 
 *Files: `docs/economy/PRODUCTION.md`, `docs/economy/CONTRACTS.md`, `docs/economy/LOGISTICS.md`*
 
+### NR-762 — About thirty harnesses build a world the app never produces - nothing owns which app-start passes a harness must replicate
+*novel-work · raised 2026-08-31 · from Found by the BL-707 slice agent, 2026-08-31; verified and quantified in the main session.*
+
+`init_survey_states` is called from `src/core/app.cpp:1341` at campaign start, and from `tools/verify/survey_harness.cpp`. NOWHERE ELSE. `make_hard_coded_world` does not call it.
+
+So every harness building a world through `make_hard_coded_world` and not calling it by hand runs with EVERY BODY `hidden` - home included. `rank_extraction_sites` returns an empty candidate list on a hidden body, so no rival can site a mine anywhere, for any resource.
+
+COUNTED: about thirty harnesses. acquisition_viability, ai_skill_harness, build_spree_harness, convoy_cargo_census, corp_terrain_matrix, debt_decomposition, demand_census, determinism_harness, era_world_harness, haulage_measure, material_floor, ownership_class, population_demand_harness, pregame_balance_harness, province_capacity_probe and more.
+
+MEASURED CONSEQUENCE on ai_skill_harness alone (see NR-758): with survey initialised, one of five seeds flips from -1090065 to +60873 and never goes below zero, another improves eight-fold, and survival reaches 1.00 on four of five. The chain_conversion_probe shows iron_ore extraction sites going 30 -> 124 with survey on, against 30 -> 30 without.
+
+THIS IS THE SECOND INSTANCE OF THE CLASS IN THIS ONE FILE. ai_skill_harness.cpp already carries a comment about the first: the default-recipe pass, which 'this harness never ran, so every GENERATED processor in the benchmark carried no_recipe for all 300 ticks - paying maintenance, never producing, and reporting as ordinary idleness.' Same shape, same file, found months apart.
+
+THE NOVELTY, and why it is filed as one: NO DOC OWNS the question 'which app-start passes must a world-building harness replicate'. `make_hard_coded_world` builds a world; `app::start_new_game` then runs a tail of passes on it; and the boundary between them is defined by nothing except which passes somebody remembered. Every harness re-answers it independently, silently, and wrongly by default.
+
+THE DANGEROUS PROPERTY is that the failure is INVISIBLE AND GREEN. A harness measuring the wrong world does not fail - it reports confidently on a world that does not exist, and its goldens then encode that world. This is the same class as the stale-prebuilt-exe problem (NR-759) and has the same cost: a green result nobody can trust.
+
+COUNTED EXACTLY 2026-09-01, replacing the 'about thirty' estimate — and it is worse, with one qualification that makes it more actionable rather than less.
+
+**48 of the 51** harnesses that build a world through `make_hard_coded_world` never call `init_survey_states`. Only three do: `ai_skill_harness`, `survey_harness` and `chain_conversion_probe` (the last two being the ones that had to).
+
+**Of those 48, 22 also run the economy tick**, so the corp AI is live in a world where no body is surveyed and no rival can site a mine anywhere: acquisition_viability, cadence_schedule, convoy_cargo_census, data_creep_harness, debt_decomposition, decision_trace_harness, haulage_measure, history_log_harness, interbody_pull_harness, material_floor, nation_wiring, player_seed_sweep, population_demand_harness, population_mvp, pregame_balance_harness, quarterly_return, spawn_solvency, spectator_determinism, tech_effect_union_harness, tick_profile, tier_margin, whole_firm_buyout. The other 26 do not run the AI, so the pass does not bite them TODAY — which is a reprieve, not a fix, since any of them could grow an economy tick.
+
+That 22 is the list that matters, and it contains most of this project's economic instruments — the haulage baseline, the bankruptcy figure, spawn solvency, the debt decomposition, the tier margins, acquisition viability. `demand_census` was the 23rd until 2026-09-01 (NR-772).
+
+THIRD INSTANCE OF THE CLASS, and the first one that cost a wrong conclusion inside a live sprint: sprint 27 ran demand_census before and after every item as its stated method, and for every item touching what the AI BUILDS the instrument could not see the work. BL-711 came back byte-identical there while the probe showed coal going 0 -> 25.
+
+**Why it matters.** Every economic conclusion this project has drawn from a harness may be measuring a world with no mines. That includes BL-634's acquisition viability, BL-635's spawn diagnosis, the haulage baseline, and the bankruptcy figure this sprint's whole premise rested on - which moved materially when corrected.
+
+- A shared `harness_world()` helper that runs make_hard_coded_world PLUS every app-start tail pass, which every harness uses instead of calling make_hard_coded_world directly. One definition, one place to fix the next time a pass is added.
+- Fix ai_skill_harness and demand_census now (the two this sprint depends on) and file the rest as a sweep.
+- Audit first: run the ~30 harnesses with and without and report which ones actually move, before changing any.
+
+> **Recommendation:** Option 1 (a shared world-setup helper in harness_params.hpp, the shape `no_prehistory()` already establishes) is still the real answer, and the exact list above makes it schedulable rather than open-ended: 22 harnesses need the pass and will move their numbers, 26 need it eventually and will not move today. Two sessions running have now paid for this gap — and the failure mode is the worst available, since a harness measuring the wrong world reports confidently rather than going red. Recommend taking it as its own item BEFORE the remaining sprint-27 channels, so the channels are measured against instruments that work; the 26 quiet ones can follow in the same item at no extra risk.
+
+> **RESOLVED.** BEN'S RULING, 2026-09-01: **the sweep happens after sprint 27 closes**, not before the remaining channels. The channels are built and measured against the instruments as they stand, and the shared world-setup helper (option 1, the `no_prehistory()` shape) lands as its own item once the sprint is done — one golden wave, after the work that would otherwise move them twice. The exact scope is now known rather than estimated: 48 of 51 world-building harnesses skip `init_survey_states`, 22 of those run the economy tick and are the ones whose numbers move.
+
+*Files: `tools/verify/harness_params.hpp`, `tools/verify/ai_skill_harness.cpp`, `tools/verify/demand_census.cpp`, `src/core/app.cpp`, `src/world/hard_coded_world.cpp`*
+
+### NR-763 — Self-sufficiency is the NORM, not the exception - chain closure saturates and destroys the endowment asymmetry generation produces
+*question · raised 2026-08-31 · from BL-706 (chain completeness read), first run, 2026-08-31. Measured by the slice agent, verified independently in the main session.*
+
+The instrument worked on its first run and its first finding contradicts the design assumption it was built to test.
+
+MEASURED - fraction of the band's terminal chains a market can source within reach:
+
+  ANCIENT (14 markets, 15 terminal goods)
+    min 0.400  p25 0.867  median 0.933  p75 0.933  max 1.000   sd 0.186
+    [0.4,0.5)  2 markets
+    [0.8,0.9)  3 markets
+    [0.9,1.0]  9 markets     <- and NOTHING between 0.5 and 0.8
+
+  INDUSTRIAL (9 markets, 11 terminal goods)
+    min 0.636  median 1.000  max 1.000   sd 0.134
+    SEVEN OF NINE markets close EVERY chain in the band.
+
+MARKETS.md property 5 expects self-sufficiency to be "possible, uncommon, and unevenly distributed". It is currently the NORM, most sharply in the industrial band - which is the band the 1960s start uses.
+
+THIS IS THE FLAT FAILURE MODE WE NAMED AS THE ENEMY, and it is now measured rather than feared. GENERATION_STRATEGY.md § Asymmetry is the deliverable: "every region can close its own chains -> no region needs another -> trade has no reason to exist." Nine of fourteen ancient markets and seven of nine industrial ones are effectively interchangeable.
+
+THE MECHANISM IS THE INTERESTING PART, and it is visible in the per-market table. The generator DOES produce real raw asymmetry - market 48704 reaches 7 distinct deposited resources, 48703 reaches 16, 48698 reaches 17. But CHAIN CLOSURE SATURATES:
+
+    market 48704:  7 raws -> closes  6 of 15
+    market 48706:  7 raws -> closes  6 of 15
+    market 48705: 12 raws -> closes 12 of 15
+    market 48699: 13 raws -> closes 14 of 15
+    market 48703: 16 raws -> closes 14 of 15
+    market 48698: 17 raws -> closes 15 of 15
+
+Twelve raws already closes twelve chains; going from 13 to 17 buys ONE more. So asymmetry in INPUTS does not survive into asymmetry in CAPABILITY - the middle of the distribution collapses upward and the world becomes bimodal: a large interchangeable cluster plus two genuinely poor outliers.
+
+That is a threshold effect, not a tuning miss, and it will not be fixed by varying deposits more.
+
+OPTION 2 IS MEASURED AND DEAD (2026-09-01). The recommended first probe was 'vary `max_logistics_reach` and re-read the spread'. `demand_census` now carries a `--reach` flag for exactly this (a knob, not an edit-and-revert of a shipped constant), and the sweep is conclusive:
+
+    reach   in-reach   ancient SPREAD
+    24      73%        min 0.3750  p25 0.8750  median 0.9375  p75 0.9375  max 1.0000
+    16      63%        min 0.3750  p25 0.8750  median 0.9375  p75 0.9375  max 1.0000
+    12      58%        min 0.3750  p25 0.8750  median 0.9375  p75 0.9375  max 1.0000
+     8      52%        min 0.3750  p25 0.8750  median 0.9375  p75 0.9375  max 1.0000
+     4      44%        min 0.3750  p25 0.8750  median 0.9375  p75 0.9375  max 1.0000
+
+Industrial is identical at every step too (min 0.6154, median 1.0000). Cutting the budget from 24 to 4 removes 40% of every market's reachable ground — market 48711 goes from 2510 in-reach tiles to 1240, a 51% loss — and NOT ONE MARKET'S COMPLETENESS MOVES, on either band, to four decimal places. The flag is verified to be biting: the R5 header echoes the overridden budget and the in-reach counts collapse as expected.
+
+WHY, and it sharpens the original finding rather than contradicting it: the raws a market needs to close its chains are all in its INNER catchment. The ground a tighter budget takes away is the far ground, and the far ground carries duplicates of resources the market already reaches. So geography does not bite because there is nothing distinctive at the edge to lose.
+
+By the entry's own reasoning that leaves the saturation STRUCTURAL, and option 1 (deeper or narrower chains) as the real answer — or option 4, accepting it and sourcing trade from price and scale rather than capability.
+
+**Why it matters.** Trade is one of the game's two pillars and it needs a reason to exist. If most markets can close most chains locally, the reason is thin - and the 1960s start, which is what the prototype opens on, is the worse of the two bands. It also means BL-706's spread is currently reporting a world that fails the design's own intent, which is exactly what the instrument was built to be able to say.
+
+- DEEPER OR NARROWER CHAINS. If closing a chain needed more distinct inputs, fewer markets would clear the threshold and the middle would spread out. Touches the recipe graph, and it is the change that attacks the saturation directly.
+- A TIGHTER REACH BUDGET. `economy.construction.max_logistics_reach = 24.0` is generous - market 48706's catchment is 493 tiles and ALL 493 are in reach. Cutting it makes geography bite and costs nothing but a constant.
+- RARER INPUTS. Make some raws genuinely scarce rather than merely varied, so a market missing one is missing it badly. Touches planetology's endowment.
+- ACCEPT IT. Self-sufficiency being common is a legitimate world if trade comes from something other than necessity - price, scale, or specialisation rather than capability.
+
+> **Recommendation:** Option 2 is eliminated by measurement — do not spend more on it. Between the two survivors: option 1 (deeper or narrower chains) attacks the mechanism directly and the measurement says why it would work — twelve raws already closes twelve chains, so the threshold is what is flat, not the endowment. Option 4 is a legitimate world and cheaper, but it needs trade to come from somewhere, and sprint 27's whole finding is that there is barely any demand to trade INTO yet. My read: option 1, but AFTER the demand channels land — a deeper recipe graph in an economy with no buyers just makes more things nobody wants. Option 3 stays ruled out for the reason already recorded: the generator already produces a 7-to-17 raw range and closure flattens it.
+
+> **RESOLVED.** BEN'S RULING, 2026-09-01: **option 1, sequenced after the demand channels.** Chain closure saturates because twelve raws already closes twelve chains, so the fix is the recipe graph's depth/width, not the endowment and not the reach budget. Option 2 was eliminated by measurement on this entry (24 -> 4 removes 40% of every market's reachable ground and the completeness spread is bit-identical on both bands); option 3 was already ruled out because the generator produces a 7-to-17 raw range that closure flattens. The sequencing is the operative half of the ruling: a deeper recipe graph in an economy with no buyers just makes more things nobody wants, so the demand channels come first.
+
+*Files: `tools/verify/demand_census.cpp`, `scripts/economy.lua`, `docs/generation/GENERATION_STRATEGY.md`, `docs/economy/MARKETS.md`*
+
 ### NR-765 — THE SAME DEFECT, THREE TIMES: an argmax on an absolute quantity, in a domain whose values span orders of magnitude
 *observation · raised 2026-08-31 · from Sprint 27 waves 1 and 2. BL-707 diagnosed one instance; BL-708 hit a second building on top of it; BL-440 had already fixed a third.*
 
@@ -1826,4 +1784,62 @@ THE ENTRY'S REAL ASK — 'naming it once is worth more than three fixes' — is 
 WHAT DID NOT GET FIXED, and it is filed rather than folded in: NR-769. Both fixes put the excluded categories in front of the scorer and the scorer still refuses them, because `net^2/capex` is itself an absolute contest — the entry's own sentence, 'a cheap good can never win an absolute-margin contest', applies one level below where it was aimed. That is BL-417 and Ben's.
 
 *Files: `src/world/corp_ai.cpp`, `src/world/corp_ai.hpp`, `tools/verify/chain_conversion_probe.cpp`*
+
+### NR-769 — BL-712's fix is in, and the scale-blind exclusion has a SECOND seat inside the build score itself
+*decision · raised 2026-09-01 · from Measured by BL-712 after implementing the per-category recipe selection the item designed.*
+
+BL-712's fix shape is done: the build candidate keeps a best PER GROUP and hands every group to the scorer. It works, and it is measurable — instrumented on the industrial band, `Power Generation` emitted **168** build candidates and `Construction` **430**, where before the change both emitted **zero**, in any world, at any time.
+
+THEY STILL DO NOT WIN. Peak scores by group over one 80-tick warm start:
+
+    Advanced Fabrication   n=1375   max 1884.3
+    Electronics            n=2140   max 1234.1
+    Welfare Goods          n=1196   max  411.6
+    Metal Foundry          n=1483   max  264.0
+    Construction           n= 430   max  105.3
+    Food Processing        n=1570   max  102.2
+    Power Generation       n= 168   max   31.9
+    Refinery               n=1174   max    1.6
+
+Builds are capped per evaluation, so an 18-60x score gap is still an exclusion — just one seat further down. The score is `net^2 / capex`, which is an ABSOLUTE contest, and § Selection must be scale-free's own sentence condemns it in as many words: *a cheap good can never win an absolute contest, however badly the world needs it*.
+
+WHY THIS WAS NOT JUST FIXED. AI_OPPONENT.md § Scoring says the quadratic's margin bias is **retained deliberately** and that replacing it is a re-tune plus a golden reshuffle — BL-417 (build score is quadratic), **Ben's call**. Taking it here would have been deciding an open item on his behalf, silently, inside a different one.
+
+**Why it matters.** BL-712's stated VERIFY criterion — power and construction_capacity produced > 0 from AI builds — is not reached, and this is why. It is also the sprint's own success test in miniature: the channel is now reachable and the corp still will not build it.
+
+- A) Take BL-417 now — replace net^2/capex with an explicit linear capital-efficiency metric. One deliberate golden re-bless wave with dated provenance, which BL-711 is already going to need.
+- B) Normalise the build score WITHIN its group before the global sort, so categories are ranked comparably. Truest to the rule as written; the largest behavioural change, and it would let a lone Refinery candidate rank beside Advanced Fabrication's best.
+- C) Add a scarcity term mirroring the existing `glut` multiplier — a good the world wants and nobody makes scores UP. Systemic rather than a handicap (the standing preference), but it is new design, not a fix.
+- D) Leave it. BL-712 delivered its fix shape; the second seat becomes its own item behind BL-417.
+
+> **Recommendation:** C is the one that reads as an in-world force rather than a term inside the agent, and it composes with A rather than competing — but it is design, so it wants your call before it is built. If the sprint needs movement sooner, D plus a new item is the honest sequencing: BL-712 is not being stretched to cover BL-417.
+
+> **RESOLVED.** BEN'S RULING, 2026-09-01: **option A — take BL-417 now.** `net^2/capex` is replaced by an explicit linear capital-efficiency metric, and the golden movement is accepted as one deliberate re-bless wave with dated provenance rather than avoided. That retires the § Scoring note that kept the quadratic — the bias is no longer 'retained deliberately', it is gone, and AI_OPPONENT.md says so. The measured case for it is this entry: BL-712 put `Power Generation` and `Construction` in front of the scorer for the first time (168 and 430 candidates against zero before) and the scorer refused them anyway, at peak scores of 31.9 and 105.3 against Advanced Fabrication's 1884. BL-711 left the same fingerprint independently — peat reaches the scorer, both its slots placeable, and still gains no site. § Selection must be scale-free already condemned an absolute contest in as many words; this makes the score obey its own rule.
+
+*Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-773 — BL-642's premise has moved under it, and its second half needs one design call before it can be built
+*question · raised 2026-09-01 · from Scoped by the sprint-27 session after BL-711 and NR-772 landed; measured, not assumed.*
+
+BL-642 has two halves. Both need a word from you before building, for different reasons.
+
+HALF (1) - 'make the opening years actually build'. The item says the construction draw NEVER FIRES during the opening years. Measured today, that is no longer the reading. `ERAS.md` settles what the phrase means: the first ~20 years ARE `app::start_new_game`'s 80-tick warm start, not a separate generation pass. And the warm start does now construct. Ancient-band construction-channel demand, blind census -> surveyed (NR-772) -> surveyed with BL-711: **93.25 -> 202.58 -> 210.08**, with timber's construct draw going 54.0 -> 118.3 and clay 0.0 -> 13.3. The AI builds 105 more buildings than the blind census could see.
+
+What REMAINS true of half (1) is narrower and sharper: the SEEDER's ~330 buildings are authored complete (`author_building` writes a default `ticks_remaining` of 0, corporation_generation.cpp) and draw nothing, ever. Fixing that literally would open the campaign with 330 half-built buildings, which is a gameplay change, not a plumbing one - so it wants your reading rather than my guess.
+
+HALF (2) - 'population centres draw construction materials as they grow' - is the half the item itself calls the one that lasts, and it is unambiguous in intent. The hook is clean and already there: economy_system.cpp's BL-616 growth block, where `pcc.population` takes a step and `++pcc.scale` promotes. What is NOT settled is whether that draw GATES growth.
+
+- A) A WANT ONLY. The centre registers demand for its materials, prices them, and grows regardless. Matches every existing injector - none of them gates - and is the safe direction: if you wanted gating, this is a subset rather than a wrong turn.
+- B) GATED, like a build. Growth stretches or pauses when the market cannot supply, exactly as run_construction stretches a build. Truest to MARKETS.md property 3 and it makes construction materials genuinely load-bearing - but a centre that stops growing for want of timber is a real gameplay change and it can deadlock a poor region.
+- C) A want now, gating later behind its own item, once the materials actually reach the shelf.
+
+> **Recommendation:** C. Half (2) as a WANT, with rates measured against the census rather than guessed, and gating filed separately - because BL-641's cliff is the standing warning here: a brand-new universal draw unmet on tick 1 collapsed operating firms 198/328 -> 33/317, and gating growth on an unmet draw is that same cliff pointed at population instead of firms. For half (1), my reading is that BL-711 and NR-772 have already delivered most of what it was reaching for, and what is left (the seeder's instant buildings) is a separate and much bigger question. Not built either way - the item is left open with this measurement attached.
+
+> **RESOLVED.** BEN'S RULING, 2026-09-01: **option B — gated.** BL-642 half (2) makes a population centre's growth draw construction materials AND stretch or pause on them, exactly as `run_construction` stretches a build — one rule for both consumers, not a want for one and a gate for the other. That is MARKETS.md property 3 taken at full strength: a centre that cannot get timber does not grow, so construction materials become genuinely load-bearing rather than merely priced.
+
+The recommendation here was C (want now, gate later) on BL-641-cliff grounds; Ben took the deeper option. THE CLIFF RISK IS REAL AND MUST BE DESIGNED FOR, not discovered: authoring a rate that is unmet on tick 1 in every market is what collapsed operating firms 198/328 -> 33/317. The difference that makes gating survivable here is that growth is EPISODIC (a step every 10 qualifying ticks) rather than a per-tick universal draw, and the existing `max_stretch` machinery already models 'slower, not dead'. Build it with the stretch path, measure against the census before authoring a non-zero rate, and floor the behaviour at stretch rather than at stop.
+
+Half (1) is unchanged and still open: see this entry's own measurement that BL-711 and NR-772 delivered most of what it reached for.
+
+*Files: `src/world/economy_system.cpp`, `src/world/corporation_generation.cpp`, `scripts/economy.lua`, `docs/economy/PRODUCTION.md`, `docs/economy/MARKETS.md`*
 

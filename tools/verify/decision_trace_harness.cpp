@@ -61,7 +61,9 @@
 #include "world/world.hpp"
 
 #include <cstdio>
+#include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <map>
 #include <set>
@@ -81,23 +83,37 @@ void check(bool ok, const char* label)
 // ---------------------------------------------------------------------------
 // Rollout parameters
 // ---------------------------------------------------------------------------
-// 2400 ticks, and the length is MEASURED rather than picked. T2 needs the run to
+// 6000 ticks, and the length is MEASURED rather than picked. T2 needs the run to
 // push more than `corp_decision_ring::capacity` (256) decisions, because a run
 // that never wraps cannot tell this streaming sink apart from the end-of-run
 // ring dump it replaces — the completeness claim would pass vacuously.
 //
-// The decision rate on this fixture was measured before choosing (seed 0, the
-// hand-built registry below):
+// IT WAS 2400, CHOSEN AGAINST A RATE THAT HAS SINCE MOVED, and the way it broke
+// is the lesson. The original table (seed 0, the hand-built registry below) read:
 //
 //     ticks  300   600   900  1200  1800  2400
 //     pushed 119   140   162   183   226   269
 //
-// It is heavily FRONT-LOADED — 119 in the first 300 ticks, then a steady ~7 per
-// 100 — so the ring first wraps somewhere around tick 2200, and 2400 clears it
-// with a little headroom. Note this is far slower than a back-of-envelope
-// "8 corps x 7 commands per evaluation" suggests: corps evaluate on a staggered
-// cadence, most candidates are rejected, and the early land-grab is what
-// produces the initial burst. The wrap is real, just further out than assumed.
+// 269 against a capacity of 256 is FIVE PERCENT of headroom, and the decision
+// rate is a property of the SCORER, not of this file. BL-417 replaced the build
+// score's `net^2 / capex` with `net / capex`, which cut the churn — 2400 ticks
+// now pushes 207 — and T2's anti-vacuity guard went red. Correctly: the run had
+// genuinely stopped wrapping, and the guard is the only reason that was visible
+// rather than a completeness claim quietly passing over nothing.
+//
+// Re-measured 2026-09-01 under the linear score:
+//
+//     ticks  2400  3600  4800  6000
+//     pushed  207   267   327   387
+//
+// A clean ~5 per 100 after the front-load. 6000 is chosen for 51% headroom over
+// the 256 wrap rather than the 5% that made a single scorer change break this —
+// the rate will move again the next time the scorer does, and the guard should
+// survive that without a re-tune. `--ticks` re-measures the table.
+//
+// The rate is far slower than a back-of-envelope "8 corps x 7 commands per
+// evaluation" suggests: corps evaluate on a staggered cadence, most candidates
+// are rejected, and the early land-grab is what produces the initial burst.
 //
 // This is also why the STREAMING design still earns its place at this rate: the
 // overflow is a certainty over a campaign rather than over a test, and the sink
@@ -106,7 +122,7 @@ void check(bool ok, const char* label)
 // deliberately thin (three recipes, seven corps); the shipped game loads the
 // full scripts/recipes.lua + economy.lua and will not have this rate.
 constexpr uint32_t k_seed  = 0;
-constexpr int      k_ticks = 2400;
+int                k_ticks = 6000;   ///< --ticks overrides it, for re-measuring the rate
 
 // ---------------------------------------------------------------------------
 // Hand-built registry — mirrors scripts/economy.lua (see VACUITY note above)
@@ -280,8 +296,14 @@ line_fields parse_line(const std::string& s)
 
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
+    // --ticks: the rate this harness sizes against is a property of the SCORER,
+    // so it moves when the scorer does (BL-417 dropped it 269 -> 207). The flag
+    // is how the table in the header above gets re-measured instead of guessed.
+    for (int i = 1; i < argc; ++i)
+        if (std::strcmp(argv[i], "--ticks") == 0 && i + 1 < argc)
+            k_ticks = std::max(1, std::atoi(argv[++i]));
     std::printf("decision_trace_harness (BL-704) — seed %u, %d ticks\n\n", k_seed, k_ticks);
 
     // -----------------------------------------------------------------------

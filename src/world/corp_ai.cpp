@@ -1021,26 +1021,42 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 c.cmd.tile   = s.tile;
                 c.cmd.type   = building_type::extraction_site;
                 c.cmd.target = s.target;
-                // BL-417 step 1: this used to read `net / payback` with
-                // `payback = capex / net` — which is `net^2 / capex`. It looked
-                // like capital efficiency and behaved like a margin bias:
-                // doubling the margin quadruples the score, doubling the cost
-                // only halves it. Written out here so the code stops lying to
-                // the next reader.
+                // BL-417 STEP 2 (Ben, 2026-09-01, ruling on NR-769): the score is
+                // RETURN ON CAPITAL PER TICK — `net / capex` — and nothing else.
                 //
-                // The bias is RETAINED, deliberately. focus_weight, jitter and
-                // the glut multiplier were all tuned against this curve, and
-                // every blessed golden records a world evolved under it —
-                // replacing it with an explicit linear metric is a re-tune plus
-                // a golden reshuffle, which is BL-417 step 2 and Ben's call.
+                // It was `net^2 / capex`, which reads as capital efficiency and
+                // behaves as a margin bias: doubling the margin quadruples the
+                // score, doubling the cost only halves it. Step 1 (BL-417,
+                // 2026-08-17) made the expression say that out loud and left the
+                // decision open. This is the decision.
                 //
-                // NOT algebraically free in float: `net / (capex / net)` and
-                // `net * net / capex` round differently. Measured against the
-                // MSVC build (ai_skill_harness 5 seeds, spectator_determinism
-                // state_hash) before landing; byte-identical both sides. See
-                // BL-417 `step_1_landed` and requirements group
-                // quadratic-build-score-honest.
-                c.score  = (net * net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
+                // WHY IT HAD TO GO, and it is measured rather than argued:
+                // AI_OPPONENT.md § Selection must be scale-free says a cheap good
+                // can never win an ABSOLUTE contest however badly the world needs
+                // it — and `net^2 / capex` is an absolute contest. BL-712 put
+                // `Power Generation` and `Construction` in front of the scorer for
+                // the first time (168 and 430 candidates, against zero before) and
+                // the scorer refused them anyway, peaking at 31.9 and 105.3 against
+                // Advanced Fabrication's 1884. BL-711 left the same fingerprint
+                // from the other side: peat reaches the scorer, both its slots are
+                // placeable, and it still never gets a site. Two independent fixes
+                // both ran into the same wall one level down, which is what made
+                // this the curve's problem rather than theirs.
+                //
+                // A RATE, WITH A UNIT. `net / capex` is credits per tick per credit
+                // of capital — dimension 1/tick — so a rival now ranks builds by
+                // how fast capital comes back, not by how fat the margin is. The
+                // multipliers are unchanged and still unitless: focus_weight is the
+                // corp's specialist premise, jitter is its personality, glut is the
+                // forecast veto.
+                //
+                // THE GOLDEN RESHUFFLE IS THE POINT, not a side effect: every
+                // blessed golden recorded a world evolved under the quadratic, and
+                // this item was held for as long as it was precisely because
+                // nobody wanted to pay that. Measured distribution over one
+                // industrial warm start, 15,549 build candidates — quadratic
+                // median 13.54 / max 1884.33, linear median 0.106 / max 2.81.
+                c.score  = (net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
                 c.spend  = capex;
                 c.reason = corp_decision_reason::best_build;
                 c.bucket = bucket_for_reason(c.reason);
@@ -1272,9 +1288,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // kept the recipe it was given.
                     c.cmd.recipe = best_recipe;
                     // Same curve as the extraction candidate, deliberately: BL-417
-                    // step 2 is the decision about whether net^2/capex is the right
-                    // shape, and it should be taken ONCE for both, not forked here.
-                    c.score  = (net * net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
+                    // step 2 was taken ONCE for both rather than forked here. See
+                    // that candidate for the full reasoning.
+                    c.score  = (net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
                     c.spend  = capex;
                     c.reason = corp_decision_reason::best_build;
                     c.bucket = bucket_for_reason(c.reason);
@@ -1365,10 +1381,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         c.cmd.tile      = best_tile;
                         c.cmd.road_tier = best_tier;
                         // Modest relative to the site it targets: a road does
-                        // not itself earn revenue, it unlocks a FUTURE
-                        // build's, so it is priced under the BL-417
-                        // net^2/capex curve rather than matching it.
-                        c.score  = 0.3f * best_net * best_net / std::max(1.0f, rex.build_cost) * jitter;
+                        // not itself earn revenue, it unlocks a FUTURE build's,
+                        // so it is priced UNDER the build curve rather than
+                        // matching it. It tracks that curve by construction, so
+                        // BL-417 step 2 moves it in lockstep — leaving the
+                        // quadratic here while the builds went linear would have
+                        // made a road outscore the site it exists to reach by two
+                        // orders of magnitude.
+                        c.score  = 0.3f * best_net / std::max(1.0f, rex.build_cost) * jitter;
                         c.spend  = std::max(1.0f, rex.build_cost);
                         c.reason = corp_decision_reason::best_build;
                         c.bucket = bucket_for_reason(c.reason);
