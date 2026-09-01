@@ -808,6 +808,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
         read_checked(t, "calm_schooling",    np.calm_schooling,    0.0, inf, ctx);
         read_checked(t, "calm_academic",     np.calm_academic,     0.0, inf, ctx);
         read_checked(t, "calm_works",        np.calm_works,        0.0, inf, ctx);
+        read_checked(t, "calm_space",        np.calm_space,        0.0, inf, ctx);
         read_checked(t, "threat_contracted", np.threat_contracted, 0.0, inf, ctx);
         read_checked(t, "threat_reserve",    np.threat_reserve,    0.0, inf, ctx);
         read_checked(t, "threat_milres",     np.threat_milres,     0.0, inf, ctx);
@@ -816,6 +817,25 @@ void recipe_registry::load_from_lua(lua_state& lua)
         read_checked(t, "calm_reserve_bonus", np.calm_reserve_bonus, 0.0, 1.0, ctx);
 
         m_nation_ai = np;
+    }
+
+    // BL-644 space-programme purchase lumps (economy.space_programme). The same
+    // strict read as nation_ai above, and for the same reason: the lump sizes
+    // feed a deterministic per-tick derivation, so a NaN here would be a spend
+    // nobody can replay. Absent table (or key) keeps the zero defaults — an
+    // unauthored world derives no state purchase.
+    sol::optional<sol::table> space_tbl = (*econ)["space_programme"];
+    if (space_tbl)
+    {
+        const std::string      ctx = "economy.space_programme";
+        const double           inf = std::numeric_limits<double>::infinity();
+        space_programme_params sp  = m_space_programme;
+        const sol::table&      t   = *space_tbl;
+
+        read_checked(t, "components_lump", sp.components_lump, 0.0, inf, ctx);
+        read_checked(t, "propellant_lump", sp.propellant_lump, 0.0, inf, ctx);
+
+        m_space_programme = sp;
     }
 
     // BL-430 player-facing recipe-switch cost/cooldown (economy.recipe_switch).

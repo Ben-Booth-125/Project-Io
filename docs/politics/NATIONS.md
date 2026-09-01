@@ -103,7 +103,7 @@ it holds** (Ben, 2026-08-22) — so a poor nation and a rich one of the same cha
 recognisably alike, differing in scale and not in kind, and no authored number is re-tuned when a
 treasury grows. All weights default to zero: a nation with no authored budget spends nothing.
 
-The nine lines, in their authored enum order (append-only once serialised — a weight vector is
+The ten lines, in their authored enum order (append-only once serialised — a weight vector is
 indexed by them):
 
 | Line | What it buys |
@@ -117,8 +117,7 @@ indexed by them):
 | `strategic_reserve` | buying goods to **hold** — through BL-350's procurement seam from a named supplier, never on the market. Distinct from `reserve_fraction`, which withholds credits; this line spends them |
 | `public_works` | works a corporation builds and the nation pays for |
 | `charters` | paying a corporation to exist somewhere it otherwise would not |
-
-| `space_programme` | government satellite launches — `spacecraft_components` and `propellant`, bought through the procurement seam. The first buyer for space goods that is not a militia contract, and the state's own stake in the gate into space (BL-644) |
+| `space_programme` | government satellite launches — `spacecraft_components` and `propellant`, bought through the procurement seam and **consumed** (a terminal sink: the satellite launched). The first buyer for space goods that is not a militia contract, and the state's own stake in the gate into space (BL-644) |
 
 The first five are Ben's (2026-08-22); the next four were proposed alongside them and accepted;
 `space_programme` is Ben's, 2026-08-26.
@@ -130,8 +129,20 @@ deliberate — it arrives in lumps, it follows a weight a rival can lobby to mov
 worth playing *politics* over rather than merely scaling into.
 The spend mechanics are generic over the enum, and a line no consumer claims on is simply skipped.
 Most lines take no subject — a flat weighted claim on the tick's spendable — but `line_takes_subject`
-(`nation_budget.hpp`) names the two that do: `public_exploration` and `contracted_force`, whose
-claims name a target (a survey site; an offer's escrow) rather than only an amount.
+(`nation_budget.hpp`) names the three that do: `public_exploration`, `contracted_force` and
+`space_programme`, whose claims name a target (a survey site; an offer's escrow; the body a launch
+lot stands on) rather than only an amount. The earmark's whole-or-nothing fill (rule 3a) is what
+makes `space_programme`'s spend a lump: a share that cannot cover a whole launch lot buys nothing,
+banks the difference, and fires later.
+
+`space_programme`'s consumer is `derive_space_programme_claims` / `settle_space_purchases`
+(`src/world/space_programme.{hpp,cpp}`): the state picks the supplier pool holding the most stock
+that covers a whole lump, prices it at the supplier market's own resolved price (procurement's
+basis — never an order on the market), pays through the budget pass's ordinary transfer, and the
+goods leave the pool **without landing anywhere** — state demand is terminal. The lump sizes are
+data (`economy.space_programme`, scripts/economy.lua). The player's corp is never a supplier: a
+state purchase drains the supplier's pool unasked, which on a rival is the standing trading grant's
+reach and on the player's corp would be a forced sale.
 
 ### 4. Law authorship
 
@@ -266,7 +277,9 @@ somebody else's machinery:
    overwrites one entry of `w.nation_budgets`; the rest keep last quarter's weights.
 2. **Gather.** This tick's claims come off `economy_report::budget_claims`, emitted earlier in the
    same tick by `corp_ai`'s cash gate — a rival that wanted to survey a body and could not afford
-   it asks its home nation. Nothing here invents a claim. Every field of a claim is validated at
+   it asks its home nation — plus the state's own `space_programme` purchase claims, derived here
+   (§ A budget: the one line whose claimant is the nation itself, its payee the supplier).
+   Every field of a claim is validated at
    gather time, the line index included: a claim carrying an out-of-range line is dropped whole,
    never clamped onto a line nobody asked for, because the moment a claim arrives over `--serve`
    this is an untrusted input boundary.

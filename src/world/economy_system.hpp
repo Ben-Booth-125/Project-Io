@@ -6,6 +6,7 @@
 #include "nation_ai.hpp"     // nation_scorer_report (BL-542; Sprint N3 T4)
 #include "nation_budget.hpp" // budget_claim, national_budget_tick (BL-537; Sprint N3 T4)
 #include "nation_step.hpp"   // earmark_result (Sprint N3 T6)
+#include "space_programme.hpp" // space_purchase (BL-644)
 #include "logistics.hpp"     // lp_pool_map (BL-596/BL-597, shared active+passive LP pool)
 #include "world.hpp"
 
@@ -100,6 +101,9 @@ struct corp_budget
     /// earmarked, not a top-up), so on that line the inflow here and the
     /// outflow of the dispatch net to zero across the tick; the ledger shows
     /// both rather than neither. The one INFLOW that is not market income.
+    /// A COMPLETED space-programme purchase (BL-644) folds here too: the state
+    /// paid for goods it consumed, the credit stays on the balance, and this
+    /// is the line that explains it.
     float subsidies   = 0.0f;
 
     /// The per-tick balance delta: income less every outflow.
@@ -278,12 +282,14 @@ struct economy_report
     // pass's own report in `national_budget`. Each is empty on a tick that
     // produced nothing; none is persisted.
 
-    /// Claims on a nation's budget raised THIS tick, in emission order. Today
-    /// the only producer is `run_corp_strategic_step`'s cash gate: a rival whose
+    /// Claims on a nation's budget raised THIS tick, in emission order. Two
+    /// producers: `run_corp_strategic_step`'s cash gate — a rival whose
     /// top-scoring survey it could not afford asks its home nation to fund that
-    /// survey in full (`public_exploration`, subject = the body) — at most one
-    /// per corp per evaluation. Emission order is the sorted-corp walk, and the
-    /// budget pass re-sorts into its own order anyway.
+    /// survey in full (`public_exploration`, subject = the body), at most one
+    /// per corp per evaluation — and `derive_space_programme_claims` (BL-644,
+    /// inside `run_nation_step`), the state's own purchase claims. Emission
+    /// order is each producer's sorted walk, and the budget pass re-sorts into
+    /// its own order anyway.
     std::vector<budget_claim> budget_claims;
 
     /// What the national budget pass did this tick: per-nation / per-line
@@ -302,6 +308,15 @@ struct economy_report
     /// — it leaves the corp's balance where it found it — so it is reported here
     /// rather than folded into `budgets[corp].subsidies`. BL-555's line.
     std::vector<earmark_result> earmarks;
+
+    /// What the space programme did this tick (BL-644): every state purchase
+    /// intent, from "the share could buy a lump" through funded (the budget
+    /// paid it) to completed (the goods left the supplier's pool and ceased to
+    /// exist — the satellite launched). The State demand channel's census
+    /// surface: a completed row is realised state demand for its `resource`
+    /// and `quantity`; an unfunded row is demand the treasury could not yet
+    /// cover. In emission order (ascending nation, then the fixed good order).
+    std::vector<space_purchase> space_purchases;
 
 };
 

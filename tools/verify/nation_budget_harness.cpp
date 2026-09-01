@@ -42,6 +42,13 @@
 //   R5  DETERMINISM: two runs of one fixture are identical, and so is a run
 //       whose claim vector arrives in the opposite order (the pass sorts into
 //       its own walk order rather than trusting the producer's).
+//   R7  THE SPACE PROGRAMME (BL-644). The tenth line's consumer, end to end:
+//       derive -> spend -> settle. A nation with treasury, weight and a stocked
+//       supplier buys a WHOLE lump at the supplier market's price and the goods
+//       are CONSUMED (a terminal sink); a supplier short of a lump is not a
+//       supplier; a share below the lump banks and later fires whole; claimed
+//       stock is reserved against a second nation; the player's corp is never
+//       a supplier; a funded lump the pool can no longer cover is clawed back.
 //   R6  THE TRANSFER RECORD AND THE EARMARK (Sprint N3 T3, 2026-08-23). Every
 //       credit moved is recorded on `national_budget_tick::transfers` — who
 //       paid whom, on which line, for what — sorted (corp, nation, line), and
@@ -62,6 +69,7 @@
 // The process exits non-zero if any assertion FAILs.
 
 #include "world/nation_budget.hpp"
+#include "world/space_programme.hpp"
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -711,7 +719,7 @@ int main()
               "R4d a non-positive claim never becomes a credit");
 
         // A LINE OUTSIDE THE ENUM. `budget_priority` has a `uint8_t` underlying
-        // type, so 0..255 are all valid VALUES while only 0..8 index the weight
+        // type, so 0..255 are all valid VALUES while only 0..9 index the weight
         // vector: the gather loop must reject the claim, not index on it.
         // Without the check this is a heap-buffer-overflow, confirmed by
         // AddressSanitizer (Sprint N1 defect 1) - and the standing rule that an
@@ -1070,6 +1078,241 @@ int main()
             check(identical,
                   "R6m the record is the same list, field for field, when the "
                   "claims arrive in the opposite order");
+        }
+    }
+
+    // --- R7: the space programme (BL-644) -----------------------------------
+    // The tenth line's consumer: derive -> spend -> settle. Every number below
+    // is dyadic (prices 2.0 / 0.5, lumps 8 / 16, treasury 1024, reserve 1/4,
+    // weights quarters and halves), so the assertions are bit equality.
+    std::printf("\n-- R7  the space programme buys, consumes, and skips whole --\n");
+    {
+        constexpr std::size_t k_comp = static_cast<std::size_t>(resource_type::spacecraft_components);
+        constexpr std::size_t k_prop = static_cast<std::size_t>(resource_type::propellant);
+        constexpr std::size_t k_space = static_cast<std::size_t>(budget_priority::space_programme);
+
+        // A market with authored prices, so the derivation has its procurement
+        // price basis (resolved price; base_price is the fallback, exercised
+        // by leaving one good's `price` at zero in R7g's twin below).
+        auto add_market = [](world& w, entity_id body) {
+            const entity_id m = w.create_entity();
+            market_component mc{};
+            mc.body = body;
+            w.markets[m] = mc;
+            return m;
+        };
+
+        // The reference space fixture. Treasury 1024, reserve 1/4 -> spendable
+        // 768; weights space 1/4, logistics 1/2, schooling 1/4 -> space share
+        // 192. Supplier pool on body_a: 100 components, 100 propellant; prices
+        // 2.0 and 0.5; lumps 8 and 16 -> claim amounts 16.0 and 8.0.
+        struct space_fixture
+        {
+            fixture   f;      // reuses the base fixture's world/corp helpers
+            entity_id body_a  = null_entity;
+            entity_id market  = null_entity;
+            space_programme_params params;
+        };
+        auto make_space_fixture = [&](float components_stock, float propellant_stock) {
+            space_fixture s;
+            s.f.nation_a = add_nation(s.f.w, "Spacefaria", 1024.0f);
+            s.f.corp_1   = add_corp(s.f.w, "Supplier",  0.0f);
+            s.f.corp_2   = add_corp(s.f.w, "Bystander", 0.0f);
+            s.body_a     = add_body(s.f.w, "Padworld");
+            s.market     = add_market(s.f.w, s.body_a);
+            s.f.w.markets.at(s.market).price[k_comp] = 2.0f;
+            s.f.w.markets.at(s.market).price[k_prop] = 0.5f;
+
+            nation_budget nb{};
+            nb.reserve_fraction     = 0.25f;
+            nb.weights[k_space]     = 0.25f;
+            nb.weights[k_logistics] = 0.5f;
+            nb.weights[k_schooling] = 0.25f;
+            s.f.budgets[s.f.nation_a] = nb;
+
+            auto& pool = s.f.w.corp_body_pools[std::make_pair(s.f.corp_1, s.body_a)];
+            pool.quantities[k_comp] = components_stock;
+            pool.quantities[k_prop] = propellant_stock;
+
+            s.params.components_lump = 8.0f;
+            s.params.propellant_lump = 16.0f;
+            return s;
+        };
+        auto run_space = [](space_fixture& s) {
+            std::vector<space_purchase> intents = derive_space_programme_claims(
+                s.f.w, s.f.budgets, s.params, s.f.claims);
+            national_budget_tick t;
+            run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
+            settle_space_purchases(s.f.w, intents, t);
+            return std::make_pair(std::move(intents), std::move(t));
+        };
+
+        // R7a: the whole loop. Both lumps derived, funded, consumed.
+        {
+            space_fixture s = make_space_fixture(100.0f, 100.0f);
+            const double credit_before = world_credit_exact(s.f.w);
+            auto [intents, t] = run_space(s);
+            const auto& pool = s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a));
+
+            check(intents.size() == 2 &&
+                  intents[0].resource == resource_type::spacecraft_components &&
+                  same(intents[0].quantity, 8.0f) && same(intents[0].credits, 16.0f) &&
+                  intents[0].supplier == s.f.corp_1 && intents[0].body == s.body_a &&
+                  intents[1].resource == resource_type::propellant &&
+                  same(intents[1].quantity, 16.0f) && same(intents[1].credits, 8.0f) &&
+                  intents[0].funded && intents[0].completed &&
+                  intents[1].funded && intents[1].completed,
+                  "R7a a nation with treasury, weight and a stocked supplier "
+                  "derives both lumps at the supplier market's price and both "
+                  "are funded and completed");
+            check(same(pool.quantities[k_comp], 92.0f) &&
+                  same(pool.quantities[k_prop], 84.0f),
+                  "R7b ...and the goods are CONSUMED: exactly one lump of each "
+                  "leaves the pool and lands nowhere - the satellite launched");
+            check(same(s.f.w.corporations.at(s.f.corp_1).balance, 24.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1000.0f) &&
+                  same(t.total_transferred, 24.0f) &&
+                  world_credit_exact(s.f.w) == credit_before,
+                  "R7c ...conservation-exact: the supplier is credited the 24.0 "
+                  "the treasury paid (1024 -> 1000), and total world credit is "
+                  "unchanged to the double-summed bit");
+        }
+
+        // R7d: no whole lump in any pool -> no claim at all. The state does
+        // not split a launch across suppliers or buy a partial lot.
+        {
+            space_fixture s = make_space_fixture(7.5f, 0.0f); // both short
+            const auto before = snapshot(s.f.w);
+            auto [intents, t] = run_space(s);
+            check(intents.empty() && s.f.claims.empty() && t.transfers.empty() &&
+                  snapshot(s.f.w) == before &&
+                  same(s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+                           .quantities[k_comp], 7.5f),
+                  "R7d a supplier short of a whole lump is not a supplier: no "
+                  "claim, no transfer, no draw - the tick is bit-identical");
+        }
+
+        // R7e: the LUMP property. A share below the lump's cost buys nothing
+        // and the treasury banks it; grown past the cost, the lump fires
+        // WHOLE. Components only (propellant lump zeroed): share = treasury x
+        // 3/4 x 1/4 = treasury x 3/16; cost 16.0 -> fires at treasury > 85.33.
+        {
+            space_fixture s = make_space_fixture(100.0f, 100.0f);
+            s.params.propellant_lump = 0.0f;
+            s.f.w.nations.at(s.f.nation_a).treasury = 64.0f; // share 12 < 16
+            {
+                auto [intents, t] = run_space(s);
+                check(intents.empty() && t.transfers.empty() &&
+                      same(s.f.w.nations.at(s.f.nation_a).treasury, 64.0f),
+                      "R7e a share below the lump buys NOTHING - no partial "
+                      "purchase, the treasury banks the share (state demand "
+                      "arrives in lumps)");
+            }
+            s.f.claims.clear();
+            s.f.w.nations.at(s.f.nation_a).treasury = 128.0f; // share 24 >= 16
+            {
+                auto [intents, t] = run_space(s);
+                check(intents.size() == 1 && intents[0].funded && intents[0].completed &&
+                      same(intents[0].credits, 16.0f) &&
+                      same(s.f.w.nations.at(s.f.nation_a).treasury, 112.0f) &&
+                      same(s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+                               .quantities[k_comp], 92.0f),
+                      "R7f ...and once the accumulated share covers it the lump "
+                      "fires whole - 16.0 paid, 8 units consumed, nothing "
+                      "in between");
+            }
+        }
+
+        // R7g: two nations, one pool - the reservation. Stock covers ONE
+        // components lump; the lower-id nation claims it and the second
+        // derives nothing, rather than both being paid for the same units.
+        {
+            space_fixture s = make_space_fixture(10.0f, 0.0f);
+            s.params.propellant_lump = 0.0f;
+            const entity_id nation_b = add_nation(s.f.w, "Latecomia", 1024.0f);
+            s.f.budgets[nation_b] = s.f.budgets.at(s.f.nation_a);
+            auto [intents, t] = run_space(s);
+            (void)t;
+            check(intents.size() == 1 && intents[0].nation == s.f.nation_a &&
+                  intents[0].funded && intents[0].completed &&
+                  same(s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+                           .quantities[k_comp], 2.0f) &&
+                  same(s.f.w.nations.at(nation_b).treasury, 1024.0f),
+                  "R7g stock a claim names is RESERVED: with one lump on hand "
+                  "two nations do not both buy it - the ascending-id walk "
+                  "takes it and the second treasury is untouched");
+        }
+
+        // R7h: the player's corp is never a supplier - a state purchase drains
+        // the pool unasked, and on the player's corp that is a forced sale the
+        // standing rules do not sanction. The fatter player pool loses to the
+        // thinner rival pool; with ONLY the player stocked, nothing is bought.
+        {
+            space_fixture s = make_space_fixture(8.0f, 0.0f); // corp_1: exactly one lump
+            s.params.propellant_lump = 0.0f;
+            s.f.w.player_entity = s.f.corp_2;
+            s.f.w.corp_body_pools[std::make_pair(s.f.corp_2, s.body_a)]
+                .quantities[k_comp] = 1000.0f; // fatter, and ineligible
+            auto [intents, t] = run_space(s);
+            (void)t;
+            const bool rival_chosen = intents.size() == 1 && intents[0].supplier == s.f.corp_1;
+
+            space_fixture q = make_space_fixture(0.0f, 0.0f);
+            q.params.propellant_lump = 0.0f;
+            q.f.w.player_entity = q.f.corp_1;
+            q.f.w.corp_body_pools.at(std::make_pair(q.f.corp_1, q.body_a))
+                .quantities[k_comp] = 1000.0f; // only the player holds stock
+            auto [q_intents, qt] = run_space(q);
+            check(rival_chosen && q_intents.empty() && qt.transfers.empty() &&
+                  same(q.f.w.corp_body_pools.at(std::make_pair(q.f.corp_1, q.body_a))
+                           .quantities[k_comp], 1000.0f),
+                  "R7h the player's corp is never a supplier: a fatter player "
+                  "pool loses to a rival's, and a world where only the player "
+                  "holds stock sees no state purchase at all");
+        }
+
+        // R7i: the claw-back defence. Drain the pool BETWEEN derive and spend
+        // (an out-of-band draw the reservation cannot see) - the transfer is
+        // reversed in the same two floats, so the nation did not pay for a
+        // launch that never happened and world credit still balances.
+        {
+            space_fixture s = make_space_fixture(100.0f, 0.0f);
+            s.params.propellant_lump = 0.0f;
+            const double credit_before = world_credit_exact(s.f.w);
+            std::vector<space_purchase> intents = derive_space_programme_claims(
+                s.f.w, s.f.budgets, s.params, s.f.claims);
+            s.f.w.corp_body_pools.at(std::make_pair(s.f.corp_1, s.body_a))
+                .quantities[k_comp] = 0.0f; // the out-of-band draw
+            national_budget_tick t;
+            run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
+            settle_space_purchases(s.f.w, intents, t);
+            check(intents.size() == 1 && intents[0].funded && !intents[0].completed &&
+                  same(s.f.w.corporations.at(s.f.corp_1).balance, 0.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f) &&
+                  world_credit_exact(s.f.w) == credit_before,
+                  "R7i a funded lump the pool can no longer cover is CLAWED "
+                  "BACK whole - balance and treasury both restored, funded but "
+                  "not completed, credit conserved");
+        }
+
+        // R7j: determinism - two identical space fixtures, identical floats
+        // and identical intent lists, over the full derive/spend/settle loop.
+        {
+            space_fixture a = make_space_fixture(100.0f, 100.0f);
+            space_fixture b = make_space_fixture(100.0f, 100.0f);
+            auto [ia, ta] = run_space(a);
+            auto [ib, tb] = run_space(b);
+            (void)ta; (void)tb;
+            bool identical = snapshot(a.f.w) == snapshot(b.f.w) && ia.size() == ib.size();
+            for (std::size_t i = 0; identical && i < ia.size(); ++i)
+                identical = ia[i].nation == ib[i].nation && ia[i].supplier == ib[i].supplier &&
+                            ia[i].body == ib[i].body && ia[i].resource == ib[i].resource &&
+                            same(ia[i].quantity, ib[i].quantity) &&
+                            same(ia[i].credits, ib[i].credits) &&
+                            ia[i].funded == ib[i].funded && ia[i].completed == ib[i].completed;
+            check(identical,
+                  "R7j two runs of one space fixture are bit-identical, intents "
+                  "included");
         }
     }
 

@@ -3,6 +3,7 @@
 #include "components.hpp"
 #include "nation_ai.hpp"   // BL-542: nation_ai_params — the nation scorer's tunables (light: entity.hpp + nation_budget.hpp only)
 #include "sentiment.hpp"   // BL-545/BL-546: sentiment_params — the authored factor table
+#include "space_programme.hpp" // BL-644: space_programme_params — the tenth budget line's purchase lumps
 #include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
 
 #include <array>
@@ -1082,6 +1083,12 @@ public:
     /// the home so that wiring the scorer (T6) reads one authored object.
     const nation_ai_params& nation_ai() const { return m_nation_ai; }
 
+    /// BL-644 space-programme purchase lumps (economy.space_programme in Lua).
+    /// Both default ZERO — an unauthored registry derives no state purchase —
+    /// and every authored value is range-checked at load and rejected by key
+    /// rather than clamped, the nation_ai discipline.
+    const space_programme_params& space_programme() const { return m_space_programme; }
+
     /// BL-628 whole-firm acquisition tunables (economy.acquisition in Lua).
     /// One number, `multiple`, range-checked at load and rejected rather than
     /// clamped. The trailing WINDOW is not here: it is
@@ -1290,6 +1297,7 @@ public:
     /// `contract_*` Trust weights and would otherwise overwrite these.
     void set_sentiment(const sentiment_params& p) { m_sentiment = p; }
     void set_nation_ai(const nation_ai_params& p) { m_nation_ai = p; }
+    void set_space_programme(const space_programme_params& p) { m_space_programme = p; }
     void set_recipe_switch(const recipe_switch_params& p) { m_recipe_switch = p; }
     void set_acquisition(const acquisition_params& p) { m_acquisition = p; }
     void set_economics(building_type type, const building_economics& e)
@@ -1544,6 +1552,11 @@ private:
     /// so a hand-built harness registry scores exactly as the scorer's own
     /// defaults do -- the registry adds a home, not a second set of numbers.
     nation_ai_params m_nation_ai = {};
+
+    /// BL-644 space-programme purchase lumps (economy.space_programme).
+    /// Default-constructed — both lumps zero, so a hand-built harness registry
+    /// derives no state purchase unless it sets them.
+    space_programme_params m_space_programme = {};
 
     /// BL-430 recipe-switch cost/cooldown. Defaults to free/instant so a
     /// hand-built harness registry that never sets this behaves as it always did.

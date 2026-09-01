@@ -242,7 +242,17 @@ inline constexpr uint32_t world_save_magic =
 /// the same answer. Refused whole on the strict-equality contract; no migration,
 /// and deliberately none. Claimed through
 /// `tools/session/next_save_version.js --claim`.
-inline constexpr uint32_t world_save_version = 22;
+/// Bumped to 23 by BL-644 (space_programme budget line): `budget_priority` gains
+/// `space_programme` at the enum's tail, so `priority_count` moves 9 -> 10 and
+/// the nation-budget record (`w_nation_budget` / `r_nation_budget`) — whose
+/// weight vector is fixed-width, no count — widens by one float. A v22 stream's
+/// budget records are each short by one float and every byte after the first
+/// misreads; refused whole on the strict-equality contract, exactly as every
+/// prior bump. No migration, and deliberately none: a pre-bump stream cannot
+/// say what a nation's space weight was, and the scorer re-authors weights on
+/// its own cadence anyway. Claimed through
+/// `tools/session/next_save_version.js --claim`.
+inline constexpr uint32_t world_save_version = 23;
 
 /// Write @p w as a complete world snapshot.
 ///

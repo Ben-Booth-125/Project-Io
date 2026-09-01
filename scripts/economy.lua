@@ -831,6 +831,24 @@ economy = {
         offbody_freight_fraction      = 0.05,
     },
 
+    -- BL-644: the space_programme budget line's purchase lumps — government
+    -- satellite launches, the tenth budget line and space goods' first real
+    -- buyer. A nation with weight on the line buys these quantities from a
+    -- named supplier's pool at the supplier market's own price (procurement's
+    -- basis — never an order on the open market), and the goods are CONSUMED:
+    -- the satellite launched. Each lump is whole-or-nothing (NATIONS.md: state
+    -- demand arrives in LUMPS), so these sizes set how much treasury a nation
+    -- banks before a purchase fires — bigger lumps, rarer and louder state
+    -- demand. First-cut figures sized against the recipe scale (both goods are
+    -- produced ~1.0/tick per plant) and spacecraft_components' ~1.44 base
+    -- price; retune by playtest. The loader rejects a non-finite or negative
+    -- value by key; an absent key (or table) keeps the zero default, which
+    -- derives no purchase at all.
+    space_programme = {
+        components_lump = 25.0, -- spacecraft_components per purchase
+        propellant_lump = 50.0, -- propellant per purchase
+    },
+
     -- BL-545/BL-546: the relational substrate's DECAY (sentiment.hpp). Each
     -- rate is the fraction of the remaining distance to neutral a dimension
     -- sheds per tick; the substrate was inert until this table existed.
