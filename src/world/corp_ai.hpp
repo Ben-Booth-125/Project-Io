@@ -210,23 +210,50 @@ struct corp_ai_params
         // price: `science` has no market slot at all, by design — it is
         // stockpiled, market-invisible and never decays.
         25.0f,
-        // MILITARY — 0.02 credits per point of `unit_strength`. The anchor is
-        // the replacement cost of a fielded regiment: `hire_unit` raises
-        // `hire_batch_manpower` (50) heads for `hire_base_cost` +
-        // `hire_cost_per_power` x the row's power_mod, and `unit_strength`
-        // scores a fully-supplied unit at count x quality x 100. A Levy Spear
-        // costs 40 credits and stands at 5,000 (0.008 cr/point); a Rifle
-        // Regiment costs 230 and stands at 6,900 (0.033). 0.02 sits between
-        // them.
+        // MILITARY — 1.35 credits per point of `unit_strength`. The anchor is
+        // the SUSTAINED cost of a fielded regiment over its service life, not
+        // its one-off raise price: `unit_upkeep` pays `credits_per_head` (0.15)
+        // x `hire_batch_manpower` (50) = 7.5 credits of wages per tick, and
+        // `value_anchor.cpp` asserts the goods half of the same vector at
+        // ~2 x wage — so keeping one regiment in the field costs ~22.5 credits
+        // a tick, all in. Over a 300-tick campaign that is ~6,750 credits
+        // against the 5,000 `unit_strength` a fully-supplied Levy Spear stands
+        // at, and 6750/5000 = 1.35.
         //
-        // A DELIBERATE UNDERSTATEMENT worth flagging rather than hiding: this
-        // prices an army at what it cost to raise, which is not what it is
-        // worth to the corp holding it. On the defaults, three regiments add
-        // roughly 300 credits to a standing whose economic term runs to five
-        // figures — so military barely registers today. That is a tuning
-        // question for whoever scores coalitions against this, and the reason
-        // the number lives here rather than in the code.
-        0.02f,
+        // THE HORIZON IS THE REAL TUNABLE HERE, and it was chosen by
+        // measurement rather than taste. A hundred ticks gives 0.45, and 0.45
+        // was measured to reorder the field on NO seed — because corps come out
+        // bimodal at 3 regiments or 0, so adjacent pairs usually carry the same
+        // military term and no weight on a uniform component can separate them.
+        // At 1.35 the composite starts disagreeing with cash: a corp holding
+        // three regiments and slightly negative cash outranks one holding no
+        // army and slightly positive cash, which is § Standing's own stated
+        // intent — *"a corp hoarding cash while its rivals arm is not ahead"*.
+        //
+        // IT WAS 0.02, the RAISE cost (a Levy Spear at 40 credits for 5,000
+        // strength, a Rifle Regiment at 230 for 6,900, and 0.02 between them),
+        // and the block that carried it flagged its own defect rather than
+        // hiding it: *"this prices an army at what it cost to raise, which is
+        // not what it is worth to the corp holding it... military barely
+        // registers today. That is a tuning question for whoever scores
+        // coalitions against this."* BL-699 (rival coalitions) is that scorer,
+        // so the question came due.
+        //
+        // WHAT MADE IT DUE, measured rather than argued (BL-697's margin read,
+        // `ai_skill_harness`, five seeds): research read 0.0 on all 35
+        // corp-rows and military was quantised to {0, 5000, 10000, 15000},
+        // weighting to at most 300 credits against economic values spanning
+        // +/-250,000. The composite REORDERED THE FIELD AGAINST NET WORTH IN
+        // NO SEED — so a coalition scoring against it would have been scoring
+        // against cash with extra steps, which is the failure AI_OPPONENT.md
+        // § Standing exists to prevent and calls "hardest to notice because it
+        // still looks like diplomacy". Ben's ruling, 2026-09-01: raise it until
+        // a fielded army can visibly change who leads.
+        //
+        // STILL A COST ANCHOR, not a combat valuation, because the world
+        // prices no such thing yet. What changed is WHICH cost: what holding
+        // an army commits a corp to, rather than what buying it took.
+        1.35f,
     };
 
     /// Projected supply/demand ratio at which a build's score starts to taper

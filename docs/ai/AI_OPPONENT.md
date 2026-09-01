@@ -125,8 +125,24 @@ composite is a data change** (the `trade_hold_threshold` discipline).
 conversion, and a conversion nobody can state is a magic number. Each weight is therefore *credits
 per unit of its component*, anchored on something the world already prices: research on what a
 science point costs to produce (a research institute's per-tick running cost), military on what a
-fielded regiment costs to raise (`hire_unit`'s own price against `unit_strength`'s scale). Net
-worth is already credits, so its weight is 1 by definition.
+fielded regiment costs **to keep** — its `unit_upkeep` draw, wages plus the goods half
+`value_anchor` holds at ~2 × wage, over a campaign-length service life. Net worth is already
+credits, so its weight is 1 by definition.
+
+**Sustained cost, not raise cost, and the difference is the whole component.** Pricing an army at
+`hire_unit`'s one-off ticket says what buying it took, not what holding it commits the corp to —
+and it makes military a rounding error by construction, because raising a regiment costs tens of
+credits where net worth runs to five and six figures. A component that cannot move an ordering is
+not in the index except on paper.
+
+**A component must be able to disagree with cash, or the composite is cash.** This is the
+property the composite exists for, so it is the one to check when a weight is tuned: does an armed
+corp ever outrank a cash-richer unarmed one? Where it does not, the index restates net worth under
+another name, and a coalition scoring against it forms against the richest corp while appearing to
+weigh three things — the failure this section opens by naming, and the one that still looks like
+diplomacy from the outside. **Weight and spread are separate causes of it**: a component that reads
+the *same* on every corp separates nobody however heavily weighted, so a uniform component is a
+finding about the world rather than about the weight.
 
 **Read at the tick boundary, never inside the scorer's walk.** Standing is read after the budget
 pass has written balances and clearing has resolved the prices that value held stock, and *before*
