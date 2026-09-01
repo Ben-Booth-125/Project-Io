@@ -14,6 +14,14 @@
 //   - action counts by corp_verb (the thrash detector: a verb count blowing
 //     through its band means the scorer is oscillating instead of holding).
 //
+// It also reports, UNBANDED, the BL-697 margin: the spread in COMPOSITE STANDING
+// (corp_standing_index) between the leading corp and the field. The four banded
+// metrics are all absolute or aggregate, so none of them can distinguish a run
+// where the whole field grew from a run where one corp ran away — and
+// AI_OPPONENT.md § The goal makes only the first a pass. Unbanded on purpose:
+// the item asks for the observed spread with units first and the choice of form
+// second, and no band read off today's pre-demand field would survive it.
+//
 // It also lands the tick-boundary STATE HASH (world::state_hash, BL-204): an
 // FNV-1a checksum over the econ-tick snapshot. Today this harness uses it purely
 // as a two-runs-same-seed determinism primitive (R0 below) — the direct sibling
@@ -55,6 +63,7 @@
 #include <cstdio>
 #include <map>
 #include <string>
+#include <utility> // std::pair — the (corp, standing) row of the BL-697 field snapshot
 #include <vector>
 
 namespace {
@@ -233,6 +242,35 @@ struct rollout_metrics
     float predicted_processor_net = 0.0f;
     int   processors_sampled      = 0;
     int   extraction_sampled      = 0;
+
+    /// BL-697 — the SPREAD in composite standing across the AI field, sampled on
+    /// the same cadence as the net-worth curve above.
+    ///
+    /// WHY THIS EXISTS AND THE FOUR METRICS ABOVE DO NOT COVER IT. Every one of
+    /// them is absolute or aggregate, so none can tell a run where the whole
+    /// field grew together from a run where ONE corp ran away — both sit inside
+    /// a generous summed-net-worth band, and AI_OPPONENT.md § The goal now makes
+    /// only the first of those a pass. The intended shape of a campaign is a
+    /// CLOSE RACE, and a close race is a statement about the gap, not the total.
+    ///
+    /// STANDING, NOT BALANCE (AI_OPPONENT.md § Standing): a corp that has just
+    /// spent its treasury on a smelter is not behind, and a corp hoarding cash
+    /// while its rivals arm is not ahead. `corp_standing_index` is the composite.
+    ///
+    /// PRINTED, NOT BANDED, and that is deliberate — see the printing site.
+    std::vector<float> standing_leader; ///< Highest composite standing, per sample (credits).
+    std::vector<float> standing_second; ///< Second-highest, per sample (credits). Leader's value if the field is 1.
+    std::vector<float> standing_median; ///< Field median, per sample (credits).
+    /// The WHOLE field at the LAST sample, leader first — the "ahead on what?"
+    /// the composite deliberately keeps its components alongside its total for,
+    /// and the reading a coalition would have to be able to state (BL-699).
+    ///
+    /// The whole field rather than just the leader, because the question a
+    /// coalition asks is comparative: a component that reads the same on every
+    /// corp separates nobody, however large it is, and one that reads zero on
+    /// every corp is not in the index at all except on paper. Neither is visible
+    /// from the leader's row alone.
+    std::vector<std::pair<entity_id, standing_index>> field_final;
 };
 
 /// Processing facilities owned by non-player corporations right now.
@@ -250,6 +288,42 @@ int rival_processor_count(const world& w)
         }
     }
     return n;
+}
+
+/// BL-697 — every AI corp's composite standing at the tick boundary, sorted
+/// LEADER FIRST.
+///
+/// TWO DETERMINISM PROPERTIES, and both are load-bearing rather than tidy.
+///
+/// (1) SNAPSHOT, NEVER PER-CORP-IN-A-WALK. `corp_standing_index`'s own contract
+/// says so: `run_corp_strategic_step` walks corps in sorted id order and applies
+/// each one's commands as it goes, so a standing read from inside that walk
+/// answers differently for the first corp than for the last. This is called from
+/// the sample block, which sits AFTER `run_tick` has finished `clear_markets` +
+/// `apply_budget` and BEFORE the next tick's strategic step — the econ-tick
+/// boundary the contract names, with every corp read at the same instant.
+///
+/// (2) SORTED WITH AN ID TIEBREAK. `world::corporations` is an unordered_map, so
+/// an equal-total pair would otherwise order by hash layout. Two corps sitting on
+/// identical standing is not a hypothetical in a young world where several corps
+/// still hold exactly their generated assets.
+std::vector<std::pair<entity_id, standing_index>>
+standing_field(const world& w, const recipe_registry& reg)
+{
+    std::vector<std::pair<entity_id, standing_index>> field;
+    for (const auto& [id, cc] : w.corporations)
+    {
+        if (cc.is_player) continue;
+        field.emplace_back(id, corp_standing_index(w, reg, id));
+    }
+    std::sort(field.begin(), field.end(),
+              [](const auto& a, const auto& b)
+              {
+                  if (a.second.total != b.second.total)
+                      return a.second.total > b.second.total; // leader first
+                  return a.first < b.first;                   // stable tiebreak
+              });
+    return field;
 }
 
 constexpr int sample_every = 10;
@@ -310,6 +384,23 @@ rollout_metrics run_rollout(uint32_t seed, int ticks)
             m.net_worth_curve.push_back(net_worth);
             if (any_below_zero) ++m.solvency_ticks_below_zero;
             m.state_hashes.push_back(w.state_hash(t));
+
+            // BL-697: the margin read, at the same boundary and on the same
+            // cadence as the curve above.
+            const auto field = standing_field(w, reg);
+            if (!field.empty())
+            {
+                const std::size_t n = field.size();
+                m.standing_leader.push_back(field.front().second.total);
+                m.standing_second.push_back(field[n > 1 ? 1 : 0].second.total);
+                // LOWER median on an even field, not the mean of the two middles:
+                // a mean is a fourth number that no corporation holds, and the
+                // whole point of this metric is to compare the leader against a
+                // corp that actually exists. Exact either way, so the choice is
+                // legibility rather than float care.
+                m.standing_median.push_back(field[(n - 1) / 2].second.total);
+                m.field_final = field;
+            }
         }
     }
 
@@ -831,6 +922,18 @@ int main()
         check(a.action_counts == b.action_counts,
               "BL-204 R0: action-verb tallies are identical across two same-seed runs");
 
+        // BL-697. The spread is unbanded, so these two are the only things
+        // holding it honest — and they are the pair BL-714's finding says an
+        // instrument needs: it must SEE its subject, and it must see the same
+        // thing twice. A metric that silently sampled an empty field would
+        // otherwise print 0.0 and read as a perfectly close race.
+        check(a.standing_leader.size() == a.net_worth_curve.size() && !a.standing_leader.empty(),
+              "BL-697 R0: the standing field is sampled at every net-worth sample point (non-empty)");
+        check(a.standing_leader == b.standing_leader &&
+              a.standing_second == b.standing_second &&
+              a.standing_median == b.standing_median,
+              "BL-697 R0: the standing-spread curves are byte-identical across two same-seed runs");
+
         // A different seed changes the hash (the hash isn't a constant / no-op).
         const rollout_metrics c = run_rollout(/*seed=*/1, /*ticks=*/60);
         check(!a.state_hashes.empty() && !c.state_hashes.empty() &&
@@ -861,6 +964,48 @@ int main()
         std::printf("    net_worth: final=%.1f min=%.1f  solvency_below_zero=%d/%zu  survival=%.2f\n",
                     final_nw, min_nw, m.solvency_ticks_below_zero, m.net_worth_curve.size(),
                     m.survival_fraction);
+        // ---- BL-697: the margin read ------------------------------------
+        //
+        // PRINTED, NOT BANDED, and the item asks for exactly this order (Rule
+        // 0b): report the observed spread with units, THEN choose the form.
+        // Both candidate forms — leader-over-median and leader-over-second —
+        // are defensible on paper and neither survives an insolvent field,
+        // where a ratio's denominator goes through zero and the "spread"
+        // reports a sign change instead of a gap. So the CREDIT GAP is printed
+        // unconditionally and the ratio only where its denominator is positive.
+        //
+        // Banding this now would freeze in a number read off a field that is
+        // still missing its demand channels (sprint 27's remaining work), which
+        // is how the stale bands above were earned in the first place.
+        if (!m.standing_leader.empty())
+        {
+            const float lead   = m.standing_leader.back();
+            const float second = m.standing_second.back();
+            const float median = m.standing_median.back();
+            std::printf("    margin (BL-697): leader=%.1f second=%.1f median=%.1f  "
+                        "gap_to_second=%.1f gap_to_median=%.1f",
+                        lead, second, median, lead - second, lead - median);
+            if (second > 0.0f) std::printf("  lead/second=%.2fx", lead / second);
+            if (median > 0.0f) std::printf("  lead/median=%.2fx", lead / median);
+            if (second <= 0.0f || median <= 0.0f)
+                std::printf("  [ratio undefined: the field is not solvent]");
+            std::printf("\n");
+            // The field, leader first, in RAW component units — economic in
+            // credits, research in science points, military in unit_strength's
+            // x100 fixed point — beside the weighted total in credits. Raw so a
+            // reader can recompute the total against `standing_weights` and see
+            // which component actually moved it, which is the audit the
+            // components-alongside-total shape exists to permit.
+            std::printf("    field (leader first, raw components):\n");
+            for (const auto& [id, si] : m.field_final)
+                std::printf("      corp %-6u economic=%12.1f research=%8.1f military=%9.1f  total=%12.1f\n",
+                            id,
+                            si.component[static_cast<std::size_t>(standing_component::economic)],
+                            si.component[static_cast<std::size_t>(standing_component::research)],
+                            si.component[static_cast<std::size_t>(standing_component::military)],
+                            si.total);
+        }
+
         int build_total = 0, dial_total = 0;
         for (const auto& [verb, count] : m.action_counts)
         {
