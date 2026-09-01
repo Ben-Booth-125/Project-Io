@@ -444,6 +444,104 @@ in the research corpus, has no observable to fire on. And **the danger model nee
 surfaces on the blackboard** — a player (or model) skilled at avoiding danger needs them before
 that skill can exist.
 
+## The first check against a real run (2026-08-31, BL-703)
+
+This document has been the meta **authored ahead of the game** since 2026-08-06. On 2026-08-31 it
+was checked against what the scorer actually does, for the first time — 2,474 traced decisions
+across five seeds of the shipped generated world (`tools/verify/ai_skill_harness.cpp` driving
+`make_hard_coded_world`, with BL-704's decision trace on).
+
+**The method matters as much as the result.** A trace, not a watch: every decision the scorer took,
+with its score, its runner-up and its reason, streamed to disk. BL-704's harness proves the trace
+does not change what it observes — `state_hash` is identical traced and untraced — so this is
+evidence rather than an impression.
+
+### What the rival actually does
+
+| Verb | Count | Share |
+|---|---|---|
+| workforce change | 856 | 35% |
+| build | 722 | 29% |
+| resume | 684 | 28% |
+| idle | 82 | 3% |
+| hire unit | 57 | 2% |
+| sell order | 33 | 1% |
+| recipe change | 26 | 1% |
+| survey | 14 | 0.6% |
+| **dispatch convoy** | **0** | — |
+| **place road** | **0** | — |
+
+### The three Era 0 cards, scored against it
+
+**ST-01 `deep_seam` — played, in a crippled form.** Its middle move dominates: 592 extraction sites
+built. But its *opening* move barely happens — **14 surveys across five whole seeds** — and its
+closing move is thin at 33 sell orders. More damningly, the "richest ground" it owns is almost
+always the same ground. Of 722 builds, the targets are **550 `iron_ore`, 100 `steel`, 61
+`petroleum`, 9 `food_rations`, 2 `refined_fuel`** — **five resources out of forty-seven.** A card
+whose thesis is *own the richest ground before rivals know it is rich* is being played by an actor
+that never looks and always digs the same hole.
+
+**ST-02 `mill_gate` — attempted constantly, almost never landed.** 111 processing facilities get
+built, so the card's capex half runs. Its *defining* move does not: **26 recipe changes, 1% of all
+decisions.** BL-696 measured why on the same day — 160 of 249 rejections scoring above 50 were
+**seam-refused `set_recipe` candidates**. The scorer proposes the widest-margin recipe over and over
+and the seam declines it, because the margin-chase is deliberately enumerated without the switch
+cost the seam applies. So `mill_gate` is not unattempted; it is *blocked*, every evaluation, and the
+attempts were invisible until the trace existed.
+
+**ST-03 `long_haul` — never played. Not once.** Zero `dispatch_convoy` and zero `place_road` in
+2,474 decisions. Both verbs exist on the seam and both were granted to rivals by name (Ben,
+2026-08-24 — `place_road` and directed `dispatch_convoy`). The card's whole thesis — *the map is a
+price surface; carry goods across its gradients* — has never been tested against the game, because
+no rival has ever taken a step of it.
+
+### The finding under all three
+
+**The deck is not wrong. The scorer cannot reach most of it.**
+
+Two measured defects, both filed the same day, account for nearly all of the above:
+
+- **BL-711** (extraction candidate list is scale-blind) — the world-level site pre-filter ranks by
+  absolute deposit magnitude with a cut-off of 7,847, against clay's best of 205.7 and peat's 75.0.
+  Whole resources are never candidates, which is why five resources absorb every build.
+- **BL-712** (recipe choice is scale-blind) — a site takes its highest-margin recipe, so a cheap
+  universal good never wins. It is why the AI cannot build a power plant or a construction sector.
+
+A deck of ten strategies against a scorer that can reach three resources and one recipe per site is
+a deck being judged on a board it cannot see all of.
+
+### The oscillation, which no card predicted
+
+**684 `resume` decisions against 82 `idle` — eight to one.** The scorer is not doing the idling; if
+it were, the two would be near-balanced. The idling is the BL-079 local-agency reflex tier, which is
+not a scored decision and therefore leaves no trace row at all.
+
+So roughly a quarter of every decision the strategic layer makes is **undoing what another layer
+did**, in a loop neither can see. That is not a strategy, and no card in this deck describes it —
+which is the strongest argument for keeping this section: the deck was authored to cover what a
+rival *chooses*, and a quarter of its behaviour is not a choice.
+
+### One thing that worked exactly as designed
+
+**61 extraction sites targeting `petroleum`** — a resource that measured demand **0.000** that
+morning and sat on the census's *extractable, no market sink* list. BL-708 gave power a market, the
+seeder placed generators, the generators bid for fuel, and rivals mined it. The chain
+`fuel → generator → power → building upkeep` induced its own supply, through the price signal,
+without a single line telling anyone to mine petroleum.
+
+That is `MARKETS.md` property 3 working — a channel that bids calls forth its own supply — and it is
+the clearest evidence in the trace that the demand design is right even where the scorer is blunt.
+
+### What this section is for
+
+It is the first entry in what should become a standing practice: **the deck is authored ahead, and
+then checked against a run.** A card that no rival has ever played is a hypothesis, not a strategy,
+and until 2026-08-31 this document could not tell the difference. Re-run it after BL-711 and BL-712
+land — the honest expectation is that the picture changes substantially, and that `long_haul` gets
+its first real test.
+
+---
+
 ## Open questions
 
 *(Ben's 2026-08-06 answers settled trap knowledge, runtime shape, roster status, first_footing

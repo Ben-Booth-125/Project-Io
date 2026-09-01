@@ -97,7 +97,11 @@ let cmd, args;
 if (isWindows) {
   // cl is only on PATH inside a Developer Prompt; vcvars64 puts it there.
   const vcvars = 'C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat';
-  if (!fs.existsSync(vcvars) && !spawnSync('where', ['cl'], { shell: true }).status === 0)
+  // PRECEDENCE FIX 2026-08-31: this read `!spawnSync(...).status === 0`, which parses
+  // as `(!status) === 0` - a boolean compared to a number, so the whole condition was
+  // ALWAYS FALSE and the guard never fired. A missing cl then failed later and
+  // confusingly instead of here with the message that names the fix.
+  if (!fs.existsSync(vcvars) && spawnSync('where', ['cl'], { shell: true }).status !== 0)
     die('cl not found and vcvars64.bat is not at its default path — open a Developer Prompt, or build through CMake');
   const cl = ['cl', '/nologo', '/std:c++20', '/EHsc', '/MP',
     debug ? '/Od /Zi' : '/O2', '/I', 'src', '/I', 'tools\\verify',

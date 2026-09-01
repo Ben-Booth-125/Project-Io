@@ -4295,14 +4295,14 @@
   {
    "brief": "rival-trace-export",
    "title": "BL-704 - a run exports a per-rival decision trace",
-   "status": "deferred",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-08-31",
    "promoted_from": "backlog.json BL-704 - Sprint 26, watch the AI play",
    "batch": "carried out of sprint 26 - blocked on demand (NR-758)",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: run and inspect the artifact"
      ],
@@ -4311,7 +4311,7 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: ai_skill_harness R0 with tracing toggled"
      ],
