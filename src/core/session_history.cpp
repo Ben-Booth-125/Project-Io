@@ -50,19 +50,6 @@ void post_battle_dispatches(const world& w, const economy_report& report,
     }
 }
 
-void post_contract_events(const world& w, const economy_report& report,
-                          ui::chat_state& chat, int day_tick)
-{
-    if (report.contract_events.empty())
-        return;
-
-    // Channel 0 is the standing Public channel — always present (chat_panel.hpp),
-    // so no guard is needed the way post_battle_dispatches needs one for Field.
-    for (const contract_dispatch& d : report.contract_events)
-        ui::chat_post(chat, day_tick, d.client, ui::chat_state::k_public_channel,
-                      contract_dispatch_line(w, d));
-}
-
 void post_nation_agency_comms(const world& w, const economy_report& report,
                               ui::chat_state& chat, int day_tick)
 {
@@ -281,7 +268,7 @@ void record_histories(const world& w, const recipe_registry& reg,
                       ui_state& st, history_stores& h)
 {
     // Record player balance, income, and expenditure for the header sparkline and
-    // economy panel graphs (BL-063).  All three are capped at plot_history_cap.
+    // the Budget ledger's profit chart (BL-063).  All three are capped at plot_history_cap.
     {
         const auto cit = w.corporations.find(w.player_entity);
         ui::push_capped(h.balance,

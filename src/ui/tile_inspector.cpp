@@ -6,8 +6,7 @@
 #include "generation_charts.hpp" // the chain-stage charts, shared with the wizard (BL-211)
 #include "presentation.hpp"
 #include "world/components.hpp"
-#include "world/history_sim.hpp"  // the Era -1 time-lapse the Ages view replays (BL-277)
-#include "world/sim_terrain_build.hpp" // real ground for the sim to fight over (BL-314)
+#include "world/era_timelapse.hpp" // the recorded Era -1 replay the Ages view folds over
 
 #include <imgui.h>
 
@@ -25,12 +24,38 @@ namespace ui {
 static_assert(fmt::campaign_epoch_year == static_cast<int>(::campaign_epoch_year),
               "History dates and the tick calendar must share a campaign epoch");
 
-void draw_tile_inspector(const world& w, ui_state& s,
-                         const generation_report& report, bool* p_open)
+/// A calendar year as the Ages transport should read it.
+///
+/// The era runs 400 BCE -> 0 CE, so a bare "%d CE" prints "-400 CE" — a year
+/// that does not exist, on the one control whose whole job is saying WHEN.
+/// Kept local because it is the only surface in the project that scrubs a
+/// signed calendar year; the moment a second one appears this belongs in fmt.
+static std::string ages_year_label(int year)
 {
+    char buf[32];
+    if (year < 0) std::snprintf(buf, sizeof buf, "%d BCE", -year);
+    else          std::snprintf(buf, sizeof buf, "%d CE",   year);
+    return buf;
+}
+
+void draw_tile_inspector(const world& w, ui_state& s,
+                         const generation_report& report,
+                         const world_params& gen_params, bool* p_open)
+{
+    // WHICH VIEW THIS PANEL LAST DREW, for the Tectonics lens arm below. File-static
+    // rather than ui_state because it is a frame-to-frame edge detector, not state a
+    // save or a verify script has any business reading.
+    static int last_drawn_view = -1;
+
     // Honour the open flag; when closed the window draws nothing at all.
     if (p_open && !*p_open)
+    {
+        // Closed: forget the view we were on, so REOPENING onto Tectonics counts as
+        // entering it and arms the lens again. Without this, a player who closed the
+        // ledger on Tectonics, changed lens, and came back would get no arm.
+        last_drawn_view = -1;
         return;
+    }
 
     // Collect body IDs into a stable order for the combo box.
     std::vector<entity_id> body_ids;
@@ -88,13 +113,23 @@ void draw_tile_inspector(const world& w, ui_state& s,
     // predates rather than work it judged: two thousand years of scrubbable borders is
     // squarely the ledger's own premise, and retiring it would be destroying a feature
     // nobody asked to remove.
-    enum view_id { view_story = 0, view_chain, view_ages };
+    // BL-660 adds Tectonics as a fourth view — the destination a plate press
+    // under the Continent lens routes to. Appended rather than inserted: the index
+    // is parked in ui_state and read by verify scripts, so renumbering the
+    // existing three would silently re-point every saved and scripted view (the
+    // trap the Ages clamp below exists because of).
+    // The indices live in tile_inspector.hpp so the canvas can route to one by
+    // name; these aliases keep the branches below reading as they always have.
+    constexpr int view_story     = history_view_story;
+    constexpr int view_chain     = history_view_chain;
+    constexpr int view_ages      = history_view_ages;
+    constexpr int view_tectonics = history_view_tectonics;
     int& view = s.history_view; // in ui_state so a verify script can park a view
 
     // Clamp: retiring Tiles renumbered Ages from 3 to 2, so a stale saved index or an
     // un-updated script can still hand us an index no branch below draws. Land on Story
     // rather than on nothing.
-    if (view < view_story || view > view_ages)
+    if (view < view_story || view > view_tectonics)
         view = view_story;
 
     nav_button("Story", view_story, view, p_open);
@@ -102,6 +137,30 @@ void draw_tile_inspector(const world& w, ui_state& s,
     nav_button("Chain", view_chain, view, p_open);
     ImGui::SameLine();
     nav_button("Ages", view_ages, view, p_open);
+    ImGui::SameLine();
+    nav_button("Tectonics", view_tectonics, view, p_open);
+
+    // ARM THE CONTINENT LENS ON ENTERING TECTONICS (Ben's ruling on NR-742,
+    // 2026-08-30). LENSES.md's routing table already sends a plate press to this
+    // view; this closes the loop the other way.
+    //
+    // THIS IS A SECOND ARMING RULE, and it is deliberately not the one slots 6 and 7
+    // use. Those arm a FIXED lens when the ledger opens, which works because their
+    // ledgers answer one question on every tab. History answers four, and only this
+    // one has a map twin - a fixed arm would hand the Continent lens to a player who
+    // opened on Story to read a deep-time biography.
+    //
+    // ON ENTERING, not while on. The edge is what is armed, so a player who reaches
+    // Tectonics and then deliberately picks another lens keeps it; re-arming every
+    // frame would make the lens strip unusable on this view. Entering covers both
+    // routes in: pressing the tab, and opening the ledger onto a parked Tectonics
+    // (the reset above is what makes the second one an edge).
+    //
+    // Closing the ledger does NOT disarm, which is the one thing this shares with
+    // slots 6 and 7 - see LENSES.md, and NR-722 for what is still unowned.
+    if (view == view_tectonics && last_drawn_view != view_tectonics)
+        s.overlay = overlay_mode::continent;
+    last_drawn_view = view;
 
     // The view-level disclosure control (BL-214, revised BL-265). Story is a single
     // block that already shows its content in the column, so there is nothing for the
@@ -121,6 +180,124 @@ void draw_tile_inspector(const world& w, ui_state& s,
     if (view == view_story)
         disclosure_controls(s, detail_surface::history_story, 0, /*in_place=*/false);
     ImGui::Separator();
+
+    // ── Tectonics (BL-660) ────────────────────────────────────────────────
+    // "click to the relevant history section, describing collisions and the
+    // opposite" (Ben, 2026-08-28). A plate press under the Continent lens opens
+    // this ledger on this view, with `ui_state::selected_plate` naming which.
+    //
+    // A DECLARED PLACEHOLDER: it lists the plate set and both boundary masks, and
+    // it does not yet tell the per-boundary STORY — which pair met, when, and what
+    // the meeting raised or opened. That narrative exists, in the body's Story
+    // view, and moving it here is the follow-on.
+    //
+    // "and the opposite" — the RIFTS — is real now. The drift pass classified both
+    // kinds all along and recorded only collisions; BL-660's data half made the
+    // divergent mask an output, so this reads it rather than inventing it.
+    //
+    // THE TWO MASKS ARE NOT EXCLUSIVE, which is the obvious reading and is wrong.
+    // The boundary walk visits each tile against two neighbours, so a tile at a
+    // junction between a closing pair and an opening pair is genuinely on both —
+    // `height_bias` has always accumulated the uplift AND the subsidence there.
+    // Measured at 1 tile in 15120 on the fixture seed. The table shows the two
+    // counts separately rather than a single "boundary" number for that reason.
+    if (view == view_tectonics)
+    {
+        const continent_state* cs = nullptr;
+        for (const auto& be : report.bodies)
+            if (be.id == selected_body) { cs = &be.continents; break; }
+
+        if (cs == nullptr || cs->plate_id.empty())
+        {
+            ImGui::TextDisabled("No tectonic record for this body.");
+            ImGui::TextDisabled("A stagnant-lid world has one plate and no boundaries.");
+            ui::foldout_end();
+            return;
+        }
+
+        // Per-plate tile and collision counts, computed here rather than cached:
+        // this view is open only when someone is looking at it, and the raster is
+        // one pass over the body.
+        const std::size_t n = cs->plate_id.size();
+        const bool have_conv = cs->convergent.size() == n;
+        const bool have_div = cs->divergent.size() == n;
+        std::vector<int> tiles(cs->plates.size(), 0);
+        std::vector<int> collide(cs->plates.size(), 0);
+        std::vector<int> rift(cs->plates.size(), 0);
+        int collide_total = 0;
+        int rift_total    = 0;
+        for (std::size_t k = 0; k < n; ++k)
+        {
+            const int pid = cs->plate_id[k];
+            if (pid < 0 || static_cast<std::size_t>(pid) >= tiles.size())
+                continue;
+            ++tiles[static_cast<std::size_t>(pid)];
+            if (have_conv && cs->convergent[k] != 0u)
+            {
+                ++collide[static_cast<std::size_t>(pid)];
+                ++collide_total;
+            }
+            if (have_div && cs->divergent[k] != 0u)
+            {
+                ++rift[static_cast<std::size_t>(pid)];
+                ++rift_total;
+            }
+        }
+
+        ImGui::SeparatorText("Plates");
+        ImGui::TextDisabled("%zu plates - %d tiles on a collision, %d on a rift",
+                            cs->plates.size(), collide_total, rift_total);
+        ImGui::Spacing();
+
+        if (ImGui::BeginTable("##tectonics", 5,
+                              ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+        {
+            ImGui::TableSetupColumn("Plate");
+            ImGui::TableSetupColumn("Kind");
+            ImGui::TableSetupColumn("Tiles");
+            ImGui::TableSetupColumn("Collision");
+            ImGui::TableSetupColumn("Rift");
+            ImGui::TableHeadersRow();
+            for (std::size_t p = 0; p < cs->plates.size(); ++p)
+            {
+                ImGui::TableNextRow();
+                // The pressed plate is highlighted, which is what makes this a
+                // DESTINATION rather than a table that happens to contain it.
+                if (s.selected_plate == static_cast<int>(p))
+                    ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0,
+                                           IM_COL32(255, 255, 255, 40));
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Text("%zu", p);
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextDisabled(cs->plates[p].oceanic ? "Oceanic" : "Continental");
+                ImGui::TableSetColumnIndex(2);
+                ImGui::Text("%d", tiles[p]);
+                ImGui::TableSetColumnIndex(3);
+                if (collide[p] > 0)
+                    ImGui::Text("%d", collide[p]);
+                else
+                    ImGui::TextDisabled("-");
+                ImGui::TableSetColumnIndex(4);
+                if (rift[p] > 0)
+                    ImGui::Text("%d", rift[p]);
+                else
+                    ImGui::TextDisabled("-");
+            }
+            ImGui::EndTable();
+        }
+
+        ImGui::Spacing();
+        ImGui::SeparatorText("Placeholder surface");
+        ImGui::TextWrapped(
+            "First cut. What is missing is the per-boundary NARRATIVE - which "
+            "pair met, in which epoch, and what the meeting raised or opened. Those lines "
+            "exist and are readable in this body's Story view; moving them here, keyed to "
+            "the plate you pressed, is the follow-on. A tile can appear in both columns: "
+            "a junction between a closing pair and an opening pair is on both boundaries.");
+
+        ui::foldout_end();
+        return;
+    }
 
     const body_component& sel_body = w.bodies.at(selected_body);
 
@@ -212,30 +389,27 @@ void draw_tile_inspector(const world& w, ui_state& s,
 
     // --- Ages: the Era -1 political time-lapse (BL-277) -------------------
     //
-    // Two thousand years of region ownership, scrubbable. The sim is run HERE,
-    // lazily, over a COPY of the body's settlement state — it does not run in
-    // the generation path and nothing it does reaches the world. That is the
-    // whole point of building this view first: the time-lapse is visible without
-    // the determinism/golden churn that wiring the sim into generation carries
-    // (BL-271 open question 2, still unanswered).
+    // A REPLAY, NOT A RE-RUN (NR-733, Ben's ruling 2026-08-30). Generation
+    // records the era's ownership history into the body's own report entry
+    // (`prehistory_timelapse`), and this view folds over it. There is no sim
+    // here, no cache to invalidate and no settlement to copy.
     //
-    // The cache is keyed on body name and survives across frames, because a
-    // 2000-year run costs ~2.1 s and re-running it per frame would stall the UI.
-    // (~600 ms before the settle-occupancy fix; ~749 real regions instead of
-    // ~191 is roughly four times the work, and the growth is the improvement.)
+    // WHAT THAT REPLACED, because the shape it fixes is worth keeping in view.
+    // This block used to re-run `run_history_sim` itself, lazily, over a copy of
+    // the body's settlement. That made it a SEVENTH CALLER of an invocation
+    // `world/era_minus_one.hpp` exists to keep singular, and it diverged from
+    // generation on all six of BL-462's axes at once. Three (span, clock, seed)
+    // were closable at the call site and were closed. The other three were not:
+    // the report's `settlement` is the state AFTER generation's sim mutated it,
+    // so a re-run started the era from its own ending and reported 0 battles and
+    // 0 conquests no matter how carefully it was parameterised — a settlement
+    // time-lapse wearing a political one's label.
+    //
+    // Replaying deletes the second caller, which closes all six divergences at
+    // once, and turns minutes on the drawing thread into a fold over a change
+    // list. The cost of that is a save-format field; `save_game_version` is 3.
     if (view == view_ages)
     {
-        // Keyed on the body name AND the generation's own identity (the Ages
-        // stale-cache review fix, landed 2026-08-05).
-        // Name alone is not enough: body names are hard-coded literals, so
-        // regenerating the world left the key matching and the view rendered the
-        // PREVIOUS world's political history over the previous world's
-        // regions — confidently, with no cue that anything was wrong.
-        static entity_id          cached_body = null_entity; // identity, not display name (BL-257)
-        static uint64_t           cached_gen = 0;
-        static settlement_state   cached_ss;
-        static history_sim_state  cached_sim;
-
         if (!entry)
         {
             ImGui::TextDisabled("No generation record for this body.");
@@ -243,66 +417,68 @@ void draw_tile_inspector(const world& w, ui_state& s,
             return;
         }
 
-        // A cheap generation fingerprint: what this world actually generated.
-        // Two different seeds essentially never agree on all four.
-        const uint64_t gen_id =
-              (static_cast<uint64_t>(report.bodies.size()) << 48)
-            ^ (static_cast<uint64_t>(entry->settlement.regions.size()) << 32)
-            ^ (static_cast<uint64_t>(entry->settlement.median_industrial_year & 0xFFFF) << 16)
-            ^  static_cast<uint64_t>(report.attempts);
+        const era_timelapse&    lapse   = entry->prehistory_timelapse;
+        const settlement_state& settled = entry->settlement;
 
-        if (cached_body != selected_body || cached_gen != gen_id)
+        if (lapse.empty())
         {
-            cached_ss = entry->settlement; // The copy the sim is allowed to move.
-            history_sim_params p;
-            p.start_year = 0;
-            p.stop_year  = static_cast<int64_t>(fmt::campaign_epoch_year);
-            // Real terrain, so the replayed history is fought over this body's
-            // actual mountains and marshes rather than an imagined plain.
-            const sim_terrain_arrays terr =
-                build_sim_terrain(w, selected_body, sel_body.grid_width, sel_body.grid_height);
-            cached_sim = run_history_sim(cached_ss, nullptr, terr.view(),
-                                         sel_body.grid_width, sel_body.grid_height,
-                                         p, 7u);
-            cached_body   = selected_body;
-            cached_gen    = gen_id;
-            s.ages_year   = 0;
-            s.ages_playing = false;
-        }
-
-        if (cached_sim.owner_changes.empty())
-        {
+            // EMPTY IS THE COMMON CASE, not an error: generation runs the era for
+            // the cradle alone, and for no body at all in a 1960-era world.
             ImGui::TextDisabled("%s was never settled - no political history to replay.",
                                 sel_body.name.c_str());
             ui::foldout_end();
             return;
         }
 
-        const int last_year = static_cast<int>(cached_sim.start_year + cached_sim.years);
+        // Park the scrubber at the run's own first year the first time this
+        // body's record is shown. Keyed on the body so switching bodies
+        // re-parks, while scrubbing within one body is left alone.
+        static entity_id parked_for = null_entity;
+        if (parked_for != selected_body)
+        {
+            parked_for   = selected_body;
+            s.ages_year  = lapse.start_year;
+            s.ages_playing = false;
+        }
+
+        const int first_year = lapse.start_year;
+        const int last_year  = lapse.start_year + lapse.years;
 
         // --- Transport -----------------------------------------------------
         if (ImGui::Button(s.ages_playing ? "Pause" : "Play"))
             s.ages_playing = !s.ages_playing;
         ImGui::SameLine();
-        if (ImGui::Button("Restart")) { s.ages_year = 0; s.ages_playing = true; }
+        if (ImGui::Button("Restart")) { s.ages_year = first_year; s.ages_playing = true; }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        ImGui::SliderInt("##ages_year", &s.ages_year, 0, last_year, "%d CE");
+        // The "format" is a finished string, not a printf template, because a
+        // signed calendar year has no single printf form ("%d CE" prints
+        // "-400 CE"). ImGui supports this deliberately: ImParseFormatTrimDecorations
+        // returns "" for a format with no specifier and TempInputScalar then falls
+        // back to "%d", so ctrl+click editing still works on the raw year.
+        ImGui::SliderInt("##ages_year", &s.ages_year, first_year, last_year,
+                         ages_year_label(s.ages_year).c_str());
 
         if (s.ages_playing)
         {
-            // ~120 years a second: a 2000-year run reads in about a quarter of a
-            // minute, which is long enough to watch a frontier move and short
-            // enough to sit through.
+            // The playback RATE follows the span rather than being a constant.
+            // 120 years a second was tuned when this replayed 2000 years; on
+            // generation's real 400-year era it empties the transport in three
+            // seconds. Deriving it keeps the stated intent — long enough to
+            // watch a frontier move, short enough to sit through — if the era
+            // length (world_params::prehistory_years) is ever retuned.
+            const float span     = static_cast<float>(last_year - first_year);
+            const float run_secs = 16.0f;
+            const float rate     = span > 0.0f ? span / run_secs : 1.0f;
             static float carry = 0.0f;
-            carry += ImGui::GetIO().DeltaTime * 120.0f;
+            carry += ImGui::GetIO().DeltaTime * rate;
             const int whole = static_cast<int>(carry);
             if (whole > 0) { carry -= static_cast<float>(whole); s.ages_year += whole; }
             if (s.ages_year >= last_year) { s.ages_year = last_year; s.ages_playing = false; }
         }
 
         // --- The map -------------------------------------------------------
-        const std::vector<uint16_t> slice = owner_slice_at(cached_sim, s.ages_year);
+        const std::vector<uint16_t> slice = owner_slice_at(lapse, s.ages_year);
 
         int live = 0;
         for (uint16_t o : slice) if (o != owner_none) ++live;
@@ -314,8 +490,9 @@ void draw_tile_inspector(const world& w, ui_state& s,
             if (o != owner_none && std::find(seen.begin(), seen.end(), o) == seen.end())
                 seen.push_back(o);
 
-        ImGui::TextDisabled("%d CE  |  %d regions  |  %d powers",
-                            s.ages_year, live, static_cast<int>(seen.size()));
+        ImGui::TextDisabled("%s  |  %d regions  |  %d powers",
+                            ages_year_label(s.ages_year).c_str(),
+                            live, static_cast<int>(seen.size()));
 
         const float avail = ImGui::GetContentRegionAvail().x;
         const int   gw    = sel_body.grid_width  > 0 ? sel_body.grid_width  : 1;
@@ -332,10 +509,10 @@ void draw_tile_inspector(const world& w, ui_state& s,
         // colour. Region granularity is what makes this cheap to draw as well
         // as cheap to store — there is no tile loop here at all.
         const float r = scale * 1.6f < 2.5f ? 2.5f : scale * 1.6f;
-        for (std::size_t i = 0; i < slice.size() && i < cached_ss.regions.size(); ++i)
+        for (std::size_t i = 0; i < slice.size() && i < settled.regions.size(); ++i)
         {
             if (slice[i] == owner_none) continue;
-            const region& p = cached_ss.regions[i];
+            const region& p = settled.regions[i];
             const ImVec2 at(origin.x + (static_cast<float>(p.col) + 0.5f) * scale,
                             origin.y + (static_cast<float>(p.row) + 0.5f) * scale);
             dl->AddCircleFilled(at, r,
@@ -349,13 +526,16 @@ void draw_tile_inspector(const world& w, ui_state& s,
         // and clipped mid-word ("371 foun"), the same failure the Story view's
         // consequence text already fixed this way.
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+        // The counters are GENERATION'S OWN, read off the report rather than off
+        // a local re-run — which is the whole difference this change made: they
+        // now describe the era the world actually has.
         ImGui::TextWrapped("Full run: %lld battles, %lld conquests, %lld foundings",
-                           static_cast<long long>(cached_sim.battles),
-                           static_cast<long long>(cached_sim.conquests),
-                           static_cast<long long>(cached_sim.foundings));
-        ImGui::TextWrapped("Time-lapse: %lld changes, %lld bytes",
-                           static_cast<long long>(cached_sim.owner_changes.size()),
-                           static_cast<long long>(owner_ring_bytes(cached_sim)));
+                           static_cast<long long>(report.prehistory_battles),
+                           static_cast<long long>(report.prehistory_conquests),
+                           static_cast<long long>(report.prehistory_foundings));
+        ImGui::TextWrapped("Time-lapse: %lld changes over %d regions",
+                           static_cast<long long>(lapse.changes.size()),
+                           lapse.region_stride);
         ImGui::PopStyleColor();
 
         ui::foldout_end();

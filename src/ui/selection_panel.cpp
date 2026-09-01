@@ -4,6 +4,7 @@
 #include "world/battle_system.hpp"      // active_battle, quote_withdrawal, read_battle_phase (BL-469)
 
 #include "charts.hpp"
+#include "construction_panel.hpp" // building_group_name - the aim of the open-in-ledger button
 
 #include "detail_level.hpp"   // disclosure_controls — the drill-through idiom (BL-214/BL-265)
 #include "foldout_column.hpp" // shell fold-out column host (shared with the ledgers)
@@ -11,6 +12,7 @@
 #include "hex_render.hpp"      // draw_tile_neighbourhood — the card's zoomed tile view
 #include "icons.hpp"
 #include "market_ledger.hpp"   // market_city_name — the dispatch form's destination identity (BL-607)
+#include "nav_pane.hpp"        // close_all_panels — the card's doors onto the fold-out column
 #include "presentation.hpp"
 #include "selection.hpp"
 #include "text_fit.hpp"
@@ -31,7 +33,7 @@
 #include "world/tech_gate.hpp"       // BL-593: recipe_unlocked — the door filters what the gate would refuse
 #include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324); also the Soldier card's Roster page name lookup
 
-#include <map> // BL-434: group -> representative-candidate lookup in draw_construction_ledger
+#include <map> // BL-434: group -> representative-candidate lookup in draw_construction_ledger_body
 
 #include <imgui.h>
 
@@ -177,9 +179,14 @@ std::string input_basket_names(const recipe* ri)
 // reflow): input_cost / maintenance / wages stacked in one column, each segment
 // its own shade and its own hover tooltip. This is the finest real split
 // building_profit.hpp supports (no revenue sub-breakdown exists to chart
-// separately, logged docs/development/NEEDS_REVIEW.json). Two clustered
-// columns sharing a baseline, drawn by hand (not ui::charts::draw_bars) since
-// draw_bars has no notion of a stacked/segmented column.
+// separately, logged docs/development/NEEDS_REVIEW.json).
+//
+// THE DRAWING ITSELF NOW LIVES IN ui::charts (BL-691). The Corporation ledger's
+// Balance card is the same chart over `corp_budget` instead of `building_profit`,
+// so this became an ADAPTER — it decides what the BUILDING's two columns are and
+// hands them over — rather than a second implementation of the same arithmetic.
+// The corp grain's wider expense set and its variable segment count are the
+// shared drawer's business, not a fork of it.
 //
 // @p input_recipe: the building's active recipe (null for extraction sites) —
 // folded in from the former standalone Inputs chart (2026-08-15): the "Input
@@ -188,73 +195,33 @@ std::string input_basket_names(const recipe* ri)
 void draw_revenue_expense_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const building_profit& p,
                                const recipe* input_recipe)
 {
-    const float expenses = p.input_cost + p.maintenance + p.wages;
-    const float ceiling  = nice_ceil(std::max(p.revenue, expenses) > 0.0f
-                                     ? std::max(p.revenue, expenses) : 1.0f);
-    const float box_w = mx.x - mn.x;
-    const float box_h = mx.y - mn.y;
-    const float gap   = box_w / 2.0f;
-    const float bw    = std::min(44.0f, gap * 0.6f);
-
-    dl->AddRect(mn, mx, IM_COL32(70, 70, 78, 255));
-
-    // Revenue — one plain bar.
+    // Held for the whole call: `stack_segment::detail` is a BORROWED pointer and
+    // the drawer reads it while building the hover.
+    std::string input_detail;
+    if (input_recipe != nullptr)
     {
-        const float  cx = mn.x + gap * 0.5f;
-        const float  bh = std::max(2.0f, box_h * (p.revenue / ceiling));
-        const ImVec2 b0{cx - bw * 0.5f, mx.y - bh};
-        const ImVec2 b1{cx + bw * 0.5f, mx.y};
-        dl->AddRectFilled(b0, b1, palette::positive, 1.5f);
-        ImGui::SetCursorScreenPos(b0);
-        ImGui::InvisibleButton("##rev_bar", {bw, bh});
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Revenue: %.1f", static_cast<double>(p.revenue));
+        // The input-cost segment ALSO names the recipe's input basket (names
+        // only, no quantities — Ben's call): the former standalone Inputs
+        // chart's content, folded into this hover.
+        const std::string names = input_basket_names(input_recipe);
+        if (!names.empty())
+            input_detail = "Inputs: " + names;
     }
 
-    // Expenses — stacked segments, bottom-up: input cost, maintenance, wages.
-    {
-        const float cx = mn.x + gap * 1.5f;
-        struct seg { float v; ImU32 col; const char* label; };
-        const seg segs[3] = {
-            { p.input_cost,  IM_COL32(205, 120, 95, 255),  "Input cost"  },
-            { p.maintenance, IM_COL32(200, 170, 95, 255),  "Maintenance" },
-            { p.wages,       IM_COL32(160, 115, 200, 255), "Wages"       },
-        };
-        float y = mx.y;
-        for (int i = 0; i < 3; ++i)
-        {
-            if (segs[i].v <= 0.0f)
-                continue;
-            const float  bh = std::max(1.0f, box_h * (segs[i].v / ceiling));
-            const ImVec2 b0{cx - bw * 0.5f, y - bh};
-            const ImVec2 b1{cx + bw * 0.5f, y};
-            dl->AddRectFilled(b0, b1, segs[i].col);
-            char btn_id[24];
-            std::snprintf(btn_id, sizeof btn_id, "##exp_seg_%d", i);
-            ImGui::SetCursorScreenPos(b0);
-            ImGui::InvisibleButton(btn_id, {bw, bh});
-            if (ImGui::IsItemHovered())
-            {
-                // The input-cost segment ALSO names the recipe's input basket
-                // (names only, no quantities — Ben's call) — the former
-                // standalone Inputs chart's content, folded into this hover.
-                if (i == 0 && input_recipe != nullptr)
-                {
-                    const std::string names = input_basket_names(input_recipe);
-                    if (!names.empty())
-                    {
-                        ImGui::SetTooltip("%s: %.1f\nInputs: %s", segs[i].label,
-                                          static_cast<double>(segs[i].v), names.c_str());
-                    }
-                    else
-                        ImGui::SetTooltip("%s: %.1f", segs[i].label, static_cast<double>(segs[i].v));
-                }
-                else
-                    ImGui::SetTooltip("%s: %.1f", segs[i].label, static_cast<double>(segs[i].v));
-            }
-            y -= bh;
-        }
-    }
+    const charts::stack_segment revenue[1] = {
+        {p.revenue, palette::positive, "Revenue", nullptr},
+    };
+    const charts::stack_segment expenses[3] = {
+        {p.input_cost,  IM_COL32(205, 120, 95, 255),  "Input cost",
+         input_detail.empty() ? nullptr : input_detail.c_str()},
+        {p.maintenance, IM_COL32(200, 170, 95, 255),  "Maintenance", nullptr},
+        {p.wages,       IM_COL32(160, 115, 200, 255), "Wages",       nullptr},
+    };
+    // 44 px columns and NO baseline captions, which is what keeps this card's
+    // geometry exactly where it was: the chart sits in the left third of a
+    // building page under its own "Revenue / Expenses" title, and its column
+    // width was fixed by the mockup it was drawn from.
+    charts::draw_stacked_columns(dl, mn, mx, revenue, 1, expenses, 3, /*bar_cap=*/44.0f);
 }
 
 // --- Analog construction status (BL-095 task E) ------------------------------
@@ -1043,6 +1010,16 @@ bool tile_icon_button(const char* id, ImVec2 sz, bool enabled, const char* tip,
                       void (*glyph)(ImDrawList*, ImVec2, float, ImU32), ImU32 glyph_col_override = 0);
 void glyph_swap(ImDrawList* dl, ImVec2 c, float r, ImU32 col);
 
+} // namespace
+
+// Drawn at namespace scope rather than file-local since Ben's 2026-08-29 ruling that
+// the Selection card's centre presents and never operates: this page's whole content
+// is a control, so its CALLER is now the Construction ledger's Buildings view
+// (construction_panel.cpp) and it needs external linkage. The body is untouched — the
+// point of relocating rather than reimplementing is that there stays exactly one
+// recipe switcher writing try_switch_recipe. The file-local helpers it calls
+// (tile_icon_button, glyph_swap) stay in the anonymous namespace above; unqualified
+// lookup still finds them from here.
 void draw_production_method_section(world& w, const recipe_registry& reg, entity_id id)
 {
     const auto bit = w.buildings.find(id);
@@ -1206,27 +1183,16 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
         {
             const bool  on_cooldown = b.recipe_switch_cooldown > 0;
 
-            // BL-428: the same chain-depth gate the Build door and
-            // try_switch_recipe apply, shown rather than discovered by a refused
-            // click. Ancient-band methods only, matching the first-cut scope.
+            // BL-692: the BL-428 chain-depth lock this row used to show ("Your
+            // industry cannot make what this needs yet", drawn greyed) is gone
+            // along with the gate behind it. try_switch_recipe no longer refuses
+            // on depth, so a greyed row here would be the UI inventing a refusal
+            // the seam would not make. Cooldown is the only thing that disables
+            // the Switch control now.
             const std::uint16_t row_id = reg.recipe_id(ri.name);
-            bool depth_locked = false;
-            if (ri.era == era_band::ancient)
-            {
-                const auto cit = w.corporations.find(w.player_entity);
-                const int  need = reg.recipe_required_depth(row_id);
-                const int  have = (cit != w.corporations.end())
-                                      ? corp_reached_depth(cit->second, reg) : 0;
-                depth_locked = (need < 0 || need > have);
-            }
 
             char tip[96];
-            if (depth_locked)
-                // Names the act, not the number — a reached-depth integer means
-                // nothing to a player who has never seen one.
-                std::snprintf(tip, sizeof tip,
-                              "Your industry cannot make what this needs yet");
-            else if (on_cooldown)
+            if (on_cooldown)
                 std::snprintf(tip, sizeof tip, "Locked %d more tick%s", b.recipe_switch_cooldown,
                              b.recipe_switch_cooldown == 1 ? "" : "s");
             else if (reg.recipe_switch().switch_cost > 0.0f)
@@ -1240,7 +1206,7 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
             // accent, not the same neutral grey every other glyph button uses.
             constexpr ImU32 switch_glyph_col = IM_COL32(90, 150, 210, 255);
             ImGui::SetCursorPos({row_w - glyph_w, 0.0f});
-            if (tile_icon_button("##switch", {glyph_w, row_h}, !on_cooldown && !depth_locked,
+            if (tile_icon_button("##switch", {glyph_w, row_h}, !on_cooldown,
                                  tip, glyph_swap, switch_glyph_col))
                 try_switch_recipe(w, reg, w.player_entity, b, row_id);
         }
@@ -1249,6 +1215,8 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
         ImGui::PopID();
     }
 }
+
+namespace {
 
 // BL-408 spectator god view: the full internals readout for a selected
 // corporation — the readout BL-068 exists to withhold, drawn ONLY when the
@@ -1501,6 +1469,21 @@ void glyph_dismantle(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
     dl->AddLine({c.x + r * 0.55f, c.y - r * 0.55f}, {c.x - r * 0.55f, c.y + r * 0.55f}, col, 2.4f);
 }
 
+// A panel outline with one row picked out — the building card's "open this
+// building in the Buildings ledger" glyph. Its own silhouette, deliberately: it
+// sits inches from Mothball (a boxed line-through), Dismantle (an X) and Auto (an
+// arc), and two lit controls sharing a shape is the confusion BL-174 named. Nothing
+// else in this vocabulary draws STACKED HORIZONTAL rows, and the longer middle rule
+// is the "this one" the button aims at.
+void glyph_roster(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    dl->AddRect({c.x - r * 0.68f, c.y - r * 0.62f}, {c.x + r * 0.68f, c.y + r * 0.62f},
+                col, 2.0f, 0, 1.6f);
+    dl->AddLine({c.x - r * 0.40f, c.y - r * 0.30f}, {c.x + r * 0.18f, c.y - r * 0.30f}, col, 1.8f);
+    dl->AddLine({c.x - r * 0.40f, c.y},             {c.x + r * 0.42f, c.y},             col, 2.6f);
+    dl->AddLine({c.x - r * 0.40f, c.y + r * 0.30f}, {c.x + r * 0.18f, c.y + r * 0.30f}, col, 1.8f);
+}
+
 // A shafted arrow pointing right — the unit card's March glyph (BL-575).
 // Distinct from glyph_goto's bare chevron (which moves the CAMERA to the
 // entity, not the entity itself) by carrying a full shaft behind the head —
@@ -1593,9 +1576,12 @@ std::vector<building_page> building_pages(const world& w, const recipe_registry&
     // Rivals: intel only (BL-068) — a single read-only Status page, nothing
     // that would reveal recipe choice or internals. Under spectator god view
     // (BL-408) the Status page opens its internals AND the read-only
-    // Profitability page joins it; Method and Workforce stay off the rival
-    // card even then, deliberately — they carry CONTROLS (recipe switch,
-    // workforce slider), and god view grants sight, never hands.
+    // Profitability page joins it.
+    //
+    // THE SHORT-CIRCUIT IS THE GUARANTEE, not a convenience: this returns a rival's
+    // whole page list without ever testing a player page's own guard, so a page added
+    // above cannot leak onto a rival card by forgetting one. It survived the
+    // 2026-08-29 lever move untouched and must keep surviving.
     if (!is_player_owned(w, id))
     {
         pages.push_back({"Status", building_page_kind::status});
@@ -1619,18 +1605,20 @@ std::vector<building_page> building_pages(const world& w, const recipe_registry&
             pages.push_back({"Profitability", building_page_kind::profitability});
     }
 
-    if (b.type == building_type::processing_facility)
-        pages.push_back({"Method", building_page_kind::method});
-
     // Chain and Depth are gone (2026-08-15 playtest rework — see
-    // building_page_kind's doc comment). Lifecycle is gone as a PAGE too: its
-    // Mothball/Dismantle controls moved onto the action grid
-    // (draw_building_selection_body), so Workforce is the only page left
-    // beyond Profitability/Method/Status.
-    pages.push_back({"Workforce", building_page_kind::workforce});
-
-    // Nothing applied (e.g. a freshly-placed infra building with no owner
-    // resolved yet) — an honest fallback rather than an empty accordion.
+    // building_page_kind's doc comment); Lifecycle is gone as a page too, its
+    // Mothball/Dismantle controls having moved onto the action grid
+    // (draw_building_selection_body).
+    //
+    // Method and Workforce are gone as of 2026-08-29 (Ben: the centre presents; it
+    // does not operate). Both were pages whose whole content was a control, and they
+    // are drawn by the Construction ledger's Buildings view now — the same two
+    // function bodies, one caller. What remains on the card REPORTS.
+    //
+    // Status is therefore the fallback for a player building with no profit data
+    // yet — a still-building site, or one the report has not touched. Before the
+    // lever move Workforce always applied, so this list was never empty; now it can
+    // be, and an empty accordion is not an honest surface.
     if (pages.empty())
         pages.push_back({"Status", building_page_kind::status});
 
@@ -1725,13 +1713,8 @@ void draw_building_page(world& w, const recipe_registry& reg, const economy_repo
     switch (kind)
     {
         case building_page_kind::profitability: draw_building_profit(w, reg, report, id); break;
-        case building_page_kind::method:        draw_production_method_section(w, reg, id); break;
         case building_page_kind::status:
             draw_building_status_page(w, reg, id, ui.spectating && ui.god_view); break;
-        case building_page_kind::workforce:
-            if (const auto bit = w.buildings.find(id); bit != w.buildings.end())
-                draw_building_workforce_page(bit->second);
-            break;
     }
 }
 
@@ -2232,7 +2215,49 @@ void draw_building_selection_body(world& w, const recipe_registry& reg,
                 building.workforce_auto = true;
         }
         ImGui::SameLine();
-        tile_icon_button("##bld_reserved3", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+
+        // Open in ledger — the fourth action, and the one this card's own lever move
+        // created the need for (Ben, 2026-08-29: "wire in the fourth grid button").
+        // With Method and Workforce off the centre, a building selected on the MAP had
+        // no route to its own levers at all; this is that route, in one press.
+        //
+        // AIMED, not merely opened: it expands this building's TYPE GROUP and leaves
+        // the building selected, so the levers are on screen rather than a roster of
+        // every type with the player left to find what they already had selected.
+        // `selected_entity` is already this building — the card's whole subject — so
+        // the aim is routing plus the group.
+        //
+        // A DOOR, not a toggle: its active state is not visible here, so a second
+        // press must not close what it opened (the standing Toggle rule binds controls
+        // whose active state shows).
+        //
+        // ABSENT on a rival's card, not merely disabled. The Buildings view is the
+        // PLAYER'S estate; a rival building has no row in it, so a button aiming at
+        // one would open an empty aim. Same discipline as the card's own
+        // rival short-circuit — the cell falls back to Reserved, so the grid keeps
+        // its shape and nothing reflows.
+        if (owned)
+        {
+            const ImVec2 p_open = ImGui::GetCursorScreenPos();
+            ui.construction_ui.open_ledger_x = p_open.x + bsz.x * 0.5f;
+            ui.construction_ui.open_ledger_y = p_open.y + bsz.y * 0.5f;
+            if (tile_icon_button("##bld_open_ledger", bsz, true,
+                                 "Open this building in the Buildings ledger",
+                                 glyph_roster))
+            {
+                close_all_panels(ui);
+                ui.show_construction_panel = true;
+                ui.construction.panel_view = 1; // Buildings
+                ui.construction.buildings_expanded = building_group_name(reg, building);
+                ui.selected_entity = sel; // already true; stated because the aim depends on it
+            }
+        }
+        else
+        {
+            ui.construction_ui.open_ledger_x = -1.0f;
+            ui.construction_ui.open_ledger_y = -1.0f;
+            tile_icon_button("##bld_reserved3", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+        }
 
         tile_icon_button("##bld_reserved4", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
         ImGui::SameLine();
@@ -2456,129 +2481,6 @@ void draw_battle_selection(world& w, ui_state& ui)
             ImGui::EndPopup();
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// BL-577 — the contract element, the battle card's sibling
-// ---------------------------------------------------------------------------
-// docs/ui/SELECTION.md § The battle element is the structural precedent named
-// by the item's own brief: like a battle, a `mercenary_contract` has no entity
-// id, so it is resolved before `selection_kind_of` and owns its whole layout,
-// header included, rather than routing through the shared 3-column band. Unlike
-// a battle it is not time-critical — nothing here expires between frames the
-// way a fight's strength does — so it does not preempt the battle check, only
-// the (still-later) province/kind resolution.
-
-/// Resolve the selected contract, or nullptr. Also clears a stale selection —
-/// there is no equivalent to a battle "ending" (a settled contract's record is
-/// kept, per world.hpp's own comment on `mercenary_contract::state`), so the
-/// only way this returns null is a stale id from a regenerated world.
-const mercenary_contract* selected_contract(const world& w, ui_state& ui)
-{
-    if (!ui.has_contract_selection())
-        return nullptr;
-    for (const mercenary_contract& c : w.mercenary_contracts)
-        if (c.id == ui.selected_contract_id)
-            return &c;
-    ui.clear_contract_selection();
-    return nullptr;
-}
-
-const char* contract_state_word(mercenary_contract_state s)
-{
-    switch (s)
-    {
-        case mercenary_contract_state::active:    return "Active";
-        case mercenary_contract_state::completed: return "Completed";
-        case mercenary_contract_state::failed:    return "Failed";
-        case mercenary_contract_state::abandoned: return "Abandoned";
-    }
-    return "\xe2\x80\x94";
-}
-
-void draw_contract_selection(const world& w, const contract_template_registry& templates,
-                             ui_state& ui)
-{
-    // The caller has already resolved and validated the pointer — same
-    // contract `selected_battle` carries for the battle card.
-    const mercenary_contract& c = *selected_contract(w, ui);
-
-    const char* client_name = "an unrecognised polity";
-    if (const auto nit = w.nations.find(c.client); nit != w.nations.end() && !nit->second.name.empty())
-        client_name = nit->second.name.c_str();
-    const char* contractor_name = "an unmarked company";
-    if (const auto cit = w.corporations.find(c.contractor); cit != w.corporations.end()
-        && !cit->second.name.empty())
-        contractor_name = cit->second.name.c_str();
-
-    // --- header -------------------------------------------------------------
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Contract");
-    ImGui::SameLine();
-    ImGui::TextDisabled("%s", contract_state_word(c.state));
-    ImGui::Separator();
-
-    // --- client / contractor -------------------------------------------------
-    ImGui::Text("Client:");
-    ImGui::SameLine();
-    ImGui::TextUnformatted(client_name);
-    ImGui::Text("Contractor:");
-    ImGui::SameLine();
-    ImGui::TextUnformatted(contractor_name);
-
-    // --- predicate (BL-570's condition_text, the same reader the laws
-    // listing in balance_ledger.cpp uses) --------------------------------
-    ImGui::Spacing();
-    if (c.template_index >= 0 &&
-        static_cast<std::size_t>(c.template_index) < templates.size())
-    {
-        // Bound to the contract's own province, exactly as
-        // `run_mercenary_contract_tick` binds it before evaluating it — a
-        // second, disagreeing copy of that bind here is exactly the trap
-        // the battle card's withdrawal-price precedent warns against.
-        condition pred = templates.at(static_cast<std::size_t>(c.template_index)).predicate;
-        pred.province  = c.province;
-        ImGui::TextWrapped("Terms: %s",
-                           condition_text(pred, resource_name, building_type_name).c_str());
-    }
-    else
-    {
-        ImGui::TextDisabled("Terms: unresolved - the authored template is missing.");
-    }
-
-    // --- committed force (CONTRACTS.md Q1: the player names the force, never
-    // the contract) -----------------------------------------------------
-    ImGui::Spacing();
-    ImGui::SeparatorText("Committed force");
-    bool any_unit = false;
-    for (const entity_id u : c.units)
-    {
-        if (u == null_entity)
-            continue;
-        any_unit = true;
-        const auto uit = w.units.find(u);
-        if (uit == w.units.end())
-        {
-            ImGui::TextDisabled("(unit no longer exists)");
-            continue;
-        }
-        ImGui::Text("%s x%d", unit_roster_display_name(uit->second.type).c_str(),
-                   uit->second.count);
-    }
-    if (!any_unit)
-        ImGui::TextDisabled("No force committed.");
-
-    // --- deadline -------------------------------------------------------
-    ImGui::Spacing();
-    ImGui::Text("Deadline: econ tick %d", c.deadline);
-
-    // --- fee split (CONTRACTS.md § Serialisation: "reuses BL-095's split-
-    // payment model" — deposit already paid, remainder on completion) ----
-    ImGui::Spacing();
-    ImGui::SeparatorText("Fee");
-    ImGui::Text("Deposit paid: Cr %.0f", static_cast<double>(c.deposit_paid));
-    ImGui::Text("Remainder on completion: Cr %.0f",
-               static_cast<double>(c.fee - c.deposit_paid));
-    ImGui::TextDisabled("Total: Cr %.0f", static_cast<double>(c.fee));
 }
 
 // --- The PROVINCE readings the tile element folds in (BL-598) ---------------
@@ -3273,13 +3175,27 @@ void draw_tile_selection(world& w, ui_state& ui)
                 {pmin.x - 2.0f, pmin.y - 2.0f}, {pmin.x + bsz.x + 2.0f, pmin.y + bsz.y + 2.0f},
                 palette::selection, 4.0f, 0, 2.0f);
         }
+        {
+            const ImVec2 cp = ImGui::GetCursorScreenPos();
+            ui.construction_ui.construct_x = any_placeable ? cp.x + bsz.x * 0.5f : -1.0f;
+            ui.construction_ui.construct_y = any_placeable ? cp.y + bsz.y * 0.5f : -1.0f;
+        }
         if (tile_icon_button("##act_construct", bsz, any_placeable,
                              any_placeable
                                  ? (primed ? "Construct buildings - nothing under way"
                                            : "Construct buildings")
                                  : "Nothing can be built on this tile",
                              glyph_hammer))
-            ui.show_build_ledger = true;
+        {
+            // DOOR TWO onto the one construction element: open the slot-3
+            // Construction ledger aimed at its Construction view, which draws the
+            // queue and then this same build bar (draw_construction_ledger_body).
+            // It is a DOOR, not a toggle — the control's own active state is not
+            // visible on the card, so a second press must not close what it opened.
+            close_all_panels(ui);
+            ui.show_construction_panel   = true;
+            ui.construction.panel_view   = 0;
+        }
         ImGui::SameLine();
 
         // Manage — enabled only when a building occupies this tile; selecting it
@@ -3320,10 +3236,128 @@ void draw_tile_selection(world& w, ui_state& ui)
 
 } // namespace
 
-void draw_selection_content(world& w, const recipe_registry& reg,
-                            const economy_report& report,
-                            const contract_template_registry& templates, ui_state& ui)
+/// The DEPOSIT card (BL-671). The Resource lens's structure is every tile on the
+/// body carrying the selected good, so that is what this counts and that is what
+/// it is about: not one tile's richness, but the whole showing.
+///
+/// Deliberately thin, and every figure derived. A deposit has no ledger of its
+/// own and no actions — you cannot dig a region, you site a building on one tile
+/// of it — so the card's job is to say how much is here and hand the player to
+/// the Market ledger, which the press has already opened on Prices.
+void draw_deposit_selection(const world& w, ui_state& ui)
 {
+    const int ri = ui.selected_deposit_resource;
+    if (ri < 0 || static_cast<std::size_t>(ri) >= resource_count)
+        return;
+    const auto rt = static_cast<resource_type>(ri);
+    const resource_presentation& rp = presentation_of(rt);
+
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(rp.colour), "%s", rp.name);
+    ImGui::SameLine();
+    ImGui::TextDisabled("Deposit");
+    ImGui::Separator();
+
+    // Counted over the ACTIVE BODY only, because that is the region the lens drew
+    // and the selection grain follows the drawing. A body-spanning total would be
+    // a different claim from the one the player just clicked on.
+    int   tiles = 0;
+    float total = 0.0f;
+    float best  = 0.0f;
+    for (const auto& [id, tile] : w.tiles)
+    {
+        if (tile.body != ui.active_body)
+            continue;
+        const float d = tile.resource_deposit[static_cast<std::size_t>(ri)];
+        if (d <= 0.0f)
+            continue;
+        ++tiles;
+        total += d;
+        best = std::max(best, d);
+    }
+
+    if (tiles == 0)
+    {
+        ImGui::TextDisabled("No %s on this body.", rp.name);
+        return;
+    }
+
+    ImGui::Text("%d tiles", tiles);
+    ImGui::SameLine();
+    ImGui::TextDisabled("carrying it on this body");
+    ImGui::Text("Richest tile  %.2f", best);
+    ImGui::Text("Total         %.2f", total);
+    ImGui::Spacing();
+    ImGui::TextDisabled("Prices for this good are open in the Market ledger.");
+}
+
+/// The PLATE card (BL-671, closing NR-697). Before this a plate press set its
+/// channel and the band showed the PREVIOUS selection — a card asserting
+/// something the player had not clicked, which is the exact failure NR-697
+/// recorded.
+///
+/// Every figure comes from `ui.selected_plate_facts`, cached by the canvas at
+/// press time; see that field for why it is a cache and not a lookup.
+void draw_plate_selection(ui_state& ui)
+{
+    const ui_state::plate_summary& f = ui.selected_plate_facts;
+
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                       "Plate %d", ui.selected_plate);
+    ImGui::SameLine();
+    ImGui::TextDisabled(f.oceanic ? "Oceanic" : "Continental");
+    ImGui::Separator();
+
+    if (f.tiles == 0)
+    {
+        // A stagnant-lid body has one plate owning everything and no boundaries,
+        // which is a legitimate answer rather than a degenerate one — but a plate
+        // with no tiles means the report and the press disagree, so say that
+        // instead of printing zeros as though they were measurements.
+        ImGui::TextDisabled("No plate data for this body.");
+        return;
+    }
+
+    ImGui::Text("%d tiles", f.tiles);
+    ImGui::SameLine();
+    ImGui::TextDisabled("on this body");
+
+    // The boundary is the point of the lens — a plate interior is just a region,
+    // but a boundary is where the mountains and the porphyry copper came from.
+    if (f.convergent_tiles > 0 || f.divergent_tiles > 0)
+    {
+        // Two counts, never summed. A tile at a junction between a closing pair
+        // and an opening pair sits on BOTH masks, so a single "boundary" number
+        // would double-count it — and the two say different things anyway: a
+        // collision is where the mountains and the porphyry copper came from, a
+        // rift is where the crust thinned and the basins opened.
+        if (f.convergent_tiles > 0)
+            ImGui::Text("%d on a collision boundary", f.convergent_tiles);
+        if (f.divergent_tiles > 0)
+            ImGui::Text("%d on a rift", f.divergent_tiles);
+    }
+    else
+        ImGui::TextDisabled("Interior plate - no classified boundary.");
+
+    ImGui::Text("Drift  %+.2f, %+.2f", f.drift_col, f.drift_row);
+    ImGui::SameLine();
+    ImGui::TextDisabled("cols, rows per epoch");
+
+    ImGui::Spacing();
+    ImGui::TextDisabled("Its tectonic record is open in the History ledger.");
+}
+
+void draw_selection_content(world& w, const recipe_registry& reg,
+                            const economy_report& report, ui_state& ui)
+{
+    // The building card's open-in-ledger button describes THIS frame. Cleared here,
+    // at the dispatcher, so it reads absent for every selection that is not a
+    // player-owned building — including the frames where no building card draws at
+    // all. A probe left standing after its control is gone is a click into nothing.
+    ui.construction_ui.open_ledger_x = -1.0f;
+    ui.construction_ui.open_ledger_y = -1.0f;
+    ui.construction_ui.construct_x   = -1.0f;
+    ui.construction_ui.construct_y   = -1.0f;
+
     // BL-598 removed the PROVINCE branch that stood here. BL-511 gave a province
     // its own resolution ahead of `selection_kind_of` — it is not an entity, so
     // the kind resolution cannot see it — and BL-534 gave it its own body. Ben
@@ -3350,14 +3384,23 @@ void draw_selection_content(world& w, const recipe_registry& reg,
         return;
     }
 
-    // BL-577: a contract resolves next, for the same structural reason the
-    // battle does — a `mercenary_contract` is not an entity, so
-    // `selection_kind_of` cannot see it. It owns its whole card (SELECTION.md
-    // § The contract element), so it returns rather than falling through to
-    // the shared header, exactly like the battle above.
-    if (ui.has_contract_selection() && selected_contract(w, ui) != nullptr)
+    // BL-671: the two NON-ENTITY LENS REGIONS resolve next, for the same
+    // structural reason the battle and the contract do — a deposit is a resource
+    // index and a plate is a raster id, so neither travels in `selected_entity`
+    // and `selection_kind_of` cannot see either. Each owns its whole card and
+    // returns rather than falling through to the shared header.
+    //
+    // Both channels were WRITE-ONLY until this landed: the canvas set them and no
+    // surface read them, so a press on a deposit or a plate left the band showing
+    // whatever was selected before it (NR-697).
+    if (ui.has_deposit_selection())
     {
-        draw_contract_selection(w, templates, ui);
+        draw_deposit_selection(w, ui);
+        return;
+    }
+    if (ui.has_plate_selection())
+    {
+        draw_plate_selection(ui);
         return;
     }
 
@@ -3490,34 +3533,6 @@ void draw_building_page_expanded(world& w, const recipe_registry& reg,
     draw_building_page(w, reg, report, ui.selected_entity, pages[static_cast<std::size_t>(page)].kind, ui);
 }
 
-namespace {
-
-/// BL-429: the named building an extraction_site targeting @p r reads as in the
-/// Build door — "Quarry" rather than "Extraction: Stone". Falls back to the
-/// resource's own display name for anything not given a bespoke identity
-/// (space/background raws outside this item's ancient-arc scope).
-const char* extraction_building_name(resource_type r)
-{
-    switch (r)
-    {
-        case resource_type::iron_ore:       return "Iron Mine";
-        case resource_type::coal:           return "Coal Mine";
-        case resource_type::petroleum:      return "Oil Field";
-        case resource_type::silica:         return "Silica Quarry";
-        case resource_type::copper_ore:     return "Copper Mine";
-        case resource_type::rare_earth_ore: return "Rare-Earth Mine";
-        case resource_type::water:          return "Water Extractor";
-        case resource_type::stone:          return "Quarry";
-        case resource_type::timber:         return "Woodcutter's Camp";
-        case resource_type::sand:           return "Sand Pit";
-        case resource_type::clay:           return "Clay Pit";
-        case resource_type::peat:           return "Peat Cutting";
-        default:                            return resource_name(r);
-    }
-}
-
-} // namespace
-
 // The tile construction ledger (BL-162): the tile-contextual surface that actually
 // lets the player build. Lists every building type placeable on the selected tile —
 // each in a bordered container (name + full credit cost + payback + an expected-profit
@@ -3525,47 +3540,42 @@ const char* extraction_building_name(resource_type r)
 // chosen build on the tile via the construction.pending_tile seam app executes.
 // Candidates sort by expected net descending on a ceiling shared across the list, so
 // the best options are the ones on screen without scrolling.
-void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_state& ui)
+void draw_construction_ledger_body(const world& w, const recipe_registry& reg, ui_state& ui)
 {
+    const ImGuiStyle& style = ImGui::GetStyle();
+
+    // Measured, not assumed: the build bar is now a SECTION of a host ledger rather
+    // than a window of its own, so its width budget is whatever the host gives it.
+    // (NR-709: a surface that hard-codes a width loses its name column the first
+    // time the column narrows.)
+    const float bar_w = ImGui::GetContentRegionAvail().x;
+
     const entity_id tile_id = ui.selected_entity;
     const auto tit = w.tiles.find(tile_id);
     if (tit == w.tiles.end())
     {
-        ui.show_build_ledger = false; // selection is not a tile — nothing to build on
+        // THE EMPTY STATE IS THE ANSWER, not a placeholder (Ben, 2026-08-29).
+        // Building is a TARGETED act, so with no target there is nothing to price.
+        // The tempting richer state — a list of tiles the player could build on —
+        // cannot be written without ordering it, and any ordering of that list is a
+        // recommendation, which is the surface Ben declined ("it enters the territory
+        // of telling the player what to do", CONCEPT.md). So this stays one line.
+        // Contrast the Buildings view, whose empty state CAN be improved: listing
+        // buildings the player already owns is navigation, not recommendation.
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Construct");
+        ImGui::Spacing();
+        ImGui::TextDisabled("Select a tile");
         return;
     }
     const tile_component& tile = tit->second;
 
-    const foldout_rect r       = foldout_column_rect();
-    const float        bar_w   = r.w;
-    const float        frame_h = ImGui::GetFrameHeight();
-    const ImGuiStyle&  style   = ImGui::GetStyle();
-
-    ImGui::SetNextWindowPos({r.x, r.y}, ImGuiCond_Always);
-    ImGui::SetNextWindowSize({r.w, r.h}, ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.90f);
-    constexpr ImGuiWindowFlags flags =
-        ImGuiWindowFlags_NoTitleBar            |
-        ImGuiWindowFlags_NoResize              |
-        ImGuiWindowFlags_NoMove                |
-        ImGuiWindowFlags_NoCollapse            |
-        ImGuiWindowFlags_NoNav                 |
-        ImGuiWindowFlags_NoBringToFrontOnFocus |
-        ImGuiWindowFlags_NoScrollbar           |
-        ImGuiWindowFlags_NoScrollWithMouse     |
-        ImGuiWindowFlags_NoSavedSettings;
-    ImGui::Begin("##build_ledger", nullptr, flags);
-
-    // ── Header: Construct · [x, y] ............................... [x] ──
+    // ── Header: Construct · [x, y] ──
+    // No close 'x': the host ledger's nav rail slot and its tab strip own closing
+    // now, and a second closer on a section inside it would close something the
+    // player did not point at.
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Construct");
     ImGui::SameLine();
     ImGui::TextDisabled("[%d, %d]", tile.grid_x, tile.grid_y);
-    const float btn = frame_h;
-    ImGui::SameLine(bar_w - style.WindowPadding.x - btn);
-    if (ImGui::Button("x", {btn, btn}))
-        ui.show_build_ledger = false; // back to the tile Selection element
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Close");
 
     ImGui::Separator();
 
@@ -3673,39 +3683,26 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     // construct_building refuses these anyway (construction_result::era_locked);
     // this is the door not showing what the gate would refuse.
     //
-    // BL-428 adds the second half of the same argument: an ancient recipe whose
-    // chain the corp has not yet reached is refused by construct_building
-    // (depth_locked), so the door should not offer it either. Ancient-band
-    // recipes only, per the 2026-08-16 first-cut ruling — an `any`-band recipe is
-    // never depth-filtered.
+    // BL-428 used to add a second half to the same argument — an ancient recipe
+    // deeper than the corp had reached was erased here too. BL-692 removed that
+    // clause with the gate behind it: construct_building no longer refuses on
+    // depth, so filtering here would hide rows the door would now accept.
     //
-    // BL-593 adds the third: a recipe locked by `recipe_unlocked` (BL-588's
-    // tech-recipe gate — the growth track and the era/depth ones are three
-    // independent locks) is dropped the same way, regardless of band. Ben's
-    // ruling (2026-08-24, the same shape as the era/depth precedent above, not
+    // BL-593 adds the remaining one: a recipe locked by `recipe_unlocked`
+    // (BL-588's tech-recipe gate) is dropped the same way, regardless of band.
+    // Ben's ruling (2026-08-24, the same shape as the era precedent above, not
     // a new one): filtered out, not shown-and-locked — "the door not showing
     // what the gate would refuse" is the standing argument, unchanged by this
     // item. `refined_copper` (E0-EC-03, BL-589) is the first recipe this
     // clause actually removes; before it, every tech gate targeted a
     // building_type, never a recipe, so this branch was dead code on every
     // prior campaign.
-    const int reached = [&]
-    {
-        const auto it = w.corporations.find(w.player_entity);
-        return (it != w.corporations.end()) ? corp_reached_depth(it->second, reg) : 0;
-    }();
     cands.erase(std::remove_if(cands.begin(), cands.end(),
-                               [&w, &reg, reached](const candidate& c)
+                               [&w, &reg](const candidate& c)
                                {
                                    if (!reg.building_available(c.type))
                                        return true;
-                                   if (!recipe_unlocked(w, reg, w.player_entity, c.recipe))
-                                       return true;
-                                   const recipe* rc = reg.get_recipe(c.recipe);
-                                   if (!rc || rc->era != era_band::ancient)
-                                       return false;
-                                   const int need = reg.recipe_required_depth(c.recipe);
-                                   return need < 0 || need > reached;
+                                   return !recipe_unlocked(w, reg, w.player_entity, c.recipe);
                                }),
                 cands.end());
 
@@ -3854,8 +3851,8 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     ImGui::BeginChild("##build_list", {0.0f, 0.0f}, false,
                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysVerticalScrollbar);
     // BL-326: candidates are pre-sorted category-then-name, so each category's rows are
-    // contiguous — walk the list opening a TreeNodeEx (this file's existing fold idiom,
-    // e.g. economy_panel.cpp) whenever the category changes, and close it once its rows
+    // contiguous — walk the list opening a TreeNodeEx (this file's existing fold idiom)
+    // whenever the category changes, and close it once its rows
     // are drawn. Defaulted open, matching the fold usage elsewhere in the UI.
     std::string open_category;
     bool        category_open = false;
@@ -4113,8 +4110,6 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     }
 
     ImGui::EndChild();
-
-    ImGui::End();
 }
 
 } // namespace ui

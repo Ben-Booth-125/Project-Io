@@ -9,13 +9,11 @@
 -- The tier logic itself is covered exhaustively by commercial_fog_harness (R2).
 -- Run with: ProjectIo --verify scripts/verify/commercial_fog.lua
 
-verify.show_panel("economy", false)
 
 -- A near-complete player convoy to Cinder: one econ step arrives + credits it, which
 -- upserts a persistent route -> Cinder reads 'known'.
 verify.seed_convoy("home", "inner", "iron_ore", 20, 0.98)
 verify.econ_step(1)
-verify.show_panel("economy", false)
 
 -- A live player convoy in transit to Pallas -> Pallas reads 'visible' (active lane).
 verify.seed_convoy("home", "asteroid", "iron_ore", 20, 0.4)

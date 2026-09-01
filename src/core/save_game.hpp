@@ -61,7 +61,20 @@ inline constexpr uint32_t save_game_magic =
 /// two halves change for different reasons, and a UI slice gaining a field
 /// should not invalidate saves whose world half is unchanged. A load checks
 /// both, so a mismatch in either still rejects the whole file.
-inline constexpr uint32_t save_game_version = 1;
+///
+/// Bumped to 2 when `continent_state` gained its `divergent` raster: the
+/// continents record (`w_continents` / `r_continents` in save_game.cpp) gains
+/// one byte-vector immediately after `convergent`, ahead of `history`. That is
+/// a MID-RECORD gap, so a v1 stream's per-body continents record misreads
+/// `history` and every envelope section after it — refused whole on the same
+/// strict-equality contract `read_save_game` already applies, rather than
+/// part-read into a campaign that looks valid and is not.
+///
+/// Refusal is the whole compatibility story here, by the format's own design:
+/// `read_save_game` compares this constant for equality and rejects on any
+/// mismatch. There is no upgrade path to write, and adding one for a single
+/// raster would be inventing a scheme this file does not have.
+inline constexpr uint32_t save_game_version = 3; // NR-733: the report carries the Era -1 time-lapse
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

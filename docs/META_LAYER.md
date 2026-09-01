@@ -101,12 +101,19 @@ contested quantity is a predicate whose meaning is contested.
 | `corp_command.cpp` | is this buyer embargoed by this supplier? |
 
 **Quests** are the fourth reader the header names; BL-087 (era-1 tech/quest system) owns the quest
-object. **The mercenary contract is a fifth**, and it is what `province_held` exists for: BL-570
-gave `condition_set` its first location-qualified subject because `docs/economy/CONTRACTS.md`'s
-spine — *"a contract is a condition_set the client will pay to have become true"* — could not be
-expressed against the nine world-wide corp scalars above. A contract stores an INDEX into an
-authored template table (`scripts/contracts.lua`) rather than a free `condition_set`, so the
-predicate itself is still authored data, never a type enum in C++.
+object.
+
+**The mercenary contract WAS a fifth, and it is what `province_held` exists for.** BL-570 gave
+`condition_set` its first location-qualified subject because a contract's spine — *"a contract is a
+condition_set the client will pay to have become true"* — could not be expressed against the
+world-wide corp scalars above. That contract was retired on 2026-08-30
+([`economy/CONTRACTS.md`](economy/CONTRACTS.md)), and its authored template table went with it.
+
+**The consequence is worth stating plainly: nothing in the game authors a non-empty
+`condition_set` any more.** The substrate is intact and `province_held` is still a valid subject;
+the one live consumer of a stored predicate is `world::corp_embargo_conditions`, which no content
+populates. So this layer is currently a mechanism without content — which is a reason to be careful
+reading the rest of this document as a description of what runs, rather than of what it is for.
 
 ## The effect side — `modifier_set`
 
@@ -216,11 +223,12 @@ item, so a tech could gate a *building type* but never the *method* a building a
 runs. `unlock_recipe` closes that: it names a `recipe::name` (never an id — ids are positional and
 a gate must survive a roster reorder), mirrored on `tech_gate::unlocks_recipe` the same way
 `unlocks_structure` already is, checked through `recipe_unlocked` at both `construct_building` and
-`try_switch_recipe` (guarding only placement leaves the retool bypass the depth gate's own comment
-already names). A recipe lock and a structure lock report the same `tech_locked` code on every
-seam — an agent cannot tell them apart, which is deliberate; the two stay distinct in MEANING, not
-in the code an agent reads. See `docs/economy/PRODUCTION.md` § Chain depth — the growth track for
-how this composes with the (separate) depth gate on the same recipe.
+`try_switch_recipe` — guarding only placement would leave a retool bypass, so both doors ask. A
+recipe lock and a structure lock report the same `tech_locked` code on every seam — an agent cannot
+tell them apart, which is deliberate; the two stay distinct in MEANING, not in the code an agent
+reads. **`tech_locked` is the only method lock**: within the roster a campaign's era band admits,
+research decides what a corp may run, and nothing else does. See `docs/economy/PRODUCTION.md`
+§ Chain depth — the growth track.
 
 ---
 

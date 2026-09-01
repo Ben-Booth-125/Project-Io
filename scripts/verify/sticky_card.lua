@@ -55,7 +55,6 @@ verify.econ_step(40) -- finish the build and produce a few ticks
 
 -- Close every fold-out ledger econ_step / placement may have opened, so the capture
 -- shows the card over a clean canvas rather than a column ledger beside it.
-verify.show_panel("economy",      false)
 verify.show_panel("construction", false)
 verify.show_panel("tile",         false)
 verify.show_panel("market",       false)
@@ -100,7 +99,6 @@ if tx then
     local drilled = verify.card_drill()
     if drilled >= 0 then
         verify.econ_step(24)
-        verify.show_panel("economy",      false)
         verify.show_panel("construction", false)
         verify.show_panel("tile",         false)
         verify.show_panel("market",       false)

@@ -135,9 +135,9 @@ The header answers "can I afford this, and which way is it trending?" without op
 
 A fixed, full-height **icon rail** pinned to the left edge (`nav_pane_width`, 56 px), below the profile. Cannot move, resize, or collapse. The rail is narrow; the profile keeps its own (wider) `profile_panel_width` above it rather than matching the rail.
 
-- Holds a vertical strip of **nine square icon slots** — the home for the game's menus and ledgers. **Every slot carries its own vector glyph** (`src/ui/icons.hpp`) — live slots in the bright stroke, reserved slots dimmed — plus a wrapping name-and-blurb tooltip.
+- Holds a vertical strip of **thirteen square icon slots** — the home for the game's menus and ledgers. **Every slot carries its own vector glyph** (`src/ui/icons.hpp`) — live slots in the bright stroke, reserved slots dimmed — plus a wrapping name-and-blurb tooltip.
 - Each slot toggles a panel open/closed; the open slot lights its glyph in the selection accent. An active slot **folds its ledger out into the shell column** to the rail's right (`[nav_pane_width, W]`) rather than spawning a floating window; opening one collapses whichever was open (accordion, via `close_all_panels`).
-- **Eight slots are live** (`nav_pane.cpp`): five carry their own subject — Corporation overview, Budget, Market Ledger, Construction, History — and three carry a **provisional occupant**, a subject whose slot hosts a surface that would otherwise have no door: Workforce hosts the Economy panel, Research the tech-tree viewer, Diplomacy the corporations table (NR-012). **One is reserved**, disabled with a dimmed glyph: Corp. Strategy. Full slot semantics in `MENU.md`.
+- **Twelve slots are live** (`nav_pane.cpp`): ten carry their own subject — Corporation overview, Budget, Construction, Acquisitions, Market Ledger, History, Generation Ledger, AI decisions, Strategy readout, Contracts — and two carry a **provisional occupant**, a subject whose slot hosts a surface that would otherwise have no door: Research hosts the tech-tree viewer, Diplomacy the corporations table (NR-012). **One is reserved**, disabled with a dimmed glyph: Corp. Strategy. Full slot semantics in `MENU.md`.
 
 ---
 
@@ -294,7 +294,7 @@ The panel, its pin toggle and the pin glyph are BL-216's pinned-items slice.
 
 ## Ledger windows — all fold-out
 
-No ledger floats. Every ledger — Construction, Economy, Market, Balance, Corporations, the
+No ledger floats. Every ledger — Construction, Market, Balance, Corporations, the
 tile construction ledger, **and the Tile Ledger** (History, slot 9 — `tile_inspector.cpp`
 opens through the same path) — draws as a **pinned, borderless panel filling the shell
 column** (`ui::foldout_begin`/`foldout_end`, `src/ui/foldout_column.hpp`) when its nav slot
@@ -313,8 +313,7 @@ Fold-out ledgers with more than one question split their content across a **butt
 `ImGui::BeginTabBar` does not render in this build), each view drawing exclusively. The splits:
 the **Construction** panel — **Construction / Buildings** (defaults to Buildings; the build
 front door is the tile Selection element's and sell orders are the Market Ledger's); the
-**Market Ledger** — **Prices / Sell Orders**; the **Economy** panel — Corps / Holdings / Markets
-(`ui_state::economy_view`, reachable from nav slot 3); the **History** ledger — Story / Chain /
+**Market Ledger** — **Prices / Sell Orders**; the **History** ledger — Story / Chain /
 Ages. The **Balance** and **Corporation** ledgers are single-question — no split. The principle
 is *one question per view, a menu to move between views* — not a mandate to split every panel.
 
@@ -325,20 +324,14 @@ being a no-op. Switching to a *different* tab is an ordinary view change. `ui::n
 ledger's open-flag as an optional `close` target; a strip with no flag passed stays a plain,
 non-closing selector.
 
-### Economy-panel table legibility
+### Narrow-column table legibility
 
-The Corporations dashboard (`corporation_panel.cpp`) and the economy tables are tuned for the
-narrow shell column: in ~244px a `SizingStretchProp` multi-column table collapses every column to a
-leading glyph, so the **identity column stretches and the numeric columns take tight fixed widths**,
-and low-value columns are dropped rather than clipped (the corp dashboard shows Corporation / Focus /
-Balance; Home Nation and Status live on the Selection panel / row tint).
-
-The Economy panel's tables use a **stretch name/resource column + fixed-width numeric columns**
-(not `SizingStretchProp`, which collapses cells to a leading glyph — a balances column reading
-`9 8 1 1…`). The **Corporation balances**, **Workforce**, **Stockpile pools**, and **Markets**
-tables all follow this pattern, so corp/body/resource identity and the full numeric values read at
-a glance. There is no per-building table on this panel — per-building profitability is the Corp
-Dashboard's job, and duplicating it here is the redundancy the panel avoids.
+Every ledger table is tuned for the narrow shell column: in ~244px a `SizingStretchProp`
+multi-column table collapses every column to a leading glyph — a balances column reading
+`9 8 1 1…` — so the **identity column stretches and the numeric columns take tight fixed
+widths**, and low-value columns are dropped rather than clipped. The Corporations dashboard
+(`corporation_panel.cpp`) shows Corporation / Focus / Balance on that rule; Home Nation and
+Status live on the Selection panel / row tint.
 
 ### Ledger family conventions
 

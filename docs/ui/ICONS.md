@@ -211,11 +211,61 @@ regolith — fall through to the generic ore-chunk: `extraction_building_name()`
 | **Strategy** | `strategy(…, colour)` | Pennant on a pole — a vertical staff with a filled right-triangle flag at its head; the flag hangs off the staff top rather than resting on a baseline, so it stays clear of the production up-triangle | Caller stroke + fill | Nav rail slot 7 (Corp. Strategy) — **reserved slot**, drawn dim; borrowed lit by slot 11 (AI decisions), whose subject is exactly the strategic decision slot 7 is reserved for |
 | **Diplomacy** | `diplomacy(…, colour)` | Two overlapping circle outlines — a two-parties-meeting motif; the overlap is the point, so it never reads as the single market-centre circle or the concentric activity pulse | Caller stroke | Nav rail slot 8 (Diplomacy) |
 | **Readout** | `readout(…, colour)` | A left axis stroke with three left-anchored horizontal tally bars of descending length — "counts compared". The axis anchor keeps it distinct from the supply route pair and the resource strata (both anchorless); the horizontal bars keep it clear of the market lens's vertical ones | Caller stroke + fill | Nav rail slot 12 (Strategy readout, BL-411, emergent strategy readout) — the feed's aggregate companion; its own glyph rather than a second borrow of `strategy`, since slot 11 already lights that pennant and two lit slots must not share a silhouette |
-| **Contract** | `contract(…, colour)` | A page with its top-right corner cut off (a dog-ear fold) plus a short check mark near the bottom — a signed-document motif. The fold distinguishes it from `ledger` (a plain ruled box, no fold); the rectangle baseline distinguishes it from `history`'s hourglass | Caller stroke | Nav rail slot 13 (Contracts ledger, BL-576) |
+| **Contract** | `contract(…, colour)` | A page with its top-right corner cut off (a dog-ear fold) plus a short check mark near the bottom — a signed-document motif. The fold distinguishes it from `ledger` (a plain ruled box, no fold); the rectangle baseline distinguishes it from `history`'s hourglass | Caller stroke | **Unassigned — no caller.** It drew the Contracts ledger's rail slot; the mercenary contract is retired (`../economy/CONTRACTS.md`) and the slot with it. Kept in the vocabulary because the shape is still the right one for a signed promise, and procurement — the live buy side — has no surface of its own |
+| **Acquisition** | `acquisition(…, colour)` | Two OUTLINED squares of different sizes with a short arrow running from the small one INTO the large one, its head ending *inside* the acquirer rather than on its edge — "one firm absorbed whole". The PAIR is the silhouette: no other rail slot draws two boxes, which is what keeps it clear of `corporation` (one *filled* square with a centred dot), `ledger` (one ruled box) and `industry` (the factory). The arrow gives the pair a direction, because a buyout has a buyer and a target and a symmetric pair would read as a merger — which the model does not have. **The head must end inside the large square**: the first draft landed it on the outline and the stroke swallowed it at rail radius, collapsing the glyph into one blob near enough to the corporation seal to be the very collision this catalogue exists to prevent | Caller stroke | Nav rail slot 5 (Acquisitions ledger) |
 
 The rail's other slots borrow lens and marker glyphs: slot 1 (Corporation overview) draws
-`corporation`, slot 3 (Workforce) `population`, slot 5 (Market Ledger) `market`, slot 6
-(Construction) `industry`, slot 10 (Generation Ledger) `continent` — see MENU.md.
+`corporation`, slot 3 (Construction) `industry`, slot 6 (Market Ledger) `market`,
+slot 10 (Generation Ledger) `continent` — see MENU.md.
+
+**A Convoys ledger draws `convoy`, which already exists** (§ 1, entity markers). Convoys leaving
+the Market ledger for a surface of their own (Ben, 2026-08-29) therefore needs no new rail glyph —
+the marker the canvas already draws for cargo in transit is the slot's silhouette, which is the
+pairing this catalogue prefers wherever a slot has a canvas twin. Its rail position is a MENU.md
+curation question and not an icon one.
+
+### 2b. The item glyph — a value-track silhouette, not one shape per good
+
+> **PLACEHOLDERS UNTIL A LATER SPRINT** (Ben, 2026-08-29: *"For flags and glyphs, use
+> placeholders. We will come to that in a different sprint later."*). The four track silhouettes
+> and the nation chips below are the **settled design**; the Market rework ships against
+> placeholders and does not wait on the art. Two conditions on that, both from the
+> honest-placeholder idiom (NR-249): a placeholder must be *visibly* provisional rather than a
+> shape a player would learn as meaning something, and the column must not be sized to the
+> placeholder — reserve the width the real glyph will need, or the table gets re-laid out twice.
+> The existing `resource` pip is the natural stand-in for the item glyph, since it is already
+> colour-keyed and already means "a resource"; it simply does not yet discriminate.
+
+The Market ledger's Goods table takes an **item glyph** column (Ben, 2026-08-29:
+*"item_glyph; name; price; body_average_price; price_relative_to_base_price;
+six_month_price_graph"*). What exists today is `resource(…, resource_type)` — a small filled
+**diamond in the resource's identity colour**, one shape for every good. Drawn as a table column
+across ~42 rows that is forty-two identical diamonds, discriminating by hue alone, immediately
+beside the resource's own name in that same hue. It would be decoration duplicating the column
+next to it.
+
+**Author four silhouettes keyed to the VALUE TRACK, not one per good.** `RESOURCES.md`
+§ Resource categories already divides the roster into **Industrial / Ambient / Habitability /
+Mercantile**, and that division is a real thing a player acts on — it says what a good is *for*.
+Four shapes in the resource's identity colour give a glyph that discriminates at row height and
+teaches a distinction the game already has, where forty-two would be a bank of art nobody can
+hold in mind and a colour-only pip would say nothing the name does not.
+
+**Production tier is the shading, if anything.** The three tiers (raw / refined / product) are an
+ordered axis, so they belong on an ordered channel — fill weight, not silhouette. Optional; the
+track alone is the load-bearing half.
+
+The existing `resource` pip is **not** replaced: it stays the deposit-marker and resource-strip
+mark, where one small colour-keyed dot is exactly right and no track distinction is wanted. The
+item glyph is a table-column glyph and a second entry, on the same rule that gave `readout` its
+own shape rather than a second borrow of `strategy`.
+
+**No nation flags exist, and the presence row must not imply otherwise.** A "list of nations who
+operate in that market" (Ben, same day) has `nation_colour(entity_id)` behind it — a per-nation
+palette colour — and nothing else. Corps carry an emblem tag; nations carry a colour. The row is
+therefore **coloured chips** with the nation's initials, named on hover. Real per-nation emblem
+artwork would be a generated identity system, which is a feature of its own and not a row on a
+ledger; do not stub one glyph and call it a flag.
 
 **Nav-rail legibility rule (BL-174, nav-rail legibility).** Every rail slot draws its **own**
 glyph — the shape says *which system the slot is for*, and **colour alone** carries availability

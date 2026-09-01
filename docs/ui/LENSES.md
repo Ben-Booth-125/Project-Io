@@ -79,7 +79,7 @@ representation intended.
 | **Corporation** | — | — | tile tint + player/rival HQ markers |
 | **Resource** | — | — | contiguous-deposit flat fill + key |
 | **Market** | — | per-body price strip | catchment tint + city-name key |
-| **Population** | — | — | per-tile value marks, workforce efficiency |
+| **Population** | — | — | per-tile workforce-efficiency **heatmap** |
 | **Scarcity** *(keyboard-cycle only)* | — | per-body shortfall badge | per-market shortfall blocks + key |
 | **Industry** *(keyboard-cycle only)* | — | — | background-firm plant amber tint + key |
 | **Continent** | — | — | plate tint + boundary lift + key |
@@ -189,9 +189,20 @@ carries glyphs only (BL-134, lens selector in legend).
 
 **Intent.** Read the map as a *corporate landscape*: where corporations operate,
 who owns what, and how the player's footprint sits against rivals. National
-territory is the border band's job (always-on chrome, [PLANETARY.md](PLANETARY.md)
-§ The national border band) — this lens is about **corporate-owned tiles**
-first; nation context is deliberately absent from its fill.
+territory is the border band's job — and **the band is suppressed while any lens
+is up** (Ben, 2026-08-28), so nation context is absent from this lens by
+construction rather than merely absent from its fill. A lens asks one question;
+a national wash over a corporate read competes with the answer.
+
+**Population (settled 2026-08-28).** This lens admits **corporations only** — the
+player and its rivals — and never a background firm. Ben: *"The corporation lens
+narrows to player and rival, the company lens shows only background firms."*
+Before the narrowing, both the tile tint and the rival HQ-marker layer drew every
+non-player corp, and background firms outnumber the rivals — so a lens asked
+"where are my rivals" and was answered "here is everyone". Background firms have
+their own lens, drawn identically: see **Company lens** below. The two
+populations are disjoint, which is the property `lens_modes.lua` captures them
+side by side to show.
 
 **Ownership definition (settled).** A *corporate-owned tile* is any tile on which
 a corporation holds a building. The mapping is derived at draw time from
@@ -254,12 +265,37 @@ levers) is BL-182's (corporate borders). See `scripts/verify/corporate_reach.lua
 
 ---
 
+## Company lens
+
+**Intent.** The Corporation lens's mirror, for the other half of the commercial
+population: where the **background firms** operate (`corporation_component::is_background`,
+the BL-365 `generate_background_firms` pass). Ben, 2026-08-28, splitting the
+words: a *corporation* is the player and its rivals, a *company* is a background
+firm (`docs/GLOSSARY.md` § Company).
+
+**Drawn identically to the Corporation lens, deliberately.** Same per-corp
+identity tint on any tile carrying that firm's building, same HQ-marker layer for
+its seat. The two lenses differ in exactly one thing — which population they
+admit — so a player who has learned to read one has learned to read the other,
+and the pair can be flipped between to compare.
+
+**Keyboard-cycle only for now.** It carries no distinct glyph yet and borrows the
+corporation mark, which is why it stays off the on-screen strip: an on-screen
+lens carries one distinct glyph, and Corp would be its immediate neighbour. It
+earns a strip slot when it earns a mark.
+
+---
+
 ## The Country lens has retired — national borders are chrome
 
-*(`overlay_mode::country` no longer exists. `"country"` and its legacy alias
-`"faction"` still parse in the verify-script name parser, resolving to
-`overlay_mode::none` — the plain canvas, which is where national borders now
-live.)*
+*(`overlay_mode::country` no longer exists, and since 2026-08-28 neither does its
+name: `"country"` and the legacy alias `"faction"` were removed from the
+verify-script name parser, where they had resolved to `overlay_mode::none`. The
+alias was retired because it was true of the picture and false of the check — a
+script naming the retired lens captured the plain canvas while still asserting a
+shield glyph and a territory tint, and six more swept it as one leg and captured
+the default view twice under two names. **The default view is the country view**;
+there is nothing left to alias.)*
 
 Ben, 2026-08-24: *"National borders should not diffuse together, instead they
 should borders extending their colour inwards. With this, we can drop the nation
@@ -445,32 +481,123 @@ surface share the resolved `market_component.price`. Verified by
 prices from base before capture (and `verify.show_panel("economy", false)` to
 clear the panel `econ_step` opens).
 
-## Per-lens selection validity & routing (settled 2026-06-15, [F4])
+## Per-lens selection validity & routing (settled 2026-06-15, [F4]; recut 2026-08-28)
 
-Owned by BL-372 (lens-keyed selection). The active lens does not only re-skin the canvas: it **defines what the pointer
-resolves to**, each lens answering "what is the meaningful target under this
-pointer?" in its own terms. SELECTION.md § Lens-driven hover & selection
-resolution owns the stack-walk; this is the per-lens table it reads.
+Owned by BL-372 (lens-keyed selection) and BL-664 (one tier under a lens). The active lens does not
+only re-skin the canvas: it **defines what the pointer resolves to**, each lens answering "what is
+the meaningful target under this pointer?" in its own terms. SELECTION.md § A lens collapses
+selection to ONE TIER owns the rule; this is the per-lens table it reads.
 
-| Lens | Valid target under the pointer | Routes selection to |
+**Under a lens there is exactly one tier**, and a marker does not outrank it (Ben, 2026-08-28). A
+lens with no answer for this ground is **inert**: no hover card, and a click that clears the
+Selection band to resting rather than falling through to a tile or a building.
+
+| Lens | Structure under the pointer | Routes selection to |
 |---|---|---|
-| **none** | the lowest drawn entity (marker, else tile/province) | Tile Ledger |
-| **Corporation** | the **owning corporation** of the tile/building | Balance Ledger |
-| **Resource** | the tile's **deposit** profile | Tile Ledger (deposit detail) |
-| **Market** | the body's **market** / the listing under the pointer | Market Ledger |
-| **Scarcity** | the tile's **market** (the catchment under the pointer) | Market Ledger |
-| **Industry** | the tile (no dedicated ledger route; falls through to the tile) | Tile Ledger |
-| **Supply** | the **route segment / stockpile** under the pointer | Supply surface |
+| **none** | the lowest drawn entity (marker, else tile), then the four-rung cycle | Tile Ledger |
+| **Corporation** | the corporation's **tile group** on this body | that corporation's ledger |
+| **Company** | the background firm's **tile group** | that company's ledger |
+| **Resource** | the **deposit** — every tile carrying the selected resource | Market Ledger, at that resource |
+| **Market** | the **market catchment** | Market Ledger |
+| **Scarcity** | the **market catchment** (the catchment under the pointer) | Market Ledger |
+| **Continent** | the **plate** | History ledger, at its tectonic record |
+| **Population** | — inert | — |
+| **Industry** | — inert | — |
+| **Throughput** | — inert | — |
+| **Supply** / **Supply-routes** / **Reach** | body-to-body; no Planetary structure | — |
 
 **Country has no row because it is not a lens.** A nation is reached by its border
 band under *every* lens — see § Structure-grain selection & routing above.
 
-A lens skips kinds it does not validate: beneath the Corporation lens a hovered
-*building* resolves *through* to its owning corporation, because the corporation
-is that lens's unit of meaning. The **none** and **Industry** rows describe the
-lens-agnostic fall-through: `body_surface_canvas.cpp` hit-tests markers (building
-outranks market centre) and otherwise takes the tile — or province — under the
-pointer, with a built tile resolving to its building.
+**A tile group lights whole on hover.** Hovering one tile of a corporation's holdings highlights
+all of them (Ben, 2026-08-28: "hovering one tile displays an outline around all company buildings
+for that corporation/company"), the same claim the market catchment's highlight makes. Ground held
+by nobody is inert.
+
+## The other direction — a ledger opens, its lens arms
+
+The table above sends a **click on a lens** to a ledger. The reverse also holds for
+some slots: **opening the ledger arms the lens**, so the list and the map answer the
+same question in two registers rather than the player having to arm it themselves.
+Ben's preference is the general form — *"opening a menu usually should arm a lens"* —
+and 2026-08-30 settled the Market half of it by name: *"when we open the market
+ledger, we should also activate the market lens."*
+
+**A pair exists only where both directions name each other.** That is what keeps this
+from becoming a lens on every slot: the routing table above is the test, and most rail
+slots are not in it.
+
+| Rail slot | Ledger | Arms | The shared question |
+|---|---|---|---|
+| 6 | Market | `market` | Which market is this ground in, and what does it pay? |
+| 7 | Convoys | `supply_routes` | What is moving, and along which lanes? |
+| 10 | History | `continent` — on entering **Tectonics**, see below | Which plate made this ground? |
+
+**There are two arming rules, and which one a slot uses follows from how many questions
+its ledger answers.**
+
+**Fixed on open** (slots 6 and 7). Every tab gets the same lens, because the ledger
+answers one question on every tab. That a strip can arm only one lens is a real
+constraint rather than a simplification — it is why Convoys left the Market ledger at
+all (`convoys.md` § 3).
+
+**On entering a sub-view** (slot 10, Ben 2026-08-30). History answers four questions and
+only **Tectonics** has a map twin, so a fixed arm would hand the Continent lens to a
+player who opened on Story to read a deep-time biography. The lens is armed on the
+**edge** — the frame the view starts being drawn — which covers both routes in: pressing
+the tab, and opening the ledger onto a Tectonics it was last left on.
+
+**On the edge, never while on it.** A player who reaches Tectonics and then deliberately
+picks another lens keeps it; re-arming every frame would make the lens strip unusable on
+that view. This is asserted rather than assumed — `lens_ledger_pairs.lua` checks that
+opening History on Story arms nothing, that entering Tectonics arms `continent`, and
+that a lens chosen afterwards survives.
+
+**The semantics, which are `nav_pane.cpp`'s and are still formally unowned (NR-722):**
+arm on **open** only, and **never disarm on close**. A player who closes a ledger keeps
+the canvas they are looking at rather than having it yanked back. What is undecided is
+the rest — whether opening a second ledger should re-arm to that one's lens, and whether
+a lens the player *deliberately* chose should be overridden by opening a ledger at all.
+
+**Why History takes the second rule.** `Continent` routes to *"History ledger, at its
+tectonic record"*, so the pair is real — but three of History's four views have nothing
+to do with plates. The choice was between a lens those three do not want and a second
+arming rule; Ben took the second rule (2026-08-30), stated here rather than left to be
+inferred from the code, which is what NR-722 exists to prevent.
+
+**Three lenses have no ledger to pair with, and that is not an omission.**
+`Corporation` and `Company` route to *that corporation's* / *that company's* ledger —
+per-entity surfaces reached through Selection, not rail slots, so there is no slot to
+arm from. `Throughput` is **inert** in the routing table and has no ledger at all: it is
+the surface half of `LOGISTICS.md` § Logistic Points, and no ledger surfaces LP.
+Logistics is the road and Supply is the traffic; the Convoys ledger is the traffic's, so
+throughput's twin would be a **Logistics ledger that does not exist**.
+
+## The strip rotates with the rung (Ben, 2026-08-28)
+
+The lens strip on the minimap shows **the lenses that draw something at the current canvas rung**,
+not a fixed set. Owned by BL-670 (rung-keyed lens strip).
+
+| Rung | On the strip |
+|---|---|
+| **Planetary** | Corporation, Company, Resource, Market, Scarcity, Industry, Population, Continent, Throughput |
+| **Circumplanetary** | Market, Scarcity, Supply |
+| **Solar** | Supply, Reach, Supply-routes |
+
+Each row is this document's own per-rung representation table read straight off: a lens appears
+where it draws something. Before this the strip was one hand-kept array of six, and the six were
+chosen by **what fit the 240 px bar** — a layout accident deciding a discovery question, which left
+six of the twelve built lenses reachable only by the `L` / `Shift+L` cycle that nothing on screen
+mentions. The keyboard cycle still reaches every lens from every rung; the strip is the discovery
+surface, not the only door.
+
+**Adding a lens means adding it to a rung row.** A lens named in no row is keyboard-only, which is
+a decision rather than an oversight only if it is written down.
+
+**Three lenses draw a value field, not a region**, and are therefore read-only surfaces: Population
+(per-tile habitability), Industry (per-tile substrate throughput) and Throughput (the reach-cost
+field). Their subject is a number spread across the map rather than a thing standing on it, so
+there is nothing for a selection to be *of*. SELECTION.md carries the reasoning.
 
 ## Resource lens
 
@@ -538,11 +665,20 @@ the population-centre markers, not this lens.
 **Rung.** Planetary only — workforce efficiency is per-tile and has no inter-body surface. Guarded
 behind `overlay_mode::population` in [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
 
-**Surface.** A per-tile red→green **value mark** (`icons::value_mark`, BL-135, value-lens tile
-marks) on every **buildable** tile (valid terrain for activity — ocean excluded), coloured by
-`ryg_colour(workforce_efficiency)`; tiles keep their terrain hue so terrain still reads. Drawn
-instead of, not blended with, the building glyph on occupied tiles. It is the **only** lens
-drawing the value mark: Opportunity shared the idiom until BL-604 retired it.
+**Surface.** A **heatmap** — the tile itself takes `ryg_colour(workforce_efficiency)` composited
+over its terrain hue at `0.72`, on every tile except water. Owned by BL-668 (workforce heatmap),
+Ben 2026-08-28: *"rework the workforce efficiency lens to be a heatmap, akin to throughput"*.
+
+It was a per-tile red→green **dot** drawn in place of the building glyph, and that shape was the
+reason to change it: this was the only lens in the roster that answered by **adding a mark** rather
+than by colouring the ground, so it read one tile at a time and never as a field — which is the
+whole reason to have a lens. The dot also had to suppress the stack ring and the landform glyph to
+avoid competing with them; a tint competes with nothing, so both are back and the tile reads
+normally under this lens.
+
+**Water is left alone** rather than tinted at the ramp's floor. Workforce efficiency is *undefined*
+on ocean, not zero, and painting it red would assert "bad ground" about ground that is not ground —
+it also keeps the coastline legible, which a wall-to-wall wash destroys.
 
 **Glyph.** A small figure — round head over a tapered torso (`icons::population`); reads as
 "people / workforce", distinct from the other lens glyphs.
@@ -784,11 +920,29 @@ behind `overlay_mode::throughput` in
 two things and one ramp cannot separate them.
 
 - **Field:** deep navy (furthest) → the logistics cyan (at an anchor), composited
-  at `0.72`. The cost ratio is **square-root compressed** before the ramp: the
-  distribution is heavily left-skewed (measured on the home body: median `20.8`
-  against a maximum of `101.8`, over 57 anchors), so a linear ramp puts four
-  fifths of the grid in its top fifth and the map reads as one flat wash.
-  Unreachable ground takes the cold end.
+  at `0.72`. The cost is normalised against the field's **90th percentile** and
+  then **square-root compressed**. Unreachable ground, and everything past p90,
+  takes the cold end. Owned by BL-669 (throughput ramp).
+
+  **Both halves are measured** — `tools/verify/throughput_field_census.cpp` is the
+  instrument, and it should be re-run whenever the anchor set moves, because this
+  ramp has now been wrong once for exactly that reason. The sqrt alone was
+  calibrated against 57 anchors; the home body carries **1917**, with median cost
+  `6.75` against a max of `81.58`, so half the grid sits in the bottom 8% of the
+  range the ramp was spread over.
+
+  **A steeper curve does not fix that, which is the part worth keeping.** Share of
+  the grid landing in the single most crowded tenth of the ramp: linear 52%, sqrt
+  32%, quadratic 45%, quartic 35%, `1-d²` 75%, cube-root 28% — every one of them
+  rescales the same bunched input, and quadratic is *worse* than the sqrt it would
+  replace. The denominator was the problem: p90 is `42.58` against a max of
+  `81.58`, so the top decile of cost is 48% of the range and holds a tenth of the
+  tiles. Normalising against p90 drops the worst bucket to **21%** — same curve,
+  three times the spread.
+
+  The trade is deliberate: ground beyond p90 saturates instead of getting its own
+  gradient. The far tenth is all equally out of reach; the near ground is where a
+  player sites.
 - **Anchor:** a **ring** on the anchor tile, its thickness carrying that anchor's
   share of the body's largest pool, in a hotter near-white cyan over a dark
   backing. A ring rather than a disc because every anchor tile already carries a

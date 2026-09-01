@@ -2,7 +2,7 @@
 
 #include "../world/economy_system.hpp" // economy_report (per-corp budget breakdown)
 #include "../world/world.hpp"
-#include "economy_panel.hpp"            // player_plot_history (profit-chart series)
+#include "plot_history.hpp"             // player_plot_history (profit-chart series)
 #include "ui_state.hpp"                 // ui_state (stubbed Tax/Wages tier state)
 
 #include <unordered_map>

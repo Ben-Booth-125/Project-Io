@@ -74,7 +74,16 @@ const isPointer = (v) => typeof v === 'string' && v.startsWith('@');
 // it was written. Bucketing by date (not by size) keeps the files stable — archiving
 // again next quarter appends a new file rather than rewriting an old one.
 function bucketFor(item) {
-    const stamp = item.resolved || item.written || null;
+    // FOUR NAMES, because the filing convention has used four (Ben, 2026-08-28).
+    // `resolved`/`written` are what this read for; `completed`/`created` are what
+    // items have actually been filed with, and 31 archived records sat in an
+    // `undated` bucket purely because of the mismatch (NR-709). Reading all four
+    // is retroactively correct and costs nothing — the alternative was settling one
+    // name and sweeping history, which is more risk for the same outcome.
+    //
+    // Landing dates come first: an item belongs in the quarter it LANDED, and only
+    // falls back to when it was written if it never recorded a landing.
+    const stamp = item.resolved || item.completed || item.written || item.created || null;
     const m = typeof stamp === 'string' ? stamp.match(/^(\d{4})-(\d{2})/) : null;
     if (!m) return 'undated';
     return `${m[1]}-Q${Math.floor((Number(m[2]) - 1) / 3) + 1}`;

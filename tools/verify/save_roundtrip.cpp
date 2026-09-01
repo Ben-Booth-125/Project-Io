@@ -734,6 +734,7 @@ int main()
             { "provinces.tile_province", w.provinces.tile_province.size(), loaded.provinces.tile_province.size() },
             { "mercenary_offers", w.mercenary_offers.size(), loaded.mercenary_offers.size() },
             { "mercenary_contracts", w.mercenary_contracts.size(), loaded.mercenary_contracts.size() },
+            { "exchanges", w.exchanges.size(), loaded.exchanges.size() },
         };
 
         bool all_match = true;
@@ -794,6 +795,71 @@ int main()
         // empty on both sides too.
         check(w.mercenary_contracts.empty() && loaded.mercenary_contracts.empty(),
               "P12 an EMPTY mercenary_contracts vector round-trips as empty (the inertness state)");
+
+        // BL-685: same inertness proof one line over -- generation never clears
+        // a market, so a freshly generated world has never recorded an exchange
+        // and this ring must be empty on both sides. The populated case is
+        // P13 below and, through the outer IOSG file, save_envelope_roundtrip.
+        check(w.exchanges.entries.empty() && loaded.exchanges.entries.empty()
+                  && loaded.exchanges.next == 0 && loaded.exchanges.total == 0,
+              "P12 an EMPTY exchange record round-trips as empty (the inertness state)");
+    }
+
+    // -----------------------------------------------------------------------
+    // P13 (BL-685) -- the exchange record, POPULATED and WRAPPED
+    // -----------------------------------------------------------------------
+    // The ring's stored order stops being its chronological order once it wraps,
+    // so `next` is state and not a derivable index. A reader that dropped it
+    // would still pass every check above (an unwrapped ring has next == 0) and
+    // would hand every consumer the retained history rotated at the wrap point.
+    {
+        world f = w;
+        const std::size_t cap  = exchange_record_ring::capacity;
+        const std::size_t over = cap + 9;
+        for (std::size_t i = 0; i < over; ++i)
+        {
+            // Every field distinct from its neighbours and from the same field
+            // one row over: a value of 0 round-trips even read into the wrong
+            // member, which is exactly what this fixture exists to catch.
+            exchange_record e;
+            e.tick       = static_cast<int>(2000 + i);
+            e.market     = static_cast<entity_id>(300 + i);
+            e.resource   = static_cast<resource_type>(i % resource_count);
+            e.quantity   = 1.25f + static_cast<float>(i);
+            e.unit_price = 0.75f + static_cast<float>(i) * 3.0f;
+            e.seller     = static_cast<entity_id>(700 + i);
+            // null_entity is a LEGAL counterparty here (it means the market
+            // itself), so the fixture carries both cases.
+            e.buyer      = (i % 4 == 0) ? null_entity : static_cast<entity_id>(800 + i);
+            f.exchanges.push(e);
+        }
+
+        std::stringstream s;
+        write_world_snapshot(f, s);
+        world back;
+        check(read_world_snapshot(back, s), "P13 a world with a wrapped exchange record reads back");
+
+        check(back.exchanges.entries.size() == cap && back.exchanges.next == over - cap
+                  && back.exchanges.total == over,
+              "P13 the ring's rows, wrap cursor and lifetime counter all survive");
+
+        bool rows_match = true;
+        for (std::size_t i = 0; i < f.exchanges.entries.size(); ++i)
+        {
+            const exchange_record& a = f.exchanges.entries[i];
+            const exchange_record& b = back.exchanges.entries[i];
+            rows_match = rows_match && a.tick == b.tick && a.market == b.market
+                && a.resource == b.resource && a.quantity == b.quantity
+                && a.unit_price == b.unit_price && a.seller == b.seller && a.buyer == b.buyer;
+        }
+        check(rows_match, "P13 every field of every row survives in STORED order");
+
+        bool chronological = true;
+        for (std::size_t i = 1; i < back.exchanges.size(); ++i)
+            chronological = chronological
+                && back.exchanges.oldest_first(i).tick
+                       == back.exchanges.oldest_first(i - 1).tick + 1;
+        check(chronological, "P13 the loaded ring reads chronologically across the wrap");
     }
 
     // -----------------------------------------------------------------------

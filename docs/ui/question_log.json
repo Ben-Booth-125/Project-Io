@@ -128,17 +128,20 @@
       "status": "drafted"
     },
     "construction_panel": {
-      "surface": "Construction panel",
-      "answers": "Can I build here, what will it cost me, and why was I refused?",
-      "because": "Placement carries terrain, deposit, slot and now logistics-reach rules (BL-323). A refusal the player cannot read is indistinguishable from a broken build, so the panel must state the reason, not merely deny.",
+      "surface": "Construction ledger - Construction view (queue + build bar)",
+      "answers": "What is under way, what is it costing me, and can I build on the tile I have selected - and if not, why was I refused?",
+      "because": "One construction element, reached by two doors. The nav rail's slot 3 and the tile Selection element's Construct button used to open two different surfaces - a queue that was empty most of the time, and a separate column tenant holding the build bar - so a player met one or the other by accident of which control they pressed. They are one view now: the queue COLLAPSED to a single line above the build bar, because the queue is empty most of the time and an empty queue that owns the surface is the front-door-as-empty-room BL-176 diagnosed. Placement carries terrain, deposit, slot and logistics-reach rules, and a refusal the player cannot read is indistinguishable from a broken build, so the bar states the reason rather than merely denying. With NO tile selected it says 'Select a tile' and nothing more - deliberately, not for want of a better idea: a richer empty state would have to list the tiles the player COULD build on, and any ordering of that list is a recommendation, which is the surface Ben declined in the same message (CONCEPT.md).",
       "backlog_item": [
+        "BL-681",
         "BL-029",
-        "BL-082",
         "BL-095",
+        "BL-162",
         "BL-367"
       ],
       "files": [
-        "src/ui/construction_panel.cpp"
+        "src/ui/construction_panel.cpp",
+        "src/ui/selection_panel.cpp",
+        "src/ui/ui_state.hpp"
       ],
       "status": "drafted"
     },
@@ -171,75 +174,71 @@
       ],
       "status": "drafted"
     },
-    "contracts_ledger_active": {
-      "surface": "Contracts ledger - Active view",
-      "answers": "What am I on the hook for right now, and what does walking away cost?",
-      "because": "An accepted mercenary_contract commits real units and a real deposit; the player needs to see the predicate it is paying to make true (condition_text), the deadline, and the force committed to it. The Abandon press exists because CONTRACTS.md Q2 makes an early exit cheaper than a rout but never free — the reputation cost has to be shown BEFORE the press commits, not discovered afterward, or the ledger would be teaching the wrong lesson about the one number that makes abandoning a real decision.",
+    "acquisitions_ledger_field": {
+      "surface": "Acquisitions ledger - the Purchasable / Possible groups",
+      "answers": "What can I buy now, and what am I saving for?",
+      "because": "Ben's wording, 2026-08-29, and it settles the surface rather than describing it: the question names BOTH groups, which is what makes the Possible group a goal rather than a tease. FINANCE.md gives ownership a price and a verb, and until this surface existed neither was readable anywhere - buy_corporation could be issued by the scorer and by the wire, and by no press a player could find. It earns its space on the menus-are-broad-ledgers test: an overview across the whole field of firms, never a targeted action on one. The two groups are the load-bearing part and were kept after measurement rather than assumed - Purchasable carries the Buy press, Possible carries a price and deliberately NO press, and that contrast is the only way a player sees what the next rung costs. The surface states the size of the field it draws, which is the clause that had to be re-measured: at the time this was settled the buyable field was one to three firms of eighty-eight, because ownership class was overwhelmingly closed. BL-678 (companies are open) retired closure for companies, and the same twelve-seed sweep now reads 81.6 public firms per seed - 35.8 Purchasable and 45.8 Possible, with 4.8 still closed. So the count on the face stops excusing a short list and starts doing the work the question asks of it: telling the player how much of the world is in reach today against how much is worth saving for.",
       "backlog_item": [
-        "BL-576"
+        "BL-628",
+        "BL-658",
+        "BL-678"
       ],
       "files": [
-        "src/ui/contracts_ledger.cpp"
+        "src/ui/acquisitions_ledger.cpp",
+        "src/ui/nav_pane.cpp",
+        "src/ui/body_surface_canvas.cpp"
       ],
-      "status": "drafted"
+      "status": "settled"
     },
-    "contracts_ledger_history": {
-      "surface": "Contracts ledger - History view",
-      "answers": "How has this line of work actually gone for me?",
-      "because": "CONTRACTS.md Q2 names three terminal states (completed / failed / abandoned) with three different money and reputation outcomes, deliberately against procurement's two — failure is the mechanism's teeth ('you are not paid for trying'). A player cannot read their own standing spiral (CONTRACTS.md: reputation falls, fees fall with it) without a record of which contracts ended which way and what they actually paid; without this view every terminal contract vanishes into the sentiment substrate with nothing on screen to show for it.",
+    "acquisitions_ledger_profitability": {
+      "surface": "Acquisitions ledger - Profitability fold-out (full-canvas)",
+      "answers": "Who is making money, and what would owning them cost?",
+      "because": "BL-626 made every corporation file a quarterly return as world state, and BL-631 made ownership class decide who may read it - but neither put a single filed figure on screen where a player could compare firms. This is that surface: one row per corporation, sortable on every column, exact where the firm files and a dash where it does not, no bands (FINANCE.md section Disclosure; Ben 2026-08-26 retired the banded read). It earns a FULL-CANVAS takeover rather than a place in the column because of the measurement that also shrank the groups above it: 85.4 firms per seed file a return they do not disclose, so the table is ~88 rows over seven columns while the buyable field is ~1.6 rows. That inversion is the whole argument for the split - the column holds what you can act on, the takeover holds what you can read.",
       "backlog_item": [
-        "BL-576"
+        "BL-627"
       ],
       "files": [
-        "src/ui/contracts_ledger.cpp"
+        "src/ui/acquisitions_ledger.cpp",
+        "src/ui/detail_level.hpp"
       ],
-      "status": "drafted"
-    },
-    "contracts_ledger_offers": {
-      "surface": "Contracts ledger - Offers view",
-      "answers": "Who wants to hire me, for what, and can I afford to say yes?",
-      "because": "CONTRACTS.md settles the mercenary contract as the sell side of the income loop: a client nation offers a fee to make a fact about the world true by a deadline. Without a surface listing open offers the player cannot act on the mechanism at all — offers exist in world::mercenary_offers whether or not anyone can see them, which is exactly the BL-089 activity-fog framing this view honours (an offer is hidden unless its target body is at least Known). The view is also where the force-picker lives: CONTRACTS.md Q1 rules the player chooses the force, never the contract, so the Accept press has to open onto something.",
-      "backlog_item": [
-        "BL-576"
-      ],
-      "files": [
-        "src/ui/contracts_ledger.cpp"
-      ],
-      "status": "drafted"
+      "status": "settled"
     },
     "corporation_dashboard": {
-      "surface": "Corporation dashboard",
-      "answers": "How is my corporation doing overall?",
-      "because": "Roll-up cards over holdings, balance and production, so the player has a whole-corp read without assembling it from four ledgers. Pairs existed on these cards before BL-247's log was removed. BL-343 added the sixth Finance bar, Levies: a law the player cannot see working is indistinguishable from an unimplemented one, so the levy is its own number rather than folded into maintenance. BL-591 (2026-08-24) added a fifth line to Production: the growth track (reached chain depth, the good that set it, what the next rung opens, what is missing to get there) — a corp-grain fact (corp_reached_depth) the 2026-08-15 playtest rework had cut from the building card without giving it a new home, so \"how is my production going\" had no answer to the growth-track half of the question until this item.",
+      "surface": "Corporation ledger",
+      "answers": "How well am I doing?",
+      "because": "ONE card, Balance: earnings against stacked expenses, and nothing else. The surface shipped with four roll-ups and three of them were answered better elsewhere — Production and Workforce by the Construction ledger's Buildings tab, which holds the estate AND the per-building levers; Trade by the Market and Convoys ledgers. What is left that only this surface can answer is how well the corporation is doing, and the honest answer to that today is money (Ben, 2026-08-29). The card earns its column because it shows its chart AT REST rather than a verdict line over an empty column, and because the chart is the whole of the quarter's arithmetic: earnings on the left, every outflow corp_budget::net() subtracts stacked on the right, each segment naming itself and its figure on hover. Interest is absent while the corp is solvent and present once it is in debt, so the segment count itself reads the solvency boundary. It is the same ui::charts drawer the building card's Revenue/Expenses graph uses, at a different grain — one chart, one arithmetic, two surfaces that cannot disagree. \"Balance\" is a sub-header inside the Corporation ledger, not a competing surface name, and its overlap with the Budget ledger is explicitly ACCEPTED (Ben, 2026-08-29) rather than an oversight to clean up. Research points, score, ranking and market cap are deferred by name until core gameplay is established; several have no store behind them at all.",
       "backlog_item": [
         "BL-081",
         "BL-214",
         "BL-343",
-        "BL-591"
+        "BL-691"
       ],
       "files": [
-        "src/ui/corporation_dashboard.cpp"
+        "src/ui/corporation_dashboard.cpp",
+        "src/ui/charts.cpp"
       ],
       "status": "settled"
     },
     "corporation_panel": {
-      "surface": "Corporation panel — stance column",
-      "answers": "What is my stance toward this rival, and can I change it?",
-      "because": "BL-448 landed a corp stance data model (friend/neutral/hostile) with zero UI — the exact BL-350 lesson (a complete seam with no press, unnoticed for weeks) this item exists to avoid. The column shows the current stance label and the legal transition presses (Declare Hostile, Offer/Accept Friendship, Return to Neutral), gated on ordinary BL-068 competitor-visibility per NR-350 (a hostile declaration stays silent, discovered on contact rather than announced).",
+      "surface": "Corporation ledger — the stance groups and the row action strip",
+      "answers": "Who am I standing with, who am I standing against, and which way does the hostility run?",
+      "because": "BL-448 (corp stance) landed a stance data model with zero UI — the BL-350 lesson (a complete seam with no press) this surface exists to avoid — and this ledger is still its only host. The shape is three collapsing groups, Friends / Hostile / Neutral, each carrying its count and each stating its emptiness in words when it has no rows: Friends is normally empty at campaign start, and a section that simply vanished would read as a missing feature rather than as an answered question. A hostile row also says WHICH DIRECTION the hostility runs, because hostility is directed (RELATIONS.md § 1 Stance) and a row that only says 'hostile' has thrown away the half of the fact the player acts on — whether they declared, or are the one being interdicted. `is_hostile` is asked once per direction and never collapsed with `are_friends`, per that section's third invariant. The four transition presses (Declare Hostile with its confirm, Offer / Accept Friendship, Return to Neutral) live in the row's own action strip, opened by a disclosure arrow, and draw at the strip's full width — the arrangement that lets them exist at all in a ~324 px column, where a fixed 220 px in-row column clipped 'Declare Hostile' to 'De...'. There is no discovery gate: RELATIONS.md § 1 Stance overturns NR-350 — 'A declaration against the player is SIGNALLED' (Ben, 2026-08-22) — so a declaration groups and reads immediately rather than waiting on contact.",
       "backlog_item": [
+        "BL-639",
         "BL-449",
         "BL-448"
       ],
       "files": [
         "src/ui/corporation_panel.cpp"
       ],
-      "status": "settled"
+      "status": "drafted"
     },
     "corporation_panel_standing": {
-      "surface": "Corporation panel — the standing columns (Reach / Capital / Share)",
-      "answers": "How large is each corporation, how much of the market does it hold, and what is it worth?",
-      "because": "The columns used to read as five bands — negligible / minor / notable / major / dominant — for every row but the player's own, on the premise that a rival's figures were private. Ben retired that premise on 2026-08-26: \"We don't need company information to be invisible.\" Two of the three axes were never hidden by anything except the banding — reach is a count of bodies the player can already see buildings on, and market share is derived from the supply/demand aggregates DISCOVERY.md names as the deliberate public signal — so the band was destroying information the world was already giving away, and buying no privacy for it. They print exactly, for every corporation. Capital is the one axis that is genuinely a FILED figure, so it follows the firm's ownership class instead: exact where the firm files, a dash where it does not (FINANCE.md § Disclosure), with the reason on hover. That is what earns the space — the column now carries a fact about the FIRM that nothing else on screen carries, and the dash reads as 'this firm does not file', never as 'you have not earned this'. What it deliberately does NOT gain is any operational quantity: production rates, stockpile levels, recipes and workforce dials stay private, and the rival hover card still shows type and owner only. An open book tells you what a firm earned, never how it operates.",
+      "surface": "Corporation ledger — the firm's name and its Capital figure",
+      "answers": "Which firm is this, and what is it worth?",
+      "because": "The row carries two fields, and the first of them is the one this surface had never managed to show. NAME: the population is the named corporate field — corporations, plus the player's own row — and background firms (BL-365, background firms) are excluded, because a background firm exists to fill a body's production gap and is not a party anyone can stand toward. Listing them put eighty-odd rows in front of the handful that are, and left the firm's name so little width it collapsed to a single letter. A diplomacy surface whose rows cannot be told apart answers nothing, so the name gets every pixel the other field does not need. CAPITAL: exact where the firm files, a dash where it does not (FINANCE.md § Disclosure), exact always for the player's own row — a corporation always reads its own books. The dash means 'this firm does not file', never 'you have not earned this', and says so on hover. The bands are retired and are not reintroduced. REACH AND SHARE ARE GONE. Both were public and both printed exactly, but at this column width they cost the name, and neither is a stance fact: reach is a count of bodies and share is a clearing-income ratio, both of them standing figures that belong with the profitability read (BL-627, profitability ledger). What the row deliberately still does NOT carry is any operational quantity — production rates, stockpile levels, recipes and workforce dials stay private. An open book tells you what a firm earned, never how it operates.",
       "backlog_item": [
+        "BL-639",
         "BL-633",
         "BL-262",
         "BL-631"
@@ -259,20 +258,6 @@
       ],
       "files": [
         "src/ui/decision_feed.cpp"
-      ],
-      "status": "drafted"
-    },
-    "economy_panel": {
-      "surface": "Economy panel (Corps / Holdings / Markets)",
-      "answers": "How do the corporations, their holdings and the markets compare against each other?",
-      "because": "The cross-corp comparison view. Ben ruled 2026-08-09 that it earns a nav-rail door rather than retirement (BL-292), so it must now justify the slot it occupies.",
-      "backlog_item": [
-        "BL-063",
-        "BL-117",
-        "BL-292"
-      ],
-      "files": [
-        "src/ui/economy_panel.cpp"
       ],
       "status": "drafted"
     },
@@ -406,12 +391,38 @@
       ]
     },
     "market_ledger": {
-      "surface": "Market Ledger",
-      "answers": "What is this good worth here, and who is willing to trade it?",
-      "because": "Markets are the public intelligence channel under the BL-068 visibility rule -- a rival's production and stockpiles are private, so price and the order book are the only honest read the player has on a competitor. Without this surface the discovery model has no channel to reason through.",
+      "surface": "Market Ledger - Goods table",
+      "answers": "What is each good worth here, and which way is it moving?",
+      "because": "Markets are the public intelligence channel under the BL-068 visibility rule -- a rival's production and stockpiles are private, so price and the order book are the only honest read the player has on a competitor. The stacked-sparkline layout this replaces failed at that in three ways and only one was density: every sparkline was autoscaled to its OWN range, so a good decaying 40% and a good flat to a rounding error drew the same shape and goods could not be compared -- the one thing a price board is for; 'now 0.63' gave no direction; and the scroll hook aimed at the window while the list sat in a child scroller, so no capture, golden or human, had ever seen past the fourth good of 45. One row per good with the 8-quarter graph flattened into it fixes the density; drawing every row against a SHARED price/base axis with a 1.0 baseline fixes the comparison, which was the real defect.",
       "backlog_item": [
         "BL-122",
-        "BL-159"
+        "BL-159",
+        "BL-686"
+      ],
+      "files": [
+        "src/ui/market_ledger.cpp"
+      ],
+      "status": "drafted"
+    },
+    "market_ledger_trades": {
+      "surface": "Market Ledger - Trades tab",
+      "answers": "What positions do I hold here, what else is standing, and what could I be doing?",
+      "because": "IT IS CALLED TRADES BECAUSE THE WORD CARRIES THE WIDENING (Ben, 2026-08-29). A sell order is one direction and one actor; a trade is a position either way round, held by anyone in the market, and -- now that the clearing tick retains a per-exchange record -- one that has already happened. The tab it replaces answered only 'what am I currently offering, at what floor?', which is the narrowest of the four things a player standing at a market wants to know.\n\nIt earns its space because markets are the public intelligence channel under the visibility rule: a rival's production and stockpiles are private, so price and the ORDER BOOK are the only honest read the player has on a competitor -- and the book was visible nowhere. THREE READS, KEPT VISIBLY DISTINCT, because they are not equally cheap to know and presenting them as one table would claim they were: my standing trades (a filter on my own orders), the market's standing trades (the same book past a gate), and potential trades (a derivation with no store behind it -- buy price here against sell price there, less the haulage the route would cost, priced through the same price_convoy_leg the auto-dispatcher and the player's own dispatch verb use, so the figure the player acts on is the figure that would bill them).\n\nTHE GATE ON THE SECOND READ IS 'the player owns a building on that body' (Ben, 2026-08-29, choosing it over 'an order here', 'either', and 'any discovered market'). Orders are world state and the deliberate public signal, so this is a reading question rather than a disclosure one -- but 'operates in' is a real predicate and is enforced, not assumed: a player reads the books of markets they trade at, not of the whole system.\n\nTHE HISTORY COLUMN IS REVENUE, NEVER PROFIT, and the limit is structural. stockpile_component is quantities[] and nothing else, so no cost basis exists anywhere in the model and the margin on a sale cannot be derived from it; quantity * unit_price is honest and a profit column would be a number the clearing loop never computed and a player would act on. An ABSENT counterparty renders as the market and not as 'unknown' -- three of the four clearing paths trade against the market as counterparty of last resort and they carry the volume, so blanking or skipping those rows would empty the section.\n\nRANKING IS PERMITTED HERE and this is the one surface where that has been ruled on explicitly (CONCEPT.md: rank where the top row is one input among several, not where it IS the move). Ben, same day: 'Market prices is a vital pillar of gameplay, but the strategy \"just build the most profitable\" is a red herring.' A potential trade sorted by margin is still weighed against reach, stock, competition and what the price does next.\n\nEACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferred: the book runs to 24 rows on the shipped fixture and the exchange read to 120, so laid out end to end the first fills the column and the other three reads are below the fold on open. A tab whose headline question is 'what could I be doing?' cannot open on a list of rival orders with the answer three screens down.",
+      "backlog_item": [
+        "BL-687"
+      ],
+      "files": [
+        "src/ui/market_ledger.cpp",
+        "src/ui/market_ledger.hpp"
+      ],
+      "status": "drafted"
+    },
+    "market_ledger_nation_row": {
+      "surface": "Market Ledger - nation presence row",
+      "answers": "Which nations operate in this market?",
+      "because": "The Body and Market combos name a place but say nothing about who is IN it, and a price is not readable without knowing whose ground feeds it -- a market served by one nation and a market four nations compete over price the same way on screen and mean entirely different things. It earns the space between the selectors and the tabs because it qualifies the market the combos just chose, before the tabs ask a question about it, and it costs one wrapped row. THESE ARE COLOUR CHIPS WITH INITIALS, NOT FLAGS, and that is deliberate: nation_colour is a palette entry and is all that exists -- corporations carry an emblem tag, nations do not -- so real per-nation emblem artwork would be a generated identity system, a feature of its own, and a single stubbed glyph would teach a vocabulary the game does not have. Placeholder even at that (Ben, 2026-08-29: flags and glyphs are a later sprint). Presence is DERIVED, since no store answers it: a building sits on a tile, market_for_tile resolves that tile's catchment market (the same routing clear_markets uses), and tile_to_nation gives the owner -- so a nation appears exactly when its ground really clears here.",
+      "backlog_item": [
+        "BL-688"
       ],
       "files": [
         "src/ui/market_ledger.cpp"
@@ -419,15 +430,16 @@
       "status": "drafted"
     },
     "market_ledger_convoys": {
-      "surface": "Market Ledger - Convoys tab",
+      "surface": "Convoys ledger (nav rail slot 7)",
       "answers": "What is on its way to me, and when does it land?",
-      "because": "Convoys are drawn on three canvases -- a moving beam on the Planetary canvas, lines on the Solar canvas, a lens glyph, an aggregated route graph -- and were LISTED nowhere, so the one number the player needs from them had no home. Travel time became load-bearing on 2026-08-12: a long haul now takes several quarters where it used to take one, and stock committed to a convoy is out of the pool for the whole of it. Without ticks-to-arrival on a surface, a player cannot tell a delivery that is late from one that was always going to be slow, and cannot plan a build against stock already in transit. The tab also gives BL-452's Hold press a per-convoy row to sit on.",
+      "because": "Convoys are drawn on three canvases -- a moving beam on the Planetary canvas, lines on the Solar canvas, a lens glyph, an aggregated route graph -- and were LISTED nowhere, so the one number the player needs from them had no home. Travel time became load-bearing on 2026-08-12: a long haul now takes several quarters where it used to take one, and stock committed to a convoy is out of the pool for the whole of it. Without ticks-to-arrival on a surface, a player cannot tell a delivery that is late from one that was always going to be slow, and cannot plan a build against stock already in transit. The tab also gives BL-452's Hold press a per-convoy row to sit on. It became a LEDGER OF ITS OWN at rail slot 7 rather than staying a Market tab: it was never a market question -- MARKETS.md owns clearing and the order book, while a convoy is cargo in transit and belongs to SUPPLY.md ('Logistics is the road, Supply is the traffic'). Its own slot also lets it arm supply_routes, the lane overlay that is the literal map twin of the list; a tab strip arms ONE lens for every tab, so opening the Market ledger for a logistics read armed the price wash instead.",
       "backlog_item": [
         "BL-452",
-        "BL-453"
+        "BL-453",
+        "BL-689"
       ],
       "files": [
-        "src/ui/market_ledger.cpp"
+        "src/ui/convoys_ledger.cpp"
       ],
       "status": "drafted"
     },
@@ -448,7 +460,7 @@
     "nav_pane": {
       "surface": "Nav rail",
       "answers": "What can I open from here?",
-      "because": "Every ledger and panel needs exactly one discoverable door. BL-292 is the standing proof of the cost when a surface lacks one: the Economy panel was drawn every frame and reachable by nobody.",
+      "because": "Every ledger and panel needs exactly one discoverable door, and the rail is where that door is. A surface with no slot is drawn every frame and reachable by nobody; a slot with no surface teaches a system the game does not have.",
       "backlog_item": [
         "BL-022",
         "BL-027",
@@ -488,12 +500,13 @@
     },
     "selection_building_card": {
       "surface": "Selection band - Building card (3-column band)",
-      "answers": "What's the state of this building, how much workforce does it have, can I close or dismantle it, and what can I do about it?",
-      "because": "The building card previously split action|facts like every other selection kind, with three MORE independently-toggled sections stacked below the facts column (Method/Chain/Depth, BL-431) - a tall, scrolling stack that read nothing like the tile card sitting one selection away. Moving the building onto the SAME 3-column band shape (zoomed tile render / paged accordion / action grid) makes 'select a thing, get its picture + a pager + its actions' one shape across the two entity kinds that actually get selected in play, rather than two competing layouts a player has to relearn. The former toggles become PAGES for the same reason the tile card's resource graphs are pages, not accordions: a page IS the opened state, so there is nothing left inside it to fold. 2026-08-15: Workforce (graph/Auto/tier grid) and Lifecycle (Close-Reopen/Dismantle) joined the accordion as two more pages, absorbed from the construction panel's deleted Buildings tab - this card is now the single home for a building's full detail, not a duplicate of it.",
+      "answers": "What is this building, what is it earning me, and what can I do about it?",
+      "because": "The building card takes the SAME 3-column band shape as the tile card (zoomed tile render / paged accordion / action grid), so 'select a thing, get its picture, a pager and its actions' is one shape across the two entity kinds that actually get selected in play. Its CENTRE presents data and never holds levers (Ben, 2026-08-29): a dial that changes the world belongs to a ledger, so Method and Workforce - two pages whose whole content was a control - moved to the Construction ledger's Buildings view, and what remains reports (Profitability, Status). The boundary runs around the CENTRE, not the element: the right-hand action grid is the designated place to act and keeps Mothball, Dismantle and Auto. The move would have left a building selected on the MAP with no route to its own levers, so the grid gained a fourth button that opens the Buildings view AIMED at this building - its type group expanded, the building selected, the levers on screen in one press. That button is a door rather than a toggle (its active state is not visible here), and it is ABSENT on a rival's card, because the Buildings view is the player's estate and aiming a rival building at it would open an empty aim. A rival card is Status only, by a short-circuit in building_pages that never tests a player page's own guard - a competitor-visibility guarantee rather than a convenience.",
       "backlog_item": [
+        "BL-683",
+        "BL-682",
         "BL-431",
         "BL-430",
-        "BL-428",
         "BL-074"
       ],
       "files": [
@@ -535,7 +548,7 @@
     "selection_panel": {
       "surface": "Selection element",
       "answers": "What have I selected, and what can I do with it?",
-      "because": "The pinned, polymorphic detail surface for the current selection. It is the answer to the click model's promise: single-click selects, and something must visibly happen when it does. BL-593 (2026-08-24) extended the tile construction ledger's candidate filter with a third lock kind (tech_locked, BL-588), filtered out the same way era_locked and depth_locked already were -- \"the door not showing what the gate would refuse\", not a new UI affordance.",
+      "because": "The pinned, polymorphic detail surface for the current selection. It is the answer to the click model's promise: single-click selects, and something must visibly happen when it does. BL-593 (2026-08-24) extended the tile construction ledger's candidate filter to recipe-level tech locks (tech_locked, BL-588), filtered out the same way era_locked already was -- \"the door not showing what the gate would refuse\", not a new UI affordance.",
       "backlog_item": [
         "BL-067",
         "BL-068",
@@ -655,6 +668,59 @@
         "src/ui/body_surface_canvas.cpp",
         "src/ui/icons.cpp",
         "src/ui/icons.hpp",
+        "src/ui/ui_state.hpp"
+      ],
+      "status": "drafted"
+    },
+    "company_lens": {
+      "surface": "Company lens — background-firm holdings on the Planetary canvas",
+      "answers": "Who else is operating on this ground, besides the rivals I actually compete with?",
+      "because": "It earns its space by taking a question OFF another surface rather than adding one. Until 2026-08-28 the Corporation lens drew every non-player firm, so it answered two questions at once and therefore neither: measured on the home body, 373 background-firm buildings across 80 companies against 33 rival buildings across 7 corporations, an 11:1 ratio in which the rivals were invisible inside their own lens. Splitting the population gives each lens one question. The pair is also the cheapest possible addition to learn — drawn identically, differing only in which firms they admit, so a player who can read one can read the other with no new vocabulary. Ben settled the words on the same day: a corporation is the player and its rivals, a company is a background firm (GLOSSARY.md).",
+      "status": "settled",
+      "backlog_item": "BL-663",
+      "files": [
+        "src/ui/ui_state.hpp",
+        "src/ui/overlay.cpp",
+        "src/ui/body_surface_canvas.cpp"
+      ]
+    },
+    "lens_region_selection": {
+      "surface": "Deposit and plate selection — the Resource and Continent lenses' hover highlight and click-through",
+      "answers": "This region the lens has drawn — what is it, and where do I go to find out more about it?",
+      "because": "A lens is a visual prelude to a ledger (Ben, 2026-08-28: \"the lens is a visual prelude to whatever we design on ledgers using various charts and tables\"), and until now two lenses drew a region that led nowhere. The Market lens had pivoted to its whole catchment since BL-603, but the Resource lens's deposit and the Continent lens's plate were explicitly excluded — lens_structure_of_tile recorded the reason, that a selection must be an entity and neither region is one, and that half-supporting them would \"promise a pivot that does not arrive\". This surface is that promise finally kept: hovering lights the whole region, and the click opens the ledger that can say something about it — Market (Prices, aimed at the resource) for a deposit, History for a plate. It costs no new screen space at all, which is the strongest form of earning it: the highlight reuses the catchment wash and the destinations are ledgers that already exist.",
+      "status": "drafted",
+      "backlog_item": "BL-659",
+      "files": [
+        "src/ui/ui_state.hpp",
+        "src/ui/body_surface_canvas.cpp",
+        "scripts/verify/lens_selection_paths.lua"
+      ]
+    },
+    "company_ledger": {
+      "surface": "Company ledger — the fold-out surface a Company-lens click opens (PLACEHOLDER)",
+      "answers": "I clicked this background firm's holding — what firm is that, and is it one of the corporations I compete with?",
+      "because": "It earns its space by being the only thing on the other end of a click that would otherwise go nowhere. Ben, 2026-08-28: \"clicking will take you to a relevant ledger. (Different types for either, make a placeholder if needed).\" The corporation half of that ruling already had a destination — the all-corporations table — while the company half had no surface of any kind, so the Company lens drew a population the player could look at and never open. The surface is DELIBERATELY THIN and says so on its own face: it answers none of the five axes a designed ledger answers (docs/ui/ledgers/README.md — top question, sub-views, lens on open, data sources, close semantics), prints only facts already public about any firm (name, registration, holdings, and capital where the firm files), and invents no figure where the world has none. Its justification is therefore provisional: it earns space today as the click's landing point, and must earn it properly when the ledger batch designs it.",
+      "status": "drafted",
+      "backlog_item": "BL-666",
+      "files": [
+        "src/ui/company_ledger.hpp",
+        "src/ui/company_ledger.cpp",
+        "src/ui/ui_state.hpp",
+        "src/ui/nav_pane.cpp",
+        "src/core/app.cpp"
+      ]
+    },
+    "construction_buildings_view": {
+      "surface": "Construction ledger - Buildings view (the estate by type)",
+      "answers": "What do I own, how much is each kind of it making me, and where do I go to tune one?",
+      "because": "It is the ledger's DEFAULT view, and it earns that over the queue by the plainest fact about the two: the player always owns buildings and usually has nothing building. Grouping by type rather than listing every building is what makes it an overview - a count and a summed profit per named type answers 'which part of my estate pays' in one glance, at the ~9 rows the shell column affords. Expanding a type row lists its own buildings, and a press selects one and draws its levers, so the chain runs type -> building -> lever without leaving the ledger. That is NAVIGATION, not recommendation: it lists what the player already owns, in a group whose count has already asserted they exist, and it ranks nothing they have not built. It also removes a dead end - 'Select a tile' is an instruction with no affordance attached, and the buildings behind a count are exactly the set the ledger has in hand. It is the destination for Method and Workforce, which left the Selection card's centre when Ben ruled that the centre presents data and never operates; the same function bodies are called from here, never a second set of controls writing the same fields.",
+      "backlog_item": [
+        "BL-682",
+        "BL-683"
+      ],
+      "files": [
+        "src/ui/construction_panel.cpp",
+        "src/ui/construction_panel.hpp",
         "src/ui/ui_state.hpp"
       ],
       "status": "drafted"

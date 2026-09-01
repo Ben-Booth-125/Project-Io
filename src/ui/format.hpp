@@ -113,7 +113,7 @@ calendar_date date_from_day(uint64_t day_tick);
 float quarter_progress(uint64_t day_tick);
 
 /// The labour-contention read for a (corp, body) workforce scalar — the single
-/// phrasing every surface uses, so the same ceiling seen from the Economy panel,
+/// phrasing every surface uses, so the same ceiling seen from a ledger,
 /// the Selection element and the hover card cannot drift in either its number or
 /// its words (BL-179).
 ///

@@ -45,6 +45,16 @@
 //
 // Capture is opt-in and costs nothing when unrequested: `make_hard_coded_world`
 // fills the fixture only when it is handed one.
+//
+// A SEVENTH CALLER EXISTED AND NOBODY COUNTED IT (NR-732/NR-733, 2026-08-30).
+// This file's scope was HARNESSES; the History ledger's Ages view re-ran the era
+// too, and diverged on all six axes above at once. It is gone — generation now
+// RECORDS the ownership history (`generation_report::body_entry::
+// prehistory_timelapse`) and the view replays that, so there is no second
+// invocation left to drift. The lesson is about scope rather than that view: a
+// file built to stop a class of defect stopped it for the callers its author had
+// in mind, and nothing made the omission visible. There is still no check that
+// says "every caller of run_history_sim derives its params here".
 
 #include "creeds.hpp"
 #include "hard_coded_world.hpp"

@@ -1,29 +1,89 @@
 corp_id,corp_name,income,expenditure,maintenance,wages,interest,net
-46798,"Faros-YelenKalen International",0,0,28,5.12927,0,-33.1293
-46799,"Exoar-Exoex Enterprises",1167.12,0,45,8.64298,0,1113.48
-46800,"Corix Industries",1296.7,0,50,9.60331,0,1237.09
-46801,"Calyx Industries",7579.24,0,41.5,7.68265,0,7530.06
-46802,"FararAthar Holdings",1105.54,0,53,9.60331,0,1042.94
-46803,"CalonIntus-PaxisAthen Ventures",1010.34,0,45,8.64298,0,956.698
-46804,"Genom Systems",0,0,21,0,0,-21
-46805,"Terel-Coron Holdings",5751.31,0,26,3.84133,0,5721.47
-51022,"Nexis Logistics",0,0,26,3.84133,0,-29.8413
-51025,"Lukuk Resources",0,0,21,2.88099,0,-23.881
-51028,"YelorCalur Operations",21983.5,0,26,3.84133,0,21953.7
-51031,"Orban-GenenOrbos Resources",0,0,26,3.84133,0,-29.8413
-51035,"HexyxCorix-CalosFaran Enterprises",462.478,0,50,9.60331,0,402.875
-51038,"Nexos-Calel Logistics",0,0,21,2.88099,0,-23.881
-51042,"Ruzumz Enterprises",17798.3,0,36,5.76199,0,17756.5
-51046,"BorosGenan-Zenom Industries",8825.81,0,36,5.76199,0,8784.05
-51049,"Sualak Systems",0,0,26,3.84133,0,-29.8413
-51053,"CoraxCoros Operations",193.897,0,31,4.80166,0,158.095
-51057,"Maikka Processing Group",513.208,0,36,5.76199,0,471.446
-51061,"Tei Extraction Co.",430.051,0,36,5.76199,0,388.289
-51065,"Dynan Resources",359.638,0,36,5.76199,0,317.876
-51068,"Luxan Industries",0,0,21,2.88099,0,-23.881
-51071,"JorenRexax Enterprises",11247.9,0,26,3.84133,0,11218.1
-51075,"Rexar Dynamics",630.131,0,36,5.76199,0,588.369
-51078,"PaxonNexen Enterprises",0,0,26,3.84133,0,-29.8413
-51082,"Zenus-Orbon Operations",174.296,0,31,4.80166,0,138.495
-51086,"Roteit Logistics",447.013,0,36,5.76199,0,405.251
-51090,"He Holdings",289.78,0,36,5.76199,0,248.018
+48690,"Faros-YelenKalen International",33.3071,21.2321,43,9.33726,0,-40.2623
+48691,"Exoar-Exoex Enterprises",174.389,17.085,60,12.5332,0,84.771
+48692,"Corix Industries",117.267,25.9331,43,9.33726,0,38.9967
+48693,"Calyx Industries",9.34756,0,21,3.13331,0,-14.7857
+48694,"FararAthar Holdings",109.264,130.381,37.5,7.58261,0,-66.1994
+48695,"CalonIntus-PaxisAthen Ventures",135.714,56.5356,49.5,9.90126,0,19.7773
+48696,"Genom Systems",45.9545,4.47033,9,1.94265,0,29.589
+48697,"Terel-Coron Holdings",22.7243,0,33,5.63996,0,-15.9156
+53323,"Nexis Logistics",31.2323,22.9279,17.5,3.00798,0,-12.2036
+53326,"Lukuk Resources",208.215,152.853,43,7.51994,0,4.84256
+53329,"YelorCalur Operations",164.172,115.604,43,7.51994,0,-1.9518
+53332,"Orban-GenenOrbos Resources",0,0,7.5,0,0,-7.5
+53335,"HexyxCorix-CalosFaran Enterprises",24.6156,17.3406,17.5,3.00798,0,-13.233
+53338,"Nexos-Calel Logistics",38.9773,31.161,9,1.12799,0,-2.31169
+53342,"Veirai Enterprises",16.963,0,41,7.51994,0,-31.5569
+53346,"BorosGenan-Zenom Industries",15.5173,0,26,4.38663,0,-14.8693
+53350,"Kemhin Systems",98.9483,0,29.5,5.63996,0,60.5572
+53355,"CoraxCoros Operations",90.6437,0,36,7.51994,0,47.1238
+53360,"Zumzum Processing Group",49.586,0,63,13.1599,0,-26.5739
+53365,"Kua Extraction Co.",114.987,0,44.5,8.77327,0,61.7136
+53370,"Dynan Resources",121.464,0,63,13.1599,0,45.3037
+53374,"Luxan Industries",20.1259,5.20635,34.5,6.64262,0,-26.223
+53378,"JorenRexax Enterprises",81.1894,28.901,33,6.89328,12.2973,0.0978355
+53383,"Rexar Dynamics",214.885,0,63,13.1599,0,138.725
+53386,"PaxonNexen Enterprises",0,0,17.5,1.87999,0,-19.38
+53390,"Zenus-Orbon Operations",11.3734,380.95,34.5,2.38132,0,-406.458
+53394,"Lidu Logistics",33.7176,6.86705,36,6.26662,0,-15.4161
+53399,"Daini Holdings",102.973,0,43,9.39993,9.60423,40.9685
+53403,"XeronBryis-Paxyx Industries",29.1725,0,36,6.89328,0,-13.7208
+53407,"DelelCalyx-Orbix Enterprises",87.1655,0,43,8.77327,0,35.3922
+53410,"ExoorOrbus Systems",10.586,6.21555,7.5,0.375997,0,-3.50557
+53413,"Luxyx Holdings",0,0,7.5,0,0,-7.5
+53417,"Calon Enterprises",9.02937,546.028,34,2.25598,0,-573.255
+53420,"Bryos Logistics",0,0,9,0,0,-9
+53425,"Bryur Dynamics",34.4714,0,54.5,10.6533,0,-30.6818
+53429,"Thathd Dynamics",18.5042,0,34.5,6.26662,0,-22.2624
+53433,"Teron Enterprises",76.7469,0,34.5,6.89328,0,35.3536
+53437,"Kathra Holdings",59.9998,7.13789,27.5,4.38663,0,20.9753
+53442,"Ruthme Logistics",34.9619,0,26,5.0133,0,3.94863
+53446,"Muamtu Extraction Co.",36.8341,0,24.5,5.0133,0,7.32081
+53450,"Intar-WenaxIntyx Industries",24.418,0,31,5.63996,0,-12.222
+53453,"DelexOrbex-Jorom Dynamics",20.7956,2.30166,9,1.12799,0,8.36594
+53457,"Terar Systems",17.0601,0,19,2.50665,0,-4.44651
+53461,"Vecos Resources",14.5359,2.06012,11.5,1.56665,0,-0.590882
+53465,"BryyxUlvom-Hexyx Industries",21.8576,4.83963,34,2.81998,17.294,-37.0961
+53469,"Hexel Systems",7.97183,389.533,34,2.13065,0,-417.692
+53472,"UlvaxIntax Systems",5.76344,0,19,1.87999,0,-15.1165
+53476,"SolonSolus Industries",25.8458,0,17.5,2.81998,0,5.52585
+53479,"MarelGenel Enterprises",0,0,17.5,1.87999,0,-19.38
+53482,"BryixFaros-Borom Ventures",0,0,9,0,0,-9
+53485,"KalusOrbom Ventures",0,0,7.5,0,0,-7.5
+53489,"QuaurXeren-UlvosExoel Operations",33.11,3.99335,18.5,3.63464,0,6.982
+53492,"Farel International",0,0,17.5,1.87999,0,-19.38
+53495,"Nexor Ventures",81.699,27.4682,43,7.51994,0,3.71085
+53498,"Tukait Operations",4.60443,0,19,1.87999,0,-16.2756
+53502,"Das Logistics",69.8359,0,26,5.51463,0,38.3212
+53506,"Hexel-ExoarUlvom Processing Group",49.8542,551.946,35,2.50665,0,-539.598
+53509,"RexelYelor Systems",0,0,9,0,0,-9
+53512,"Intel International",3.6886,0,19,1.87999,0,-17.1914
+53516,"Zenix Ventures",10.1035,2.78483,9,0.563996,0,-2.24537
+53519,"DelelJoris-Zenom Holdings",0,0,9,0,0,-9
+53523,"BororOrbar-Teror Processing Group",17.2877,380.95,35,2.50665,0,-401.169
+53527,"Genis-Wenix International",57.3811,0,26,4.38663,0,26.9944
+53530,"Henshi Logistics",0,0,7.5,0,0,-7.5
+53534,"Borel-Quaus Holdings",79.2781,0,43,8.77327,0,27.5049
+53538,"Dikha International",42.9076,0,43,8.77327,0,-8.86562
+53542,"AthanVecom Extraction Co.",69.7592,0,43,8.77327,0,17.9859
+53547,"Muashu Ventures",37.8094,0,49.5,9.77593,0,-21.4666
+53552,"AthurOrbix International",119.957,380.95,69.5,11.0293,0,-341.522
+53556,"Lidu Extraction Co.",95.6995,0,43,8.77327,0,43.9263
+53559,"ExourZenyx-Solos International",48.1923,9.26804,33,5.63996,0,0.284325
+53562,"AexarMarar-MarisCorus Processing Group",0,0,7.5,0,0,-7.5
+53566,"Kalen Extraction Co.",34.3293,6.86705,26,4.51197,0,-3.04972
+53570,"Hishem Enterprises",18.3814,0,18.5,3.13331,0,-3.25191
+53574,"Reheth Enterprises",3.5234,0,24,0.375997,15.9026,-36.7551
+53577,"Kenhon Systems",0,0,7.5,0,0,-7.5
+53580,"Rimere Processing Group",0,0,9,0,0,-9
+53583,"SolisFarex Industries",0,0,9,0,0,-9
+53586,"Marur Industries",8.32939,3.81323,19,2.25598,0,-16.7398
+53589,"UlvelSolos Industries",0,0,7.5,0,0,-7.5
+53592,"CalorVecar Systems",12.4847,7.9288,9,0,0,-4.44405
+53595,"Ruthme Enterprises",0,0,9,0,0,-9
+53598,"Muamtu Dynamics",12.1419,3.50171,22.5,4.2613,0,-18.1211
+53601,"Ruari Extraction Co.",0,0,7.5,0,0,-7.5
+53604,"Aexix Resources",0,0,9,0,0,-9
+53608,"NexonGenor Operations",0,0,10.5,0,19.4616,-29.9616
+53612,"ExoonSolor-Luxor Operations",4.03109,0,33,5.51463,0,-34.4835
+53615,"Nexyx Ventures",0,0,7.5,0,0,-7.5

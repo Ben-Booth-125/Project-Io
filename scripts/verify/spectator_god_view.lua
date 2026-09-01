@@ -15,7 +15,6 @@
 -- only), but the session should BE a spectated one end to end.
 verify.spectate(true)
 verify.econ_step(8)
-verify.show_panel("economy", false) -- econ_step opens it; the column holds one occupant
 
 -- Find a rival building on the home body: the player's first asset names home,
 -- then the first non-player building on that body is the subject. Deterministic

@@ -172,13 +172,27 @@ curve read the way intuition expects it to.
 
 A corporation with no home region — the rung-3 case where the settlement pass never reached the
 nation — takes its class from the national character, the same fallback its focus takes.
-Background firms (Pass 6) are classed by the same read; nothing about the class branches on
-`is_background`.
+**COMPANIES ARE OPEN, and this pass is about CORPORATIONS** (Ben, 2026-08-29). Everything above
+derives the class for a **corporation**. A **company** — a background firm (Pass 6) — is `public`
+by construction: it discloses, and it can be bought, always. The reasoning is what the two words
+already mean here. A corporation is a rival with a seat at the table, and whether its books are its
+own is a fact about it worth generating. A company is part of the **commercial population the
+player trades with** — the field the acquisitions ledger reads and the market clears against — and a
+firm the player can neither price nor read is not part of a population, it is a blank. Closure on a
+company bought nothing: it hid the great majority of the world's firms behind a label carrying no
+other consequence. Design: BL-678 (companies are open).
+
+The mechanism follows the rule rather than leading it. Pass 6 still evaluates the
+national-character read for every company it authors — the derivation is pure and draws nothing, so
+the generation stream is identical either way — and then **overrides** the result with `public`.
+Nothing about the class branches on `is_background` *inside* the derivation; the override is applied
+after it, which is what keeps the world byte-for-byte the world it was.
 
 **The class does two jobs, and both are load-bearing.** It decides whether the corporation files
 a quarterly return the player may read, and it decides whether the corporation may be bought
 outright. Both are [`FINANCE.md`](../economy/FINANCE.md)'s — § Disclosure and § Whole-firm
-acquisition. Generation's part is only to derive the field.
+acquisition. Generation's part is only to derive the field — and for a company there is nothing to
+derive, because both answers are yes.
 
 **The floor rides the existing reroll.** If *no* specialist comes out `public`, nothing in the
 world files and nothing is buyable, so the world-level reject-and-reroll of Pass 2 takes a second
@@ -394,7 +408,8 @@ passes above have already produced:
   screen this mechanism replaces existed because a pure draw handed the player a pure-extraction
   corp on 13 of 24 seeds, and a viability floor alone would never have rejected one — a shallow
   corp is usually perfectly profitable. Viability answers *can this corp survive*; the weighting
-  answers *is there a game in it*.
+  answers *is there a game in it*. The concern is **variety of play**, not a ladder to climb:
+  a corp that only digs has fewer decisions in front of it, whatever it may build.
 - **Population centres.** A corp whose holdings sit on or near populated ground weights up, because
   labour, demand and market access are all there. This reads the settlement pass's own output, so
   it is one more consumer of an existing signal rather than new machinery.
@@ -420,9 +435,9 @@ mechanism's too, and their natural home is still the New World wizard.
 
 **What the floor alone does not solve — and where it is solved instead.** The selection stage was
 built on a *measured* problem: over 24 seeds the generator handed the player a pure-extraction corp
-on 13 of them, so the chain-depth ladder had no rung to stand on. A viability floor does not touch
-that, because a shallow pure-extraction corp is usually perfectly profitable and clears the floor
-every time. It is the **weighted draw above**, not the floor, that carries the depth concern — and
+on 13 of them, leaving the player a campaign with one kind of decision in it. A viability floor
+does not touch that, because a pure-extraction corp is usually perfectly profitable and clears it
+every time. It is the **weighted draw above**, not the floor, that carries this concern — and
 because the weighting is a bias rather than a gate, the shallow opening remains *possible*, just no
 longer the default. `player_seed_sweep` is the instrument that says by how much.
 

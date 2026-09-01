@@ -12,7 +12,6 @@
 --   ProjectIo --verify scripts/verify/settlement_labels.lua
 
 verify.econ_step(2)                 -- settle
-verify.show_panel("economy", false) -- clear the auto-opened panel off the capture
 verify.goto_surface("home")
 verify.set_overlay("none")
 

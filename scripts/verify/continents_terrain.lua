@@ -8,8 +8,6 @@ verify.set_zoom(1)
 verify.set_overlay("none")
 verify.capture("continents_terrain_plain_wide")
 
-verify.set_overlay("country")
-verify.capture("continents_terrain_country_wide")
 
 -- BL-226 (Continent lens): the plates themselves, read back from the retained
 -- generation record. This is the check that the lens shows the plate field the

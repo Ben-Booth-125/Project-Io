@@ -25,13 +25,27 @@
 namespace {
 
 // --- Deposit depletion constants (backlog.json § Environment, settled 2026-06-15) ---
-/// BL-428: record that @p corp has now produced @p r, raising its reached chain
-/// depth if this good sits deeper than anything it had made before. Called from
-/// the two places a good is actually created (run_extraction, run_processing)
-/// rather than from a per-tick sweep, so the bit is set by the *event* of making
-/// something — a corp cannot inherit depth from stock it merely bought.
+/// BL-428: record that @p corp has now produced @p r. Called from the two places
+/// a good is actually created (run_extraction, run_processing) rather than from a
+/// per-tick sweep, so the bit is set by the *event* of making something — a corp
+/// cannot inherit depth from stock it merely bought.
 ///
 /// Set-only. See corporation_component::produced_ever for why it never clears.
+///
+/// ⚠ WRITE-ONLY SINCE BL-692 (2026-08-29), AND DELIBERATELY SO. Retiring the
+/// chain-depth gate removed the only *consumer* of this bit in the simulation:
+/// nothing in `world/*` now reads `produced_ever` to decide anything. It is kept
+/// — and still written every tick — for exactly one binding reason: it is PINNED
+/// BY THE SAVE FORMAT (`world_save.cpp` writes it in field order for
+/// `world_save_version` 16), so dropping it would break every existing save.
+/// `corp_reached_depth` survives beside it as a computation with no caller in
+/// `world/*`; `chain_depth.cpp`'s G-rows still exercise both.
+///
+/// This annotation is the point. NR-718's dead `panel_view` was a field written
+/// and never read that LOOKED live, and it cost a session to rediscover. If you
+/// are here because you found a write with no read: that is expected, it is
+/// recorded, and the save seam is why. Do not delete it without moving the save
+/// format, and do not assume it still gates anything — it gates nothing.
 void mark_produced(world& w, entity_id corp, resource_type r)
 {
     const auto it = w.corporations.find(corp);
@@ -742,21 +756,14 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
     if (old_r != nullptr && new_r != nullptr && old_r->group != new_r->group)
         return recipe_switch_result::cross_group;
 
-    // BL-428 chain-depth gate, mirroring construct_building's. Without it the gate
-    // has a trivial bypass: place the shallowest ancient method the corp can
-    // reach, then immediately retool onto the deepest one in the same group, and
-    // the ladder never has to be climbed at all. A gate that only guards the front
-    // door is not a gate. Ancient-band recipes only, same first-cut scope.
-    if (new_r != nullptr && new_r->era == era_band::ancient)
-    {
-        const int need = reg.recipe_required_depth(new_recipe_id);
-        if (need < 0 || need > corp_reached_depth(cit->second, reg))
-            return recipe_switch_result::depth_locked;
-    }
+    // BL-692 (2026-08-29): the BL-428 chain-depth gate that mirrored
+    // construct_building's is GONE from both doors together — retiring it at the
+    // build door alone would have left this one refusing a retool the front door
+    // now permits. Depth no longer gates anything; tech is the only method lock.
 
-    // BL-588 tech-recipe gate, mirroring construct_building's — SAME reason
-    // the depth gate above sits at both doors: guarding only placement leaves
-    // the one-click bypass (place the ungated method, retool onto the
+    // BL-588 tech-recipe gate, mirroring construct_building's — it guards BOTH
+    // doors for the reason the depth gate used to: guarding only placement
+    // leaves the one-click bypass (place the ungated method, retool onto the
     // tech-locked one in the same group).
     if (!recipe_unlocked(w, reg, corp, new_recipe_id))
         return recipe_switch_result::tech_locked;

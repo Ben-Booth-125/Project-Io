@@ -64,6 +64,10 @@ opener is ruled out (Ben, 2026-07-30).
 A single click never descends the zoom ladder. The minimap ascend gesture stays
 a single click — the minimap has no selection semantics.
 
+**Everything above describes the canvas with NO LENS active.** Under a lens the click model
+collapses to one tier and the marker precedence inverts — see § A lens collapses selection to ONE
+TIER, which supersedes this section wherever the two differ.
+
 ---
 
 ## Action + Facts — content by selection type
@@ -79,6 +83,29 @@ render through the same two-column split:
 - **Facts** (right, muted) — only what informs that action, via
   `draw_selection_facts`. Everything encyclopedic (orbit, composition,
   deposits, prices) lives in the ledgers.
+
+### The centre presents; it does not operate
+
+**The Selection element's centre presents DATA and never holds levers** (Ben, 2026-08-29). A
+dial that changes the world belongs to a ledger; the centre says what the selected thing *is*
+and what it is *doing*. The element is a **reading** surface with one designated place to act.
+
+**This REVERSES NR-245** — *"There is no Manage link — every control it would route to lives on
+this card"* — for the centre specifically, and the reversal is recorded rather than quietly
+applied, newest-dated winning. What NR-245 was avoiding remains avoided: there is still no
+Manage link and no round trip through a second surface, because the ledger that now holds the
+levers is reachable from the card's own action grid.
+
+The boundary runs **around the centre, not around the element**. The right-hand **action grid**
+is the designated action area and keeps its buttons; the centre's paged accordion keeps only
+pages that report. Where a page's whole content is a control — a recipe switcher, a workforce
+slider — that page moves to the ledger for its kind.
+
+The rule composes with the **menus-are-broad-ledgers** test in `MENU.md` rather than fighting it.
+That test asks whether a *surface* earns a rail slot; this one asks where a *control* lives once
+the surface exists. A ledger may be entered by a targeted press without becoming a targeted
+surface: the Buildings ledger is a broad roster of the whole estate, and selecting one building
+is how you aim it.
 
 Each kind routes its 'go to' to the right place:
 
@@ -230,16 +257,21 @@ resources are absent, so the requirement is surfaced up front rather than only o
 click.
 
 **Rejection is reason-coded, not silent** — for a row the ledger actually shows. A DIFFERENT
-class of refusal never becomes a row at all: `construction_result::era_locked`,
-`depth_locked` and (since BL-593) `tech_locked` are filtered out of the candidate list before
-it renders, on one repeated argument stated in the filter's own code comment — *"the door not
-showing what the gate would refuse."* All three lock kinds resolve differently (never
-available at all / earned by building / earned by research, PRODUCTION.md § Chain depth) but
-share the same door-side treatment: not a reason string, an absent row. `refined_copper`
-(`E0-EC-03`, BL-589) was the first recipe the tech clause actually removed — every earlier
-tech gate targeted a `building_type`, never a recipe, so the branch was dead code until then.
-Filtered was the ruled choice over shown-and-locked (Ben, 2026-08-24) — extending the existing
-era/depth precedent rather than adding a new lock-reason string and UI affordance.
+class of refusal never becomes a row at all: `construction_result::era_locked` and (since
+BL-593) `tech_locked` are filtered out of the candidate list before it renders, on one repeated
+argument stated in the filter's own code comment — *"the door not showing what the gate would
+refuse."* The two lock kinds resolve differently (never available in this campaign at all /
+earned by research, PRODUCTION.md § Chain depth) but share the same door-side treatment: not a
+reason string, an absent row. `refined_copper` (`E0-EC-03`, BL-589) was the first recipe the
+tech clause actually removed — every earlier tech gate targeted a `building_type`, never a
+recipe, so the branch was dead code until then. Filtered was the ruled choice over
+shown-and-locked (Ben, 2026-08-24) — extending the existing era precedent rather than adding a
+new lock-reason string and UI affordance.
+
+**Chain depth locks nothing** (Ben, 2026-08-29). The door once carried a third clause erasing a
+recipe deeper than the corp had reached, and the Method Switch row once greyed itself with *"Your
+industry cannot make what this needs yet."* Neither exists: tech is the only method lock, so the
+Switch control is disabled by its cooldown alone.
 
 `placement_rules::can_place[_in_world]` return a `placement_result` — a `placement_reason`
 enum plus human string, implicitly convertible to `bool` — so an invalid type that DOES survive
@@ -293,27 +325,6 @@ header):
      Included only once the building is complete (`ticks_remaining <= 0`) **and**
      `estimate_building_profit` reports `has_data`; a still-building building has nothing here
      (its **Status** page covers it).
-   - **Method** (`building_page_kind::method`, `draw_production_method_section`) — "Which way
-     should this building make its output?" Only for `processing_facility`. A **tiled grid**
-     (2 columns): each era-allowed recipe gets its own bordered tile with the recipe name and
-     its expected profit (`estimate_prospective_profit`, priced at the building's real staffing)
-     in a **larger font**, and, for every recipe but the active one, a **big glyph Switch
-     button** (`glyph_swap`, a two-arrow swap icon) sized as the tile's dominant visual element.
-     Calls `try_switch_recipe` exactly as `construction_panel.cpp`'s management dropdown does. A
-     single-recipe building still gets the page ("Only one method available.").
-
-     **No group label here, by design.** The grid lists every era-allowed recipe regardless of
-     `group` — the cheap intra-group switch and the pricier cross-group retool both go through
-     `try_switch_recipe`, which refuses (or prices) whichever the corp cannot afford. The
-     construction ledger is where GROUP membership is the organising axis (PRODUCTION.md § Sub-
-     facility groups); on an existing building the axis is "every method this building could
-     run". If a player is surprised by a cross-group switch's cost, the fix is pricing the
-     Switch button, not adding a group tag.
-   - **Workforce** (`building_page_kind::workforce`, `draw_building_workforce_page`) — "How much
-     workforce, and by whose hand?" A placeholder trend graph (no per-building history —
-     NR-249) and a single **horizontal 1% slider** (`ImGui::SliderInt`, 0–100): editing it sets
-     `workforce_target` directly and clears `workforce_auto` — a manual edit pins the target.
-     Any player-owned building, regardless of type. The Auto control lives on the action grid.
    - **Status** (`building_page_kind::status`) — the fallback: construction rate/ETA for a
      still-building building, "Operating." otherwise. **Rival buildings get ONLY this page** —
      the public building type plus (via `draw_rival_building_summary`) owner name, tile, and
@@ -321,12 +332,21 @@ header):
      single Status page for any non-player-owned building rather than testing each page's
      guard against data it must not show.
 
+   **Method and Workforce are NOT pages of this accordion.** Their whole content was a control,
+   and the centre presents data (§ The centre presents; it does not operate). They are drawn by
+   the **Construction ledger's Buildings view** — the same `draw_production_method_section` and
+   `draw_building_workforce_page` bodies, called from `construction_panel.cpp`, never a second
+   set of controls writing `workforce_target` and `try_switch_recipe`. The Buildings view reads
+   `ui_state::selected_entity`, so a building selected on the map and a building selected from
+   that view's own roster reach the same levers: the two selectors compose.
+
    `building_pages()` / `draw_building_page()` are the shared list+dispatch pair the in-band
    accordion and the full-canvas takeover (`draw_building_page_expanded`, `selection_card.cpp`)
    both read — the same precedent as the tile element's `tile_metrics` / `draw_tile_metric_chart`.
-3. **Right quarter — a 2×3 action grid**, mirroring the tile element's grid. There is no
-   Manage link — every control it would route to lives on this card (Ben, NR-245). Three
-   building-level actions:
+   Removing a page changes both surfaces at once, which is the point of the pair.
+3. **Right quarter — a 2×3 action grid**, mirroring the tile element's grid. This is the
+   element's designated place to ACT; the centre is where it presents. Four building-level
+   actions:
    - **Mothball** (`glyph_mothball`, a box with a line through it) — flips `decommissioned`
      (reversible — no output, no wages while closed) and invalidates the logistics anchor
      cache. A **toggle button** per the standing Toggle rule — its own active state
@@ -343,9 +363,20 @@ header):
      baked into the label text: the button's id (`"##bld_auto"`) is **stable** — a label that
      carried the live percentage would change every tick while `solve_workforce_target`
      re-solves, churning the ImGui ID and corrupting hover/active/focus state. The percentage
-     is read on the Workforce page, not here.
+     is read beside the workforce slider in the Buildings view, not here.
+   - **Open in ledger** (`glyph_roster`, a panel outline with one row picked out), beside Auto —
+     opens the Construction ledger's **Buildings** view **aimed** at this building: its type
+     group expanded and the building selected, so the levers that left the centre are on screen
+     in one press. It exists because the lever move would otherwise leave a building selected on
+     the MAP with no route to its own controls at all. It is a **door, not a toggle** — its
+     active state is not visible on the card, so a second press must not close what it opened —
+     and it takes its own glyph rather than sharing a silhouette with the lit controls inches
+     away (BL-174).
    Mothball, Dismantle and Auto are all disabled with "Competitor building - intel only" for a
-   rival. **Three slots are reserved** (`glyph_reserved`).
+   rival. **Open in ledger is ABSENT on a rival's card**, not merely disabled: the Buildings view
+   is the player's estate, so a rival building has no row for the button to aim at. Its cell
+   falls back to `glyph_reserved`, so the grid keeps its shape and nothing reflows. **Two slots
+   are reserved** (`glyph_reserved`).
 
 `ui_state::selection_building_page` is the pager index, reset to 0 alongside
 `card_resource_page` on every new selection (`app.cpp`).
@@ -516,6 +547,10 @@ way every other selecting surface already does.
 
 ### Tile repeat-click selection cycle
 
+**A no-lens gesture.** The cycle walks the stack of things standing on one piece of ground, and a
+lens removes that stack (§ A lens collapses selection to ONE TIER, rule 1). Everything in this
+section applies to the plain canvas only.
+
 `body_surface_canvas.cpp`'s click handler cycles **Battle → Soldier → Building → Tile → Battle**
 on a **repeat** click at the same tile the selection already sits on, skipping any stage with
 nothing there (no unit on the tile skips straight to Building; no building skips to Tile).
@@ -668,30 +703,106 @@ building → market → unit  →  tile  →  body
 (the marker kinds first, then the tile they occupy, then the body that hosts it). "Lowest" means
 **most-specific** — earliest in that order.
 
-**Lowest *valid* entity.** Resolution walks the stack from most-specific and returns the **first
-entity the active lens deems valid**. Validity is not fixed: it is **the active lens's question**
-(§ Per-lens selection validity in LENSES.md). With **no lens** every drawn kind is valid, so
-resolution returns the literal lowest entity (a building over a tile resolves to the building; bare
-terrain resolves to the tile, whose element carries its province). Under a lens, kinds the
-lens does not care about are *skipped*, so the same pointer position can resolve to a **different
-entity per lens**.
+**The stack is the NO-LENS rule.** With no lens active every drawn kind is valid, so resolution
+returns the literal lowest entity (a building over a tile resolves to the building; bare terrain
+resolves to the tile, whose element carries its province), and a repeat click walks the four rungs
+below (§ Tile repeat-click selection cycle). Under a lens the stack does not apply at all — see
+the next section, which supersedes it.
 
-**The lens names the ledger the selection drives.** Resolving the entity and choosing its 'go to'
-ledger are the *same* decision — the lens that validates the entity also routes it:
+### A lens collapses selection to ONE TIER (Ben, 2026-08-28)
 
-| Active lens | Resolves to | 'Go to' / routes to |
+Owned by BL-664 (one tier under a lens). Three rules, and they hold for every lens without
+exception:
+
+1. **The lens's structure is the only thing under the pointer.** Resolution asks the active lens
+   what structure this ground belongs to and answers with that, or with nothing. It does not walk
+   a stack, because under a lens there is no stack — there is the lens's subject and there is
+   everything the lens is not about.
+2. **Markers do not outrank lenses.** A building glyph is not a shortcut past the lens's question.
+   Under the Market lens a click on a plant gives the catchment; under Resource it gives the
+   deposit; under Corporation it gives the owner. This inverts the no-lens precedence deliberately:
+   *outside* a lens a marker is the specific thing the player aimed at, but *inside* one the lens
+   is the question they are asking and the marker is only ground that happens to be built on.
+3. **A lens with no answer here is inert.** Where the lens resolves to nothing — a tile carrying
+   none of the selected resource, ground in no catchment, a lens with no structure grain at all —
+   **no hover card appears and a click does nothing to the canvas**. It does not fall through to
+   the tile, and it does not fall through to a marker. A lens that has nothing to say about this
+   ground says nothing.
+
+**One hover mark, not three (Ben, 2026-08-28: "we want to stop dual hover").** A pointer position
+could light three things at once — the tile's own ring, its province edge, and the lens structure's
+wash — so hovering a market lit the catchment *and* the tile inside it. Under a lens the structure
+is the only thing that lights, because it is the only thing the pointer resolves to; the tile ring
+and the province edge are **no-lens marks**. Selection is a different question and keeps its
+outlines under every lens.
+
+**A click on inert ground clears the band to resting.** The Selection band returns to the player's
+own corporation (§ Always open), exactly as a click on empty space does. Leaving the previous
+selection standing is the worse of the two readings: it makes the band assert something the player
+did not just click and has no way to connect to the pointer (the failure NR-697 names).
+
+**The repeat-click cycle is a no-lens gesture.** Battle → Soldier → Building → Tile requires a
+stack to walk, and rule 1 removes it. Under a lens a repeat click on the same ground re-resolves to
+the same structure, which is the honest reading: there is one tier, and it does not move.
+
+**Consequence — a lens with no structure grain is a pure read.** Population, Industry and
+Throughput draw a per-tile *value field* rather than a region: their subject is a number spread
+across the map, not a thing on it. Under rule 3 they are entirely non-interactive — no hover card,
+no selection, anywhere on the body (Ben, 2026-08-28: "for lenses which return none, just don't
+surface a hover, and clicks will do nothing"). This is a deliberate category, not a gap: a value
+field is something you *read*, and giving it a fake selectable grain would promise a pivot it has
+no destination for.
+
+### The lens names the ledger the selection drives
+
+Resolving the entity and choosing its 'go to' ledger are the *same* decision — the lens that
+validates the structure also routes it. [LENSES.md](LENSES.md) § Per-lens selection validity &
+routing owns the per-lens table; this is the shape it takes.
+
+| Active lens | Resolves to | Routes to |
 |---|---|---|
-| **none** (terrain) | the tile (or the lowest drawn marker on it) | Tile Ledger |
-| **Corporation** | the owning **corporation** of the hovered tile/building | Balance Ledger |
-| **Resource** | the hovered tile's **deposit** | Tile Ledger (deposit detail) |
-| **Market** | the body's **market** / listing | Market Ledger |
-| **Country** | the owning **nation** | Nation ledger |
-| **Supply** | the **route / stockpile** under the pointer | Supply surface |
+| **none** (terrain) | the lowest drawn entity, then the four-rung cycle | Tile Ledger |
+| **Corporation** | the corporation's **tile group** — every tile it holds on this body | that corporation's ledger |
+| **Company** | the background firm's **tile group**, same shape, different subject | that company's ledger |
+| **Resource** | the **deposit** — every tile carrying the selected resource | Market Ledger, aimed at that resource |
+| **Market** / **Scarcity** | the **market catchment** under the pointer | Market Ledger |
+| **Continent** | the **plate** | History ledger, at its tectonic record |
+| **Population** / **Industry** / **Throughput** | nothing — inert | — |
 
-This couples the Selection element's Focus state to the lens system (LENSES.md) and the ledger
-family: the 'go to' dispatch seam (`focus_on_entity`) is unchanged — the lens only changes *which
-entity id and which target* are handed to it. The same dispatch carries the non-spatial 'go to'
-routing (nation/corporation → ledger) specified above.
+**A tile group is a structure like any other.** Hovering one tile of a corporation's holdings
+lights **all** of them at once (Ben, 2026-08-28: "hovering one tile displays an outline around all
+company buildings for that corporation/company"), and clicking any of them opens that owner's
+ledger. It is the same claim the market catchment's highlight makes — *all of this is one thing* —
+so it takes the same wash the catchment does rather than a walked boundary (Ben's 2026-08-24 ruling
+on that question, recorded in `body_surface_canvas.cpp`: a wash is per-tile and costs one test,
+and an area statement is the truer read anyway).
+
+### A deposit and a plate are cards, not just channels
+
+The two non-entity structures get Selection-band content of their own, dispatched ahead of the
+kind resolution exactly as the battle and the contract are — none of the four is an entity, so
+`selection_kind_of` cannot see any of them. Owned by BL-671 (the two region cards).
+
+- **Deposit** — the good's showing across the **active body**: how many tiles carry it, the richest,
+  the total. Not one tile's richness: the lens draws every tile carrying the good, and the selection
+  grain follows the drawing. It has no actions — you cannot dig a region, you site a building on one
+  tile of it — so the card hands the player to the Market ledger, already open on Prices.
+- **Plate** — its kind (oceanic or continental), its tile count, its drift, and its boundary tiles
+  counted **separately as collisions and rifts**. Never summed: a tile at a junction between a
+  closing pair and an opening pair sits on both, and the two say different things — a collision is
+  where the mountains came from, a rift is where the crust thinned.
+
+**Why the band showed the wrong subject before this.** The band substitutes the player's own
+corporation whenever `selected_entity` is null (§ Always open), and both region presses deliberately
+null it. So a plate press did not leave the band blank — it confidently showed a *different*
+subject, which is the worse failure and the harder one to notice.
+
+**Corporation and Company route to DIFFERENT ledgers**, because since the 2026-08-28 split
+([GLOSSARY.md](GLOSSARY.md)) they are different words: a corporation is a named operating firm the
+player competes with, a company is a background firm. One is a rival dossier, the other is a
+market participant. BL-666 (owner ledger destinations) owns what each destination is.
+
+Ground held by nobody is inert under both, by rule 3.
 
 ## Open questions
 

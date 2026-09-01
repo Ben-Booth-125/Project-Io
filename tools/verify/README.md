@@ -582,9 +582,8 @@ the pull reads one of them). Deliberately asserts only the structural half —
 which market gets picked is not stable across standard libraries, so the varying
 numbers are printed rather than asserted.
 
-Each exits non-zero on a failed assertion. The economy *panel* (the visual class)
-is verified separately via `ProjectIo --verify scripts/verify/economy_panel.lua`
-(the `verifier-visual` skill).
+Each exits non-zero on a failed assertion. The visual class is verified separately,
+through `ProjectIo --verify scripts/verify/<name>.lua` (the `verifier-visual` skill).
 
 ## nation_wiring (Sprint N3 slice 1)
 
@@ -844,3 +843,69 @@ working directory or the script loads throw.
 cmake --build build --target mercenary_contract_harness   # from a vcvars shell
 ctest --test-dir build -R mercenary_contract_harness
 ```
+
+## `exchange_record_harness` — the clearing tick's per-exchange record (BL-685)
+
+`world::exchanges` is a ring of realised exchanges appended by `clear_markets`
+(`docs/economy/MARKETS.md` § The exchange record). Six rows.
+
+**E1/E2** are the reconciliation, and they are the whole reason the row is written beside the cash
+accrual rather than in a pass of its own: per seller, `sum(quantity × unit_price)` must equal the
+income `clear_markets` returned, and the summed quantity must equal what left that corp's pool. A
+record that could disagree with the money loop would be a second, quieter set of books.
+
+**E3** is the field the design is most specific about. A standing sell order carries a floor of
+1.0 into a market whose resolved price is 2.5; the row must carry **2.5**, because a floor is a
+reservation price and what a seller asked is not what they got.
+
+**E4** is the determinism row and it has two halves. Two runs of the same world agree — and a
+third world, logically identical but with its markets *inserted into the unordered_map in the
+opposite order*, agrees too. The second half is the one with teeth: it fails any walk that reads
+`world::markets`' own hash iteration order instead of the sorted clearing walk.
+
+**E5** exercises the cap directly, including `oldest_first`'s read across the wrap. **E6** prints
+rows-per-tick for the fixture and asserts nothing.
+
+**There is no profit row, and that is the subject rather than an omission.** No cost basis exists
+anywhere in the model (`stockpile_component` is `quantities[]`), so revenue is the only honest
+figure a sale can produce. Lua-free; reached by the generic glob.
+
+## `save_envelope_roundtrip` — the save ENVELOPE's first round-trip coverage (BL-685, NR-708)
+
+`save_roundtrip.cpp` covers the **world** half (`world_save.{hpp,cpp}`). This is its missing
+counterpart on the outer IOSG stream: `write_save_game` → `read_save_game`, asserting the clock,
+`world_params`, the generation report, the app histories, the whole `ui_state` slice, and
+BL-685's exchange ring *through the file* — including a **wrapped** ring, whose stored order is
+not its chronological order, so a reader that dropped the wrap cursor is caught. S7 asserts the
+refusal contract: a bumped version and a bad magic each refuse the whole file with both
+destinations untouched.
+
+**It links ImGui**, and is the second harness that does (after `font_glyph_harness`), for the
+same reason one layer over: `src/core/save_game.cpp` includes `ui/ui_state.hpp` and so
+`<imgui.h>`, which the headless tier excludes by construction — which is exactly why the envelope
+had never been testable. It opens no window and creates no context. Hand-declared in
+`CMakeLists.txt` above the glob; compiles `save_game.cpp` in alongside `io_world_obj`.
+
+```
+cmake --build build --target save_envelope_roundtrip   # from a vcvars shell
+ctest --test-dir build -R "exchange_record_harness|save_envelope_roundtrip"
+```
+
+## Build note (2026-08-30): the glob loop carries the sol2 + Lua INCLUDE paths
+
+Since b668434c (the v0.1.21 cut), `tools/verify/harness_params.hpp` — the shared
+`no_prehistory()` / `parsed_gen_config()` helper that around thirty harnesses include — reaches
+`scripting/lua_state.hpp` and so `<sol/sol.hpp>`. `io_world_obj` publishes only `src`, so from a
+**clean configure** every glob-declared harness that included that header died on
+
+```
+fatal error C1083: Cannot open include file: 'sol/sol.hpp'
+```
+
+before it ever reached a link — `determinism_harness`, `world_determinism`,
+`spectator_determinism`, `quarterly_return`, `save_roundtrip`, `demand_census` and two dozen
+more, i.e. most of the gate. An existing build tree kept passing on stale objects, which is how
+it survived a release cut. The glob loop now puts the sol2 and Lua **include** paths on every
+harness; a path costs a TU that does not use it nothing, and putting them on all of them beats a
+hand-kept list the next shared header would fall off. **Linking** Lua stays opt-in — a harness
+that constructs a `lua_state` is still hand-declared with `lua54`.

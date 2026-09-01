@@ -1,6 +1,7 @@
 #pragma once
 
 #include "continents.hpp"
+#include "era_timelapse.hpp" // the recorded Era -1 ownership replay (NR-733)
 #include "planetology.hpp"
 #include "settlement.hpp"
 #include "world.hpp"
@@ -336,6 +337,30 @@ struct generation_report
         /// seam.
         settlement_state settlement;
 
+        /// THE RECORDED ERA -1 TIME-LAPSE (NR-733, Ben's ruling 2026-08-30) — the
+        /// ownership history the History ledger's Ages view replays, beside the
+        /// settlement it is the history OF.
+        ///
+        /// RECORDED RATHER THAN RE-SIMULATED, and that is the whole point. The
+        /// view used to re-run the era itself, which made it a seventh caller of
+        /// an invocation `era_minus_one.hpp` exists to keep singular. It diverged
+        /// from generation on all six of BL-462's axes, and three could not be
+        /// closed at the call site because `settlement` above is the state AFTER
+        /// the sim mutated it — a re-run started the era from its own ending, so
+        /// it reported 0 battles and 0 conquests however carefully it was
+        /// parameterised. Replaying what generation produced closes all six by
+        /// deleting the second caller, and costs a fold over a change list rather
+        /// than minutes on the drawing thread.
+        ///
+        /// EMPTY ON EVERY BODY BUT THE CRADLE, and on all of them in a 1960-era
+        /// world — generation runs the era once, gated on `era_minus_one_enabled`.
+        /// The view reads an empty record as "never settled", which is what it is.
+        ///
+        /// UNLIKE the rest of this struct this one DOES reach the save: the
+        /// report is serialised whole by `core/save_game.cpp`, which is why it
+        /// moved `save_game_version` to 3.
+        era_timelapse prehistory_timelapse;
+
         /// Exactly what `generate_body_tiles` was called with for this body — the
         /// arguments that are NOT recoverable from anything else the report or the
         /// world holds (the seed above all: Kepler's is chosen by the BL-276
@@ -386,6 +411,7 @@ struct generation_report
     int64_t prehistory_battles   = 0; ///< Battles fought in that span.
     int64_t prehistory_conquests = 0; ///< Regions that changed hands.
     int64_t prehistory_foundings = 0; ///< Regions founded by the sim.
+
 };
 
 /// Construct and return a world populated with the prototype's authored bodies.

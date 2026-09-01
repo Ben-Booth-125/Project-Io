@@ -314,6 +314,26 @@ const char* building_type_name(building_type t)
     return "None";
 }
 
+const char* extraction_building_name(resource_type r)
+{
+    switch (r)
+    {
+        case resource_type::iron_ore:       return "Iron Mine";
+        case resource_type::coal:           return "Coal Mine";
+        case resource_type::petroleum:      return "Oil Field";
+        case resource_type::silica:         return "Silica Quarry";
+        case resource_type::copper_ore:     return "Copper Mine";
+        case resource_type::rare_earth_ore: return "Rare-Earth Mine";
+        case resource_type::water:          return "Water Extractor";
+        case resource_type::stone:          return "Quarry";
+        case resource_type::timber:         return "Woodcutter's Camp";
+        case resource_type::sand:           return "Sand Pit";
+        case resource_type::clay:           return "Clay Pit";
+        case resource_type::peat:           return "Peat Cutting";
+        default:                            return resource_name(r);
+    }
+}
+
 namespace palette {
 
 ImU32 corp_colour(int slot)

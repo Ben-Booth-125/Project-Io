@@ -23,7 +23,6 @@
 // replay determinism through the step.
 
 #include "harness_params.hpp"
-#include "world/contract_template.hpp" // BL-573: run_nation_step's new param
 #include "world/budget_system.hpp"
 #include "world/components.hpp"
 #include "world/corp_ai.hpp"
@@ -92,7 +91,6 @@ struct tick_out
 // no Lua load) is safe for every row in this harness -- it never creates a
 // mercenary_contract, so run_mercenary_contract_tick's walk over
 // w.mercenary_contracts is vacuous regardless of what the registry holds.
-const contract_template_registry g_empty_contract_templates;
 
 /// One full tick, exactly as app::step_economy / main.cpp order it, with the
 /// production sink passed so the levy path is live.
@@ -103,7 +101,7 @@ economy_report run_tick(world& w, const recipe_registry& reg, int tick)
     economy_report rep = run_economy_step(w, reg, /*spectating=*/false);
     auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings);
-    run_nation_step(w, reg, rep, tick, g_empty_contract_templates);
+    run_nation_step(w, reg, rep, tick);
     advance_tech_gates(w);
     return rep;
 }
@@ -176,7 +174,7 @@ int main()
             probe = run_economy_step(w, reg, false);
             auto flows = clear_markets(w, reg, probe);
             apply_budget(w, reg, flows, probe.workforce_contention, &probe.budgets, &probe.buildings);
-            if (t < use_tick) { run_nation_step(w, reg, probe, t, g_empty_contract_templates); advance_tech_gates(w); }
+            if (t < use_tick) { run_nation_step(w, reg, probe, t); advance_tech_gates(w); }
         }
 
         int funded = 0;
@@ -196,7 +194,7 @@ int main()
         std::map<entity_id, float> bal_before;
         for (const auto& [cid, cc] : w.corporations) bal_before[cid] = cc.balance;
 
-        run_nation_step(w, reg, probe, use_tick, g_empty_contract_templates);
+        run_nation_step(w, reg, probe, use_tick);
 
         int paid = 0, dispatched = 0, clawed = 0;
         double paid_credits = 0.0, dispatched_credits = 0.0;

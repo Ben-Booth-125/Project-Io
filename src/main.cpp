@@ -125,14 +125,6 @@ int run_serve(int ticks, long long as_corp, bool as_any)
     recipe_registry reg;
     reg.load_from_lua(lua);
 
-    // BL-573: contract_template_registry threaded from the app-layer boundary
-    // exactly where `reg` is, above — the same script-load + registry pattern,
-    // never a Lua load performed inside world/* itself.
-    lua_state contract_lua;
-    contract_lua.load("scripts/contracts.lua");
-    contract_template_registry contract_templates;
-    contract_templates.load_from_lua(contract_lua);
-
     world w = make_hard_coded_world();
 
     const uint16_t default_recipe = reg.default_recipe_id(); // BL-429
@@ -171,7 +163,7 @@ int run_serve(int ticks, long long as_corp, bool as_any)
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings,        // BL-343: law enforcement seam
                      &report.building_labour); // BL-614: wages on the per-building grant
-        run_nation_step(w, reg, report, t, contract_templates); // Sprint N3: nations score, spend, dispatch
+        run_nation_step(w, reg, report, t); // Sprint N3: nations score, spend, dispatch
         advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
         credit_arrived_convoys(w, t);
         // Age any dispatched survey by the days this tick spans (app.cpp does the
@@ -232,11 +224,6 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
     reg.load_from_lua(lua);
 
     // BL-573: same app-layer threading as run_serve, above.
-    lua_state contract_lua;
-    contract_lua.load("scripts/contracts.lua");
-    contract_template_registry contract_templates;
-    contract_templates.load_from_lua(contract_lua);
-
     world w = make_hard_coded_world();
 
     // Author default recipes onto generated processors (mirrors app::load_economy).
@@ -263,7 +250,7 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings,        // BL-343: law enforcement seam
                      &report.building_labour); // BL-614: wages on the per-building grant
-        run_nation_step(w, reg, report, t, contract_templates); // Sprint N3: nations score, spend, dispatch
+        run_nation_step(w, reg, report, t); // Sprint N3: nations score, spend, dispatch
         advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
         credit_arrived_convoys(w, t);
     }
@@ -322,6 +309,40 @@ void crash_log(const char* what)
     std::fprintf(stderr, "%s\n", what);
 }
 
+/// Mirror SDL's whole log stream to stderr, flushed per line.
+///
+/// WHY THIS EXISTS (NR-694, 2026-08-28). SDL's default sink on Windows is
+/// OutputDebugString plus a console SDL attaches for itself, and NEITHER
+/// reaches a redirected pipe. So `ProjectIo --verify-all scripts/verify > log`
+/// wrote a ZERO-BYTE log across a two-hour run: verify_api.cpp's per-script
+/// progress line, every `Golden PASS/FAIL` line and any Lua error were all
+/// emitted and all invisible.
+///
+/// The cost was never cosmetic. With no output, a script that ran and produced
+/// NOTHING (NR-693, shell_pass) is indistinguishable from one the run has not
+/// reached yet, and a hang is indistinguishable from slow work — both had to be
+/// inferred from capture filenames and CPU sampling instead of read off a log.
+///
+/// stderr rather than stdout, so a caller can still redirect the two apart.
+/// Flushed every line because the case that needs the log most is the one that
+/// never exits, and a buffered tail of a hung process shows nothing at all.
+void log_to_stderr(void*, int category, SDL_LogPriority priority, const char* message)
+{
+    const char* tag = priority >= SDL_LOG_PRIORITY_ERROR ? "ERROR: "
+                    : priority == SDL_LOG_PRIORITY_WARN  ? "WARN: "
+                                                         : "";
+    std::fprintf(stderr, "%s%s\n", tag, message);
+    std::fflush(stderr);
+
+#ifdef _WIN32
+    // Keep the debugger's view intact — replacing the sink would otherwise take
+    // OutputDebugString away from anyone attached in Visual Studio.
+    OutputDebugStringA(message);
+    OutputDebugStringA("\n");
+#endif
+    (void)category;
+}
+
 #ifdef _WIN32
 /// Last-chance SEH filter: names the fault and the address, then lets the
 /// process die. No unwinding, no allocation beyond fopen — by the time this
@@ -348,6 +369,13 @@ int main(int argc, char* argv[])
 #ifdef _WIN32
     SetUnhandledExceptionFilter(seh_crash_filter);
 #endif
+    // Installed before anything can log, so the harness's own progress lines are
+    // visible from the first one (NR-694). Unconditional rather than gated on
+    // --verify: an interactive run's stderr costs nothing when nobody reads it,
+    // and gating would mean the one mode that most needs a log is the one whose
+    // logging is special-cased.
+    SDL_SetLogOutputFunction(log_to_stderr, nullptr);
+    SDL_SetLogPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
     // The third silent death shape: std::terminate (an exception escaping a
     // noexcept boundary or a thread, a double-throw in unwind). Neither the
     // catch below nor the SEH filter above sees it.

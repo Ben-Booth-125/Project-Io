@@ -103,12 +103,41 @@ namespace {
 // and no game code reads or writes it.
 std::string g_scroll_window;
 float       g_scroll_fraction = 0.0f;
+// NR-719: whether any scroller has CLAIMED the pending request since it was made.
+// A request that no window and no child ever matches used to be indistinguishable
+// from one that worked — which is precisely how the Market ledger's price list was
+// captured at its head for its whole life while the script believed it had asked
+// for the foot. The verify layer reads this to fail loudly instead.
+bool g_scroll_claimed = false;
 } // namespace
 
 void foldout_request_scroll(const char* window_name, float fraction)
 {
     g_scroll_window   = (window_name != nullptr) ? window_name : "";
     g_scroll_fraction = (fraction < 0.0f) ? 0.0f : ((fraction > 1.0f) ? 1.0f : fraction);
+    g_scroll_claimed  = false;
+}
+
+bool foldout_scroll_was_claimed()
+{
+    // An empty request is the documented "clear the parking" call, which nothing
+    // is meant to claim — so it is vacuously satisfied rather than a failure.
+    return g_scroll_window.empty() || g_scroll_claimed;
+}
+
+void foldout_scroll_child(const char* key)
+{
+    // The other half of NR-719. `foldout_request_scroll` reaches the ledger
+    // WINDOW, and a ledger that nests its content in a BeginChild scroller — as
+    // the Market ledger's price list did — leaves the window itself with no
+    // scrollable extent at all: `GetScrollMaxY()` is 0, `SetScrollY` is a no-op,
+    // and the "foot" capture comes back byte-identical to the head. This is the
+    // hook the old comment on `foldout_request_scroll` said was needed and did
+    // not claim; call it immediately after a successful BeginChild.
+    if (key == nullptr || g_scroll_window.empty() || g_scroll_window != key)
+        return;
+    ImGui::SetScrollY(g_scroll_fraction * ImGui::GetScrollMaxY());
+    g_scroll_claimed = true;
 }
 
 bool foldout_begin(const char* name)
@@ -131,7 +160,10 @@ bool foldout_begin(const char* name)
     // PREVIOUS frame's content size, which is why the request is sticky — the first
     // frame after a view change still reports the old extent (often 0).
     if (open && !g_scroll_window.empty() && g_scroll_window == name)
+    {
         ImGui::SetScrollY(g_scroll_fraction * ImGui::GetScrollMaxY());
+        g_scroll_claimed = true;
+    }
 
     return open;
 }

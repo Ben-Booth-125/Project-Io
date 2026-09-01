@@ -207,7 +207,6 @@ void draw_metric_expanded(const world& w, const resource_history_view& hist, ui_
 
 void draw_selection_band(world& w, const recipe_registry& reg,
                          const economy_report& report,
-                         const contract_template_registry& templates,
                          const resource_history_view& history, ui_state& ui,
                          ImVec2 band_origin, ImVec2 band_size)
 {
@@ -219,6 +218,13 @@ void draw_selection_band(world& w, const recipe_registry& reg,
     entity_id sel = ui.selected_entity;
     if (sel == null_entity || selection_kind_of(w, sel) == selection_kind::none)
         sel = w.player_entity; // the player corp exists before the first frame
+
+    // A DEPOSIT or PLATE selection reaches here with `selected_entity` null and is
+    // substituted above like any other empty selection — harmlessly, because
+    // draw_selection_content dispatches on the region fields BEFORE it looks at
+    // the entity and returns without reading `sel` (BL-671). Worth stating: this
+    // substitution is what made a plate press show the previous card, which is
+    // what NR-697 was reporting.
 
     // ── Placement (BL-213) ──
     // Fixed: fills the exact rect the caller computed (bottom band, between the
@@ -256,7 +262,7 @@ void draw_selection_band(world& w, const recipe_registry& reg,
             // content itself re-pointed the selection (e.g. the Manage button).
             const entity_id real_sel = ui.selected_entity;
             ui.selected_entity       = sel;
-            draw_selection_content(w, reg, report, templates, ui);
+            draw_selection_content(w, reg, report, ui);
             if (ui.selected_entity == sel)
                 ui.selected_entity = real_sel;
         }

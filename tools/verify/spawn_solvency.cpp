@@ -122,7 +122,6 @@
 #include "harness_params.hpp"
 #include "world/budget_system.hpp"
 #include "world/components.hpp"
-#include "world/contract_template.hpp"
 #include "world/corporation_generation.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
@@ -209,7 +208,6 @@ constexpr double k_baseline_rival_units_per_seed   =   16.9; // mean of 15..20
 
 /// BL-573: run_nation_step's template registry. Empty is correct here — nothing
 /// in this sweep opens a mercenary contract, so the walk is vacuous.
-const contract_template_registry g_no_contract_templates;
 
 /// The producing side of the seated corp, accumulated over the trailing window.
 /// The cost side alone cannot say WHY income is thin — a corp can be poor because
@@ -258,7 +256,7 @@ void tick(world& w, const recipe_registry& reg, int t)
     auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
                  &rep.building_labour);
-    run_nation_step(w, reg, rep, t, g_no_contract_templates);
+    run_nation_step(w, reg, rep, t);
     advance_tech_gates(w);
     credit_arrived_convoys(w, t);
 

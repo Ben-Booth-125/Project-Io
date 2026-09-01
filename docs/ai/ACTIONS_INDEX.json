@@ -31,11 +31,11 @@
   ],
   [
    "gameplay.place_sell_order",
-   "The 'Sell Orders' tab of the Market Ledger (opened from the nav rail; the tab is scoped to the ledger's selected market body). Since BL-293 the press is not the only route: place_sell_order is a corp_verb, so an agent issues it directly against the corp-command seam and a rival corp's scorer issues it too."
+   "The 'Trades' tab of the Market Ledger, under the 'Place a trade' fold in its 'My trades' section (opened from the nav rail; the tab is scoped to the ledger's selected market body). The tab was called 'Sell Orders' until it widened to hold four reads. Since BL-293 the press is not the only route: place_sell_order is a corp_verb, so an agent issues it directly against the corp-command seam and a rival corp's scorer issues it too."
   ],
   [
    "gameplay.remove_sell_order",
-   "The 'Remove' button beside each listed order on the Market Ledger's Sell Orders tab; also a corp_verb, issuable directly."
+   "The 'x' button at the end of each row in the 'My trades' section of the Market Ledger's Trades tab; also a corp_verb, issuable directly. The tab was called 'Sell Orders' and the button 'Remove' until the tab widened to hold four reads."
   ],
   [
    "gameplay.request_quote",
@@ -47,11 +47,11 @@
   ],
   [
    "gameplay.set_recipe",
-   "The Method comparison section on the Selection panel's building Facts column (BL-431, `draw_production_method_section` — Compare toggle, each alternate's basket/wage/rate plus a Switch button); the same seam also drives the 'Production Methods' combo in the Building panel's Buildings-tab inline detail."
+   "The Method grid in the Construction ledger's Buildings view (`draw_production_method_section`): one row per era-allowed recipe in the building's own group, each with its expected profit and a Switch glyph."
   ],
   [
    "gameplay.set_workforce",
-   "The workforce slider on the Selection band's building layout (0–200% of nominal); the Building panel's inline detail offers a coarser 0/20/40/60/80/100 tier button grid instead."
+   "The workforce slider in the Construction ledger's Buildings view (`draw_building_workforce_page`), below a placeholder trend graph. The slider reaches 0-100%; the command seam reaches 200."
   ],
   [
    "gameplay.set_workforce_auto",
@@ -178,6 +178,10 @@
    "Minimap lens bar, slot 6 (the two-interlocking-plates-split-by-a-diagonal-seam glyph)"
   ],
   [
+   "lens.company",
+   "Keyboard lens cycle only — no lens-bar slot yet (it has no distinct glyph; see BL-663)."
+  ],
+  [
    "lens.corporation",
    "Minimap lens bar, slot 1 (the seal-square glyph: filled square with centred inner dot)"
   ],
@@ -226,16 +230,32 @@
    "Lens strip slot 6, on the minimap (draw_overlay_controls, src/ui/overlay.cpp). Its glyph is a TRUCK in profile (icons::throughput) — its own mark since BL-605, no longer the borrowed convoy chevron, because an on-screen lens carries one distinct glyph."
   ],
   [
+   "ledger.nav_acquisitions",
+   "Nav rail, slot 5 (Acquisitions icon - two outlined squares with an arrow driven from the small one into the large one)"
+  ],
+  [
+   "ledger.acquisitions_buy",
+   "Acquisitions ledger, a Purchasable row's 'Buy' press"
+  ],
+  [
+   "ledger.acquisitions_group",
+   "Acquisitions ledger, the 'Purchasable' and 'Possible' group headers"
+  ],
+  [
+   "ledger.acquisitions_profitability",
+   "Acquisitions ledger, the 'Profitability' row's full-canvas control"
+  ],
+  [
+   "ledger.acquisitions_profitability_sort",
+   "Acquisitions ledger, Profitability fold-out, the table's column headers"
+  ],
+  [
    "ledger.budget_tax_tier",
    "Balance Ledger (Budget), 'Taxes' tier control"
   ],
   [
    "ledger.budget_wage_tier",
    "Balance Ledger (Budget), 'Wages' tier control"
-  ],
-  [
-   "ledger.build_ledger_close",
-   "Tile construction ledger (the 'Construct · [x, y]' fold-out, BL-162), header"
   ],
   [
    "ledger.chat_channel_tab",
@@ -251,19 +271,15 @@
   ],
   [
    "ledger.construction_view_tab",
-   "Construction panel, view tab strip"
+   "Construction ledger, view tab strip"
   ],
   [
    "ledger.corp_card_expand",
-   "Corporation dashboard, one of the four roll-up cards (Production / Trade / Workforce / Finance)"
+   "Corporation ledger, the Balance card's title row"
   ],
   [
-   "ledger.corp_drill_back",
-   "Corporation dashboard, drill breadcrumb ('Corporation > Card > Subject')"
-  ],
-  [
-   "ledger.corp_rollup_drill",
-   "Corporation dashboard, expanded roll-up overlay (Production, Trade, or Workforce card)"
+   "ledger.corp_balance_segment_hover",
+   "Corporation ledger, a segment of the Balance card's expense column"
   ],
   [
    "ledger.corps_table_row_select",
@@ -306,6 +322,10 @@
    "Market Ledger, 'Market' combo"
   ],
   [
+   "ledger.market_nation_chip",
+   "Market Ledger, nation presence row (below the Body/Market selectors, above the tab strip)"
+  ],
+  [
    "ledger.market_view_tab",
    "Market Ledger, view tab strip at the top"
   ],
@@ -315,7 +335,7 @@
   ],
   [
    "ledger.nav_construction",
-   "Nav rail, slot 6 (Construction icon)"
+   "Nav rail, slot 3 (Construction icon)"
   ],
   [
    "ledger.nav_corporation",
@@ -326,16 +346,16 @@
    "Nav rail, slot 8 (Diplomacy icon - provisionally hosts the corporations table)"
   ],
   [
-   "ledger.nav_economy",
-   "Nav rail, slot 3 (Workforce icon - provisionally hosts the Economy panel)"
-  ],
-  [
    "ledger.nav_history",
    "Nav rail, slot 9 (History icon)"
   ],
   [
    "ledger.nav_market",
-   "Nav rail, slot 5 (Market Ledger icon)"
+   "Nav rail, slot 6 (Market Ledger icon)"
+  ],
+  [
+   "ledger.nav_convoys",
+   "Nav rail, slot 7 (Convoys icon), directly after Market"
   ],
   [
    "ledger.selection_body_goto_surface",
@@ -519,19 +539,19 @@
   ],
   [
    "gameplay.declare_hostile",
-   "Corporation panel, Stance column. Confirm popup on press (demolish precedent — not literally irreversible, but not unilaterally reversible by the target either)."
+   "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Declare Hostile keeps an INLINE confirm inside the strip (demolish precedent — not literally irreversible, but not unilaterally reversible by the target either)."
   ],
   [
    "gameplay.offer_friendship",
-   "Corporation panel, Stance column."
+   "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group."
   ],
   [
    "gameplay.accept_friendship",
-   "Corporation panel, Stance column. Shown only on a rival row carrying a pending offer FROM that rival TO the player."
+   "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Shown only in the strip of a row carrying a pending offer FROM that firm TO the player."
   ],
   [
    "gameplay.return_to_neutral",
-   "Corporation panel, Stance column. Shown whenever the row is currently Hostile or Friend."
+   "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Shown in the strip whenever the row is currently in the Hostile or Friends group."
   ],
   [
    "gameplay.march_unit",
@@ -558,20 +578,12 @@
    "The BATTLE CARD in the Selection element (BL-469, landed 2026-08-21): select a live battle and its 'Break off' press sits under the withdrawal price, with a confirm popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card."
   ],
   [
-   "gameplay.accept_offer",
-   "The Contracts ledger's Offers view, Accept press (BL-576). Select an offer whose escrow has cleared its fee, press Accept to open the force picker, check owned uncommitted units, press Confirm. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger."
-  ],
-  [
-   "gameplay.abandon_contract",
-   "The Contracts ledger's Active view, Abandon press (BL-576). Select an active contract, press Abandon to see its reputation cost, confirm in the popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger."
-  ],
-  [
    "gameplay.raze_centre",
    "Seam-only for now (BL-616, centre promotion and decline): a corp_verb issued against the corp-command seam (ProjectIo --serve, COMMAND opcode). No UI press exists yet — the occupation surface that would host one belongs to the conquest consequence item (BL-518)."
   ],
   [
    "gameplay.buy_corporation",
-   "Seam-only for now (BL-628, whole-firm acquisition): a corp_verb issued against the corp-command seam (ProjectIo --serve, COMMAND opcode). The press that will host it is the Profitability ledger's buyout control (BL-627, profitability ledger) — the only surface that reads another corporation's filed return, and therefore the only one that can show the price before it is paid."
+   "The Acquisitions ledger (nav rail slot 5, and the Company lens's click destination): the Buy press on a PURCHASABLE row. The two groups are the whole affordance — Purchasable rows carry the press, Possible rows show the price and carry none, because a price you cannot meet is something to save toward rather than something refused. Also still a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger. NOTE FOR A PLANNER: the field is LARGE — measured over twelve seeds of the shipped spawn (tools/verify/acquisition_viability.cpp section C), 88 corporations yield a mean of 81.6 buyable firms, 35.8 of them Purchasable at the moment of reading. A company is publicly_held by construction (BL-678, companies are open); only a corporation can class private or closed and be unpriceable, which is a mean of 5.2 per seed. A mean of 10.6 firms per seed price at exactly ZERO, which is not a bargain - the price floor caught a firm whose debts exceed its book value, and buy_corporation transfers that debt at face value."
   ],
   [
    "chrome.quick_save_key",
@@ -586,16 +598,28 @@
    "Command line."
   ],
   [
-   "ledger.nav_contracts",
-   "Nav rail, slot 13 (Contracts icon — a page with a signed check mark)"
-  ],
-  [
-   "ledger.contracts_view_tab",
-   "Contracts ledger, view tab strip at the top"
-  ],
-  [
    "canvas.border_band_select",
    "The national border band on the Planetary canvas — always-on chrome, not a lens. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths."
+  ],
+  [
+   "ledger.company_open",
+   "The Company ledger (fold-out column). NO RAIL SLOT — it is reached only by a canvas press, the same shape as the tile construction ledger (ledger.selection_construct_open)."
+  ],
+  [
+   "ledger.construction_queue_toggle",
+   "Construction ledger, Construction view, the 'Queue - N cr / qtr' collapsing header"
+  ],
+  [
+   "ledger.construction_buildings_group",
+   "Construction ledger, Buildings view, a type-group header row (name, count, total profit)"
+  ],
+  [
+   "ledger.construction_buildings_select",
+   "Construction ledger, Buildings view, a building row inside an expanded type group"
+  ],
+  [
+   "ledger.selection_open_in_buildings",
+   "Selection band, building card's right-hand 2x3 action grid, 'Open in ledger' button (a panel outline with one row picked out)"
   ]
  ]
 }

@@ -10,6 +10,200 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-08-29 — Sprint 24a: every ledger rebuilt, and three deletions that took a ruling with them
+
+**Mode:** Design → Full (Batch Delivery, eight waves). **Sprint 24a: closed.**
+**Runtime:** one long session. Eleven worktree agents, one measurement workflow, eight integrating builds.
+
+Twenty-two items. The sprint set out to *review* the ledgers against captures and ended having
+rebuilt most of them, deleted one outright, added two, and found four designed mechanisms that
+have never run in a played world.
+
+### The instrument was wrong before the work was
+
+Every density judgement made in the first half of this session was taken at **1280×720**. Ben
+reviews at 1920×1080, and he said so: *"the UI doesn't shrink at smaller resolutions."*
+
+He was right and the arithmetic says why the difference is entirely vertical. `shell_column_width`
+is `0.20 · disp_x` clamped to [380, 460] — 380 px at 1280, 384 px at 1920, four pixels across the
+whole common range. But the chrome above and below is fixed: the profile tile, and a bottom band
+whose height derives from `minimap_width = max(336, 0.28 · min(disp_x, disp_y))`, which is 336 at
+both. **All 360 extra rows land in the ledger's content height.**
+
+Measured on the Market ledger: **3.5 goods at 720p, nine at 1080p.** So several arguments for a
+redesign were made against half the height the reviewer has. Re-measured, the Budget ledger's
+complaint **dissolved entirely** — at 1080p it fits chart, levers, laws, assets and the full
+ranking at once — while the Corporation dashboard's got **worse**, its four verdict lines sitting
+above ~700 px of void.
+
+`ledger_pass` moved to 1080p. `shell_pass` deliberately stayed at 720p, and that split earned
+itself within the day: the fourteenth rail slot put its centre at **y = 746 against the 720 px
+floor**, leaving Contracts drawn and unpressable. Invisible at 1080p. **The review resolution and
+the fit resolution are different questions.**
+
+### Three deletions, three orphaned rulings
+
+The pattern only became visible because it happened three times:
+
+- **BL-176's empty-room fix** went with the Buildings tab in a 2026-08-15 rework. The Construction
+  panel went back to opening on an empty queue, and nothing recorded that the fix had been undone
+  (NR-718).
+- **NR-245's controls-on-the-card** went with the levers when Ben ruled that the Selection centre
+  presents and does not operate (BL-683).
+- **BL-591's growth-track readout** went with the Production card (NR-724) — a readout built
+  precisely because `corp_reached_depth` gated five places and displayed in none.
+
+All three were found by *reading*, none by a check. A deletion should ask what a ruling placed
+there, and nothing in the method prompts that question.
+
+### Measurement overturned the brief five times, and twice the wrong premise was mine
+
+- **The `x0` convoy.** I wrote into `convoys.md` that the display "is reporting what it was given".
+  It was **rounding** what it was given: 1669 dispatches over five seeds, **zero empty holds**, and
+  77 carrying a positive cargo below 0.5 that `"x%.0f"` renders as `x0`.
+- **`body_average_price`.** I predicted the pressure was on the graph's width. It was the column
+  count — with the column, 13 of 45 names fit; without it, 36 of 45.
+- **The roster is 45 goods**, not the ~42 the docs and I both repeated.
+- **The Trades gate's shut half is unreachable by selection**, because only one market-bearing body
+  ever exists.
+- **Chain depth's retirement** does not hand gating to tech, because tech is an allowlist of locks
+  with nothing to withhold.
+
+### Four designed mechanisms that have never run
+
+This is the sprint's real yield, and none of it was on the plan.
+
+- **Off-world markets.** One market-bearing body at 16, 60, 120, 240 and **400 econ ticks**. Markets
+  seed home-only and an off-world one needs a building to *complete* there; nothing ever builds
+  off-world. So spontaneous emergence, its distance pricing and its counterpart-demand rule describe
+  behaviour no played world has met (NR-725).
+- **Rival acquisition.** `FINANCE.md` says rivals buy, in the present tense, naming `corp_ai.cpp`.
+  `buy_corporation` appears nowhere in that file. I relayed the doc as fact to an agent and to Ben;
+  the agent found it by asking why a clean result was clean (NR-717).
+- **The mercenary contract.** `can_accept = fully_escrowed && !expired`, and client nations never
+  fund their own offers — seven offers at `escrow 0/400`. The player's stated income loop has never
+  been exercisable. Ben retired it the same day (BL-693).
+- **Chain depth as a growth gate.** Sawmill, Stonemason, Potter's Kiln and Weaver are depth-0, open
+  today, and produce **0.0**. Depth was never the brake (NR-727).
+
+### The seam that finally got a test
+
+`save_envelope_roundtrip` exists. NR-708 had recorded that **no envelope field had ever had
+round-trip coverage**, on a seam where `read_save_game` refuses the whole file on a version
+mismatch. The change that would have added one more untested field brought the assertion instead —
+20 rows, including a **wrapped** exchange ring.
+
+And in passing: since the v0.1.21 cut, roughly **thirty harnesses could not compile from a clean
+configure**. Warm trees kept passing on stale objects, so everyone saw green, and **a release was
+cut over it** (NR-721).
+
+### What Ben ruled
+
+The Selection centre presents data and never holds levers, reversing NR-245. The game does not play
+itself — declining a build-opportunity ledger — then the qualification that makes it usable: rank
+where the top row is *one input among several*, never where it *is* the move. Closure retired for
+companies. Convoys earned slot 7. Chain depth retired as a gate. Mercenary contracts retired.
+
+### Left open
+
+The growth track's new home (NR-724), whether off-world investment is meant to happen at all
+(NR-725), `quarterly_return` R2 failing on main with no owner (NR-720), and whether a clean
+configure belongs in the loop (NR-721). Goldens are knowingly red on Ben's instruction. The
+**live click** is owed on every surface this sprint touched.
+
+---
+
+## 2026-08-28 — Sprint 23 closes: a lens becomes a question, and the answer stops disagreeing with itself
+
+**Mode:** Design, then Full (Batch Delivery, three waves). **Sprint 23: closed, goal met.**
+**Sprint 24 opened.**
+
+Thirteen items. The sprint began as a design session on selection and ended with every planned item
+landed, both carried review-queue entries answered, and the next batch opened with four defects
+already filed against its own surfaces.
+
+### The rule
+
+Ben opened with a principle rather than a review: *"when lenses are active, selection is only one
+tier, as opposed to the default lens, which may cycle through elements with multiple clicks."* Two
+rulings followed — *"Markers do not outrank lenses"* and *"for lenses which return none, just don't
+surface a hover, and clicks will do nothing."*
+
+Written into SELECTION.md and LENSES.md before any code, then built as **BL-664**. The interesting
+consequence was accepted rather than inferred: Population, Industry and Throughput draw a per-tile
+value field with no structure grain, so under the rule they became entirely non-interactive — two
+of the three are on-bar lenses, so it is visible.
+
+**BL-665** gained the corporation and company area resolvers. Their absence had been *measured*, not
+assumed — the first draft of that switch reported `tile` on empty ground and `building` on owned
+ground, never `corporation`, because a marker always won the press. BL-664 removed the precedence
+and the objection dissolved with it.
+
+### Where the review barrier earned its place
+
+**BL-666**'s first cut routed a corporation press to `show_corporation_panel` — which drives the
+**player's own dashboard**. That is NR-700 reproduced one commit after the item that filed it. The
+two ui_state flags are named the wrong way round (`show_corporations_table` drives
+`draw_corporation_panel`), and the check could not have caught it either: `pointer_target` had no
+name distinguishing the two corporation surfaces, so the assertion passed for both. Two independent
+guards failed to the same naming confusion (NR-704).
+
+The same pass found a **save-breaking bug the batch made reachable**: `max_overlay` was hand-kept at
+`supply_routes` while two lenses had been appended after it, so a save written under Throughput or
+Company would not reopen — the whole envelope, not one field (NR-703).
+
+### Measurement overturned the plan, twice
+
+Ben asked for a **quadratic** throughput ramp. A new census (`throughput_field_census`) said no: the
+ramp was already sqrt, quadratic is *worse* (45% of the grid in one tenth of the ramp against 32%),
+and no curve over `cost/max` could work because the input is bunched — 1917 anchors where the sqrt
+was calibrated against 57, median cost 6.75 against a max of 81.58. The denominator was the problem.
+p90 is 42.58, so the top decile of cost was eating half the ramp while holding a tenth of the tiles.
+p90 + sqrt: worst bucket 21%. **BL-669.**
+
+An assertion written to prove the convergent and divergent boundary masks are exclusive **failed**,
+and was not weakened. A tile at a junction between a closing pair and an opening pair is genuinely on
+both, and `height_bias` has always taken both terms there. The false claim was corrected in the
+header, the `.cpp` and CONTINENTS.md (NR-707).
+
+### The rest
+
+**BL-667** one hover mark under a lens; **BL-668** the workforce heatmap (it was the only lens
+answering by *adding a mark* rather than colouring the ground); **BL-670** the rung-keyed lens strip,
+which dissolved a discovery problem that a layout constraint had been deciding — the old array of six
+was chosen by what fit a 240 px bar, leaving six of twelve built lenses reachable only by a key
+nothing on screen mentions.
+
+**BL-671** gave the deposit and the plate Selection-band cards. Both channels had been *write-only*:
+the canvas set them and nothing read them, so a press showed the previous subject — not blank, which
+is the worse failure. **BL-660** landed in two halves, a Tectonics view plus the divergent boundary
+mask the generator had been classifying and discarding. **BL-673** gave each structure lens its own
+hover card, reading the resolver so the card's subject cannot disagree with the click's.
+
+**BL-672** closed NR-698 on Ben's ruling: `verify.find_deposit_tile` answers *where* a good is
+deposited — one tile, raster order, no other tile data — recorded as a scoped exception beside the
+standing rule it narrows. It bought the identity assertion, which a blind sweep could never make:
+press two goods' deposits, require two different selections. The check went 7 rows to 21.
+
+### Verification
+
+`lens_one_tier` 38/38, `lens_region_destinations` 21/21, `lens_strip_and_fields` green,
+`continents_harness` ALL PASS, `throughput_field_census` reporting. Four durable checks where batch 1
+left none — that batch was capture-only, with a human eye as the entire test. Live-clicked in the
+built app: the marker rule, the inert lens, the band clearing to resting, and the corporation
+destination.
+
+### Open for Ben
+
+- The **Company destination** has never been live-clicked, and the blocker is the world rather than
+  access — a fresh campaign carried no background firm on the home body at all. Folded into BL-636.
+  If they are genuinely absent early, the Company lens needs an empty state.
+- **31 archived backlog records** sit in an `undated` bucket. The cause is fixed (the bucketer now
+  reads all four date field names); the residue is historical and would need a full restore to move.
+- **No envelope field has save round-trip coverage**, and the save version moved to 2 (NR-708).
+
+---
+
 ## 2026-08-26 — Sprint 20 closes: the loop closes, and the instruments were measuring a different world
 
 **Mode:** Full (Batch Delivery, six waves). **Cut:** v0.1.21. **Sprint 20: closed, goal met and proved.**

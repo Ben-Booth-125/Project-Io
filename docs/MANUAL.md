@@ -288,20 +288,20 @@ Buildings occupy tiles, consume inputs, and emit outputs on a recipe. Placement 
 terrain, deposits, slot rules and **logistical reach** — you cannot build at unbounded distance from
 a supply anchor, and build time depends on where you build, not only what.
 
-A campaign does not open onto the whole roster. Most building types and most recipes are not
-buildable on day one — a fresh corporation sees a narrow opening set, and the rest is **earned**.
-Three separate locks govern this, and the Build door tells them apart: an **era lock** (a recipe
-belongs to a later technological era and never appears here); a **depth lock** (you have not yet
-reached the chain depth a recipe requires — shown greyed with the reason, so you can see what you
-are missing); and a **tech lock** (a specific research condition, e.g. holding a stockpile or
-running a processing facility, that unlocks one recipe by name once met). Some buildings offer
-**alternate production methods** for the same output — a real trade-off, not a straight upgrade,
-so the better choice depends on which market the output is going to.
+**You may build any building and run any method your research permits.** Two locks govern the
+Build door, and both remove a row rather than showing it greyed — the door does not offer what it
+would refuse: an **era lock** (a building or recipe belongs to a later technological era and never
+appears in this campaign at all) and a **tech lock** (a specific research condition — holding a
+stockpile, running a processing facility, a cash surplus — that unlocks one recipe by name once
+met). Nothing is locked behind what you have produced before.
 
-The corporation dashboard's Production card carries a **growth track**: the chain depth you have
-reached and the good that set it, the buildings within reach at the next rung, and the specific
-inputs still missing to place one of them. This is the intended way to read "what do I build
-next" — not a wiki, the readout on your own dashboard.
+So what stops you is not permission. A method you can place may still be a bad idea, or simply
+dead: its inputs may not be for sale anywhere you can reach, or its output may have no buyer. That
+is the real constraint on early growth, and it is one you read off **prices and supply**, not off a
+locked row. Check that a chain's inputs can actually be bought before you build the far end of it.
+
+Some buildings offer **alternate production methods** for the same output — a real trade-off, not a
+straight upgrade, so the better choice depends on which market the output is going to.
 
 *Authority: `docs/economy/PRODUCTION.md`.*
 

@@ -28,6 +28,74 @@ void hover_terrain_header(const tile_component& tile)
                     landform_name(tile.landform));
 }
 
+// --- The STRUCTURE lenses' cards (BL-673, closing NR-701) ------------------------
+//
+// Ben, 2026-08-28: "we should wire in contextual hover cards. For now leave them as
+// placeholders, but for each lens, we need a different hover card."
+//
+// WHAT THESE FIX. BL-664 made a lens resolve the pointer to its own structure, and
+// the card kept describing the TILE — so hovering a rival's plant under the
+// Corporation lens said "Scrubby Volcanic, Habitability 11%" while a click there
+// selected the corporation. The card answered a question the lens was not asking,
+// and it was a LOSS against the old behaviour, where a marker at least gave you the
+// building.
+//
+// THEY READ THE RESOLVER, NOT THE TILE. `ui_state::hovered_structure` and
+// `hovered_structure_kind` are what `lens_structure_of_tile` already decided this
+// frame, so the card's subject cannot disagree with the click's — which was the
+// whole defect. Nothing here re-resolves anything.
+//
+// DECLARED PLACEHOLDERS, deliberately thin: each names the structure and says what
+// the press will open. What they do NOT carry is the reading that would make them
+// worth dwelling on — a corporation's holdings and balance, a catchment's clearing
+// prices, a plate's collision record. Those are per-lens content designs, and
+// guessing at them here would bake in five shapes nobody chose.
+
+// Corporation / Company: the OWNER the pointer resolved through.
+void hover_structure_owner(const world& w, entity_id corp, bool background)
+{
+    const auto it = w.corporations.find(corp);
+    if (it == w.corporations.end())
+    {
+        ImGui::TextDisabled(background ? "Company" : "Corporation");
+        return;
+    }
+    ImGui::TextUnformatted(it->second.name.c_str());
+    ImGui::TextDisabled(background ? "Background company" : "Corporation");
+    // SHORT BY MEASUREMENT, not by taste: the first cut read "Click for the
+    // corporations table" and the card clipped it to "...corporations ta". The card
+    // is a fixed-width popup, so an action hint has to fit rather than trail off.
+    ImGui::TextDisabled(background ? "Click: company ledger" : "Click: corporations table");
+}
+
+// Market / Scarcity: the CATCHMENT, which is what both lenses tint.
+void hover_structure_market(const world& w, entity_id market, bool scarcity)
+{
+    const auto it = w.markets.find(market);
+    if (it == w.markets.end())
+    {
+        ImGui::TextDisabled("Market catchment");
+        return;
+    }
+    const auto bit = w.bodies.find(it->second.body);
+    if (bit != w.bodies.end())
+        ImGui::Text("%s Market", bit->second.name.c_str());
+    else
+        ImGui::TextUnformatted("Market");
+    ImGui::TextDisabled(scarcity ? "Shortfall catchment" : "Price catchment");
+    ImGui::TextDisabled("Click: Market ledger");
+}
+
+// Continent: the PLATE. `hovered_structure` carries the synthetic key the resolver
+// minted (plate index + 1, so 0 stays "none"), which is why this subtracts one
+// rather than treating it as an id.
+void hover_structure_plate(entity_id key)
+{
+    ImGui::Text("Plate %d", static_cast<int>(key) - 1);
+    ImGui::TextDisabled("Tectonic plate");
+    ImGui::TextDisabled("Click: History ledger");
+}
+
 // --- Exemplar 1: tile × resource lens -------------------------------------------
 
 void hover_tile_resource(const tile_component& tile, resource_type res)
@@ -315,6 +383,34 @@ void draw_hover_content(const world& w, const ui_state& ui, entity_id eid)
 {
     if (eid == null_entity)
         return;
+
+    // THE STRUCTURE THE LENS RESOLVED comes first, ahead of every kind branch
+    // (BL-673). Under a lens the pointer resolves to a structure or to nothing, and
+    // the card must describe the same thing the click will select — a card keyed on
+    // the entity kind cannot, because the entity here is only the ground the
+    // structure happens to cover.
+    //
+    // The Resource lens is the exception that proves the rule: its structure IS the
+    // deposit on this tile, so the tile card already answers the lens's question and
+    // is left alone below.
+    switch (ui.hovered_structure_kind)
+    {
+    case structure_kind::corporation:
+        hover_structure_owner(w, ui.hovered_structure, /*background=*/false);
+        return;
+    case structure_kind::company:
+        hover_structure_owner(w, ui.hovered_structure, /*background=*/true);
+        return;
+    case structure_kind::market:
+        hover_structure_market(w, ui.hovered_structure,
+                               ui.overlay == overlay_mode::scarcity);
+        return;
+    case structure_kind::plate:
+        hover_structure_plate(ui.hovered_structure);
+        return;
+    default:
+        break; // deposit, nation, none — fall through to the kind dispatch
+    }
 
     // Dispatch: tile
     if (const auto tile_it = w.tiles.find(eid); tile_it != w.tiles.end())

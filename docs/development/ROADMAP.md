@@ -67,7 +67,7 @@ authority doc for its subject, and the work in whichever sprint opens it.
 | Theme | What it means |
 |---|---|
 | **The watch** | An agent plays a rendered session and a human watches — the live agent control seam, the spectator god view, the emergent-strategy readout, the attention director. |
-| **Economy breadth** | The growth spine is **chain depth**: how far down the production graph a corp reaches gates its next building. Past 20 building types, with alternate production methods that trade off rather than upgrade. |
+| **Economy breadth** | The growth spine is **research**: what a corp may build is a consequence of what it has unlocked, not of what it has produced. Past 20 building types, with alternate production methods that trade off rather than upgrade. |
 | **The economy tells the truth** | The measured pathologies, fixed — processing underearns extraction, the economy mines one resource, co-extraction is invisible, intra-catchment distance is free. |
 | **Ancient conflict & seams** | The Era −1 machinery graduates from generator to gameplay: era-keyed rosters, the strategic layer, the diplomacy seam and its battery, myth and theology. |
 | **Stance & force** | Who may fight whom, and the verbs to do it — the unit verb family, company answerability, the stance surface, formations. *(Logistic Points left this theme: pulled forward and shipped by Sprint 18 — see Cut so far.)* |

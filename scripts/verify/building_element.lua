@@ -7,8 +7,8 @@
 -- the stack-capacity readout, and the Idle / Demolish controls.
 --
 -- NOTE on staging: the Selection element only draws when NO nav ledger owns the
--- fold-out column (app gates it on ui::any_panel_open). building_profit.lua closes
--- only the economy panel, which is why its golden shows an empty column and never
+-- fold-out column (app gates it on ui::any_panel_open). building_profit.lua closed
+-- only one ledger, which is why its golden shows an empty column and never
 -- actually exercised this surface. This script closes every ledger that shares the
 -- slot, then picks a player building from verify.buildings() rather than hard-coding
 -- grid coordinates that a generation change can silently invalidate.
@@ -19,7 +19,6 @@ verify.econ_step(6)          -- populate run states, prices, and the report rows
 verify.goto_surface("home")  -- Kepler: fully surveyed, player buildings visible
 
 -- Free the fold-out column: any open ledger suppresses the Selection element.
-verify.show_panel("economy",      false)
 verify.show_panel("construction", false)
 verify.show_panel("tile",         false)
 verify.show_panel("market",       false)

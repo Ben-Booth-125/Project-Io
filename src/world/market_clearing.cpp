@@ -539,6 +539,54 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     std::unordered_map<entity_id, corp_cash_flow> flows;
     const auto& by_body = markets_by_body(w);
 
+    // --- The exchange record (BL-685) ---------------------------------------
+    //
+    // One row per exchange, appended to `w.exchanges` at each of the FOUR points
+    // below where this pass actually moves goods for money. It is written beside
+    // the cash-flow accrual it belongs to and never in a fifth pass of its own:
+    // `quantity * unit_price` is the same product the neighbouring statement adds
+    // to `corp_cash_flow`, so the record cannot come to disagree with the money
+    // loop. Authority: docs/economy/MARKETS.md § The exchange record.
+    //
+    // `unit_price` IS THE PRICE CLEARING RESOLVED. For the three auto paths that
+    // is `ref_price` — the market as counterparty of last resort — and for a
+    // matched trade it is the price the match executed on. It is never read back
+    // off a `sell_order::floor_price` or a `buy_order::max_price`: those are the
+    // reservation prices an order CARRIED into clearing, and an order is honoured
+    // at clearing, so what a seller asked and what they got are different numbers.
+    //
+    // DETERMINISM. The append order is a total order over the clearing walk, not
+    // whatever a hash container happens to iterate in, and each of the four sites
+    // walks a sequence that is already deterministic for its own reason:
+    //   1. `auto_sells`  — built from `world::corp_body_pools`, a std::map, with
+    //                      the resource index ascending inside each pool.
+    //   2. `auto_buys`   — built from `economy_report::purchases`, a std::map
+    //                      (BL-422 made it one, for this same class of reason).
+    //   3. `trades`      — built over `book_mids` sorted ascending and each
+    //                      market's resources sorted ascending.
+    //   4. the auto-clear — the same sorted walk as 3, then each order book's own
+    //                      insertion order, which is the TIME half of price-time
+    //                      priority and is itself state.
+    // `world::markets` is an unordered_map and is NEVER the thing walked to emit a
+    // row. Nothing below reads a wall clock or an unseeded source.
+    //
+    // A ZERO-QUANTITY row is not an exchange and is dropped: it would spend a ring
+    // slot on nothing and put a divide-by-zero in every reader that averages.
+    auto record_exchange = [&w](entity_id market, std::size_t r, float qty, float price,
+                                entity_id seller, entity_id buyer) {
+        if (qty <= 0.0f)
+            return;
+        exchange_record e;
+        e.tick       = w.current_econ_tick;
+        e.market     = market;
+        e.resource   = static_cast<resource_type>(r);
+        e.quantity   = qty;
+        e.unit_price = price;
+        e.seller     = seller;
+        e.buyer      = buyer;
+        w.exchanges.push(e);
+    };
+
     // The standing order book, read from the world (BL-293). Bound by reference
     // rather than copied: nothing below resizes either vector — this pass mutates
     // markets and pools, never the book — so the references stay valid, and the
@@ -777,11 +825,22 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             w.markets.at(se.market).inventory[se.r] += left; // BL-422: credit what left
         }
         flows[se.corp].income += se.qty * ref_price[se.market][se.r];
+        // Exchange row 1 of 4: the market is the BUYER of last resort here, and
+        // has no corp behind it — `null_entity` on that side means the market
+        // itself, not an unknown counterparty (components.hpp, exchange_record).
+        record_exchange(se.market, se.r, se.qty, ref_price[se.market][se.r],
+                        se.corp, null_entity);
     }
 
     // --- Auto-demand clearing: expenditure at ref_price ---
     for (const auto_buy_entry& be : auto_buys)
+    {
         flows[be.corp].expenditure += be.qty * ref_price[be.market][be.r];
+        // Row 2 of 4: the mirror of row 1 — the market is the SELLER, so this is
+        // the buy side of a player's history (what I bought, at what price).
+        record_exchange(be.market, be.r, be.qty, ref_price[be.market][be.r],
+                        null_entity, be.corp);
+    }
 
     // --- Explicit order-book matching (player sell vs player buy) ---
     // Provides preferred-seller routing and a VWAP price signal when priced orders
@@ -910,6 +969,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         }
         flows[t.seller].income     += t.qty * t.price;
         flows[t.buyer].expenditure += t.qty * t.price;
+        // Row 3 of 4: the only path with a REAL corp on both sides. `t.price` is
+        // the price the match executed on — read off the matching pass, not off
+        // the standing order, which is why the tariff block below prices the duty
+        // against the same number.
+        record_exchange(t.market, t.r, t.qty, t.price, t.seller, t.buyer);
     }
 
     // --- Import tariff (Sprint D4) ------------------------------------------
@@ -1011,6 +1075,12 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                     w.markets.at(mid).inventory[r] += left; // BL-422: credit what left
                 }
                 flows[se.corp].income += se.rem * rp;
+                // Row 4 of 4: the buyer-of-last-resort sale. The order carried a
+                // floor of `se.floor_price` and cleared at `rp` — the record takes
+                // `rp`, because that is what the seller GOT. An order whose floor
+                // sat above `rp` never reaches here (it held its stock), so no
+                // row is written for a sale that did not happen.
+                record_exchange(mid, r, se.rem, rp, se.corp, null_entity);
             }
         }
     }

@@ -12,7 +12,6 @@
 -- EMPTY map — and an empty map still captures a PNG and still blesses clean.
 verify.econ_step(4)
 
-verify.show_panel("economy", false)
 verify.goto_surface("home")
 
 verify.set_overlay("industry")

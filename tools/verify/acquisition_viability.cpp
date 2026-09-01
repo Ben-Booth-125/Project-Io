@@ -91,7 +91,6 @@
 #include "harness_params.hpp"
 #include "world/budget_system.hpp"
 #include "world/components.hpp"
-#include "world/contract_template.hpp"
 #include "world/corp_command.hpp"
 #include "world/corporation_generation.hpp"
 #include "world/economy_system.hpp"
@@ -149,7 +148,6 @@ constexpr int k_r1_window  = 8;   ///< Quarters R1 reads for its trend. Two year
 
 /// BL-573: run_nation_step's template registry. Empty is correct — nothing in
 /// this sweep opens a mercenary contract, so the walk is vacuous.
-const contract_template_registry g_no_contract_templates;
 
 // ---------------------------------------------------------------------------
 // The tick
@@ -170,7 +168,7 @@ void tick(world& w, const recipe_registry& reg, int t, bool spectating)
     auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
                  &rep.building_labour);
-    run_nation_step(w, reg, rep, t, g_no_contract_templates);
+    run_nation_step(w, reg, rep, t);
     advance_tech_gates(w);
     credit_arrived_convoys(w, t);
 }
@@ -270,6 +268,19 @@ struct field_snapshot
     int holdings = 0;
     int units    = 0;
     double net_sum = 0.0;   ///< summed last-filed net over the rivals
+
+    // BL-678 (companies are open) — CONSOLIDATION. Opening the whole company
+    // population to acquisition makes ~85 firms per seed buyable where 1.6 were,
+    // and `buy_corporation` is scored in corp_ai.cpp's candidate list, so a rival
+    // can now snowball through acquisition in a way this economy has never been
+    // exercised against. These four fields are what tells you whether it did.
+    int    corps        = 0;   ///< every corporation alive, PLAYER INCLUDED
+    int    holders      = 0;   ///< corporations holding at least one building
+    int    max_holdings = 0;   ///< the largest single holding count in the field
+    /// Herfindahl index over holding SHARES, 0..1. 1/holders when every holder is
+    /// the same size; 1.0 when one firm owns the world. The number that answers
+    /// "did the field concentrate into fewer hands" without needing a threshold.
+    double hhi          = 0.0;
 };
 
 field_snapshot survey_field(const world& w)
@@ -278,7 +289,13 @@ field_snapshot survey_field(const world& w)
     for (const entity_id id : sorted_corp_ids(w))
     {
         const corporation_component& cc = w.corporations.at(id);
-        f.holdings += static_cast<int>(cc.assets.size());
+        const int hold = static_cast<int>(cc.assets.size());
+        f.holdings += hold;
+        ++f.corps;
+        if (hold > 0)
+            ++f.holders;
+        if (hold > f.max_holdings)
+            f.max_holdings = hold;
         if (id == w.player_entity || cc.is_player)
             continue;
         ++f.rivals;
@@ -286,6 +303,17 @@ field_snapshot survey_field(const world& w)
             ++f.solvent;
         if (!cc.returns.empty())
             f.net_sum += static_cast<double>(cc.returns.back().net);
+    }
+    if (f.holdings > 0)
+    {
+        // Second walk, same sorted order: the shares need the total, which the
+        // first walk is still accumulating.
+        for (const entity_id id : sorted_corp_ids(w))
+        {
+            const double share = static_cast<double>(w.corporations.at(id).assets.size())
+                               / static_cast<double>(f.holdings);
+            f.hhi += share * share;
+        }
     }
     // Ascending unit id, so the walk over the unordered `w.units` cannot inherit
     // its layout — the count is order-independent, but the walk must not be.
@@ -298,6 +326,106 @@ field_snapshot survey_field(const world& w)
         if (w.units.at(uid).owner != w.player_entity)
             ++f.units;
     return f;
+}
+
+// ---------------------------------------------------------------------------
+// THE BUYABLE FIELD — a census (2026-08-29, for the acquisitions ledger)
+// ---------------------------------------------------------------------------
+//
+// The acquisitions ledger groups the buyable field into PURCHASABLE (priced
+// within the acquirer's balance) and POSSIBLE (priced, beyond it today). Both
+// groups are empty unless firms are BOTH `publicly_held` AND have filed, and a
+// fixture capture on 2026-08-29 showed most firms rendering a dash for Capital
+// — i.e. not public at all. So the field may be a ledger with nothing in it,
+// and that has to be measured before a pixel of it is laid out.
+//
+// It REPORTS and never asserts a magnitude, deliberately: the moment it asserts
+// "the field must hold N firms", tuning gets aimed at the harness instead of at
+// the economy — the failure mode `demand_census`'s header already names. Its one
+// assertion is the non-vacuity of its own reading.
+struct census_entry
+{
+    std::string name;
+    float       price      = 0.0f;
+    bool        affordable = false;
+};
+
+struct field_census
+{
+    int corps_total     = 0;   ///< every corporation, player included
+    int public_held     = 0;   ///< publicly_held, acquirer and player excluded
+    int private_held    = 0;
+    int closed_held     = 0;
+    int public_filed    = 0;   ///< public AND has filed — THE BUYABLE FIELD
+    int public_unfiled  = 0;   ///< public but never filed — priced by nothing
+    int nonpublic_filed = 0;   ///< files but is unbuyable (disclosure ≠ acquisition)
+    int purchasable     = 0;   ///< buyable, priced within the acquirer's balance
+    int possible        = 0;   ///< buyable, priced, beyond the acquirer's balance
+    int at_floor        = 0;   ///< priced at exactly zero by the max(0, ...) floor
+    float acquirer_balance = 0.0f;
+    float min_price = 0.0f, max_price = 0.0f, median_price = 0.0f;
+    std::vector<census_entry> entries;   ///< the buyable field, ascending price
+};
+
+/// Walks the field through the SAME gates `apply_corp_command` applies, in the
+/// same order, and prices through `corp_acquisition_price` — never a restated
+/// formula. `is_background` is deliberately NOT among the gates, because the
+/// verb does not test it: the buyable field is every public filed firm.
+field_census census_field(const world& w, const recipe_registry& reg, entity_id acquirer)
+{
+    field_census c;
+    const float k = reg.acquisition().multiple;
+    const auto ait = w.corporations.find(acquirer);
+    if (ait != w.corporations.end())
+        c.acquirer_balance = ait->second.balance;
+
+    for (const entity_id id : sorted_corp_ids(w))
+    {
+        const corporation_component& cc = w.corporations.at(id);
+        ++c.corps_total;
+        if (id == acquirer || id == w.player_entity || cc.is_player)
+            continue;   // gates (1)/(2): never the acquirer, never the player
+
+        const bool filed = !cc.returns.empty();
+        switch (cc.ownership_class)
+        {
+            case ownership_class::publicly_held:  ++c.public_held;  break;
+            case ownership_class::privately_held: ++c.private_held; break;
+            case ownership_class::closed:         ++c.closed_held;  break;
+        }
+        if (cc.ownership_class != ownership_class::publicly_held)
+        {
+            if (filed)
+                ++c.nonpublic_filed;
+            continue;   // gate (3)
+        }
+        if (!filed)
+        {
+            ++c.public_unfiled;
+            continue;   // gate (4) — a firm that does not file cannot be priced
+        }
+        ++c.public_filed;
+
+        const float price = corp_acquisition_price(cc, k);
+        if (!std::isfinite(price))
+            continue;
+        if (!(price > 0.0f))
+            ++c.at_floor;
+        const bool afford = c.acquirer_balance >= price;   // gate (5), the seam's own test
+        if (afford) ++c.purchasable; else ++c.possible;
+        c.entries.push_back(census_entry{ cc.name, price, afford });
+    }
+
+    std::sort(c.entries.begin(), c.entries.end(),
+              [](const census_entry& a, const census_entry& b)
+              { return a.price != b.price ? a.price < b.price : a.name < b.name; });
+    if (!c.entries.empty())
+    {
+        c.min_price    = c.entries.front().price;
+        c.max_price    = c.entries.back().price;
+        c.median_price = c.entries[c.entries.size() / 2].price;
+    }
+    return c;
 }
 
 // ---------------------------------------------------------------------------
@@ -364,6 +492,10 @@ struct seed_row
     field_snapshot field_seat;
     field_snapshot field_close;
     int   field_holdings_gen = 0;
+
+    // --- C: the buyable field, at the seat and at the last pre-buy quarter ---
+    field_census census_seat;
+    field_census census_close;
 };
 
 /// Mean filed `net` over a corp's last @p n returns, and the matching mean
@@ -428,7 +560,9 @@ seed_row run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory,
         r.seat_balance  = cc.balance;
         r.seat_holdings = static_cast<int>(cc.assets.size());
     }
-    r.field_seat = survey_field(w);
+    r.field_seat   = survey_field(w);
+    r.census_seat  = census_field(w, reg, r.seated);
+    r.census_close = r.census_seat;   // overwritten every quarter below
 
     // --- live play. The seated corp is excluded from the scorer, exactly as a
     //     human's corp is, so what it accumulates it accumulates by holding what
@@ -443,6 +577,11 @@ seed_row run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory,
         r.net_trace.push_back(cc.returns.empty() ? 0.0f : cc.returns.back().net);
 
         r.final_balance = cc.balance;
+
+        // The census of the field the ledger will render, this quarter. Kept as
+        // the LAST PRE-BUY reading: a buy erases a firm, so a census taken after
+        // one is not the field the ledger would have shown.
+        r.census_close = census_field(w, reg, r.seated);
 
         // Both gates, every quarter. The first time each becomes affordable is
         // recorded; only the selected one fires the verb.
@@ -660,6 +799,113 @@ int main(int argc, char** argv)
                              : (b.cheapest.had_target ? "no buy" : "NO TARGET"));
         std::fflush(stdout);
     }
+
+    // =====================================================================
+    // C — THE BUYABLE FIELD. How much is there to render at all?
+    // =====================================================================
+    std::printf("\n=== C  THE BUYABLE FIELD - is there a ledger here? ===\n");
+    std::printf("  The acquisitions ledger groups the field into PURCHASABLE "
+                "(price <= the player's\n"
+                "  balance) and POSSIBLE (priced, beyond it today). A firm that "
+                "does not file cannot be\n"
+                "  priced and does not appear at all. Every count below is taken "
+                "through the SAME gates\n"
+                "  apply_corp_command applies, in its order, priced by "
+                "corp_acquisition_price.\n"
+                "  REPORTED, never asserted: a row that pinned a field size would "
+                "be an instrument to\n"
+                "  tune against rather than a reading.\n\n");
+    std::printf("  seed | corps | public priv closed | pub+FILED  pub-unfiled | "
+                "PURCHASABLE  POSSIBLE | at floor\n");
+    std::printf("  -----+-------+--------------------+-----------------------+-"
+                "-----------------------+---------\n");
+    long tot_public = 0, tot_filed = 0, tot_unfiled = 0, tot_purch = 0,
+         tot_poss = 0, tot_floor = 0, tot_priv = 0, tot_closed = 0,
+         tot_nonpub_filed = 0;
+    int census_seeds = 0;
+    for (const seed_row& r : rows)
+    {
+        if (r.seated == null_entity)
+            continue;
+        const field_census& c = r.census_close;
+        ++census_seeds;
+        tot_public  += c.public_held;   tot_priv    += c.private_held;
+        tot_closed  += c.closed_held;   tot_filed   += c.public_filed;
+        tot_unfiled += c.public_unfiled; tot_purch  += c.purchasable;
+        tot_poss    += c.possible;      tot_floor   += c.at_floor;
+        tot_nonpub_filed += c.nonpublic_filed;
+        std::printf("  %4u | %5d | %6d %4d %6d | %9d %12d | %11d %9d | %7d\n",
+                    r.seed, c.corps_total, c.public_held, c.private_held,
+                    c.closed_held, c.public_filed, c.public_unfiled,
+                    c.purchasable, c.possible, c.at_floor);
+    }
+    if (census_seeds > 0)
+    {
+        const double n = static_cast<double>(census_seeds);
+        std::printf("  -----+-------+--------------------+-----------------------+-"
+                    "-----------------------+---------\n");
+        std::printf("  mean |       | %6.1f %4.1f %6.1f | %9.1f %12.1f | %11.1f "
+                    "%9.1f | %7.1f\n",
+                    tot_public / n, tot_priv / n, tot_closed / n, tot_filed / n,
+                    tot_unfiled / n, tot_purch / n, tot_poss / n, tot_floor / n);
+        std::printf("\n  Non-public firms that DO file (disclosure is not "
+                    "acquisition): %.1f per seed.\n", tot_nonpub_filed / n);
+    }
+
+    std::printf("\n  Prices in the buyable field, and the balance they are read "
+                "against:\n");
+    std::printf("  seed |   player balance |      min |   median |      max | "
+                "the field, ascending price\n");
+    std::printf("  -----+------------------+----------+----------+----------+-"
+                "---------------------------\n");
+    for (const seed_row& r : rows)
+    {
+        if (r.seated == null_entity)
+            continue;
+        const field_census& c = r.census_close;
+        if (c.entries.empty())
+        {
+            std::printf("  %4u | %16.0f |        - |        - |        - | "
+                        "(EMPTY — no public filed firm)\n",
+                        r.seed, static_cast<double>(c.acquirer_balance));
+            continue;
+        }
+        std::printf("  %4u | %16.0f | %8.0f | %8.0f | %8.0f |",
+                    r.seed, static_cast<double>(c.acquirer_balance),
+                    static_cast<double>(c.min_price),
+                    static_cast<double>(c.median_price),
+                    static_cast<double>(c.max_price));
+        // Every row, with a P/o marker: P purchasable, o possible.
+        for (const census_entry& e : c.entries)
+            std::printf(" %s%.0f", e.affordable ? "P" : "o",
+                        static_cast<double>(e.price));
+        std::printf("\n");
+    }
+    for (const seed_row& r : rows)
+    {
+        if (r.seated == null_entity || r.census_close.entries.empty())
+            continue;
+        std::printf("    seed %4u names:", r.seed);
+        for (const census_entry& e : r.census_close.entries)
+            std::printf("  [%s] %.24s %.0f", e.affordable ? "P" : "o",
+                        e.name.c_str(), static_cast<double>(e.price));
+        std::printf("\n");
+    }
+
+    std::printf("\n  Same census AT THE SEAT (quarter 0), for the change over the "
+                "window:\n");
+    for (const seed_row& r : rows)
+    {
+        if (r.seated == null_entity)
+            continue;
+        const field_census& c = r.census_seat;
+        std::printf("    seed %4u  public %2d, filed %2d, purchasable %2d, "
+                    "possible %2d, balance %.0f\n",
+                    r.seed, c.public_held, c.public_filed, c.purchasable,
+                    c.possible, static_cast<double>(c.acquirer_balance));
+    }
+    check(census_seeds > 0 && tot_public + tot_priv + tot_closed > 0, "C",
+          "the census read a non-empty field of corporations (non-vacuous)");
 
     // =====================================================================
     // R1 — does the seated corp accumulate?
@@ -917,6 +1163,66 @@ int main(int argc, char** argv)
                 tot_hold_gen, tot_hold_close,
                 tot_hold_gen > 0 ? 100.0 * (tot_hold_close - tot_hold_gen) / tot_hold_gen : 0.0);
     std::printf("  rival standing force %d units\n", tot_units);
+
+    // --- CONSOLIDATION (BL-678, companies are open) -----------------------
+    // REPORTED, never asserted. A pinned concentration figure would be an
+    // instrument to tune the economy against, which is the failure this file's
+    // C section already refuses for the field size. What it must do is make the
+    // snowball VISIBLE if there is one.
+    //
+    // `buy_corporation` is the ONLY path that erases a corporation (corp_command
+    // .cpp is the sole `w.corporations.erase`), so the fall in the corp count
+    // between the seat and the close IS the acquisition count over the run,
+    // exactly. One of them is the player's when the seed bought; the rest are
+    // rivals acting through the scorer.
+    std::printf("\n  --- CONSOLIDATION: acquisitions over the run, and where the "
+                "holdings ended up ---\n");
+    std::printf("  Corps only ever disappear by acquisition, so the count delta IS "
+                "the acquisition count.\n");
+    std::printf("  seed | corps seat -> close | acq total | player | RIVAL | holders "
+                "seat -> close | largest holding | HHI seat -> close\n");
+    std::printf("  -----+---------------------+-----------+--------+-------+--------"
+                "--------------+-----------------+-------------------\n");
+    int tot_acq = 0, tot_acq_player = 0, tot_acq_rival = 0, consol_seeds = 0;
+    double hhi_seat_sum = 0.0, hhi_close_sum = 0.0;
+    for (const seed_row& r : rows)
+    {
+        if (r.seated == null_entity)
+            continue;
+        const int acq        = r.field_seat.corps - r.field_close.corps;
+        const int acq_player = r.bought ? 1 : 0;
+        const int acq_rival  = acq - acq_player;
+        tot_acq        += acq;
+        tot_acq_player += acq_player;
+        tot_acq_rival  += acq_rival;
+        hhi_seat_sum   += r.field_seat.hhi;
+        hhi_close_sum  += r.field_close.hhi;
+        ++consol_seeds;
+        std::printf("  %4u |     %4d -> %-4d    |    %4d   |   %2d   |  %4d |    "
+                    "%4d -> %-4d      |      %4d       |  %.4f -> %.4f\n",
+                    r.seed, r.field_seat.corps, r.field_close.corps,
+                    acq, acq_player, acq_rival,
+                    r.field_seat.holders, r.field_close.holders,
+                    r.field_close.max_holdings,
+                    r.field_seat.hhi, r.field_close.hhi);
+    }
+    if (consol_seeds > 0)
+    {
+        const double n = static_cast<double>(consol_seeds);
+        std::printf("\n  acquisitions per seed: %.2f total = %.2f player + %.2f RIVAL\n",
+                    tot_acq / n, tot_acq_player / n, tot_acq_rival / n);
+        std::printf("  mean HHI over holdings: %.4f at the seat -> %.4f at the close "
+                    "(%+.1f%%)\n",
+                    hhi_seat_sum / n, hhi_close_sum / n,
+                    hhi_seat_sum > 0.0
+                        ? 100.0 * (hhi_close_sum - hhi_seat_sum) / hhi_seat_sum : 0.0);
+        std::printf("  READ IT LIKE THIS: HHI rising sharply with a falling holder "
+                    "count is a snowball;\n"
+                    "                     a flat HHI with the holder count intact is "
+                    "an open field that\n"
+                    "                     nobody consolidated.\n");
+    }
+
     check(tot_hold_close > tot_hold_gen, "R4",
           "the field is still ACTING — its holding count grew over the run");
     check(tot_rivals > 0 && tot_solv_close > 0, "R4",

@@ -55,6 +55,14 @@ enum class overlay_mode
     continent,   ///< Tectonic plates from the Continents/Drift pass: per-plate tint + boundary emphasis, read from the generation report. BL-226. See LENSES.md § Continent lens.
     supply_routes, ///< Aggregated trade_route graph: one edge per body pair, thickness from log-scaled convoy_count, colour from recency tier. BL-014. See LENSES.md § Supply-routes lens.
     throughput,    ///< Active Logistic Points: the reach envelope (served / beyond reach) plus a per-anchor LP magnitude disc. BL-598. See LENSES.md § Throughput lens.
+    // Ben, 2026-08-28: corporation and company are now DIFFERENT WORDS (GLOSSARY.md).
+    // A corporation is a named operating firm — the player and its rivals; a company
+    // is a BL-365 background firm (`corporation_component::is_background`). The
+    // Corporation lens narrowed to the former on the same ruling, so this is the
+    // only way to see the latter. Appended at the end rather than beside
+    // `corporation` because the value is serialised in the save's view bindings —
+    // inserting mid-enum would silently re-point a saved lens.
+    company,       ///< Background-firm holdings, drawn exactly as the Corporation lens draws corporations. See LENSES.md § Company lens.
     count,         ///< Sentinel — keep last. The lens-cycle wrap (canvas_command.cpp) derives its modulus from this, so a new lens above is reachable without touching a hand-kept count.
 };
 
@@ -89,6 +97,22 @@ enum class structure_kind : uint8_t
     nation,      ///< A generated nation, selected by its national border band.
     market,      ///< A market and its whole catchment (Market and Scarcity lenses).
     corporation, ///< A corporation's holdings on the active body (Corporation lens).
+    // A COMPANY IS ITS OWN KIND, not a corporation with a flag (BL-665). The two
+    // are different words since the 2026-08-28 split (GLOSSARY.md) and Ben ruled
+    // they reach different destinations, so the difference belongs in the answer
+    // the resolver gives rather than being re-derived by every routing site.
+    company,     ///< A background firm's holdings on the active body (Company lens).
+    // The two NON-ENTITY structures (Ben, 2026-08-28, choosing option A). Both
+    // are regions the lens already draws and the player could not select: a
+    // deposit is every tile carrying the lens's resource, a plate is a Voronoi
+    // region of `continent_state::plate_id`. Neither has an entity id, so
+    // neither travels in `selected_entity` — they get their own fields below, on
+    // the precedent BL-511 set with `selected_province` and BL-469 with the
+    // battle triple. `structure_hit_zone::id` carries a SYNTHETIC key for these
+    // (resource index / plate index, both +1 so 0 stays "none"), which is safe
+    // because every comparison also tests the kind.
+    deposit,     ///< A resource deposit — every tile carrying the lens's resource (Resource lens).
+    plate,       ///< A tectonic plate (Continent lens).
 };
 
 /// One segment of a structure's boundary, registered by the draw pass so the
@@ -208,26 +232,79 @@ struct construction_state
     /// human string shown by the build UI ("Built.", "Can't afford it.", …).
     std::string   last_message;
 
-    /// Which bounded sub-view the Building window shows (2026-07-06 tabbed
-    /// redesign; slimmed to two by BL-143 when the Build front door moved to the
-    /// tile Selection element and Sell Orders moved to the Market Ledger).
-    /// **0 = Construction** (the queue: "what's building?"),
-    /// **1 = Buildings** ("what do I own?", plus the inline recipe/workforce
-    /// detail for the selected row).
+    /// Which bounded sub-view the nav-rail slot-3 **Construction ledger** shows.
     ///
-    /// Defaults to **Buildings** (BL-176): the queue is empty most of the time,
-    /// so opening on it made the panel's front door an empty room, while the
-    /// player always owns buildings. The old default of 0 predates the BL-143
-    /// slim, when view 0 was the Build front door rather than a queue.
+    /// **0 = Construction** — the collapsible build QUEUE ("what is under way, and
+    /// what is it costing?") sitting above the tile-selection build bar
+    /// (`draw_construction_ledger_body`, selection_panel.cpp). ONE construction
+    /// element with TWO DOORS: the rail slot and the tile Selection element's
+    /// Construct button both open this view, so there is a single build bar
+    /// implementation rather than a panel copy and a card copy.
+    /// **1 = Buildings** — the player's estate grouped by building type, one row
+    /// per type with a count and a total profit; expanding a row lists that
+    /// type's own buildings, and pressing one selects it and draws its levers.
+    ///
+    /// Defaults to **Buildings**: the queue is empty most of the time, so opening
+    /// on it makes the ledger's front door an empty room, while the player always
+    /// owns buildings.
     int           panel_view = 1;
 
-    /// Last building the panel auto-focused on (BL-176). The Buildings tab keys
-    /// its selected row off the shared `ui_state::selected_entity`, so selecting
-    /// a building anywhere already selects its row here; this field only tracks
-    /// the EDGE, so newly selecting a building snaps the panel to the Buildings
-    /// view once, without pinning it there every frame (which would stop the
-    /// player ever reaching the queue).
-    entity_id     panel_focus_building = null_entity;
+    /// Which type group the Buildings view has expanded — the group's display
+    /// name, empty for none. Held here rather than left to ImGui's own
+    /// `CollapsingHeader` storage so it is one-at-a-time (an accordion), stable
+    /// across a re-layout, and drivable/readable by a verify script. Re-pressing
+    /// the open header closes it, which is the Toggle rule a header obeys by
+    /// construction. VIEW state, not serialised.
+    std::string   buildings_expanded;
+
+    /// Whether the Construction view's queue section is expanded. Collapsed by
+    /// default and collapsed most of the time, because the queue is usually
+    /// empty: closed it costs one line, and the build bar below it is then what
+    /// the player meets. VIEW state, not serialised.
+    bool          queue_open = false;
+};
+
+/// Where the Construction ledger's own controls landed on screen this frame, so a
+/// verify script can press the REAL control rather than a computed guess.
+///
+/// PUBLISHED RATHER THAN RE-DERIVED, for the same reason `acquisitions_buy_x` is:
+/// the surface that drew the thing is the only honest source for where it landed,
+/// and a script re-deriving a row's y from `shell_column_width` plus a guessed line
+/// count would be asserting against its own arithmetic. Every field is rewritten
+/// each frame the surface draws and reset to "absent" (`x < 0`) when it does not.
+/// VIEW state, not serialised.
+struct construction_controls
+{
+    float     tab_x[2]      = {-1.0f, -1.0f}; ///< The two tab buttons; index = panel_view (0 Construction, 1 Buildings).
+    float     tab_y[2]      = {-1.0f, -1.0f};
+
+    float     group_x       = -1.0f; ///< First type-group header row on the Buildings view.
+    float     group_y       = -1.0f;
+
+    float     member_x      = -1.0f; ///< First building row inside the EXPANDED group; absent when nothing is expanded.
+    float     member_y      = -1.0f;
+    entity_id member        = null_entity; ///< Which building that row selects.
+
+    /// The TILE Selection card's Construct button — door two onto the same
+    /// Construction view the rail slot opens. Published so a check can press the
+    /// real control and assert that both doors land on one surface, which is the
+    /// load-bearing half of the reconciliation. Absent (`x < 0`) when no tile card
+    /// draws, or when nothing is placeable on the tile (the button disables).
+    float     construct_x   = -1.0f;
+    float     construct_y   = -1.0f;
+
+    /// The building Selection card's fourth action-grid button — "open this
+    /// building in the Buildings ledger". Absent (`x < 0`) on a rival's card,
+    /// which is the property a check asserts as a positive absence.
+    float     open_ledger_x = -1.0f;
+    float     open_ledger_y = -1.0f;
+
+    /// Which building the Buildings view actually DREW LEVERS FOR this frame,
+    /// `null_entity` for none. The surface reporting what it drew, so "the levers
+    /// appeared" is an assertion rather than an inference from a capture — the
+    /// harness's clipping check is vacuous on this class of surface (NR-663), so a
+    /// green picture proves nothing on its own.
+    entity_id levers_for = null_entity;
 };
 
 /// Shared selection and view state for the three primary canvases.
@@ -284,42 +361,186 @@ struct ui_state
     // Policy: all ledgers start closed. The player opens them deliberately from
     // the navigation pane; none are shown on a fresh session.
     bool show_tile_ledger = false; ///< Whether the Tile Ledger window is open. Toggled by the nav pane tab and the window's close button.
-    bool show_economy_panel = false; ///< Whether the Layer 3 economy panel is open. Toggled by the nav pane tab and the window's close button.
-    bool show_construction_panel = false; ///< Whether the Layer 4 construction / building-management panel is open. Toggled by the nav pane tab and the window's close button.
-    bool show_build_ledger = false;       ///< Whether the tile-contextual construction ledger is open (BL-162). Opened by the tile Selection element's "Construct Buildings" button; reads selected_entity as the target tile. Not a nav-rail ledger — closed by close_all_panels and by selecting a new entity. The Selection element itself lives in the bottom band (BL-213), not the fold-out column.
+    /// Whether the nav-rail slot-3 **Construction ledger** is open. Toggled by the
+    /// rail slot, and opened by the tile Selection element's Construct button —
+    /// which aims it at `construction.panel_view == 0`, the build bar's own view.
+    /// There is no separate `show_build_ledger`: the tile-contextual build bar is
+    /// a SECTION of this ledger's Construction view, not a second column tenant,
+    /// so the two doors cannot show two different build bars.
+    bool show_construction_panel = false;
     bool show_market_ledger = false; ///< Whether the Market Ledger is open.
+
+    /// Whether the Convoys ledger is open (BL-689). Nav-rail slot 7, directly
+    /// after Market. It was the Market ledger's third tab until the Goods
+    /// flattening deleted that strip, and it left rather than being re-homed
+    /// because it was never a market question: a convoy is cargo in transit and
+    /// belongs to `SUPPLY.md`, not to the doc that owns clearing and the order
+    /// book. Its own slot also lets it arm `supply_routes` on open — the lane
+    /// overlay is the literal map twin of the list, and a tab strip could never
+    /// give it that, since opening the Market ledger armed the price wash.
+    bool show_convoys_ledger = false;
+
+    /// Whether the Company ledger is open (BL-666). A column occupant with NO
+    /// nav-rail slot: a company is not a population the player
+    /// browses, it is the thing under the cursor when a Company-lens holding is
+    /// clicked, so the only way in is that click. Closed by close_all_panels
+    /// like every other tenant of the fold-out column.
+    ///
+    /// The surface it opens is a declared PLACEHOLDER — it answers none of the
+    /// five axes a real ledger design answers (docs/ui/ledgers/README.md) and
+    /// says so on its face. It exists because Ben's 2026-08-28 ruling on the
+    /// corporation/company split requires the two lenses to land somewhere
+    /// DIFFERENT on click, and the company half had no destination at all.
+    bool show_company_ledger = false;
+
+    /// Which background firm the Company ledger is about — the click's payload,
+    /// held apart from `selected_entity` because the two answer different
+    /// questions: `selected_entity` stays the clicked HOLDING (a building, what
+    /// the Selection band inspects), while this names the FIRM behind it.
+    /// Collapsing them would make the ledger reinterpret a building id as a corp
+    /// id every frame. null_entity => the ledger draws its empty state rather
+    /// than vanishing, so a stale click reads as "nothing here", not as a bug.
+    entity_id selected_company = null_entity;
+
+    /// Which corporation the all-corporations table should aim its row at
+    /// (BL-666, the Corporation-lens half of the same ruling). Kept distinct
+    /// from `selected_company` for the same reason the two lenses are distinct
+    /// words: a corporation is the player or a rival, a company is a background
+    /// firm, and the two never share a destination. Written by the canvas click,
+    /// read by the corporations table; null_entity => the table aims at no row
+    /// in particular and lists as it always has.
+    entity_id selected_corporation_dossier = null_entity;
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
 
-    /// Whether the Contracts ledger is open (BL-576). Nav-rail slot 13 —
-    /// the curated nine and the developer/observability tail (slots 1-12,
-    /// MENU.md) were already full when this landed, so Contracts is a new
-    /// PLAYER-system slot appended after the tail rather than inside it (see
-    /// nav_pane.cpp's own comment on slot 13 for the reasoning).
-    bool show_contracts_ledger = false;
+    // ── The Acquisitions ledger ───────────────────────────────────────────
+    //
+    // Nav-rail slot 5, inserted ABOVE Market (Ben, 2026-08-29), which pushes
+    // every slot from Market down by one. Two doors reach the same surface:
+    // this rail slot, and the Company lens's click destination (a background
+    // firm's holdings resolve through to the firm, and the firm's question is
+    // "can I buy it").
+    //
+    // MEASURED BEFORE IT WAS LAID OUT, AND THE NUMBER HAS SINCE MOVED BY FIFTY
+    // TIMES. Over a TWELVE-seed sweep of the shipped spawn
+    // (`tools/verify/acquisition_viability.cpp` § C), 88 corporations per seed
+    // now yield a BUYABLE FIELD of a mean 81.6 firms — Purchasable 35.8,
+    // Possible 45.8, neither group empty on any seed. It was 1.6 when this
+    // surface was designed, because ownership class was overwhelmingly `closed`
+    // at a mean of 84.8 per seed; retiring closure for background firms took
+    // that to 4.8. Filing has never been the binding gate — public-but-unfiled
+    // is zero on every seed.
+    //
+    // The layout was built for the one-row case and was NOT padded to look
+    // busier. It needed no change to hold eighty, which is the payoff for
+    // having measured the field rather than assumed it.
+    /// Whether the Acquisitions ledger is open. Toggled by nav-rail slot 5 and
+    /// opened by a Company-lens click.
+    bool show_acquisitions_ledger = false;
 
-    /// Contracts ledger view tab: 0=Offers, 1=Active, 2=History — the same
-    /// `ui::nav_button` button-strip idiom every split ledger uses
-    /// (LAYOUT.md § One-question-per-view splits).
-    int contracts_ledger_view = 0;
+    /// Which of the two groups are expanded. Both open at rest: with a mean of
+    /// two rows in the whole field, a collapsed group hides the entire answer.
+    bool acquisitions_purchasable_open = true;
+    bool acquisitions_possible_open    = true;
 
-    /// The Accept press's force picker (BL-576). Non-zero names the
-    /// `mercenary_offer::id` currently being staffed; the popup lists the
-    /// player's own uncommitted units with a checkbox each, writing into
-    /// `contracts_picker_units` below. Reset to 0 when the popup closes
-    /// (Confirm or Cancel) — there is no cross-frame "armed" state visible
-    /// outside the popup itself, unlike March's canvas-spanning two-step,
-    /// because picking a force needs no second surface: everything the
-    /// player touches lives inside this one ledger.
-    uint32_t contracts_picker_offer = 0;
+    /// The corporation a Company-lens click aimed at, or `null_entity`. The
+    /// ledger highlights its row so the click lands somewhere visible rather
+    /// than merely opening a list. Never a filter — the field is two rows long
+    /// and filtering it to one would answer a question nobody asked.
+    entity_id acquisitions_focus_corp = null_entity;
 
-    /// Which owned units are checked in the open force picker, indexed
-    /// arbitrarily (unused slots stay `null_entity`) — the exact shape
-    /// `corp_command::units` and `mercenary_contract::units` already carry,
-    /// so Confirm copies this straight into the command with no translation.
-    /// Cleared whenever `contracts_picker_offer` changes to a different
-    /// offer (or to 0), so a stale pick from one offer cannot leak into
-    /// another's Accept.
-    std::array<entity_id, mercenary_contract_max_units> contracts_picker_units{};
+    /// Where the FIRST Purchasable row's Buy button actually is, in screen
+    /// pixels, published by the ledger each frame it draws one; `x < 0` means
+    /// there is none. `acquisitions_buy_corp` names the firm that button buys.
+    ///
+    /// PUBLISHED RATHER THAN RE-DERIVED, for the same reason
+    /// `planetary_center_screen` is: the ledger is the only honest source for
+    /// "the screen point that is this press". A verify script computing it from
+    /// `shell_column_width` plus a guessed line count would be asserting against
+    /// its own arithmetic, and would silently start clicking empty column the
+    /// first time a line of prose was added above the table. VIEW state, not
+    /// serialised, rewritten every frame.
+    float     acquisitions_buy_x    = -1.0f;
+    float     acquisitions_buy_y    = -1.0f;
+    entity_id acquisitions_buy_corp = null_entity;
+
+    /// Where the Construction ledger's tabs, type-group headers, building rows and
+    /// the building card's open-in-ledger button landed this frame. Same reasoning
+    /// as `acquisitions_buy_x` above; see `construction_controls`.
+    construction_controls construction_ui;
+
+    /// The profitability fold-out's sort: column index, and direction. VIEW
+    /// state, not serialised. -1 is "unsorted" — filed order, which is the
+    /// sorted-`entity_id` walk `apply_budget` itself writes in, so the resting
+    /// order is deterministic rather than an unordered map's layout.
+    int  acquisitions_sort_column    = -1;
+    bool acquisitions_sort_ascending = true;
+
+    /// The profitability fold-out's three CROSS-CUTTING SELECTORS (BL-680,
+    /// profitability filters): end resource, input resource, body. All three
+    /// are supply-chain questions — "who makes the thing I need", "who competes
+    /// with me for the input I buy", "who is within reach" — and they combine
+    /// as AND.
+    ///
+    /// They are SELECTORS, NOT VIEWS, so the toggle rule does not bind them,
+    /// exactly as it does not bind the Market ledger's Body and Market combos:
+    /// a selector switches a target rather than expressing an active state, and
+    /// re-picking the current value is a no-op rather than an undo.
+    ///
+    /// Held here rather than in a function-local static for the same reason the
+    /// sort above is: the shell's windows carry `NoSavedSettings`, so ImGui
+    /// forgets everything the moment the takeover closes, and a filter that
+    /// silently reset on every close would read as the surface losing the
+    /// player's question. VIEW state, not serialised.
+    ///
+    /// `-1` / `null_entity` is "every" in each case — the absence of a filter,
+    /// never a value that could be confused with resource index 0.
+    int       acquisitions_filter_end   = -1;
+    int       acquisitions_filter_input = -1;
+    entity_id acquisitions_filter_body  = null_entity;
+
+    /// Where the three filter combos are drawn, and where each one's first real
+    /// option lands once its popup is open, in screen pixels. Index 0 = end
+    /// resource, 1 = input resource, 2 = body. `x < 0` means not drawn this
+    /// frame (the fold-out is closed, or the table had no rows to filter).
+    ///
+    /// PUBLISHED RATHER THAN RE-DERIVED, for the same reason
+    /// `acquisitions_buy_x` is: the surface that drew the control is the only
+    /// honest source for where it landed. A verify script that computed a combo
+    /// centre from the canvas rect plus a guessed line count would be asserting
+    /// against its own arithmetic, and would start clicking empty canvas the
+    /// first time a line of prose moved above it. The OPTION position is
+    /// published separately because a combo popup is its own window: clicking
+    /// the combo only opens it, and selecting a value needs a second real
+    /// press on a real item. VIEW state, rewritten every frame.
+    float acquisitions_filter_x[3]     = { -1.0f, -1.0f, -1.0f };
+    float acquisitions_filter_y[3]     = { -1.0f, -1.0f, -1.0f };
+    float acquisitions_filter_opt_x[3] = { -1.0f, -1.0f, -1.0f };
+    float acquisitions_filter_opt_y[3] = { -1.0f, -1.0f, -1.0f };
+
+    /// The corporations the profitability table ACTUALLY DREW this frame, in
+    /// draw order — after the disclosure listing rule and after all three
+    /// filters.
+    ///
+    /// Published because the alternative is worse: a verify script that
+    /// re-applied the filter rule to an unfiltered row set would be asserting
+    /// against its own arithmetic, and would keep passing if the surface stopped
+    /// filtering altogether. This is the surface reporting what it put on
+    /// screen, which is the only thing worth checking. Empty when the fold-out
+    /// is closed, or when a filter combination excluded every row. VIEW state,
+    /// not serialised, rewritten every frame.
+    std::vector<entity_id> acquisitions_profit_shown;
+
+    // THE CONTRACTS LEDGER'S VIEW STATE IS GONE (BL-693). The mercenary
+    // contract — the SELL side of CONTRACTS.md — is retired, so the ledger, its
+    // rail slot and every flag that drove them are deleted rather than left
+    // dormant: view state has no reason to outlive the surface it described, and
+    // none of it was ever serialised (save_game.hpp's ui_state slice is the
+    // canvas rung, the selection and the pan/zoom, nothing else), so removing it
+    // does not move the save envelope.
+    //
+    // The WORLD-side record is a different matter and is still here — see
+    // `selected_contract_id` below, and `mercenary_offer` in components.hpp.
+    // Procurement, the BUY side, never had view state on `ui_state` at all.
 
     /// Whether the Generation Ledger is open (BL-303). A DEVELOPER TUNING surface,
     /// not shipped chrome — it explains why a tile generated as it did — so like
@@ -327,10 +548,24 @@ struct ui_state
     /// press. See ui/generation_ledger.hpp, docs/generation/GENERATION_LEDGER.md.
     bool show_generation_ledger = false;
 
-    /// Generation Ledger: 0=Body (histograms, thresholds, profile echo),
-    /// 1=Tile (the per-tile derivation breadcrumb). In ui_state, like every other
-    /// panel view index, so a verify script can park the ledger on a view.
-    int  generation_ledger_view = 0;
+    /// Generation Ledger section disclosure. The ledger is ONE flat panel of
+    /// stacked sections (the Balance ledger's shape) rather than a tab strip: the
+    /// Tile view was retired 2026-08-30 and there is no second view left to name.
+    ///
+    /// Held here rather than in ImGui's own storage for the construction_panel
+    /// reason - the state is then stable across a rebuild and drivable by a verify
+    /// script, which ImGui's internal id storage is not. A `CollapsingHeader` is a
+    /// toggle by construction, so the standing Toggle rule needs no second control.
+    ///
+    /// Profile and Thresholds open by default: they are short, and they are what
+    /// the other four sections are read AGAINST - a histogram that surprises is
+    /// traced back to the profile that asked for it.
+    bool gen_profile_open   = true;
+    bool gen_thresholds_open = true;
+    bool gen_bands_open     = false;
+    bool gen_substrate_open = false;
+    bool gen_cover_open     = false;
+    bool gen_landform_open  = false;
 
     // --- AI decision feed (BL-407) ---
     // A reader over stores that have always been populated and never surfaced:
@@ -445,6 +680,68 @@ struct ui_state
         selected_battle_defender = null_entity;
     }
 
+    // --- The selected deposit and plate (BL-659 / BL-660) -----------------
+    // Ben, 2026-08-28, choosing option A: follow the battle precedent rather
+    // than give deposits and plates entity ids in world/. Both are regions the
+    // lens DRAWS and the player could not previously select, and
+    // `lens_structure_of_tile` recorded why — "a structure must be an ENTITY
+    // here, because that is what a selection is ... highlighting a region the
+    // player then cannot select would promise a pivot that does not arrive."
+    // These two fields are what make the pivot arrive.
+    //
+    // A deposit is keyed by its RESOURCE, not by a region id, because that is
+    // what the lens draws: the Resource lens fills every tile whose deposit of
+    // the selected resource is non-zero, contiguous or not. Keying it any finer
+    // than the drawing would break the rule the routing table is built on — the
+    // selection grain follows the drawing.
+    int selected_deposit_resource = -1; ///< resource_type index, -1 = none.
+    int selected_plate            = -1; ///< continent_state::plate_id index, -1 = none.
+
+    /// What the Selection element says about the selected PLATE, cached by the
+    /// canvas at press time (BL-671).
+    ///
+    /// CACHED RATHER THAN LOOKED UP, which is the interesting half. A plate lives
+    /// in the GENERATION REPORT, not in `world` — the band's draw signature takes
+    /// a world and does not have the report, and threading one through four call
+    /// sites to read five numbers would put a presentation-only dependency into
+    /// every selection card. The canvas already holds the report's
+    /// `continent_state` for the lens it is drawing, so it fills this once, on the
+    /// press that made the selection.
+    ///
+    /// Safe to cache because plates DO NOT CHANGE after generation: the drift pass
+    /// runs once and its output is retained, so there is no later state for this
+    /// to go stale against. That is the property that makes the shortcut honest,
+    /// and it is the thing to re-check if plates ever become dynamic.
+    struct plate_summary
+    {
+        int   tiles            = 0;     ///< Tiles this plate owns on the body.
+        int   convergent_tiles = 0;     ///< Of those, tiles on a collision boundary.
+        int   divergent_tiles  = 0;     ///< Of those, tiles on a rift boundary. NOT
+                                        ///< exclusive with the above: a tile at a
+                                        ///< junction sits on both, and the height
+                                        ///< bias has always taken both terms there.
+        bool  oceanic          = false; ///< Oceanic plates bias the height field down.
+        float drift_col        = 0.0f;  ///< Per-epoch drift, grid columns.
+        float drift_row        = 0.0f;  ///< Per-epoch drift, grid rows.
+    };
+    plate_summary selected_plate_facts;
+
+    /// Clear both non-entity lens selections. Called by every other selection
+    /// path for the same reason `clear_battle_selection` is: the Selection
+    /// element must never have two things to draw.
+    void clear_lens_region_selection()
+    {
+        selected_deposit_resource = -1;
+        selected_plate            = -1;
+    }
+
+    /// Is a deposit / a plate the thing the Selection element should draw?
+    /// The battle and contract predicates' shape, and for the same reason: these
+    /// are not entities, so `selection_kind_of` cannot see them and the band's
+    /// dispatcher has to be told before it asks.
+    bool has_deposit_selection() const { return selected_deposit_resource >= 0; }
+    bool has_plate_selection()   const { return selected_plate >= 0; }
+
     // --- The selected mercenary contract (BL-577) ------------------------
     // A `mercenary_contract` has no entity id — it lives in
     // `world::mercenary_contracts`, keyed by its own stable `id` — so, exactly
@@ -455,17 +752,7 @@ struct ui_state
     //
     // MUTUALLY EXCLUSIVE with `selected_entity` and the battle triple, on the
     // same "whichever is set last clears the others" rule.
-    // There is no canvas marker for a contract (CONTRACTS.md's ledger-and-map
-    // framing puts a contract's PROVINCE on the map, not the contract itself),
-    // so the setter is a future ledger row press (BL-576, Contracts ledger) —
-    // whichever surface sets this must clear the others, the same duty every
-    // other selecting surface already carries.
-    uint32_t selected_contract_id = 0;
-
-    bool has_contract_selection() const { return selected_contract_id != 0; }
-
-    void clear_contract_selection() { selected_contract_id = 0; }
-
+    //
     /// The value of `selected_entity` the Planetary canvas last wrote, so the
     /// canvas can tell its OWN selection from one some other surface made — a
     /// ledger row, a corp list, a just-built building. On a mismatch the canvas
@@ -562,10 +849,10 @@ struct ui_state
     /// Whether the all-corporations balance table is open (corporation_panel.cpp).
     ///
     /// PROVISIONAL HOME. This table used to occupy nav slot 1, and was deleted by
-    /// BL-248 as a duplicate of the Economy panel's Corps view. Ben restored it
+    /// BL-248 as a duplicate of a second aggregate view. Ben restored it
     /// (NEEDS_REVIEW NR-012, 2026-08-01) — the deletion was not intended — and parked
-    /// it on slot 8 (Diplomacy) so it is reachable and can be compared against the
-    /// Corps view before its real home is chosen. Slot 8 is otherwise unbuilt, so
+    /// it on slot 8 (Diplomacy) so it is reachable while its real home is chosen.
+    /// Slot 8 is otherwise unbuilt, so
     /// nothing is displaced; when Diplomacy is actually designed this occupant moves.
     bool show_corporations_table = false;
 
@@ -580,17 +867,54 @@ struct ui_state
     // button-strip views (ui::nav_button_strip); this is the selected view per panel,
     // persisted so a panel reopens where the player left it. See the Construction
     // panel's construction.panel_view for the template.
-    int  economy_view = 0; ///< Economy panel: 0=Corps, 1=Holdings, 2=Markets (BL-117).
-
-    /// Market Ledger: 0=Prices, 1=Sell Orders (BL-159 — sell-order management
-    /// relocated here from the Construction/Building panel), 2=Convoys (BL-453 —
-    /// the player's cargo in flight, with its ticks-to-arrival; drawn on three
-    /// canvases before this and listed on none).
+    /// Market Ledger: 0=Goods (BL-686 — one row per traded good, the 8-quarter
+    /// graph flattened into the row), 1=Sell Orders (BL-159 — sell-order
+    /// management relocated here from the Construction/Building panel).
+    ///
+    /// There is no view 2. Convoys held it (BL-453) until BL-689 gave it rail
+    /// slot 7 and its own ledger; the draw clamps a stale 2 back to 0 so a save
+    /// or a verify hook carrying the old index lands on Goods rather than on
+    /// nothing. View 1 becomes TRADES in a later slice (BL-687), which waits on
+    /// an exchange record the world does not keep yet.
     int  market_ledger_view = 0;
 
+    /// How many Goods rows should fill the Market ledger's column height.
+    ///
+    /// ROW HEIGHT IS THE OPEN MEASUREMENT (Ben, 2026-08-29: "let's compare this
+    /// at 8 rows, 10 rows, and 12 rows"). A dial rather than a constant so the
+    /// three variants are one capture script rather than three builds, and so
+    /// the answer can be set without a recompile once Ben has picked. The
+    /// density judgement is taken at 1920x1080 — the screen being reviewed —
+    /// because `shell_column_width` is effectively fixed across the common
+    /// range and what a resolution change moves is the column's HEIGHT.
+    int  market_goods_rows = 10;
+
+    /// Whether the Goods table draws the `body average price` column.
+    ///
+    /// DEFAULTS OFF ON A MEASUREMENT, not a preference. The design nominated this
+    /// as the FIRST COLUMN TO DROP if the row will not fit, and required the fit
+    /// be measured rather than assumed — expecting the pressure at 384 px to be
+    /// on the graph's width rather than the column count. Measured at 1920x1080
+    /// over the real 45-good roster (`scripts/verify/goods_table.lua`, which
+    /// prints both):
+    ///
+    ///     with the column:     name column 42 px, 13 of 45 names fit
+    ///     without the column:  name column 98 px, 36 of 45 names fit
+    ///
+    /// So the expectation was wrong and the design's own rule applies: dropping
+    /// one text column more than doubles the name width, because the graph is
+    /// only ~3.4em to begin with. At 42 px "Iron Ore" and "Iron-something" BOTH
+    /// elide to "Iron ...", which defeats the one thing a price board is for.
+    /// Kept as a dial so the call is one line to revert, and the script reports
+    /// both numbers on every run.
+    bool market_goods_show_body = false;
+
     /// History ledger: 0=Story (the body's biography), 1=Chain (the generation
-    /// charts), 2=Tiles (the tile/building/market tables), 3=Ages (the Era -1
-    /// political time-lapse, BL-277). BL-211.
+    /// charts), 2=Ages (the Era -1 political time-lapse, BL-277), 3=Tectonics
+    /// (the plate view, BL-660). BL-211. The names are `history_view_id` in
+    /// ui/tile_inspector.hpp — this comment is the mirror, not the source, and
+    /// it read "2=Tiles, 3=Ages" against a Tiles view that no longer exists
+    /// until 2026-08-30 (NR-713).
     int  history_view = 0;
 
     /// Ages view: the year currently scrubbed to, and whether playback is
@@ -806,6 +1130,14 @@ struct ui_state
     /// field ramp normalises against, so the shading is body-relative rather than
     /// calibrated to an absolute cost nobody can read. 0 when no field exists.
     float lp_reach_max = 0.0f;
+
+    /// The 90th percentile of the same field, and the ramp's actual denominator
+    /// (`throughput_field_census`, 2026-08-28). `lp_reach_max` stays because the
+    /// legend still reports the body's true worst case — but normalising the
+    /// COLOUR against it spends half the ramp on the far decile, which holds a
+    /// tenth of the tiles. Zero when the field is absent; the ramp falls back to
+    /// the max, which is the pre-2026-08-28 behaviour rather than a blank map.
+    float lp_reach_p90 = 0.0f;
 
     double sim_now_days = 0.0; ///< Latest continuous sim time (elapsed days); the beam-motion clock.
 

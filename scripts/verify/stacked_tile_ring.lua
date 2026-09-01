@@ -25,7 +25,6 @@
 verify.window(1280, 720)
 verify.goto_surface("home")
 verify.econ_step(4)
-verify.show_panel("economy", false)
 
 -- Placement is cash-gated and this check is about the RENDER, not about whether the
 -- player could afford four buildings on day four.
@@ -91,6 +90,4 @@ end
 -- Under a lens: the ground under the ring is a saturated categorical fill here, and
 -- the segments' dark under-stroke is what has to carry them over it.
 verify.center_tile(site.x, site.y, 44)
-verify.set_overlay("country")
-shot("stack_ring_lens_country")
 verify.set_overlay("none")

@@ -1,95 +1,112 @@
 {
- "_schema": "sprints/io-v2",
- "_note": [
-  "Canonical store for Project Io's sprint rhythm — every sprint's goal, planned items, retro",
-  "(landed/slipped/feedback) and free-form notes. Drained from SPRINTS.md prose 2026-08-19;",
-  "fully canonical since 2026-08-24 (Ben: move sprints into JSON, archive completed ones).",
-  "SPRINTS.md is a GENERATED mirror — node tools/session/render_sprints.js — never hand-edit it.",
-  "",
-  "HOT/COLD SPLIT (2026-08-24): this file holds open/proposed/gated sprints only. A sprint",
-  "whose state goes terminal (closed, superseded, subsumed, retro-recorded, landed) is moved",
-  "whole into docs/development/archive/sprints-<quarter>.json by",
-  "tools/session/archive_sprints.js. The renderer reads both, so the mirror’s status table",
-  "still indexes every sprint ever run.",
-  "",
-  "FIELDS per entry in `sprints`:",
-  "  id           — sprint number/label as used in prose (e.g. '19', '18 retro', 'P1'). Freed",
-  "    numbers may be re-used after a purge; the archive disambiguates colliding keys by date.",
-  "  theme        — short human handle for the sprint (pair with id in prose, same rule as BL ids).",
-  "  state        — one of: open, proposed, gated (hot) / closed, superseded, subsumed,",
-  "    retro-recorded, landed (terminal — archive these).",
-  "  status_line  — the one-line 'Where things stand' row for the mirror's table. Replaces the",
-  "    retired status_table array (2026-08-24, NR-598): one entry, one line, nothing to drift.",
-  "  opened_date / closed_date — ISO dates where recorded; null where never dated.",
-  "  goal         — the sprint's stated (or reconstructed) goal.",
-  "  planned      — array of planned items/work, one string per item.",
-  "  retro        — object with landed/slipped/filed/runtime/feedback string fields where the",
-  "    sprint carries a closed retro. Omitted for sprints with no retro yet.",
-  "  risk         — the sprint's stated risk paragraph(s), where present.",
-  "  done_when    — the sprint's stated done-when criterion, where present.",
-  "  notes        — catch-all prose: rulings, audit tables, amendments, sequencing notes.",
-  "  author       — optional; who is running the sprint (e.g. 'Joe'). Nullable; missing means",
-  "    the default dev-sprint rhythm (policy 2026-08-22).",
-  "",
-  "TOP-LEVEL PROSE FIELDS (rendered into the mirror by render_sprints.js): header (intro",
-  "paragraphs), format (the entry template), format_notes, rulings (dated standing rulings —",
-  "cap, ceiling, deletion policy), next_up (the current 'what runs next' paragraph — update it",
-  "when the board changes), footer_notes (standing debts worth repeating).",
-  "",
-  "Landed items referenced by BL-id here are NOT re-described — see backlog.json (or its cold",
-  "archive) for that item's own design/resolution prose. This file is about the sprint as a",
-  "unit of pacing and sequencing, not a duplicate backlog.",
-  "",
-  "HISTORY: the 'Sprints 26-33: The Fall' arc (proposed 2026-08-18) was captured here in full,",
-  "then deleted outright in the 2026-08-24 purge along with every other never-executed plan —",
-  "see the deletion ruling in `rulings`; the sprints from that period that actually ran",
-  "survive in the archive."
- ],
- "header": [
-  "A lightweight rhythm layered over the backlog/Delivery system: a **goal** stated at the start, a **retro** at the close comparing what landed against it. This is feedback *for Ben* — pacing and priority signal, not a new authority (backlog.json/REFINED.md/DEVLOG stay the source of truth for what’s actually true about an item).",
-  "Entries are one per **sprint** — a sprint is a themed span of work, not a fixed calendar week; it closes when its goal is settled (landed or deliberately descoped), not on a clock. A gap with no entry means no sprint goal was set — that’s fine, skip it rather than backfilling.",
-  "**Fully in JSON since 2026-08-24** (Ben: move sprints into JSON; archive them once complete). Drained from prose 2026-08-19; the last hand-kept surface — this file’s status table — retired 2026-08-24 after NR-598 caught it drifting. `sprints.json` holds the open/proposed/gated sprints; every completed sprint lives whole in `archive/sprints-*.json`, moved by `tools/session/archive_sprints.js`."
- ],
- "format": "## Sprint N — theme (opened YYYY-MM-DD)\n\n**Goal.** 1-2 sentences: the outcome this sprint is aiming for, referencing backlog item ids\nand/or a version goal (v0.1.1 etc.).\n\n**Planned.** BL-ids targeted, one line each.\n\n**Retro** (filled in at close).\n- Landed: ...\n- Slipped: ... (+ why — scope grew, blocked on a dependency, deprioritized)\n- Feedback: anything worth Ben knowing about how the sprint actually went — a pattern, a\n  misjudged estimate, a design call that needed more/less discussion than expected.",
- "format_notes": [
-  "(The old **Runtime** line — total session time vs. items delivered — is dropped from the template. It went uncollected for seven-plus consecutive entries; see Sprint 19’s retro in the archive for the reasoning. If the pacing signal is wanted again later, derive it from commit timestamps rather than reviving an unstarted timer.)"
- ],
- "rulings": [
-  "**Active-sprint cap (Ben, 2026-08-23).** No more than 3 sprints open/proposed at once — enough that a session doesn’t have to weigh a long tail of undocumented parallel work.",
-  "**Sprint-number ceiling (Ben, 2026-08-24): keep sprints 18 and below.** Nothing is planned or authored past sprint 18 — narrower than the count cap above, this bounds *how far ahead* the sprint horizon is allowed to reach at all.",
-  "**Unstarted plans are DELETED, not archived (Ben, 2026-08-24).** A sprint that was only ever open/proposed and never really executed is a stale reference once dropped — closing it and keeping its prose around just to reopen the same number later isn’t worth the upkeep. On adopting the cap, 27 open/proposed sprints (plus Sprint 32, authored and dropped same-day on the ceiling above) were removed outright from `sprints.json`, freeing their numbers rather than retiring them: 20, 21, 22, 22-24 preamble, 23, 24, 25, 26-33, 26a, 26b, 27, 28, 29, 30, 31, 32, B1, B2, B3, C1, C2, C3, D2, D3, D4, N3, N4, ST1, W1. This is narrower than it looks: a sprint that actually **landed work** — even a partial or unsatisfying result (Sprint 19’s goal NOT met, P1’s rendering debt) — is a real historical fact and stays in the status table as closed. Only the never-executed ones were deleted. A freed number picked back up is authored fresh against the current docs, never resurrected under its old prose.",
-  "**Also deleted 2026-08-24, same basis:** six orphaned backlog items (BL-579–BL-584) a concurrent review-queue-purge session had filed with no sprint attached, plus Sprint 32’s own three items (BL-595–BL-597, Logistic Points / Throughput lens) — all unstarted, all removed from `backlog.json` outright rather than archived.",
-  "**Sprint 25b deleted 2026-08-24, same policy** (the Sprint 18 design form verdict): never opened, gated on a sequence (25a → 21 → 23 → 25b) whose middle numbers the purge had already freed. Its undelivered half — interception narration, the out_cuts sink — is unowned until re-filed (NR-599); the interdiction core itself landed 2026-08-21 and is unaffected.",
-  "**Sprint-number ceiling advanced to 19 (Ben, 2026-08-25: 'Open sprint 19 with these items').** The 2026-08-24 ceiling stands in spirit - author no sprint past the one Ben opens - with 19 now the horizon.",
-  "**Sprint-number ceiling advanced to 20 (Ben, 2026-08-26: 'Write this up as sprint 20').** The 2026-08-24 ceiling stands in spirit - author no sprint past the one Ben opens - with 20 now the horizon.",
-  "**Sprint-number ceiling advanced to 21 (Ben, 2026-08-26: 'A, and open it as sprint 21').** The 2026-08-24 ceiling stands in spirit - author no sprint past the one Ben opens - with 21 now the horizon. Two sprints are open (20, 21), inside the three-sprint cap."
- ],
- "sprints": [
-  {
-   "id": "21",
-   "theme": "The other half of the economy - demand",
-   "state": "open",
-   "status_line": "Opened 2026-08-26 - every good gets a buyer that is a mechanism, then viability is measured over repeated passes",
-   "opened_date": "2026-08-26",
-   "goal": "Author the demand side. The roster grew a supply chain and never grew the demand for it, so the ancient economy terminates in artisan goods nobody buys and most spawns are structurally unprofitable - not mistuned, unbought. Eight demand channels (MARKETS.md § Demand channels), of which the load-bearing ones scale with the economy rather than with an authored weight. Then MEASURE, and expect to go round more than once: Ben, 2026-08-26 - 'we will get interesting data and do a few passes over viability'. The felt goal: a world where the goods a player is meant to chase are wanted by somebody, and it is legible WHO.",
-   "planned": [
-    "BL-648 (admission rule names an injector) - FIRST. The guard that stops this recurring. Expect it RED on ten goods the day it lands; the rest of the sprint turns it green",
-    "BL-649 (demand census) - FIRST, with it. The instrument: per resource, per band, who actually wants it. Run before and after every pass, deltas kept",
-    "BL-640 (era-banded household basket) - wave 1: the basket ladders by era as well as stratum; resurrects four of the seven ancient dead ends",
-    "BL-641 (building upkeep in goods) - wave 1: the largest structural sink. A unit already pays credits + goods; a building pays credits only",
-    "BL-642 (construction actually draws) - wave 1: the opening years build, and centres draw materials as they grow",
-    "BL-644 (space programme budget line) - wave 2: the tenth line, and space goods' first buyer that is not a militia contract",
-    "BL-647 (endemic luxury demand) - wave 2: tobacco, spices, coffee and furs, wanted by wealth and flavoured by national character",
-    "BL-643 (network upkeep draws) - wave 2: a sink scaled by geography rather than population",
-    "BL-646 (battles burn ordnance) - wave 2: the only channel that couples the two pillars - Conflict moves Trade",
-    "BL-645 (research consumes goods) - GATED on BL-619, which is a design session with Ben, not a build slice",
-    "VIABILITY PASSES - after each wave: census, measure spawn viability, retune, repeat. The passes are the sprint, not an epilogue"
-   ],
-   "notes": "Opened on Ben's instruction, 2026-08-26 ('A, and open it as sprint 21'), after the session's own measurement answered his question: the ancient band has TWO live demand sinks, and ten goods pass the orphan check by naming a 'mercantile demand' that grep says was never built (NR-671). Ceiling advanced to 21 on the same instruction. ORDERING IS LOAD-BEARING: BL-648 and BL-649 go FIRST, not last. The guard makes the gap visible and the census makes each pass measurable - without them a viability pass is a guess with a number attached. A red guard with a named list is worth more than a green one that means nothing; do not weaken it to pass while the channels are being built. SEVERAL CHANNELS ARE DESIGNED-BUT-INERT rather than missing, which is why the sprint is cheaper than it looks: `strategic_reserve` is already a goods-buying budget line no consumer claims on; `logistics_maintenance` already names network upkeep; recipes already carry the era field the demand baskets need; and `run_unit_upkeep` is already the credits-plus-goods shape BL-641 wants for buildings. RELATIONSHIP TO SPRINT 20: Sprint 20 stays open and owns the ledger, the buyout and the spawn shortlist. Its BL-634 (acquisition viability) CANNOT honestly pass until this sprint lands - a corp at -28/qtr never saves up for anything - so BL-634's measurement is the natural close-out for BOTH sprints. BL-630's shortlist gains a real mechanism to gate on once demand exists: BL-635 measured that a spawn's survival currently depends on whether the generator handed it a resource anyone wants."
-  }
- ],
- "next_up": "Sprint 21 (demand) is the only open sprint: eight items, all designed, none started. BL-648's guard is deliberately RED on eight goods and turns green as channels land. BL-654 (a short pool buys up to a reservation ceiling) gates BL-641's rates going non-zero and should land early. Ben's steer, 2026-08-26: Sprint 21 is a VISIBILITY pass - it should also pick up NR-663's family (four checks whose green means less than it appears), BL-639's panel columns, and the thorough fix for NR-686 (a dev build resolving scripts/ from the repo root). Sprint 20's nine slipped items carry forward; three are design-owed on Ben.",
- "footer_notes": [
-  "**The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first."
- ]
+  "_schema": "sprints/io-v2",
+  "_note": [
+    "Canonical store for Project Io's sprint rhythm — every sprint's goal, planned items, retro",
+    "(landed/slipped/feedback) and free-form notes. Drained from SPRINTS.md prose 2026-08-19;",
+    "fully canonical since 2026-08-24 (Ben: move sprints into JSON, archive completed ones).",
+    "SPRINTS.md is a GENERATED mirror — node tools/session/render_sprints.js — never hand-edit it.",
+    "",
+    "HOT/COLD SPLIT (2026-08-24): this file holds open/proposed/gated sprints only. A sprint",
+    "whose state goes terminal (closed, superseded, subsumed, retro-recorded, landed) is moved",
+    "whole into docs/development/archive/sprints-<quarter>.json by",
+    "tools/session/archive_sprints.js. The renderer reads both, so the mirror’s status table",
+    "still indexes every sprint ever run.",
+    "",
+    "FIELDS per entry in `sprints`:",
+    "  id           — sprint number/label as used in prose (e.g. '19', '18 retro', 'P1'). Freed",
+    "    numbers may be re-used after a purge; the archive disambiguates colliding keys by date.",
+    "  theme        — short human handle for the sprint (pair with id in prose, same rule as BL ids).",
+    "  state        — one of: open, proposed, gated (hot) / closed, superseded, subsumed,",
+    "    retro-recorded, landed (terminal — archive these).",
+    "  status_line  — the one-line 'Where things stand' row for the mirror's table. Replaces the",
+    "    retired status_table array (2026-08-24, NR-598): one entry, one line, nothing to drift.",
+    "  opened_date / closed_date — ISO dates where recorded; null where never dated.",
+    "  goal         — the sprint's stated (or reconstructed) goal.",
+    "  planned      — array of planned items/work, one string per item.",
+    "  retro        — object with landed/slipped/filed/runtime/feedback string fields where the",
+    "    sprint carries a closed retro. Omitted for sprints with no retro yet.",
+    "  risk         — the sprint's stated risk paragraph(s), where present.",
+    "  done_when    — the sprint's stated done-when criterion, where present.",
+    "  notes        — catch-all prose: rulings, audit tables, amendments, sequencing notes.",
+    "  author       — optional; who is running the sprint (e.g. 'Joe'). Nullable; missing means",
+    "    the default dev-sprint rhythm (policy 2026-08-22).",
+    "",
+    "TOP-LEVEL PROSE FIELDS (rendered into the mirror by render_sprints.js): header (intro",
+    "paragraphs), format (the entry template), format_notes, rulings (dated standing rulings —",
+    "cap, ceiling, deletion policy), next_up (the current 'what runs next' paragraph — update it",
+    "when the board changes), footer_notes (standing debts worth repeating).",
+    "",
+    "Landed items referenced by BL-id here are NOT re-described — see backlog.json (or its cold",
+    "archive) for that item's own design/resolution prose. This file is about the sprint as a",
+    "unit of pacing and sequencing, not a duplicate backlog.",
+    "",
+    "HISTORY: the 'Sprints 26-33: The Fall' arc (proposed 2026-08-18) was captured here in full,",
+    "then deleted outright in the 2026-08-24 purge along with every other never-executed plan —",
+    "see the deletion ruling in `rulings`; the sprints from that period that actually ran",
+    "survive in the archive."
+  ],
+  "header": [
+    "A lightweight rhythm layered over the backlog/Delivery system: a **goal** stated at the start, a **retro** at the close comparing what landed against it. This is feedback *for Ben* — pacing and priority signal, not a new authority (backlog.json/REFINED.md/DEVLOG stay the source of truth for what’s actually true about an item).",
+    "Entries are one per **sprint** — a sprint is a themed span of work, not a fixed calendar week; it closes when its goal is settled (landed or deliberately descoped), not on a clock. A gap with no entry means no sprint goal was set — that’s fine, skip it rather than backfilling.",
+    "**Fully in JSON since 2026-08-24** (Ben: move sprints into JSON; archive them once complete). Drained from prose 2026-08-19; the last hand-kept surface — this file’s status table — retired 2026-08-24 after NR-598 caught it drifting. `sprints.json` holds the open/proposed/gated sprints; every completed sprint lives whole in `archive/sprints-*.json`, moved by `tools/session/archive_sprints.js`."
+  ],
+  "format": "## Sprint N — theme (opened YYYY-MM-DD)\n\n**Goal.** 1-2 sentences: the outcome this sprint is aiming for, referencing backlog item ids\nand/or a version goal (v0.1.1 etc.).\n\n**Planned.** BL-ids targeted, one line each.\n\n**Retro** (filled in at close).\n- Landed: ...\n- Slipped: ... (+ why — scope grew, blocked on a dependency, deprioritized)\n- Feedback: anything worth Ben knowing about how the sprint actually went — a pattern, a\n  misjudged estimate, a design call that needed more/less discussion than expected.",
+  "format_notes": [
+    "(The old **Runtime** line — total session time vs. items delivered — is dropped from the template. It went uncollected for seven-plus consecutive entries; see Sprint 19’s retro in the archive for the reasoning. If the pacing signal is wanted again later, derive it from commit timestamps rather than reviving an unstarted timer.)"
+  ],
+  "rulings": [
+    "**Active-sprint cap (Ben, 2026-08-23).** No more than 3 sprints open/proposed at once — enough that a session doesn’t have to weigh a long tail of undocumented parallel work.",
+    "**Sprint-number ceiling (Ben, 2026-08-24): keep sprints 18 and below.** Nothing is planned or authored past sprint 18 — narrower than the count cap above, this bounds *how far ahead* the sprint horizon is allowed to reach at all.",
+    "**Unstarted plans are DELETED, not archived (Ben, 2026-08-24).** A sprint that was only ever open/proposed and never really executed is a stale reference once dropped — closing it and keeping its prose around just to reopen the same number later isn’t worth the upkeep. On adopting the cap, 27 open/proposed sprints (plus Sprint 32, authored and dropped same-day on the ceiling above) were removed outright from `sprints.json`, freeing their numbers rather than retiring them: 20, 21, 22, 22-24 preamble, 23, 24, 25, 26-33, 26a, 26b, 27, 28, 29, 30, 31, 32, B1, B2, B3, C1, C2, C3, D2, D3, D4, N3, N4, ST1, W1. This is narrower than it looks: a sprint that actually **landed work** — even a partial or unsatisfying result (Sprint 19’s goal NOT met, P1’s rendering debt) — is a real historical fact and stays in the status table as closed. Only the never-executed ones were deleted. A freed number picked back up is authored fresh against the current docs, never resurrected under its old prose.",
+    "**Also deleted 2026-08-24, same basis:** six orphaned backlog items (BL-579–BL-584) a concurrent review-queue-purge session had filed with no sprint attached, plus Sprint 32’s own three items (BL-595–BL-597, Logistic Points / Throughput lens) — all unstarted, all removed from `backlog.json` outright rather than archived.",
+    "**Sprint 25b deleted 2026-08-24, same policy** (the Sprint 18 design form verdict): never opened, gated on a sequence (25a → 21 → 23 → 25b) whose middle numbers the purge had already freed. Its undelivered half — interception narration, the out_cuts sink — is unowned until re-filed (NR-599); the interdiction core itself landed 2026-08-21 and is unaffected.",
+    "**Sprint-number ceiling advanced to 19 (Ben, 2026-08-25: 'Open sprint 19 with these items').** The 2026-08-24 ceiling stands in spirit - author no sprint past the one Ben opens - with 19 now the horizon.",
+    "**Sprint-number ceiling advanced to 20 (Ben, 2026-08-26: 'Write this up as sprint 20').** The 2026-08-24 ceiling stands in spirit - author no sprint past the one Ben opens - with 20 now the horizon.",
+    "**Sprint-number ceiling advanced to 21 (Ben, 2026-08-26: 'A, and open it as sprint 21').** The 2026-08-24 ceiling stands in spirit - author no sprint past the one Ben opens - with 21 now the horizon. Two sprints are open (20, 21), inside the three-sprint cap.",
+    "**Sprint-number ceiling advanced to 22 (Ben, 2026-08-27, corrected 2026-08-28 00:16).** The 2026-08-24 ceiling stands in spirit - author no sprint past the one Ben opens - with 22 now the horizon. Two sprints open (21 demand, 22 UI visibility), inside the three-sprint cap. Ben has named 23 for the new UI elements he will describe once Sprint 22's improvements land, so 23 is spoken for but NOT yet authored.",
+    "**A sprint was renumbered and un-renumbered across the 2026-08-27/28 midnight; both moves are recorded because neither lost anything.** The demand sprint was moved 21 -> 22 to free the number for a UI visibility pass, then moved back at 00:16 on 2026-08-28 when Ben clarified that 'sprint 21' means the demand sprint to him. What made the round trip safe is that the demand sprint had LANDED WAVE 0 and was therefore moved WHOLE both times, never deleted under the 2026-08-24 unstarted-plans rule. The lesson worth keeping: a number is cheap to move and expensive to be wrong about, so confirm which sprint a bare number refers to before renumbering anything - the pre-move records (the DEVLOG heading, the NEEDS_REVIEW sources, the `sprint-21-wave-0` requirements batch key) all said 21, and they were right.",
+    "**The active-sprint cap is deliberately exceeded, as PROPOSED not open (Ben, 2026-08-28: \"Let's make a sprint for each batch\").** The 3-sprint cap counts sprints being worked; 23-27 are a decomposition of one agreed body of work, authored together so the batch boundaries are settled once rather than re-argued five times. Only one is worked at a time. If that reads as cap-breaking later, close them back down to a single sprint with a batch list — the content is the value, not the numbering."
+  ],
+  "sprints": [
+    {
+      "id": "21",
+      "theme": "The other half of the economy - demand",
+      "state": "paused",
+      "status_line": "PAUSED 2026-08-28 with wave 0 landed - the UI batches take priority; resume at wave 1 (BL-640/641/642)",
+      "opened_date": "2026-08-26",
+      "goal": "Author the demand side. The roster grew a supply chain and never grew the demand for it, so the ancient economy terminates in artisan goods nobody buys and most spawns are structurally unprofitable - not mistuned, unbought. Eight demand channels (MARKETS.md § Demand channels), of which the load-bearing ones scale with the economy rather than with an authored weight. Then MEASURE, and expect to go round more than once: Ben, 2026-08-26 - 'we will get interesting data and do a few passes over viability'. The felt goal: a world where the goods a player is meant to chase are wanted by somebody, and it is legible WHO.",
+      "planned": [
+        "BL-648 (admission rule names an injector) - FIRST. The guard that stops this recurring. Expect it RED on ten goods the day it lands; the rest of the sprint turns it green",
+        "BL-649 (demand census) - FIRST, with it. The instrument: per resource, per band, who actually wants it. Run before and after every pass, deltas kept",
+        "BL-640 (era-banded household basket) - wave 1: the basket ladders by era as well as stratum; resurrects four of the seven ancient dead ends",
+        "BL-641 (building upkeep in goods) - wave 1: the largest structural sink. A unit already pays credits + goods; a building pays credits only",
+        "BL-642 (construction actually draws) - wave 1: the opening years build, and centres draw materials as they grow",
+        "BL-644 (space programme budget line) - wave 2: the tenth line, and space goods' first buyer that is not a militia contract",
+        "BL-647 (endemic luxury demand) - wave 2: tobacco, spices, coffee and furs, wanted by wealth and flavoured by national character",
+        "BL-643 (network upkeep draws) - wave 2: a sink scaled by geography rather than population",
+        "BL-646 (battles burn ordnance) - wave 2: the only channel that couples the two pillars - Conflict moves Trade",
+        "BL-645 (research consumes goods) - GATED on BL-619, which is a design session with Ben, not a build slice",
+        "VIABILITY PASSES - after each wave: census, measure spawn viability, retune, repeat. The passes are the sprint, not an epilogue"
+      ],
+      "notes": "PAUSED 2026-08-28 on Ben's instruction, wave 0 complete (BL-648 guard, BL-649 census). Nothing is abandoned: the guard is deliberately red, the census is the before/after instrument, and wave 1 resumes where it stopped. Opened on Ben's instruction, 2026-08-26 ('A, and open it as sprint 21'), after the session's own measurement answered his question: the ancient band has TWO live demand sinks, and ten goods pass the orphan check by naming a 'mercantile demand' that grep says was never built (NR-671). Ceiling advanced to 21 on the same instruction. ORDERING IS LOAD-BEARING: BL-648 and BL-649 go FIRST, not last. The guard makes the gap visible and the census makes each pass measurable - without them a viability pass is a guess with a number attached. A red guard with a named list is worth more than a green one that means nothing; do not weaken it to pass while the channels are being built. SEVERAL CHANNELS ARE DESIGNED-BUT-INERT rather than missing, which is why the sprint is cheaper than it looks: `strategic_reserve` is already a goods-buying budget line no consumer claims on; `logistics_maintenance` already names network upkeep; recipes already carry the era field the demand baskets need; and `run_unit_upkeep` is already the credits-plus-goods shape BL-641 wants for buildings. RELATIONSHIP TO SPRINT 20: Sprint 20 stays open and owns the ledger, the buyout and the spawn shortlist. Its BL-634 (acquisition viability) CANNOT honestly pass until this sprint lands - a corp at -28/qtr never saves up for anything - so BL-634's measurement is the natural close-out for BOTH sprints. BL-630's shortlist gains a real mechanism to gate on once demand exists: BL-635 measured that a spawn's survival currently depends on whether the generator handed it a resource anyone wants."
+    },
+    {
+      "id": "25",
+      "theme": "UI visibility - batch 5: canvases & the zoom ladder",
+      "state": "proposed",
+      "status_line": "Proposed 2026-08-28 as sprint 26; RENUMBERED to 25 on 2026-08-30 when Ben retired the shell-chrome and startup batches - \"Sprint 25 and 27 don't need a revisit, UI items for these are working great.\"",
+      "opened_date": "2026-08-28",
+      "goal": "Review the three canvases and the ladder between them - Solar, Circumplanetary, Planetary - plus the render layers that sit on them (tiles, terrain, roads, settlements, fog, borders, provinces) and the keyboard navigation model.",
+      "planned": [
+        "UI-001..UI-024, UI-094..UI-097 in the catalogue",
+        "The body-to-body lenses deferred from batch 1 (Supply, Supply-routes, Reach) - Ben, 2026-08-28: \"I don't think we need body-to-body lenses yet. Keep the code but ignore for this session.\" They are canvas-grain, so they belong here",
+        "BL-694 (top-bar tracker) - Ben, 2026-08-30, the one piece carried out of the retired shell-chrome batch. Steel / Boost / Research points on the top bar as 'absolute (+delta/qtr)'. TWO OF THE THREE QUANTITIES DO NOT EXIST YET: Boost is a new untradeable resource and untradeability is not a property the resource model has, and research points have no representation in src/world at all. So this is a design item before it is a UI one, and its research third is gated on BL-619."
+      ],
+      "notes": "Was sprint 26, one of six UI review batches split out on 2026-08-28. RENUMBERED to 25 on 2026-08-30, when Ben closed out the other two proposed batches on the grounds that their surfaces are already working: batch 4 (shell chrome - header, profile tile, nav rail, time panel, comms dock, minimap, menus) and batch 6 (startup - main menu, the New World wizard, the generation screen). Neither was descoped for cost; both were judged done enough not to earn a review pass.\n\nONE ITEM WAS RESCUED FROM THE DELETED BATCH 4 and is carried here rather than dropped with it: the top-bar tracker, BL-694. It is header-grain rather than canvas-grain, so it sits slightly outside this sprint's theme - deliberately, because it is the only piece of shell chrome Ben still wants and keeping it needs no sprint of its own.\n\nMETHOD, unchanged and proven across batches 1 and 3: capture the whole class first, send it to Ben in one go, take his calls, build, re-capture, and expect the re-capture to find something the code read did not. Capture at 1920x1080 for a design review and keep the fit check at 1280x720 - the two are different questions (sprint 24b's rule)."
+    }
+  ],
+  "next_up": "SPRINT NUMBERING, reset by Ben on 2026-08-30: the proposed shell-chrome (old 25) and startup (old 27) batches are DELETED - \"Sprint 25 and 27 don't need a revisit, UI items for these are working great\" - and the canvases batch renumbered from 26 to 25. THE NEXT NEW SPRINT IS 26. Two of the six UI review batches from 2026-08-28 therefore never run, and that is a judgement that their surfaces are good enough rather than a deferral.\n\nOPEN AND PAUSED: sprint 24b (the ledgers not yet read) is the live one; sprint 21 (demand) stays PAUSED with wave 0 landed - its guard (BL-648) is deliberately red and its census (BL-649) is the before/after instrument for when it resumes. Sprint 20 also stays open and owns BL-634 (acquisition viability), which cannot honestly pass until sprint 21's demand channels land.\n\nNEXT UP: sprint 25 (canvases & the zoom ladder), carrying BL-694 (top-bar tracker) out of the retired batch 4.",
+  "footer_notes": [
+    "**The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first."
+  ]
 }

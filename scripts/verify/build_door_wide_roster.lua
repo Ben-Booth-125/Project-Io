@@ -8,7 +8,6 @@
 -- Run: ProjectIo --verify scripts/verify/build_door_wide_roster.lua
 
 verify.econ_step(4)
-verify.show_panel("economy", false)
 verify.goto_surface("home")
 
 verify.select_tile(57, 34)

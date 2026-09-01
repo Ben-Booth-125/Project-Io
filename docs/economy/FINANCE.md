@@ -268,8 +268,15 @@ that two of them disagree.
 
 Every corporation writes a return. **What may be read is decided by the target's ownership class**,
 not by the fog: `public` corporations file, `private` and `closed` corporations do not. The class
-is generated from the home region's industrialisation timing —
+is generated from how far the enforceable promise reached the home region —
 [`CORPORATION_GENERATION.md`](../generation/CORPORATION_GENERATION.md) owns that derivation.
+
+**The class governs CORPORATIONS. A company always files** (Ben, 2026-08-29; BL-678, companies are
+open). A background firm is `public` by construction, so disclosure is not a question asked of it:
+it is part of the commercial population the player trades with, and a firm whose figures are a dash
+is not a member of a population. What follows in this section is therefore a rule about the
+handful of named rivals, not about the field — and the field is the great majority of the firms in
+any world.
 
 **A corporation always reads its own books.** Disclosure governs what one firm may learn about
 **another** — it is a competitor rule, and turning it on its author would be nonsense: a firm that
@@ -392,16 +399,30 @@ above, with no consent — its books are open, so it can be priced. A **private*
 may not: there is no filed return to price it from and no negotiation verb yet. That is the second
 job the ownership class does, and it is why the class is worth generating rather than authoring.
 
+**Every company is buyable** (Ben, 2026-08-29; BL-678, companies are open). A background firm is
+`public` by construction, so the gate above never refuses one. This is what makes the acquisitions
+ledger a market rather than a curiosity: the field it lists is the commercial population of the
+world, not the two or three named rivals that happened to class `public`. The corollary is that
+**closure is a rival's property alone** — the question "are this firm's books its own" is asked of
+the actors the player competes with, and answered `yes` for the population the player trades with.
+
 **What it costs politically.** Nothing new is needed. `equity_taken` already exists as a sentiment
 factor ([`RELATIONS.md`](../politics/RELATIONS.md) § The factors) — *"the observer wanted a firm
 and the subject took it"*. An acquisition's political cost lands there, on the rivals who wanted
 the same firm.
 
-**Rivals buy too.** `buy_corporation` joins the `corp_command` seam and is scored in
-`corp_ai.cpp`'s existing deterministic candidate list, capped at one acquisition per evaluation and
-carried in the candidate's `spend` under the solvency gate — the shape every widening in
+**Rivals should buy too.** The design: `buy_corporation` is scored on `corp_ai.cpp`'s existing
+deterministic candidate list, capped at one acquisition per evaluation and carried in the
+candidate's `spend` under the solvency gate — the shape every widening in
 `.claude/rules/io-standing-rules.md` takes, a legal verb on the scorer and never a planner.
-Design: BL-629 (rival acquisition).
+Owner: BL-629 (rival acquisition).
+
+*The paragraph above is a design, and it is phrased in the conditional deliberately.* It read as
+present-tense fact — "`buy_corporation` **joins** the seam and **is scored** in `corp_ai.cpp`'s
+existing candidate list" — which is a sentence a reader cannot distinguish from a description of
+shipped code, and at least one did not. A doc says what is true of the **design**; whether a piece
+is built is a backlog fact (`.claude/rules/io-standing-rules.md` § Terms & docs). Where a design
+paragraph names the file it will live in, the conditional is what keeps the two readings apart.
 
 ## Surfaces
 

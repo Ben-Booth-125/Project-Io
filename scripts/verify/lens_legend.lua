@@ -32,9 +32,9 @@ verify.frames(2)
 -- right edge on the screen edge, and NOTHING drawn over the canvas or the
 -- bottom panels. The count belongs in the header on purpose — a collapsed
 -- legend that does not say how much it hides gives no reason to open it.
-verify.set_overlay("country")
+verify.set_overlay("corporation")
 verify.frames(2)
-verify.capture("legend_country_collapsed")
+verify.capture("legend_corporation_collapsed")
 
 -- ---------------------------------------------------------------------------
 -- L2 / L3 — the press lands, and the body scrolls rather than overrunning.
@@ -60,14 +60,14 @@ local header_y = ceiling_y + 16          -- inside the header band (now the full
 verify.hover(header_x, header_y, 2)
 verify.click(header_x, header_y)
 verify.frames(2)
-verify.capture("legend_country_expanded")
+verify.capture("legend_corporation_expanded")
 
 -- Re-press closes it again. This is the standing toggle rule: a control whose
 -- active state is visible undoes itself on a second press.
 verify.hover(header_x, header_y, 2)
 verify.click(header_x, header_y)
 verify.frames(2)
-verify.capture("legend_country_recollapsed")
+verify.capture("legend_corporation_recollapsed")
 
 -- ---------------------------------------------------------------------------
 -- The other legend-bearing lenses use the SAME box, so a regression in one is

@@ -614,6 +614,17 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 report->prehistory_conquests = hs.conquests;
                 report->prehistory_foundings = hs.foundings;
                 report->prehistory_years     = hs.years;
+                // NR-733: the ownership history itself, so the Ages view can
+                // REPLAY the era rather than re-running it. Recorded at the one
+                // call site that ran it, which is what makes it generation's own
+                // era and not a second construction of one.
+                //
+                // Onto the CRADLE'S OWN ENTRY, because that is the body the era
+                // was fought over — every other entry keeps an empty record, and
+                // the view reads empty as "never settled".
+                for (generation_report::body_entry& be : report->bodies)
+                    if (be.id == kepler)
+                        be.prehistory_timelapse = as_timelapse(hs);
             }
 
             // The same four counts into the fixture, so a harness holding one

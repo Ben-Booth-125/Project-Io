@@ -55,7 +55,6 @@ constexpr auto max_season     = season::winter;
 constexpr auto max_battle_res = battle_result::defender_victory;
 constexpr auto max_battle_end = campaign_battle_end::stalemate;
 constexpr auto max_withdraw   = withdrawing_side::defender;
-constexpr auto max_contract_state = mercenary_contract_state::abandoned; // BL-573
 
 // ---------------------------------------------------------------------------
 // Component writers / readers
@@ -449,6 +448,29 @@ bool r_buy(std::istream& i, buy_order& b)
         && r_id(i, b.preferred_seller);
 }
 
+// --- the exchange record (BL-685) ------------------------------------------
+// One row, in the declaration order of `exchange_record` (components.hpp). The
+// two counterparty ids are written as plain ids because `null_entity` is a
+// LEGAL value on either side here and means the market itself, not an absent
+// field — the reader must not treat it as a defect.
+void w_exchange(std::ostream& o, const exchange_record& e)
+{
+    w_int(o, e.tick);
+    w_id(o, e.market);
+    w_enum(o, e.resource);
+    w_f32(o, e.quantity);
+    w_f32(o, e.unit_price);
+    w_id(o, e.seller);
+    w_id(o, e.buyer);
+}
+
+bool r_exchange(std::istream& i, exchange_record& e)
+{
+    return r_int(i, e.tick) && r_id(i, e.market) && r_enum(i, e.resource, max_resource)
+        && r_f32(i, e.quantity) && r_f32(i, e.unit_price) && r_id(i, e.seller)
+        && r_id(i, e.buyer);
+}
+
 void w_quote(std::ostream& o, const procurement_quote& q)
 {
     w_u32(o, q.id);
@@ -493,57 +515,6 @@ bool r_contract(std::istream& i, procurement_contract& c)
         && r_enum(i, c.resource, max_resource) && r_id(i, c.delivery_body)
         && r_f32(i, c.quantity) && r_f32(i, c.unit_price) && r_i32(i, c.lead_time_ticks)
         && r_i32(i, c.ticks_elapsed) && r_f32(i, c.deposit_paid) && r_f32(i, c.freight_cost);
-}
-
-/// BL-572: a mercenary contract offer. Rejects a non-finite `fee`/`offer_escrow`
-/// on the same grounds `r_nation_budget` does — the writer below cannot have
-/// produced one, so the stream is corrupt rather than odd.
-void w_offer(std::ostream& o, const mercenary_offer& m)
-{
-    w_u32(o, m.id);
-    w_id(o, m.client);
-    w_u32(o, m.target_province);
-    w_int(o, m.template_index);
-    w_f32(o, m.fee);
-    w_int(o, m.deadline);
-    w_int(o, m.issued_tick);
-    w_f32(o, m.offer_escrow);
-}
-
-bool r_offer(std::istream& i, mercenary_offer& m)
-{
-    if (!(r_u32(i, m.id) && r_id(i, m.client) && r_u32(i, m.target_province)
-          && r_int(i, m.template_index) && r_f32(i, m.fee) && r_int(i, m.deadline)
-          && r_int(i, m.issued_tick) && r_f32(i, m.offer_escrow)))
-        return false;
-    return std::isfinite(m.fee) && std::isfinite(m.offer_escrow);
-}
-
-/// BL-573: an accepted mercenary contract. Rejects a non-finite `fee`/
-/// `deposit_paid` on the same grounds `r_offer` does above.
-void w_mercenary_contract(std::ostream& o, const mercenary_contract& c)
-{
-    w_u32(o, c.id);
-    w_id(o, c.client);
-    w_id(o, c.contractor);
-    w_int(o, c.template_index);
-    w_u32(o, c.province);
-    w_f32(o, c.fee);
-    w_f32(o, c.deposit_paid);
-    w_int(o, c.deadline);
-    w_int(o, c.accepted_tick);
-    w_id_array(o, c.units);
-    w_enum(o, c.state);
-}
-
-bool r_mercenary_contract(std::istream& i, mercenary_contract& c)
-{
-    if (!(r_u32(i, c.id) && r_id(i, c.client) && r_id(i, c.contractor)
-          && r_int(i, c.template_index) && r_u32(i, c.province) && r_f32(i, c.fee)
-          && r_f32(i, c.deposit_paid) && r_int(i, c.deadline) && r_int(i, c.accepted_tick)
-          && r_id_array(i, c.units) && r_enum(i, c.state, max_contract_state)))
-        return false;
-    return std::isfinite(c.fee) && std::isfinite(c.deposit_paid);
 }
 
 void w_condition(std::ostream& o, const condition& c)
@@ -924,21 +895,23 @@ void write_world_snapshot(const world& w, std::ostream& out)
     // is a well-formed section here, so that path is not the one taken.
     w_ids(out, w.province_holder);
 
-    // --- open mercenary-contract offers (BL-572), the v7 trailing section ---
-    // Same shape as province_holder above: live tick state, not generation
-    // output, so it gets its own section rather than riding inside any
-    // magic-guarded embedded stream. The allocator cursor travels with it,
-    // exactly like `next_convoy_id`/`next_order_id`/`next_procurement_id` do
-    // near the top of this function — a load that reset it to 1 would mint an
-    // id a live offer already holds.
-    w_u32(out, w.next_offer_id);
-    w_vec(out, w.mercenary_offers, w_offer);
-
-    // --- accepted mercenary contracts (BL-573), the v8 trailing section -----
-    // Same shape as mercenary_offers above: live tick state, its own section,
-    // allocator cursor travels with it.
-    w_u32(out, w.next_contract_id);
-    w_vec(out, w.mercenary_contracts, w_mercenary_contract);
+    // --- the exchange record (BL-685), the v19 trailing section --------------
+    // Same shape as the two sections above: live tick state, its own section.
+    //
+    // The RING'S CURSORS travel with the rows and are not derivable from them.
+    // `entries` is the raw ring, so once it has wrapped its vector order is no
+    // longer chronological — `next` is the only thing that says where the oldest
+    // row sits, and a load that reset it to 0 would hand every reader the
+    // history rotated. `total` is the lifetime count, which the retained rows
+    // cannot reconstruct once the ring has dropped its first row.
+    //
+    // Written in the ring's STORED sequence, not re-ordered oldest-first, for
+    // the reason the order book is written as stored: the stored sequence is
+    // itself the state, and canonicalising it here would make write(read(x))
+    // differ from x for a wrapped ring.
+    w_vec(out, w.exchanges.entries, w_exchange);
+    w_u32(out, static_cast<uint32_t>(w.exchanges.next));
+    w_u64(out, static_cast<uint64_t>(w.exchanges.total));
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -1109,17 +1082,27 @@ bool read_world_snapshot(world& w, std::istream& in)
     if (!r_ids(in, s.province_holder))
         return false;
 
-    // BL-572: open mercenary-contract offers, format v7's trailing section.
-    uint32_t next_offer = 1;
-    if (!(r_u32(in, next_offer) && r_vec(in, s.mercenary_offers, r_offer)))
-        return false;
-    s.next_offer_id = next_offer;
-
-    // BL-573: accepted mercenary contracts, format v8's trailing section.
-    uint32_t next_contract = 1;
-    if (!(r_u32(in, next_contract) && r_vec(in, s.mercenary_contracts, r_mercenary_contract)))
-        return false;
-    s.next_contract_id = next_contract;
+    // BL-685: the exchange record, format v19's trailing section. The two range
+    // checks are not defensive noise — `exchange_record_ring::oldest_first`
+    // indexes with `next` and would run off the end of a shorter `entries` on a
+    // corrupt or hand-edited stream, and this stream reaches an AI-facing seam
+    // (a save handed to `--serve`), so it is an untrusted input boundary. The
+    // writer cannot produce either violation: `push` never grows past `capacity`
+    // and keeps `next` in [0, capacity). Refuse whole, destination untouched.
+    {
+        uint32_t next_slot = 0;
+        uint64_t total     = 0;
+        if (!r_vec(in, s.exchanges.entries, r_exchange))
+            return false;
+        if (s.exchanges.entries.size() > exchange_record_ring::capacity)
+            return false;
+        if (!(r_u32(in, next_slot) && r_u64(in, total)))
+            return false;
+        if (next_slot >= exchange_record_ring::capacity)
+            return false;
+        s.exchanges.next  = static_cast<std::size_t>(next_slot);
+        s.exchanges.total = static_cast<std::size_t>(total);
+    }
 
     clear_derived_state(s);
     w = std::move(s); // replace only on full success

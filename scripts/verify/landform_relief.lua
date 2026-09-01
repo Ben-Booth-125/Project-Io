@@ -52,8 +52,6 @@ verify.capture("landform_cinder_zoom")
 verify.set_overlay("continent")
 verify.capture("landform_cinder_lens_continent")
 
-verify.set_overlay("country")
-verify.capture("landform_cinder_lens_country")
 
 -- BL-232: spanning markers, and the tooltip that makes the glyph vocabulary
 -- learnable. A run of contiguous mountains draws ONE chain of peaks rather than a

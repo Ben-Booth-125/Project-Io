@@ -6,7 +6,6 @@
 #include "scripting/lua_state.hpp"
 #include "ui/ui_state.hpp"
 #include "world/body_names.hpp"
-#include "world/contract_template.hpp" // BL-573: contract_template_registry, loaded in load_economy()
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/recipe_registry.hpp"
@@ -288,7 +287,7 @@ private:
     void ensure_works_loaded();
 
     /// Run one economy tick: production → market clearing → budget, storing the
-    /// per-building report for the economy panel. Driven by the econ-tick boundary
+    /// per-building report the ledgers read. Driven by the econ-tick boundary
     /// in run() and by the verify API.
     void step_economy();
 
@@ -364,7 +363,6 @@ private:
 
     sim_loop        m_sim_loop;
     lua_state       m_lua;
-    lua_state       m_contract_lua; ///< BL-573: separate Lua state for scripts/contracts.lua — see load_economy().
     world           m_world;
     world_params    m_pending_world_params; ///< Edited by the New World menu and then by the wizard; consumed by start_new_game (BL-114/167).
     world_params    m_active_world_params;  ///< The descriptor the live world was built from; shown as the "seed used".
@@ -465,10 +463,9 @@ private:
 
     ui_state        m_ui;
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
-    contract_template_registry m_contract_templates; ///< BL-573: mercenary-contract kinds, loaded from scripts/contracts.lua at startup, threaded into run_nation_step exactly like m_registry.
     works_registry  m_works;             ///< BL-321 Era -1 works table, loaded from scripts/works.lua at startup.
     tech_tree_registry m_tech_tree;      ///< BL-087 mock tech/quest tree, loaded from Lua at startup; F9 viewer only.
-    economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the economy panel.
+    economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the ledgers.
     std::vector<corp_standing> m_last_corp_standings; ///< Per-corp standing profile (BL-262 first slice), recomputed each econ tick from m_last_econ_report's cash flow; read by the Corporations panel. Transient runtime cache — NOT serialised, same as m_last_econ_report.
     ui::chat_state  m_chat;              ///< Comms log state (BL-205): channels, messages, drafts.
     std::vector<persona::pack> m_persona_bench; ///< Seated mountain bench (BL-207 slice 1); empty if load_bench() failed.
@@ -480,8 +477,8 @@ private:
     /// econ_tick, so a loaded campaign rotates exactly as an unsaved one.
     uint64_t        m_econ_steps = 0;
     std::vector<float> m_balance_history;      ///< Recent player balances (one per econ tick, capped); feeds the header net + sparkline.
-    std::vector<float> m_income_history;      ///< Recent player income per econ tick (market sales); feeds economy panel graph.
-    std::vector<float> m_expenditure_history; ///< Recent player expenditure per econ tick (auto-buys + wages + maintenance); feeds economy panel graph.
+    std::vector<float> m_income_history;      ///< Recent player income per econ tick (market sales); feeds the Budget ledger's profit chart.
+    std::vector<float> m_expenditure_history; ///< Recent player expenditure per econ tick (auto-buys + wages + maintenance); feeds the Budget ledger's profit chart.
     ui::market_plot_history m_market_history; ///< Price / supply / demand history per market, per resource; feeds market ledger graphs.
     std::deque<std::unordered_map<entity_id, int>> m_building_rank_hist; ///< Player-building profit rankings (entity→rank), one snapshot per econ tick, last 5 kept; the oldest is ~4 ticks (a year) back, feeding the Budget ledger's rank-change column (BL-171).
 

@@ -50,7 +50,6 @@
 #include "harness_params.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
-#include "world/contract_template.hpp"
 #include "world/nation_step.hpp"
 #include "world/spawn_seat.hpp"
 #include "world/supply_system.hpp"
@@ -261,7 +260,6 @@ int run_roster(uint32_t seed, const recipe_registry& reg)
 
 /// BL-573: run_nation_step's template registry. Empty is correct — nothing here
 /// asks a contract question, and an empty roster opens no contracts.
-const contract_template_registry g_no_contract_templates;
 
 /// The app's warm-start tick, composed as `app::step_economy` composes it, with
 /// the one difference that IS BL-630: `spectating = true`. Nobody is seated
@@ -280,7 +278,7 @@ void warm_tick(world& w, const recipe_registry& reg, int t)
     auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
                  &rep.building_labour);
-    run_nation_step(w, reg, rep, t, g_no_contract_templates);
+    run_nation_step(w, reg, rep, t);
     advance_tech_gates(w);
     credit_arrived_convoys(w, t);
 }

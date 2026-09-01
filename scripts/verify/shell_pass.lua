@@ -32,9 +32,9 @@ print("SHELL state_hash=" .. verify.state_hash())
 
 -- Every panel this pass touches, so `ledger()` can guarantee a clean column.
 local PANELS = {
-    "corporation", "balance", "economy", "tech_tree", "market", "construction",
-    "corporations_table", "tile", "generation_ledger", "decisions", "strategy",
-    "contracts", "build",
+    "corporation", "balance", "construction", "tech_tree", "acquisitions",
+    "market", "corporations_table", "tile", "generation_ledger", "decisions",
+    "strategy", "build",
 }
 
 local function close_all()
@@ -187,24 +187,19 @@ verify.frames(1)
 -- accurate record, not a gap.
 ledger("corporation",        "shell_20_slot01_corporation")
 ledger("balance",            "shell_21_slot02_budget")
-ledger("economy",            "shell_22_slot03_workforce_economy")
+ledger("construction",       "shell_22_slot03_construction")
 ledger("tech_tree",          "shell_23_slot04_research")
-ledger("market",             "shell_24_slot05_market")
-ledger("construction",       "shell_25_slot06_construction")
+ledger("acquisitions",       "shell_24_slot05_acquisitions")
+ledger("market",             "shell_25_slot06_market")
 ledger("corporations_table", "shell_26_slot08_diplomacy_corps")
 ledger("tile",               "shell_27_slot09_history")
 ledger("generation_ledger",  "shell_28_slot10_generation")
 ledger("decisions",          "shell_29_slot11_ai_decisions")
 ledger("strategy",           "shell_30_slot12_strategy")
-ledger("contracts",          "shell_31_slot13_contracts_offers", 0)
 
--- The Contracts ledger's other two views. The fixture stages content in all
--- three deliberately (see its header), so an empty tab here is a finding rather
--- than a fixture accident.
-verify.panel_view("contracts", 1)
-shot("shell_32_slot13_contracts_active")
-verify.panel_view("contracts", 2)
-shot("shell_33_slot13_contracts_history")
+-- Slot 13 is the last one. Contracts held a fourteenth slot and three captures
+-- here (offers / active / history); the mercenary contract is retired and the
+-- ledger is deleted, so the pass ends at the developer tail (BL-693).
 
 close_all()
 verify.frames(1)

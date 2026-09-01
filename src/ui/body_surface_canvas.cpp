@@ -7,6 +7,7 @@
 #include "hover_content.hpp"
 #include "hex_render.hpp"
 #include "icons.hpp"
+#include "tile_inspector.hpp"   // history_view_tectonics (BL-660 routing)
 #include "market_ledger.hpp" // market_city_name (Market lens catchment key, BL-015)
 #include "nav_pane.hpp"
 #include "presentation.hpp"
@@ -1163,18 +1164,29 @@ entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx
 /// tile itself (Population, Industry) returns none and keeps tile grain — the
 /// selection grain follows the drawing, which is the whole rule.
 ///
-/// A structure must be an ENTITY here, because that is what a selection is. The
-/// Resource lens's contiguous deposit and the Continent lens's plate are regions
-/// with no entity id, so they are absent rather than half-supported: highlighting
-/// a region the player then cannot select would promise a pivot that does not
-/// arrive.
+/// A structure USED TO have to be an entity here, because that is what a selection
+/// is, and the Resource lens's deposit and the Continent lens's plate are regions
+/// with no entity id — so both were absent rather than half-supported, on the
+/// grounds that highlighting a region the player then cannot select promises a
+/// pivot that does not arrive.
+///
+/// BOTH NOW RESOLVE (Ben, 2026-08-28, choosing option A over giving them real
+/// entity ids in world/). They travel in `ui_state::selected_deposit_resource`
+/// and `selected_plate` rather than in `selected_entity`, exactly as the battle
+/// triple (BL-469) and `selected_province` (BL-511) do — the sanctioned shape in
+/// this codebase for a selection whose subject is not an entity. `out_id` carries
+/// a synthetic key for them (index + 1), which no caller may treat as an entity:
+/// every comparison pairs it with the kind, and the click path dispatches on the
+/// kind before it ever reaches `selected_entity`.
 ///
 /// @param tile_to_corp This frame's tile→owning-corp index, already built by the
 ///                     caller for the Corporation lens's own tint.
 structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
                                       entity_id tile,
                                       const std::unordered_map<entity_id, entity_id>& tile_to_corp,
-                                      entity_id* out_id)
+                                      entity_id* out_id,
+                                      const continent_state* plates = nullptr,
+                                      int grid_w = 0)
 {
     if (out_id != nullptr)
         *out_id = null_entity;
@@ -1197,14 +1209,90 @@ structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
             *out_id = m;
         return structure_kind::market;
     }
-    // The Corporation lens is DELIBERATELY absent, and finding out why is worth
-    // recording. Its structure is exactly the set of tiles carrying that corp's
-    // buildings — so every tile in it also carries a MARKER, and a marker
-    // outranks a structure by design ("a marker is a specific thing the player
-    // aimed at"). An area pivot here could therefore never fire: measured, not
-    // reasoned — the first draft of this switch included it and the check
-    // reported `tile` on empty ground and `building` on owned ground, never
-    // `corporation`. The lens resolves through the marker instead, below.
+    case overlay_mode::resource:
+    {
+        // The deposit as DRAWN: every tile whose selected-resource deposit is
+        // non-zero. Not a flood fill — the lens itself does not do one ("any tile
+        // carrying the resource is part of the deposit", LENSES.md), and the
+        // selection grain must follow the drawing or the highlight would disagree
+        // with the wash under it. So the whole resource on this body is one
+        // structure, and its key is the resource index.
+        const auto tit = w.tiles.find(tile);
+        if (tit == w.tiles.end())
+            return structure_kind::none;
+        const std::size_t sel = static_cast<std::size_t>(state.lens_resource);
+        if (sel >= std::size(tit->second.resource_deposit)
+            || tit->second.resource_deposit[sel] <= 0.0f)
+            return structure_kind::none;
+        if (out_id != nullptr)
+            *out_id = static_cast<entity_id>(sel) + 1u; // synthetic; +1 keeps 0 = none
+        return structure_kind::deposit;
+    }
+    case overlay_mode::continent:
+    {
+        // The plate as drawn: the Voronoi region of `plate_id`. A stagnant-lid
+        // body has one plate owning everything, which is a legitimate answer
+        // rather than a degenerate one — the key is still stable.
+        if (plates == nullptr || plates->plate_id.empty() || grid_w <= 0)
+            return structure_kind::none;
+        const auto tit = w.tiles.find(tile);
+        if (tit == w.tiles.end())
+            return structure_kind::none;
+        const std::size_t idx =
+            static_cast<std::size_t>(tit->second.grid_y) * static_cast<std::size_t>(grid_w)
+            + static_cast<std::size_t>(tit->second.grid_x);
+        if (idx >= plates->plate_id.size())
+            return structure_kind::none;
+        const int pid = plates->plate_id[idx];
+        if (pid < 0)
+            return structure_kind::none;
+        if (out_id != nullptr)
+            *out_id = static_cast<entity_id>(pid) + 1u; // synthetic; +1 keeps 0 = none
+        return structure_kind::plate;
+    }
+    case overlay_mode::corporation:
+    case overlay_mode::company:
+    {
+        // THE OWNER'S TILE GROUP — every tile it holds on this body, lit and
+        // selected as one (Ben, 2026-08-28: "hovering one tile displays an
+        // outline around all company buildings for that corporation/company").
+        //
+        // THIS CASE WAS DELIBERATELY ABSENT UNTIL BL-665, and the reason it was
+        // absent is worth keeping because it was MEASURED, not reasoned: the
+        // structure is exactly the set of tiles carrying that owner's buildings,
+        // so every tile in it also carries a MARKER — and a marker outranked a
+        // structure, so an area pivot here could never fire. The first draft of
+        // this switch included it and the check reported `tile` on empty ground
+        // and `building` on owned ground, never `corporation`. The lens resolved
+        // through the marker instead, as a hand-wired special case in the click
+        // handler.
+        //
+        // BL-664 removed the marker's precedence under a lens, which dissolves
+        // the objection: the area resolver is now reachable on owned ground
+        // whether or not a glyph sits on it, and the special case is deleted.
+        //
+        // Keyed to the TINT (compute_tile_fill), because the selection grain
+        // follows the drawing: Corporation admits corporations proper — the
+        // player and its rivals — and Company admits BL-365 background firms,
+        // neither showing the other's. A tile no firm of the admitted kind holds
+        // answers none, and is inert.
+        const auto oit = tile_to_corp.find(tile);
+        if (oit == tile_to_corp.end())
+            return structure_kind::none;
+        const auto cit = w.corporations.find(oit->second);
+        if (cit == w.corporations.end())
+            return structure_kind::none;
+        const bool want_background = (state.overlay == overlay_mode::company);
+        if (cit->second.is_background != want_background)
+            return structure_kind::none;
+        if (out_id != nullptr)
+            *out_id = oit->second;
+        // Distinct KINDS for the two, not one kind and a lookup at the routing
+        // site: they are different words since the 2026-08-28 split and Ben
+        // ruled they reach different destinations, so the difference belongs in
+        // the answer rather than being re-derived by every caller.
+        return want_background ? structure_kind::company : structure_kind::corporation;
+    }
     default:
         return structure_kind::none;
     }
@@ -1245,6 +1333,7 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     state.lp_anchor_total = 0.0f;
     state.lp_anchor_max   = 0.0f;
     state.lp_reach_max    = 0.0f;
+    state.lp_reach_p90    = 0.0f;
 
     // Off by default in every sense: no lens, no work. The lens is the only reader,
     // and the pools must not be built when nobody is looking at them — LP is a rate,
@@ -1286,9 +1375,27 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     // Max over a vector is order-independent, so it is deterministic where a
     // float sum over a hash map would not be.
     const std::vector<float>& reach = body_reach_field(w, state.active_body);
+    std::vector<float> finite;
+    finite.reserve(reach.size());
     for (const float c : reach)
         if (c >= 0.0f && !std::isinf(c))
+        {
             state.lp_reach_max = std::max(state.lp_reach_max, c);
+            finite.push_back(c);
+        }
+
+    // The 90th percentile, which is what the field ramp actually divides by.
+    // nth_element rather than a full sort: this runs once per lens-active frame
+    // over ~31k values, and the ramp needs one order statistic, not an ordering.
+    // Deterministic despite nth_element's unspecified partial order, because only
+    // the value AT the position is read — and equal values are equal.
+    if (!finite.empty())
+    {
+        const std::size_t k = (finite.size() * 9) / 10;
+        std::nth_element(finite.begin(), finite.begin() + static_cast<std::ptrdiff_t>(k),
+                         finite.end());
+        state.lp_reach_p90 = finite[k];
+    }
 }
 
 void update_body_vision(world& w, ui_state& state, double now_days)
@@ -1554,6 +1661,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // province_sync_entity witness exists to prevent, one selection kind
         // later.
         state.clear_battle_selection();
+                state.clear_lens_region_selection();
         state.province_sync_entity = state.selected_entity;
     }
 
@@ -2144,6 +2252,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // is hoisted out of the draw loop into this lambda and run one pass ahead over
     // the visible row band plus a one-row margin. The derivation itself is
     // unchanged, line for line — only where it runs moved.
+    // A BL-365 background firm — a "company" rather than a "corporation" since
+    // Ben's 2026-08-28 terminology ruling. Looked up rather than cached because
+    // the corporation set is small and this runs only under two lenses.
+    const auto is_background_firm = [&w](entity_id corp) -> bool
+    {
+        const auto it = w.corporations.find(corp);
+        return it != w.corporations.end() && it->second.is_background;
+    };
+
     auto compute_tile_fill = [&](entity_id id, const tile_component& tile) -> ImU32
     {
         const auto   corp_it    = tile_to_corp.find(id);
@@ -2168,9 +2285,23 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // Corporation lens: tint a tile that carries a corporate building with its
         // owning corp's colour (a direct replacement of the terrain hue). Tiles
         // with no corporate building keep their terrain hue — no nation underlay.
+        //
+        // NARROWED to corporations proper (Ben, 2026-08-28): the player and its
+        // rivals, never a BL-365 background firm. The two are different words now
+        // (GLOSSARY.md), and a lens that mixed them answered neither question —
+        // "who are my rivals here" drowned in the background firms that outnumber
+        // them. Those get their own lens immediately below, drawn identically.
         if (state.overlay == overlay_mode::corporation)
         {
-            if (has_owner)
+            if (has_owner && !is_background_firm(corp_it->second))
+                fill = owner_col;
+        }
+        // Company lens: the exact mirror — background firms only, same per-corp
+        // identity tint, so the two lenses are read the same way and differ only
+        // in which population of firms they admit.
+        else if (state.overlay == overlay_mode::company)
+        {
+            if (has_owner && is_background_firm(corp_it->second))
                 fill = owner_col;
         }
         // Resource lens (BL-019): flat, uniform fill over the contiguous deposit of
@@ -2194,9 +2325,27 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (col_it != market_catchment_colour.end())
                 fill = lerp_colour(fill, col_it->second, 0.55f);
         }
-        // Population (Workforce) lens (BL-135): not a full-tile tint — it reads as
-        // a per-tile red→green dot mark, drawn below in place of the building glyph
-        // (workforce_efficiency). Tiles keep their terrain hue here.
+        // Population (Workforce) lens (BL-135, recut to a HEATMAP 2026-08-28 on
+        // Ben's instruction: "rework the workforce efficiency lens to be a
+        // heatmap, akin to throughput").
+        //
+        // It was a per-tile red→green DOT drawn in place of the building glyph,
+        // which made it the only lens in the roster that answered by adding a mark
+        // rather than by colouring the ground — so it read at one tile at a time
+        // and never as a field, which is the whole reason to have a lens. Now it
+        // tints like every other value lens and the tile keeps its glyphs.
+        //
+        // WATER IS LEFT ALONE rather than tinted at its floor value. Workforce
+        // efficiency is undefined on ocean, not zero, and painting it the ramp's
+        // red end would assert "bad ground here" about ground that is not ground.
+        // Terrain hue is the honest answer, and it also keeps the coastline
+        // legible, which a wall-to-wall wash destroys.
+        else if (state.overlay == overlay_mode::population
+                 && !placement_rules::is_water_tile(tile.substrate))
+        {
+            const float eff = workforce_efficiency(std::clamp(tile.habitability, 0.0f, 1.0f));
+            fill = lerp_colour(fill, ryg_colour(eff), 0.72f);
+        }
         // Scarcity lens (BL-018): a market-level shortfall field. Every tile in a
         // market's catchment reads as one chunky block tinted by that market's
         // supply shortfall of the selected good (demand outran supply last tick),
@@ -2263,15 +2412,38 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const float rc = tile_reach_cost(w, id);
             if (rc >= 0.0f)
             {
-                // SQUARE-ROOT COMPRESSION, measured rather than guessed. With 57
-                // anchors on the home body the cost distribution is heavily
-                // left-skewed — median 20.8 against a maximum of 101.8 — so a
-                // linear ramp puts four fifths of the grid in its top fifth and
-                // the map reads as one flat cyan wash. Compressing the ratio
-                // spreads the NEAR field, which is the half the player sites in.
+                // NORMALISED AGAINST THE 90th PERCENTILE, then square-root
+                // compressed. Both halves are measured — `throughput_field_census`
+                // is the harness, re-run it whenever the anchor set moves.
+                //
+                // The sqrt was calibrated in Sprint 18 against 57 anchors. The home
+                // body now carries 1917, and the census says why that broke the
+                // read: median cost 6.75 against a max of 81.58, so HALF the grid
+                // sits in the bottom 8% of the range the ramp is spread over.
+                //
+                // WHAT THE MEASUREMENT OVERTURNED. The obvious fix is a steeper
+                // curve, and it does not work — every curve over cost/max rescales
+                // the same bunched input. Share of the grid landing in the single
+                // most crowded tenth of the ramp: linear 52%, sqrt 32%, quadratic
+                // 45%, quartic 35%, 1-d² 75%, cube-root 28%. Quadratic is WORSE
+                // than the sqrt it would replace.
+                //
+                // The problem is the DENOMINATOR, not the curve. p90 is 42.58
+                // against a max of 81.58 — the top decile of cost is 48% of the
+                // range and holds a tenth of the tiles, so normalising against the
+                // max spends half the ramp on ground almost nothing sits on.
+                // Normalising against p90 instead and clamping drops the worst
+                // bucket to 21%: the same curve, three times the spread.
+                //
+                // Ground beyond p90 saturates at the cold end rather than being
+                // given its own gradient. That is the honest trade and it is the
+                // point: the far tenth is all equally out of reach, and the near
+                // ground is where a player sites.
+                const float denom = (state.lp_reach_p90 > 0.0f) ? state.lp_reach_p90
+                                                                : state.lp_reach_max;
                 const float t = std::isinf(rc)
                     ? 0.0f
-                    : 1.0f - std::sqrt(std::clamp(rc / state.lp_reach_max, 0.0f, 1.0f));
+                    : 1.0f - std::sqrt(std::clamp(rc / denom, 0.0f, 1.0f));
                 fill = lerp_colour(fill, throughput_field_colour(t), 0.72f);
             }
         }
@@ -2470,7 +2642,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     const int band_depth = coarse_fill ? 1 : k_border_band_tiles;
     const int band_lo    = std::max(0,      row_lo - band_depth);
     const int band_hi    = std::min(gh - 1, row_hi + band_depth);
-    if (raster_ok && !w.tile_to_nation.empty())
+    // SUPPRESSED UNDER EVERY LENS (Ben, 2026-08-28). The band is always-on chrome
+    // on the plain canvas — that is what BL-601 made it, and it is why the default
+    // view IS the country view. But a lens is a question about one subject, and a
+    // national wash over a corporate or resource read competes with the answer.
+    // Ben, on the Corporation lens: "we will not display country borders when
+    // displaying that lens. This will bring focus on to corporations" — extended
+    // to all lenses on the same instruction.
+    //
+    // Gated on the COMPUTATION, not just the wash below, so the three-ring
+    // relaxation over the visible band costs nothing while a lens is up. Every
+    // depth stays 0xFF, and the wash's `depth < band_depth` test then fails on
+    // its own without needing a second guard.
+    const bool draw_border_band = (state.overlay == overlay_mode::none);
+    if (draw_border_band && raster_ok && !w.tile_to_nation.empty())
     {
         for (int cr = band_lo; cr <= band_hi; ++cr)
         for (int cc = 0; cc < gw; ++cc)
@@ -2814,7 +2999,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             {
                 entity_id            tile_struct = null_entity;
                 const structure_kind sk = lens_structure_of_tile(w, state, id,
-                                                                 tile_to_corp, &tile_struct);
+                                                                 tile_to_corp, &tile_struct,
+                                                                 plates, gw);
                 if (sk == state.hovered_structure_kind && tile_struct == state.hovered_structure)
                 {
                     constexpr ImU32 lit = IM_COL32(255, 255, 255, 34);
@@ -2980,11 +3166,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // above says "this ground is near a frontier"; this pass says WHICH
             // frontier and whose, and it is what carries the hit corridor.
             //
-            // ALWAYS ON, under every lens. `overlay_mode::country` retired with
-            // this item (Ben, 2026-08-24: "with this, we can drop the nation
-            // lens") - the national read is chrome now, on the same footing as
-            // roads and rivers, and it is drawn here rather than earlier so it
-            // stays legible over a road span.
+            // ON THE PLAIN CANVAS ONLY (Ben, 2026-08-28). It was "always on,
+            // under every lens" from BL-601 until now - the national read became
+            // chrome on the same footing as roads and rivers. Ben, reviewing the
+            // lens sweep: "All: We can still see nation borders."
+            //
+            // THIS IS THE SECOND OF TWO NATION-BORDER PASSES and the reason the
+            // first suppression looked ineffective: the inward WASH (gated at
+            // `draw_border_band` above) says "this ground is near a frontier",
+            // while this pass draws the coloured rule that says WHICH frontier and
+            // whose. Suppressing only the wash left the rule drawing, so the
+            // borders were still plainly there. Both now answer to one flag.
+            //
+            // The hit corridor goes with it, deliberately: it is built inside this
+            // same loop, and a border that is invisible but still clickable is a
+            // worse outcome than either state. Under a lens the lens's own subject
+            // is what hover and selection pivot to (BL-603).
             //
             // THE STROKE IS INSET, not laid along the shared edge, and that is
             // the whole answer to "borders should not diffuse together". A
@@ -2995,6 +3192,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // side: the pair reads as two parallel coloured lines with the
             // frontier between them, and no pixel ever belongs to a colour that
             // is neither neighbour's.
+            if (draw_border_band)
             {
                 const entity_id own_nation = nation_of(id);
                 if (own_nation != null_entity)
@@ -3144,10 +3342,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     }
                 }
 
-                // The Workforce (Population) lens replaces the building silhouette
-                // with the per-tile value mark drawn below (BL-135) — the mark reads
-                // the tile's rank, not its installation.
-                if (state.overlay != overlay_mode::population)
                 {
                     // Stacked-tile ring (BL-596). Drawn BEFORE the centre glyph so
                     // the silhouette stays the loudest thing on the tile, and before
@@ -3158,11 +3352,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     // which of them leads (the lowest-id representative, the same one
                     // tile_to_bld picks); the "+N" badge still names how many
                     // buildings in total. Three different questions, three marks.
-                    //
-                    // Suppressed under the two value lenses for the same reason the
-                    // silhouette is: those lenses replace the tile's installation
-                    // read with a per-tile value mark, and a ring with no centre
-                    // glyph would be a ring with nothing to be dominant.
                     if (draw_r > kStackRingLodRadiusPx)
                     {
                         const auto kinds_it = tile_bld_kinds.find(id);
@@ -3278,7 +3467,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // is a blob, not a line. The all-four-neighbours "filled interior" case that
             // was designed alongside this was CANCELLED on the same measurement: not one
             // tile in the system has four, so it would have been dead code on every seed.
-            if (!built && state.overlay != overlay_mode::population)
+            if (!built)
             {
                 const ImU32 ink = contrast_ink(fill);
                 bool        spanned = false;
@@ -3327,20 +3516,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                     tile.landform, ink);
             }
 
-            // Value-lens tile marks (BL-135): the Workforce (Population) lens draws
-            // a per-tile red→green dot on every BUILDABLE tile (valid terrain for
-            // activity — ocean excluded), not just occupied ones, reading
-            // workforce_efficiency(habitability). Drawn instead of, not blended with,
-            // the building glyph on occupied tiles (suppressed above). Opportunity
-            // shared this idiom until BL-604 retired it; the shape stays keyed on one
-            // lens rather than pretending to a family of one.
-            if (state.overlay == overlay_mode::population &&
-                !placement_rules::is_water_tile(tile.substrate))
-            {
-                const float t = workforce_efficiency(std::clamp(tile.habitability, 0.0f, 1.0f));
-                const float mr = std::max(2.0f, draw_r * 0.22f);
-                icons::value_mark(dl, {cx, cy}, mr, ryg_colour(t));
-            }
+            // The Workforce (Population) lens's per-tile DOT used to be drawn here
+            // (BL-135's value mark). It is gone: the lens tints the tile itself now
+            // (see compute_tile_fill), so the mark it drew "instead of the building
+            // glyph" has nothing left to stand in for. With it go the two
+            // suppressions it needed — the stack ring and the landform glyph both
+            // draw under this lens exactly as they do under every other one.
 
             // Throughput lens (BL-606): the MAGNITUDE half. LP is generated at
             // anchors — cities, built-and-active ports and inland hubs — and
@@ -3505,7 +3686,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (revealed && prov_id != 0)
             {
                 const bool prov_selected = (prov_id == state.selected_province);
-                const bool prov_hovered  = (prov_id == state.hovered_province);
+                // Hover only with NO lens, for the reason recorded at the tile
+                // ring below (Ben's "stop dual hover", 2026-08-28): under a lens
+                // the resolved thing is the lens's structure, and a province edge
+                // lighting inside it is a second answer to a question that has one.
+                // SELECTION is untouched — `selected_province` is non-zero only on
+                // the tile rung, which a lens cannot reach anyway, so it needs no
+                // guard of its own.
+                const bool prov_hovered  = (prov_id == state.hovered_province)
+                                           && state.overlay == overlay_mode::none;
                 const highlight ph = resolve_highlight(prov_selected,
                                                        prov_hovered, /*pinned=*/false);
                 if (ph != highlight::none)
@@ -3559,7 +3748,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
     // Hover outline for the single resolved copy. Skipped when the hovered tile is
     // also the selection — selection outranks hover, and its ring is already drawn.
-    if (have_hover && !hovered_selected)
+    //
+    // AND SKIPPED UNDER A LENS (Ben, 2026-08-28: "we want to stop dual hover —
+    // right now if I hover a market, the province/tile also gets highlighted").
+    // Three hover marks could fire on one pointer position: this tile ring, the
+    // province edge below, and the lens structure's own wash. Under a lens the
+    // structure is the ONLY thing the pointer resolves to (BL-664), so it is the
+    // only thing that may light — a tile ring inside a lit catchment says the
+    // pointer is on two things at once, and one of them is not selectable.
+    //
+    // With no lens the tile IS the resolved thing, so the ring is the right mark
+    // and is unchanged.
+    if (have_hover && !hovered_selected && state.overlay == overlay_mode::none)
         draw_hex_highlight(dl, hover_verts, highlight::hovered);
 
     // BL-511: the hovered PROVINCE, for the outline the tile loop draws. Written
@@ -3575,7 +3775,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     {
         entity_id sid = null_entity;
         const structure_kind sk =
-            lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &sid);
+            lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &sid, plates, gw);
         state.hovered_structure      = sid;
         state.hovered_structure_kind = sk;
     }
@@ -3776,11 +3976,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // no double-draw). Each rival's marker is drawn on its OWN home body
     // (draw_corp_hq gates on the seat's body), so a rival only shows one when its
     // home body is the one on screen.
-    if (state.overlay == overlay_mode::corporation)
+    //
+    // SPLIT WITH THE TINT (Ben, 2026-08-28): the Corporation lens shows rival
+    // corporations' seats, the Company lens shows background firms' seats, and
+    // neither shows the other's. Before the split this loop drew every non-player
+    // corp — background firms included, and they outnumber the rivals — so the
+    // marker layer answered "where is everyone" when the lens was asking "where
+    // are my rivals". Same population rule as compute_tile_fill, so a seat and
+    // its tiles never appear under different lenses.
+    if (state.overlay == overlay_mode::corporation || state.overlay == overlay_mode::company)
     {
+        const bool want_background = (state.overlay == overlay_mode::company);
         for (const auto& [corp_id, cc] : w.corporations)
         {
             if (corp_id == w.player_entity)
+                continue;
+            if (cc.is_background != want_background)
                 continue;
             draw_corp_hq(corp_id, cc);
         }
@@ -3935,7 +4146,36 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 tile_bld = tb->second;
 
         entity_id hover_eid = null_entity;
-        if (marker_hover != null_entity)
+        if (state.overlay != overlay_mode::none)
+        {
+            // BL-664, the hover half of the same rule. Under a lens the pointer
+            // resolves to the lens's structure or to nothing, so:
+            //
+            //  - a MARKER takes no part. The card's subject is the ground, not
+            //    the glyph standing on it, because the lens is what the player is
+            //    asking about ("markers do not outrank lenses", Ben 2026-08-28).
+            //  - where the lens has NO STRUCTURE for this ground there is NO CARD
+            //    AT ALL ("for lenses which return none, just don't surface a
+            //    hover"). Three lenses — Population, Industry, Throughput — draw a
+            //    value field with no structure grain, so the card is absent across
+            //    the whole body while one of them is active. That is deliberate: a
+            //    value field is something you read.
+            //
+            // `hovered_structure_kind` was resolved by the tile loop earlier in
+            // THIS frame (it is written well above this read), so this costs a
+            // read rather than a second resolve and hover cannot disagree with the
+            // click about what the ground resolved to.
+            //
+            // WHAT THE CARD IS ABOUT IS STILL THE TILE, not the structure -- so a
+            // press and a hover at the same pixel agree on the KIND and differ on
+            // the SUBJECT. Deliberate and bounded: `draw_hover_content` has no
+            // branch for a corporation, a company, a catchment or a plate, and
+            // writing four is content work rather than the resolution rule this
+            // item is about. Recorded as owed rather than done (NR-701).
+            hover_eid = (state.hovered_structure_kind != structure_kind::none)
+                        ? hovered_tile : null_entity;
+        }
+        else if (marker_hover != null_entity)
             hover_eid = marker_hover;
         else if (tile_bld != null_entity)
             hover_eid = tile_bld;
@@ -4066,16 +4306,40 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
         else if (!state.construction.active)
         {
+            // WHICH RULE APPLIES IS DECIDED FIRST (BL-664, Ben 2026-08-28),
+            // because these are two different resolutions rather than one with an
+            // exception. SELECTION.md § A lens collapses selection to ONE TIER is
+            // the authority.
+            //
+            //   NO LENS — the marker/tile stack, most-specific first, with the
+            //             four-rung repeat-click cycle over it.
+            //   A LENS  — the lens's structure, or NOTHING. "Markers do not
+            //             outrank lenses": inside a lens the marker is only
+            //             ground that happens to be built on, and the lens is the
+            //             question the player is asking. A lens with no answer
+            //             for this ground selects nothing at all.
+            //
+            // THE BORDER BAND IS OUTSIDE THE SPLIT. A nation is reached by
+            // clicking its border under EVERY lens (BL-601) because the band is
+            // always-on chrome rather than any lens's own structure, so the
+            // boundary resolver runs in both branches and outranks both. That is
+            // also why the boundary is asked BEFORE the lens's area: a border is
+            // a thing the player aimed at, a catchment is ground they happen to
+            // be over (the BL-603 ordering, unchanged).
+            const bool lensed = (state.overlay != overlay_mode::none);
+
             // Resolve marker hit zones in priority order (BL-031): building
             // outranks market-centre; both outrank tile. Shared with hover.
+            // Suppressed entirely under a lens by the rule above.
             const entity_id marker_hit =
-                resolve_marker_hit(state.marker_hit_zones, mouse.x, mouse.y);
+                lensed ? null_entity
+                       : resolve_marker_hit(state.marker_hit_zones, mouse.x, mouse.y);
 
             // STRUCTURE-GRAIN selection (BL-601), between the markers and the
-            // tile/province fallback. A marker is a specific thing the player
-            // aimed at and still outranks a boundary; a boundary in turn
-            // outranks the ground it runs across, because inside the corridor
-            // the border IS what the pointer is on.
+            // tile/province fallback. With no lens a marker is a specific thing
+            // the player aimed at and still outranks a boundary; a boundary in
+            // turn outranks the ground it runs across, because inside the
+            // corridor the border IS what the pointer is on.
             //
             // This is the route the retired Country lens used to own - LENSES.md
             // sent a hovered tile under that lens to its owning nation. Ben's
@@ -4094,49 +4358,166 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                             &struct_kind)
                     : null_entity;
 
-            // BL-603, the Corporation lens's half: a hovered/clicked BUILDING
-            // resolves THROUGH to its owning corporation. LENSES.md's routing
-            // table has said exactly this since 2026-06-15 — "beneath the
-            // Corporation lens a hovered building resolves through to its owning
-            // corporation, because the corporation is that lens's unit of
-            // meaning" — and nothing implemented it; a click gave the building.
-            //
-            // It lands here rather than in the area resolver because this lens's
-            // structure IS its marker tiles, so there is no ground to pivot from.
-            entity_id lens_through = null_entity;
-            if (marker_hit != null_entity && state.overlay == overlay_mode::corporation)
-            {
-                if (const auto bit = w.buildings.find(marker_hit); bit != w.buildings.end())
-                {
-                    const auto tc = tile_to_corp.find(bit->second.tile);
-                    if (tc != tile_to_corp.end())
-                        lens_through = tc->second;
-                }
-            }
+            // Set when the click resolved to a NON-ENTITY structure (a deposit or
+            // a plate). Those take their own selection channels, so both the
+            // entity-structure branch and the tile fallback must stand down —
+            // without this the fallback would immediately select the tile under
+            // the pointer and overwrite the region the player just picked.
+            bool non_entity_structure = false;
+
+            // Set when a lens was active and had NOTHING to say about this
+            // ground — BL-664's rule 3. Distinct from `structure_hit ==
+            // null_entity`, which under no lens simply means "fall through to
+            // the tile". Here there is no falling through: the click selects
+            // nothing and the band returns to resting.
+            bool lens_answered_nothing = false;
+
+            // The hand-wired Corporation-lens pivot that used to sit here — a
+            // clicked BUILDING resolving through to its owning corporation — is
+            // GONE, folded into `lens_structure_of_tile`'s own corporation case
+            // (BL-665). It existed only because a marker outranked a structure,
+            // so the lens could not reach its owner from the ground; BL-664
+            // removed that precedence and the area resolver answers on owned
+            // ground whether or not a glyph sits on it. One resolver, not two.
 
             // BL-603: the AREA structure, if the boundary one did not answer. The
             // boundary resolver wins where both do, and that ordering is the whole
             // reason a border is still clickable under a lens: a nation's rule is a
             // thing the player AIMED at, a catchment is the ground they happen to be
             // over. Same branch, same mutual exclusion, one resolver later.
-            if (lens_through != null_entity)
-            {
-                structure_hit = lens_through;
-                struct_kind   = structure_kind::corporation;
-            }
-            else if (structure_hit == null_entity && marker_hit == null_entity)
+            if (lensed && structure_hit == null_entity)
             {
                 entity_id area_id = null_entity;
                 const structure_kind area_kind =
-                    lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &area_id);
-                if (area_kind != structure_kind::none && area_id != null_entity)
+                    lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &area_id,
+                                           plates, gw);
+                // A DEPOSIT AND A PLATE ARE NOT ENTITIES, so they never reach
+                // `structure_hit` — that variable feeds `selected_entity` a few
+                // lines down, and a synthetic key landing there would read as a
+                // real entity to every surface that later resolves it. They are
+                // dispatched here instead, into their own fields (BL-659/BL-660,
+                // Ben's option A), and the entity path is skipped entirely.
+                if (area_kind == structure_kind::deposit || area_kind == structure_kind::plate)
+                {
+                    state.clear_lens_region_selection();
+                    state.clear_battle_selection();
+                    state.selected_entity      = null_entity;
+                    state.selected_province    = 0u;
+                    state.province_sync_entity = null_entity;
+                    state.selection_cycle_tile = null_entity;
+                    non_entity_structure = true;
+
+                    if (area_kind == structure_kind::deposit)
+                    {
+                        // "select a deposit going to the market ledger for this
+                        // item" (Ben, 2026-08-28). The resource is the key, and
+                        // the Market ledger already follows a selected resource,
+                        // so this opens the panel and the existing route aims it.
+                        state.selected_deposit_resource = static_cast<int>(area_id) - 1;
+                        close_all_panels(state);
+                        state.show_market_ledger = true;
+                        // ...ON THE PRICES VIEW (BL-659). Opening the ledger on
+                        // whichever tab was last used answers a different question
+                        // from the one the press asked: a deposit's question is
+                        // "what is this worth", and Prices is the view that says
+                        // so. The view then highlights the pressed resource's own
+                        // sparkline, which is what "aimed at that resource" means
+                        // in a view that lists every traded good.
+                        state.market_ledger_view = 0;
+                    }
+                    else
+                    {
+                        // "click to the relevant history section, describing
+                        // collisions and the opposite" (Ben, 2026-08-28). The
+                        // History ledger is the destination; aiming it AT the
+                        // plate's own collision/rift record is BL-660's second
+                        // half and is not built — see PLACEHOLDER below.
+                        state.selected_plate = static_cast<int>(area_id) - 1;
+
+                        // Cache what the Selection element will say about it, here
+                        // and only here — the band cannot reach the generation
+                        // report, and this pass already holds it (BL-671; the
+                        // field's own comment carries the reasoning).
+                        state.selected_plate_facts = {};
+                        if (plates != nullptr && gw > 0)
+                        {
+                            const int pid = state.selected_plate;
+                            const std::size_t n = plates->plate_id.size();
+                            const bool have_conv = plates->convergent.size() == n;
+                            const bool have_div  = plates->divergent.size() == n;
+                            for (std::size_t k = 0; k < n; ++k)
+                            {
+                                if (plates->plate_id[k] != pid)
+                                    continue;
+                                ++state.selected_plate_facts.tiles;
+                                if (have_conv && plates->convergent[k] != 0u)
+                                    ++state.selected_plate_facts.convergent_tiles;
+                                if (have_div && plates->divergent[k] != 0u)
+                                    ++state.selected_plate_facts.divergent_tiles;
+                            }
+                            if (pid >= 0 && static_cast<std::size_t>(pid) < plates->plates.size())
+                            {
+                                const tectonic_plate& tp =
+                                    plates->plates[static_cast<std::size_t>(pid)];
+                                state.selected_plate_facts.oceanic   = tp.oceanic;
+                                state.selected_plate_facts.drift_col = tp.drift_col;
+                                state.selected_plate_facts.drift_row = tp.drift_row;
+                            }
+                        }
+
+                        close_all_panels(state);
+                        state.show_tile_ledger = true;
+                        // ...ON THE TECTONICS VIEW (BL-660). Opening the History
+                        // ledger on whichever view was last used answers a
+                        // different question from the one the press asked.
+                        state.history_view = history_view_tectonics;
+                    }
+                }
+                else if (area_kind != structure_kind::none && area_id != null_entity)
                 {
                     structure_hit = area_id;
                     struct_kind   = area_kind;
                 }
+                else
+                {
+                    lens_answered_nothing = true;
+                }
             }
 
-            if (structure_hit != null_entity)
+            if (non_entity_structure)
+            {
+                // Already dispatched into its own field above; nothing further.
+            }
+            else if (lens_answered_nothing)
+            {
+                // BL-664 rule 3: the active lens has no answer for this ground, so
+                // the click does nothing to the canvas and the Selection band
+                // CLEARS TO RESTING (Ben, 2026-08-28). It does not fall through to
+                // the tile and it does not fall through to a marker.
+                //
+                // Clearing rather than leaving the previous selection standing is
+                // the ruled half and the one worth stating: a band still showing
+                // the last thing selected asserts something the player did not
+                // just click and cannot connect to the pointer — the failure
+                // NR-697 recorded, arriving here by a different route.
+                state.selected_entity      = null_entity;
+                state.selected_province    = 0u;
+                state.province_sync_entity = null_entity;
+                state.selection_cycle_tile = null_entity;
+                state.clear_battle_selection();
+                state.clear_lens_region_selection();
+                // AND THE OWNER SURFACES GO WITH IT. A ledger whose whole subject
+                // is one named firm cannot outlive the selection that named it:
+                // leaving the Company ledger open on firm X after the player has
+                // cleared the band is the same failure NR-697 recorded, just in
+                // the column instead of the band. The tile build ledger is the
+                // precedent -- app.cpp actively closes it once the selection stops
+                // being a tile, rather than letting it sit there.
+                state.selected_company             = null_entity;
+                state.selected_corporation_dossier = null_entity;
+                state.show_company_ledger          = false;
+            }
+            else if (structure_hit != null_entity)
             {
                 // A structure is an ENTITY selection, so it takes the same
                 // mutual exclusion every marker hit does: the province clears,
@@ -4148,6 +4529,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 state.province_sync_entity = structure_hit;
                 state.selection_cycle_tile = null_entity;
                 state.clear_battle_selection();
+                state.clear_lens_region_selection();
 
                 // "Clicking opens up our market ledger for THAT market" (Ben,
                 // 2026-08-24). The ledger already follows the selection - BL-159
@@ -4161,8 +4543,65 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
                 else if (struct_kind == structure_kind::corporation)
                 {
+                    // BL-666. This used to open the BALANCE ledger, which is the
+                    // PLAYER'S OWN BOOKS — so clicking a rival's ground showed you
+                    // your own accounts (NR-700). Wrong in the way that is hardest
+                    // to catch in a capture: not empty, not broken, just not about
+                    // the thing that was pressed.
+                    //
+                    // The corporations table is the surface that IS about a named
+                    // firm, and it already highlights its row from the dossier
+                    // field, so this aims it rather than inventing a route.
+                    //
+                    // THE FLAG IS `show_corporations_table`, NOT
+                    // `show_corporation_panel`, and the two are named the wrong way
+                    // round: `show_corporation_panel` drives
+                    // `draw_corporation_dashboard` (nav slot 1, THE PLAYER'S OWN
+                    // corporation at a glance), while `show_corporations_table`
+                    // drives `draw_corporation_panel` (nav slot 8, the
+                    // all-corporations table). The first draft of this line took the
+                    // flag whose name matched the function it wanted and reproduced
+                    // NR-700 one surface over — a rival's ground opening the
+                    // player's own dashboard. Read app.cpp:1981-1989 before touching
+                    // either flag.
+                    state.selected_corporation_dossier = structure_hit;
+                    state.selected_company             = null_entity;
                     close_all_panels(state);
-                    state.show_balance_ledger = true;
+                    state.show_corporations_table = true;
+                }
+                else if (struct_kind == structure_kind::company)
+                {
+                    // A DIFFERENT DESTINATION, not the same one with a flag (Ben,
+                    // 2026-08-28: "Different types for either, make a placeholder
+                    // if needed"). A corporation is a rival the player competes
+                    // with; a company is a background firm. Routing both to the
+                    // corporations table would re-merge the distinction the
+                    // 2026-08-28 terminology split just drew.
+                    //
+                    // `selected_company` rather than reading `selected_entity`
+                    // back: the ledger's subject must survive the player selecting
+                    // something else, which a live-selection read would not.
+                    state.selected_company             = structure_hit;
+                    state.selected_corporation_dossier = null_entity;
+                    close_all_panels(state);
+                    // THE COMPANY LENS'S DESTINATION, since BL-675. The
+                    // placeholder this replaces was BL-666's, and it was always
+                    // meant to be replaced: a corporation press asks "how is this
+                    // rival doing", a company press asks "can I buy this". So a
+                    // background firm lands on the Acquisitions ledger.
+                    //
+                    // The firm is carried across as the ledger's FOCUS, never a
+                    // filter. The buyable field is a mean of 81.6 firms on the
+                    // shipped spawn (measured, acquisition_viability § C), and
+                    // filtering it to one would answer a question nobody asked.
+                    // A clicked firm may well not be in the field at all — most
+                    // background firms are `closed` and cannot be priced — so the
+                    // highlight can go unmatched, and the ledger says on its own
+                    // face how many of the world's firms file. An unmatched
+                    // highlight is the honest outcome; inventing a row for an
+                    // unpriceable firm would be worse.
+                    state.acquisitions_focus_corp  = structure_hit;
+                    state.show_acquisitions_ledger = true;
                 }
             }
             else
@@ -4274,6 +4713,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 else
                 {
                     state.clear_battle_selection();
+                state.clear_lens_region_selection();
                 }
             }
             else

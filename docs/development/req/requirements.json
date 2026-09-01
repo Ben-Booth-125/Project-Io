@@ -3996,6 +3996,33 @@
    "promoted_from": "backlog.json BL-634 (ACQUISITION_VIABILITY)",
    "resolved": "2026-08-26",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "one-tier-lens-selection",
+   "title": "BL-664 - a lens collapses selection to one tier",
+   "status": "complete",
+   "resolved": "2026-08-28",
+   "promoted_from": "backlog.json BL-664 (one tier under a lens) - Sprint 23, UI visibility batch 2",
+   "batch": "sprint-23-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "corp-company-tile-groups",
+   "title": "BL-665 - Corporation and Company resolve to an owner's tile group",
+   "status": "complete",
+   "resolved": "2026-08-28",
+   "promoted_from": "backlog.json BL-665 (corp and company tile groups) - Sprint 23, UI visibility batch 2",
+   "batch": "sprint-23-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "owner-ledger-destinations",
+   "title": "BL-666 - a corporation and a company each reach their own destination",
+   "status": "complete",
+   "resolved": "2026-08-28",
+   "promoted_from": "backlog.json BL-666 (owner ledger destinations) - Sprint 23, UI visibility batch 2",
+   "batch": "sprint-23-wave-1",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   }
  ]
 }

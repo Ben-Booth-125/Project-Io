@@ -76,7 +76,7 @@
         "A stated recipe (anything but no_recipe) requires type = processing_facility AND an id the recipe registry resolves (rejected_invalid otherwise, checked before placement — BL-388).",
         "placement_rules::can_place_in_world accepts (type, target) on this tile — ocean, missing deposit, a port off the coast, or a full per-body slot cap (Launchpad: max 1 per body) all refuse (rejected_placement).",
         "The BL-615 stratum gate accepts the SPECIFIC named building's authored placement_gate (POPULATION.md § Strata gate buildings): schooling must stand ON a population-centre tile (needs_centre otherwise), a university on a centre of stratum City (4)+ (centre_too_small below it), and a heavy processor recipe (the steel-mill class: steel, steel_from_iron_nickel, steel_bessemer) within 6 grid steps of some centre (far_from_centre beyond). All three surface as rejected_placement through the seam; the reason codes are distinct at the placement layer.",
-        "The building type is UNLOCKED for the acting corporation (BL-344), AND, if a recipe is stated, that RECIPE is separately unlocked (BL-588). Two independent tech locks, shown two different ways. One building type is gated: military_base requires E0-ML-01 \"Standing Garrison Doctrine\" (2 extraction sites + Cr 2,000 balance) -- a locked STRUCTURE still appears as a row, showing \"Locked - the technology that permits this has not been researched\" in place of the Build button. Recipe-level gates (BL-588/BL-589) work differently: refined_copper requires E0-EC-03 (1 processing facility + Cr 400), the Toolmaker requires E0-EC-01 (1 processing facility + Cr 500), the Bessemer Converter requires E1-EC-01 (holding machinery in stockpile) -- a tech-locked RECIPE is filtered OUT of the ledger entirely (BL-593, 2026-08-24, Ben's ruling: \"the door not showing what the gate would refuse\", the same treatment era_locked and depth_locked already had), so it never appears as a row at all, locked or otherwise. Either way construct_building refuses with tech_locked, which the corp-command seam reports as rejected_tech_locked -- an agent driving construct_building/corp_command directly (rather than reading rows off the ledger) sees the SAME refusal code for both, since the door's filtering is a UI convenience, not a second gate.",
+        "The building type is UNLOCKED for the acting corporation (BL-344), AND, if a recipe is stated, that RECIPE is separately unlocked (BL-588). Two independent tech locks, shown two different ways. One building type is gated: military_base requires E0-ML-01 \"Standing Garrison Doctrine\" (2 extraction sites + Cr 2,000 balance) -- a locked STRUCTURE still appears as a row, showing \"Locked - the technology that permits this has not been researched\" in place of the Build button. Recipe-level gates (BL-588/BL-589) work differently: refined_copper requires E0-EC-03 (1 processing facility + Cr 400), the Toolmaker requires E0-EC-01 (1 processing facility + Cr 500), the Bessemer Converter requires E1-EC-01 (holding machinery in stockpile) -- a tech-locked RECIPE is filtered OUT of the ledger entirely (BL-593, 2026-08-24, Ben's ruling: \"the door not showing what the gate would refuse\", the same treatment era_locked already had), so it never appears as a row at all, locked or otherwise. Either way construct_building refuses with tech_locked, which the corp-command seam reports as rejected_tech_locked -- an agent driving construct_building/corp_command directly (rather than reading rows off the ledger) sees the SAME refusal code for both, since the door's filtering is a UI convenience, not a second gate.",
         "The corporation's balance covers the full capex: registry build_cost plus the material costs priced at the tile's local market (rejected_funds). The UI shows this one credit total and disables Build with 'Can't afford' when short."
       ],
       "expected_output": "The press enqueues a construction request; the app's mutable pass executes construct_building the same frame. On success a building entity exists immediately — staffed at 50% workforce (0 for a port), a processing facility seeded with the pressed row's recipe — and the capex is debited up front. Construction is then DURATIVE and material-gated: each economy tick (one quarter) it advances at a rate in [0,1] set by how much of its per-tick material need the local market can supply; scarce materials stretch the ETA and total shortage shows 'Paused - market can't supply materials'. Management controls unlock only when construction completes. A rejected attempt mutates nothing; the reason string appears at the top of the ledger (construction.last_message), and invalid rows already show reason-coded text in place of the Build button ('Cannot build on water', 'A port must sit on the coast', ...).\n\nNOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT scripts/world_gen.lua, so only 16 of 37 resources carry a market price and coal is not among them. Since steel's recipe needs coal, a processing facility built through the seam has never produced a unit in any recorded session. Extraction works; processing does not, and the cause is configuration rather than the verb.",
@@ -197,8 +197,8 @@
     {
       "id": "gameplay.place_sell_order",
       "family": "gameplay",
-      "surface": "The 'Sell Orders' tab of the Market Ledger (opened from the nav rail; the tab is scoped to the ledger's selected market body). Since BL-293 the press is not the only route: place_sell_order is a corp_verb, so an agent issues it directly against the corp-command seam and a rival corp's scorer issues it too.",
-      "press": "Open the Market Ledger, switch to the Sell Orders tab, pick a resource in the combo (only resources the market prices are listed), type a Quantity/qtr and a Floor price, click 'Add sell order'. The button is disabled with no resource chosen or quantity <= 0. The button does not mutate anything itself — it queues a corp_command that the frame's end applies through apply_corp_command, which is the same call an agent makes.",
+      "surface": "The 'Trades' tab of the Market Ledger, under the 'Place a trade' fold in its 'My trades' section (opened from the nav rail; the tab is scoped to the ledger's selected market body). The tab was called 'Sell Orders' until it widened to hold four reads. Since BL-293 the press is not the only route: place_sell_order is a corp_verb, so an agent issues it directly against the corp-command seam and a rival corp's scorer issues it too.",
+      "press": "Open the Market Ledger, switch to the Trades tab, expand 'Place a trade', pick a good in the combo (only goods the market prices are listed), type a Qty/qtr and a Floor, click 'Place sell trade'. The button is disabled with no good chosen or quantity <= 0. The button does not mutate anything itself — it queues a corp_command that the frame's end applies through apply_corp_command, which is the same call an agent makes.",
       "args": [
         {
           "name": "body",
@@ -235,8 +235,8 @@
     {
       "id": "gameplay.remove_sell_order",
       "family": "gameplay",
-      "surface": "The 'Remove' button beside each listed order on the Market Ledger's Sell Orders tab; also a corp_verb, issuable directly.",
-      "press": "Open the Market Ledger, switch to the Sell Orders tab; each of the player's standing orders on the selected body renders as a row ('<resource> x<qty> >= <floor>') with a small 'Remove' button. Click Remove on the target row. Immediate — no confirmation. The row queues a corp_command naming the order's id.",
+      "surface": "The 'x' button at the end of each row in the 'My trades' section of the Market Ledger's Trades tab; also a corp_verb, issuable directly. The tab was called 'Sell Orders' and the button 'Remove' until the tab widened to hold four reads.",
+      "press": "Open the Market Ledger, switch to the Trades tab; each of the player's standing orders on the selected body is a row of the 'My trades' table (good, quantity, and the limit as '>= floor' for a sell or '<= ceiling' for a buy) ending in a small 'x'. Click the 'x' on the target row. Immediate — no confirmation. The row queues a corp_command naming the order's id. A BUY row shows a disabled '-' instead: no verb removes a buy order, so a press that could not succeed is not drawn.",
       "args": [
         {
           "name": "order",
@@ -312,8 +312,8 @@
     {
       "id": "gameplay.set_recipe",
       "family": "gameplay",
-      "surface": "The Method comparison section on the Selection panel's building Facts column (BL-431, `draw_production_method_section` — Compare toggle, each alternate's basket/wage/rate plus a Switch button); the same seam also drives the 'Production Methods' combo in the Building panel's Buildings-tab inline detail.",
-      "press": "Select the owned building, press Compare, then Switch on the desired alternate row (Selection panel); or open the production-method combo and click a recipe row (Buildings-tab detail — each row carries a resource pip for its primary output).",
+      "surface": "The Method grid in the Construction ledger's Buildings view (`draw_production_method_section`): one row per era-allowed recipe in the building's own group, each with its expected profit and a Switch glyph.",
+      "press": "Open the Construction ledger (nav rail slot 3, or the building card's 'Open in ledger' button), expand the building's type group, press the building, then press Switch on the desired method row. Selecting the building on the MAP drives the same levers - the two selectors compose.",
       "args": [
         {
           "name": "building",
@@ -329,9 +329,9 @@
       "preconditions": [
         "The acting corporation exists (rejected_no_corp otherwise).",
         "The corporation owns the building (rejected_not_owner otherwise).",
-        "The recipe is valid for the building's type (rejected_invalid otherwise).",
-        "Construction is complete — the UI hides all controls while ticks_remaining > 0.",
-        "The building produces output (infrastructure has no recipe section at all)."
+        "The recipe is valid for the building's type, and in the ACTIVE recipe's own group - a cross-group retool is refused outright, so it is never offered (rejected_invalid otherwise).",
+        "Construction is complete - the ledger draws 'Under construction.' instead of the levers while ticks_remaining > 0.",
+        "The building is a processing facility (nothing else has a method to choose; the section draws nothing for other types)."
       ],
       "expected_output": "On success, an immediate component write gated by economy.recipe_switch (BL-430): a one-off credit cost debited from the corp and a cooldown before the SAME building may switch again through this seam (both configurable, default free/instant). From the next economy tick the building consumes the new recipe's inputs and produces its outputs; its profit readout, its input demand on the local market, and what it contributes to the pool all change with it. Re-selecting the recipe already active, switching on cooldown, or switching without enough credit all reject (rejected_state / on_cooldown / insufficient_funds at the command seam) and change nothing.",
       "reason_to_select": "The first lever on a processor's profitability, free of capex: per-recipe margins genuinely diverge with local prices (steel can lose money on a tile where food rations clear well), so switching chases the better-clearing output with the plant already paid for. Every new processor defaults to the steel recipe, so this is typically the first press after building one."
@@ -339,8 +339,8 @@
     {
       "id": "gameplay.set_workforce",
       "family": "gameplay",
-      "surface": "The workforce slider on the Selection band's building layout (0–200% of nominal); the Building panel's inline detail offers a coarser 0/20/40/60/80/100 tier button grid instead.",
-      "press": "Band: select the owned building, untick 'Auto' (the slider is disabled while Auto holds the dial), drag the slider. Panel: click a tier button directly — this pins even while Auto is active.",
+      "surface": "The workforce slider in the Construction ledger's Buildings view (`draw_building_workforce_page`), below a placeholder trend graph. The slider reaches 0-100%; the command seam reaches 200.",
+      "press": "Open the Construction ledger (nav rail slot 3, or the building card's 'Open in ledger' button), expand the building's type group, press the building, then drag the slider. Selecting the building on the MAP drives the same lever. 'Auto' lives on the building card's action grid, and a manual drag here is what clears it.",
       "args": [
         {
           "name": "building",
@@ -357,7 +357,8 @@
         "The acting corporation exists (rejected_no_corp otherwise).",
         "The corporation owns the building (rejected_not_owner otherwise).",
         "The value is inside [0, 200] (rejected_invalid otherwise).",
-        "The building is not ALREADY at that target AND already pinned (rejected_state otherwise). Setting the value the auto-solver happens to be holding is NOT a no-op — it takes control away from the solver, which is a real change."
+        "Construction is complete - the ledger draws 'Under construction.' instead of the levers while ticks_remaining > 0.",
+        "The building is not ALREADY at that target AND already pinned (rejected_state otherwise). Setting the value the auto-solver happens to be holding is NOT a no-op - it takes control away from the solver, which is a real change."
       ],
       "expected_output": "workforce_target is set AND workforce_auto is cleared — a manual move pins the dial, so the per-tick profit-max auto-solver stops adjusting this building until Auto is re-enabled. This IS the workforce-auto opt-out. Actual staffing is the target mediated by body-level labour contention: when the corp's demand on the body exceeds the habitability-sized pool, every building is throttled by the same fraction and the band prints 'Body allows N%'. Wages scale with assigned workforce; output scales with effective workforce. Since BL-293 the command seam clears workforce_auto exactly as the press does — before that it set the target and left the flag, so an agent's target was silently re-solved on the next tick. Setting a value already held on an already-pinned dial is a no-op (rejected_state).",
       "reason_to_select": "Trades wage bill against output when the solver's profit-max answer is not what is wanted — throttle to cut losses without idling, staff to 0 to park a building cheaply, or overdrive past 100% to feed a downstream chain even at a per-building loss. Also the deliberate press for taking manual control away from the auto-solver."
@@ -561,9 +562,10 @@
       "preconditions": [
         "The app is in-game with the Planetary surface primary.",
         "The pointer rests over an entity; moving off it before ~0.5 s means no card appears.",
-        "No hover card is already up, and construction placement mode is not active (the placement ghost owns that moment)."
+        "No hover card is already up, and construction placement mode is not active (the placement ghost owns that moment).",
+        "If a lens is active, it resolves a structure for the ground under the pointer — a lens with no answer there raises no card (BL-664)."
       ],
-      "expected_output": "Glance phase: after ~0.5 s a small chrome-free card appears above the cursor and tracks it like a tooltip; leaving the entity dismisses it. Stick phase: after ~2.5 s total the card freezes in place and is dismissed only when the cursor leaves the card's rect plus a 26 px pad, so long lines can be read to the end. Content is keyed on the active lens (e.g. terrain header + habitability by default; deposit richness under Resource; price signal on a market centre under Market; rival buildings show type + owner only). The card never captures the pointer, never opens the Selection band (clicking is the only opener), and changes no selection or view state.",
+      "expected_output": "Glance phase: after ~0.5 s a small chrome-free card appears above the cursor and tracks it like a tooltip; leaving the entity dismisses it. Stick phase: after ~2.5 s total the card freezes in place and is dismissed only when the cursor leaves the card's rect plus a 26 px pad, so long lines can be read to the end. Content is keyed on the active lens (e.g. terrain header + habitability by default; deposit richness under Resource; price signal on a market centre under Market; rival buildings show type + owner only). The card never captures the pointer, never opens the Selection band (clicking is the only opener), and changes no selection or view state. UNDER A LENS (BL-664, Ben 2026-08-28) the card is gated by the same one-tier rule the click obeys: a marker takes no part, the card's subject is the ground, and where the active lens has NO structure for that ground NO CARD APPEARS AT ALL. Population, Industry and Throughput have no structure grain, so the card is absent across the whole body while one of them is active. Note the card's content still describes the TILE rather than the structure the click would select — draw_hover_content has no branch for a corporation, company, catchment or plate (NR-701).",
       "reason_to_select": "Read a thing before committing a click — check a tile's landform and movement cost, a deposit's richness, or a price signal, and learn the glyph vocabulary at the point of looking."
     },
     {
@@ -713,12 +715,12 @@
       "id": "canvas.select",
       "family": "canvas",
       "surface": "The primary canvas (Solar, Circumplanetary, or Planetary rung — whichever fills the window).",
-      "press": "Single left-click on an entity: a body on the Solar/Circumplanetary rungs, a PROVINCE or marker on the Planetary surface (BL-511, 2026-08-21 — a plain click on the Planetary ground now selects the province, not the bare tile). A LIVE BATTLE OUTRANKS ALL OF THEM (BL-469, 2026-08-21): if a fight stands in the clicked province, the click selects the battle.",
+      "press": "Single left-click on an entity: a body on the Solar/Circumplanetary rungs, a TILE or marker on the Planetary surface. A LIVE BATTLE OUTRANKS ALL OF THEM (BL-469): if a fight stands in the clicked tile's province, the click selects the battle. UNDER A LENS THIS ALL CHANGES (BL-664, Ben 2026-08-28). A lens collapses selection to ONE TIER: the press resolves to the active lens's structure or to NOTHING, markers take no part ('markers do not outrank lenses'), and there is no repeat-click cycle. Corporation resolves the owner's tile group on this body, Company the same for a background firm, Resource the deposit, Market and Scarcity the catchment, Continent the plate. Population, Industry and Throughput draw a value field with no structure grain and are INERT — a press does nothing and clears the Selection band to resting, as does a press on any ground the active lens has no answer for (unowned ground under Corporation, a tile without the selected resource under Resource). The national border band is outside the rule and stays clickable under every lens (canvas.border_band_select). Everything above this sentence describes the canvas with NO lens active.",
       "args": [
         {
           "name": "target",
           "type": "entity",
-          "meaning": "The entity under the cursor. Overlapping candidates resolve to one entity: the stack UNIT > building > market > PROVINCE > body is walked most-specific first (BL-575, 2026-08-23, put the unit marker ahead of the building marker — a unit standing on a built tile must be reachable on the FIRST click, matching the repeat-click cycle's own precedence below, not only after cycling past the building), the active lens filters validity, and nearest-to-cursor (entity id breaking ties) picks a single stable winner. On the Planetary rung the ground itself resolves to the province containing the hovered tile (BL-511): the tile is still the data grain and the Selection card lists the province member tiles, their terrain and their summed deposits, but it is no longer what a plain click addresses. A unit marker (BL-575) is drawn once per (province, owner) GROUP at the province's anchor tile — the group's lowest-id unit is what a click on it resolves to; the Selection card is the same unit card either way."
+          "meaning": "The entity under the cursor. WITH NO LENS ACTIVE, overlapping candidates resolve to one entity: the stack UNIT > building > market > TILE > body is walked most-specific first (BL-575 put the unit marker ahead of the building marker — a unit standing on a built tile must be reachable on the FIRST click), and nearest-to-cursor (entity id breaking ties) picks a single stable winner. The ground itself resolves to the TILE, which carries its province as a set of sections in the Selection element (BL-598 dissolved the separate province rung: a rung of its own selected the same ground twice). A unit marker is drawn once per (province, owner) GROUP at the province's anchor tile — the group's lowest-id unit is what a click on it resolves to. UNDER A LENS none of this stack applies; see the press field."
         }
       ],
       "preconditions": [
@@ -726,7 +728,7 @@
         "The pointer is over the primary canvas, not over the minimap inset or any ImGui panel (panels capture the mouse).",
         "An entity is under the cursor (empty space is a different press — see canvas.deselect)."
       ],
-      "expected_output": "selected_entity becomes the target and the Selection band (fixed strip at the bottom of the screen) appears or re-points, showing that kind's action and facts; a new selection resets any drill-down stack in the band. Nothing else changes: same rung, same pan, same zoom, active_body untouched, no lens change, the canvas is not re-skinned, and any open fold-out ledger stays open. A single click never navigates. PROVINCE GRAIN (BL-511, 2026-08-21): selecting Planetary ground shows the PROVINCE in the same Selection element every other kind uses (refolded 2026-08-21 on Ben's ruling that there should not be a second selection element) — header, then the shared three-column band: the province rendered over its mixture bar (the blend legend) on the left, a Tiles / Deposits / Buildings pager in the centre (member tiles with terrain, deposits summed across the province, the buildings standing in it), a Go to action grid on the right. The canvas outlines the province OUTER boundary. BATTLE GRAIN (BL-469, 2026-08-21): when a live battle stands in the clicked province the Selection element shows the BATTLE instead — the phase word, per-unit strength bars for both sides, and the withdrawal price with its base / per-round / pursuit terms separated, plus the 'Break off' press (see gameplay.withdraw_from_battle). Which battle, when several stand in one province: the acting corp's own first, then sorted (province, attacker, defender) order. REPEAT-CLICK CYCLE (Ben, 2026-08-21; widened to five rungs by BL-469): clicking the same spot again walks BATTLE > UNIT > PROVINCE > BUILDING > TILE, skipping any rung with nothing on it. The hit-test itself is unchanged and still resolves most-specific-first, so the FIRST click on a building selects the building, not its province.",
+      "expected_output": "selected_entity becomes the target and the Selection band (fixed strip at the bottom of the screen) appears or re-points, showing that kind's action and facts; a new selection resets any drill-down stack in the band. Nothing else changes: same rung, same pan, same zoom, active_body untouched, no lens change, the canvas is not re-skinned. A single click never navigates. BATTLE GRAIN (BL-469): when a live battle stands in the clicked tile's province the Selection element shows the BATTLE instead — the phase word, per-unit strength bars for both sides, and the withdrawal price with its base / per-round / pursuit terms separated, plus the 'Break off' press (see gameplay.withdraw_from_battle). Which battle, when several stand in one province: the acting corp's own first, then sorted (province, attacker, defender) order. REPEAT-CLICK CYCLE, NO LENS ONLY (Ben 2026-08-21; cut to FOUR rungs by BL-598 and confined to the plain canvas by BL-664): clicking the same spot again walks BATTLE > UNIT > BUILDING > TILE, skipping any rung with nothing on it. The hit-test itself is unchanged and still resolves most-specific-first, so the FIRST click on a building selects the building. On bare ground with no unit, no building and no battle exactly one rung is live, so a repeat click re-selects the same tile. UNDER A LENS a repeat press re-resolves to the same structure — one tier, and it does not move. A LENS PRESS MAY ALSO OPEN A LEDGER, because the lens that resolves the structure also routes it: Corporation opens the corporations table aimed at that firm, Company the Company ledger, Resource and Market and Scarcity the Market ledger, Continent the History ledger.",
       "reason_to_select": "Inspect a thing and surface its one primary move — Dispatch Survey on an unsurveyed body, Manage on your building, the construct/manage grid on a tile — without losing your current framing."
     },
     {
@@ -878,8 +880,21 @@
         "Needs the active body's generation-report plate record (matched by body name); a body with no record gets an honest 'no plate record' key instead of a tint.",
         "Re-clicking while active clears the lens (see lens.clear)."
       ],
-      "expected_output": "Each tectonic plate tints a categorical colour from a dedicated ten-colour earthy table at 0.80 opacity (deliberately not the nation wheel — plates are substrate, not identity). Boundary tiles — any neighbour on another plate — get a separate white lift at 0.45, so plate seams read pale. The key explains that pale tiles are boundaries and reports the plate count; a stagnant-lid body says 'one immobile plate' rather than drawing a meaningless single tint. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.",
+      "expected_output": "Each tectonic plate tints a categorical colour from a dedicated ten-colour earthy table at 0.80 opacity (deliberately not the nation wheel — plates are substrate, not identity). Boundary tiles — any neighbour on another plate — get a separate white lift at 0.45, so plate seams read pale. The key explains that pale tiles are boundaries and reports the plate count; a stagnant-lid body says 'one immobile plate' rather than drawing a meaningless single tint. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. HOVER AND SELECTION (BL-660, 2026-08-28): hovering lights the whole tectonic PLATE under the pointer, and clicking selects it and opens the History Ledger. Like the deposit, a plate is not an entity — it travels in ui_state::selected_plate. The History ledger's dedicated tectonic section, describing that plate's convergent (collision) and divergent (rift) boundaries, is BL-660's second half and is NOT yet built: the click currently opens the ledger without aiming it. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.",
       "reason_to_select": "Why is the land shaped like that? Shows the plates that drifted the terrain into place, and above all where they meet — the seams the mountain ranges, rifts, and boundary-formed deposits came from. Honestly informational/orientational: it explains the map rather than driving an economic decision."
+    },
+    {
+      "id": "lens.company",
+      "family": "lens",
+      "surface": "Keyboard lens cycle only — no lens-bar slot yet (it has no distinct glyph; see BL-663).",
+      "press": "Cycle the lens with the lens-cycle key until Company is active.",
+      "args": [],
+      "preconditions": [
+        "The app is in-game on a body surface; like every lens it only re-skins the Planetary canvas.",
+        "If Company is already the active lens, cycling past it clears it (see lens.clear)."
+      ],
+      "expected_output": "On the Planetary canvas, every tile holding a BACKGROUND FIRM's building tints to that firm's identity colour, and each background firm's seat draws an HQ marker. The mirror of lens.corporation, drawn identically and admitting the opposite population: a corporation is the player and its rivals, a company is a background firm (GLOSSARY.md, Ben 2026-08-28). The two lenses are disjoint — no firm appears under both. Measured on the home body at generation: 373 background-firm buildings across 80 companies, against 33 rival buildings across 7 corporations, so this lens is much the busier of the pair. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.",
+      "reason_to_select": "See the commercial population the Corporation lens deliberately excludes — who is operating here besides your actual rivals."
     },
     {
       "id": "lens.corporation",
@@ -892,7 +907,7 @@
         "The lens only re-skins the Planetary canvas; selecting it while on Solar or Circumplanetary changes nothing visible until the player descends to a body surface.",
         "If Corporation is already the active lens, this same press clears it instead (see lens.clear)."
       ],
-      "expected_output": "On the Planetary canvas, every tile holding a corporate building tints to its owning corporation's identity colour (the literal building tile only — no influence radius). The player's tiles additionally get a thin white border. Each rival corporation's HQ-projected reach ring and HQ star draw on that corp's home body in its identity colour. Tiles with no corporate building keep their plain terrain colour — there is no nation underlay. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. No on-canvas colour key yet (glyph highlight + tooltip only). Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.",
+      "expected_output": "On the Planetary canvas, every tile holding a corporate building tints to its owning corporation's identity colour (the literal building tile only — no influence radius). The player's tiles additionally get a thin white border. Each rival corporation's HQ-projected reach ring and HQ star draw on that corp's home body in its identity colour. Tiles with no corporate building keep their plain terrain colour — there is no nation underlay. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. No on-canvas colour key yet (glyph highlight + tooltip only). Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. NARROWED 2026-08-28: only CORPORATIONS tint and only rival corporations draw HQ markers — background firms are excluded and have their own lens (lens.company). National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.",
       "reason_to_select": "Who owns what: where do rival corporations operate, how does my footprint sit against theirs, and where do their HQ reach rings suggest they will grow? Use it to find uncontested ground to expand into or to size up a rival's holdings before competing."
     },
     {
@@ -925,7 +940,7 @@
         "Planetary-only. The field is read from the economy report, so at least one economy tick must have run before the tint has anything to show.",
         "Cleared by cycling off it or the clear hotkey, not by a bar re-click."
       ],
-      "expected_output": "A sequential dark-to-amber tint over the tiles carrying buildings owned by BACKGROUND corporations (corporation_component.is_background). Per tile the value is the sum over those buildings of (0.5 + 0.5 x output share), where output share is that building's output this tick normalised to the largest background output on the body — so an idle or under-construction background plant still reads, a high-output one reads brightest, and two buildings on one tile stack. Normalised to the body maximum. Tiles with no background building keep plain terrain. Low-to-high amber gradient key titled 'Background industry'. Pure rendering — it changes nothing in the market arithmetic. Pointer clicks fall through to the tile (Tile Ledger); there is no dedicated ledger route. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.",
+      "expected_output": "A sequential dark-to-amber tint over the tiles carrying buildings owned by BACKGROUND corporations (corporation_component.is_background). Per tile the value is the sum over those buildings of (0.5 + 0.5 x output share), where output share is that building's output this tick normalised to the largest background output on the body — so an idle or under-construction background plant still reads, a high-output one reads brightest, and two buildings on one tile stack. Normalised to the body maximum. Tiles with no background building keep plain terrain. Low-to-high amber gradient key titled 'Background industry'. Pure rendering — it changes nothing in the market arithmetic. Pointer clicks fall through to the tile (Tile Ledger); there is no dedicated ledger route. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.",
       "reason_to_select": "Select to answer 'where is the industry I did not build?' — the distribution of rival background firms' plant across this body, before choosing where to place your own or which market to lean on. Re-pointed by BL-373 (2026-08-12) at real background-corporation buildings; it no longer tints the vestigial tile.substrate_density generation ripple, so the tint is now a reading of where background industry IS rather than where it plausibly would be. Distinct from Production, which ranks output intensity INCLUDING your own holdings — use Production to see how hard the body is running, this to see whose plant is already there. It does NOT drive market supply or demand; background firms move the market through their ordinary buildings, which this lens merely locates."
     },
     {
@@ -959,7 +974,7 @@
         "Prices must have resolved (the economy has ticked) for the strip to show meaningful numbers.",
         "Re-clicking while active clears the lens (see lens.clear)."
       ],
-      "expected_output": "Planetary: a catchment tint — one colour per market, so market boundaries read as colour boundaries — with a city-name swatch key and the shared good selector in the legend. Circumplanetary: a compact per-body price strip (good → price list, the selected good highlighted). Terrain shows through the tint. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.",
+      "expected_output": "Planetary: a catchment tint — one colour per market, so market boundaries read as colour boundaries — with a city-name swatch key and the shared good selector in the legend. Circumplanetary: a compact per-body price strip (good → price list, the selected good highlighted). Terrain shows through the tint. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.",
       "reason_to_select": "Which market does a tile clear against, and where do market boundaries fall? Decide which catchment to build in (your output sells to the nearest centre) and read per-body prices on the Circumplanetary rung to pick where a good is dear enough to sell."
     },
     {
@@ -972,7 +987,7 @@
         "Always pressable; Planetary-only. No selector — a whole-body surface with no per-good pick.",
         "Re-clicking while active clears the lens (see lens.clear)."
       ],
-      "expected_output": "Every buildable tile gets a small per-tile red-to-green value mark keyed by workforce efficiency — the same habitability-to-labour curve the economy applies (full 1.0x efficiency at habitability >= 0.6, ramping down to 0.5x at habitability 0). Tiles keep their terrain hue; the marks carry the signal. A gradient key labelled 'Workforce efficiency' labels the bar's ends 'low' and 'high' (the underlying curve spans 0.5x to 1.0x, but the key does not print the numbers). Note: this is the labour consequence, not raw habitability, and not population density (that lives on the population-centre markers). Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.",
+      "expected_output": "Every buildable tile gets a small per-tile red-to-green value mark keyed by workforce efficiency — the same habitability-to-labour curve the economy applies (full 1.0x efficiency at habitability >= 0.6, ramping down to 0.5x at habitability 0). Tiles keep their terrain hue; the marks carry the signal. A gradient key labelled 'Workforce efficiency' labels the bar's ends 'low' and 'high' (the underlying curve spans 0.5x to 1.0x, but the key does not print the numbers). Note: this is the labour consequence, not raw habitability, and not population density (that lives on the population-centre markers). Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.",
       "reason_to_select": "Where does labour run at full efficiency? Site buildings where the marks read green (habitability >= 0.6 = full workforce), because the same wages buy less output on the red end. The siting complement to Resource's material read."
     },
     {
@@ -987,7 +1002,7 @@
         "Shows the player's own trade routes only (competitor-visibility rule — rival lanes stay private).",
         "Cleared by cycling off it or the clear hotkey."
       ],
-      "expected_output": "No tile re-skin. A connection-list key headed 'Reach (your trade network)' opens upward out of the minimap's header at top right (the lens chrome region), collapsed by default: one row per body the active body is routed to, name plus a recency dot — fresh routes green, gone-cold routes grey (the activity-fog colour convention). An unrouted body honestly reads 'no routes from this body'. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.",
+      "expected_output": "No tile re-skin. A connection-list key headed 'Reach (your trade network)' opens upward out of the minimap's header at top right (the lens chrome region), collapsed by default: one row per body the active body is routed to, name plus a recency dot — fresh routes green, gone-cold routes grey (the activity-fog colour convention). An unrouted body honestly reads 'no routes from this body'. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.",
       "reason_to_select": "Which bodies does my commercial network actually touch from here, and which links have gone cold? The health check on your persistent trade network — a greying link is a market going stale in your activity fog."
     },
     {
@@ -1006,7 +1021,7 @@
         "Always pressable; Planetary-only. No simulation dependency — deposit data exists from tile generation, so it works from turn one.",
         "Re-clicking while active clears the lens (see lens.clear)."
       ],
-      "expected_output": "Every tile carrying any deposit of the selected good (deposit > 0) fills flat and uniform with that resource's identity colour at fixed 0.8 opacity — the shape of the contiguous deposit, not a magnitude gradient. Tiles without the good keep their terrain hue. The key — in the lens chrome region, the minimap's header at top right — shows the selected resource's swatch + name, the note 'filled = deposit present', and hosts the shared good selector. Deposit magnitude lives in tile detail, not this surface. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.",
+      "expected_output": "Every tile carrying any deposit of the selected good (deposit > 0) fills flat and uniform with that resource's identity colour at fixed 0.8 opacity — the shape of the contiguous deposit, not a magnitude gradient. Tiles without the good keep their terrain hue. The key — in the lens chrome region, the minimap's header at top right — shows the selected resource's swatch + name, the note 'filled = deposit present', and hosts the shared good selector. Deposit magnitude lives in tile detail, not this surface. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. HOVER AND SELECTION (BL-659, 2026-08-28): hovering any tile carrying the selected resource lights the whole DEPOSIT — every tile carrying it on this body, which is exactly what the lens fills, since the selection grain follows the drawing grain. Clicking selects the deposit and opens the Market Ledger on its Prices view, aimed at that resource. The deposit is not an entity: it travels in ui_state::selected_deposit_resource, not selected_entity. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.",
       "reason_to_select": "Where can a chosen good be extracted? The pre-economy siting lens: find the deposit blobs of iron, copper, etc. before placing extraction. Answers 'where is the iron' by shape; how rich each tile is comes from clicking it."
     },
     {
@@ -1026,7 +1041,7 @@
         "Planetary-only. The economy must have ticked so market supply/demand arrays are populated.",
         "Cleared by cycling off it or pressing the clear hotkey (controls family), not by a bar re-click."
       ],
-      "expected_output": "A market-level field, not per-tile: every tile in a market's catchment reads as one solid block, composited toward a hot red hue at opacity proportional to that market's supply shortfall of the selected good (max(0, demand - supply), normalised to the body's worst market). A met market keeps plain terrain; a short one reads hot. With one market per body the whole body is a single block — honest to the market structure. Abundant-to-scarce key plus the selected resource's swatch and the shared selector. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.",
+      "expected_output": "A market-level field, not per-tile: every tile in a market's catchment reads as one solid block, composited toward a hot red hue at opacity proportional to that market's supply shortfall of the selected good (max(0, demand - supply), normalised to the body's worst market). A met market keeps plain terrain; a short one reads hot. With one market per body the whole body is a single block — honest to the market structure. Abundant-to-scarce key plus the selected resource's swatch and the shared selector. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. BEING RE-MADE (BL-662, Ben 2026-08-28): the lens keeps the name Scarcity, is re-cut to tint MARKETS, takes the retired Opportunity lens's glyph, and will route to a new Market-ledger sub-view. Not yet built — today it still draws per-market shortfall blocks. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.",
       "reason_to_select": "Where did demand outrun supply for a chosen good last tick? The inverse of the Resource lens — gaps, not concentrations. Pick a good you can produce and find the hot markets: that is where to sell into or build supply for."
     },
     {
@@ -1041,7 +1056,7 @@
         "Shows player convoys only; nothing renders if no player convoy is in transit.",
         "Cleared by cycling off it or the clear hotkey."
       ],
-      "expected_output": "Solar: a route line per player convoy currently in transit between bodies. Circumplanetary: a convoy-count badge beside each body's label. Planetary: a convoy glyph on the active body's tiles while a player convoy touches them. Lines and badges use a single neutral logistics hue — flow, not ownership. Tiles are not re-tinted; supply annotates, it does not re-skin terrain. The throughput scale-key is still owed. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.",
+      "expected_output": "Solar: a route line per player convoy currently in transit between bodies. Circumplanetary: a convoy-count badge beside each body's label. Planetary: a convoy glyph on the active body's tiles while a player convoy touches them. Lines and badges use a single neutral logistics hue — flow, not ownership. Tiles are not re-tinted; supply annotates, it does not re-skin terrain. The throughput scale-key is still owed. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.",
       "reason_to_select": "Where are my goods moving right now? Verify dispatched convoys are actually in flight and see the live shape of your logistics — the in-motion read; the standing lanes they carve belong to the Supply-routes lens."
     },
     {
@@ -1055,7 +1070,7 @@
         "Off the bar: reachable only via the keyboard lens cycle. (A 2026-07-31 doc note claimed the cycle could not reach this lens; that was stale — canvas_command.cpp anchors overlay_mode_count to supply_routes+1 with a static_assert, so the cycle covers all 14 modes.)",
         "Planetary key only (the specified Solar aggregated-graph render is owed); player routes only."
       ],
-      "expected_output": "No tile re-skin. A lane-list key: one row per standing trade lane touching the active body (one entry per body pair), with a log-scaled thickness bar from that lane's cumulative convoy count (a single completion reads as a thin sliver; heavy repeat traffic saturates rather than growing linearly) and the same recency-tier colouring as Reach. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.",
+      "expected_output": "No tile re-skin. A lane-list key: one row per standing trade lane touching the active body (one entry per body pair), with a log-scaled thickness bar from that lane's cumulative convoy count (a single completion reads as a thin sliver; heavy repeat traffic saturates rather than growing linearly) and the same recency-tier colouring as Reach. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.",
       "reason_to_select": "Which standing lanes carry my economy, and how heavily? The aggregate counterpart to Supply's in-flight convoys: the carved trade lanes and their traffic weight, for judging which routes are load-bearing and which are vestigial."
     },
     {
@@ -1071,8 +1086,81 @@
         "Reads the authored economy.military.active_lp_per_anchor_tick; an authored rate of zero yields no anchor rings.",
         "Cleared by cycling off it or the clear hotkey, not by a bar re-click."
       ],
-      "expected_output": "Two layers over the Planetary surface. FIELD: every tile is composited 0.72 toward a deep-navy-to-cyan ramp over its weighted reach cost to the nearest supply anchor — cyan at an anchor, navy on the ground furthest from one, the cold end for anything unreachable. The cost ratio is square-root compressed before the ramp because the distribution is heavily left-skewed (measured on the home body: median 20.8 against a maximum 101.8 over 57 anchors), so a linear ramp would read as one flat wash. ANCHORS: every supply anchor tile carries a RING (not a filled mark — the tile already carries a settlement or building marker drawn over it), its thickness carrying that anchor's active Logistic Points as a share of the body's largest pool, in a hotter near-white cyan over a dark backing. KEY: a fixed-height gradient key flush-left of the minimap, drawn on ImGui's FOREGROUND list with an opaque fill so it is readable over the Selection band — the field ramp labelled far / at anchor, the anchor ring beside its per-anchor LP rate, and the body's anchor count and total LP per tick. Pure rendering: it computes no game state, mutates nothing, and cannot trigger the reach-field Dijkstra (it reads the const tile_reach_cost, whose -1 'not computed' case draws nothing). The LP pools are rebuilt every frame and never persisted — LP is a per-tick rate, never a stock. Pointer clicks fall through to the tile/province; there is no dedicated ledger route. Terrain texture (BL-520) survives this lens at 0.45 strength.",
+      "expected_output": "Two layers over the Planetary surface. FIELD: every tile is composited 0.72 toward a deep-navy-to-cyan ramp over its weighted reach cost to the nearest supply anchor — cyan at an anchor, navy on the ground furthest from one, the cold end for anything unreachable. The cost ratio is square-root compressed before the ramp because the distribution is heavily left-skewed (measured on the home body: median 20.8 against a maximum 101.8 over 57 anchors), so a linear ramp would read as one flat wash. ANCHORS: every supply anchor tile carries a RING (not a filled mark — the tile already carries a settlement or building marker drawn over it), its thickness carrying that anchor's active Logistic Points as a share of the body's largest pool, in a hotter near-white cyan over a dark backing. KEY: a fixed-height gradient key flush-left of the minimap, drawn on ImGui's FOREGROUND list with an opaque fill so it is readable over the Selection band — the field ramp labelled far / at anchor, the anchor ring beside its per-anchor LP rate, and the body's anchor count and total LP per tick. Pure rendering: it computes no game state, mutates nothing, and cannot trigger the reach-field Dijkstra (it reads the const tile_reach_cost, whose -1 'not computed' case draws nothing). The LP pools are rebuilt every frame and never persisted — LP is a per-tick rate, never a stock. Pointer clicks fall through to the tile/province; there is no dedicated ledger route. Terrain texture (BL-520) survives this lens at 0.45 strength. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.",
       "reason_to_select": "Select to answer 'how much can move through here, and how far is this ground from the capacity that would move it?' — before ordering a march that active LP could refuse, before siting a building whose supply has to come from somewhere, or when deciding where a new port or inland hub would actually widen the network. It is the surface half of the Logistic Points cap (LOGISTICS.md): a refused march is legible only if the player can see where throughput is thin, and a cap nobody can see is silent interdiction. It extends the Reach lens rather than replacing it — Reach spends the same field as a yes/no placement predicate, this spends the quantity that predicate throws away. It does NOT mean LP is priced by distance (it is not): the shading says how far this ground is from a generator, never that the points thin out on the way."
+    },
+    {
+      "id": "ledger.nav_acquisitions",
+      "family": "ledger",
+      "surface": "Nav rail, slot 5 (Acquisitions icon - two outlined squares with an arrow driven from the small one into the large one)",
+      "press": "Click the paired-squares glyph in the left icon rail, above the Market Ledger",
+      "args": [],
+      "preconditions": [
+        "In-game"
+      ],
+      "expected_output": "Toggles the Acquisitions ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows the player's balance, the size of the buyable field ('N of M firms file and can be priced'), and two collapsing groups over that field: Purchasable (priced at or below the balance, each row carrying a Buy press) and Possible (priced, beyond the balance today, no press). Beneath them sits the Profitability fold-out's door.",
+      "reason_to_select": "The only surface that prices another corporation, and therefore the only place a whole-firm buyout can be planned rather than merely issued. Expect a LONG list: measured over twelve seeds, a mean of 81.6 firms of eighty-eight are buyable - 35.8 Purchasable and 45.8 Possible. Companies are open by construction (BL-678, companies are open), so ownership class excludes only the handful of rivals that class private or closed, mean 5.2. The field is the world's commercial population, so rank it before reading it rather than reading it whole."
+    },
+    {
+      "id": "ledger.acquisitions_buy",
+      "family": "ledger",
+      "surface": "Acquisitions ledger, a Purchasable row's 'Buy' press",
+      "press": "Click 'Buy' on a row in the Purchasable group",
+      "args": [],
+      "preconditions": [
+        "The Acquisitions ledger is open",
+        "The row is in the PURCHASABLE group - i.e. its price is at or below the player corporation's balance. A Possible row carries no press at all, rather than a disabled one"
+      ],
+      "expected_output": "Enqueues gameplay.buy_corporation against that firm onto the deferred command queue, drained on the next frame through the same apply_corp_command seam an agent's COMMAND uses - so the press and the wire are one code path. On success the firm is DISSOLVED and its holdings, stock, cash and filed returns transfer; the field line and both groups redraw one firm shorter. See gameplay.buy_corporation for the price formula and the full transfer/cancel/drop disposition.",
+      "reason_to_select": "Take a whole competitor in one step at a price read off a record it published itself. WATCH THE ZERO PRICE: because the price's cash term is signed, a deeply indebted firm's negative balance cancels its book value and the floor hands it over for nothing - and the dissolution rule then moves that debt to you at face value. Five of twelve measured seeds priced their one buyable firm at exactly 0 for this reason. The row says so on hover; a free firm is not a cheap firm."
+    },
+    {
+      "id": "ledger.acquisitions_group",
+      "family": "ledger",
+      "surface": "Acquisitions ledger, the 'Purchasable' and 'Possible' group headers",
+      "press": "Click a group header to collapse it; click again to expand",
+      "args": [
+        {
+          "name": "group",
+          "type": "enum",
+          "meaning": "'Purchasable' (priced within the balance, carries the Buy presses) or 'Possible' (priced, beyond the balance today, no press)"
+        }
+      ],
+      "preconditions": [
+        "The Acquisitions ledger is open"
+      ],
+      "expected_output": "Collapses or expands that group. Both are EXPANDED at rest, against the usual instinct, because the whole field averages under two rows - a collapsed group would hide the entire answer. Each header carries its own row count, so an empty group reads as '(0)' rather than as a surface that failed to populate.",
+      "reason_to_select": "Purely a reading convenience; it changes nothing about the world. There is rarely enough content here to need it."
+    },
+    {
+      "id": "ledger.acquisitions_profitability",
+      "family": "ledger",
+      "surface": "Acquisitions ledger, the 'Profitability' row's full-canvas control",
+      "press": "Click the chevron in the Profitability row's right-hand gutter",
+      "args": [],
+      "preconditions": [
+        "The Acquisitions ledger is open"
+      ],
+      "expected_output": "Opens a full-canvas takeover over the canvas region (the nav rail, header, clock, comms dock and Selection band all survive it, and the Acquisitions column stays visible beside it) holding ONE ROW PER CORPORATION with seven columns: Firm, Type, End resource, Input resource, Profit/qtr, Price, Ownership. Exact figures where the firm files and a DASH where it does not, with no bands anywhere - a dash always means 'this firm does not file', never 'you have not earned this'. Closed by the return control top-left, or by Esc.",
+      "reason_to_select": "The widest financial read in the game and the one an acquisition should be planned from: it is where a firm that prices below what it is worth becomes visible. Note the shape of the data before reading it - roughly 85 of 88 firms per seed file a return in world state that they do NOT disclose, so most rows carry a name, an ownership class and five dashes. Sorting by Ownership brings the readable firms to the top and is the fastest way through it."
+    },
+    {
+      "id": "ledger.acquisitions_profitability_sort",
+      "family": "ledger",
+      "surface": "Acquisitions ledger, Profitability fold-out, the table's column headers",
+      "press": "Click a column header to sort ascending; click again to reverse",
+      "args": [
+        {
+          "name": "column",
+          "type": "enum",
+          "meaning": "'Firm', 'Type', 'End resource', 'Input resource', 'Profit/qtr', 'Price' or 'Ownership'"
+        }
+      ],
+      "preconditions": [
+        "The Profitability fold-out is open"
+      ],
+      "expected_output": "Re-sorts every row. An UNDISCLOSED cell sorts as ABSENT rather than as zero, in either direction - a dash is not a small number, and letting dashes sort among the real values would make the ordering lie. Ties keep the resting order, which is ascending corporation id (the same sorted walk apply_budget files returns in), so the sort is deterministic rather than an unordered map's layout. The choice survives closing and reopening the fold-out.",
+      "reason_to_select": "Sort by Price to find the cheapest firm, by Profit/qtr to find the one whose filed return understates it, or by Ownership to collapse the ~85 undisclosed rows out of the way in one press."
     },
     {
       "id": "ledger.budget_tax_tier",
@@ -1109,18 +1197,6 @@
       ],
       "expected_output": "The displayed tier changes and highlights. HONESTLY: a stub with NO economic effect yet (BL-155); distinct from the per-building workforce target, which is a real, separate control owned elsewhere.",
       "reason_to_select": "Will eventually set corporate wage policy; today it is display-only."
-    },
-    {
-      "id": "ledger.build_ledger_close",
-      "family": "ledger",
-      "surface": "Tile construction ledger (the 'Construct · [x, y]' fold-out, BL-162), header",
-      "press": "Click the 'x' button at the right of the header",
-      "args": [],
-      "preconditions": [
-        "Tile construction ledger is open (opened from the tile Selection band's Construct button)"
-      ],
-      "expected_output": "Closes the ledger, returning attention to the tile Selection band. The ledger also closes itself automatically if the selection stops being a tile.",
-      "reason_to_select": "Done browsing build candidates (or deciding not to build) - exits without building anything."
     },
     {
       "id": "ledger.chat_channel_tab",
@@ -1186,69 +1262,45 @@
     {
       "id": "ledger.construction_view_tab",
       "family": "ledger",
-      "surface": "Construction panel, view tab strip",
-      "press": "Click the 'Construction' or 'Buildings' tab button",
+      "surface": "Construction ledger, view tab strip",
+      "press": "Click the 'Buildings' or 'Construction' tab button",
       "args": [
         {
           "name": "view",
           "type": "enum",
-          "meaning": "'Construction' (in-progress builds) or 'Buildings' (owned buildings; the default)"
+          "meaning": "'Buildings' (the estate by type; the default) or 'Construction' (the build queue plus the tile build bar)"
         }
       ],
       "preconditions": [
-        "Construction panel is open"
+        "Construction ledger is open"
       ],
-      "expected_output": "Switches the view. Re-clicking the currently-active tab closes the whole Construction panel (toggle rule); switching tabs is an ordinary view change. Buildings lists owned buildings with their management surface; Construction lists what is currently being built.",
-      "reason_to_select": "Buildings answers 'what do I operate and how is each doing?'; Construction answers 'what is on the way and when does it land?'"
+      "expected_output": "Switches the view. Re-clicking the currently-active tab CLOSES the whole ledger (toggle rule) rather than collapsing to an overview; switching to the other tab is an ordinary view change.",
+      "reason_to_select": "Buildings answers 'what do I operate and how is each doing?'; Construction answers 'what is on the way, what does it cost, and what could I put on this tile?'"
     },
     {
       "id": "ledger.corp_card_expand",
       "family": "ledger",
-      "surface": "Corporation dashboard, one of the four roll-up cards (Production / Trade / Workforce / Finance)",
-      "press": "Click the chevron on a card's title row",
-      "args": [
-        {
-          "name": "card",
-          "type": "enum",
-          "meaning": "Which roll-up: Production, Trade, Workforce, or Finance"
-        }
-      ],
-      "preconditions": [
-        "Corporation dashboard is open"
-      ],
-      "expected_output": "Opens that card as a full-screen overlay (the drill-through idiom, BL-214) - the card's full item list and charts at screen size. Only one thing can be expanded at a time; expanding a second card folds the first. Re-clicking the chevron (or pressing Esc) folds the overlay back to the one-line verdict.",
-      "reason_to_select": "The folded card is a verdict line; expanding answers 'what is BEHIND this verdict?' - the per-item breakdown that names which building, lane, or account moves the number."
-    },
-    {
-      "id": "ledger.corp_drill_back",
-      "family": "ledger",
-      "surface": "Corporation dashboard, drill breadcrumb ('Corporation > Card > Subject')",
-      "press": "Click the card-name link in the breadcrumb",
+      "surface": "Corporation ledger, the Balance card's title row",
+      "press": "Click the full-canvas control on the Balance card's title row",
       "args": [],
       "preconditions": [
-        "A roll-up drill is open (a subject is being viewed)"
+        "Corporation ledger is open"
       ],
-      "expected_output": "Pops the drill: returns the overlay to the card's full item list. (Esc also unwinds one drill level before folding the overlay itself.)",
-      "reason_to_select": "Returns to the comparison list to check a different subject against the one just read."
+      "expected_output": "Gives the Balance card the canvas region: the same two-column chart (earnings against stacked expenses) at screen size, with the ledger column still visible beside it. Only one thing can be expanded at a time. Clicking the return control top-left (or pressing Esc) folds it back. There is no expand-in-place control on this card - it already shows its chart at rest, so the gutter's left slot is empty.",
+      "reason_to_select": "The column chart is legible at rest; the takeover is for reading the segment proportions and hovering individual flows with room to work."
     },
     {
-      "id": "ledger.corp_rollup_drill",
+      "id": "ledger.corp_balance_segment_hover",
       "family": "ledger",
-      "surface": "Corporation dashboard, expanded roll-up overlay (Production, Trade, or Workforce card)",
-      "press": "Click one of the labelled magnitude-bar rows in the expanded card",
-      "args": [
-        {
-          "name": "row",
-          "type": "index",
-          "meaning": "Which item (a building, trade lane, or workforce site) to drill into"
-        }
-      ],
+      "surface": "Corporation ledger, a segment of the Balance card's expense column",
+      "press": "Hover a segment of the stacked Expenses column",
+      "args": [],
       "preconditions": [
-        "A roll-up card is expanded",
-        "The card has drillable items (Production, Trade, Workforce do; Finance has no item rows)"
+        "Corporation ledger is open",
+        "At least one economy quarter has been measured"
       ],
-      "expected_output": "Drills to that subject's detail view inside the overlay, replacing the list; a 'Corporation > Card > Subject' breadcrumb appears at the top. Each row shows a 'Click to drill in' tooltip on hover.",
-      "reason_to_select": "Moves from 'production is down' to 'THIS building is the one dragging it' - the subject-level answer a decision needs."
+      "expected_output": "Names that flow and its figure for the quarter - Inputs, Maintenance, Wages, Interest, Levies or Force. A flow that is zero this quarter is ABSENT from the stack rather than drawn flat, so the segment count itself reads the corp's position: Interest appears only while the balance is negative.",
+      "reason_to_select": "The chart says which side is bigger at a glance; the hover says WHICH outflow is the one to act on."
     },
     {
       "id": "ledger.corps_table_row_select",
@@ -1272,7 +1324,7 @@
       "id": "ledger.nav_generation",
       "family": "ledger",
       "surface": "Nav rail, slot 10 (plate/continent glyph)",
-      "press": "Click the plate glyph at the bottom of the left icon rail",
+      "press": "Click the plate glyph in the developer tail of the left icon rail",
       "args": [],
       "preconditions": [
         "In-game"
@@ -1424,22 +1476,35 @@
       "reason_to_select": "A body can host several market centres with different books; this picks the exact venue for a trade."
     },
     {
+      "id": "ledger.market_nation_chip",
+      "family": "ledger",
+      "surface": "Market Ledger, nation presence row (below the Body/Market selectors, above the tab strip)",
+      "press": "Hover a coloured chip to name the nation. The chips are not clickable.",
+      "args": [],
+      "preconditions": [
+        "Market Ledger is open",
+        "At least one nation operates in the selected market (the row reads \"No national presence.\" otherwise)"
+      ],
+      "expected_output": "A wrapped row of one chip per nation operating in the selected market, in ascending nation id, wrapping to further rows if needed. Each chip is that nation's identity colour carrying up to two initials; hovering names it in full. THESE ARE NOT FLAGS -- nation_colour is a palette entry and is all that exists, so real per-nation emblem artwork would be a generated identity system rather than a glyph, and the chip is an explicit placeholder. Presence is derived: a nation appears when a building stands on a tile whose catchment market (market_for_tile) is this one.",
+      "reason_to_select": "Answers 'which nations operate in this market?'. A price is not readable without knowing whose ground feeds it: a market served by one nation and a market four nations compete over look identical on a price line and mean entirely different things for embargo risk, tariffs and stance."
+    },
+    {
       "id": "ledger.market_view_tab",
       "family": "ledger",
       "surface": "Market Ledger, view tab strip at the top",
-      "press": "Click the 'Prices' or 'Sell Orders' tab button",
+      "press": "Click the 'Goods' or 'Trades' tab button",
       "args": [
         {
           "name": "view",
           "type": "enum",
-          "meaning": "'Prices' (default) or 'Sell Orders'"
+          "meaning": "'Goods' (default, index 0) or 'Trades' (index 1). Index 1 was labelled 'Sell Orders' until the tab widened to hold four reads. Index 2 was Convoys until it became its own ledger at nav rail slot 7; a stale 2 clamps back to Goods rather than drawing nothing."
         }
       ],
       "preconditions": [
         "Market Ledger is open"
       ],
-      "expected_output": "Switches the ledger to that view. Re-clicking the CURRENTLY-ACTIVE tab closes the whole Market Ledger (toggle rule on tab strips); clicking the other tab is an ordinary view change. Prices shows the order book / price table for the selected market; Sell Orders shows the player's standing sell orders there.",
-      "reason_to_select": "Prices answers 'what is the market paying?'; Sell Orders answers 'what am I currently offering, at what floor?' - the two halves of a selling decision."
+      "expected_output": "Switches the ledger to that view. Re-clicking the CURRENTLY-ACTIVE tab closes the whole Market Ledger (toggle rule on tab strips); clicking the other tab is an ordinary view change.\n\nGoods shows one row per traded good at the selected market -- item glyph, name, price, price vs base, and an 8-QUARTER price graph flattened into the row, every row drawn against a SHARED price/base axis with a 1.0 baseline so goods can be compared.\n\nTRADES shows FOUR headed sections, each bounded and scrolling inside itself so all four heads stay on screen: (1) MY TRADES -- the acting corp's standing orders on the selected market's BODY, each with a Remove press; (2) ALL TRADES HERE -- every standing order on that body whoever holds it, GATED on the player owning a building on the body (the section says so in words when the gate is shut, which is a different answer from an empty book); (3) POTENTIAL TRADES -- a derivation, ranked by margin best first: buy price here against sell price at another market, less the per-unit haulage price_convoy_leg charges for that route, with the three terms and the travel time in the row's hover, and no row at all for a lane that will not price; (4) RECENT TRADES -- the exchange record filtered to this market, newest first, columns qtr / good / counterparty / REVENUE. The revenue column is quantity * unit_price and is NOT a profit: no cost basis exists anywhere in the model, so a margin is not derivable from a sale. A counterparty that is the market itself renders as 'Market' -- it is not unknown, and three of the four clearing paths trade against the market.",
+      "reason_to_select": "Goods answers 'what is each good worth here, and which way is it moving?'; Trades answers 'what positions do I hold here, what else is standing, and what could I be doing?'. Convoys is no longer here: 'what is on its way to me' is a logistics question and now has its own rail slot (ledger.nav_convoys)."
     },
     {
       "id": "ledger.nav_budget",
@@ -1456,14 +1521,14 @@
     {
       "id": "ledger.nav_construction",
       "family": "ledger",
-      "surface": "Nav rail, slot 6 (Construction icon)",
+      "surface": "Nav rail, slot 3 (Construction icon)",
       "press": "Click the industry/factory glyph on the left icon rail",
       "args": [],
       "preconditions": [
         "In-game"
       ],
-      "expected_output": "Toggles the Construction panel open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows the Construction / Buildings split (defaults to Buildings): what is being built now, and the buildings the player owns with their management controls.",
-      "reason_to_select": "Answers 'what do I own and what is under way?' - the broad building overview; per-building operations (recipe, workforce, demolish) are reached from here but are separate presses."
+      "expected_output": "Toggles the Construction ledger open in the fold-out column; re-click closes; opening closes any other ledger. It opens on BUILDINGS - the player's estate grouped by building type, one row per type with a count and a total profit - because the queue is empty most of the time and the player always owns buildings. The other tab, Construction, holds the build queue and the tile build bar.",
+      "reason_to_select": "Answers 'what do I own, and what is each kind of it earning me?' - the broad estate overview, and the route to a single building's levers (expand its type, press the building)."
     },
     {
       "id": "ledger.nav_corporation",
@@ -1474,8 +1539,8 @@
       "preconditions": [
         "In-game (the rail is permanent chrome)"
       ],
-      "expected_output": "Toggles the Corporation dashboard open in the fold-out column. Opening it closes whichever other ledger was open (accordion). If it is already open, clicking again closes it (toggle rule). Open, it shows the player corporation's four roll-up cards - Production, Trade, Workforce, Finance - each a one-line verdict with an expand chevron.",
-      "reason_to_select": "Answers 'how is my corporation doing overall, and where is the weak card?' - the top-level health check that decides which subsystem to drill into next."
+      "expected_output": "Toggles the Corporation ledger open in the fold-out column. Opening it closes whichever other ledger was open (accordion). If it is already open, clicking again closes it (toggle rule). Open, it shows ONE card, Balance: a verdict line ('+X/qtr, balance Y') over a two-column chart - the quarter's earnings against its expenses stacked by flow - and the quarter's net beneath it. Production and Workforce are answered by the Construction ledger's Buildings tab, Trade by the Market and Convoys ledgers.",
+      "reason_to_select": "Answers 'how well am I doing?' - the money read, which is the honest answer to that question today."
     },
     {
       "id": "ledger.nav_corporations_table",
@@ -1486,20 +1551,8 @@
       "preconditions": [
         "In-game"
       ],
-      "expected_output": "Toggles the all-corporations balance table open in the fold-out column; re-click closes; opening closes any other ledger. Open, it lists every corporation with its balance side by side (player row highlighted). Diplomacy itself is not built; this table is the slot's provisional occupant.",
+      "expected_output": "Toggles the all-corporations balance table open in the fold-out column; re-click closes; opening closes any other ledger. Open, it lists every corporation with its balance side by side (player row highlighted). Diplomacy itself is not built; this table is the slot's provisional occupant. Since BL-666 the table is also the destination of a Corporation-lens canvas press, which aims its highlighted row at the pressed firm via selected_corporation_dossier.",
       "reason_to_select": "Answers 'how do rivals' finances compare to mine?' - the only side-by-side rival-balance read in the game."
-    },
-    {
-      "id": "ledger.nav_economy",
-      "family": "ledger",
-      "surface": "Nav rail, slot 3 (Workforce icon - provisionally hosts the Economy panel)",
-      "press": "Click the workforce (population) glyph on the left icon rail",
-      "args": [],
-      "preconditions": [
-        "In-game"
-      ],
-      "expected_output": "Toggles the Economy panel open in the fold-out column; re-click closes; opening closes any other ledger. Open, it splits across three views - Corps (the player's balance trend, every corporation's balance, and the workforce table), Holdings (stockpile pools by body) and Markets (supply, demand and price per body). Workforce itself is not built; this panel is the slot's provisional occupant.",
-      "reason_to_select": "Answers 'what is the whole economy doing?' in one surface - balances, labour, stock on hand and market state side by side, rather than one body or one corporation at a time."
     },
     {
       "id": "ledger.nav_history",
@@ -1516,14 +1569,26 @@
     {
       "id": "ledger.nav_market",
       "family": "ledger",
-      "surface": "Nav rail, slot 5 (Market Ledger icon)",
+      "surface": "Nav rail, slot 6 (Market Ledger icon)",
       "press": "Click the market glyph on the left icon rail",
       "args": [],
       "preconditions": [
         "In-game"
       ],
-      "expected_output": "Toggles the Market Ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows prices, supply and demand for one market on one body (chosen by the Body and Market selectors), split into Prices and Sell Orders views.",
+      "expected_output": "Toggles the Market Ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows one market on one body (chosen by the Body and Market selectors), a nation presence row of colour chips naming who operates there, and the Goods / Trades views.",
       "reason_to_select": "Answers 'what does this good trade for, where?' - the price signal behind every sell-order, extraction and routing decision."
+    },
+    {
+      "id": "ledger.nav_convoys",
+      "family": "ledger",
+      "surface": "Nav rail, slot 7 (Convoys icon), directly after Market",
+      "press": "Click the convoy chevron on the left icon rail",
+      "args": [],
+      "preconditions": [
+        "In-game"
+      ],
+      "expected_output": "Toggles the Convoys ledger open in the fold-out column; re-click closes; opening closes any other ledger AND ARMS THE supply_routes LENS -- the lane overlay is the map twin of this list. Closing does not disarm it, so the player's lens is left where they left it. Open, it lists one row per convoy of your corp in flight, soonest arrival first: cargo and quantity, origin -> destination and mode, a progress bar carrying the ETA in qtr (or 'held' / 'stalled'), and the haul cost already paid. One flat view; NO Body/Market selectors, because a convoy is a route between two places and is not scoped by the market you are looking at.",
+      "reason_to_select": "Answers 'what is on its way, and what is it costing me?'. It is the only surface reporting TICKS TO ARRIVAL: convoys are drawn on three canvases and listed nowhere else, and since travel time became load-bearing a long haul takes several quarters, with the cargo out of your pool for all of it. Read it before planning a build against stock you think you have."
     },
     {
       "id": "ledger.selection_body_goto_surface",
@@ -1560,7 +1625,7 @@
         "A tile is selected",
         "Something is actually placeable on the tile (otherwise the button disables with 'Nothing can be built on this tile')"
       ],
-      "expected_output": "Opens the tile construction ledger (BL-162) in the fold-out column: every building type placeable on THIS tile, with full cost, expected-profit bar, and reason-coded validity. Opening it is non-mutating; the Build presses inside it belong to the construction action family. The button carries an accent ring ('primed') when the player has nothing under construction anywhere.",
+      "expected_output": "Opens the Construction ledger on its CONSTRUCTION view - the collapsible queue above the build bar for THIS tile: every building type placeable here, with full cost, expected-profit bar, and reason-coded validity. The same view the nav rail's slot 3 opens, so the two doors cannot show two different build bars. Opening it is non-mutating; the Build presses inside it belong to the construction action family. The button carries an accent ring ('primed') when the player has nothing under construction anywhere.",
       "reason_to_select": "The front door to building on a specific tile - answers 'what could I put here and what would it earn?' before committing."
     },
     {
@@ -2168,8 +2233,8 @@
     {
       "id": "gameplay.declare_hostile",
       "family": "gameplay",
-      "surface": "Corporation panel, Stance column. Confirm popup on press (demolish precedent — not literally irreversible, but not unilaterally reversible by the target either).",
-      "press": "Open the Corporation panel, find the rival's row (only shown once the corp is otherwise BL-068-discovered), click 'Declare Hostile', confirm 'Declare' in the popup ('Cancel' backs out).",
+      "surface": "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Declare Hostile keeps an INLINE confirm inside the strip (demolish precedent — not literally irreversible, but not unilaterally reversible by the target either).",
+      "press": "Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Declare Hostile'. The strip then asks to confirm: click 'Declare' to apply, 'Cancel' to back out. There is NO discovery gate — every named corporation is listed and actionable (RELATIONS.md § 1 Stance: a declaration against the player is signalled).",
       "args": [
         {
           "name": "counterparty",
@@ -2187,8 +2252,8 @@
     {
       "id": "gameplay.offer_friendship",
       "family": "gameplay",
-      "surface": "Corporation panel, Stance column.",
-      "press": "Open the Corporation panel, find the rival's row, click 'Offer Friendship'. Shows 'Offer sent' afterward until the target accepts, declines, or either party moves to hostile.",
+      "surface": "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group.",
+      "press": "Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Offer Friendship'. The strip then reads 'Offer sent' until the target accepts, declines, or either party moves to hostile.",
       "args": [
         {
           "name": "counterparty",
@@ -2208,8 +2273,8 @@
     {
       "id": "gameplay.accept_friendship",
       "family": "gameplay",
-      "surface": "Corporation panel, Stance column. Shown only on a rival row carrying a pending offer FROM that rival TO the player.",
-      "press": "Open the Corporation panel; a row with an incoming offer shows 'Accept Friendship' instead of 'Offer Friendship'. Click it.",
+      "surface": "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Shown only in the strip of a row carrying a pending offer FROM that firm TO the player.",
+      "press": "Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Accept Friendship' — a row with an incoming offer shows it in place of 'Offer Friendship'. The row moves into the Friends group.",
       "args": [
         {
           "name": "counterparty",
@@ -2227,8 +2292,8 @@
     {
       "id": "gameplay.return_to_neutral",
       "family": "gameplay",
-      "surface": "Corporation panel, Stance column. Shown whenever the row is currently Hostile or Friend.",
-      "press": "Open the Corporation panel, find the rival's row, click 'Return to Neutral'.",
+      "surface": "Corporation ledger (rail slot 8, Diplomacy). Rows are grouped Friends / Hostile / Neutral by the stance tables; the presses live in a row's ACTION STRIP, which a disclosure arrow at the left of the row opens. One strip is open at a time, and a press that changes stance moves the row to its new group. Shown in the strip whenever the row is currently in the Hostile or Friends group.",
+      "press": "Open the Corporation ledger (rail slot 8), find the firm by name in its stance group, click the arrow at the left of its row to open the action strip, then click 'Return to Neutral'. The row moves back into the Neutral group.",
       "args": [
         {
           "name": "counterparty",
@@ -2369,59 +2434,6 @@
       "reason_to_select": "The ONLY decision a commander has once contact is made — a battle opens because two hostile forces share a province, not because anyone asked for it, so there is no 'attack' verb to weigh against this one. Weigh it on the cost curve rather than on the odds alone: the price rises with every round already fought AND with how badly you are losing, and the rounds themselves have already cost their own attrition, so a late withdrawal compounds twice. Breaking off early from a fight you are losing is cheap; breaking off late from one you are losing badly is where armies die. At the shipped pacing (3 rounds a tick, 6 to a stalemate) a full battle spans two ticks, so there is exactly ONE real opportunity to use this. THE CARD QUOTES THE PRICE BEFORE YOU PAY IT — base, per-round and pursuit shown separately, taken from the resolver's own arithmetic — so the cost curve is readable rather than something to infer from the rules."
     },
     {
-      "id": "gameplay.accept_offer",
-      "family": "gameplay",
-      "surface": "The Contracts ledger's Offers view, Accept press (BL-576). Select an offer whose escrow has cleared its fee, press Accept to open the force picker, check owned uncommitted units, press Confirm. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger.",
-      "press": "Press 'Accept' on a fully-escrowed, unexpired offer to open a popup listing the player's own uncommitted units with a checkbox and strength each; check at least one, press 'Confirm' to dispatch, or 'Cancel' to back out with nothing sent. Over the seam: COMMAND corp=<id> verb=25 order=<offer id> counterparty=<client nation id> units=[<unit id>, ...].",
-      "args": [
-        {
-          "name": "order",
-          "type": "uint32 (mercenary_offer::id)",
-          "meaning": "The offer to accept. Must name a live entry in world.mercenary_offers — consumed (erased) on success, so accepting the same id twice fails the second time."
-        },
-        {
-          "name": "counterparty",
-          "type": "entity_id",
-          "meaning": "The offer's CLIENT NATION, not a corp — this verb's counterparty check forks on verb (corp_command.cpp). Must equal the named offer's own client field."
-        },
-        {
-          "name": "units",
-          "type": "entity_id[8]",
-          "meaning": "The corp's OWN units to commit — unused slots are 0/null. At least one must be named, each must be owned by the acting corp and not already committed to another ACTIVE mercenary contract. CONTRACTS.md Q1: the player chooses the force, the contract never does."
-        }
-      ],
-      "preconditions": [
-        "`order` names a real, still-open offer (rejected_invalid otherwise).",
-        "`counterparty` names a real nation matching that offer's client (rejected_invalid otherwise).",
-        "`current_econ_tick < offer.deadline` — the offer has not expired (rejected_invalid otherwise).",
-        "`offer_escrow >= fee` — the offer is FULLY ESCROWED (rejected_state otherwise); a partially-funded offer is not yet acceptable.",
-        "Every named unit is real, owned by the acting corp, and not already committed to another active mercenary contract (rejected_invalid / rejected_not_owner / rejected_state otherwise); at least one unit must be named (rejected_invalid on an empty force).",
-        "The acting corp exists (rejected_invalid otherwise)."
-      ],
-      "expected_output": "A new mercenary_contract is created: client and template copied from the offer, province bound from the offer's target, fee copied, the deposit (fee x deposit_fraction) paid straight from the offer's own already-filled escrow, deadline copied, the named units set as the committed force, state = active. The consumed offer is erased from world.mercenary_offers so it cannot be accepted twice. A rejection mutates nothing.",
-      "reason_to_select": "The only way to turn a want into income. Underbidding is the loop's teeth (CONTRACTS.md): a cheap contract with too little force risks losing the fight, the fee AND the standing — reading the target's garrison strength (Offers view) against the force you are about to commit is the whole skill."
-    },
-    {
-      "id": "gameplay.abandon_contract",
-      "family": "gameplay",
-      "surface": "The Contracts ledger's Active view, Abandon press (BL-576). Select an active contract, press Abandon to see its reputation cost, confirm in the popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger.",
-      "press": "Press 'Abandon' on an active contract to open a confirm popup showing the deposit forfeit and the reputation (Trust) cost with the client nation, then press 'Abandon' again to dispatch or 'Keep' to back out. Over the seam: COMMAND corp=<id> verb=26 order=<contract id>. No other field is read.",
-      "args": [
-        {
-          "name": "order",
-          "type": "uint32 (mercenary_contract::id)",
-          "meaning": "The contract to walk away from. Must be one of the acting corp's OWN contracts, still in the active state."
-        }
-      ],
-      "preconditions": [
-        "`order` names a real contract (rejected_invalid otherwise).",
-        "The acting corp is that contract's contractor (rejected_not_owner otherwise).",
-        "The contract is still active — an already-terminal contract cannot be abandoned again (rejected_state otherwise)."
-      ],
-      "expected_output": "The contract's state becomes abandoned. Same money outcome as a failure — the deposit already paid at accept_offer is not clawed back, and the reserved remainder is simply never disbursed — but a DISTINCT, LESSER sentiment magnitude (contract_cancelled, not contract_failed) records that the contractor chose this rather than losing a fight (CONTRACTS.md Q2: 'an honest early exit costs less than a rout, but it still costs').",
-      "reason_to_select": "An early, priced way out of a contract that reading the field has shown cannot be won — cheaper than letting it run to a failed deadline, never free. The ledger shows the exact reputation number before the press commits, not after."
-    },
-    {
       "id": "gameplay.raze_centre",
       "family": "gameplay",
       "surface": "Seam-only for now (BL-616, centre promotion and decline): a corp_verb issued against the corp-command seam (ProjectIo --serve, COMMAND opcode). No UI press exists yet — the occupation surface that would host one belongs to the conquest consequence item (BL-518).",
@@ -2444,8 +2456,8 @@
     {
       "id": "gameplay.buy_corporation",
       "family": "gameplay",
-      "surface": "Seam-only for now (BL-628, whole-firm acquisition): a corp_verb issued against the corp-command seam (ProjectIo --serve, COMMAND opcode). The press that will host it is the Profitability ledger's buyout control (BL-627, profitability ledger) — the only surface that reads another corporation's filed return, and therefore the only one that can show the price before it is paid.",
-      "press": "Over the seam: COMMAND corp=<id> verb=28 counterparty=<target corp id>. No other field is read.",
+      "surface": "The Acquisitions ledger (nav rail slot 5, and the Company lens's click destination): the Buy press on a PURCHASABLE row. The two groups are the whole affordance — Purchasable rows carry the press, Possible rows show the price and carry none, because a price you cannot meet is something to save toward rather than something refused. Also still a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the ledger. NOTE FOR A PLANNER: the field is LARGE — measured over twelve seeds of the shipped spawn (tools/verify/acquisition_viability.cpp section C), 88 corporations yield a mean of 81.6 buyable firms, 35.8 of them Purchasable at the moment of reading. A company is publicly_held by construction (BL-678, companies are open); only a corporation can class private or closed and be unpriceable, which is a mean of 5.2 per seed. A mean of 10.6 firms per seed price at exactly ZERO, which is not a bargain - the price floor caught a firm whose debts exceed its book value, and buy_corporation transfers that debt at face value.",
+      "press": "Open the Acquisitions ledger (nav rail slot 5, or click a background firm's holdings under the Company lens) and press 'Buy' on a row in the Purchasable group. Over the seam: COMMAND corp=<id> verb=28 counterparty=<target corp id>. No other field is read.",
       "args": [
         {
           "name": "counterparty",
@@ -2507,36 +2519,6 @@
       "reason_to_select": "Resume a campaign directly, or open a fixed world for a capture run without paying generation on every launch — the reason the save format exists (BL-536)."
     },
     {
-      "id": "ledger.nav_contracts",
-      "family": "ledger",
-      "surface": "Nav rail, slot 13 (Contracts icon — a page with a signed check mark)",
-      "press": "Click the contract glyph on the left icon rail",
-      "args": [],
-      "preconditions": [
-        "In-game"
-      ],
-      "expected_output": "Toggles the Contracts ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows three views: Offers (open mercenary_offers the activity fog admits), Active (the player's own live mercenary_contracts), History (the player's terminal-state contracts).",
-      "reason_to_select": "Answers 'who wants to hire me, what am I on the hook for, and how has it gone?' — the mercenary contract is the sell-side income loop (CONTRACTS.md) and the only door onto it."
-    },
-    {
-      "id": "ledger.contracts_view_tab",
-      "family": "ledger",
-      "surface": "Contracts ledger, view tab strip at the top",
-      "press": "Click the 'Offers', 'Active' or 'History' tab button",
-      "args": [
-        {
-          "name": "view",
-          "type": "enum",
-          "meaning": "'Offers' (default), 'Active' or 'History'"
-        }
-      ],
-      "preconditions": [
-        "Contracts ledger is open"
-      ],
-      "expected_output": "Switches the ledger to that view. Re-clicking the CURRENTLY-ACTIVE tab closes the whole Contracts ledger (toggle rule on tab strips); clicking a different tab is an ordinary view change.",
-      "reason_to_select": "Offers answers 'who wants to hire me'; Active answers 'what am I on the hook for now'; History answers 'how has it gone' — three different questions over the same mercenary-contract record."
-    },
-    {
       "id": "canvas.border_band_select",
       "family": "canvas",
       "surface": "The national border band on the Planetary canvas — always-on chrome, not a lens. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths.",
@@ -2550,6 +2532,89 @@
       ],
       "expected_output": "The NATION is selected — `selection_kind` becomes `nation` and the Selection element shows its card, which is the route to a nation's ledger. The province mirror clears, as it does for every entity selection. Hovering the corridor names the nation at the cursor immediately, well short of the hover card's dwell delay, so the target is readable before the click commits.",
       "reason_to_select": "This is the ONLY route to a nation. It replaced the Country lens, which used to own it: under that lens a hovered tile resolved to its owning nation. Ben, 2026-08-24 — 'National borders should not diffuse together, instead they should borders extending their colour inwards. With this, we can drop the nation lens' and, on what replaces the route, 'click the border itself'. The border is what carries the nation on screen now, so it is the thing that opens it."
+    },
+    {
+      "id": "ledger.company_open",
+      "family": "ledger",
+      "surface": "The Company ledger (fold-out column). NO RAIL SLOT — it is reached only by a canvas press, the same shape as the tile construction ledger (ledger.selection_construct_open).",
+      "press": "Activate the Company lens, then single left-click any tile held by a background firm on the Planetary surface. There is no menu route and no keyboard route.",
+      "args": [
+        {
+          "name": "company",
+          "type": "entity_id",
+          "meaning": "The background firm owning the pressed tile, resolved as the lens's tile-group structure (BL-665). Travels in ui_state::selected_company so the ledger keeps its subject when the selection moves on."
+        }
+      ],
+      "preconditions": [
+        "The app is in-game with the Planetary surface primary.",
+        "The Company lens is the active lens — under any other lens the same press resolves to something else.",
+        "The pressed tile is held by a corporation with is_background set. Ground held by nobody, or by a corporation proper, is INERT under this lens: no card, no selection, and the Selection band clears to resting (BL-664 rule 3)."
+      ],
+      "expected_output": "The Company ledger opens in the fold-out column naming that firm, and every other ledger closes. It is a DECLARED PLACEHOLDER (BL-666) and says so on its face: the firm's name, that it is a background company rather than a corporation, its registration nation, its holdings on the active body, its reach in bodies, and capital only where the firm files a return. No rail slot and no close button — it closes when another ledger opens, or when a press on inert ground clears the selection that named it (NR-702).",
+      "reason_to_select": "Answers 'who is this firm I keep seeing on the map?' for the background firms that make up most of the economy and had no surface of any kind before. A corporation is a rival and reaches the corporations table; a company is a market participant and reaches this."
+    },
+    {
+      "id": "ledger.construction_queue_toggle",
+      "family": "ledger",
+      "surface": "Construction ledger, Construction view, the 'Queue - N cr / qtr' collapsing header",
+      "press": "Click the header",
+      "args": [],
+      "preconditions": [
+        "Construction ledger is open on the Construction view"
+      ],
+      "expected_output": "Expands or collapses the build queue. Collapsed (the default) it is one line carrying the estimated per-quarter cost of everything in progress, and the tile build bar sits directly below it; expanded it lists each in-progress build with its rate, ETA in quarters and paused status. A toggle by construction - the same press undoes it.",
+      "reason_to_select": "The queue is empty most of the time, so it stays out of the way; open it when something is actually building and the question is when it lands."
+    },
+    {
+      "id": "ledger.construction_buildings_group",
+      "family": "ledger",
+      "surface": "Construction ledger, Buildings view, a type-group header row (name, count, total profit)",
+      "press": "Click the group header",
+      "args": [
+        {
+          "name": "group",
+          "type": "string",
+          "meaning": "The building type's display name - the same words the build door offers ('Quarry', 'Metal Foundry', 'Port')"
+        }
+      ],
+      "preconditions": [
+        "Construction ledger is open on the Buildings view",
+        "The player owns at least one building of that type (a type with none has no row)"
+      ],
+      "expected_output": "Expands the group to list its own buildings, one line each carrying the tile and that building's own net per quarter - visibly summing to the total on the header. One group is open at a time (an accordion), and re-pressing the open header closes it. Nothing in the world changes.",
+      "reason_to_select": "The step from 'which part of my estate pays' to 'which building in it' - and the only route to a specific building's levers that does not go via the map."
+    },
+    {
+      "id": "ledger.construction_buildings_select",
+      "family": "ledger",
+      "surface": "Construction ledger, Buildings view, a building row inside an expanded type group",
+      "press": "Click the row",
+      "args": [
+        {
+          "name": "building",
+          "type": "entity_id",
+          "meaning": "Implicit - the building the row names"
+        }
+      ],
+      "preconditions": [
+        "Construction ledger is open on the Buildings view",
+        "A type group is expanded"
+      ],
+      "expected_output": "Selects that building (the shared selection, so the Selection band follows it too) and draws its LEVERS below the roster: the production-method grid for a processing facility, and the workforce slider for any building. Pure re-selection - the levers themselves are separate presses (gameplay.set_recipe, gameplay.set_workforce).",
+      "reason_to_select": "Reaches a building's operating controls by name rather than by hunting it on the map."
+    },
+    {
+      "id": "ledger.selection_open_in_buildings",
+      "family": "ledger",
+      "surface": "Selection band, building card's right-hand 2x3 action grid, 'Open in ledger' button (a panel outline with one row picked out)",
+      "press": "Click the icon button",
+      "args": [],
+      "preconditions": [
+        "A building is selected",
+        "The building is the PLAYER'S - the button is absent on a rival's card, because the Buildings view is the player's estate and aiming a rival building at it would open an empty aim"
+      ],
+      "expected_output": "Opens the Construction ledger on its Buildings view AIMED at this building: its type group expanded and the building selected, so its levers (production method, workforce) are on screen in one press. A DOOR, not a toggle - a second press does not close it, because the button carries no visible active state. Nothing in the world changes.",
+      "reason_to_select": "The route from a building found on the MAP to its operating controls. The card's centre presents data and never holds levers, so this is how a map selection reaches them."
     }
   ]
 }

@@ -27,8 +27,11 @@
 //       regions classed `closed`, so nothing filed and nothing was buyable in
 //       any default world.
 //   R3  A corp with no home region falls back to national character, exactly as
-//       its focus does; background firms class by the same read, and nothing
-//       branches on is_background to decide a class.
+//       its focus does. BL-678 (companies are open) splits the second half of
+//       this row off from the first: a COMPANY is `publicly_held` always, so the
+//       background-firm check asserts openness rather than the derivation, and
+//       the settle-less cohort is what still holds the national-character read
+//       to account.
 //   R4  Pass 2's world-level reject-and-reroll takes a SECOND condition -- at
 //       least one public specialist -- and never patches an individual corp. An
 //       unmet floor after the attempt cap STANDS and is reported.
@@ -693,34 +696,39 @@ int main(int argc, char* argv[])
         check(mismatched == 0,
               "R3 with no settlement record every corp classes by national character");
 
-        // Background firms (BL-365). They hold a home nation and never a home
-        // region, so they land on the SAME fallback -- checked here against the
-        // national character, not against anything keyed on is_background.
+        // Background firms -- COMPANIES ARE OPEN (BL-678). Until BL-678 a company
+        // landed on the same national-character fallback the settle-less cohort
+        // above takes, and this row asserted exactly that. It no longer holds and
+        // the row is not weakened to accommodate it: the RULE CHANGED, so the row
+        // now asserts the new rule, which is strictly stronger than the old one.
+        // A company is `publicly_held`, always -- no ideology, no region, no
+        // charter reach enters it. The class stays a CORPORATION's property, and
+        // the settle-less cohort immediately above is what still holds the
+        // national-character derivation to account.
         recipe_registry reg;
         const std::vector<entity_id> firms =
             generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
-        int firm_mismatched = 0;
+        int firm_not_public = 0;
         for (const entity_id cid : firms)
         {
             const auto cit = w.corporations.find(cid);
             if (cit == w.corporations.end()) continue;
-            const auto nit = w.nations.find(cit->second.home_nation);
-            const ideology pol = (nit != w.nations.end())
-                ? nit->second.politics : ideology::isolationist;
-            if (cit->second.ownership_class != ownership_from_character(pol))
-                ++firm_mismatched;
+            if (cit->second.ownership_class != ownership_class::publicly_held)
+                ++firm_not_public;
         }
-        std::printf("background firms: %zu generated, %d mismatched\n",
-                    firms.size(), firm_mismatched);
-        check(firm_mismatched == 0,
-              "R3 every background firm classes by the same national-character read");
+        std::printf("background firms: %zu generated, %d not publicly_held\n",
+                    firms.size(), firm_not_public);
+        check(firm_not_public == 0,
+              "R3 every background firm is publicly_held -- a company is open by "
+              "construction");
         if (firms.empty())
             std::printf("     NOTE: the headless build has no Lua recipe registry, so the "
                         "measured stop condition\n"
-                        "     admits no firms and this row is vacuous here. The path itself "
-                        "is the same\n"
-                        "     ownership_from_character call the settle-less cohort above "
-                        "exercises non-vacuously.\n");
+                        "     admits no firms and this row is vacuous here. "
+                        "acquisition_viability's section C\n"
+                        "     is where the rule is read non-vacuously -- it loads the real "
+                        "registry and counts\n"
+                        "     the classes over twelve seeds of the shipped spawn.\n");
     }
 
     // -----------------------------------------------------------------------

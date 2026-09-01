@@ -2,7 +2,6 @@
 -- Runs economy ticks to show live building states, then opens the construction
 -- panel showing a building's recipe selector and workforce slider.
 verify.econ_step(6)
-verify.show_panel("economy", false)
 verify.show_panel("construction", true)
 
 -- Navigate to a body with buildings so the building detail section populates

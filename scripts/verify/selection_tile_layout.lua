@@ -9,7 +9,6 @@
 -- Run with: ProjectIo --verify scripts/verify/selection_tile_layout.lua
 
 verify.econ_step(4)                    -- populate live building / market state
-verify.show_panel("economy", false)    -- keep the capture clear of the auto panel
 verify.goto_surface("home")            -- Kepler: fully surveyed, deposits visible
 
 -- A tile with deposits: image + coords at top, deposit bars in the middle,

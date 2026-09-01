@@ -150,6 +150,112 @@ float chart_row_height(const chart_metrics& m)
     return h;
 }
 
+namespace {
+
+/// A stacked column's total — the sum of the segments that will actually be
+/// drawn, so the axis ceiling and the stack cannot disagree about the top.
+float column_total(const stack_segment* segs, std::size_t count)
+{
+    float t = 0.0f;
+    for (std::size_t i = 0; i < count; ++i)
+        if (segs[i].value > 0.0f)
+            t += segs[i].value;
+    return t;
+}
+
+/// One stacked column, bottom-up in array order, each drawn segment carrying an
+/// InvisibleButton so it can name itself on hover.
+///
+/// A LONE segment is a plain bar and keeps a plain bar's manners: a rounded cap,
+/// a 2 px floor, and it draws even at zero. A stack of several skips its zeros —
+/// that is what gives the corp grain its variable segment count without a second
+/// code path (see the header note on the solvency boundary).
+void draw_stack(ImDrawList* dl, float cx, float base_y, float box_h, float bw,
+                float ceiling, const stack_segment* segs, std::size_t count, int column)
+{
+    const bool  lone     = (count == 1);
+    const float rounding = lone ? 1.5f : 0.0f;
+    const float floor_h  = lone ? 2.0f : 1.0f;
+
+    float y = base_y;
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        if (!lone && segs[i].value <= 0.0f)
+            continue;
+        const float  bh = std::max(floor_h, box_h * (segs[i].value / ceiling));
+        const ImVec2 b0{cx - bw * 0.5f, y - bh};
+        const ImVec2 b1{cx + bw * 0.5f, y};
+        dl->AddRectFilled(b0, b1, segs[i].colour, rounding);
+
+        char btn_id[32];
+        std::snprintf(btn_id, sizeof btn_id, "##stack_%d_%d", column, static_cast<int>(i));
+        ImGui::SetCursorScreenPos(b0);
+        ImGui::InvisibleButton(btn_id, {bw, bh});
+        if (ImGui::IsItemHovered())
+        {
+            if (segs[i].detail != nullptr && segs[i].detail[0] != '\0')
+                ImGui::SetTooltip("%s: %.1f\n%s", segs[i].label,
+                                  static_cast<double>(segs[i].value), segs[i].detail);
+            else
+                ImGui::SetTooltip("%s: %.1f", segs[i].label,
+                                  static_cast<double>(segs[i].value));
+        }
+        y -= bh;
+    }
+}
+
+} // namespace
+
+void draw_stacked_columns(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
+                          const stack_segment* left,  std::size_t left_count,
+                          const stack_segment* right, std::size_t right_count,
+                          float bar_cap,
+                          const char* left_caption, const char* right_caption,
+                          bool tight_axis)
+{
+    const float peak = std::max(column_total(left, left_count),
+                                column_total(right, right_count));
+    const float top  = (peak > 0.0f) ? peak : 1.0f;
+    const float ceiling = tight_axis ? tight_ceil(top) : nice_ceil(top);
+
+    const bool  captioned = (left_caption != nullptr) || (right_caption != nullptr);
+    // The caption strip is carved out of the plot, never added to it: the host
+    // budgeted this rectangle and the chart must stay inside it.
+    const float cap_h  = captioned ? ImGui::GetTextLineHeight() + 2.0f : 0.0f;
+    const float base_y = mx.y - cap_h;
+    const float box_w  = mx.x - mn.x;
+    const float box_h  = base_y - mn.y;
+    const float gap    = box_w / 2.0f;
+    // Auto-fit (bar_cap 0) is held under a fifth of the plot's height as well as
+    // under half its width: on a full-canvas host gap * 0.6 is several hundred
+    // pixels, and two columns that wide read as blocks rather than as a chart.
+    const float bw     = (bar_cap > 0.0f) ? std::min(bar_cap, gap * 0.6f)
+                                          : std::min(gap * 0.6f, box_h * 0.2f);
+    if (box_h <= 0.0f || box_w <= 0.0f)
+        return;
+
+    dl->AddRect(mn, mx, IM_COL32(70, 70, 78, 255));
+
+    const float lx = mn.x + gap * 0.5f;
+    const float rx = mn.x + gap * 1.5f;
+    draw_stack(dl, lx, base_y, box_h, bw, ceiling, left,  left_count,  0);
+    draw_stack(dl, rx, base_y, box_h, bw, ceiling, right, right_count, 1);
+
+    if (captioned)
+    {
+        const auto caption = [&](float cx, const char* text) {
+            if (text == nullptr || text[0] == '\0')
+                return;
+            // fit-exempt: a two-word baseline caption under a column whose width
+            // is the host's, degraded by centring rather than by elision.
+            const float w = ImGui::CalcTextSize(text).x;
+            dl->AddText({cx - w * 0.5f, base_y + 1.0f}, IM_COL32(190, 190, 198, 255), text);
+        };
+        caption(lx, left_caption);
+        caption(rx, right_caption);
+    }
+}
+
 void draw_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
                const bar* bars, std::size_t count,
                float ceiling, const char* fmt, float bar_cap,

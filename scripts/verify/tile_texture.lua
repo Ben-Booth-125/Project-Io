@@ -96,8 +96,6 @@ verify.capture("texture_lod_wholegrid")
 -- What would falsify the decision: if the marks read as speckle/noise unrelated to
 -- the lens colour, or if they blur the categorical boundary the lens is about.
 verify.set_zoom(4)
-verify.set_overlay("country")
-verify.capture("texture_lens_country")
 
 verify.set_overlay("continent")
 verify.capture("texture_lens_continent")

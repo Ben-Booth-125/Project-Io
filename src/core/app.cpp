@@ -14,12 +14,13 @@
 #include "ui/charts.hpp"
 #include "ui/circumplanetary_canvas.hpp"
 #include "ui/construction_panel.hpp"
-#include "ui/contracts_ledger.hpp" // nav slot 13, the mercenary Contracts ledger (BL-576)
+#include "ui/acquisitions_ledger.hpp" // nav slot 5, the Acquisitions ledger + its profitability fold-out
+#include "ui/company_ledger.hpp"   // Company-lens click destination, no rail slot (BL-666)
 #include "ui/detail_level.hpp" // the drill-through fold idiom (BL-214)
 #include "ui/balance_ledger.hpp"
 #include "ui/corporation_dashboard.hpp" // nav slot 1, the four roll-ups (BL-248)
 #include "ui/corporation_panel.hpp"     // all-corporations table, restored to slot 8 (NR-012)
-#include "ui/economy_panel.hpp"
+#include "ui/convoys_ledger.hpp"
 #include "ui/market_ledger.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/fonts.hpp"
@@ -1010,14 +1011,6 @@ void app::load_economy()
     m_lua.load("scripts/economy.lua");
     m_registry.load_from_lua(m_lua);
 
-    // BL-573: the mercenary-contract template roster, loaded the same way and
-    // at the same app-layer boundary as m_registry above — never a Lua load
-    // performed inside world/* itself. A separate lua_state (not m_lua) so a
-    // hot-reload of the economy tables cannot also silently reset the
-    // contract kinds a live campaign's contracts still reference by index.
-    m_contract_lua.load("scripts/contracts.lua");
-    m_contract_templates.load_from_lua(m_contract_lua);
-
     // BL-433: gate the roster on the campaign's era band, derived from the epoch
     // year the live world was actually built from. Must happen HERE, after the
     // load (which resets the band to `any`) and before anything browses recipes —
@@ -1130,8 +1123,7 @@ void app::step_economy()
     // apply_budget so the treasury holds this quarter's levy and tariff; before
     // the tech gates so a `surplus` gate reads the moved balance. Keyed on the
     // econ counter (BL-568), which step_economy set at its top.
-    run_nation_step(m_world, m_registry, m_last_econ_report, m_world.current_econ_tick,
-                    m_contract_templates);
+    run_nation_step(m_world, m_registry, m_last_econ_report, m_world.current_econ_tick);
     lap(3); // nation step (folded into the budget phase)
     // BL-344: evaluate the tech gates once per economy tick, after the money loop
     // has moved balances (a `surplus` gate should read this quarter's balance, not
@@ -1160,11 +1152,6 @@ void app::step_economy()
         // post lines the player never saw, all stamped on the same day.
         if (!m_warm_starting)
             session_history::post_battle_dispatches(m_world, m_last_econ_report, m_chat, day);
-        // BL-577: contract traffic to the Public channel, on the same
-        // pre-game suppression as battle dispatches — a nation should not
-        // announce a contract the player never saw open.
-        if (!m_warm_starting)
-            session_history::post_contract_events(m_world, m_last_econ_report, m_chat, day);
         // Persona counsel is suppressed through the pre-game warm start
         // (2026-08-12): measured at ~1.05 s/tick — 93% of the AppHangB1 stall —
         // against ~80 ms for everything else combined, and what it buys there
@@ -1926,7 +1913,8 @@ void app::render()
         m_prev_selection = m_ui.selected_entity;
     }
 
-    ui::draw_tile_inspector(m_world, m_ui, m_generation_report, &m_ui.show_tile_ledger);
+    ui::draw_tile_inspector(m_world, m_ui, m_generation_report, m_active_world_params,
+                            &m_ui.show_tile_ledger);
     // Generation Ledger (BL-303) — regenerates the per-pass record on demand from
     // the report's tile-pass inputs; nothing it reads is held on the world.
     ui::draw_generation_ledger(m_world, m_ui, m_generation_report, &m_ui.show_generation_ledger);
@@ -1944,14 +1932,20 @@ void app::render()
     // score/margin fields are deliberately absent from it (NR-226 fence).
     ui::draw_strategy_readout(m_world, m_strategy_readout, m_ui,
                               &m_ui.show_strategy_readout);
-    {
-        const ui::player_plot_history phist{m_balance_history, m_income_history, m_expenditure_history};
-        ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, phist, m_ui, &m_ui.show_economy_panel);
-    }
     // Construction panel — an ordinary fold-out tab in the shell column (BL-122),
     // one of the mutually-exclusive column occupants (ledgers + Selection).
     ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
-    ui::draw_market_ledger(m_world, m_ui, m_market_history, m_ui.show_market_ledger);
+    // Market ledger — Goods and Trades. It takes a NON-CONST world and the recipe
+    // registry because the Trades tab's potential-trade read prices real convoy
+    // legs through `price_convoy_leg` (which warms the A* cache and mutates no
+    // game state), rather than inventing a second haulage model that could
+    // disagree with the one that actually bills the player.
+    ui::draw_market_ledger(m_world, m_registry, m_ui, m_market_history, m_ui.show_market_ledger);
+    // Convoys ledger (BL-689) — nav slot 7, directly after Market. Was the Market
+    // ledger's third tab until the Goods flattening deleted that strip; it left
+    // rather than being re-homed because a convoy is cargo in transit and belongs
+    // to SUPPLY.md, not to the doc that owns clearing and the order book.
+    ui::draw_convoys_ledger(m_world, m_ui, m_ui.show_convoys_ledger);
     {
         // Budget ledger (BL-171): profit chart reads the income/expenditure series;
         // the rank table's change column reads the ranking from ~4 econ ticks back.
@@ -1962,13 +1956,22 @@ void app::render()
         ui::draw_balance_ledger(m_world, m_registry, m_last_econ_report, bhist,
                                 prior_rank, m_ui, m_ui.show_balance_ledger);
     }
-    // Contracts ledger (BL-576) — nav slot 13: offers, active contracts and
-    // terminal history for the mercenary contract (CONTRACTS.md). Reads the
-    // same m_contract_templates run_nation_step already threads through for
-    // the tick-evaluation pass, so the Active view's predicate wording can
-    // never disagree with what actually settles the contract.
-    ui::draw_contracts_ledger(m_world, m_registry, m_contract_templates, m_ui,
-                              m_ui.show_contracts_ledger);
+    // Acquisitions ledger — nav slot 5, and the Company lens's click
+    // destination. Which firms can be bought outright and at what price, plus
+    // the full-canvas profitability fold-out over every corporation's filed
+    // return. Every ledger here is guarded by its own open flag and at most one
+    // is set.
+    ui::draw_acquisitions_ledger(m_world, m_registry, m_ui,
+                                 m_ui.show_acquisitions_ledger);
+    // NO CONTRACTS LEDGER, AND NO MERCENARY CONTRACT AT ALL (BL-693, then
+    // NR-731 on 2026-08-30). The SELL side of CONTRACTS.md is gone to the
+    // world layer: records, passes, serialisation and comms traffic. What is
+    // left of the word "contract" here is PROCUREMENT, the BUY side, which is
+    // live and untouched.
+    // Company ledger (BL-666) — where a Company-lens click lands. Drawn with the
+    // rail ledgers because it occupies the same fold-out column, but it has no
+    // rail slot: only a canvas click opens it. A declared placeholder for now.
+    ui::draw_company_ledger(m_world, m_ui, m_ui.show_company_ledger);
     // Corporation dashboard (BL-248) — nav slot 1, MENU.md's long-named surface.
     // Replaces the all-corporations balance table that used to occupy this slot: a
     // comparison table is not "the player corporation at a glance", and the Economy
@@ -1977,7 +1980,7 @@ void app::render()
                                    m_ui.show_corporation_panel);
 
     // The displaced table itself, restored (NR-012). BL-248 deleted it as a duplicate
-    // of the Economy panel's Corps view; Ben did not intend a deletion, so it is back
+    // of a second aggregate view; Ben did not intend a deletion, so it is back
     // and reachable from nav slot 8 until its real home is chosen. Deleting a file
     // because a similar view exists is the call that was wrong here — dormant beats
     // deleted, since intent is not recoverable from a diff.
@@ -2009,24 +2012,15 @@ void app::render()
         const ui::resource_history_view rhist{ &m_body_resource_hist,
                                                &m_tile_resource_hist,
                                                &m_resource_hist_days };
-        ui::draw_selection_band(m_world, m_registry, m_last_econ_report, m_contract_templates,
+        ui::draw_selection_band(m_world, m_registry, m_last_econ_report,
                                 rhist, m_ui, band_origin, band_size);
     }
 
-    // The shell fold-out column is ledgers-only (BL-195). The one contextual, per-
-    // tile surface it still hosts is the tile construction ledger (BL-162), opened
-    // from the card's "Construct Buildings" button; it draws only when no nav ledger
-    // owns the column and the selection is a tile.
-    if (!ui::any_panel_open(m_ui))
-    {
-        const entity_id sel         = m_ui.selected_entity;
-        const bool      sel_is_tile = sel != null_entity && m_world.tiles.count(sel) > 0;
-
-        if (m_ui.show_build_ledger && sel_is_tile)
-            ui::draw_construction_ledger(m_world, m_registry, m_ui);
-        else
-            m_ui.show_build_ledger = false; // not a tile → no build ledger
-    }
+    // The shell fold-out column is ledgers-only (BL-195), and it now really is: the
+    // tile-contextual build bar used to be a second, non-ledger tenant drawn here, and
+    // is a SECTION of the Construction ledger's Construction view since 2026-08-29.
+    // The card's Construct button opens that ledger on that view; nothing is drawn
+    // beside the ledgers any more.
 
     // Execute any construction request queued this frame by the build front door
     // (tile Selection element) or a placement-mode canvas click. Centralised here
@@ -2047,15 +2041,20 @@ void app::render()
                 // it is done — the Selection card carries the live rate / ETA / paused
                 // status from here on.
                 m_ui.construction.last_message    = "Construction started.";
-                // BL-162: the construction ledger must SURVIVE the build it initiated.
-                // Reselecting the new building makes the selection non-tile, which forces
-                // show_build_ledger false above — the ledger vanishes and the player has to
-                // reselect the tile to place a second building on it (a rich tile stacks up
-                // to 4 extraction sites). It also hid "Construction started.", which is drawn
-                // inside the ledger. So reselect only when some OTHER surface (a placement-mode
-                // canvas click) initiated the build.
-                if (!m_ui.show_build_ledger)
-                    m_ui.selected_entity = built;             // inspect the new building
+                // BL-162: the build bar must SURVIVE the build it initiated. It reads
+                // `selected_entity` as its target tile, so reselecting the new BUILDING
+                // makes the selection non-tile and the bar falls back to "Select a tile" —
+                // the player would have to reselect the tile to place a second building
+                // on it (a rich tile stacks up to 4 extraction sites), and would lose
+                // "Construction started.", which is drawn inside the bar. So reselect
+                // only when some OTHER surface (a placement-mode canvas click) initiated
+                // the build, i.e. when the build bar is not the surface on screen.
+                {
+                    const bool bar_showing = m_ui.show_construction_panel &&
+                                             m_ui.construction.panel_view == 0;
+                    if (!bar_showing)
+                        m_ui.selected_entity = built;         // inspect the new building
+                }
                 break;
             case construction_result::invalid_tile:
                 m_ui.construction.last_message = "Can't build there."; break;
@@ -2076,12 +2075,6 @@ void app::render()
                 // research reaches this one, so saying "not researched yet" would
                 // send the player looking for a tech that does not exist.
                 m_ui.construction.last_message = "Not in this era."; break;
-            case construction_result::depth_locked:
-                // BL-428: the third distinct lock, and it is the only one the
-                // player clears by BUILDING. Names the act, not the number — a
-                // reached-depth integer means nothing on its own.
-                m_ui.construction.last_message =
-                    "Your industry cannot make what this needs yet."; break;
             default:
                 m_ui.construction.last_message = "Construction failed."; break;
         }

@@ -290,6 +290,23 @@ set(IO_WARNING_FLAGS
     $<$<CXX_COMPILER_ID:MSVC>:/W4>)
 target_compile_options(ProjectIo PRIVATE ${IO_WARNING_FLAGS})
 
+# verify_api.cpp needs /bigobj on MSVC.
+#
+# It is one translation unit holding the WHOLE verify surface — every
+# `v.set_function(...)` binding, each of which instantiates a pile of sol2
+# templates — and it reached the COFF section limit (fatal error C1128) on the
+# addition of three more readers. The limit is 65,535 sections per object file;
+# /bigobj raises it to 2^32. Nothing about the code is wrong, and splitting the
+# file to dodge it would be a large refactor bought for no design reason.
+#
+# Scoped to the ONE file that needs it rather than the target, so a future TU
+# that quietly grows past the limit still reports it here instead of being
+# absorbed silently.
+if(MSVC)
+    set_source_files_properties(src/core/verify_api.cpp
+        PROPERTIES COMPILE_OPTIONS "/bigobj")
+endif()
+
 # ---------------------------------------------------------------------------
 # Precompiled header
 # Covers headers present in 5+ TUs. Excluded: sol2 (3 TUs, very slow to
@@ -486,11 +503,7 @@ target_compile_features(commercial_fog_harness PRIVATE cxx_std_20)
 enable_testing()
 
 file(GLOB IO_WORLD_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/world/*.cpp")
-# BL-570: contract_template.cpp joins this exclusion for the same reason as
-# recipe_registry.cpp -- it includes <sol/sol.hpp> directly (its load_from_lua
-# needs a live Lua table), so it cannot be part of the SDL/Lua-free world
-# superset. condition_set_harness (below) adds it back explicitly.
-list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|works_registry|tech_tree|world_gen_config|contract_template)\\.cpp$")
+list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|works_registry|tech_tree|world_gen_config)\\.cpp$")
 
 # ---------------------------------------------------------------------------
 # The world layer, compiled ONCE (BL-287)
@@ -514,50 +527,13 @@ target_include_directories(io_world_obj PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src"
 target_compile_features(io_world_obj PUBLIC cxx_std_20)
 target_compile_options(io_world_obj PRIVATE ${IO_WARNING_FLAGS})
 
-# condition_set_harness (BL-570) needs a live sol2/Lua state for its C9 rows:
-# it loads the REAL scripts/contracts.lua through contract_template_registry
-# (contract_template.cpp, the sol2/Lua TU the world superset above deliberately
-# excludes) rather than a hand-built fixture, so a typo in the authored table
-# is exactly what it must catch. Same shape as pregame_balance_harness below:
-# add back contract_template.cpp + scripting/lua_state.cpp, the sol2 include
-# dir, and link lua54. Declared BEFORE the generic glob so the `if(NOT TARGET
-# ...)` guard in the foreach skips redeclaring it, while the unconditional
-# add_test still registers it as a CTest test.
-add_executable(condition_set_harness
-    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/condition_set_harness.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/contract_template.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
-)
-target_include_directories(condition_set_harness PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-    "${sol2_src_SOURCE_DIR}/include"
-)
-target_link_libraries(condition_set_harness PRIVATE io_world_obj lua54)
-target_compile_features(condition_set_harness PRIVATE cxx_std_20)
-target_compile_options(condition_set_harness PRIVATE ${IO_WARNING_FLAGS})
-
-# mercenary_contract_harness (BL-573) needs a live sol2/Lua state for BOTH
-# registries the item threads: recipe_registry (scripts/recipes.lua +
-# economy.lua, for the authored procurement.deposit_fraction split and the
-# sentiment factor weights the item's own terminal-state rows measure) and
-# contract_template_registry (scripts/contracts.lua, for the real take/hold
-# predicates run_mercenary_contract_tick evaluates against). Same shape as
-# condition_set_harness above: add back recipe_registry.cpp AND
-# contract_template.cpp + scripting/lua_state.cpp, the sol2 include dir, and
-# link lua54.
-add_executable(mercenary_contract_harness
-    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/mercenary_contract_harness.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/contract_template.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
-)
-target_include_directories(mercenary_contract_harness PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-    "${sol2_src_SOURCE_DIR}/include"
-)
-target_link_libraries(mercenary_contract_harness PRIVATE io_world_obj lua54)
-target_compile_features(mercenary_contract_harness PRIVATE cxx_std_20)
-target_compile_options(mercenary_contract_harness PRIVATE ${IO_WARNING_FLAGS})
+# condition_set_harness NO LONGER NEEDS A LIVE LUA STATE. Its C9 rows loaded the
+# real scripts/contracts.lua through contract_template_registry; the mercenary
+# contract was retired (NR-731, 2026-08-30) and took the script, the registry and
+# those rows with it. It is an ordinary world-superset harness now, so the generic
+# glob below declares it and this block declares nothing.
+#
+# mercenary_contract_harness is deleted outright for the same reason.
 
 # pregame_balance_harness is another harness that genuinely needs a live Lua
 # state: it constructs a `lua_state`, loads scripts/economy.lua + recipes.lua,
@@ -779,6 +755,55 @@ target_link_libraries(substrate_census PRIVATE io_world_obj lua54)
 target_compile_features(substrate_census PRIVATE cxx_std_20)
 target_compile_options(substrate_census PRIVATE ${IO_WARNING_FLAGS})
 
+# throughput_field_census (2026-08-28) — live-Lua for substrate_census's reason:
+# it censuses the REACH FIELD of the really generated world, and the anchor set
+# that field is seeded from is generated content. Reports only; gates nothing.
+# Written because the Throughput lens's ramp was calibrated against 57 anchors
+# and the world now carries orders of magnitude more, so the curve is being
+# chosen against a distribution nobody had measured since.
+add_executable(throughput_field_census
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/throughput_field_census.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(throughput_field_census PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(throughput_field_census PRIVATE io_world_obj lua54)
+target_compile_features(throughput_field_census PRIVATE cxx_std_20)
+target_compile_options(throughput_field_census PRIVATE ${IO_WARNING_FLAGS})
+
+# acquisition_viability (BL-634) — live-Lua, and it was reaching the generic glob
+# loop below instead, which links io_world_obj alone. That target cannot compile
+# it at all: the harness includes scripting/lua_state.hpp, so it dies on
+# `fatal error C1083: Cannot open include file: 'sol/sol.hpp'` before it ever gets
+# to a link. Declared here for the same reason spawn_solvency is, and its R0 row
+# says why in its own header: it LOADS AND PARSES the shipped scripts/world_gen.lua
+# into a world_gen_config, because the C++ fallback prices ten resources against
+# that table's forty-two and a sweep run on the fallback measures a world where a
+# third of the roster cannot be sold at all. So recipe_registry.cpp and
+# world_gen_config.cpp both come back, plus contract_template.cpp for the empty
+# template registry run_nation_step takes.
+add_executable(acquisition_viability
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/acquisition_viability.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/contract_template.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(acquisition_viability PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(acquisition_viability PRIVATE io_world_obj lua54)
+target_compile_features(acquisition_viability PRIVATE cxx_std_20)
+target_compile_options(acquisition_viability PRIVATE ${IO_WARNING_FLAGS})
+
 # province_capacity_probe (2026-08-20) — live-Lua for exactly substrate_census's
 # reason above: it measures the world AFTER generate_background_firms, so every
 # authored input must be the real one or it reports a world the game never builds.
@@ -820,6 +845,29 @@ target_include_directories(font_glyph_harness PRIVATE
 target_link_libraries(font_glyph_harness PRIVATE imgui)
 target_compile_features(font_glyph_harness PRIVATE cxx_std_20)
 target_compile_options(font_glyph_harness PRIVATE ${IO_WARNING_FLAGS})
+
+# save_envelope_roundtrip (BL-685, closing NR-708) is the SECOND harness that
+# links ImGui, and it does so for font_glyph_harness's reason one layer over:
+# its subject is src/core/save_game.cpp, which includes ui/ui_state.hpp and so
+# <imgui.h>. The headless tier links io_world_obj and excludes ImGui BY
+# CONSTRUCTION, which is precisely why the save ENVELOPE had never had
+# round-trip coverage while the world half (save_roundtrip.cpp) has had it since
+# BL-536. save_game.cpp is not in ${IO_WORLD_SOURCES} (that glob is src/world
+# only), so it is compiled in here alongside io_world_obj for the world half it
+# embeds. It opens no window and creates no ImGui context: it writes a file into
+# the working directory and reads it back. Declared before the foreach so the
+# `if(NOT TARGET ...)` guard skips it while the unconditional add_test still
+# registers it.
+add_executable(save_envelope_roundtrip
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/save_envelope_roundtrip.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/save_game.cpp"
+)
+target_include_directories(save_envelope_roundtrip PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+target_link_libraries(save_envelope_roundtrip PRIVATE io_world_obj imgui)
+target_compile_features(save_envelope_roundtrip PRIVATE cxx_std_20)
+target_compile_options(save_envelope_roundtrip PRIVATE ${IO_WARNING_FLAGS})
 
 # price_band_harness (BL-442) is live-Lua for one row only, P2: it asserts that
 # the band the SHIPPED scripts/economy.lua authors is the band that reaches
@@ -1180,7 +1228,36 @@ foreach(harness_src ${IO_VERIFY_HARNESSES})
         # Links io_world_obj rather than recompiling ${IO_WORLD_SOURCES} (BL-287).
         add_executable(${harness_name} "${harness_src}")
         target_link_libraries(${harness_name} PRIVATE io_world_obj)
-        target_include_directories(${harness_name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+        # The sol2 include dir is on EVERY harness, including the Lua-free ones,
+        # and that is deliberate rather than sloppy (fixed 2026-08-30, found
+        # while building BL-685's rows).
+        #
+        # `tools/verify/harness_params.hpp` is the shared `no_prehistory()` /
+        # `parsed_gen_config()` helper that ~30 harnesses include, and since
+        # b668434c (the v0.1.21 cut) it includes scripting/lua_state.hpp and so
+        # <sol/sol.hpp>. io_world_obj publishes only ${CMAKE_CURRENT_SOURCE_DIR}
+        # /src, so from a CLEAN configure every glob-declared harness that
+        # included that header died on
+        #     fatal error C1083: Cannot open include file: 'sol/sol.hpp'
+        # -- determinism_harness, world_determinism, spectator_determinism,
+        # quarterly_return, save_roundtrip, demand_census and two dozen more,
+        # i.e. most of the ctest gate. An existing build tree kept passing on
+        # stale objects, which is why it survived a release cut.
+        #
+        # An include path costs a TU that does not use it nothing, so it goes on
+        # all of them rather than on a hand-maintained list that the next shared
+        # header would fall off.
+        #
+        # `lua_src_SOURCE_DIR` travels with it because sol2's own headers include
+        # <lua.h>: it is the same INCLUDE path lua54 publishes, taken as a path
+        # rather than by linking the library. LINKING Lua is a different question
+        # and stays opt-in -- a harness that constructs a lua_state is
+        # hand-declared above with lua54, and nothing here changes that.
+        target_include_directories(${harness_name} PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/src"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+            "${sol2_src_SOURCE_DIR}/include"
+            "${lua_src_SOURCE_DIR}")
         target_compile_features(${harness_name} PRIVATE cxx_std_20)
         target_compile_options(${harness_name} PRIVATE ${IO_WARNING_FLAGS})
     endif()

@@ -358,6 +358,8 @@ enum counter : int
     c_astar_cache,
     c_ai_decisions,        ///< Ring occupancy (capped at 256 by construction).
     c_ai_decisions_total,  ///< Lifetime pushes — EXPECTED to climb; reported, not asserted.
+    c_exchanges,           ///< BL-685 ring occupancy (capped by construction), the check that matters.
+    c_exchanges_total,     ///< Lifetime rows — EXPECTED to climb; reported, not asserted.
     c_workforce_overrides,
     c_rep_buildings,       ///< Transient: economy_report.buildings.
     c_rep_agency_events,   ///< Transient: economy_report.agency_events.
@@ -393,6 +395,8 @@ const char* const k_counter_names[c_count] = {
     "world.astar_cost_cache",
     "world.ai_decisions.entries",
     "world.ai_decisions.total [informational]",
+    "world.exchanges.entries",
+    "world.exchanges.total [informational]",
     "world.workforce_supply_overrides",
     "economy_report.buildings [transient]",
     "economy_report.agency_events [transient]",
@@ -404,7 +408,10 @@ const char* const k_counter_names[c_count] = {
 
 /// `ai_decisions.total` is a lifetime counter by design (BL-202 telemetry), so it
 /// climbs on purpose. It is sampled and printed but excluded from the assertion.
-bool informational(int c) { return c == c_ai_decisions_total; }
+/// `exchanges.total` is the same shape one item over (BL-685) — the ring's
+/// OCCUPANCY (`c_exchanges`) is the thing that must plateau, and it is asserted;
+/// the lifetime row count is telemetry and climbs for the life of a campaign.
+bool informational(int c) { return c == c_ai_decisions_total || c == c_exchanges_total; }
 
 struct sample
 {
@@ -475,6 +482,11 @@ sample take_sample(int tick, const world& w, const economy_report& rep,
     s.v[c_astar_cache]          = static_cast<long long>(w.astar_cost_cache.size());
     s.v[c_ai_decisions]         = static_cast<long long>(w.ai_decisions.entries.size());
     s.v[c_ai_decisions_total]   = static_cast<long long>(w.ai_decisions.total);
+    // BL-685: the exchange record. Unlike ai_decisions this one is SAVE STATE,
+    // so an unbounded ring would grow the save file as well as the heap — which
+    // makes the plateau on `c_exchanges` the sharper of the two checks.
+    s.v[c_exchanges]            = static_cast<long long>(w.exchanges.entries.size());
+    s.v[c_exchanges_total]      = static_cast<long long>(w.exchanges.total);
     s.v[c_workforce_overrides]  = static_cast<long long>(w.workforce_supply_overrides.size());
 
     s.v[c_rep_buildings]      = static_cast<long long>(rep.buildings.size());
@@ -567,8 +579,8 @@ int main(int argc, char* argv[])
                 mid_tick, total_ticks);
     std::printf("  RSS uses max(%lld KiB, %.0f%%) — allocators return pages lazily.\n",
                 k_rss_abs_tol, k_rss_rel_tol * 100.0);
-    std::printf("  `ai_decisions.total` is a lifetime telemetry counter by design and is\n"
-                "  reported but NOT asserted.\n\n");
+    std::printf("  `ai_decisions.total` and `exchanges.total` are lifetime telemetry counters\n"
+                "  by design and are reported but NOT asserted; their rings' OCCUPANCY is.\n\n");
 
     const auto t_build0 = std::chrono::steady_clock::now();
     world w = make_hard_coded_world(no_prehistory());

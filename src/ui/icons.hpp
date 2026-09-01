@@ -394,14 +394,43 @@ void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// away (a dog-ear fold) plus a short check mark near the bottom (a signed
 /// document motif) — in @p colour. Distinct from `ledger` (a plain ruled
 /// box) by the fold and the check, and from `history` (the hourglass) by
-/// having a baseline rectangle at all. Nav rail slot 13, the Contracts
-/// ledger (BL-576). See ICONS.md § Nav-rail affordances.
+/// having a baseline rectangle at all. See ICONS.md § Nav-rail affordances.
+///
+/// UNASSIGNED — it has NO CALLER (BL-693). It drew nav rail slot 14 for the
+/// Contracts ledger; the mercenary contract is retired and that slot is gone.
+/// The glyph is kept in the vocabulary because the shape is still the right one
+/// for a signed promise, and procurement — the BUY side of CONTRACTS.md, which
+/// is live — has no surface of its own yet. Anything drawing this again should
+/// take the slot deliberately, not inherit it.
 ///
 /// @param dl     Draw list to render into.
 /// @param centre Glyph centre, screen pixels.
 /// @param r      Half-extent of the glyph, screen pixels.
 /// @param colour Stroke colour of the page outline and the check mark.
 void contract(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the Acquisitions nav-rail glyph — a large outlined square on the left
+/// and a smaller outlined square on the right, with a short arrow running from
+/// the small one INTO the large one: "one firm absorbed whole into another",
+/// which is exactly what `buy_corporation` does and the only thing it does.
+///
+/// TWO BOXES IS THE SILHOUETTE, and it is deliberately unlike every other lit
+/// slot (BL-174 — two lit slots must never share a shape). `corporation` is ONE
+/// filled square with a centred dot; `ledger` is ONE ruled box; `industry` is
+/// the factory; `contract` is a dog-eared page. Nothing else in the rail draws
+/// a pair, so the pair is the mark. The squares are OUTLINED rather than
+/// filled, which keeps the seal (a solid square) unmistakable beside it at rail
+/// radius, and the arrow gives the pair a direction — a takeover has a buyer
+/// and a target, and a symmetric pair would say "merger", which the model does
+/// not have.
+///
+/// Nav rail slot 5, the Acquisitions ledger. See ICONS.md § Nav-rail affordances.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour of both squares and the arrow.
+void acquisition(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
 /// Draw a unit marker — a humanoid silhouette (a filled circle "head" over a
 /// triangle "body") in @p fill, with the standard dark outline — in @p fill.

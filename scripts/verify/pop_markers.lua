@@ -8,7 +8,6 @@
 --   ProjectIo --verify scripts/verify/pop_markers.lua
 
 verify.econ_step(2)                     -- settle
-verify.show_panel("economy", false)     -- clear the auto-opened panel off the capture
 verify.goto_surface("home")
 
 -- Always-on: markers show at the plain default lens (no lens armed).
@@ -35,5 +34,3 @@ verify.capture("pop_markers_zoom")
 
 -- Country lens: the same markers pick up the host-nation tint (R4).
 frame_tile(best.x, best.y, 9)
-verify.set_overlay("country")
-verify.capture("pop_markers_country_tint")

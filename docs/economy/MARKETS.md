@@ -485,6 +485,102 @@ BL-160 (auto-exchange policy), whose buy band is the player buy surface and whos
 2026-07-31). Whether the dormant side should instead be removed is BL-383 (remove dormant buy
 side).
 
+## Trades — the standing order read as a position
+
+Ben, 2026-08-29, redesigning the Market ledger: *"Sell orders are complicated, and we should
+rework this into persistent trades. A sell order can be made automatically by companies and rival
+corps, but we get to see both our orders and all orders in markets where we operate. What we
+really want to see is a list of trades, and their profits. We also want to see potential trades
+and their profits."*
+
+A **trade** is a standing position in a market: a good, a direction, a quantity, a floor or
+ceiling, and an owner. It is not a new mechanism — it is the order book (§ Where the order book
+lives) read as something a player holds rather than something they submit. `world::sell_orders`
+and `world::buy_orders` are already world state and already written by rivals and background
+firms through the same verbs the player presses, so the population this surface reads exists.
+
+**Three reads, and they are not equally cheap. Say which is which rather than presenting them as
+one table.**
+
+1. **My standing trades.** Every order the player's corp holds, per market. Exists today; this is
+   the existing Sell Orders view under a better name and with the buy side admitted.
+2. **The market's standing trades.** Every order in a market the player **operates in**, whoever
+   owns it. The book is world state and orders are the deliberate public signal (§ Real market
+   inventory), so this is a reading question rather than a disclosure one — but *operates in* is
+   the gate, and it must be a real predicate rather than "every market": a player reads the books
+   of markets they trade at, not of the whole system.
+3. **Potential trades.** Not a record at all — a **derivation**: for each good the player can
+   reach, buy price here against sell price there, less the haulage the route would cost
+   (`LOGISTICS.md` traversal cost, `SUPPLY.md` convoy pricing). This is the read that makes the
+   surface worth opening, and it is the one with no existing store behind it.
+
+**What does NOT exist, and must not be faked.** A **realised** trade — a buy matched to a sell at
+a price, with a profit — is not recorded anywhere. Clearing is an aggregate over supply and demand
+(§ The clearing tick); it resolves a price and moves quantity, and it does not pair a seller with
+a buyer or retain what any single exchange earned. So "a list of trades and their profits" is
+answerable for **positions** (what I am offering, at what floor, against what the market pays) and
+not yet for **history** (what I sold, to whom, for what margin). Reporting a realised profit that
+the clearing loop never computed would be inventing a number, and the honest-placeholder idiom
+(NR-249) is not licence to do it on a figure a player would act on.
+
+Making history real means the clearing loop retaining a per-exchange record, which is a change to
+the money loop and not to a ledger. **Ben, 2026-08-29: add it.**
+
+### The exchange record
+
+One row per exchange, appended by the clearing tick, ring-capped the way the plot histories are:
+
+| Field | Why |
+|---|---|
+| `tick` | The econ tick it cleared on. A tick is a quarter, so this is the date. |
+| `market` | Which board. The surface is per-market. |
+| `resource` | What moved. |
+| `quantity` | How much. |
+| `unit_price` | The price clearing resolved, not the floor the order carried — an order is honoured *at clearing*, so what the seller asked and what they got are different numbers and only one of them is the trade. |
+| `seller`, `buyer` | The two corps. Either may be a background firm — and either may be **absent**, which means the market itself and not an unknown party (see below). |
+
+**One side is often the MARKET, and a reader must say so rather than blank the row.** Only the
+matched order-book path (§ Where the order book lives) has a real corp on both sides, and that path
+is dormant in play while the buy side has no emitter. The three paths that carry the volume trade
+against the market as counterparty of last resort: a corp's auto-surplus is *sold to the market*, a
+processor's input draw is *bought from the market*, and an unmatched standing sell auto-clears *to
+the market* at the resolved price. Those exchanges are real — goods moved, cash moved — so they are
+recorded, with the absent side left empty. A surface renders that side as the market; treating it as
+missing data would hide most of the history the record exists to keep.
+
+**It records REVENUE, not profit, and that limit is structural rather than an omission.**
+`stockpile_component` is `quantities[]` and nothing else — **there is no cost basis anywhere in
+the model**. A unit of iron ore in a pool does not know what it cost to extract or to buy, so the
+margin on selling it cannot be derived from the sale. `quantity * unit_price` is honest;
+`profit` is not available at this grain and must not be printed as though it were.
+
+Two routes to a real margin, both larger than this record and neither taken here:
+
+- **Carry a cost basis on the pool** — a weighted average acquisition cost per resource per corp,
+  updated on every inflow. That is inventory accounting, and it makes every producer and every
+  buyer write a second number on every tick.
+- **Answer margin at the building instead**, where `building_profit.hpp` already nets revenue
+  against input cost, maintenance and wages. This is where margin currently lives and it is a
+  *per-building* answer, not a per-trade one.
+
+So the surface reads: **what moved, at what price, between whom** — and the Trades tab must
+label that column **revenue**. The cost-basis question is the follow-on, and it is an economy
+decision rather than a UI one.
+
+**Serialisation.** The record is world state, so it is in the save envelope and
+`save_game_version` moves. NR-708 records that **no envelope field has round-trip coverage** and
+that `read_save_game` refuses the whole file on a version mismatch — so this is the change that
+should finally bring an envelope round-trip assertion with it, rather than adding one more
+untested field to a seam that has never been tested.
+
+**Ranking is permitted here**, and this is the one surface where that has been ruled on
+explicitly. `CONCEPT.md` § Player identity holds the rule and its qualification: a surface may
+rank where the top row is one input among several. Ben, same day: *"Market prices is a vital
+pillar of gameplay, but the strategy 'just build the most profitable' is a red herring."* A
+potential trade sorted by margin is information the player must still weigh against reach, stock,
+competition and what the price does next — so ordering it does not decide the game. Ordering
+*tiles to build on* by margin does, and is refused.
+
 ## Procurement — a layer over the market, not a second market
 
 > **[`CONTRACTS.md`](CONTRACTS.md) is the authority for contracting** — both the buy side

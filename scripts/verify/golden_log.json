@@ -198,13 +198,6 @@
       "reason": "Same as country_lens_full — world-change re-bless",
       "batch": "Improved Core-Loop"
     },
-    "economy_panel_refit.png": {
-      "blessed_date": "2026-06-17",
-      "commit": "44b0228",
-      "reason_tag": "unknown",
-      "reason": "",
-      "batch": ""
-    },
     "header_populated.png": {
       "blessed_date": "2026-06-17",
       "commit": "44b0228",

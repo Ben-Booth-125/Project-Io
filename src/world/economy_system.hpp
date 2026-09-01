@@ -286,13 +286,6 @@ struct economy_report
     /// rather than folded into `budgets[corp].subsidies`. BL-555's line.
     std::vector<earmark_result> earmarks;
 
-    /// Mercenary-contract lifecycle events this tick (BL-577): offer issued,
-    /// accepted, completed, failed, abandoned — see `contract_dispatch`
-    /// (nation_step.hpp) for the shape and each producer's own comment for
-    /// exactly when it fires. `session_history::post_contract_events` is the
-    /// one reader; the Public channel is nation-voiced only (CHAT.md), so
-    /// each line speaks as `contract_dispatch::client`.
-    std::vector<contract_dispatch> contract_events;
 };
 
 /// Run one economy step over every corporation's buildings: extraction credits
@@ -576,10 +569,10 @@ enum class recipe_switch_result : uint8_t
     insufficient_funds,   ///< The owning corp cannot cover recipe_switch().switch_cost.
     cross_group,          ///< BL-434 retraction: new recipe is a DIFFERENT `group` — refused
                           ///< outright, not priced. See try_switch_recipe's comment.
-    depth_locked,         ///< BL-428: the corp has not reached the chain depth the new recipe needs.
-                          ///< Closes the retool bypass — see try_switch_recipe's comment.
+    // BL-692 removed `depth_locked` (BL-428): chain depth no longer gates a
+    // retool, so the value became unreachable.
     tech_locked,          ///< BL-588: the corp has not earned the tech that unlocks the new recipe.
-                          ///< A SECOND, independent lock alongside depth_locked — see try_switch_recipe.
+                          ///< The only method lock left at this door — see try_switch_recipe.
 };
 
 /// Attempt a PLAYER-grade recipe switch on `b`, gated by `economy.recipe_switch`

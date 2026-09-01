@@ -16,7 +16,6 @@ verify.goto_surface("home")
 -- Populate market supply/demand so shortfall is meaningful, then clear the economy
 -- panel that econ_step opens so it does not obscure the capture.
 verify.econ_step(12)
-verify.show_panel("economy", false)
 
 -- Scarcity of iron ore: each market's catchment tints by its iron shortfall; the
 -- key shows the iron swatch.

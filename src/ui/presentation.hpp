@@ -80,6 +80,17 @@ const char* body_type_name(body_type t);
 /// @return  Null-terminated display name.
 const char* building_type_name(building_type t);
 
+/// The NAMED building an `extraction_site` targeting @p r reads as — "Quarry"
+/// rather than "Extraction: Stone" (BL-429). Falls back to the resource's own
+/// display name for anything with no bespoke identity.
+///
+/// One vocabulary, three surfaces: the Build door offers these names, the
+/// Construction ledger's Buildings view groups the player's estate under them,
+/// and both mean the same building. It lives here beside `building_type_name`
+/// rather than file-local to one of them, because a second copy is how the door
+/// and the roster would come to call the same building two things.
+const char* extraction_building_name(resource_type r);
+
 /// Semantic palette — meaning-driven colours shared across the whole UI so the
 /// data-dense surfaces read consistently and a restyle is a one-file change.
 /// Grouped by role rather than by hue.
