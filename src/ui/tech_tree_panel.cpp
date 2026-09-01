@@ -5,8 +5,10 @@
 
 #include <imgui.h>
 
-#include <algorithm> // std::clamp — MSVC pulls it in transitively, g++ does not (NR-450)
+#include <algorithm>
+#include <cfloat> // std::clamp — MSVC pulls it in transitively, g++ does not (NR-450)
 #include <cmath>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -78,6 +80,8 @@ constexpr ImU32 kColRingHighlight = IM_COL32(66, 74, 90, 110);    ///< Terrace s
 constexpr ImU32 kColRingShadow    = IM_COL32(0, 0, 0, 160);       ///< …dark outer edge-line, no gradient.
 constexpr ImU32 kColEdgeIncision  = IM_COL32(6, 7, 10, 220);      ///< Connector groove: the cut…
 constexpr ImU32 kColEdgeLip       = IM_COL32(96, 106, 124, 110);  ///< …and its lit lower lip.
+constexpr ImU32 kColTravelNode    = IM_COL32(92, 100, 116, 150);  ///< Travel junction: dimmer than any tech, never a state colour.
+constexpr ImU32 kColTravelLink    = IM_COL32(70, 78, 94, 90);     ///< Its routing line — below the prereq grooves in weight.
 constexpr float kShadowOffset     = 2.5f;                          ///< Screen px, deliberately not zoom-scaled.
 
 /// Node silhouette by category (wide7 — varied shapes fixed hexagon fatigue).
@@ -147,8 +151,59 @@ void add_node_shape(ImDrawList* dl, node_shape s, ImVec2 c, float r, ImU32 col,
 // criterion (minimise curves) so the trial at least points the right way.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Label legibility ramp (2026-09-01, Joe: "make the text shrink when zoomed out
+// and disappear at minimum size to completely beat this clutter/overlap
+// problem"). On-canvas titles were drawn at a FIXED font size at EVERY zoom, so
+// zooming out packed unchanged text into an ever-smaller web — which is exactly
+// the overlap the style sheet has carried since the real1 reality check.
+//
+// Below kLabelHideZoom nothing draws at all. Between there and kLabelFullZoom
+// the label shrinks and fades TOGETHER, so the canvas thins out gradually
+// instead of every title popping in on one frame. Above kLabelFullZoom the size
+// is held: labels are screen-space furniture and have no business growing into
+// billboards just because the web did.
+// ---------------------------------------------------------------------------
+constexpr float kLabelHideZoom  = 0.55f; ///< At or below this zoom, no on-canvas text at all.
+constexpr float kLabelFullZoom  = 1.00f; ///< At or above this, full size and full opacity.
+constexpr float kLabelMinScale  = 0.60f; ///< Smallest the font shrinks to before it vanishes.
+
+constexpr float kTravelNodeMul  = 0.45f; ///< Travel-node radius as a fraction of a tech node's.
+constexpr float kTravelMinGap    = 0.22f; ///< Radians. Below this the ring is already busy; adding a junction would just clutter.
 constexpr float kGlyphMinRadius = 9.0f;  ///< Screen px node radius below which a glyph is illegible; don't draw one.
 constexpr float kPipMinRadius   = 11.0f; ///< Screen px node radius below which cost pips are noise.
+
+/// Resolve the on-canvas label size and opacity for a zoom. Returns false when
+/// the caller should skip the label entirely.
+bool label_ramp(float zoom, float& out_size, float& out_alpha)
+{
+    const float t = std::clamp((zoom - kLabelHideZoom) / (kLabelFullZoom - kLabelHideZoom), 0.0f, 1.0f);
+    if (t <= 0.0f)
+        return false;
+    out_size  = ImGui::GetFontSize() * (kLabelMinScale + (1.0f - kLabelMinScale) * t);
+    // Opacity reaches full before size does, so a shrinking label stays readable
+    // rather than spending the whole band as washed-out grey.
+    out_alpha = std::min(1.0f, t * 1.7f);
+    return true;
+}
+
+/// @p col with its alpha scaled by @p a.
+ImU32 fade(ImU32 col, float a)
+{
+    const ImU32 orig_a = (col >> IM_COL32_A_SHIFT) & 0xFFu;
+    return (col & ~(0xFFu << IM_COL32_A_SHIFT))
+         | (static_cast<ImU32>(static_cast<float>(orig_a) * a) << IM_COL32_A_SHIFT);
+}
+
+/// Horizontally-centred text at an EXPLICIT size. The sized AddText overload
+/// needs its own measurement — ImGui::CalcTextSize only knows the current font
+/// size, so it would mis-centre every scaled label.
+void add_scaled_text(ImDrawList* dl, ImVec2 pos, float size, ImU32 col, const char* txt, bool centre_y)
+{
+    ImFont* font = ImGui::GetFont();
+    const ImVec2 ts = font->CalcTextSizeA(size, FLT_MAX, 0.0f, txt);
+    dl->AddText(font, size, { pos.x - ts.x * 0.5f, centre_y ? pos.y - ts.y * 0.5f : pos.y }, col, txt);
+}
 
 /// Draws a closed polyline from normalised [-1, 1] points scaled about @p c.
 void add_glyph_poly(ImDrawList* dl, ImVec2 c, float r, ImU32 col, float th,
@@ -378,6 +433,15 @@ struct constellation_geometry
     /// fork (id suffix A/B off a capstone prereq), derived here so the draw
     /// loop needs no per-frame by_id map at all.
     std::vector<std::pair<ImVec2, ImVec2>> branch_pairs;
+
+    /// TRAVEL NODES (2026-09-01) — the small unlabelled junctions wide8 scatters
+    /// through its web. They are NOT techs: they carry no id, no state, no glyph
+    /// and no label, and nothing can ever be earned at one. Their whole job is to
+    /// make the constellation read as a ROUTING NETWORK — a supplier catalogue's
+    /// wiring diagram — instead of labelled dots on bare rings. Derived purely
+    /// from the ring geometry, so they cache with it and never touch the world.
+    std::vector<ImVec2> travel_nodes;
+    std::vector<std::pair<ImVec2, ImVec2>> travel_links;
 };
 
 struct tech_geometry_cache
@@ -615,6 +679,54 @@ constellation_geometry build_constellation(const tech_tree_registry& tree, int e
                                       geo.pos_by_id[branch_nodes[1]->id]);
     }
 
+    // Travel junctions. One per angular GAP on each ring: where two neighbouring
+    // techs sit far enough apart that the ring reads empty between them, a
+    // junction goes at the midpoint and is wired to both. Radius is jittered off
+    // the ring by a hash of (ring, index) so they scatter rather than forming a
+    // second perfect circle — wide8's junctions sit between the tiers, not on
+    // them. std::map, not unordered_map: iteration order decides the hash inputs,
+    // and a view has no business being less reproducible than the sim it draws.
+    {
+        std::map<int, std::vector<std::pair<float, ImVec2>>> ring_nodes;
+        for (const node_layout& nl : geo.layout)
+            ring_nodes[nl.ring].emplace_back(std::atan2(nl.canvas_pos.y, nl.canvas_pos.x), nl.canvas_pos);
+
+        for (auto& [ring, items] : ring_nodes)
+        {
+            if (items.size() < 2)
+                continue;
+            std::sort(items.begin(), items.end(),
+                      [](const auto& a, const auto& b) { return a.first < b.first; });
+
+            const float ring_radius = kBaseRadius + static_cast<float>(ring - 1) * kRingSpacing;
+            for (std::size_t i = 0; i < items.size(); ++i)
+            {
+                const auto& a = items[i];
+                const auto& b = items[(i + 1) % items.size()];
+                float gap = b.first - a.first;
+                if (gap <= 0.0f)
+                    gap += 6.28318530718f; // the wrap-around pair
+                if (gap < kTravelMinGap)
+                    continue;
+
+                std::uint32_t h = 2166136261u;
+                for (int v : {ring, static_cast<int>(i)})
+                {
+                    h ^= static_cast<std::uint32_t>(v);
+                    h *= 16777619u;
+                }
+                const float jitter = (static_cast<float>(h % 100u) / 100.0f - 0.5f) * kRingSpacing * 0.55f;
+                const float rr    = ring_radius + jitter;
+                const float angle = a.first + gap * 0.5f;
+                const ImVec2 p{ rr * std::cos(angle), rr * std::sin(angle) };
+
+                geo.travel_nodes.push_back(p);
+                geo.travel_links.emplace_back(a.second, p);
+                geo.travel_links.emplace_back(p, b.second);
+            }
+        }
+    }
+
     return geo;
 }
 
@@ -644,7 +756,11 @@ bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_i
     ImDrawList* dl = ImGui::GetWindowDrawList();
     const ImVec2 region = ImGui::GetContentRegionAvail();
     const ImVec2 origin = ImGui::GetCursorScreenPos();
-    const ImVec2 centre{ origin.x + region.x * 0.5f + pan_x, origin.y + region.y * 0.5f + pan_y };
+    // Canvas centre before pan. Input is handled BEFORE `centre` is fixed for the
+    // frame: the old order derived centre from a pan it then mutated, so a drag
+    // rendered one frame stale, and cursor-anchored zoom cannot work at all
+    // against a stale centre.
+    const ImVec2 base{ origin.x + region.x * 0.5f, origin.y + region.y * 0.5f };
 
     // Middle-drag pans, matching the zoom-ladder canvases' own idiom
     // (body_surface_canvas.cpp) — Ben tried left-click-pans (2026-08-06) and
@@ -658,20 +774,63 @@ bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_i
             pan_y += io.MouseDelta.y;
         }
         if (io.MouseWheel != 0.0f)
-            zoom = std::clamp(zoom * std::pow(1.1f, io.MouseWheel), kMinZoom, kMaxZoom);
+        {
+            // CURSOR-ANCHORED zoom (Joe, 2026-09-01): the canvas point under the
+            // pointer stays put, so scrolling zooms INTO whatever node is hovered
+            // rather than toward the middle of the canvas. Same behaviour the
+            // planetary canvas already has (body_surface_canvas.cpp).
+            const float new_zoom = std::clamp(zoom * std::pow(1.1f, io.MouseWheel), kMinZoom, kMaxZoom);
+            const ImVec2 m = ImGui::GetMousePos();
+            const ImVec2 c{ base.x + pan_x, base.y + pan_y };
+            const float k = new_zoom / zoom; // 1 at the clamp bounds — pan then holds still
+            pan_x += (m.x - c.x) * (1.0f - k);
+            pan_y += (m.y - c.y) * (1.0f - k);
+            zoom = new_zoom;
+        }
     }
+
+    const ImVec2 centre{ base.x + pan_x, base.y + pan_y };
 
     auto to_screen = [&](ImVec2 c) { return ImVec2{ centre.x + c.x * zoom, centre.y + c.y * zoom }; };
 
-    // Ring guides — wide8's terraced bevel: each ring is a flat step, drawn as
-    // a dark outer edge-line plus a lit inner lip, never a gradient.
+    // One ramp for every on-canvas string this frame — node titles, quest names
+    // and the exclusion marks all thin out together.
+    float lbl_size = 0.0f, lbl_alpha = 0.0f;
+    const bool draw_labels = label_ramp(zoom, lbl_size, lbl_alpha);
+
+    // ---------------------------------------------------------------------
+    // The terraced basin (wide8's background, restored 2026-09-01). The rings
+    // were guide LINES only, which threw away the best part of the reference:
+    // in wide8 each tier is a flat PLATE, a step lighter than the one outside
+    // it, so the web sits in a stepped basin rather than floating on flat void.
+    //
+    // Painter's order, outermost disc first — ImGui has no annulus fill, and
+    // concentric filled circles give exact band edges for free. Tone ramps
+    // COOL-DARK at the rim to a lighter, fractionally warmer core: depth and
+    // colour variation both, entirely inside the grey ramp. No third accent —
+    // wide4's many-hued pass is the failure this stays clear of.
+    // ---------------------------------------------------------------------
     float outer_radius = kBaseRadius;
     for (const wedge_info& w : wedges)
         outer_radius = std::max(outer_radius, w.max_radius);
-    for (float r = kBaseRadius; r <= outer_radius + 1.0f; r += kRingSpacing)
+
+    std::vector<float> tier_radii; // ascending: ring 1 outward
+    for (float r = kBaseRadius; r <= outer_radius + kRingSpacing; r += kRingSpacing)
+        tier_radii.push_back(r);
+
+    const int tiers = static_cast<int>(tier_radii.size());
+    for (int i = tiers - 1; i >= 0; --i)
     {
-        dl->AddCircle(centre, r * zoom + 1.5f, kColRingShadow, 96, 1.0f);
-        dl->AddCircle(centre, r * zoom, kColRingHighlight, 96, 1.0f);
+        // t: 0 at the core plate, 1 at the rim.
+        const float t = tiers <= 1 ? 0.0f : static_cast<float>(i) / static_cast<float>(tiers - 1);
+        const int cr = static_cast<int>(33.0f + (16.0f - 33.0f) * t);
+        const int cg = static_cast<int>(34.0f + (17.0f - 34.0f) * t);
+        const int cb = static_cast<int>(41.0f + (25.0f - 41.0f) * t); // blue holds up at the rim — cooler outside
+        dl->AddCircleFilled(centre, tier_radii[i] * zoom, IM_COL32(cr, cg, cb, 255), 96);
+
+        // The step's own edge: dark outer line, lit inner lip. Flat, no gradient.
+        dl->AddCircle(centre, tier_radii[i] * zoom + 1.5f, kColRingShadow, 96, 1.0f);
+        dl->AddCircle(centre, tier_radii[i] * zoom, kColRingHighlight, 96, 1.0f);
     }
 
     // Wedge boundary rays + quest labels.
@@ -684,10 +843,22 @@ bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_i
 
         const ImVec2 label_pos = to_screen({ (wedges[i].max_radius + kRingSpacing * 0.55f) * std::cos(wedges[i].centre_angle),
                                               (wedges[i].max_radius + kRingSpacing * 0.55f) * std::sin(wedges[i].centre_angle) });
-        const std::string label = wedges[i].quest->name;
-        const ImVec2 text_size = ImGui::CalcTextSize(label.c_str());
-        dl->AddText({ label_pos.x - text_size.x * 0.5f, label_pos.y - text_size.y * 0.5f }, // fit-exempt: on-canvas node label, canvas pans to content
-                    IM_COL32(190, 200, 215, 220), label.c_str());
+        if (draw_labels)
+            add_scaled_text(dl, label_pos, lbl_size, // fit-exempt: on-canvas node label, canvas pans to content
+                            fade(IM_COL32(190, 200, 215, 220), lbl_alpha),
+                            wedges[i].quest->name.c_str(), /*centre_y=*/true);
+    }
+
+    // Travel junctions and their routing, UNDER everything a tech owns: this is
+    // background wiring, and it must never compete with a real prereq groove.
+    for (const auto& [ta, tb] : geo.travel_links)
+        dl->AddLine(to_screen(ta), to_screen(tb), kColTravelLink, 1.0f);
+    for (const ImVec2& tp : geo.travel_nodes)
+    {
+        const ImVec2 sp = to_screen(tp);
+        const float tr = kNodeRadius * zoom * kTravelNodeMul;
+        dl->AddCircleFilled(sp, tr, kColNodeCore, 12);
+        dl->AddCircle(sp, tr, kColTravelNode, 12, 1.0f);
     }
 
     // Edges — prereqs whose source has a position in THIS view. A prereq
@@ -722,10 +893,12 @@ bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_i
         // (colour2), and a third live hue broke wide4. Warmth alone carries
         // the "these two conflict" read.
         dl->AddLine(a, b, IM_COL32(150, 140, 124, 150), 1.5f);
-        const ImVec2 mid{ (a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f };
-        const ImVec2 text_size = ImGui::CalcTextSize("excludes");
-        dl->AddText({ mid.x - text_size.x * 0.5f, mid.y - text_size.y * 0.5f }, // fit-exempt: on-canvas node label, canvas pans to content
-                    IM_COL32(184, 172, 150, 220), "excludes");
+        if (draw_labels)
+        {
+            const ImVec2 mid{ (a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f };
+            add_scaled_text(dl, mid, lbl_size, // fit-exempt: on-canvas node label, canvas pans to content
+                            fade(IM_COL32(184, 172, 150, 220), lbl_alpha), "excludes", /*centre_y=*/true);
+        }
     }
 
     // Nodes.
@@ -819,7 +992,7 @@ bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_i
             pip_h = add_cost_pips(dl, nl.node->cost, {spos.x, spos.y + r + 3.0f},
                                    std::min(1.4f, zoom), stroke) + 3.0f;
 
-        if (zoom > 0.6f)
+        if (draw_labels)
         {
             // Name, not id (BL-310 round 3, Ben: "so players do not have to
             // work out a dictionary in their mind for each tech"). Authored
@@ -827,9 +1000,8 @@ bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_i
             // is still a name — never the bare id, which is what the player
             // would have had to decode.
             const std::string label = display_label(*nl.node);
-            const ImVec2 text_size = ImGui::CalcTextSize(label.c_str());
-            dl->AddText({ spos.x - text_size.x * 0.5f, spos.y + r + 2.0f + pip_h }, // fit-exempt: on-canvas node label, canvas pans to content
-                        IM_COL32(170, 178, 190, 210), label.c_str());
+            add_scaled_text(dl, { spos.x, spos.y + r + 2.0f + pip_h }, lbl_size, // fit-exempt: on-canvas node label, canvas pans to content
+                            fade(IM_COL32(170, 178, 190, 210), lbl_alpha), label.c_str(), /*centre_y=*/false);
         }
 
         if (hovered)

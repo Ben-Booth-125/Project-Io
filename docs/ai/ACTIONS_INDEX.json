@@ -154,6 +154,10 @@
    "Keyboard."
   ],
   [
+   "canvas.tech_tree_navigate",
+   "The F9 tech-tree constellation canvas (src/ui/tech_tree_panel.cpp, draw_constellation). A full-canvas takeover bounded to ui::canvas_rect(); it is chrome-less by decision (BL-310 round 4), so it carries no zoom slider or scale bar of its own — this is the only way to move around it."
+  ],
+  [
    "ledger.tech_tree_style_preview",
    "The 'Style preview' checkbox at the foot of the Tech Tree fold-out ledger in the shell nav column (src/ui/tech_tree_panel.cpp, draw_tech_tree_menu). The F9 constellation canvas is chrome-less by decision (BL-310 round 4), so every control for that surface lives in this ledger."
   ],

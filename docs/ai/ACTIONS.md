@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*155 entries — 27 gameplay · 25 canvas · 15 lens · 55 ledger · 33 chrome.*
+*156 entries — 27 gameplay · 26 canvas · 15 lens · 55 ledger · 33 chrome.*
 
 ---
 
@@ -814,6 +814,23 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** Toggles the mock tech-tree viewer — a read-only design aid rendering display data from scripts/tech_tree.lua, tabbed by era (Era -1 Antiquity placeholder / Era 0 / Era 1 / Standing lines), with NO simulation coupling (nothing can be researched from it; research is not implemented). Pressing F9 again closes it (toggle rule). Sim, view, and selection untouched.
 
 **Reason to select.** Preview the planned research structure. Do not select this expecting to act — it is a mock, not a system.
+
+### `canvas.tech_tree_navigate` — The F9 tech-tree constellation canvas (src/ui/tech_tree_panel.cpp, draw_constellation). A full-canvas takeover bounded to ui::canvas_rect(); it is chrome-less by decision (BL-310 round 4), so it carries no zoom slider or scale bar of its own — this is the only way to move around it.
+
+**Press.** Middle-mouse drag to pan. Scroll wheel to zoom.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `pan` | `mouse delta (screen px)` | Middle-drag moves the web under the cursor, matching the zoom-ladder canvases' idiom rather than left-drag (Ben, 2026-08-06). |
+| `zoom` | `wheel notches` | Each notch scales by 1.1, clamped to [0.35, 3.0]. |
+
+**Valid when:**
+- The tech-tree takeover is open (ui_state::show_tech_tree) and the cursor is over its canvas.
+- The selected era view has authored gate quests — the Era 2 placeholder has no constellation to navigate.
+
+**Expected output.** Pan and zoom of the radial constellation only. Zoom is CURSOR-ANCHORED (2026-09-01): the canvas point under the pointer stays fixed, so scrolling magnifies whatever node is hovered rather than the middle of the canvas — the same behaviour the planetary canvas has. At the clamp bounds the scale stops and the view holds still rather than drifting. On-canvas text is tied to the zoom: below 0.55 no node title, quest name or exclusion mark draws at all, and between 0.55 and 1.0 they shrink and fade together, so a zoomed-out constellation is shapes only. Nothing about the world, the selection, the rung or the sim changes; the camera is not shared with any other canvas.
+
+**Reason to select.** To read a dense era. The Era 1 web is far denser than it looks at rest, and at default zoom its always-on titles overlap. Zoom in on the region you care about — labels stay screen-sized, so magnifying separates them. An agent needing tech identity should read the registry rather than navigate here; this moves a camera and reports nothing.
 
 ### `canvas.zoom_keys` — Keyboard.
 
