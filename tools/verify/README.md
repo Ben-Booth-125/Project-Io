@@ -909,6 +909,28 @@ survives `clear_markets` into priced state.
 node tools/verify/build_harness.js endemic_demand_harness --run
 ```
 
+## `campaign_lapse` — the spectated-campaign measurement instrument (BL-723)
+
+The sweep battery's engine (BL-724…BL-729). Runs one spectated campaign — nobody seated, every
+corp scorer-driven — under one parameter set and writes per-tick CSVs to
+`build_gen/verify/lapse/<tag>/`: `corps.csv` (the seven budget flows + net + balance + holdings +
+footprint tiles + market share, per corp per tick), `markets.csv` (price/base/supply/demand/
+shortfall per priced good per market), `world.csv` (valued production — NR-774's GDP definition —
+exchange revenue, convoys, active/idle buildings, corps in debt, stance pairs, treasuries, state
+purchases), plus a manifest stating every parameter, override and proxy bracket. Overrides
+(`--pop-scale`, `--bg-scale`) take the `--reach` pattern: applied after `load_from_lua`, echoed
+in the manifest, authored Lua untouched. `--t0` runs the validity battery instead: A/A
+byte-identity, a differential knob proof, zero-observation-fails, and a wall-clock ceiling — all
+mutation-proved red at authoring. Visual half: `scripts/verify/campaign_lapse.lua` (capture-only,
+no goldens — one Corporation-lens frame per game-year, stitched to a time-lapse outside the
+engine).
+
+```
+cmd //c tools\verify\build_lua_harness.bat campaign_lapse
+./build_gen/verify/campaign_lapse.exe --t0
+./build_gen/verify/campaign_lapse.exe --tag baseline-s0
+```
+
 ## Build note (2026-08-30): the glob loop carries the sol2 + Lua INCLUDE paths
 
 Since b668434c (the v0.1.21 cut), `tools/verify/harness_params.hpp` — the shared

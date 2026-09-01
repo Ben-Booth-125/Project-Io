@@ -288,6 +288,15 @@ in `tools/verify/README.md`.
   tranche survives both era bands and a banded row masks (E5); on the generated world the demand
   survives `clear_markets` into priced state (E6). Every row mutation-proved red at authoring.
   Links the world superset. Build via `node tools/verify/build_harness.js endemic_demand_harness`.
+- **`campaign_lapse`** — BL-723, the spectated-campaign measurement instrument (2026-09-01): one
+  spectated campaign under one parameter set becomes per-tick CSVs
+  (`build_gen/verify/lapse/<tag>/` — corps, markets, world, manifest) for the sweep battery
+  BL-724…BL-729. Valued production is NR-774's GDP definition; parameter overrides take the
+  `--reach` pattern (post-load, manifest-echoed). `--t0` is the validity battery — A/A
+  byte-identity, differential knob proof, zero-observation-fails, wall-clock ceiling — every row
+  mutation-proved red at authoring. Lua-linked class: build via
+  `cmd //c tools\verify\build_lua_harness.bat campaign_lapse`. The visual half is
+  `scripts/verify/campaign_lapse.lua` (capture-only, no goldens).
 - **`ai_skill_harness`** — AI skill-regression instrument (BL-204,
   docs/ai/AI_OPPONENT.md § 3): freezes a 5-seed benchmark set (`world_params.seed`
   0-4, spanning the generator's body/terrain/market diversity), runs 300 ticks of
