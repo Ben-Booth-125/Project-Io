@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*120 entries — 114 open, 6 resolved.*
+*123 entries — 117 open, 6 resolved.*
 
 ---
 
@@ -1427,7 +1427,7 @@ NOVELTY: the change is in `corporation_generation.cpp`, which is the GENERATION 
 
 *Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`, `docs/generation/GENERATION_STRATEGY.md`*
 
-### NR-767 — save_roundtrip is a Lua-LINKED harness and nothing says so
+### NR-767 — Lua-LINKED harnesses are a growing class and the only record of it is a hand-written list
 *observation · raised 2026-09-01 · from Found by BL-710 while repairing the harness.*
 
 `tools/verify/save_roundtrip.cpp` includes `harness_params.hpp`, which since NR-686's fix includes `scripting/lua_state.hpp` — so it pulls sol2 and needs the Lua link. `build_harness.js` and `build_harness.bat` fail it with `fatal error C1083: Cannot open include file: 'sol/sol.hpp'`, which reads as a broken harness rather than as the wrong builder. It builds cleanly with `cmd //c toolserifyuild_lua_harness.bat save_roundtrip`.
@@ -1435,6 +1435,8 @@ NOVELTY: the change is in `corporation_generation.cpp`, which is the GENERATION 
 The documented Lua-linked list (build_lua_harness.bat's own header, and NEXT_SESSION.md) names pregame_balance_harness, condition_set_harness, mercenary_contract_harness, spawn_solvency, demand_census and chain_depth. It does not name save_roundtrip, and the list is a hand-maintained enumeration rather than a derived fact.
 
 THE GENERAL SHAPE: **any harness that includes `harness_params.hpp` is now Lua-linked**, and `harness_params.hpp` is the header that DEVELOPMENT_PRACTICES.md § A harness must build the world the application builds tells every harness to use. So the class is growing by design and the list will keep going stale.
+
+MEASURED WIDER, 2026-09-01. Working BL-712 I reached for eight harnesses and FIVE of them failed `build_harness.bat` on the same `sol/sol.hpp` line, none of them on any list: world_determinism, determinism_harness, recipe_switch_harness, build_spree_harness, decision_trace_harness — plus save_roundtrip and ai_skill_harness. So this is not one stale entry; the documented list names six harnesses and the real class is at least thirteen and growing every time a harness adopts harness_params.hpp, which DEVELOPMENT_PRACTICES.md § A harness must build the world the application builds tells it to do.
 
 **Why it matters.** This is NR-759's pattern one level up: a harness that will not build looks identical to a harness that is broken, and the last session lost time to exactly that ambiguity. The failure mode is silent-absence, not red.
 
@@ -1456,6 +1458,69 @@ Related but distinct: the literal version-refusal ladder stops at v15 (P19b). v1
 > **Recommendation:** Add one cheap row: assert `resource_count` equals what the populated fixture wrote, and note the current value in the harness output the way `next entity id` is noted. Not done here — BL-710 is scoped as deletions only, and adding an assertion to the save seam mid-repair is the thing that item explicitly warned against.
 
 *Files: `tools/verify/save_roundtrip.cpp`, `src/world/world_save.hpp`*
+
+### NR-769 — BL-712's fix is in, and the scale-blind exclusion has a SECOND seat inside the build score itself
+*decision · raised 2026-09-01 · from Measured by BL-712 after implementing the per-category recipe selection the item designed.*
+
+BL-712's fix shape is done: the build candidate keeps a best PER GROUP and hands every group to the scorer. It works, and it is measurable — instrumented on the industrial band, `Power Generation` emitted **168** build candidates and `Construction` **430**, where before the change both emitted **zero**, in any world, at any time.
+
+THEY STILL DO NOT WIN. Peak scores by group over one 80-tick warm start:
+
+    Advanced Fabrication   n=1375   max 1884.3
+    Electronics            n=2140   max 1234.1
+    Welfare Goods          n=1196   max  411.6
+    Metal Foundry          n=1483   max  264.0
+    Construction           n= 430   max  105.3
+    Food Processing        n=1570   max  102.2
+    Power Generation       n= 168   max   31.9
+    Refinery               n=1174   max    1.6
+
+Builds are capped per evaluation, so an 18-60x score gap is still an exclusion — just one seat further down. The score is `net^2 / capex`, which is an ABSOLUTE contest, and § Selection must be scale-free's own sentence condemns it in as many words: *a cheap good can never win an absolute contest, however badly the world needs it*.
+
+WHY THIS WAS NOT JUST FIXED. AI_OPPONENT.md § Scoring says the quadratic's margin bias is **retained deliberately** and that replacing it is a re-tune plus a golden reshuffle — BL-417 (build score is quadratic), **Ben's call**. Taking it here would have been deciding an open item on his behalf, silently, inside a different one.
+
+**Why it matters.** BL-712's stated VERIFY criterion — power and construction_capacity produced > 0 from AI builds — is not reached, and this is why. It is also the sprint's own success test in miniature: the channel is now reachable and the corp still will not build it.
+
+- A) Take BL-417 now — replace net^2/capex with an explicit linear capital-efficiency metric. One deliberate golden re-bless wave with dated provenance, which BL-711 is already going to need.
+- B) Normalise the build score WITHIN its group before the global sort, so categories are ranked comparably. Truest to the rule as written; the largest behavioural change, and it would let a lone Refinery candidate rank beside Advanced Fabrication's best.
+- C) Add a scarcity term mirroring the existing `glut` multiplier — a good the world wants and nobody makes scores UP. Systemic rather than a handicap (the standing preference), but it is new design, not a fix.
+- D) Leave it. BL-712 delivered its fix shape; the second seat becomes its own item behind BL-417.
+
+> **Recommendation:** C is the one that reads as an in-world force rather than a term inside the agent, and it composes with A rather than competing — but it is design, so it wants your call before it is built. If the sprint needs movement sooner, D plus a new item is the honest sequencing: BL-712 is not being stretched to cover BL-417.
+
+*Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-770 — Both construction yards vanish inside 80 ticks and it is NOT the recipe chase
+*observation · raised 2026-09-01 · from Measured by BL-712 with chain_conversion_probe, industrial band, before and after the fix.*
+
+`steel -> construction_capacity` reads 2 facilities at spawn and **0** after an 80-tick warm start. That is unchanged by BL-712: with the chase now confined to a facility's own group, a yard can only move to another Construction method, and no other Construction row appears in the probe at all. So the two yards are not being switched — they are being removed.
+
+WHAT BL-712 DID FIX NEARBY, for contrast, so the two are not confused: `silica -> silicon` was 16 -> 2 before and is 16 -> 10 after; total processing facilities after the warm start went 268 -> 282 and distinct recipes in use 14 -> 17. The scale-blind chase was real and it is gone. The yards are a different mechanism.
+
+THE LIKELY CAUSE, unverified and deliberately not chased here: `economy.lua` authors `construction_capacity` upkeep at **0.0 in both bands** (lines 494-499, the BL-641 zero-rate note). Its only demand is the construction draw itself, so a yard's revenue depends entirely on something being built within reach of it. That makes it a persistently loss-making building, which is exactly what the BL-079 reflex tier idles.
+
+**Why it matters.** BL-709 landed construction as an economy-scaled sector and the economy is removing it. This is upstream of BL-642 (construction draws) and probably the same fact from the other side.
+
+> **Recommendation:** Hand it to BL-642 as the first thing that item measures: it already owns the construction draw, and 'the yard has no revenue' and 'the draw does not reach the market' are likely one finding. Do not fix it inside BL-712 — a yard that the reflex tier is right to idle is not an AI-selection defect.
+
+*Files: `scripts/economy.lua`, `src/world/economy_system.cpp`, `tools/verify/chain_conversion_probe.cpp`*
+
+### NR-771 — ai_skill_harness — sprint 27's own success criterion — is STRUCTURALLY BLIND to a per-category change
+*observation · raised 2026-09-01 · from Found by BL-712 running the harness before and after the fix and getting byte-identical numbers.*
+
+Sprint 27's success test is `ai_skill_harness` showing a field that is not monotonically insolvent. Run at HEAD and again with BL-712's fix in, it returns **identical numbers on all five seeds** — same net worths to the decimal, same solvency counts, the same 25 failures. Not similar: identical.
+
+THE HARNESS CANNOT SEE THE CHANGE. `make_registry` (ai_skill_harness.cpp ~145-162) hand-builds **three** recipes — steel, refined_fuel, food_rations — and sets `group` on none of them, so all three fall to the default "General". BL-712 is a per-`recipe::group` change. With exactly one group in the registry, a per-group best IS a global argmax and the cross-group dial guard can never fire. The instrument is inert by construction, and byte-identity is the proof.
+
+THE FIX IS NOT IN DOUBT — it was measured on the REAL Lua registry with chain_conversion_probe, which reads 45 recipes across 13 groups. Industrial band, before -> after: total processing facilities after an 80-tick warm start 268 -> 282, distinct recipes in use 14 -> 17, `silica -> silicon` 16->2 becomes 16->10, and instrumented candidate emission for `Power Generation` and `Construction` went from ZERO to 168 and 430. It is the SUCCESS TEST that is blind, not the work.
+
+This is DEVELOPMENT_PRACTICES.md § A harness must build the world the application builds, at the worst possible altitude: a three-recipe economy standing in for a forty-five-recipe one, in the harness the sprint is steering by.
+
+**Why it matters.** Sprint 27 is steering by this instrument. A change can be right, measured, and land — and the harness will report no movement, which reads as 'the fix did nothing'. Worse in the other direction: a change that genuinely helps the shipped economy still cannot show here, so the sprint could complete every item and its own criterion would not move.
+
+> **Recommendation:** Two options, and they are not exclusive. (a) Give the hand-built registry real `group` values and a few more recipes spanning at least three groups — cheap, keeps the harness Lua-free, and makes it able to see category-shaped work. (b) Move the harness onto the Lua registry the way demand_census and chain_conversion_probe already do, which is the § A harness must build the world the application builds answer and costs it the Lua link (NR-767). Until one of them is done, sprint 27's success criterion should be read as chain_conversion_probe + demand_census, not this.
+
+*Files: `tools/verify/ai_skill_harness.cpp`, `docs/development/DEVELOPMENT_PRACTICES.md`, `docs/development/sprints.json`*
 
 ---
 

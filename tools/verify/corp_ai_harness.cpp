@@ -933,6 +933,109 @@ int main()
         }
     }
 
+    // =====================================================================
+    // R8 — a dial TUNES; it does not repurpose (BL-712,
+    //      AI_OPPONENT.md § "Selection must be scale-free")
+    // =====================================================================
+    // The recipe margin-chase used to run an unrestricted argmax over ABSOLUTE
+    // per-batch margin. Margins in the shipped roster span three orders, so that
+    // argmax landed on an out-of-group recipe nearly every time — and
+    // try_switch_recipe has REFUSED a cross-group switch outright since
+    // 2026-08-16 (Ben's BL-434 retraction). So the chase spent its one proposal
+    // per building on a command that could not apply, and starved the legal
+    // within-group switch that would have.
+    //
+    // ROW 2 IS THE LOAD-BEARING ONE, and that is worth stating because row 1 is
+    // weaker than it looks: the seam refuses the cross-group switch anyway, so
+    // row 1 passes with or without the scorer's guard. It is kept as the
+    // statement of the property. Row 2 is what actually goes red before the fix
+    // — verified by removing the guard and re-running, 2026-09-01 — because the
+    // refused proposal crowds out the sibling that would have been taken.
+    {
+        // Two groups. "Alpha" holds the incumbent and a strictly better
+        // sibling; "Beta" holds one recipe worth ~100x either of them.
+        auto staged_registry = [&]() {
+            recipe_registry reg = make_registry();
+            building_economics pe;
+            pe.base_rate            = 1.0f;
+            pe.maintenance          = 0.0f;
+            pe.base_wage            = 0.0f;
+            pe.build_cost           = 100.0f;
+            pe.build_duration_ticks = 2.0f;
+            reg.set_economics(building_type::processing_facility, pe);
+
+            recipe a_lo;
+            a_lo.name  = "alpha_low";
+            a_lo.group = "Alpha";
+            a_lo.inputs [ri(resource_type::iron_ore)] = 1.0f;
+            a_lo.outputs[ri(resource_type::steel)]    = 1.0f;
+            recipe a_hi = a_lo;
+            a_hi.name  = "alpha_high";
+            a_hi.outputs[ri(resource_type::steel)] = 3.0f;   // same group, fatter
+            recipe b_rich;
+            b_rich.name  = "beta_rich";
+            b_rich.group = "Beta";
+            b_rich.inputs [ri(resource_type::iron_ore)]  = 1.0f;
+            b_rich.outputs[ri(resource_type::machinery)] = 5.0f; // priced 100x
+
+            reg.add_recipe(a_lo);
+            reg.add_recipe(a_hi);
+            reg.add_recipe(b_rich);
+            return reg;
+        };
+
+        // The facility sits on the AI corp's own tile, complete and off
+        // cooldown, holding a full input pool so both routes are runnable.
+        auto staged_scene = [&](const recipe_registry& reg, const char* incumbent) {
+            scene s = make_scene(5000.0f);
+            market_component& mc = s.w.markets.at(s.market);
+            mc.base_price[ri(resource_type::steel)]     = 10.0f;
+            mc.base_price[ri(resource_type::machinery)] = 1000.0f;
+            mc.price = mc.base_price;
+
+            const entity_id t = make_tile(s.w, s.body, 1, 1, terrain_substrate::rocky, 0.0f);
+            const entity_id f = s.w.create_entity();
+            building_component b{};
+            b.tile               = t;
+            b.type               = building_type::processing_facility;
+            b.workforce_assigned = 1.0f;
+            b.workforce_auto     = false;
+            b.target_resource    = resource_type::steel;
+            b.recipe             = reg.recipe_id(incumbent);
+            s.w.buildings[f] = b;
+            s.w.corporations.at(s.ai_corp).assets.push_back(f);
+
+            stockpile_component pool;
+            pool.quantities[ri(resource_type::iron_ore)] = 10000.0f;
+            s.w.corp_body_pools[{s.ai_corp, s.body}] = pool;
+            return std::make_pair(std::move(s), f);
+        };
+
+        // Walk enough evaluations that the chase, if it were going to fire,
+        // has had its cooldown windows — one refusal on one tick proves little.
+        auto settle = [&](scene& s, const recipe_registry& reg) {
+            for (int t = 1; t <= 12; ++t)
+            {
+                economy_report rep;
+                run_corp_strategic_step(s.w, reg, rep, t);
+            }
+        };
+
+        {
+            const recipe_registry reg = staged_registry();
+            auto  st = staged_scene(reg, "alpha_low");
+            scene s  = std::move(st.first);
+            settle(s, reg);
+            const uint16_t held = s.w.buildings.at(st.second).recipe;
+            check(held != reg.recipe_id("beta_rich"),
+                  "BL-712 R8: a facility is NEVER dragged across groups by a fatter "
+                  "absolute margin - becoming a different facility is a build decision");
+            check(held == reg.recipe_id("alpha_high"),
+                  "BL-712 R8: and the chase still WORKS - the better sibling inside "
+                  "its own group is taken, so the row above is not vacuous");
+        }
+    }
+
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",
                 g_failures, g_failures == 1 ? "" : "s");
     return g_failures == 0 ? 0 : 1;

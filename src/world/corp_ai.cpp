@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <map>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -311,14 +312,20 @@ candidate_family family_of(const corp_command& cmd)
 
 /// Deterministic ordering: bucket asc FIRST (a lower bucket may never starve
 /// a higher one — AI_OPPONENT.md §2B), then score desc, then verb, subject,
-/// tile as the existing BL-202 tie-break.
+/// tile as the existing BL-202 tie-break, then target and recipe (BL-712).
 bool candidate_before(const candidate& a, const candidate& b)
 {
     if (a.bucket != b.bucket) return a.bucket < b.bucket;
     if (a.score != b.score) return a.score > b.score;
     if (a.cmd.verb != b.cmd.verb) return a.cmd.verb < b.cmd.verb;
     if (a.cmd.subject != b.cmd.subject) return a.cmd.subject < b.cmd.subject;
-    return a.cmd.tile < b.cmd.tile;
+    if (a.cmd.tile != b.cmd.tile) return a.cmd.tile < b.cmd.tile;
+    // BL-712: one tile can now emit one build candidate PER RECIPE GROUP,
+    // so tile alone no longer separates two rows. Without this, equal-score
+    // siblings fall to std::sort's unspecified order among equivalents —
+    // stable for one binary, not a property the simulation may rest on.
+    if (a.cmd.target != b.cmd.target) return a.cmd.target < b.cmd.target;
+    return a.cmd.recipe < b.cmd.recipe;
 }
 
 /// Strategy weight for a verb family under the corp's industrial focus —
@@ -1082,8 +1089,22 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // full run. Measured at 30.9% of processing building-ticks
                 // (NR-266), so this remains an over-estimate; the `reachable`
                 // gate below is the coarse guard against the worst of it.
-                uint16_t best_recipe = no_recipe;
-                float    best_net    = 0.0f;
+                //
+                // BL-712: the best is kept PER GROUP, not once. A single argmax
+                // over net margin is a category exclusion rather than a ranking
+                // (AI_OPPONENT.md § Selection must be scale-free): margins span
+                // three orders, so `power` at net 3.98 could never out-rank
+                // price-ceiled `electronics` at net 290 and NO rival ever built a
+                // plant, in any world, at any time. `recipe::group` is the
+                // category the design already authors (BL-434) — "Power
+                // Generation" and "Construction" are each their own — so the
+                // pre-filter now narrows WITHIN a group and hands every group to
+                // the scorer, which is what the scorer is for.
+                //
+                // std::map, so the emission order below is the group's collation
+                // order rather than registry-walk order — a function of the
+                // roster, not of iteration.
+                std::map<std::string, std::pair<uint16_t, float>> group_best;
                 for (int i = 0; i < n_recipes; ++i)
                 {
                     const recipe&  rc  = reg.recipe_at(building_type::processing_facility, i);
@@ -1132,64 +1153,82 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     if (!bp.has_data)
                         continue;
                     const float n = bp.net();
-                    if (n > best_net || (n == best_net && best_recipe != no_recipe && rid < best_recipe))
+                    auto  slot = group_best.find(abs->group);
+                    if (slot == group_best.end())
                     {
-                        best_net    = n;
-                        best_recipe = rid;
+                        group_best.emplace(abs->group, std::make_pair(rid, n));
+                        continue;
                     }
+                    // Same tie-break as the single argmax had, now applied
+                    // within the group: lowest absolute id wins a draw.
+                    if (n > slot->second.second
+                        || (n == slot->second.second && rid < slot->second.first))
+                        slot->second = std::make_pair(rid, n);
                 }
-                if (best_recipe == no_recipe)
+                if (group_best.empty())
                     continue; // nothing this corp can reach, run and profit from
 
-                const recipe* rc = reg.get_recipe(best_recipe);
-                // The target names the primary output. It is what the glut
-                // forecast is run against, and it is the argument placement_rules
-                // reads for the Hydroponics Bay rule (BL-166).
-                const resource_type target    = primary_output(*rc);
-                const float         primary_q = rc->outputs[static_cast<std::size_t>(target)];
+                // ONE candidate per group. Each is scored on the same curve and
+                // vetoed by the same placement and glut gates as before — and
+                // those gates are the second half of why this matters: they used
+                // to run AFTER the argmax, so a tile whose fattest recipe failed
+                // placement or forecast a glut produced NO candidate at all,
+                // rather than falling through to one that would have placed.
+                for (const auto& [grp, pick] : group_best)
+                {
+                    (void)grp; // the key is the category; the pick is what to build
+                    const uint16_t best_recipe = pick.first;
+                    const float    best_net    = pick.second;
+                    const recipe* rc = reg.get_recipe(best_recipe);
+                    // The target names the primary output. It is what the glut
+                    // forecast is run against, and it is the argument placement_rules
+                    // reads for the Hydroponics Bay rule (BL-166).
+                    const resource_type target    = primary_output(*rc);
+                    const float         primary_q = rc->outputs[static_cast<std::size_t>(target)];
 
-                if (!placement_rules::can_place_in_world(w, tile, building_type::processing_facility, target))
-                    continue;
+                    if (!placement_rules::can_place_in_world(w, tile, building_type::processing_facility, target))
+                        continue;
 
-                const float net = best_net;
-                if (net <= 0.0f)
-                    continue; // never build into an expected loss, same as above
+                    const float net = best_net;
+                    if (net <= 0.0f)
+                        continue; // never build into an expected loss, same as above
 
-                // BL-709 / NR-592, the processing half — same reasoning as the
-                // extraction candidate above. The recipe travels into the
-                // lookup, because since BL-590 the material basket is keyed by
-                // it: a Sawmill and a Smithy do not cost the same to build, and
-                // the scorer should not pretend they do.
-                const float capex      = std::max(1.0f, pe.build_cost
-                    + build_material_cost(w, reg, tile, building_type::processing_facility,
-                                          target, best_recipe));
-                const float added_rate = primary_q * batches;
-                const int   horizon    = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
-                const float glut       = forecast_glut_multiplier(w, tile, target, added_rate, horizon, p);
-                if (glut <= 0.0f)
-                    continue; // forecast hard glut — veto, as the extraction half does
+                    // BL-709 / NR-592, the processing half — same reasoning as the
+                    // extraction candidate above. The recipe travels into the
+                    // lookup, because since BL-590 the material basket is keyed by
+                    // it: a Sawmill and a Smithy do not cost the same to build, and
+                    // the scorer should not pretend they do.
+                    const float capex      = std::max(1.0f, pe.build_cost
+                        + build_material_cost(w, reg, tile, building_type::processing_facility,
+                                              target, best_recipe));
+                    const float added_rate = primary_q * batches;
+                    const int   horizon    = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
+                    const float glut       = forecast_glut_multiplier(w, tile, target, added_rate, horizon, p);
+                    if (glut <= 0.0f)
+                        continue; // forecast hard glut — veto, as the extraction half does
 
-                candidate c;
-                c.cmd.tick   = tick;
-                c.cmd.corp   = corp;
-                c.cmd.verb   = corp_verb::build;
-                c.cmd.tile   = tile;
-                c.cmd.type   = building_type::processing_facility;
-                c.cmd.target = target;
-                // The recipe MUST travel with the command. construct_building
-                // substitutes steel for `no_recipe` — right for a caller with no
-                // opinion, wrong for one that chose — and BL-388 closed exactly
-                // that trap by making corp_command assert the built processor
-                // kept the recipe it was given.
-                c.cmd.recipe = best_recipe;
-                // Same curve as the extraction candidate, deliberately: BL-417
-                // step 2 is the decision about whether net^2/capex is the right
-                // shape, and it should be taken ONCE for both, not forked here.
-                c.score  = (net * net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
-                c.spend  = capex;
-                c.reason = corp_decision_reason::best_build;
-                c.bucket = bucket_for_reason(c.reason);
-                cands.push_back(c);
+                    candidate c;
+                    c.cmd.tick   = tick;
+                    c.cmd.corp   = corp;
+                    c.cmd.verb   = corp_verb::build;
+                    c.cmd.tile   = tile;
+                    c.cmd.type   = building_type::processing_facility;
+                    c.cmd.target = target;
+                    // The recipe MUST travel with the command. construct_building
+                    // substitutes steel for `no_recipe` — right for a caller with no
+                    // opinion, wrong for one that chose — and BL-388 closed exactly
+                    // that trap by making corp_command assert the built processor
+                    // kept the recipe it was given.
+                    c.cmd.recipe = best_recipe;
+                    // Same curve as the extraction candidate, deliberately: BL-417
+                    // step 2 is the decision about whether net^2/capex is the right
+                    // shape, and it should be taken ONCE for both, not forked here.
+                    c.score  = (net * net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
+                    c.spend  = capex;
+                    c.reason = corp_decision_reason::best_build;
+                    c.bucket = bucket_for_reason(c.reason);
+                    cands.push_back(c);
+                }
             }
         }
 
@@ -1488,7 +1527,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // just gets rejected rather than mutating anything; it is not a new
             // planner, just an unpriced one. Stated explicitly (not a silent gap) —
             // see NEEDS_REVIEW.json.
-            if (b.type == building_type::processing_facility && b.recipe != no_recipe)
+            const recipe* cur_rc = (b.type == building_type::processing_facility && b.recipe != no_recipe)
+                                       ? reg.get_recipe(b.recipe) : nullptr;
+            if (cur_rc != nullptr)
             {
                 const float cur_margin = recipe_margin(w, reg, b.tile, b.recipe);
                 const int   n          = reg.recipe_count(building_type::processing_facility);
@@ -1496,8 +1537,47 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 float    best_m  = cur_margin;
                 for (int i = 0; i < n; ++i)
                 {
-                    const uint16_t rid = static_cast<uint16_t>(i);
-                    const float    m   = recipe_margin(w, reg, b.tile, rid);
+                    // BL-712, the two defects this walk carried.
+                    //
+                    // (1) ID SPACE. `i` was used AS an absolute recipe id, but the
+                    // loop bound is the BROWSE count — recipe_registry.hpp keeps the
+                    // two apart, and the build candidate above crosses them through
+                    // recipe_id(name) precisely because NR-254 caught the Build door
+                    // getting this wrong. So the chase was scoring a set that is
+                    // neither this era's roster nor the whole registry: it could
+                    // propose an out-of-band recipe and could never see one whose
+                    // absolute id sits past the browse count.
+                    const recipe&  rc  = reg.recipe_at(building_type::processing_facility, i);
+                    const uint16_t rid = reg.recipe_id(rc.name);
+                    if (reg.get_recipe(rid) == nullptr)
+                        continue; // the name did not round-trip; never propose it
+                    //
+                    // (2) SCALE-BLINDNESS, the same defect as the build candidate
+                    // (AI_OPPONENT.md § Selection must be scale-free) — but here it
+                    // was also proposing something the SEAM HAS REFUSED SINCE
+                    // 2026-08-16. try_switch_recipe returns `cross_group` outright
+                    // for a switch that changes group: Ben's BL-434 retraction, on
+                    // the grounds that "switching methods can mean changing to a
+                    // different building type" and the only route to a different
+                    // type is dismantle-and-rebuild (economy_system.cpp, that
+                    // branch's own comment).
+                    //
+                    // Margins in the shipped roster span three orders, so an
+                    // unrestricted argmax over ABSOLUTE per-batch margin lands on
+                    // an out-of-group recipe nearly every time. The chase then
+                    // spent its one proposal per building on a command that could
+                    // not apply, and — because only the single argmax is ever
+                    // proposed — STARVED the legal within-group switch that would
+                    // have. Asserted by corp_ai_harness R8, whose second row goes
+                    // red without this guard for exactly that reason.
+                    //
+                    // So this is not a new rule, it is the scorer being told what
+                    // the seam already decided: a dial tunes within a group;
+                    // becoming a different facility is a build decision, scored as
+                    // one, above.
+                    if (rc.group != cur_rc->group)
+                        continue;
+                    const float m = recipe_margin(w, reg, b.tile, rid);
                     if (m > best_m) { best_m = m; best_id = rid; }
                 }
                 if (best_id != b.recipe)

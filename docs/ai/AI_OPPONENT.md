@@ -476,6 +476,28 @@ answering a WORLD-level question"* — and the reason it is stated here as a rul
 that item's note is that fixing one instance does not prevent the next: the same sentence written at
 a different altitude is the same defect.
 
+### A dial tunes; it does not repurpose
+
+**A recipe switch is a tune within a facility's group. Becoming a different facility is a build**
+**decision, and it is scored as one.**
+
+`recipe::group` is what a processing facility IS — a Metal Foundry, a Power Generation plant, a
+Construction yard — and the seam has enforced this since Ben's BL-434 retraction (2026-08-16): a
+switch that crosses a group is **refused outright**, because "switching methods can mean changing
+to a different building type", and the only route to a different type is dismantle and rebuild.
+
+The scorer must be told what the seam already decided. A margin chase that ranks every recipe in
+the roster is the scale-free rule's defect (§ above) with an extra cost on top: because a facility
+gets **one** switch proposal per evaluation, an argmax that lands out-of-group spends that proposal
+on a command that cannot apply, and **starves the legal within-group switch that would have**. The
+failure is silent — the refusal is a seam result, not a red row — and it looks from the outside
+like a facility that simply never retools.
+
+The general shape, and the reason this sits beside § Selection must be scale-free rather than
+inside it: **a scorer that proposes what its seam forbids is not merely wasteful, it is blind.** It
+cannot tell a refusal from an absence, so the candidate it should have offered is never scored at
+all. Where a seam has a hard precondition, the candidate generator carries it too.
+
 ### One dial, one owner (Ben, 2026-08-31)
 
 **No two agency tiers may write the same building state.** The reflex tier (§ the BL-079 grant) and
