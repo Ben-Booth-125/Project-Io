@@ -3,6 +3,7 @@
 #include "components.hpp"
 #include "nation_ai.hpp"   // BL-542: nation_ai_params — the nation scorer's tunables (light: entity.hpp + nation_budget.hpp only)
 #include "sentiment.hpp"   // BL-545/BL-546: sentiment_params — the authored factor table
+#include "network_upkeep.hpp"  // BL-643: network_upkeep_params — the logistics_maintenance line's material rates
 #include "space_programme.hpp" // BL-644: space_programme_params — the tenth budget line's purchase lumps
 #include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
 
@@ -1140,6 +1141,12 @@ public:
     /// rather than clamped, the nation_ai discipline.
     const space_programme_params& space_programme() const { return m_space_programme; }
 
+    /// BL-643 network-upkeep material rates (economy.network_upkeep in Lua).
+    /// All default ZERO — an unauthored registry derives no upkeep draw — and
+    /// every authored value is range-checked at load and rejected by key
+    /// rather than clamped, the space_programme discipline.
+    const network_upkeep_params& network_upkeep() const { return m_network_upkeep; }
+
     /// BL-628 whole-firm acquisition tunables (economy.acquisition in Lua).
     /// One number, `multiple`, range-checked at load and rejected rather than
     /// clamped. The trailing WINDOW is not here: it is
@@ -1357,6 +1364,7 @@ public:
     void set_sentiment(const sentiment_params& p) { m_sentiment = p; }
     void set_nation_ai(const nation_ai_params& p) { m_nation_ai = p; }
     void set_space_programme(const space_programme_params& p) { m_space_programme = p; }
+    void set_network_upkeep(const network_upkeep_params& p) { m_network_upkeep = p; }
     void set_recipe_switch(const recipe_switch_params& p) { m_recipe_switch = p; }
     void set_acquisition(const acquisition_params& p) { m_acquisition = p; }
     void set_economics(building_type type, const building_economics& e)
@@ -1625,6 +1633,11 @@ private:
     /// Default-constructed — both lumps zero, so a hand-built harness registry
     /// derives no state purchase unless it sets them.
     space_programme_params m_space_programme = {};
+
+    /// BL-643 network-upkeep material rates (economy.network_upkeep).
+    /// Default-constructed — every rate zero, so a hand-built harness registry
+    /// derives no upkeep draw unless it sets them.
+    network_upkeep_params m_network_upkeep = {};
 
     /// BL-430 recipe-switch cost/cooldown. Defaults to free/instant so a
     /// hand-built harness registry that never sets this behaves as it always did.

@@ -884,6 +884,31 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_space_programme = sp;
     }
 
+    // BL-643 network-upkeep material rates (economy.network_upkeep). The same
+    // strict read as space_programme above, and for the same reason: these
+    // rates feed a deterministic per-tick derivation, so a NaN here would be a
+    // draw nobody can replay. Absent table (or key) keeps the zero defaults —
+    // an unauthored world derives no upkeep draw.
+    sol::optional<sol::table> net_tbl = (*econ)["network_upkeep"];
+    if (net_tbl)
+    {
+        const std::string     ctx = "economy.network_upkeep";
+        const double          inf = std::numeric_limits<double>::infinity();
+        network_upkeep_params np  = m_network_upkeep;
+        const sol::table&     t   = *net_tbl;
+
+        read_checked(t, "stone_track",    np.stone_per_level[0],  0.0, inf, ctx);
+        read_checked(t, "stone_road",     np.stone_per_level[1],  0.0, inf, ctx);
+        read_checked(t, "stone_highway",  np.stone_per_level[2],  0.0, inf, ctx);
+        read_checked(t, "timber_track",   np.timber_per_level[0], 0.0, inf, ctx);
+        read_checked(t, "timber_road",    np.timber_per_level[1], 0.0, inf, ctx);
+        read_checked(t, "timber_highway", np.timber_per_level[2], 0.0, inf, ctx);
+        read_checked(t, "stone_hub",      np.stone_per_hub,       0.0, inf, ctx);
+        read_checked(t, "timber_hub",     np.timber_per_hub,      0.0, inf, ctx);
+
+        m_network_upkeep = np;
+    }
+
     // BL-430 player-facing recipe-switch cost/cooldown (economy.recipe_switch).
     sol::optional<sol::table> recipe_switch = (*econ)["recipe_switch"];
     if (recipe_switch)

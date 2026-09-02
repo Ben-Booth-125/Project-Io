@@ -869,6 +869,31 @@ economy = {
         propellant_lump = 50.0, -- propellant per purchase
     },
 
+    -- BL-643: network upkeep — the logistics_maintenance budget line's
+    -- consumer and the Infrastructure demand channel (MARKETS.md). Each tick a
+    -- nation's road/hub network bills stone and timber at these rates
+    -- (per road tile by level; per active port / inland hub), bought from a
+    -- named supplier's pool at the supplier market's own price and CONSUMED —
+    -- the repairs go into the roadbed. UNLIKE space_programme the claim is
+    -- pro-rata (upkeep is continuous, not lumpy): a share short of the bill
+    -- buys the funded fraction, so an over-authored rate degrades to "spend
+    -- the whole logistics share" and can never overdraw a treasury. First-cut
+    -- figures aimed at the measured stone glut (floored in 6 of 9 markets,
+    -- 2026-09-01) — a mid-size nation at ~200 road tiles bills tens of units
+    -- per quarter; retune by playtest against demand_census. The loader
+    -- rejects a non-finite or negative value by key; an absent key (or table)
+    -- keeps the zero default, which derives no draw at all.
+    network_upkeep = {
+        stone_track    = 0.05,  -- stone per Track tile per quarter
+        stone_road     = 0.15,  -- ...per Road tile
+        stone_highway  = 0.40,  -- ...per Highway tile
+        timber_track   = 0.025, -- timber per Track tile per quarter
+        timber_road    = 0.075, -- ...per Road tile
+        timber_highway = 0.20,  -- ...per Highway tile
+        stone_hub      = 5.0,   -- stone per active port / inland hub per quarter
+        timber_hub     = 2.5,   -- timber per active port / inland hub per quarter
+    },
+
     -- BL-545/BL-546: the relational substrate's DECAY (sentiment.hpp). Each
     -- rate is the fraction of the remaining distance to neutral a dimension
     -- sheds per tick; the substrate was inert until this table existed.
