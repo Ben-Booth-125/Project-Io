@@ -297,6 +297,13 @@ in `tools/verify/README.md`.
   mutation-proved red at authoring. Lua-linked class: build via
   `cmd //c tools\verify\build_lua_harness.bat campaign_lapse`. The visual half is
   `scripts/verify/campaign_lapse.lua` (capture-only, no goldens).
+- **`firm_exit_harness`** — BL-743 firm exit (2026-09-01): the insolvency wind-up. F1/F1b the
+  trigger fires and the estate liquidates (building demolished, unit disbanded, pool lands WHOLE
+  in market inventory — the conservation law); F2 the player is exempt absolutely; F3 a short
+  streak or one solvent quarter survives; F4 the re-walk (no store the dissolution table names
+  still holds the erased id); F5 inert defaults touch nothing; F6 determinism. F1b and F2
+  mutation-proved red at authoring. Fixture-only; build via
+  `cmd //c tools\verify\build_lua_harness.bat firm_exit_harness`.
 - **`ai_skill_harness`** — AI skill-regression instrument (BL-204,
   docs/ai/AI_OPPONENT.md § 3): freezes a 5-seed benchmark set (`world_params.seed`
   0-4, spanning the generator's body/terrain/market diversity), runs 300 ticks of

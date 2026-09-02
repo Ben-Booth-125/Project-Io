@@ -8,6 +8,7 @@
 #include "nation_step.hpp"   // earmark_result (Sprint N3 T6)
 #include "space_programme.hpp" // space_purchase (BL-644)
 #include "network_upkeep.hpp"  // network_purchase (BL-643)
+#include "corp_command.hpp"    // firm_exit_record (BL-743)
 #include "logistics.hpp"     // lp_pool_map (BL-596/BL-597, shared active+passive LP pool)
 #include "world.hpp"
 
@@ -327,6 +328,11 @@ struct economy_report
     /// `drawn` the realised consumption, and the gap is demand the budget
     /// could not pay. In emission order (ascending nation, stone then timber).
     std::vector<network_purchase> network_purchases;
+
+    /// Which firms the insolvency wind-up erased this tick (BL-743), with the
+    /// written-off balance and what was liquidated. Report-only — the lapse
+    /// and census read it; nothing feeds it back into the sim.
+    std::vector<firm_exit_record> firm_exits;
 
 };
 

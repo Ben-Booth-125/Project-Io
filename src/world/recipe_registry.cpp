@@ -884,6 +884,25 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_space_programme = sp;
     }
 
+    // BL-743 firm-exit trigger (economy.firm_exit). Strict read: the trigger
+    // erases actors, so a NaN threshold would be a wind-up nobody can replay.
+    // Absent table keeps the inert defaults — an unauthored world never exits
+    // a firm.
+    sol::optional<sol::table> exit_tbl = (*econ)["firm_exit"];
+    if (exit_tbl)
+    {
+        const std::string ctx = "economy.firm_exit";
+        firm_exit_params  fe  = m_firm_exit;
+        const sol::table& t   = *exit_tbl;
+
+        read_checked(t, "balance_floor", fe.balance_floor,
+                     -std::numeric_limits<double>::infinity(), 0.0, ctx);
+        read_checked(t, "consecutive_quarters", fe.consecutive_quarters,
+                     0, 40, ctx); // 40 = the return-retention cap
+
+        m_firm_exit = fe;
+    }
+
     // BL-643 network-upkeep material rates (economy.network_upkeep). The same
     // strict read as space_programme above, and for the same reason: these
     // rates feed a deterministic per-tick derivation, so a NaN here would be a

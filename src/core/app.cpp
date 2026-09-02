@@ -1165,7 +1165,12 @@ void app::step_economy()
     // (transient runtime cache, not serialised — same treatment as m_last_econ_report).
     m_last_corp_standings = compute_corp_standings(m_world, flows);
     credit_arrived_convoys(m_world, static_cast<int>(m_sim_loop.day_tick()));
-    lap(5); // standings + convoy credit
+    // BL-743: the insolvency wind-up, LAST — it reads the returns this tick's
+    // apply_budget just filed, and everything above already ran against the
+    // field as it stood. Inert at unauthored params; the player's corp is
+    // exempt inside the pass itself.
+    run_firm_exits(m_world, m_registry.firm_exit(), &m_last_econ_report.firm_exits);
+    lap(5); // standings + convoy credit + exits
 
     // Post-step presentation (BL-361: extracted to core/session_history.cpp):
     // the nation-voiced agency comms (BL-212), the persona counsel posts

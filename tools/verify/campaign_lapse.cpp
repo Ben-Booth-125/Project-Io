@@ -115,6 +115,7 @@ struct lapse_params
     int         epoch_year  = 0;     ///< 0 = leave world_params' own default.
     float       pop_scale   = 1.0f;  ///< population demand_scale multiplier.
     float       bg_scale    = 1.0f;  ///< background demand_scale multiplier.
+    abundance_level abundance = abundance_level::standard; ///< BL-724's scarcity axis.
     std::string tag         = "run";
     double      budget_s    = 900.0; ///< T0d wall-clock ceiling for one rollout.
 };
@@ -137,6 +138,8 @@ tick(world& w, const recipe_registry& reg, int t, economy_report& rep_out)
     run_nation_step(w, reg, rep, t);
     advance_tech_gates(w);
     credit_arrived_convoys(w, t);
+    // BL-743: the insolvency wind-up, last — app::step_economy's own order.
+    run_firm_exits(w, reg.firm_exit(), &rep.firm_exits);
     rep_out = std::move(rep);
     return flows;
 }
@@ -274,7 +277,8 @@ rollout_result run_rollout(const lapse_params& lp, const recipe_registry& reg,
     rollout_result out;
 
     world_params p;
-    p.seed = lp.seed;
+    p.seed      = lp.seed;
+    p.abundance = lp.abundance;
     if (lp.epoch_year != 0)
         p.epoch_year = lp.epoch_year;
     if (!lp.prehistory)
@@ -309,7 +313,7 @@ rollout_result run_rollout(const lapse_params& lp, const recipe_registry& reg,
     out.markets_csv = "tick,market,body,resource,price,base_price,supply,demand,shortfall\n";
     out.world_csv = "tick,valued_production,exchange_revenue,convoys,buildings_active,"
                     "buildings_idle,corps,corps_in_debt,hostile_pairs,friend_pairs,"
-                    "sell_orders,treasury_sum,state_purchase_qty\n";
+                    "sell_orders,treasury_sum,state_purchase_qty,firm_exits\n";
 
     const int total_ticks = lp.warm_ticks + lp.ticks;
     for (int t = 1; t <= total_ticks; ++t)
@@ -400,13 +404,14 @@ rollout_result run_rollout(const lapse_params& lp, const recipe_registry& reg,
 
         const double valued = valued_production(w, reg, rep);
         appendf(out.world_csv,
-                "%d,%.4f,%.4f,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f\n",
+                "%d,%.4f,%.4f,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%d\n",
                 t, valued, exchange_revenue_at(w, t),
                 static_cast<int>(w.convoys.size()), active, idle,
                 static_cast<int>(w.corporations.size()), in_debt,
                 static_cast<int>(w.corp_hostile_pairs.size()),
                 static_cast<int>(w.corp_friend_pairs.size()),
-                static_cast<int>(w.sell_orders.size()), treasury_sum, state_qty);
+                static_cast<int>(w.sell_orders.size()), treasury_sum, state_qty,
+                static_cast<int>(rep.firm_exits.size()));
 
         if (t == total_ticks)
         {
@@ -501,6 +506,14 @@ int main(int argc, char** argv)
             lp.pop_scale = static_cast<float>(std::atof(argv[++i]));
         else if (std::strcmp(argv[i], "--bg-scale") == 0 && i + 1 < argc)
             lp.bg_scale = static_cast<float>(std::atof(argv[++i]));
+        else if (std::strcmp(argv[i], "--abundance") == 0 && i + 1 < argc)
+        {
+            ++i;
+            if (std::strcmp(argv[i], "sparse") == 0)        lp.abundance = abundance_level::sparse;
+            else if (std::strcmp(argv[i], "lean") == 0)     lp.abundance = abundance_level::lean;
+            else if (std::strcmp(argv[i], "standard") == 0) lp.abundance = abundance_level::standard;
+            else { std::printf("usage: --abundance sparse|lean|standard\n"); return 2; }
+        }
         else if (std::strcmp(argv[i], "--tag") == 0 && i + 1 < argc)
             lp.tag = argv[++i];
         else if (std::strcmp(argv[i], "--t0") == 0)
@@ -583,6 +596,9 @@ int main(int argc, char** argv)
     appendf(manifest, "epoch_year=%s\n",
             lp.epoch_year != 0 ? std::to_string(lp.epoch_year).c_str()
                                : "(world_params default)");
+    appendf(manifest, "abundance=%s\n",
+            lp.abundance == abundance_level::sparse ? "sparse"
+            : lp.abundance == abundance_level::lean ? "lean" : "standard");
     appendf(manifest, "override pop demand_scale x%.3f%s\n",
             static_cast<double>(lp.pop_scale), lp.pop_scale == 1.0f ? " (none)" : "");
     appendf(manifest, "override bg demand_scale x%.3f%s\n",

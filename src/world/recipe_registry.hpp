@@ -3,6 +3,7 @@
 #include "components.hpp"
 #include "nation_ai.hpp"   // BL-542: nation_ai_params — the nation scorer's tunables (light: entity.hpp + nation_budget.hpp only)
 #include "sentiment.hpp"   // BL-545/BL-546: sentiment_params — the authored factor table
+#include "corp_command.hpp"    // BL-743: firm_exit_params — the insolvency wind-up trigger
 #include "network_upkeep.hpp"  // BL-643: network_upkeep_params — the logistics_maintenance line's material rates
 #include "space_programme.hpp" // BL-644: space_programme_params — the tenth budget line's purchase lumps
 #include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
@@ -1364,6 +1365,9 @@ public:
     void set_sentiment(const sentiment_params& p) { m_sentiment = p; }
     void set_nation_ai(const nation_ai_params& p) { m_nation_ai = p; }
     void set_space_programme(const space_programme_params& p) { m_space_programme = p; }
+    /// BL-743: the firm-exit trigger (economy.firm_exit in Lua; inert defaults).
+    const firm_exit_params& firm_exit() const { return m_firm_exit; }
+    void set_firm_exit(const firm_exit_params& p) { m_firm_exit = p; }
     void set_network_upkeep(const network_upkeep_params& p) { m_network_upkeep = p; }
     void set_recipe_switch(const recipe_switch_params& p) { m_recipe_switch = p; }
     void set_acquisition(const acquisition_params& p) { m_acquisition = p; }
@@ -1633,6 +1637,10 @@ private:
     /// Default-constructed — both lumps zero, so a hand-built harness registry
     /// derives no state purchase unless it sets them.
     space_programme_params m_space_programme = {};
+
+    /// BL-743 firm-exit trigger (economy.firm_exit). Inert defaults: an
+    /// unloaded registry never winds a firm up.
+    firm_exit_params m_firm_exit = {};
 
     /// BL-643 network-upkeep material rates (economy.network_upkeep).
     /// Default-constructed — every rate zero, so a hand-built harness registry

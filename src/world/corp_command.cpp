@@ -504,6 +504,60 @@ void merge_returns(std::vector<quarterly_return>& dst,
 /// the world. Both ids name live corporations; the caller has already priced the
 /// firm and taken the payment. Reads no clock, no RNG, and no unordered
 /// container's ORDER — only its contents.
+// The CANCEL/DROP half of a corporation's end, shared by the buyout
+// (`dissolve_into`) and the no-heir wind-up (`run_firm_exits`, BL-743) so the
+// two paths cannot drift — one rule, two callers, exactly as FINANCE.md's
+// dissolution table intends.
+
+/// CANCEL: open market orders (both sides of the book — a promise made by a
+/// party that no longer exists) and unaccepted procurement quotes (nothing has
+/// been paid; the counterparty simply asks again).
+void sever_orders_and_quotes(world& w, entity_id target)
+{
+    w.sell_orders.erase(std::remove_if(w.sell_orders.begin(), w.sell_orders.end(),
+                                       [&](const sell_order& o) { return o.corp == target; }),
+                        w.sell_orders.end());
+    w.buy_orders.erase(std::remove_if(w.buy_orders.begin(), w.buy_orders.end(),
+                                      [&](const buy_order& o) { return o.corp == target; }),
+                       w.buy_orders.end());
+    w.procurement_quotes.erase(
+        std::remove_if(w.procurement_quotes.begin(), w.procurement_quotes.end(),
+                       [&](const procurement_quote& q)
+                       { return q.buyer == target || q.supplier == target; }),
+        w.procurement_quotes.end());
+}
+
+/// CANCEL live battles (no honest way to substitute a combatant), then DROP
+/// every opinion and permission that was the target's alone: stance rows (a
+/// declaration is about a party), sentiment both directions (nobody holds an
+/// opinion of a firm that no longer exists), embargo predicates, earned techs,
+/// scalar modifiers.
+void sever_battles_and_opinions(world& w, entity_id target)
+{
+    w.battles.erase(std::remove_if(w.battles.begin(), w.battles.end(),
+                                   [&](const active_battle& b)
+                                   { return b.attacker == target || b.defender == target; }),
+                    w.battles.end());
+
+    const auto drop_pairs = [&](std::set<std::pair<entity_id, entity_id>>& s)
+    {
+        for (auto it = s.begin(); it != s.end();)
+            it = (it->first == target || it->second == target) ? s.erase(it) : std::next(it);
+    };
+    drop_pairs(w.corp_hostile_pairs);
+    drop_pairs(w.corp_friend_pairs);
+    drop_pairs(w.corp_friend_offers);
+
+    for (auto it = w.sentiment.pairs.begin(); it != w.sentiment.pairs.end();)
+        it = (it->first.first == target || it->first.second == target)
+                 ? w.sentiment.pairs.erase(it)
+                 : std::next(it);
+
+    w.corp_embargo_conditions.erase(target); // a refusal-to-deal predicate is the firm's own
+    w.earned_techs.erase(target);            // FINANCE.md lists what transfers; research is not on it
+    w.corp_modifiers.erase(target);          // scalar modifiers were applied TO that firm
+}
+
 void dissolve_into(world& w, entity_id acquirer, entity_id target)
 {
     corporation_component& acq = w.corporations.at(acquirer);
@@ -626,26 +680,7 @@ void dissolve_into(world& w, entity_id acquirer, entity_id target)
             w.trade_routes.erase(w.trade_routes.begin() + static_cast<std::ptrdiff_t>(*it));
     }
 
-    // --- CANCEL: the order book --------------------------------------------
-    // FINANCE.md, in as many words: open market orders are CANCELLED rather than
-    // reassigned — an order is a promise made by a party that no longer exists.
-    // Both sides of the book, though only the sell side has a press today.
-    w.sell_orders.erase(std::remove_if(w.sell_orders.begin(), w.sell_orders.end(),
-                                       [&](const sell_order& o) { return o.corp == target; }),
-                        w.sell_orders.end());
-    w.buy_orders.erase(std::remove_if(w.buy_orders.begin(), w.buy_orders.end(),
-                                      [&](const buy_order& o) { return o.corp == target; }),
-                       w.buy_orders.end());
-
-    // --- CANCEL: live procurement quotes -----------------------------------
-    // A quote is an unaccepted OFFER — the order book's argument exactly. Nothing
-    // has been paid and nobody is owed anything; the counterparty simply asks
-    // again if it still wants the goods.
-    w.procurement_quotes.erase(
-        std::remove_if(w.procurement_quotes.begin(), w.procurement_quotes.end(),
-                       [&](const procurement_quote& q)
-                       { return q.buyer == target || q.supplier == target; }),
-        w.procurement_quotes.end());
+    sever_orders_and_quotes(w, target);
 
     // --- TRANSFER: accepted procurement contracts --------------------------
     // An ACCEPTED contract is different from a quote and from an order: a deposit
@@ -664,44 +699,7 @@ void dissolve_into(world& w, entity_id acquirer, entity_id target)
                        [](const procurement_contract& c) { return c.buyer == c.supplier; }),
         w.procurement_contracts.end());
 
-    // --- CANCEL: live battles ----------------------------------------------
-    // A battle is a fight between two parties; one of them ceasing to exist ends
-    // it, and there is no honest way to substitute a combatant mid-engagement.
-    // The stance rows that opened it are dropped just below, so nothing re-opens
-    // it on the next tick.
-    w.battles.erase(std::remove_if(w.battles.begin(), w.battles.end(),
-                                   [&](const active_battle& b)
-                                   { return b.attacker == target || b.defender == target; }),
-                    w.battles.end());
-
-    // --- DROP: stance ------------------------------------------------------
-    // A declaration is about a party. Inheriting the target's hostilities would
-    // hand the acquirer wars it never declared, and inheriting its friendships
-    // would mint agreement the other side never gave (a friendship row is
-    // evidence BOTH corps chose it — stance.hpp's invariant 1).
-    const auto drop_pairs = [&](std::set<std::pair<entity_id, entity_id>>& s)
-    {
-        for (auto it = s.begin(); it != s.end();)
-            it = (it->first == target || it->second == target) ? s.erase(it) : std::next(it);
-    };
-    drop_pairs(w.corp_hostile_pairs);
-    drop_pairs(w.corp_friend_pairs);
-    drop_pairs(w.corp_friend_offers);
-
-    // --- DROP: sentiment rows ----------------------------------------------
-    // Sentiment is an OPINION held BY someone ABOUT someone. Both directions go:
-    // nobody has an opinion of a firm that no longer exists, and the dissolved
-    // firm's own opinions die with it. Merging them into the acquirer's rows would
-    // invent feelings neither party ever had.
-    for (auto it = w.sentiment.pairs.begin(); it != w.sentiment.pairs.end();)
-        it = (it->first.first == target || it->first.second == target)
-                 ? w.sentiment.pairs.erase(it)
-                 : std::next(it);
-
-    // --- DROP: permissions and capabilities that were the target's alone ---
-    w.corp_embargo_conditions.erase(target); // a refusal-to-deal predicate is the firm's own
-    w.earned_techs.erase(target);            // FINANCE.md lists what transfers; research is not on it
-    w.corp_modifiers.erase(target);          // scalar modifiers were applied TO that firm
+    sever_battles_and_opinions(w, target);
 
     // --- The seat, recomputed over the merged holding set -------------------
     recompute_hq(w, acq);
@@ -774,6 +772,146 @@ float corp_acquisition_price(const corporation_component& target, float multiple
     // redemption anyone could take, and the price is a SINK rather than a payment
     // to a modelled seller. A firm priced at zero is worthless, stated plainly.
     return (priced > 0.0) ? static_cast<float>(priced) : 0.0f;
+}
+
+// ---------------------------------------------------------------------------
+// BL-743 — firm exit: dissolution without an heir (see corp_command.hpp)
+// ---------------------------------------------------------------------------
+
+void run_firm_exits(world& w, const firm_exit_params& p,
+                    std::vector<firm_exit_record>* out)
+{
+    // Inert unless BOTH halves are authored — the standing inertness
+    // discipline: an unloaded registry runs the pre-BL-743 world untouched.
+    if (!(p.consecutive_quarters > 0) || !(p.balance_floor < 0.0f)
+        || !std::isfinite(p.balance_floor))
+        return;
+
+    // Scan first, wind up after: the wind-up mutates w.corporations, and the
+    // trigger must read one consistent snapshot of the field. Sorted ids.
+    std::vector<entity_id> doomed;
+    {
+        std::vector<entity_id> ids;
+        ids.reserve(w.corporations.size());
+        for (const auto& kv : w.corporations)
+            ids.push_back(kv.first);
+        std::sort(ids.begin(), ids.end());
+        for (const entity_id id : ids)
+        {
+            const corporation_component& cc = w.corporations.at(id);
+            // THE PLAYER'S CORP IS EXEMPT ABSOLUTELY, spectate included: the
+            // never-erase-the-seat ruling (NR-670), and `world::player_entity`
+            // is the camera/ledger anchor — it must exist.
+            if (id == w.player_entity || cc.is_player)
+                continue;
+            const std::size_t n = static_cast<std::size_t>(p.consecutive_quarters);
+            if (cc.returns.size() < n)
+                continue; // too young to have failed for that long
+            bool under = true;
+            for (std::size_t i = cc.returns.size() - n; i < cc.returns.size(); ++i)
+                under = under && (cc.returns[i].balance < p.balance_floor);
+            if (under)
+                doomed.push_back(id);
+        }
+    }
+
+    for (const entity_id target : doomed)
+    {
+        const corporation_component& tgt = w.corporations.at(target);
+        firm_exit_record rec;
+        rec.corp    = target;
+        rec.balance = tgt.balance;
+
+        // LIQUIDATE holdings: demolished through the ordinary verb machinery
+        // (building + corp asset + building stockpile erased in one place).
+        // Copy first — demolish edits the asset list under the walk.
+        {
+            const std::vector<entity_id> assets = tgt.assets;
+            for (const entity_id b : assets)
+                if (demolish_building(w, target, b))
+                    ++rec.holdings;
+        }
+
+        // LIQUIDATE pools: dumped to the local market's REAL inventory — the
+        // conservation law (inventory gains what pools lose). A body with no
+        // market loses the goods; stated, not hidden.
+        {
+            std::vector<std::pair<entity_id, stockpile_component>> pools;
+            for (auto it = w.corp_body_pools.lower_bound({target, entity_id{0}});
+                 it != w.corp_body_pools.end() && it->first.first == target; ++it)
+                pools.emplace_back(it->first.second, it->second);
+            for (const auto& [body, pool] : pools)
+            {
+                const entity_id mid = any_market_on_body(w, body);
+                if (mid != null_entity)
+                {
+                    market_component& mc = w.markets.at(mid);
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                        mc.inventory[r] += pool.quantities[r];
+                }
+                w.corp_body_pools.erase(std::make_pair(target, body));
+            }
+        }
+
+        // LIQUIDATE units: disbanded. Sorted ids so the erase order is fixed.
+        {
+            std::vector<entity_id> uids;
+            for (const auto& kv : w.units)
+                if (kv.second.owner == target)
+                    uids.push_back(kv.first);
+            std::sort(uids.begin(), uids.end());
+            for (const entity_id u : uids)
+                w.units.erase(u);
+            rec.units = static_cast<int>(uids.size());
+        }
+
+        // LIQUIDATE in-flight cargo: the goods are real (they left the pool at
+        // dispatch), so they land in the DESTINATION market's inventory rather
+        // than vanishing; the convoy itself is erased.
+        w.convoys.erase(
+            std::remove_if(w.convoys.begin(), w.convoys.end(),
+                           [&](const convoy_component& c)
+                           {
+                               if (c.corp != target)
+                                   return false;
+                               const auto mit = w.markets.find(c.dest_market);
+                               if (mit != w.markets.end())
+                                   mit->second.inventory[static_cast<std::size_t>(
+                                       c.cargo_resource)] += c.cargo_qty;
+                               return true;
+                           }),
+            w.convoys.end());
+
+        // DROP: the dead firm's trade-route rows and workforce overrides.
+        w.trade_routes.erase(
+            std::remove_if(w.trade_routes.begin(), w.trade_routes.end(),
+                           [&](const trade_route& r) { return r.corp == target; }),
+            w.trade_routes.end());
+        for (auto it = w.workforce_supply_overrides.lower_bound({target, entity_id{0}});
+             it != w.workforce_supply_overrides.end() && it->first.first == target;)
+            it = w.workforce_supply_overrides.erase(it);
+
+        // CANCEL: accepted contracts EITHER side. Unlike the buyout (which
+        // transfers them to the heir) there is nobody left to deliver or to
+        // receive; what was already paid stays paid — the counterparty keeps
+        // the deposit, exactly as a cancelled promise leaves the books.
+        w.procurement_contracts.erase(
+            std::remove_if(w.procurement_contracts.begin(), w.procurement_contracts.end(),
+                           [&](const procurement_contract& c)
+                           { return c.buyer == target || c.supplier == target; }),
+            w.procurement_contracts.end());
+
+        // CANCEL/DROP: the shared severance — one rule with the buyout.
+        sever_orders_and_quotes(w, target);
+        sever_battles_and_opinions(w, target);
+
+        // DIE: the balance (the creditor was the void) and the record, with
+        // the actor. History is KEPT — never rewritten.
+        w.corporations.erase(target);
+
+        if (out)
+            out->push_back(rec);
+    }
 }
 
 corp_command_result apply_corp_command(world& w, const recipe_registry& reg,

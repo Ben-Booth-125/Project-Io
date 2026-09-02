@@ -30,6 +30,20 @@ economy = {
         idle_maintenance_floor = 0.15,
     },
 
+    -- BL-743 (Ben, 2026-09-01: "Yes to firm exit") — the insolvency wind-up.
+    -- A corporation (never the player's) whose last N FILED quarters all
+    -- closed below the floor is wound up: holdings demolished, pools and
+    -- in-flight cargo dumped to market inventory (the conservation law),
+    -- units disbanded, orders/quotes/battles cancelled, opinions dropped,
+    -- the debt written off with the actor. Measured motivation: 57-59 of 89
+    -- corps ended 30 years underwater and every one kept operating - exit is
+    -- the market's own supply discipline. First-cut thresholds: three years
+    -- of deep insolvency; the sweep battery owns tuning them.
+    firm_exit = {
+        balance_floor        = -2000.0,
+        consecutive_quarters = 12,
+    },
+
     -- Per building_type constants.
     --   base_rate   — extraction: output units per tick at richness 1, workforce 1.
     --                 processing: recipe batches per tick at workforce 1.

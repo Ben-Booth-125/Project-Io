@@ -424,6 +424,40 @@ shipped code, and at least one did not. A doc says what is true of the **design*
 is built is a backlog fact (`.claude/rules/io-standing-rules.md` § Terms & docs). Where a design
 paragraph names the file it will live in, the conditional is what keeps the two readings apart.
 
+## Firm exit — insolvency has a consequence
+
+A corporation (never the player's) whose last N **filed** quarters all closed below an authored
+balance floor is **wound up**: dissolution without an heir. Exit is the market's own supply
+discipline — a failed producer leaving is what clears a glut without anyone touching a price —
+and it is what makes bankruptcy a real verdict rather than a status. Design: BL-743 (firm exit);
+Ben's ruling, 2026-09-01.
+
+The trigger reads the quarterly returns (§ The quarterly return) — already persistent, already
+deterministic — so the pass carries no state of its own. Both thresholds are authored
+(`economy.firm_exit`: `balance_floor`, `consecutive_quarters`, capped at the 40-quarter
+retention); unauthored values disable the pass outright. One solvent quarter inside the window
+resets the sentence.
+
+**Disposition follows the dissolution table (§ Dissolution), read down the no-heir column:**
+
+| Outcome | What it applies to |
+|---|---|
+| **LIQUIDATE** | Holdings (demolished through the ordinary verb), units (disbanded), pools and in-flight cargo — dumped to the local / destination market's **real inventory**, honouring the conservation law (inventory gains what pools lose). A body with no market loses the goods; stated, not hidden. |
+| **DIE** | The balance (the debt is written off — the creditor was the void) and the filed returns, with the actor. |
+| **CANCEL** | Open orders, quotes, live battles — and, unlike the buyout, accepted contracts on **either** side: nobody is left to deliver or receive, and what was already paid stays paid. |
+| **DROP** | Stance, sentiment, embargo conditions, techs, modifiers, trade-route rows, workforce overrides. |
+| **KEEP** | History — never rewritten. |
+
+The CANCEL/DROP half is **shared code** with the buyout's `dissolve_into`
+(`src/world/corp_command.cpp`), so the two ends of a corporation cannot drift. **The player's
+corp is exempt absolutely, spectate included** — the never-erase-the-seat ruling (Ben,
+2026-08-26, NR-670), and mechanically `world::player_entity` is the camera/ledger anchor. The
+player's own failure stays *Stagnation as loss* (`docs/CONCEPT.md`): progressive, never an
+erasure.
+
+Check: `tools/verify/firm_exit_harness.cpp` — including the re-walk row (no store the
+dissolution table names still holds an erased id) and the inertness row.
+
 ## Surfaces
 
 - **Budget ledger** — the itemised flow breakdown, player corp only

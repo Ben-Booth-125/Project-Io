@@ -332,6 +332,58 @@ float corp_trailing_net(const corporation_component& c);
 float corp_acquisition_price(const corporation_component& target, float multiple);
 
 // ---------------------------------------------------------------------------
+// BL-743 — firm exit (docs/economy/FINANCE.md § Firm exit)
+// ---------------------------------------------------------------------------
+// Insolvency finally has a consequence: a corporation whose last
+// `consecutive_quarters` FILED returns all closed below `balance_floor` is
+// wound up — dissolution WITHOUT AN HEIR. Exit is the market's own supply
+// discipline (Ben, 2026-09-01: measured, 57-59 of 89 corps ended 30 years
+// underwater and every one kept operating, so gluts never cleared).
+//
+// The trigger reads the filed quarterly returns — already persistent, already
+// deterministic — so the pass carries NO new state and no save-format move.
+// Authored INERT (quarters 0 / floor 0 disable it): an unloaded registry runs
+// the pre-BL-743 arithmetic bit-identically.
+//
+// THE PLAYER'S CORP IS EXEMPT ABSOLUTELY, spectate included: the never-erase-
+// the-seat ruling (Ben, 2026-08-26, NR-670) — and mechanically,
+// `world::player_entity` is the camera/ledger anchor and must exist.
+//
+// Disposition (FINANCE.md's dissolution rule, the no-heir column):
+//   LIQUIDATE  holdings (demolished), units (disbanded), pools and in-flight
+//              cargo (dumped to the local / destination market's REAL
+//              inventory — the conservation law: inventory gains what pools
+//              lose; a body with no market loses the goods, stated).
+//   DIE        the balance (debt written off — the creditor was the void) and
+//              the filed returns (they were the firm's own record).
+//   CANCEL     open orders, quotes, live battles, accepted contracts (the
+//              counterparty keeps what was already paid).
+//   DROP       stance, sentiment, embargo conditions, techs, modifiers,
+//              trade-route rows, workforce overrides.
+//   KEEP       history — never rewritten.
+
+struct firm_exit_params
+{
+    float balance_floor        = 0.0f; ///< A filed close below this counts. 0 disables.
+    int   consecutive_quarters = 0;    ///< Streak length required. 0 disables.
+};
+
+/// One exit, reported so the census and the lapse can see it. Report-only.
+struct firm_exit_record
+{
+    entity_id corp     = null_entity;
+    float     balance  = 0.0f; ///< The written-off closing balance.
+    int       holdings = 0;    ///< Buildings demolished in the wind-up.
+    int       units    = 0;    ///< Units disbanded.
+};
+
+/// Run the exit pass: scan (sorted corp ids), wind up every triggered firm.
+/// Deterministic; mutates nothing when the params are inert or nothing
+/// triggers. Call once per econ tick, after the returns are filed.
+void run_firm_exits(world& w, const firm_exit_params& p,
+                    std::vector<firm_exit_record>* out);
+
+// ---------------------------------------------------------------------------
 // Decision log (the AI's legibility surface / replay artifact)
 // ---------------------------------------------------------------------------
 
