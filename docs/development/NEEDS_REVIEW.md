@@ -24,11 +24,31 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*2 entries — 2 open, 0 resolved.*
+*3 entries — 1 open, 2 resolved.*
 
 ---
 
 ## Open
+
+### NR-777 — What is "marginal cost" for a processor - inputs included (A) or conversion only (B)? The reading decides the size of the retune
+*question · raised 2026-09-02 · from Applying NR-776 (approved) to the recipe_margin table, 2026-09-02. With k = 1.0 and inputs inside marginal cost, routes (a)+(b) cannot get a single processing recipe green: profit >= marginal cost means revenue >= 2 x inputs at EVERY stage, so route (c) - prices - is forced on the whole ladder, not the residue.*
+
+Two readings of Ben's sentence, quantified with the cheapest route setting each good's price, raws pinned at their extraction price, k = 1.0:
+
+A - MARGINAL COST INCLUDES INPUTS (the economics reading, and the one the harness runs today): every processing stage must double the value it takes in. At processing base_rate 16 (wage/batch 0.75): 24 of 50 goods re-priced - steel 8->13.5, machinery 22->55.5, alloys 34->79.5, electronics 29->41.5, spacecraft_components 140->277.5, ordnance 43->110.5, consumer_goods 12->55.5, tools 25.5->88.8 - ladder top 56x -> 111x; 17 alternate routes need their input cost cut to the cheapest route's bar (steel_from_blooms 54.5 -> 6.0, steel_bessemer 13.1 -> 6.0, hydroponics_bay 9.0 -> 0.8, the four construction methods ~25-40%). Every price-dependent tuning moves with it (demand baskets, reservation_mult, procurement lumps, build costs, spawn capital, ceil_mult), the sweeps' baselines go stale, goldens re-bless. In return M2 (fixed cost at the floor) becomes attainable at today's maintenance: steel's value-add 7.5/batch x 8 batches x 0.25 = 15/tick against 16.8 of wages + maintenance - nearly there, and the tiers above clear.
+
+B - MARGINAL COST IS THE CONVERSION COST (wage per batch; inputs pass through at cost): value-add >= 2 x wage. At base_rate 16: 9 goods re-priced by small amounts (food_rations 6->7.5, consumer_goods 12->17, silicon 5->5.5, clean_water 3->4.5), ladder unchanged at 56x, 9 alternates need input cuts (steel_from_blooms 25 -> 6.5, hydroponics_bay 6.3 -> 1.5, charcoal 4.5 -> 2.5; steel's coal route 7.0 -> 6.5 or steel 8 -> 8.5). Cheap - but it leaves gross margins at 10-15% and M2 fails almost everywhere: steel's value-add 2/batch x 8 x 0.25 = 4/tick against 16.8, so the floor half needs maintenance cut ~4x and wages with it - a second, larger retune of the very constant the 2026-09-01 ledger named as 80% of drains.
+
+Either way, processing base_rate 8 -> 16 (wage/batch 1.5 -> 0.75) is route (a) and halves the alternate-route cuts; and EXTRACTION's floor half is independent of the reading: at W = 0.5 a site needs price >= 3.8 to cover 9.5/tick of wages + maintenance at the floor, so raws either rise (iron_ore 2.5 -> ~4, which propagates up under both readings) or extraction's fixed costs fall (maintenance 5 -> ~2, wage 8 -> ~4).
+
+Recommendation: A, with base_rate 16 - it is the sentence as written, it makes profit robust across the whole band rather than only at base, and it is the retune that also clears the floor half without gutting maintenance. It is a sprint, not a pass: one re-priced table, the 17 alternates re-costed, ceil_mult re-derived, sweeps re-baselined. B is the light touch if the 56x ladder must not move.
+
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
 
 ### NR-775 — Two constants taken for the recipe margin anchor - k = 1.0 and typical_workforce = 0.5
 *decision taken on your behalf · raised 2026-09-02 · from Sprint 31 opening, 2026-09-02: the instrument needed both numbers to run, and neither is in your sentence exactly.*
@@ -36,6 +56,8 @@ the work happens, and that is the durable record. What stays here is what is sti
 1. profit_over_marginal k = 1.0 - your sentence read verbatim: "a greater profit than marginal costs" = margin >= 1.0 x marginal cost, i.e. revenue at least twice marginal cost. The harness prints the roster's count at 0 / 0.5 / 1 / 2 beside it so the bar can move on a measurement (today: ancient 9/2/1/0 of 19, industrial 16/2/2/0 of 25).
 
 2. typical_workforce W = 0.5 for the floor half (M2) - the value corporation_generation.cpp seeds every generated building with (default_workforce_assigned), i.e. the staffing the world opens at. W=1.0 would halve the per-batch share of fixed cost and turn several M2 rows green without any table changing; 0.5 is the honest opening case. Both live in economy.lua's recipe_margin_anchor as data.
+
+> **RESOLVED.** RESOLVED. Ben, 2026-09-02: approved as taken - k = 1.0 (profit at least equal to marginal cost) and typical_workforce = 0.5 stand as the authored anchor constants.
 
 ### NR-776 — Retune direction for the roster - rates and costs first, or prices?
 *question · raised 2026-09-02 · from recipe_margin first run, 2026-09-02: 41 of 44 priced recipes fail M1, and the failure has a shape - zero or negative value-add before wages, then a 1.50 wage per batch.*
@@ -50,10 +72,5 @@ Three routes to green, not exclusive, and the ORDER is the call:
 
 Recommendation: (a) then (b), re-run recipe_margin on every edit, (c) only where a row still fails, and re-derive ceil_mult once at the end. Say if you would rather move prices.
 
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
+> **RESOLVED.** RESOLVED. Ben, 2026-09-02: approved the recommended order - rates and costs first, then input quantities where value-add is zero or negative, base prices last with ceil_mult re-derived once at the end. NR-777 records the consequence found on applying it: under k = 1.0 the processing half cannot go green from (a)+(b) alone.
 
