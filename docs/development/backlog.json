@@ -229,6 +229,103 @@
     "tools/verify/nation_scorer_harness.cpp"
    ],
    "design": "The harness references derive_contract_offers / contract_offer_params / world::mercenary_offers (~15 sites), all deleted by cc88997c (the mercenary teardown). It has not compiled since, which means the nation scorer's term-by-term guard rows have been unrunnable through every scorer change after the teardown - including BL-644's calm_space addition, which landed with zero direct scorer verification (nation_wiring's scored ticks cover it only indirectly).\n\nTHE WORK: strip the mercenary-era rows (their subject no longer exists - deleting them is truth, not weakening), get the remaining term guards compiling and green, and add a calm_space row on the harness's own mutate-what-it-reads pattern: raise calm, watch the space_programme weight move by calm_space x delta; zero calm_space, watch it stop. A check that cannot run is worse than one that fails (DEVELOPMENT_PRACTICES: rebuild before believing)."
+  },
+  {
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (operating-loss methods, Ben's rulings)",
+   "requires": [
+    "BL-741",
+    "BL-742"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-738",
+   "short_name": "INDUSTRY_RATES_GO_LIVE",
+   "category": "Economy",
+   "title": "Building upkeep in goods stops shipping at zero - the Industry channel earns its keep",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "scripts/economy.lua",
+    "tools/verify/demand_census.cpp"
+   ],
+   "design": "Ben, 2026-09-01: 'Building should have upkeep too.' The machinery is all landed - BL-641 built the draw, BL-654 made it BID below the reservation ceiling (price_band.reservation_mult, authored 9.0) - only the RATES ship at zero. THE WORK: author non-zero per-type rates for goods genuinely produced in the campaign band (the 227->19 collapse came from drawing goods produced 0.0; the census's producibility columns are the guard), starting from the derived values kept in comments in scripts/economy.lua. MEASURED, NOT GUESSED: demand_census before/after per band, and a campaign_lapse knob-x-knob cell - processors sit at -0.44 cr/qtr operating and this adds their input cost, so the rate is tuned against BOTH sectors' operating net, not extraction's alone. A rate that starves buildings (supply-factor decay census-wide) is the named failure mode; land small and raise measured.\n\nSTAGE 1 MEASURED AND WITHDRAWN 2026-09-01: repair timber/stone rates ran a full campaign_lapse cell (tag after-fixes) - extraction operating net -6.75 -> -31.29 cr/qtr, operating-positive corps 29 -> 16, valued production x1.05 -> x0.91. The cost side landed; the income side cannot arrive until BL-741 (nation revenue breadth) and BL-742 (state buys meet the market) - now hard requires. The one clean positive: stone off the floor (0.42x -> 1.38x base, floored 5 -> 2 of 9 markets) - the price signal works. The full record is in scripts/economy.lua at the goods table and the two lapse run dirs (baseline-s0, after-fixes). Ben's ruling stands; the sequencing was wrong."
+  },
+  {
+   "status": "designed",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (operating-loss methods, Ben's rulings)",
+   "requires": [
+    "BL-739"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-740",
+   "short_name": "MAINTENANCE_FLOOR_ANCHOR",
+   "category": "Economy",
+   "title": "A building's fixed cost is coverable at the price FLOOR - an anchor, not a hand-tune",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "scripts/economy.lua",
+    "tools/verify/tier_margin.cpp"
+   ],
+   "design": "Ben, 2026-09-01: agreed. The value_anchor discipline applied to operating cost: per extraction target, taper-mean output valued at base_price x floor_mult must cover the building's fixed cost per tick (maintenance incl. the BL-739 idle floor share + wages at typical workforce) - so the WORST legal market still pays the lights and profit comes from beating it, under any future base-price retune. THE WORK: derive the bound per (building type, target resource), retune the authored maintenance constants where they breach it, and add the harness rows (tier_margin or a sibling) asserting the invariant with a differential red-proof. The anchor is checked at authoring time against the authored tables, never against live resolved prices."
+  },
+  {
+   "status": "open",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (BL-643 build findings)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-741",
+   "short_name": "NATION_REVENUE_BREADTH",
+   "category": "Economy",
+   "title": "One nation in 43 has a treasury - every state demand channel is throttled by it",
+   "authority_doc": "docs/politics/NATIONS.md",
+   "files": [
+    "src/world/law.hpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "design": "MEASURED (BL-643 build, 2026-09-01): over the 80-tick census warm start exactly 1 of 43 nations holds ANY treasury (sum 108.3 cr) - the single seeded extraction levy's author. Every state-side demand channel (BL-643 network upkeep, BL-644 space programme, the garrison line, every future budget line) buys only what a treasury funds, so channel reach is bounded by nation income breadth, not by authored rates: the network channel derived 3,357 intents and funded 138.\n\nTHE QUESTION: how do the other 42 nations earn? Candidates, each already designed somewhere: seed the levy per nation rather than once (every nation authors its own extraction levy - NATIONS.md's jurisdiction machinery already scopes who pays); the Pass 7 generation-time treasury credit NATIONS.md marks 'not yet implemented'; tariff enactment (BL-541, inert - no author). Decide against the treasury-constructs-at-zero rule (only levy in, tariff in, budget out may move one) - per-nation levy seeding is the change most inside the settled design."
+  },
+  {
+   "status": "open",
+   "glyph": "~",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": null,
+   "written": "2026-09-01",
+   "author": "Claude (BL-643 build findings)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-742",
+   "short_name": "STATE_BUYS_MEET_THE_MARKET",
+   "category": "Economy",
+   "title": "Nation purchases read corp pools that auto-surplus already swept to market",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/space_programme.cpp",
+    "src/world/network_upkeep.cpp"
+   ],
+   "design": "MEASURED (BL-643 build, 2026-09-01): in the industrial band NO non-player (corp, body) pool holds any stone or timber at all over the census warm start - production credits pools, then auto-surplus lists everything above processor reservation and clearing sweeps it into market_component::inventory. The BL-644 state-purchase template buys FROM POOLS, so the state channels starve beside a stocked market (industrial network channel: bit-inert; ancient works only because processors reserve timber).\n\nTHE QUESTION: should derive-*-claims fall back to buying from market inventory when pools are empty - paying the resolved price, decrementing inventory (the same real, finite stock run_processing and run_construction already draw), with the credit going... to whom? Market inventory has no owner; the pool-purchase's virtue is a named supplier who gets paid, which is the operating-income half the channels exist for. Options: (a) suppliers keep a processor-reservation-style hold for state demand (a standing-order shape); (b) the state posts BUY ORDERS on the dormant buy book (BL-160's first real emitter, and then the want IS a price signal); (c) buy from inventory and treat the credit as reaching the market's recent sellers (needs a cost-basis-like attribution the model deliberately lacks). Option (b) is the one that also closes MARKETS.md property 3 for these channels. A call for Ben before any code."
   }
  ]
 }

@@ -741,12 +741,18 @@ int main(int argc, char** argv)
                         static_cast<double>(m_full),
                         m_full > 0.0f ? 100.0 * m_zero / m_full : 0.0);
             all_equal  = all_equal && (m_zero == m_decom);
+            // BL-739: the floor is AUTHORED now (economy.thresholds.
+            // idle_maintenance_floor) — the row asserts against the registry's
+            // own value, never a re-stated constant, so a retune moves the
+            // check with the world instead of failing it.
             all_thirty = all_thirty &&
-                (std::fabs(m_zero - e.maintenance * 0.3f) <= 1e-5f * std::max(1.0f, e.maintenance));
+                (std::fabs(m_zero - e.maintenance * reg.idle_maintenance_floor())
+                     <= 1e-5f * std::max(1.0f, e.maintenance));
         }
         check(all_equal, "A1", "a building at workforce_target 0 pays EXACTLY the "
                                "maintenance it would pay decommissioned");
-        check(all_thirty, "A1", "and that figure is maintenance x 0.30 (BL-049's floor)");
+        check(all_thirty, "A1", "and that figure is maintenance x the authored idle floor "
+                                "(BL-049's 30% until BL-739 moved it to data)");
     }
 
     std::vector<seed_result> rows;

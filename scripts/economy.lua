@@ -497,26 +497,30 @@ economy = {
         -- turning maintenance construction on later is a data change - and so
         -- that the number it would need is measured, not guessed, when someone
         -- has provisioned the yards to answer it.
-        -- BL-738 (Ben, 2026-09-01: "Building should have upkeep too") — STAGE 1:
-        -- REPAIR MATERIALS. The safe widening is the one the table's own
-        -- criteria pick: a good must be MET on day 1 (the cliff is the cold
-        -- start, not the rate) and gluts want the demand. machinery/electronics
-        -- stay 0 — they are CEILED in 7-8 of 9 markets (supply-short; a draw
-        -- now starves the buildings against a shortage). timber and stone are
-        -- FLOORED (stone in 6 of 9; the campaign_lapse baseline puts extraction
-        -- corps at -6.75 cr/qtr operating for want of buyers), production dwarfs
-        -- these draws by two orders, and a structure consuming repair timber and
-        -- stone is the channel's own fiction. Rates are first-cut (~30-45/tick
-        -- band-wide against production in the thousands); demand_census and a
-        -- campaign_lapse cell measure them. Ancient rows untouched this stage.
+        -- BL-738 (Ben, 2026-09-01: "Building should have upkeep too") — STAGE 1
+        -- LANDED, MEASURED, AND WITHDRAWN THE SAME DAY, and the measurement is
+        -- the record. Repair timber/stone rates (0.05/0.05 extraction,
+        -- 0.08/0.08 processing, industrial band) were the met-on-day-1
+        -- widening; a full campaign_lapse cell (seed 0, 120 measured quarters,
+        -- tag after-fixes) against the baseline measured: extraction operating
+        -- net -6.75 -> -31.29 cr/qtr, operating-positive corps 29 -> 16,
+        -- valued production x1.05 -> x0.91. The COST side of the channel
+        -- arrived; the INCOME side cannot yet — the state channels that would
+        -- pay material suppliers are throttled by BL-741 (one nation in 43
+        -- holds any treasury) and BL-742 (state purchases read pools that
+        -- auto-surplus already swept to market). One clean positive stands:
+        -- stone lifted off the floor (0.42x -> 1.38x base, floored markets
+        -- 5 -> 2 of 9) — the price signal works; the money loop behind it is
+        -- what is missing. The rates return WITH BL-741/BL-742 (BL-738 now
+        -- requires both); the principle is Ben's ruling and is not withdrawn.
         goods = {
             extraction_site = {
                 ancient    = { tools = 0.0, planks = 0.0, construction_capacity = 0.0 }, -- derived 0.07 / 0.15; capacity BL-709
-                industrial = { machinery = 0.0, power = 0.25, timber = 0.05, stone = 0.05, construction_capacity = 0.0 },  -- derived 0.11; power BL-708; repair BL-738; capacity BL-709
+                industrial = { machinery = 0.0, power = 0.25, timber = 0.0, stone = 0.0, construction_capacity = 0.0 },  -- derived 0.11; power BL-708; repair BL-738 withdrawn pending BL-741/742; capacity BL-709
             },
             processing_facility = {
                 ancient    = { tools = 0.0, planks = 0.0, construction_capacity = 0.0 }, -- derived 0.14 / 0.30; capacity BL-709
-                industrial = { machinery = 0.0, electronics = 0.0, power = 0.40, timber = 0.08, stone = 0.08, construction_capacity = 0.0 }, -- derived 0.15 / 0.06; power BL-708; repair BL-738; capacity BL-709
+                industrial = { machinery = 0.0, electronics = 0.0, power = 0.40, timber = 0.0, stone = 0.0, construction_capacity = 0.0 }, -- derived 0.15 / 0.06; power BL-708; repair BL-738 withdrawn pending BL-741/742; capacity BL-709
             },
         },
     },
