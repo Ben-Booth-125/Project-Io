@@ -1,0 +1,124 @@
+PROJECT IO — CHROME BUTTON ICONS, ROUND 4 (SCOPED)
+Drafted 2026-08-30. Supersedes round 3's scope.
+
+SCOPE CORRECTION
+Everything "installed on a tile" (extraction site, processing facility, port,
+military base, settlement, HQ, unit, under-construction, ...) will be a REAL
+RENDERED building / object on the oblique map — not a glyph. Drop all of those.
+Landform marks are terrain rendering, not icons — drop. Corp emblems need their
+own creative brainstorm — separate, later.
+
+What we need now: the actual BUTTONS on the UI chrome. Four groups:
+  A. Left shell nav-rail buttons (13)
+  B. Map lens buttons (6)   — the round-1 lens row was on the right track
+  C. Time-panel pause/play mark (the I-V tier buttons are typographic, not icons)
+  D. Selection-band 2x3 action grid (bottom-centre, left of the minimap) — the
+     six context slots that change with what is selected (tile / building / unit)
+
+~28 marks. One cohesive family. Explore the same design languages as round 3
+(L1-L4) but ONLY on this set — full set per language, one sheet each.
+
+=============================================================================
+HARD CONSTRAINTS
+=============================================================================
+- These are TOOLBAR buttons, ~20-24px, in a 56px rail and a lens strip. Read at
+  that size. Single stroke colour (no runtime recolour here — chrome, not
+  owner-tinted map markers).
+- Settled context: background #0F0F14, accent gold #E8A33D, flat vector, no
+  gradient / glow. The ACTIVE nav slot is a filled gold block behind the glyph
+  (settled in shell round 2) — so each glyph must also read as a dark knockout
+  on a solid gold ground, not only as gold-on-dark. Design for both states.
+- One family: shared grid, weight, corner/terminal treatment, optical size.
+- Distinct silhouettes — 13 rail buttons stacked in a column must be told apart
+  by shape alone, fast.
+- Sheet: one image ~1600x1200, dark #0F0F14 ground, glyphs in gold #E8A33D,
+  grouped A/B/C/D with headers, every glyph labelled, no decorative frames. Show
+  each nav glyph TWICE where practical: gold-on-dark and dark-on-gold (active).
+
+=============================================================================
+A — NAV-RAIL BUTTONS (13)  (meanings; forms are open)
+=============================================================================
+Player systems:
+  1  Corporation ...... your company overview — assets, standing, at a glance
+  2  Budget .......... allocation of money across priorities
+  3  Market Ledger ... trade: prices, the order book, what's clearing
+  4  Construction .... the build queue / what's going up
+  5  History ......... the chronicle — past events, the world's story so far
+  6  Workforce ....... labour and employment (currently also the economy panel door)
+  7  Research ........ the technology tree (a mercenary company PROCURES tech,
+                        it doesn't research it — catalogue, not skill tree)
+  8  Diplomacy ....... relations, stance and standing between actors
+  9  Corp Strategy ... strategic planning — RESERVED / disabled: render a dimmed
+                        version, the rail teaches the shape of the game
+Developer / observability tail (visually a touch apart from 1-9):
+  10 Generation Ledger  why a tile generated as it did — the derivation view
+  11 AI decisions ..... the rival scorer's rationale feed
+  12 Strategy readout . the aggregate: verb mix, spend, reasons per rival
+Appended player system:
+  13 Contracts ........ procurement and mercenary agreements — the income loop
+
+=============================================================================
+B — MAP LENS BUTTONS (6)  (map-overlay modes; single-select, null state)
+=============================================================================
+  Corp ........ colour the map by which corporation owns/operates what
+  Country ..... colour by nation / territory
+  Resource .... deposits and richness of a selected good
+  Market ...... market reach / price bands
+  Population .. workforce / habitability
+  Continent ... the tectonic/continent structure
+Keep them a clearly-related sub-family (they sit in their own strip), but
+distinguishable from the nav-rail set — a lens is a way of SEEING, not a place
+to go.
+
+=============================================================================
+C — TIME PANEL (1 icon)
+=============================================================================
+  Pause / Play .... one slot that shows a drawn FILLED SQUARE while running
+                     (deliberately not "||", which reads as the numeral II next
+                     to the I-V tier buttons) and flips to a PLAY triangle ">"
+                     when paused. Design both faces in the family's language.
+(The five speed tiers are Roman numerals I-V set in type + an active highlight —
+optionally show a treatment for the numeral button, but it is not an icon.)
+
+=============================================================================
+D — SELECTION-BAND ACTION GRID  (2x3, bottom-centre, left of the minimap)
+=============================================================================
+Context-dependent: the same six slots show different actions per selection kind
+(SELECTION.md owns this). Design the distinct action marks below; empty slots
+use the Reserved placeholder. History and Supply reuse their group-A/B glyphs.
+
+  Construct / Build .. opens the tile's construction ledger; carries a "primed"
+                       accent-ring state when something is placeable
+  Manage ............ open the management surface for a built tile
+  Mothball .......... idle a building, reversible (a box with a line through it);
+                       a toggle — re-click un-mothballs
+  Dismantle ......... permanently remove a building. SELECTION.md's placeholder is
+                       "a simple X" — but a bare X reads as "close / dismiss"
+                       everywhere else in the chrome. Design a destructive mark
+                       that is NOT the close affordance (resolve this collision).
+  Auto .............. hand a building's workforce dial to the auto-solver
+                       (a circular "refresh" arrow); shows an active-ring state
+  Swap .............. switch a building's active recipe (a two-arrow swap)
+  Go to ............. focus the camera on the selected entity (also the panel
+                       header's [>]); shared with the "go to" affordance
+  Reserved .......... the placeholder in an unused slot — deliberately quiet,
+                       reads as "nothing here yet", not as a disabled action
+
+=============================================================================
+LANGUAGES
+=============================================================================
+Render the full A+B+C+D set in each of L1-L4 from round 3:
+  L1 Engraved instrument   — fine mil-spec panel engraving
+  L2 Bold signage          — heavy transit-sign clarity, best tiny-size read
+  L3 Faceted constructivist — angular / schematic, matches the tech-tree HMI
+                              language and the shell's settled look (frontrunner)
+  L4 Rounded-geometric modern — contemporary icon craft, subtle personality
+One sheet per language.
+
+=============================================================================
+NEXT
+=============================================================================
+Judge L1-L4 as whole button families. Pick one, refine the full set in it, then
+it graduates into ICONS.md (nav-rail + lens + time + selection-action rows) and
+drives the src/ui/icons.cpp rebuild for those glyphs only. Corp-emblem
+brainstorm and the on-map rendered buildings are separate tracks.

@@ -4563,6 +4563,192 @@
      "evidence": "COMPLETE, verified 2026-09-01. `build_material_cost` is priced into the capex of BOTH build candidates — corp_ai.cpp:951 (extraction) and :1202 (processing) — so the score AND the solvency spend carry the material basket, keyed by recipe per BL-590. NR-592 marked resolved on this evidence. corp_ai_harness green, including BL-712's new R8; the thrash check is corp_ai_harness R2's action-budget rows, also green."
     }
    ]
+  },
+  {
+   "brief": "ground-bake-renderer",
+   "title": "BL-732 - the Planetary ground renders as baked painterly chunks",
+   "status": "complete",
+   "resolved": "2026-09-01",
+   "promoted_from": "backlog.json BL-732 - Sprint 29, rendering",
+   "batch": "sprint-29",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "Item-spanning: with no lens active, the Planetary canvas draws its ground from baked chunk textures - continuous painterly terrain (no hex grid lines or per-tile gaps), hillshaded relief from the height field, the C-F near-future grade - at play zoom and at the whole-grid view, with the cylinder wrap seam invisible.",
+     "verification": [
+      "visual: scripts/verify/ground_bake.lua captures at play zoom, whole-grid, and across the wrap seam"
+     ],
+     "notes": "The acceptance gate. Judged against docs/ui/design/renders/map/it3 panel C-F for direction, not pixel identity.",
+     "evidence": "COMPLETE 2026-09-01. scripts/verify/ground_bake.lua captures: ground_bake_wide/play/close/seam plus the bare pair (border band off via the verify-only set_border_band toggle). The ground is continuous painterly terrain - no grid lines or per-tile gaps on the plain canvas, organic domain-warped coastlines, fractal-detail hillshade, C-F grade - and the wrap seam frame shows no discontinuity. Judged in-family against it3 panel C-F for direction; Ben final eye owed on the live app (left open). Known and expected: the analytic chrome (national border band above all) visually dominates the muted ground - BL-734 evidence, not a defect here."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The bake is a pure function of world state: two bakes of the same chunk are byte-identical; land and water classes do not cross-blend (coastline stays hard); survey-masked tiles bake as the lock colour and do not leak terrain into revealed neighbours; the grade pass measurably desaturates; the wrap seam columns are continuous.",
+     "verification": [
+      "headless: tools/verify/ground_bake_check.cpp over make_hard_coded_world"
+     ],
+     "notes": "Compiles ground_bake.cpp + terrain_palette.cpp with the world objects - both files must stay SDL/ImGui/Lua-free.",
+     "evidence": "COMPLETE 2026-09-01. ground_bake_check: 10/10 - determinism (byte-identical re-bake), wrap (px0+W byte-identical, noise lattices period-snapped), class separation (land/water distinct, water blue), relief responds, grade separable + desaturates, unsurveyed body bakes lock colour only, region_hash moves with a covered tile. Also emits 6 param-variant preview PNGs per run for look iteration."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The classic per-tile renderer survives as the fallback: any active lens renders through the existing per-tile path unchanged, and a tile whose chunk is not yet baked falls back to the vector fill.",
+     "verification": [
+      "visual: a lens rung in ground_bake.lua matches the pre-item lens render",
+      "code: the not-ready branch in body_surface_canvas.cpp"
+     ],
+     "notes": "Fallback-by-coverage, RENDERING.md. Lens-over-painterly is BL-734, not this item.",
+     "evidence": "COMPLETE 2026-09-01. ground_bake_lens_fallback capture: Resource lens renders the classic per-tile path (crisp water hexes, per-tile fills); ground images are not drawn under any lens (ground_on gates on overlay==none). Chunk-not-ready fallback is the same skip flag (on_bake) per tile."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "Live: on the built app, pan/zoom/hover/select work over the baked ground - hover card appears, a click selects (amber hex on the selection), progressive chunk fill does not hitch the frame.",
+     "verification": [
+      "live: open the built exe, click the thing"
+     ],
+     "notes": "The 2026-08-19 live-click rule; a capture alone does not close this row.",
+     "evidence": "COMPLETE 2026-09-01. Live on the built exe (launched --load into a verify-produced save, driven via computer use): click selected a tile/province (Selection panel filled, Tile [106,51] - Track), scroll zoom anchored and the wanted-chunk bake followed with no vector holes, hover showed the card (Barrens - Highland / Habitability 18% / convoy cost) with the hover hex outline. Debug-build chunk bake can jank the first seconds after a body switch (budget 2 chunks/frame, CPU bake); far page covers meanwhile - noted for a future threaded bake, not a blocker."
+    }
+   ]
+  },
+  {
+   "brief": "ground-wave-2",
+   "title": "BL-735 - stepped zoom tiers, threaded bake, muted borders",
+   "status": "complete",
+   "resolved": "2026-09-01",
+   "promoted_from": "backlog.json BL-735 - Sprint 29",
+   "batch": "sprint-29",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "The national border band draws as a single frontier ring at 0.35 alpha in a luma-muted nation colour, wash and stroke alike; depth 1+ tiles carry no wash.",
+     "verification": [
+      "visual: ground_bake.lua wide/play captures vs the previous 3-ring render"
+     ],
+     "notes": "The BL-734 partial ruling (Ben 2026-09-01), recorded in PLANETARY.md.",
+     "evidence": "COMPLETE 2026-09-01. ground_bake_wide/play captures + live Release session: the band is the single frontier ring at 0.35 alpha, luma-muted (k_border_mute 0.55) on wash and stroke; the coastal bead-strings are gone and the map reads as terrain first. PLANETARY.md falloff table rewritten with the ruling."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Planetary zoom steps a fixed x2 ladder (wheel and = / - keys; upper rungs stay continuous; verify set_zoom free-form), and every rung draws its ground from a bake tier that is never magnified more than ~7% - crisp at each step, including a new closest rung capture.",
+     "verification": [
+      "visual: per-rung captures at ~6/26/51/102 px hexes",
+      "live: wheel steps land on the ladder"
+     ],
+     "notes": "Tiers {far 6, 12, 24, 48, 96 px/r}.",
+     "evidence": "COMPLETE 2026-09-01. Captures at every rung (ground_bake_wide ~6px far page, play ~26px/24 tier, close ~51px/48 tier, closest ~102px/96 tier) after resolution-adaptive sharpening (weight-exponent wpow, detail/noise lift, colour mottle at the close tiers). Live on the Release build: each wheel notch doubles the drawn hex scale and the tier chunks follow (diagnostic probe confirmed draw_r 35.5 -> tier 48, 30 chunks published). Multi-notch wheel events step ONE rung (sign-only) - deliberate. Verify set_zoom stays free-form; existing script framings unchanged. POST-REVIEW: rung-1 capture (ground_bake_mid, the 12 px tier) added - the fleet caught that tier unexercised; tier headroom fixed 0.93->1.2x so rungs land on their MATCHING tier (0.93 sent every rung one tier high); fractional/multi-notch wheel input accumulates to whole notches before a rung fires."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "No ground bake executes on the render thread outside --verify: chunks and the far page bake on a worker against immutable source snapshots, generation-guarded, LRU-capped; live pan/zoom does not hitch on bakes.",
+     "verification": [
+      "code: ground_layer worker path",
+      "live: pan/zoom on the Release build"
+     ],
+     "notes": "Release build staged at the granted path for play.",
+     "evidence": "COMPLETE 2026-09-01. ground_layer.cpp: bake_region runs only in worker_main (jobs carry immutable source snapshot + geometry + params; generation counter discards stale results) and in bake_now, which only the bake_everything (--verify) path calls; the render thread hashes, enqueues (cap 6), uploads and publishes; far hash once per source generation; LRU eviction per tier. Live Release session panned and stepped zoom with no visible stalls; the Release play build is staged at the granted Start-menu path (the previous roughness was in large part the Debug build staged there). POST-REVIEW: the fleet confirmed a critical flag-wedge family (generation bump or texture-allocation failure orphaning a result left queued/m_far_queued stuck forever - bricked chunks, far page dark until body switch). Fixed: upload clears the pending flag unconditionally before any early return, the far hash re-arms on an orphaned drop, the source refresh gates on an in-flight counter (not just queue emptiness), and eviction floors its cap at 2x the wanted set."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "The bake stays pure and green: ground_bake_check 10/10 unchanged (determinism, wrap, classes, mask - the harness bakes at 24 px/r, where the adaptive dials are at rest, so P1/P2 remain exact). The close-grain octave gating (>= 40 px/r) is verified by code inspection plus the per-rung captures, NOT by the harness.",
+     "verification": [
+      "headless: ground_bake_check"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-01. ground_bake_check 10/10 after every wave-2 bake change; at the harness geometry (24 px/r) res_t=0, wpow=2, fine octave off, so the wrap/determinism checks bind exactly. Octave gate: code (ground_bake.cpp fine_on = g.s >= 40) + the close/closest captures. Reworded after the review fleet flagged the original row promising harness evidence the fixture cannot produce."
+    }
+   ]
+  },
+  {
+   "brief": "ground-sharpness",
+   "title": "BL-736 - the baked ground gets its edges back",
+   "status": "complete",
+   "resolved": "2026-09-02",
+   "promoted_from": "backlog.json BL-736 - Sprint 30",
+   "batch": "sprint-30",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "Cover-class boundaries and the shoreline carry a crisp 1px ink stroke that follows the warped (organic) boundary; the close tiers additionally pass an unsharp mask; neither pass may seam at a chunk edge (apron) nor touch the survey lock fill or the transparent margin.",
+     "verification": [
+      "visual: per-rung captures + 48px forest preview",
+      "headless: ground_bake_check P8 (48px determinism + wrap, all passes active)"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-02. ground_preview_v7_forest48 + per-rung captures: every cover patch and the coastline carries the 1px ink stroke following the warped organic boundary; unsharp bites on rock texture at 48/96. Apron A=6 around every window; both passes tag-gated (lock fill and transparent margin untouched, unsharp additionally requires kernel-reach tags). ground_bake_check P8 13->17 checks green with all passes active."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The grade haze lift falls and contrast rises with bake resolution, so the close tiers keep local contrast; the far/play tiers are visually unchanged in character.",
+     "verification": [
+      "visual: wide/play captures vs previous run"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-02. Grade sweep: lift *= (1 - 0.5*res_t), contrast += 0.045*res_t; res_t=0 at the far/12/24 tiers so their captures keep the wave-2 character."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "With the frame HUD on, the Planetary canvas reports the ground detail metric: active tier px/r, texel:pixel ratio, published chunk count.",
+     "verification": [
+      "live: toggle the HUD, read the line"
+     ],
+     "notes": "The polygon-count analogue.",
+     "evidence": "COMPLETE 2026-09-02. Canvas draws the ground line into the FOREGROUND list behind show_frame_hud: active tier px/r, texel:pixel, chunk count (far-page variant when no chunk tier is active)."
+    }
+   ]
+  },
+  {
+   "brief": "stepped-tilt",
+   "title": "BL-737 - the top rungs tilt the land",
+   "status": "complete",
+   "resolved": "2026-09-02",
+   "promoted_from": "backlog.json BL-737 - Sprint 30",
+   "batch": "sprint-30",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "Zoom rungs 3 and 4 draw the ground at 22.5 and 45 degrees: y squashed by cos(tilt), the height field displacing rows upward (hills carry silhouettes), trees as upright sprites drawn back-to-front. Lower rungs and the far page stay flat; the squashed far page carries a tier fill transitionally.",
+     "verification": [
+      "visual: rung-3/rung-4 captures",
+      "headless: ground_bake_check tilt phase (determinism + wrap at a tilted tier)"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-02. ground_bake_close (22.5 deg) and ground_bake_closest (45 deg) captures + ground_preview_v8_tilt45: height-displaced ground, standing trees (trunk, upright canopy, ground shadow), lower rungs flat. ground_bake_check P9: oblique bake byte-identical twice, wrap-exact one period east, lift derives to ~0.9, projection differs from flat."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Interaction survives the squash: hover hit-testing is elliptical (dy/sy), click selects the intended tile at both tilted rungs, the wheel anchor keeps the point under the cursor fixed across a tilt-crossing step, and the selection/hover hexes draw squashed.",
+     "verification": [
+      "live: click/hover/step at rungs 3-4"
+     ],
+     "notes": "Height displacement is deliberately ignored for hits.",
+     "evidence": "COMPLETE 2026-09-02. Live on the Release build at the tilted rung: click selected the aimed tile (Tile [124,46], squashed province outline drawn), hover card resolved the correct tile under the cursor (Scrubby Rock 27%), wheel steps crossed the tilt thresholds with the cursor anchor holding. Hit tests run in ground space via the camera inverse (mouse_g); height displacement deliberately ignored for hits."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "Tilt is a pure function of zoom (verify set_zoom included), so captures are deterministic; ACTIONS zoom entries describe the tilt at the top rungs.",
+     "verification": [
+      "code + docs/ai/ACTIONS.json",
+      "visual: capture at a free-form zoom between rungs"
+     ],
+     "notes": null,
+     "evidence": "COMPLETE 2026-09-02. planetary_tilt_sy is pure in zoom (thresholds at rung midpoints); the ground_bake_midrung_tilt capture (free-form zoom 8) lands deterministically on the 22.5-deg side; ACTIONS zoom entries note the tilt at the top rungs, plain canvas only."
+    }
+   ]
   }
  ]
 }

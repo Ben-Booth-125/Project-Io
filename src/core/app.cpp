@@ -237,6 +237,7 @@ void app::apply_ui_scale()
 
 app::~app()
 {
+    m_ground.shutdown(); // baked-ground textures die before their renderer
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
@@ -1854,6 +1855,12 @@ void app::render()
                 // Ordered AFTER body_reach_field because the lens draws the reach
                 // envelope under the anchors and both must describe one frame.
                 ui::update_body_throughput(m_world, m_ui, m_registry);
+                // BL-732: the baked-ground cache. Bakes the far page on a body
+                // switch and a budgeted few full-res chunks against last frame's
+                // ground_request, then publishes ui_state::ground for the canvas
+                // draw below. Texture work on the render thread, before the
+                // draw data is submitted.
+                m_ground.tick(m_renderer, m_world, m_ui, m_ground_bake_all);
                 // No lens-key anchor argument (Sprint 17b, one chrome home):
                 // every legend now asks ui::lens_chrome_rect for the one region —
                 // the minimap's header, top right — rather than being handed a

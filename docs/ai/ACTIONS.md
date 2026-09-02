@@ -821,13 +821,13 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `direction` | `enum: in | out` | = / + zooms in one step; - zooms out one step. |
+| `direction` | `enum: in | out` | = / + zooms in one step; - zooms out one step. On the PLANETARY rung a step is one rung of the fixed x2 zoom ladder (matching the wheel; Ben, 2026-09-01); on the other rungs it is the continuous x1.1 factor. |
 
 **Valid when:**
 - The app is in-game and no ImGui text field has keyboard focus.
 - The current rung is not at its zoom bound in that direction.
 
-**Expected output.** The current rung's zoom factor steps in or out, clamped to the same per-rung bounds the wheel and slider share. Unlike the wheel there is no cursor anchor to aim — the view scales in place. No selection, rung, lens, or speed change. On the Planetary surface, zoom also gates the terrain-texture pass (BL-520): the substrate grain and cover pattern draw only above 14 px of drawn hex circumradius and reach full strength at 22 px, so zooming out fades the ground texture away before BL-269's coarse-fill threshold (7 px) is reached. Nothing about the tile's identity changes with it — the terrain colour, the relief shading, the survey mask and the fog wash are colour, not geometry, and survive to the whole-grid view.
+**Expected output.** The view zooms about the canvas centre. On the Planetary rung a press lands on the next rung of the fixed x2 ladder (same ladder as the wheel; the baked ground swaps to that rung's texture tier; the top two rungs tilt the land 22.5 / 45 degrees on the plain canvas); on the other rungs it is a continuous x1.1 change. No selection or lens state changes.
 
 **Reason to select.** Zoom without the mouse — the keyboard leg of the pan/zoom pair for keyboard-only driving.
 
@@ -853,14 +853,14 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `direction` | `enum: in | out` | Wheel-up zooms in, wheel-down zooms out, one increment per notch. |
+| `direction` | `enum: in | out` | Wheel-up zooms in, wheel-down zooms out, one increment per notch. On the PLANETARY rung a notch steps a fixed x2 zoom ladder (5 rungs spanning the old continuous range; Ben, 2026-09-01) so each level pairs with a ground-bake texture tier; the Solar and Circumplanetary rungs stay continuous (x1.1 per notch). |
 
 **Valid when:**
 - The app is in-game.
 - The pointer is over the primary canvas, not the minimap inset or an ImGui panel.
 - The current rung is not already at its zoom bound in that direction (zoom is clamped per rung).
 
-**Expected output.** The current rung's zoom factor changes, anchored at the cursor: the point under the pointer stays put while the view scales around it. Per-rung state; the zoom slider (where present) moves to reflect the new factor. No selection, rung, pan-recentre, lens, or speed change. On the Planetary surface, zoom also gates the terrain-texture pass (BL-520): the substrate grain and cover pattern draw only above 14 px of drawn hex circumradius and reach full strength at 22 px, so zooming out fades the ground texture away before BL-269's coarse-fill threshold (7 px) is reached. Nothing about the tile's identity changes with it — the terrain colour, the relief shading, the survey mask and the fog wash are colour, not geometry, and survive to the whole-grid view.
+**Expected output.** The view zooms about the cursor (the point under the mouse stays fixed). On the Planetary rung the zoom lands on the next rung of the fixed x2 ladder and the baked ground swaps to that rung's texture tier (briefly softer while the tier's chunks arrive, then crisp). The top two rungs additionally TILT the land (22.5 / 45 degrees, plain canvas only; a lens stays flat); fractional wheel deltas accumulate and a rung fires per whole notch, at most one rung per frame. On the Solar and Circumplanetary rungs zoom is continuous (x1.1 per notch). No selection or lens state changes.
 
 **Reason to select.** Move closer to or further from a specific spot — cursor anchoring means you aim the zoom at the thing you are interested in.
 

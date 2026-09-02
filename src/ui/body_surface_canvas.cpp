@@ -53,6 +53,11 @@ constexpr float kMaxViewScale    = 0.7f;
 constexpr float kMaxZoom         = 20.0f;
 constexpr float kMinZoom         = 1.0f / (kMaxViewScale * kMinZoomHeadroom * kFitMargin); // ~1.253
 
+/// Rungs on the stepped x2 zoom ladder (Ben, 2026-09-01): kMinZoom * 2^k for
+/// k = 0..k_zoom_rungs-1. kMinZoom * 16 ≈ 20.05, so the top rung clamps to
+/// kMaxZoom and the ladder spans exactly the old continuous range in 5 steps.
+constexpr int k_zoom_rungs = 5;
+
 // terrain_colour, hex_vertices, and hex_local_centre now live in ui/hex_render.hpp
 // (shared with the Selection band's zoomed tile-neighbourhood view, BL-194) so both
 // surfaces draw from one terrain palette and one hex geometry rather than diverging.
@@ -142,11 +147,37 @@ constexpr float k_land_blend_strength = 0.35f;
 
 /// Depth of the inward band, in tiles. Depth 0 is a tile touching a foreign
 /// owner — another nation, or unclaimed ground, so a coastline is a border too.
-constexpr int k_border_band_tiles = 3;
+///
+/// ONE TILE (Ben, 2026-09-01, judging the baked ground): the three-ring falloff
+/// was tuned against flat saturated hexes; over the muted painterly bake the
+/// band inverted its contrast relationship with the ground and became the
+/// loudest mark on the map. "A 1 tile glow, rather than the current 2/3 tile
+/// glow" — the frontier ring alone, in a muted colour (below).
+constexpr int k_border_band_tiles = 1;
 
-/// Wash opacity by depth. Falls off steeply so the band reads as an edge effect
-/// rather than as a tint: past the third ring the ground is plain again.
-constexpr float k_border_band_alpha[k_border_band_tiles] = { 0.50f, 0.26f, 0.11f };
+/// Wash opacity by depth — the single frontier ring.
+constexpr float k_border_band_alpha[k_border_band_tiles] = { 0.35f };
+
+/// How far the band's colour is pulled toward its own luma before drawing —
+/// the "muted colour palette" half of the same 2026-09-01 ruling. Applied to
+/// the wash AND the stroke; the border-corridor hover label keeps the full
+/// identity colour, because a label must be read, not weighed.
+constexpr float k_border_mute = 0.55f;
+
+/// Mute a nation identity colour for the band: desaturate toward its own luma
+/// by k_border_mute and sit it down slightly, so the ring reads as a claim on
+/// the ground rather than as chrome over it.
+inline ImU32 muted_nation_colour(ImU32 nc)
+{
+    const float r = static_cast<float>((nc >> IM_COL32_R_SHIFT) & 0xFFu);
+    const float g = static_cast<float>((nc >> IM_COL32_G_SHIFT) & 0xFFu);
+    const float b = static_cast<float>((nc >> IM_COL32_B_SHIFT) & 0xFFu);
+    const float luma = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+    auto ch = [&](float v) {
+        return static_cast<int>((v + (luma - v) * k_border_mute) * 0.92f);
+    };
+    return IM_COL32(ch(r), ch(g), ch(b), 255);
+}
 
 /// Scale applied to the whole treatment — wash AND stroke — where the frontier
 /// faces UNCLAIMED ground rather than another nation (Ben, 2026-08-24: "reduce
@@ -2129,6 +2160,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                          ? ImVec2{state.mouse.x, state.mouse.y}
                          : ImVec2{-1.0f, -1.0f}; // off-screen sentinel suppresses hover
 
+    // --- BL-737: the stepped tilt camera -----------------------------------
+    // The top zoom rungs view the land obliquely (22.5°/45°). The canvas keeps
+    // drawing entirely in FLAT ground space; one vertex-range squash at the
+    // end of the map passes is the camera, and this inverse maps the real
+    // cursor into that flat space so every existing hit test works unchanged.
+    // Tilt is a pure function of zoom (verify's free-form zooms included) and
+    // applies on the plain canvas only — a lens is an analytic read and stays
+    // flat, which also keeps its legend chrome out of the squash.
+    const float  tilt_sy    = state.overlay == overlay_mode::none
+                                  ? planetary_tilt_sy(zoom) : 1.0f;
+    const float  tilt_pivot = canvas_centre.y;
+    const ImVec2 mouse_g    = { mouse.x,
+                                tilt_pivot + (mouse.y - tilt_pivot) / tilt_sy };
+
     // Hover resolves to a single tile copy. Adjacent hexes' circular hit-tests
     // overlap, and the cylinder draws several wrap copies of each tile, so more
     // than one (tile, copy) can satisfy the hover test at once. The nearest hex
@@ -2231,14 +2276,106 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // visibility is the wrap-window test itself, hoisted to the top of the loop
     // body — an off-screen tile costs one bounds test and one multiply-compare.
     const float row_pitch = 1.5f * hex_size; // hex_local_centre's vertical pitch
+    // The clip edges map into GROUND space first (the camera squash shows a
+    // taller ground band than the screen band when tilted — BL-737).
+    const float clip_top_g = tilt_pivot + (grid_area_origin.y - hit_r - tilt_pivot) / tilt_sy;
+    const float clip_bot_g = tilt_pivot
+        + (grid_area_origin.y + grid_area_size.y + hit_r - tilt_pivot) / tilt_sy;
     const int row_lo = raster_ok ? std::max(
         0, static_cast<int>(std::floor(
-               ((grid_area_origin.y - hit_r - view_origin.y) / zoom + grid_cy) / row_pitch)))
+               ((clip_top_g - view_origin.y) / zoom + grid_cy) / row_pitch)))
         : 0;
     const int row_hi = raster_ok ? std::min(
         gh - 1, static_cast<int>(std::ceil(
-               ((grid_area_origin.y + grid_area_size.y + hit_r - view_origin.y) / zoom + grid_cy) / row_pitch)))
+               ((clip_bot_g - view_origin.y) / zoom + grid_cy) / row_pitch)))
         : -1;
+
+    // --- BL-732: the baked painterly ground (docs/ui/RENDERING.md) ----------
+    // With no lens active, the ground is drawn from the baked chunk textures
+    // core/ground_layer publishes into `state.ground` — the far page first
+    // (whole body, low-res, always ready after a body switch), the ready
+    // full-res chunks over it — and the per-tile loop below then SKIPS its
+    // fill and texture emit for surveyed tiles (`on_bake`): the no-grid rule,
+    // and the fallback-by-coverage rule, in one flag. Canonical space is the
+    // hex grid at circumradius 1, so canonical -> local is a scale by hex_size.
+    const ground_view& gview = state.ground;
+    const bool ground_on = state.overlay == overlay_mode::none
+                        && gview.body == state.active_body
+                        && gview.far_ready;
+    const auto canon_to_screen = [&](float gx_, float gy_) -> ImVec2 {
+        return to_screen({ gx_ * hex_size, gy_ * hex_size });
+    };
+    // Publish this frame's visible window for NEXT frame's bake pass (one
+    // frame of latency; the far page covers it). x in canonical units, wrap
+    // handled by ground_layer.
+    {
+        const float x0c = ((visible_left  - view_origin.x) / zoom + grid_cx) / hex_size;
+        const float x1c = ((visible_right - view_origin.x) / zoom + grid_cx) / hex_size;
+        state.ground_req.body   = state.active_body;
+        state.ground_req.x0     = x0c;
+        state.ground_req.x1     = x1c;
+        state.ground_req.y0     = 1.5f * static_cast<float>(row_lo) - 1.0f;
+        state.ground_req.y1     = 1.5f * static_cast<float>(row_hi) + 1.0f;
+        state.ground_req.draw_r = draw_r; ///< Picks the bake tier (stepped ladder).
+        state.ground_req.sy     = tilt_sy; ///< The tilted rungs want oblique tiers (BL-737).
+        state.ground_req.valid  = raster_ok;
+    }
+    // BL-737: everything from here to the camera squash at the end of the map
+    // passes draws in FLAT ground space; the squash over this vertex range IS
+    // the tilt. (The background rect, title and chrome above this line stay
+    // screen-space.)
+    const int v_map_start = dl->VtxBuffer.Size;
+
+    if (ground_on)
+    {
+        // Draw one image quad per wrap copy that intersects the canvas. The
+        // image spans exactly one wrap period, so copies abut seamlessly.
+        const auto draw_ground_rect = [&](const ground_chunk_view& cv)
+        {
+            if (!cv.tex)
+                return;
+            const ImVec2 p0 = canon_to_screen(cv.x0, cv.y0);
+            const ImVec2 p1 = canon_to_screen(cv.x1, cv.y1);
+            const int k_lo = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_left  - p1.x) / period_px)) : 0;
+            const int k_hi = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil ((visible_right - p0.x) / period_px)) : 0;
+            for (int k = k_lo; k <= k_hi; ++k)
+            {
+                const float off = static_cast<float>(k) * period_px;
+                if (p1.x + off < visible_left || p0.x + off > visible_right)
+                    continue;
+                dl->AddImage((ImTextureID)(intptr_t)cv.tex,
+                             { p0.x + off, p0.y }, { p1.x + off, p1.y });
+            }
+        };
+        draw_ground_rect(gview.far);
+        for (const ground_chunk_view& cv : gview.chunks)
+            draw_ground_rect(cv);
+
+        // BL-736: the ground-detail metric — the texel renderer's answer to a
+        // polygon count. Rides the existing frame-HUD toggle; texel:pixel is
+        // the number that says whether "blurry" is a resolution problem (it
+        // is not, when this reads ~0.85-1.0) or a content problem.
+        if (state.show_frame_hud)
+        {
+            char gbuf[96];
+            if (gview.tier_ppr > 0.0)
+                std::snprintf(gbuf, sizeof gbuf,
+                              "ground: tier %.0f px/r  ·  %.2f texel/px  ·  %d chunks",
+                              gview.tier_ppr, gview.tier_ppr / draw_r,
+                              static_cast<int>(gview.chunks.size()));
+            else
+                std::snprintf(gbuf, sizeof gbuf,
+                              "ground: far page 6 px/r  ·  %.2f texel/px",
+                              6.0f / draw_r);
+            // Foreground list: HUD text must not ride the tilt camera's squash.
+            ImGui::GetForegroundDrawList()->AddText(
+                { grid_area_origin.x + 8.0f,
+                  grid_area_origin.y + grid_area_size.y - 22.0f },
+                IM_COL32(200, 210, 220, 200), gbuf); // fit-exempt: debug HUD line
+        }
+    }
 
     // --- BL-511: the province fill cache ------------------------------------
     // The province, not the hex, is the unit this canvas renders and the player
@@ -2654,7 +2791,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // relaxation over the visible band costs nothing while a lens is up. Every
     // depth stays 0xFF, and the wash's `depth < band_depth` test then fails on
     // its own without needing a second guard.
-    const bool draw_border_band = (state.overlay == overlay_mode::none);
+    const bool draw_border_band = (state.overlay == overlay_mode::none)
+                               && !state.dbg_hide_border_band;
     if (draw_border_band && raster_ok && !w.tile_to_nation.empty())
     {
         for (int cr = band_lo; cr <= band_hi; ++cr)
@@ -2807,6 +2945,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const ImU32       fill      = shade.fill;
         const uint32_t    prov_id   = shade.province;
 
+        // BL-732: this tile's ground is carried by the baked texture drawn
+        // before the loop — skip the per-tile fill and texture emit (the
+        // no-grid rule), and re-express the washes compute_tile_fill folded
+        // into the fill as translucent overlays instead. A survey-masked tile
+        // keeps the old path (the lock fill is knowledge, not terrain), which
+        // also keeps the god-view tell byte-identical.
+        const bool on_bake = ground_on && surveyed;
+
         // Corner colours for the blend. Each hex corner is shared with two of the
         // six neighbours (k_corner_sides); a corner takes the MEAN of this tile's
         // fill and those of its corner-sharing neighbours that are in the SAME
@@ -2895,7 +3041,47 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // `hex_size * zoom` is recovered as `draw_r + 1` (draw_r is that minus the
             // 1 px border shrink), and the same 1 px is taken back off each axis so the
             // background still shows through as the grid texture the hexes give.
-            if (coarse_fill)
+            if (on_bake)
+            {
+                // The baked ground already carries terrain, relief and grain.
+                // What the fill path also carried — the player-identity wash,
+                // the construction-suitability washes, the vision fog — draws
+                // here as translucent full-radius hexes over the bake, at the
+                // same strengths compute_tile_fill blends them in at.
+                ImVec2 wash_verts[6];
+                hex_vertices(wash_verts, cx, cy, draw_r + 1.0f);
+                if (is_player_tile)
+                {
+                    const ImU32 pid = corp_identity(w.player_entity);
+                    dl->AddConvexPolyFilled(wash_verts, 6,
+                        (pid & ~IM_COL32_A_MASK) | (ImU32(77) << IM_COL32_A_SHIFT)); // 0.30
+                }
+                if (suitability_active && !selected)
+                {
+                    const bool placeable = placement_rules::can_place(
+                        tile, suitability_btype, suitability_target);
+                    if (!placeable)
+                        dl->AddConvexPolyFilled(wash_verts, 6, IM_COL32(0, 0, 0, 90)); // 0.35
+                    else if (suitability_affine_kind)
+                    {
+                        bool any_dep = false;
+                        const resource_type best =
+                            placement_rules::richest_extractable(tile, any_dep);
+                        if (any_dep && best == suitability_target)
+                            dl->AddConvexPolyFilled(wash_verts, 6,
+                                                    IM_COL32(100, 200, 100, 61)); // 0.24
+                    }
+                }
+                if (vision < 1.0f)
+                {
+                    // fog_dim's wash (lerp toward (8,10,16) by 0.5*(1-vision)),
+                    // as an alpha overlay over the baked ground.
+                    const int fa = static_cast<int>(std::lround(127.5f * (1.0f - vision)));
+                    if (fa > 0)
+                        dl->AddConvexPolyFilled(wash_verts, 6, IM_COL32(8, 10, 16, fa));
+                }
+            }
+            else if (coarse_fill)
             {
                 const float step = draw_r + 1.0f; // hex_size * zoom
                 const float hw   = kSqrt3 * step * 0.5f - 0.5f;
@@ -2920,7 +3106,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // lens wash all keep showing under the glyph.
             // Never drawn under `coarse_fill`, which is implied: coarse_fill needs
             // draw_r <= 7 and texture_strength is 0 below draw_r 14.
-            if (revealed && texture_strength > 0.0f)
+            if (revealed && texture_strength > 0.0f && !on_bake)
                 draw_tile_texture(dl, { cx, cy }, draw_r, tile.grid_x, tile.grid_y,
                                   tile.substrate, tile.cover, tile.cover_density,
                                   fill, texture_strength);
@@ -2963,7 +3149,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const entity_id nat = nation_of(id);
                 if (nat != null_entity)
                 {
-                    const ImU32 nc = palette::nation_colour(nat);
+                    // Muted (2026-09-01): the identity colour desaturated for
+                    // the band, so the claim reads without shouting over the
+                    // painterly ground.
+                    const ImU32 nc = muted_nation_colour(palette::nation_colour(nat));
                     const float scale = border_political[shade_idx]
                                         ? 1.0f : k_border_unclaimed_scale;
                     const int   a  = static_cast<int>(k_border_band_alpha[depth] * scale * 255.0f);
@@ -3197,7 +3386,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const entity_id own_nation = nation_of(id);
                 if (own_nation != null_entity)
                 {
-                    const ImU32 border_col = palette::nation_colour(own_nation);
+                    // Muted like the wash (2026-09-01) — the pair must read as
+                    // one treatment.
+                    const ImU32 border_col = muted_nation_colour(palette::nation_colour(own_nation));
 
                     // Standard odd-r neighbour offsets (col, row deltas; canonical table, BL-363).
                     const int (*off)[2] = hex_neighbors::offsets(tile.grid_y);
@@ -3727,8 +3918,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // lands on the copy actually under the cursor; nearest centre wins.
             if (input_enabled)
             {
-                const float dx = mouse.x - cx;
-                const float dy = mouse.y - cy;
+                const float dx = mouse_g.x - cx;
+                const float dy = mouse_g.y - cy; // ground-space cursor (BL-737)
                 const float d2 = dx * dx + dy * dy;
                 const bool in_area = mouse.x >= grid_area_origin.x &&
                                      mouse.x <= grid_area_origin.x + grid_area_size.x &&
@@ -4103,7 +4294,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     {
         structure_kind hk = structure_kind::nation;
         const entity_id hovered_structure =
-            resolve_structure_hit(state.structure_hit_zones, mouse.x, mouse.y, &hk);
+            resolve_structure_hit(state.structure_hit_zones, mouse_g.x, mouse_g.y, &hk);
         const char* label = nullptr;
         ImU32       label_col = palette::neutral;
         if (hovered_structure != null_entity && hk == structure_kind::nation)
@@ -4119,7 +4310,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             ImDrawList* fdl = ImGui::GetForegroundDrawList();
             const ImVec2 ts  = ImGui::CalcTextSize(label);
             const float  pad = 5.0f;
-            const ImVec2 tl { mouse.x + 14.0f, mouse.y + 14.0f };
+            // Positioned at the GROUND-space cursor: the camera squash maps it
+            // back onto the real one (BL-737).
+            const ImVec2 tl { mouse_g.x + 14.0f, mouse_g.y + 14.0f };
             const ImVec2 br { tl.x + ts.x + pad * 2.0f, tl.y + ts.y + pad * 2.0f };
             fdl->AddRectFilled(tl, br, IM_COL32(18, 18, 24, 235), 3.0f);
             fdl->AddRect(tl, br, label_col, 3.0f, 0, 1.5f);
@@ -4135,7 +4328,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // Resolve the highest-priority entity under the cursor (shared with the
         // click path below — resolve_marker_hit, BL-362).
         const entity_id marker_hover =
-            resolve_marker_hit(state.marker_hit_zones, mouse.x, mouse.y);
+            resolve_marker_hit(state.marker_hit_zones, mouse_g.x, mouse_g.y);
 
         // A built tile resolves to its BUILDING across the whole hex, not just inside
         // the glyph's radius: once a tile carries an installation, the installation is
@@ -4772,6 +4965,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
+    // BL-737: the camera. One squash over every map-space vertex emitted since
+    // v_map_start — fills, strokes, ground images, glyphs and labels alike —
+    // about the canvas centre. Chrome drawn before the marker, ImGui windows
+    // (hover card, ledgers) and the foreground list are untouched.
+    if (tilt_sy < 1.0f)
+    {
+        ImDrawVert* vtx = dl->VtxBuffer.Data;
+        const int   n   = dl->VtxBuffer.Size;
+        for (int vi = v_map_start; vi < n; ++vi)
+            vtx[vi].pos.y = tilt_pivot + (vtx[vi].pos.y - tilt_pivot) * tilt_sy;
+    }
+
     // Pan and zoom. Middle mouse button pans; scroll wheel zooms, anchored at
     // the cursor so the point under the mouse stays fixed.
     {
@@ -4789,16 +4994,59 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             state.planetary_pan_x = std::fmod(state.planetary_pan_x, period_px);
 
         if (io.MouseWheel != 0.0f)
+            state.planetary_wheel_accum += io.MouseWheel;
+        // STEPPED (Ben, 2026-09-01): one wheel NOTCH = one x2 ladder rung, so
+        // each zoom level pairs with a bake tier and the ground stays crisp at
+        // every step. Deltas accumulate first — a notched mouse sends ±1 and
+        // steps immediately; a precision wheel/trackpad sends fractions that
+        // must add up to a notch before a rung fires (review fleet,
+        // 2026-09-01). A fast multi-notch burst still steps one rung per
+        // frame, deliberately: rungs are x2 apart and skipping two in one
+        // frame reads as a teleport. The cursor-anchor math is unchanged.
+        if (std::fabs(state.planetary_wheel_accum) >= 0.99f)
         {
-            const float new_zoom = std::clamp(zoom * std::pow(1.1f, io.MouseWheel), kMinZoom, kMaxZoom);
-            // World point under the cursor, kept fixed across the zoom change.
+            const int dir = state.planetary_wheel_accum > 0.0f ? +1 : -1;
+            state.planetary_wheel_accum = 0.0f;
+            const float new_zoom = planetary_zoom_stepped(zoom, dir);
+            // World point under the cursor, kept fixed across the zoom change —
+            // read through the OLD tilt's inverse, re-projected through the NEW
+            // tilt's (a step can cross a tilt threshold; the point under the
+            // cursor must land back under the cursor either side — BL-737).
+            const float new_sy = state.overlay == overlay_mode::none
+                                     ? planetary_tilt_sy(new_zoom) : 1.0f;
             const ImVec2 wp = { (mouse.x - view_origin.x) / zoom + grid_cx,
-                                (mouse.y - view_origin.y) / zoom + grid_cy };
+                                (mouse_g.y - view_origin.y) / zoom + grid_cy };
+            const float target_gy = tilt_pivot + (mouse.y - tilt_pivot) / new_sy;
             state.planetary_pan_x = mouse.x - (wp.x - grid_cx) * new_zoom - canvas_centre.x;
-            state.planetary_pan_y = mouse.y - (wp.y - grid_cy) * new_zoom - canvas_centre.y;
+            state.planetary_pan_y = target_gy - (wp.y - grid_cy) * new_zoom - canvas_centre.y;
             state.planetary_zoom  = new_zoom;
         }
     }
+}
+
+float planetary_zoom_stepped(float current, int direction)
+{
+    // A zoom that sits between rungs (verify's free-form set_zoom, an old
+    // save's value) steps to the next rung IN THE DIRECTION OF TRAVEL, never
+    // rounds first — stepping down from 3.0 lands on 2.5, not 1.25.
+    constexpr float eps = 0.01f;
+    const float k_exact = std::log2(std::max(current, kMinZoom) / kMinZoom);
+    const int   k = direction > 0
+        ? static_cast<int>(std::floor(k_exact + eps)) + 1
+        : static_cast<int>(std::ceil (k_exact - eps)) - 1;
+    const int   kc = std::clamp(k, 0, k_zoom_rungs - 1);
+    return std::min(kMinZoom * static_cast<float>(1 << kc), kMaxZoom);
+}
+
+float planetary_tilt_sy(float zoom)
+{
+    // Thresholds at the geometric midpoints between rungs 2/3 and 3/4, so a
+    // free-form zoom lands on the tilt of its nearest rung.
+    if (zoom >= kMinZoom * 11.31f)
+        return 0.70710678f; // 45°
+    if (zoom >= kMinZoom * 5.657f)
+        return 0.92387953f; // 22.5°
+    return 1.0f;
 }
 
 } // namespace ui

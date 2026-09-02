@@ -10,6 +10,194 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-02 (sprint 30 opens) — The ground gets its edges back, and the land tilts
+
+**Mode:** Full, batch (BL-736 + BL-737), committed as one intertwined change on Ben's
+call — he paused the pre-commit review fleet and took the improvement as-is, noting *"I
+expect we will want a different approach later on"* (the 3D milestone stays the likely
+destination; everything here — brushes, stamps, the tilt seam — carries into it).
+
+**BL-736 (ground sharpness pass).** Diagnosis first: texel:pixel is ~0.85–1.0 at every
+rung, so "still a general blur" was edge content, not resolution — the new ground HUD
+line (tier, texel/px, chunks; the texel renderer's polygon count) makes that measurable.
+The bake became an apron orchestrator (A=6, post passes can't seam at chunk edges):
+cover-boundary + shoreline INK (1 px, follows the warped organic edge for free),
+UNSHARP mask at ≥ 40 px/r (tag-gated, kernel-reach checked so the survey mask stays
+byte-exact), grade haze halves / contrast rises with resolution. The v7 forest preview
+reads like a hand-inked map.
+
+**BL-737 (stepped tilt).** The reference mock's feature, taken: rungs 3/4 view the land
+at 22.5°/45°, axonometric, tilt a pure function of zoom, plain canvas only. The camera
+is ONE vertex-range squash about the canvas centre plus one inverse on the cursor —
+every existing hit test unchanged; the tilted rungs bake OBLIQUE tiers (tier keyed
+ppr+tilt): height displaces rows into real hill silhouettes (double-gather resolve,
+masked re-resolve locks so peaks truncate at the survey mask), and trees STAND — trunk,
+upright canopy pre-stretched 1/cos(tilt), shadow left on the ground plane.
+ground_bake_check grew to 17 checks (P9: oblique determinism + wrap); live on the
+Release build: click/hover/step all correct at the tilted rungs.
+
+**Caveat recorded:** the 21-agent review fleet over this diff was stopped before its
+verdicts on Ben's instruction — this batch, unlike waves 1–2, shipped without the
+adversarial pass. The next session should treat the tilt/apron seams as unreviewed.
+
+---
+
+## 2026-09-01 (BL-735, wave 2) — The ground sharpens, steps, and stops stalling
+
+**Mode:** Full. **Runtime:** same evening as the BL-732 delivery; Ben judged the first bake
+live and ruled: not smooth enough, too blurred (approximate C-F's 3D read with STEPPED zoom —
+2.5D), borders way too strong (muted palette, 1-tile glow).
+
+### Built
+
+**Stepped zoom + tiers.** Planetary zoom is a fixed ×2 ladder (`planetary_zoom_stepped`,
+kMinZoom × 2^k, five rungs — kMinZoom×16 ≈ kMaxZoom, so the ladder spans the old continuous
+range exactly); wheel and `=`/`-` step it, upper rungs stay continuous, verify `set_zoom`
+stays free-form so scripted framings hold. Each rung pairs a bake tier {far 6, 12, 24, 48,
+96 px/r} — never magnified more than ~7%, minification capped at 2:1. ACTIONS zoom entries
+updated.
+
+**Resolution-adaptive bake.** The bake's softness was canonical-scale (1.4 tiles ≈ 70 px of
+blur at the close tiers): past the 24 px tier the interpolation weight EXPONENT steepens
+(coverage radius can't drop below one tile; crispness comes from the falloff), detail/noise
+amplitudes lift, a fine grain octave and a warm/cool colour mottle join. Diagnosed via a
+temporary tier/chunk print — the tier pipeline was correct; the mist was bake content.
+
+**Threaded bake.** All baking moved to a worker thread against immutable source snapshots
+(generation-guarded, self-contained jobs, LRU-capped tiers, far-hash once per source
+generation); the render thread hashes, enqueues, uploads, publishes. `--verify` stays fully
+synchronous. Until the far page lands after a body switch, the vector fallback carries the
+frame — a visual pop traded for zero render-thread stalls.
+
+**Muted borders (the BL-734 partial).** Band collapses to the single frontier ring at 0.35
+alpha; wash AND stroke draw the nation colour pulled 0.55 toward its own luma (the corridor
+hover label keeps full identity). PLANETARY.md's falloff table rewritten with the ruling.
+
+**Release staged for play.** The roughness Ben felt was partly the Debug build staged at the
+granted path — the Release play build now sits there instead.
+
+### Checks
+
+ground_bake_check 10/10 unchanged; ground_bake.lua regrown to per-rung captures (every tier,
+the 12 px rung included after review) with `frames(2)` settling the request latency. A
+21-agent adversarial review over the integrated diff (4 dimensions → per-finding refuters)
+confirmed 14 findings, 3 refuted; the critical family — a generation bump or failed texture
+allocation orphaning an in-flight bake with its `queued` flag stuck, bricking chunks or
+darkening the far page until a body switch — was fixed by clearing pending flags
+unconditionally in upload, re-arming the far hash on an orphaned drop, gating source refresh
+on an in-flight counter, flooring eviction at 2× the wanted set, raising tier headroom to
+1.2× (0.93 sent every rung one tier high), and accumulating fractional wheel deltas to whole
+notches. Doc fleet-catches fixed the ~7% magnification overclaim (fit-derived hex sizes; the
+top rung's large-window bound is now stated), ACTIONS' stale expected_output, R4's
+unprovable promise, and BL-734's stale remaining-work line.
+
+---
+
+## 2026-09-01 (BL-732 delivery) — The ground bakes, and it looks like a planet
+
+**Mode:** Full. **Runtime:** one session; one cold-configure + full Debug build in the fresh
+worktree, ~8 incremental builds, ~4 verify runs, one live computer-use pass. **Requirements:**
+`ground-bake-renderer` R1–R4 all complete.
+
+The procedural-first half of BL-732 (ground bake renderer): the Planetary canvas ground now
+draws from CPU-baked painterly chunk textures on the plain canvas, with the classic vector
+path surviving under every lens and wherever a chunk is not yet baked.
+
+### Built
+
+`src/ui/terrain_palette.{hpp,cpp}` (pure palette extracted from hex_render, byte-identical
+delegation, compile-time layout guard); `src/ui/ground_bake.{hpp,cpp}` (pure bake: class-
+separated tile interpolation, two-octave **domain warp** for organic coastlines, fractal-
+detail **hillshade** low-octave-gradient, period-snapped noise lattices, separable near-future
+grade); `src/core/ground_layer.{hpp,cpp}` (SDL chunk cache: synchronous far page, budgeted
+512 px chunks against the canvas's ground_request, content-hash invalidation); canvas
+integration (chunk quads under everything, per-tile fill/texture skip via `on_bake`, washes
+re-expressed as translucent overlays, no-grid rule live); `tools/verify/ground_bake_check`
+(10/10 + six param-variant preview PNGs per run); `scripts/verify/ground_bake.lua` (7
+captures incl. a bare pair via the new verify-only `set_border_band` toggle).
+
+### Look iterations (the useful failures)
+
+Round 1: blend radius 1.55 → mush. Round 2: radius 1.15 → hex mosaic (per-tile jitter is the
+mosaic dial). Round 3: fractal gradient at full frequency → speckle (gradient must read the
+LOW octave only, half-cell central differences). Round 4: single-octave warp translates hex
+corners without breaking them; big warp swirls texture → two-octave warp for the boundary,
+detail/grain sampled UNWARPED. End state genuinely reads in the C-F family.
+
+### The BL-734 evidence this produced
+
+Over muted graded ground the analytic chrome inverts its old contrast relationship: the
+national border band (hex-scalloped, full-strength, on every coastline) is now the loudest
+mark on the map, and fog steps read hex-crisp over organic ground. Captured in the
+wide/play vs bare pairs — the layer-contract ruling now has its exhibits.
+
+### Notes
+
+Debug-build chunk bake can jank the first seconds after a body switch (CPU bake, 2
+chunks/frame budget; far page covers meanwhile) — a future threaded bake if it matters.
+The computer-use grant resolved to a pruned worktree's exe path (the standing trap); fixed
+by staging this build at the granted path — the Start-menu ProjectIo shortcut now runs
+this build. story_check's 55 fails and the ACTIONS/NEEDS_REVIEW mirror staleness predate
+this session and were left untouched.
+
+---
+
+## 2026-09-01 (sprint 29 opens) — The ground gets a mechanism
+
+**Mode:** Design (research + authority docs, no code). **Runtime:** one short session, parallel
+worktree while sprint 28 runs.
+
+The brief: can the canvas move to much more detailed rendering — a tile renderer, the planet
+canvas view? Research first, authority docs after, questions to Ben as they arose.
+
+### Researched
+
+`docs/research/CANVAS_RENDERING.md`: the option ladder (richer vector / textured hex atlas /
+baked terrain chunks / SDL3 GPU pipeline), the finding that tiles already carry everything a
+detailed renderer eats (continuous `height` from BL-517, river edges with flow, graded cover),
+and that the current 2D backend supports textures, render targets and textured meshes unused.
+The advisor's pick was baked chunks; Ben ruled otherwise, which is what the ladder was for.
+
+### Ruled (Ben, the design form)
+
+Authored **hex-tile atlas** on the current backend; scope the **Planetary tile grid** only;
+**authored raster assets** from reference images (coming later); **ambient animation** in scope
+(flipbook); layer contract **held for the reference images**.
+
+### Landed
+
+`docs/ui/RENDERING.md` (new authority: mechanism, manifest + vector fallback-by-coverage,
+variant hash, transition fringes, verify-pinned flipbook clock, far page at the 7 px pivot,
+asset policy); TECH_FOUNDATIONS amended (the "not a prototype concern" sentence overturned,
+decision-log row added); PLANETARY.md pointer; CLAUDE.md router row. Items: BL-732 (hex tile
+atlas renderer, buildable against a placeholder atlas), BL-733 (tile art asset pipeline) and
+BL-734 (ground/chrome layer contract) — the latter two in review.json, blocked on the reference
+images. Sprint 29 opened in sprints.json.
+
+### Round 2 — the reference images arrive (same day)
+
+Ben pointed at `Ui-Development:docs/ui/design/renders/map/` — a whole style workstream
+(owner: Joe, `GLOBAL_STYLE_SHEET.md`) with two judged rounds. The images falsified the
+morning's atlas ruling: the direction is grid-free continuous terrain, oblique camera,
+installations as real geometry. Second form ruled: **C-F ratified** (painterly relief +
+near-future grade); mechanism **switched to baked chunks** (hillshade + authored biome
+brushes); **no on-ground grid** (selection/hover hex only, amber); **installations as
+rendered geometry, glyphs retire from the canvas**; camera **staged** — 2D bake now,
+oblique end-state (2.5D vs 3D, trade-offs in the research note § The end-state choice)
+as a future milestone; design docs **merged to main** and registered in the router.
+
+RENDERING.md rewritten to the baked-chunk mechanism; TECH_FOUNDATIONS re-amended;
+style sheet gains the Planetary-map sub-track with the ratification; BL-732 →
+GROUND_BAKE_RENDERER, BL-733 → BIOME_BRUSH_ART_PIPELINE (unblocked), BL-734 re-scoped
+to the surviving channels (both review.json blocks resolved).
+
+### Open
+
+it4 supporting frames and glyph round 5 remain with Joe; the 2.5D-vs-3D end-state call
+is Ben's, parked until the staged bake is real.
+
+---
+
 ## 2026-09-01 (success-lever session) — The two buyers come back, and the sweeps get their design
 
 **Mode:** Design → Full (two worktree agents) → integration. **Runtime:** one session; one full

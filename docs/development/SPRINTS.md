@@ -178,6 +178,26 @@ CLIMATE IS NOT AVAILABLE TO THIS SPRINT, DELIBERATELY. AI_OPPONENT.md named two 
 
 CHECK BEFORE STARTING: BL-712 (recipe choice is scale-blind) in sprint 27 fixes an argmax that stops the AI building whole categories of building. A coalition brake tuned against a field that cannot build power or construction is a brake tuned against a crippled opponent.
 
+### Sprint 29 — The world gets a face - detailed canvas rendering
+*Open · opened 2026-09-01*
+
+**Goal.** Move the Planetary canvas off the minimal vector style: the ground renders as baked painterly chunks in the ratified C-F direction (painterly relief + near-future grade) - hillshade from the height field, authored biome brushes, NO on-ground hex grid, installations as rendered geometry - on the existing 2D backend, with the vector bake surviving as fallback-by-coverage. Felt goal: the surface reads as terrain, not as a diagram. Camera stays top-down this stage; the oblique end-state (2.5D vs 3D) is a flagged future milestone.
+
+**Planned.**
+- BL-732 (ground bake renderer) - chunk bake + cache + invalidation, no-grid rule, installation stamps, grade pass, animated overlays, verify pinning. Buildable procedural-first.
+- BL-733 (biome brush art pipeline) - authored C-F brushes and structure stamps, judged against it3 C-F. Unblocked.
+- BL-734 (ground/chrome layer contract) - the surviving analytic channels over painterly ground; lands as PLANETARY/CANVASES/LENSES/ICONS edits.
+- BL-735 (ground wave 2) - stepped x2 zoom ladder pairing bake tiers {6,12,24,48,96 px/r}, all baking on a worker thread, border band muted to a single frontier ring. Ben rulings 2026-09-01 evening.
+
+### Sprint 30 — Canvas texture update
+*Open · opened 2026-09-02*
+
+**Goal.** The close rungs stop reading as blur: real edges return to the baked ground (cover-boundary ink, shoreline stroke, unsharp mask, close-tier grade trim, a ground-detail HUD metric), and the top two zoom rungs tilt the land (22.5/45 deg axonometric with height-displaced ground and standing trees) - the stepped-2.5D read the reference triptych promised, without the 3D milestone.
+
+**Planned.**
+- BL-736 (ground sharpness pass) - apron-baked post passes: cover-edge ink + shoreline stroke, unsharp mask at the close tiers, grade haze trim by resolution, texel/chunk HUD line.
+- BL-737 (stepped tilt) - per-rung fixed tilt keyed by zoom, oblique bake variant (height-displaced rows, upright tree sprites), squash-aware canvas transform and hit-testing.
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -224,6 +244,8 @@ CHECK BEFORE STARTING: BL-712 (recipe choice is scale-blind) in sprint 27 fixes 
 | 26 | The world that brakes a leader - a rival worth watching | CLOSED 2026-08-31 AT WAVE 1 on Ben's call, GOAL MET. Spectator mode works and the feed reads; the measurement that wave 1 produced then made wave 2 not worth running, and demand takes priority as sprint 27. |
 | 27 | The other half of the economy - demand, resumed | OPENED 2026-08-31 on Ben's call, resuming sprint 21's waves 1+ against sprint 26's measurement. Wave 0 (the guard, the census) already landed under 21. |
 | 28 | The AI that holds back - the brake, once standing means something | PROPOSED 2026-08-31 on Ben's call, taking the three sprint-26 items whose tuning is blocked on demand. NOT open: it starts when sprint 27 has given standing a meaning. |
+| 29 | The world gets a face - detailed canvas rendering | OPENED 2026-09-01. Design forms ruled, RENDERING.md landed, BL-732 (ground bake renderer) DELIVERED same day; Ben judged the first bake live and ruled wave 2 - stepped x2 zoom with bake tiers, threaded bake, muted 1-tile borders (BL-735, in flight). |
+| 30 | Canvas texture update | OPENED 2026-09-02. Ben, on the wave-2 build: still a general blur, and the mock's stepped tilt (~45 deg at max zoom) is the feature to take. Two items: the sharpness pass and the stepped tilt. |
 
 **Next up.** SPRINT NUMBERING, reset by Ben on 2026-08-30: the proposed shell-chrome (old 25) and startup (old 27) batches are DELETED - "Sprint 25 and 27 don't need a revisit, UI items for these are working great" - and the canvases batch renumbered from 26 to 25. THE NEXT NEW SPRINT IS 26. Two of the six UI review batches from 2026-08-28 therefore never run, and that is a judgement that their surfaces are good enough rather than a deferral.
 
@@ -233,4 +255,4 @@ NEXT UP: sprint 25 (canvases & the zoom ladder), carrying BL-694 (top-bar tracke
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*37 sprints archived cold; 5 open/gated in the hot store.*
+*37 sprints archived cold; 7 open/gated in the hot store.*

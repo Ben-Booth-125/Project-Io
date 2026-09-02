@@ -21,6 +21,14 @@ This canvas communicates:
 
 ## Tile grid
 
+> **The ground's render mechanism is owned by [RENDERING.md](RENDERING.md)** — baked
+> painterly chunks, the C-F art direction, the no-grid rule, installations as rendered
+> geometry, animation and LOD. This doc owns the analytic channels above the ground;
+> which of them survive, retire or restyle over painterly ground is owned by BL-734
+> (ground/chrome layer contract), and until that settles every channel below keeps its
+> current spec — except where RENDERING.md's rulings already retire it (the on-ground
+> grid, the building/settlement canvas glyphs).
+
 **Shape:** Pointy-top hexagons in odd-r offset coordinates. Odd rows are shifted right by half a column. Grid axes: columns (x) run left-to-right, rows (y) run top-to-bottom.
 
 **Target size and aspect ratio:** A body's grid is roughly **9 columns wide for every 5 rows tall** — the height is a little *under* half the width. The reasoning is geometric: the grid width spans the body's full circumference (both hemispheres), so a pole-to-pole height would be half the width; truncating the non-traversable polar caps brings it a little under half. The two planets are standardised to **180 × 84** (columns × rows); **Selene**, as a moon, uses **90 × 42** (the same ratio at half scale). The prototype world's surface bodies are **Cinder, Kepler, Selene, and Pallas** (Pallas, a notable belt asteroid, carries a small grid); **Helios** is the system star and has no surface.
@@ -338,15 +346,19 @@ honest:
 
 | Depth | Wash opacity | Reads as |
 |---|---|---|
-| 0 (on the frontier) | 0.50 | The edge itself, under the coloured rule |
-| 1 | 0.26 | The colour reaching inwards |
-| 2 | 0.11 | The last trace before plain ground |
-| 3+ | none | Terrain, texture and the active lens, untouched |
+| 0 (on the frontier) | 0.35 | The single frontier ring, under the coloured rule |
+| 1+ | none | Terrain, texture and the active lens, untouched |
 
-`k_border_band_tiles` = 3. At the **coarse-fill LOD** (`draw_r ≤ 7 px`) the band collapses to
-depth 0 alone: at the whole-grid view a single ring still draws the political outline, which is the
-whole read at that zoom, and relaxing three rings over every hex on the body is the one place the
-pass could cost real frame time.
+`k_border_band_tiles` = 1, and the band colour is **muted** — the nation identity colour
+pulled toward its own luma by `k_border_mute` (0.55) and sat down slightly, wash and stroke
+alike (the border-corridor hover label keeps the full identity colour: a label must be read,
+not weighed). Ben, 2026-09-01, judging the first baked painterly ground: the three-ring
+falloff and full-strength colour were tuned against flat saturated hexes, and over the muted
+C-F bake the band inverted its contrast relationship with the ground — it became the loudest
+mark on the map. *"Nation borders are way too strong. We should use a muted colour palette,
+and we should also make it a 1 tile glow."* The inward-falloff mechanism above remains the
+design (the depth relaxation still runs, and widening the ring is one constant) — what the
+ruling sets is its extent and its volume.
 
 The band is gated on `revealed`, like the survey mask itself: a border drawn through the survey
 mask would leak the political shape of ground the player has not paid to survey
@@ -597,7 +609,12 @@ for i in 0..5:
 - **Single-click** the surface: markers are hit-tested first, in the order **building → market → unit** (`body_surface_canvas.cpp`), so buildings, markets and units stay independently selectable. A click that misses every marker but lands in a **national border corridor** selects that nation (§ The national border band). Otherwise it selects the **province** (§ Province grain above) rather than the tile; the tile is one press away in the province card. Clicks do not change the view rung — the Planetary screen is the bottom of the ladder.
 - **Ascend:** clicking the minimap (which shows the Circumplanetary view) promotes it to primary.
 - **Middle mouse button drag:** pan. Horizontal panning is unbounded — the grid is a cylinder, so panning past the east or west edge wraps seamlessly to the opposite side. Each tile is drawn (and hit-tested) at every horizontal offset that falls within the canvas, so there is no visible seam and the column under the cursor is always correct.
-- **Scroll wheel:** zoom, anchored at the cursor position.
+- **Scroll wheel:** zoom, anchored at the cursor position — **stepped**, one ×2 ladder
+  rung per notch (Ben, 2026-09-01; [RENDERING.md](RENDERING.md) § Level of detail owns the
+  ladder and its bake-tier pairing). The `=`/`-` keys step the same ladder. The top two
+  rungs additionally **tilt the land** (22.5°/45°, plain canvas only — RENDERING.md
+  § The stepped tilt); interaction is unchanged under the tilt, with hit-testing
+  through the camera's inverse.
 
 The wrap seam has **no marker**: the wrap is seamless by construction and a seam indicator would
 draw attention to a boundary that does not exist for the player.

@@ -182,6 +182,53 @@
    "design": "The harness references derive_contract_offers / contract_offer_params / world::mercenary_offers (~15 sites), all deleted by cc88997c (the mercenary teardown). It has not compiled since, which means the nation scorer's term-by-term guard rows have been unrunnable through every scorer change after the teardown - including BL-644's calm_space addition, which landed with zero direct scorer verification (nation_wiring's scored ticks cover it only indirectly).\n\nTHE WORK: strip the mercenary-era rows (their subject no longer exists - deleting them is truth, not weakening), get the remaining term guards compiling and green, and add a calm_space row on the harness's own mutate-what-it-reads pattern: raise calm, watch the space_programme weight move by calm_space x delta; zero calm_space, watch it stop. A check that cannot run is worse than one that fails (DEVELOPMENT_PRACTICES: rebuild before believing)."
   },
   {
+   "status": "open",
+   "glyph": "~",
+   "priority": "A",
+   "version_goal": null,
+   "sprint": "29",
+   "written": "2026-09-01",
+   "author": "Ben + Claude (sprint 29 design form, 2026-09-01)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "difficulty": 2,
+   "id": "BL-733",
+   "short_name": "BIOME_BRUSH_ART_PIPELINE",
+   "title": "Biome brush and structure-stamp art pipeline (C-F direction)",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "assets/brushes/",
+    "docs/ui/design/"
+   ],
+   "design": "UNBLOCKED 2026-09-01 - the reference images arrived (docs/ui/design/renders/map/, C-F ratified). The authored-asset half of RENDERING.md: painterly biome brushes (canopy, scrub, marsh, rock...) and installation structure stamps in the C-F direction, judged against the it3 C-F panel; assets/brushes/ cwd-relative like fonts, Lua manifest with a provenance line per sheet, pages <= 4096^2. Fallback-by-coverage means partial delivery is shippable - author the highest-coverage biomes first. The near-future grade is NOT authored into brushes (it is a runtime pass; round-2 confirmed finding)."
+  },
+  {
+   "status": "open",
+   "glyph": "~",
+   "priority": "A",
+   "version_goal": null,
+   "sprint": "29",
+   "written": "2026-09-01",
+   "author": "Ben + Claude (sprint 29 design form, 2026-09-01)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "difficulty": 2,
+   "id": "BL-734",
+   "short_name": "GROUND_CHROME_LAYER_CONTRACT",
+   "title": "Ground/chrome layer contract - the fate of each analytic channel over atlas art",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "docs/ui/PLANETARY.md",
+    "docs/ui/CANVASES.md",
+    "docs/ui/LENSES.md"
+   ],
+   "design": "PARTLY RULED 2026-09-01 against the references: the on-ground grid RETIRES (selection/hover hex only) and building/settlement canvas glyphs RETIRE (installations are rendered geometry) - those two are settled in RENDERING.md and are not this item. THE REMAINING WORK, channel by channel over painterly C-F ground: lens tints (a saturated categorical fill over painterly terrain reads differently than over flat hues - weight/blend mode per lens), the land blend and per-lens province reduction table (the bake interpolation replaces the blend - reconcile PLANETARY.md), landform relief tint + glyphs and the procedural texture pass (likely redundant - the art carries material and relief), fog washes and survey mask over baked chunks, and where ownership/stack/count reads move now the silhouette+ring+badge are gone (hover/selection surfaces). Lands as edits to PLANETARY.md/CANVASES.md/LENSES.md/ICONS.md and closes this item. Open in the live app against the bake before ruling weights (Rule 0b). BORDER BAND: RULED and BUILT (Ben 2026-09-01 evening, under BL-735) - single frontier ring, 0.35 alpha, luma-muted; PLANETARY.md carries it. Do not re-rule."
+  },
+  {
    "status": "designed",
    "glyph": "~",
    "priority": "A",

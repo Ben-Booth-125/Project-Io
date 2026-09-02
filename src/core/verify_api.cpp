@@ -483,6 +483,10 @@ void app::inject_pointer(float x, float y, int button, int clicks)
 
 int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
 {
+    // BL-732: a capture must never race the ground cache's per-frame bake
+    // budget — every chunk bakes synchronously for the whole batch.
+    m_ground_bake_all = true;
+
     // Deterministic, non-interactive setup: fixed window (resized to verify_w/
     // verify_h below), seeded world, sim left paused so orbits and ticks never
     // advance between captures. The script drives view/overlay state directly.
@@ -587,6 +591,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
     v.set_function("set_overlay", [this](const std::string& name) {
         m_ui.overlay = overlay_from_name(name);
+    });
+    // BL-732: bare-ground judgement captures — hide the national border band
+    // (verify-only; the band's weight over painterly ground is BL-734's call).
+    v.set_function("set_border_band", [this](bool on) {
+        m_ui.dbg_hide_border_band = !on;
     });
     // Drive the Resource/Market/Scarcity lens-local selector headlessly so a golden
     // can pick the displayed good.

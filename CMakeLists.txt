@@ -558,6 +558,28 @@ target_link_libraries(pregame_balance_harness PRIVATE io_world_obj lua54)
 target_compile_features(pregame_balance_harness PRIVATE cxx_std_20)
 target_compile_options(pregame_balance_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# ground_bake_check (BL-732) additionally compiles the two PURE ui TUs the
+# ground bake lives in — ui/ground_bake.cpp + ui/terrain_palette.cpp are
+# SDL/ImGui/Lua-free by design (docs/ui/RENDERING.md § Verification), which is
+# the whole reason a headless harness can exercise the bake at all. Declared by
+# hand because the generic batch below compiles only the harness TU beside
+# io_world_obj; the include dirs mirror the batch's (harness_params.hpp pulls
+# sol headers even in Lua-free harnesses).
+add_executable(ground_bake_check
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/ground_bake_check.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/ground_bake.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/terrain_palette.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/png_writer.cpp"
+)
+target_include_directories(ground_bake_check PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+    "${lua_src_SOURCE_DIR}")
+target_link_libraries(ground_bake_check PRIVATE io_world_obj)
+target_compile_features(ground_bake_check PRIVATE cxx_std_20)
+target_compile_options(ground_bake_check PRIVATE ${IO_WARNING_FLAGS})
+
 # spawn_solvency (BL-635) is the fourth Lua-linked harness, and the reason is
 # stated in its own header: it asserts a MAGNITUDE, not a relation. Every other
 # economy harness restates scripts/economy.lua as C++ constants because the
