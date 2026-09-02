@@ -38,10 +38,16 @@ struct building_opex
 /// its siblings for scarce labour pays the premium it offered, on the labour it
 /// actually got. Decommissioned buildings pay only fixed material maintenance,
 /// no wages.
+/// @p idle_floor is the BL-739 idle-maintenance floor — the fraction of
+/// `e.maintenance` charged even at workforce 0 or decommissioned. Every caller
+/// passes `reg.idle_maintenance_floor()`; the parameter is deliberately
+/// UNDEFAULTED so a new call site cannot silently fall back to a stale copy
+/// (the price-band lesson: one authored value, every site moves together).
 building_opex compute_building_opex(const building_component& b,
                                     const building_economics& e,
                                     float contention_scalar,
-                                    float mean_hab);
+                                    float mean_hab,
+                                    float idle_floor);
 
 /// Mean population-centre habitability on a body (BL-074 helper): the average of every
 /// population centre's habitability whose tile sits on `body`, or 1.0 when the body has

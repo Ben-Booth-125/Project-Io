@@ -266,6 +266,13 @@ void recipe_registry::load_from_lua(lua_state& lua)
     {
         m_t_full = thr->get_or("t_full", 1.0f);
         m_t_idle = thr->get_or("t_idle", 0.2f);
+        // BL-739: validated as the value that lands — a floor outside [0, 1]
+        // is rejected, never clamped (the loader precedent).
+        const float floor = thr->get_or("idle_maintenance_floor", m_idle_maintenance_floor);
+        if (!std::isfinite(floor) || floor < 0.0f || floor > 1.0f)
+            throw std::runtime_error("economy.thresholds.idle_maintenance_floor must be "
+                                     "finite and in [0, 1]");
+        m_idle_maintenance_floor = floor;
     }
 
     // BL-365 population-growth gate (economy.population_growth). Scalars fall

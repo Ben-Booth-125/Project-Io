@@ -359,7 +359,8 @@ float idle_maintenance(const world& w, const recipe_registry& reg, const buildin
     probe.decommissioned     = true;
     const entity_id body     = tile_body(w, b.tile);
     const float     hab      = (body != null_entity) ? body_mean_habitability(w, body) : 1.0f;
-    return compute_building_opex(probe, reg.economics(b.type), 1.0f, hab).maintenance;
+    return compute_building_opex(probe, reg.economics(b.type), 1.0f, hab,
+                                 reg.idle_maintenance_floor()).maintenance;
 }
 
 } // namespace

@@ -1316,6 +1316,9 @@ public:
 
     // --- direct construction for tests (headless harness builds these by hand) ---
     void set_thresholds(float t_full, float t_idle) { m_t_full = t_full; m_t_idle = t_idle; }
+    /// BL-739: the idle-maintenance floor (economy.thresholds.idle_maintenance_floor).
+    float idle_maintenance_floor() const { return m_idle_maintenance_floor; }
+    void  set_idle_maintenance_floor(float f) { m_idle_maintenance_floor = f; }
     void set_growth(const growth_params& s) { m_growth = s; }
     void set_migration(const migration_params& m) { m_migration = m; }
     void set_population_demand(const population_demand_params& p)
@@ -1560,6 +1563,12 @@ private:
 
     float m_t_full = 1.0f;
     float m_t_idle = 0.2f;
+
+    /// BL-739: fraction of `maintenance` charged even at workforce 0 or
+    /// decommissioned. The C++ default is the pre-BL-739 constant so an
+    /// unloaded registry (hand-built harness mirrors) runs the old arithmetic;
+    /// the shipped Lua authors 0.15 (Ben, 2026-09-01).
+    float m_idle_maintenance_floor = 0.3f;
 
     /// BL-078 elastic-substrate model tunables (economy.substrate). Defaults match
     /// economy.lua so a hand-built harness registry behaves sensibly without Lua.

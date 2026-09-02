@@ -552,7 +552,8 @@ int solve_workforce_target(const world& w, const recipe_registry& reg,
 
         building_component probe = b;
         probe.workforce_target   = wt;
-        const building_opex opex = compute_building_opex(probe, e, contention, hab);
+        const building_opex opex = compute_building_opex(probe, e, contention, hab,
+                                                         reg.idle_maintenance_floor());
 
         float revenue = 0.0f, input_cost = 0.0f;
         if (b.type == building_type::extraction_site && tit != w.tiles.end())

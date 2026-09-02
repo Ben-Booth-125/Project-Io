@@ -501,7 +501,8 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg,
             // Maintenance is a pure function of the building: contention and
             // habitability move only WAGES. 1.0f/1.0f is therefore exact, not an
             // approximation, and A2 below proves it against the filed return.
-            bt.floor_at_warm = compute_building_opex(b, e, 1.0f, 1.0f).maintenance;
+            bt.floor_at_warm = compute_building_opex(b, e, 1.0f, 1.0f,
+                                                     reg.idle_maintenance_floor()).maintenance;
             if (b.type == building_type::extraction_site)
             {
                 const market_price mp = price_at(w, b.tile, b.target_resource);
@@ -727,9 +728,12 @@ int main(int argc, char** argv)
             building_component decom; decom.type = t; decom.workforce_target = 100;
             decom.decommissioned = true;
             building_component full;  full.type = t;  full.workforce_target = 100;
-            const float m_zero  = compute_building_opex(zero,  e, 1.0f, 1.0f).maintenance;
-            const float m_decom = compute_building_opex(decom, e, 1.0f, 1.0f).maintenance;
-            const float m_full  = compute_building_opex(full,  e, 1.0f, 1.0f).maintenance;
+            const float m_zero  = compute_building_opex(zero,  e, 1.0f, 1.0f,
+                                                        reg.idle_maintenance_floor()).maintenance;
+            const float m_decom = compute_building_opex(decom, e, 1.0f, 1.0f,
+                                                        reg.idle_maintenance_floor()).maintenance;
+            const float m_full  = compute_building_opex(full,  e, 1.0f, 1.0f,
+                                                        reg.idle_maintenance_floor()).maintenance;
             std::printf("  %-14s maintenance const %6.2f | wt=0 %6.2f  decom %6.2f  "
                         "wt=100 %6.2f   floor share of full %5.1f%%\n",
                         type_name(t), static_cast<double>(e.maintenance),

@@ -20,6 +20,14 @@ economy = {
     thresholds = {
         t_full = 1.0,
         t_idle = 0.2,
+        -- BL-739: the idle-maintenance floor - the fraction of a building's
+        -- maintenance constant charged even at workforce 0 or decommissioned.
+        -- Was a hard-coded 0.30 (BL-049); measured at ~61% of the residual
+        -- spawn deficit (material_floor, BL-635 diagnosis), trimmed to 0.15 on
+        -- Ben's 2026-09-01 ruling. Non-zero deliberately: holding land is
+        -- never free. The C++ default stays 0.30 so an unloaded registry runs
+        -- the pre-BL-739 arithmetic.
+        idle_maintenance_floor = 0.15,
     },
 
     -- Per building_type constants.
