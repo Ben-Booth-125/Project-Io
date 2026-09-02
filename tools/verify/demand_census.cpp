@@ -243,9 +243,10 @@ const channel_row k_channels[] = {
       "run_building_upkeep (economy_system.cpp) <- economy.building_upkeep.goods, per building type "
       "and ERA-BANDED, scaling with BUILDING COUNT (MARKETS.md property 1). BL-654: it BIDS now -- "
       "the pool is drawn first and the shortfall goes to market at up to price_band.reservation_mult "
-      "x base, so the draw prices what it wants (see the `upkeep/bd` column). BL-738 stage 1 "
-      "(2026-09-01) authored the first non-power rates: industrial repair timber and stone, the "
-      "met-on-day-1 widening; machinery/electronics stay zero while ceiled in 7-8 of 9 markets" },
+      "x base, so the draw prices what it wants (see the `upkeep/bd` column). BL-738's stage-1 "
+      "repair rates (industrial timber/stone) were landed, MEASURED over a full campaign cell, and "
+      "withdrawn the same day - cost without the income side (broke nations, BL-741/BL-742); the "
+      "record is at the scripts/economy.lua goods table. Only power carries a non-zero rate" },
     { "Construction",   ch_state::present,
       "run_construction -> economy_report::wants (economy_system.cpp) <- economy.buildings.resource_costs "
       "/ material_overrides. Fires only where something is BUILDING (owner BL-642)" },

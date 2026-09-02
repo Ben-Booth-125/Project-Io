@@ -60,6 +60,26 @@ deliberately red on tools / rigging / trade_goods_misc.
 NR-774 (the four definitions); the player-corp supplier exclusion under spectate (BL-644's
 delegated call — the BL-409 no-subject reading says it should lift); lump sizes 25/50 first-cut.
 
+### Addendum, same session — the operating-loss block: two land, one waits, one teaches
+
+Ben ruled on the six proposed operating-loss methods: infrastructure channel **in full**;
+building upkeep **yes** ("Building should have upkeep too"); extraction throttle-on-floored-price
+**REJECTED** — *"we should see players penalised for overinvesting in mining, and we should see
+the market decide what is profitable. Eventually a deposit runs out, and so it is up to a player
+to pace their consumption"* — a dated narrowing worth remembering: no price-triggered supply
+throttle, ever; the market's verdict and deposit depletion are the pacing mechanisms. Idle-floor
+trim and the maintenance anchor agreed; firm exit pending his read of the re-explanation.
+
+**Landed:** BL-643 (network upkeep, the BL-644 template, 72/72 red-proved) and BL-739 (idle floor
+to data, 0.30 → 0.15, all seven call sites). **Found:** the state channels' wallet is missing —
+one nation in 43 holds any treasury (BL-741), and state purchases read pools auto-surplus already
+swept (BL-742). **Taught:** BL-738's stage-1 repair rates ran a full campaign cell and made the
+field WORSE (extraction operating net −6.75 → −31.29; cost side without the income side), so they
+were withdrawn with their measurement written at the table and BL-738 now requires BL-741/742.
+The clean positive: stone off the floor, 0.42× → 1.38× base — the price signal works; the money
+loop behind it is what is missing. BL-740 (maintenance anchor) waits for its measured table —
+BL-739 just moved its baseline.
+
 ### Addendum, same session — BL-723 lands and the first film ships
 
 The campaign-lapse instrument built, T0-verified (every validity row mutation-proved red), and
