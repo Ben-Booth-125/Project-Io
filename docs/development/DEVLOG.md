@@ -10,6 +10,59 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-02 (sprint 31 opens) — Every recipe priced at base, and most of them lose
+
+**Mode:** Design → Light build (one harness, one data table) → sprint bookkeeping. **Runtime:**
+one session; sprint 29's branch merged and pushed first (the ground bake + sprint 30 wave 1).
+
+Ben's brief: a robust market where every player makes a steady profit, and *"the simplest way to
+do this is to ensure that all recipes (at base price) make a greater profit than marginal
+costs"* — the obvious part the demand work walked past. Agreed, with two qualifications now in
+`PRODUCTION.md` § The recipe margin anchor: base is the middle of a band, so the rule has a second
+half at the price floor (BL-740's form, whole roster); and the anchor is necessary, not sufficient
+— the 2026-09-01 ledger's structural −755/qtr and the year-30 debt spiral are separate levers.
+
+### Built
+
+**BL-744 stage 1 — `tools/verify/recipe_margin`.** Loads the three authored tables through a live
+Lua state (NEEDS_LUA), prices every processing recipe and every `k_extractable` target in both
+bands, asserts M1 (margin ≥ k × marginal cost at base) and M2 (fixed cost covered at the floor at
+typical staffing), R0 non-vacuity, R5 unpriced inputs, R6 differential red-proof. Knobs in
+`economy.recipe_margin_anchor` (k = 1.0, Ben's sentence verbatim; W = 0.5, generation's seeded
+staffing). Not `add_test`'ed until the tables clear it. CMake target declared.
+
+### The finding — the opening table of sprint 31
+
+| band | priced recipes | M1 red | any positive margin | clear 2× | M2 red | extraction M1 / M2 red (of 18) |
+|---|---|---|---|---|---|---|
+| ancient | 19 | 18 | 9 | 0 | 18 | 1 / 16 |
+| industrial | 25 (+2 propellant, exempt) | 23 | 16 | 0 | 23 | 1 / 16 |
+
+The shape: the mid-chain is authored at zero or negative value-add **before wages** — steel 8 from
+7.0 of inputs, refined_copper 7.5 from 6.0, silicon 5 from 4, food_rations 6 from 6, clean_water 3
+from 3, consumer_goods 12 from 14, steel_from_blooms 8 from 22 — and the wage per batch
+(12 / 8 = 1.50) eats what is left. Only glass (ancient), medical_supplies and
+spacecraft_components_heavy (industrial) clear k = 1. Extraction clears M1 everywhere but regolith
+and fails M2 on 16 of 18: at the floor a mine at W = 0.5 earns 2.5 × price per tick against 9 of
+wages + maintenance. Steel's authored margin was already recorded as positive in `tier_margin` R7's
+comment (7.0 in, 8.0 out) — true before wages, false after.
+
+### Filed
+
+BL-744 (recipe margin anchor) — the retune is stage 2; BL-740 (maintenance floor anchor) folded
+into the same instrument and re-sprinted. NR-775 (the two delegated constants), NR-776 (retune
+direction: rates and costs first, input quantities, prices last — Ben's call). Requirements group
+`recipe-margin-anchor` R1 complete, R2–R3 pending.
+
+### Sprints
+
+On Ben's instruction every prior sprint is archived: 21 and 26 (were "complete", now `closed`),
+25 and 28 (`superseded`, never opened), 27, 29 and 30 (`closed` with retros). **Sprint 31 opened** —
+long-term market viability, every recipe pays at base — with the done-when on `recipe_margin`
+R1–R4 green in both bands and `campaign_lapse` on the industrial band operating-positive.
+
+---
+
 ## 2026-09-02 (sprint 30 opens) — The ground gets its edges back, and the land tilts
 
 **Mode:** Full, batch (BL-736 + BL-737), committed as one intertwined change on Ben's
