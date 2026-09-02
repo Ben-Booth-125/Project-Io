@@ -57,7 +57,9 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
     // per-pass inertness `run_national_budget` states for an empty budget map.
     const bool any_lump = (std::isfinite(p.components_lump) && p.components_lump > 0.0f)
                        || (std::isfinite(p.propellant_lump) && p.propellant_lump > 0.0f);
-    if (!any_lump || budgets.empty() || w.corp_body_pools.empty())
+    // BL-742: an empty pool map no longer short-circuits — the market
+    // fallback can buy a whole lump off a real shelf.
+    if (!any_lump || budgets.empty())
         return out;
 
     // The two goods, in the fixed authored order the claims are emitted in.
@@ -70,6 +72,8 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
     // (corp, body, resource). Two nations walked in ascending id never claim
     // the same units, so a funded claim always finds its lump at settlement.
     std::map<std::tuple<entity_id, entity_id, std::size_t>, float> reserved;
+    // BL-742: inventory promised to an earlier MARKET fallback, (market, resource).
+    std::map<std::pair<entity_id, std::size_t>, float> mkt_reserved;
 
     for (const auto& [nid, bud] : budgets) // std::map: ascending nation
     {
@@ -145,7 +149,70 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
                 }
             }
             if (best_corp == null_entity)
-                continue; // nobody holds a whole lump: the state splits no launch
+            {
+                // BL-742: no pool holds a whole lump — auto-surplus sweeps
+                // pools into market inventory every tick, so check the shelf
+                // before declaring the world short. The lump discipline is
+                // unchanged: one market must hold the WHOLE lump (the state
+                // splits no launch across shelves), the purchase bypasses the
+                // claim machinery (no corp payee), caps itself at the line's
+                // remaining share, and settles as a direct whole-or-nothing
+                // treasury debit. The supplier was already paid when the stock
+                // sold in; the money leaves the world as every market purchase
+                // does (money_conservation's documented simplification).
+                entity_id best_mkt  = null_entity;
+                float     mkt_avail = 0.0f;
+                {
+                    std::vector<entity_id> mids;
+                    mids.reserve(w.markets.size());
+                    for (const auto& [mid, mc] : w.markets)
+                    {
+                        (void)mc;
+                        mids.push_back(mid);
+                    }
+                    std::sort(mids.begin(), mids.end());
+                    for (const entity_id mid : mids)
+                    {
+                        const market_component& mc = w.markets.at(mid);
+                        if (!(mc.base_price[ri] > 0.0f))
+                            continue;
+                        float avail = mc.inventory[ri];
+                        const auto mrit = mkt_reserved.find(std::make_pair(mid, ri));
+                        if (mrit != mkt_reserved.end())
+                            avail -= mrit->second;
+                        if (avail >= lump && avail > mkt_avail)
+                        {
+                            best_mkt  = mid;
+                            mkt_avail = avail;
+                        }
+                    }
+                }
+                if (best_mkt == null_entity)
+                    continue; // no pool and no shelf holds a whole lump
+
+                const market_component& mc = w.markets.at(best_mkt);
+                const float unit = mc.price[ri] > 0.0f ? mc.price[ri] : mc.base_price[ri];
+                if (!std::isfinite(unit) || !(unit > 0.0f))
+                    continue;
+                const float amount = lump * unit;
+                if (!std::isfinite(amount) || !(amount > 0.0f))
+                    continue;
+                if (amount > share - line_claimed)
+                    continue; // the lump gate, unchanged: whole or not at all
+                line_claimed += amount;
+                mkt_reserved[std::make_pair(best_mkt, ri)] += lump;
+
+                space_purchase sp;
+                sp.nation   = nid;
+                sp.supplier = null_entity; // THE MARKET
+                sp.market   = best_mkt;
+                sp.body     = mc.body;
+                sp.resource = good;
+                sp.quantity = lump;
+                sp.credits  = amount;
+                out.push_back(sp);
+                continue;
+            }
 
             const float unit = unit_price_at(w, best_body, ri);
             if (!std::isfinite(unit) || !(unit > 0.0f))
@@ -191,6 +258,34 @@ void settle_space_purchases(world& w,
                             std::vector<space_purchase>& purchases,
                             const national_budget_tick& tick)
 {
+    // ---- BL-742: MARKET-fallback lumps settle first, independent of the
+    // transfer record — no claim rode the machinery, so the treasury is
+    // debited directly, WHOLE OR NOTHING (the lump property survives the
+    // fallback). The goods leave the market's real inventory; the money
+    // leaves the world as every market purchase does. Intent order is derive
+    // order — deterministic.
+    for (space_purchase& sp : purchases)
+    {
+        if (sp.supplier != null_entity)
+            continue; // a pool lump: the transfer loop below owns it
+        const auto nit = w.nations.find(sp.nation);
+        const auto mit = w.markets.find(sp.market);
+        if (nit == w.nations.end() || mit == w.markets.end())
+            continue;
+        const std::size_t ri = static_cast<std::size_t>(sp.resource);
+        if (!(sp.credits > 0.0f) || !(sp.quantity > 0.0f))
+            continue;
+        if (nit->second.treasury < sp.credits)
+            continue; // whole or nothing: the share banked, the lump waits
+        if (mit->second.inventory[ri] < sp.quantity)
+            continue; // the shelf thinned between derive and settle: no partial launch
+
+        mit->second.inventory[ri] -= sp.quantity;
+        nit->second.treasury      -= sp.credits;
+        sp.funded    = true;
+        sp.completed = true;
+    }
+
     if (tick.transfers.empty())
         return;
 

@@ -89,8 +89,15 @@ struct network_upkeep_params
 struct network_purchase
 {
     entity_id     nation   = null_entity; ///< The maintaining nation.
-    entity_id     supplier = null_entity; ///< The corp whose pool held the materials.
+    /// The corp whose pool held the materials — or `null_entity`, which means
+    /// THE MARKET (BL-742): when no pool holds the good, the purchase falls
+    /// back to a market's real inventory, the exchange-record convention for a
+    /// side with no corp behind it. A null-supplier purchase debits the
+    /// treasury directly (the standing unbacked-market simplification
+    /// money_conservation documents) and decrements `market`'s inventory.
+    entity_id     supplier = null_entity;
     entity_id     body     = null_entity; ///< Where the goods stand (the pool's body).
+    entity_id     market   = null_entity; ///< BL-742: the inventory market, when supplier is null.
     resource_type resource = resource_type::stone;
     float         quantity = 0.0f; ///< Units the claim asked for — the bill.
     float         credits  = 0.0f; ///< quantity x the supplier market's unit price — the claim amount.

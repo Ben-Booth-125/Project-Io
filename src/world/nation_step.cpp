@@ -126,7 +126,7 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // delta. A clawed-back purchase moved nothing net and folds nothing.
     settle_space_purchases(w, space, report.national_budget);
     for (const space_purchase& sp : space)
-        if (sp.completed)
+        if (sp.completed && sp.supplier != null_entity) // BL-742: a market buy pays no corp
             report.budgets[sp.supplier].subsidies += sp.credits;
     report.space_purchases = std::move(space);
 
@@ -137,7 +137,7 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // onto `subsidies` only when the goods actually moved.
     settle_network_purchases(w, network, report.national_budget);
     for (const network_purchase& np : network)
-        if (np.completed)
+        if (np.completed && np.supplier != null_entity) // BL-742: a market buy pays no corp
             report.budgets[np.supplier].subsidies += np.paid;
     report.network_purchases = std::move(network);
 

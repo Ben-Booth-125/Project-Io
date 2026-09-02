@@ -1413,6 +1413,43 @@ int main()
                   "fold - pools drained, supplier credited, subsidies explain "
                   "the delta, report.space_purchases carries both completed rows");
         }
+
+        // R7m (BL-742): NO pool holds a lump, but a market shelf holds a whole
+        // one — the fallback buys it whole or not at all (the lump property
+        // survives the fallback): supplier null, no claim, direct whole
+        // treasury debit, inventory decremented. A shelf holding only HALF a
+        // lump buys nothing.
+        {
+            space_fixture s = make_space_fixture(0.0f, 0.0f); // pools EMPTY
+            s.params.propellant_lump = 0.0f;
+            auto& mc = s.f.w.markets.at(s.market);
+            mc.base_price[k_comp] = 1.0f;
+            mc.inventory[k_comp]  = 100.0f; // holds the whole lump of 8
+            std::vector<space_purchase> intents = derive_space_programme_claims(
+                s.f.w, s.f.budgets, s.params, s.f.claims);
+            national_budget_tick t;
+            run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
+            settle_space_purchases(s.f.w, intents, t);
+            const bool whole_ok =
+                intents.size() == 1 && intents[0].supplier == null_entity &&
+                intents[0].market == s.market && intents[0].completed &&
+                same(mc.inventory[k_comp], 92.0f) &&
+                same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f - 16.0f) &&
+                s.f.claims.empty();
+
+            space_fixture q = make_space_fixture(0.0f, 0.0f);
+            q.params.propellant_lump = 0.0f;
+            auto& qmc = q.f.w.markets.at(q.market);
+            qmc.base_price[k_comp] = 1.0f;
+            qmc.inventory[k_comp]  = 4.0f; // HALF a lump: no purchase
+            std::vector<space_purchase> q_intents = derive_space_programme_claims(
+                q.f.w, q.f.budgets, q.params, q.f.claims);
+            check(whole_ok && q_intents.empty() &&
+                  same(qmc.inventory[k_comp], 4.0f),
+                  "R7m (BL-742) empty pools, stocked shelf: the lump comes "
+                  "whole off market inventory (treasury debited directly, no "
+                  "claim, no corp paid) - and a half-lump shelf buys nothing");
+        }
     }
 
     // --- R9: network upkeep (BL-643) ----------------------------------------
@@ -1750,6 +1787,59 @@ int main()
                   "fold - pools drained, supplier credited, subsidies explain "
                   "the delta, report.network_purchases carries both completed "
                   "rows");
+        }
+
+        // R9k (BL-742): NO pool holds the goods, but a market's REAL inventory
+        // does — the measured industrial-band case. The purchase falls back to
+        // the shelf: supplier is null (THE MARKET, the exchange-record
+        // convention), no budget claim rides the machinery, the treasury is
+        // debited directly, inventory decrements, and no corp is paid — the
+        // money leaves the world as every market purchase does. Bills 16 stone
+        // + 8 timber at prices 2.0/4.0 = 32 + 32; share 384 covers both.
+        {
+            net_fixture s = make_net_fixture(0.0f, 0.0f); // pools EMPTY
+            auto& mc = s.f.w.markets.at(s.market);
+            mc.base_price[k_stone]  = 1.0f;   // priced, so the shelf is buyable
+            mc.base_price[k_timber] = 1.0f;
+            mc.inventory[k_stone]   = 100.0f; // the swept stock, on the shelf
+            mc.inventory[k_timber]  = 100.0f;
+            auto [intents, t] = run_net(s);
+            (void)t;
+            check(intents.size() == 2 &&
+                  intents[0].supplier == null_entity && intents[0].market == s.market &&
+                  intents[0].completed && intents[1].completed &&
+                  same(intents[0].drawn, 16.0f) && same(intents[1].drawn, 8.0f) &&
+                  same(mc.inventory[k_stone], 84.0f) &&
+                  same(mc.inventory[k_timber], 92.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f - 64.0f) &&
+                  same(s.f.w.corporations.at(s.f.corp_1).balance, 0.0f) &&
+                  s.f.claims.empty(),
+                  "R9k (BL-742) empty pools, stocked shelf: the purchase falls "
+                  "back to market inventory - treasury debited directly, "
+                  "inventory drawn, no claim appended, no corp paid");
+        }
+
+        // R9l (BL-742): the fallback caps ITSELF at the line share — a poor
+        // nation's shelf purchase is pro-rata against the share, not the
+        // treasury. Treasury 128, reserve 1/4 -> spendable 96, logistics 1/2
+        // -> share 48 against a 64.0 bill: 32 stone-credits fit whole, timber
+        // gets the remaining 16 of its 32 (half its bill -> 4 of 8 units).
+        {
+            net_fixture s = make_net_fixture(0.0f, 0.0f);
+            s.f.w.nations.at(s.f.nation_a).treasury = 128.0f;
+            auto& mc = s.f.w.markets.at(s.market);
+            mc.base_price[k_stone]  = 1.0f;
+            mc.base_price[k_timber] = 1.0f;
+            mc.inventory[k_stone]   = 100.0f;
+            mc.inventory[k_timber]  = 100.0f;
+            auto [intents, t] = run_net(s);
+            (void)t;
+            check(intents.size() == 2 &&
+                  same(intents[0].drawn, 16.0f) &&
+                  same(intents[1].quantity, 4.0f) && same(intents[1].drawn, 4.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 128.0f - 48.0f),
+                  "R9l (BL-742) the shelf purchase caps itself at the line "
+                  "share, pro-rata - 48 of the 64.0 bill, never the treasury");
         }
     }
 

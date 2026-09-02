@@ -72,9 +72,15 @@ struct space_programme_params
 /// budget could not pay this tick; `completed` is goods actually consumed.
 struct space_purchase
 {
+    /// BL-742: when `supplier` is `null_entity` the counterparty is THE MARKET
+    /// — the lump comes whole from `market`'s real inventory, the treasury is
+    /// debited directly (the standing unbacked-market simplification), and no
+    /// budget claim rides the transfer machinery. See network_upkeep.hpp's
+    /// twin comment for the full rationale.
     entity_id     nation   = null_entity; ///< The buying nation.
-    entity_id     supplier = null_entity; ///< The corp whose pool held the lump.
+    entity_id     supplier = null_entity; ///< The corp whose pool held the lump; null = THE MARKET.
     entity_id     body     = null_entity; ///< Where the goods stand — the claim's earmark subject.
+    entity_id     market   = null_entity; ///< BL-742: the inventory market, when supplier is null.
     resource_type resource = resource_type::spacecraft_components;
     float         quantity = 0.0f; ///< The lump; leaves the pool whole on completion.
     float         credits  = 0.0f; ///< quantity x the supplier market's unit price — the claim amount.
