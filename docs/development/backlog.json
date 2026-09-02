@@ -40,30 +40,6 @@
   {
    "status": "designed",
    "glyph": "~",
-   "priority": "A",
-   "difficulty": 2,
-   "version_goal": null,
-   "sprint": null,
-   "written": "2026-09-01",
-   "author": "Claude (success-lever session, Ben's instruction)",
-   "requires": [
-    "BL-723"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-724",
-   "short_name": "SWEEP_SPAWN_DISTRIBUTION",
-   "category": "Tooling",
-   "title": "Sweep 1 - the spread of starts: seeds x abundance, nothing else moved",
-   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
-   "files": [
-    "tools/verify/campaign_lapse.cpp"
-   ],
-   "design": "8+ seeds x abundance {sparse 0.40, lean 0.65, standard 1.00} - the cleanest scarcity axis (one enum, a pure post-multiply, stream-identical at standard) - 120 ticks past warm start, no other overrides. Measures the DISTRIBUTION of opening quality, never one sample: fraction of seeds where the shortlist corp reaches trailing net >= 0 within 8 quarters; GDP-trend slope per cell; time to first positive quarter.\n\nSUCCESS SHAPE: sparse < lean < standard strictly ordered, and sparse still above the viability floor - the ambient-resource baseline (stone/timber/sand/clay/peat on every eligible tile) is the designed worst case, and this sweep is its proof or refutation. Cross-checks on the same seeds: player_seed_sweep, spawn_solvency.\n\nINTERPRETATION BOUND: the deliverable is the spread, never fairness - \"there is no reason that every start needs to be equally good and fair\" (Ben, 2026-08-31). A poor start is a legitimate outcome; a non-functional one is the defect."
-  },
-  {
-   "status": "designed",
-   "glyph": "~",
    "priority": "B",
    "difficulty": 3,
    "version_goal": null,
@@ -133,31 +109,6 @@
     "tools/verify/campaign_lapse.cpp"
    ],
    "design": "abundance x a global multiplier on the ore-province redistribution shares (copper 65% / petroleum 60% / iron 55% / coal 45% - sweep {0.7x, 1.0x, 1.3x}, clamped inside [0, 0.95]). Concentration is the geography half of scarcity, separate from world totals: higher shares mean spawn quality depends on being near one of 2-3 ore provinces.\n\nWATCH: chain-completeness spread per market (the demand_census R5 read - the SPREAD is the deliverable; reports, never gates); GDP trend per cell; trade volume. THE PREDICTION UNDER TEST: trade RISES with concentration, because trade arises from supply asymmetry (MARKETS.md property 5) - a cell where it falls instead is a finding about reach or the band, localisable against sweep 2. Optional third axis if runtime allows: drawdown {0, 0.5, 0.9} - thins the accessible fraction of the homeworld start."
-  },
-  {
-   "status": "designed",
-   "glyph": "~",
-   "priority": "A",
-   "difficulty": 2,
-   "version_goal": null,
-   "sprint": null,
-   "written": "2026-09-01",
-   "author": "Claude (success-lever session, Ben's instruction)",
-   "requires": [
-    "BL-723"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-728",
-   "short_name": "SWEEP_DEMAND_COMPOSITION",
-   "category": "Tooling",
-   "title": "Sweep 5 - whose money is it: demand channel composition",
-   "authority_doc": "docs/economy/MARKETS.md",
-   "files": [
-    "tools/verify/campaign_lapse.cpp",
-    "scripts/economy.lua"
-   ],
-   "design": "population_demand.demand_scale {0.5, 1, 2} x background_demand.demand_scale {0.5, 1, 2} - both already clean one-number axes in scripts/economy.lua. The background-industrial stopgap is ~70% of industrial-band demand (census 2026-09-01: 3698.9 of 5298.3 total), so this sweep prices what the world's income is actually made of, and how fragile every trend is to the stopgap's eventual retirement.\n\nOnce BL-644 (state channel) and BL-647 (endemic luxury) land, their weights join as cells, and the sweep ranks ALL live channels by effect size on GDP and net income - which also ranks every other lever's ceiling, since a price lever can only move income that some channel is paying.\n\nEXPECTED OUTCOME: this sweep dominates every other sweep's effect sizes. If it does not, that inversion is the headline finding, not a footnote."
   },
   {
    "status": "designed",
@@ -280,30 +231,6 @@
     "tools/verify/tier_margin.cpp"
    ],
    "design": "Ben, 2026-09-01: agreed. The value_anchor discipline applied to operating cost: per extraction target, taper-mean output valued at base_price x floor_mult must cover the building's fixed cost per tick (maintenance incl. the BL-739 idle floor share + wages at typical workforce) - so the WORST legal market still pays the lights and profit comes from beating it, under any future base-price retune. THE WORK: derive the bound per (building type, target resource), retune the authored maintenance constants where they breach it, and add the harness rows (tier_margin or a sibling) asserting the invariant with a differential red-proof. The anchor is checked at authoring time against the authored tables, never against live resolved prices."
-  },
-  {
-   "status": "designed",
-   "glyph": "~",
-   "priority": "A",
-   "difficulty": 4,
-   "version_goal": null,
-   "sprint": null,
-   "written": "2026-09-01",
-   "author": "Claude (Ben: 'Yes to firm exit', 2026-09-01)",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-743",
-   "short_name": "FIRM_EXIT",
-   "category": "Economy",
-   "title": "A failed firm leaves the market - insolvency finally has a consequence",
-   "authority_doc": "docs/economy/FINANCE.md",
-   "files": [
-    "src/world/economy_system.cpp",
-    "src/world/corp_command.cpp",
-    "docs/economy/FINANCE.md"
-   ],
-   "design": "Ben, 2026-09-01: yes. MEASURED MOTIVATION (campaign_lapse baselines): 57-59 of 89 corps end 30 years underwater and every one keeps operating - immortal debtors flood every market from beyond the grave, so the market's verdict (bankruptcy) has no consequence and gluts never clear. Exit IS the market's own supply discipline.\n\nTHE SHAPE: a deterministic insolvency trigger (balance below a threshold for N consecutive quarters - both authored in data, the reflex-tier loss-streak precedent), then wind-up through the DISSOLUTION machinery the buyout already built (FINANCE.md § Dissolution: TRANSFER/CANCEL/DROP/KEEP walked over every store, the re-walk harness proving no dangling id). Holdings liquidate or transfer; the corp is erased. THE PLAYER'S CORP IS EXEMPT ABSOLUTELY - stagnation-as-loss stays progressive (CONCEPT.md), and the never-erase-the-seat rule (Ben, 2026-08-26, NR-670) already sits at the command seam.\n\nPROVENANCE: the cancelled BL-657 (a failing firm exits) and BL-658 (the free-firm trap - the buyout solvency gate must test the post-acquisition POSITION, not the price) owned this before the 2026-09-01 single-focus close purged them; their rows no longer exist in any store, so this filing re-carries both halves - the exit trigger AND the post-acquisition solvency gate, which stops a zero-priced debtor sinking its buyer during the wind-down auction if one is designed.\n\nPROVING TEST: a campaign_lapse cell - corps-in-debt count stops climbing monotonically, gluts clear on exits (floored-everywhere count falls), survivor operating nets rise; the dissolution re-walk harness green on a warm world ticked past several exits."
   }
  ]
 }

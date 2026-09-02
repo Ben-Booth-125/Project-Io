@@ -593,9 +593,17 @@ int main(int argc, char** argv)
     appendf(manifest, "seed=%u\nwarm_ticks=%d\nmeasured_ticks=%d\nprehistory=%s\n",
             lp.seed, lp.warm_ticks, lp.ticks,
             lp.prehistory ? "ON (the shipped spawn)" : "OFF (--fast, NOT the spawn)");
-    appendf(manifest, "epoch_year=%s\n",
-            lp.epoch_year != 0 ? std::to_string(lp.epoch_year).c_str()
-                               : "(world_params default)");
+    // The band is NAMED, never implied: the world_params default epoch is 0
+    // (the ancient 0 CE arc), and a whole session's sweeps once ran the wrong
+    // band because the manifest said only "(default)" (2026-09-01).
+    {
+        world_params probe;
+        const int epoch = lp.epoch_year != 0 ? lp.epoch_year
+                                             : static_cast<int>(probe.epoch_year);
+        appendf(manifest, "epoch_year=%d  band=%s\n", epoch,
+                era_band_for_epoch(epoch) == era_band::ancient ? "ANCIENT"
+                                                              : "INDUSTRIAL");
+    }
     appendf(manifest, "abundance=%s\n",
             lp.abundance == abundance_level::sparse ? "sparse"
             : lp.abundance == abundance_level::lean ? "lean" : "standard");

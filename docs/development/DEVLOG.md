@@ -80,6 +80,28 @@ The clean positive: stone off the floor, 0.42× → 1.38× base — the price si
 loop behind it is what is missing. BL-740 (maintenance anchor) waits for its measured table —
 BL-739 just moved its baseline.
 
+### Addendum, same session — firm exit lands, and the first sweeps speak
+
+**BL-743 built and verified** (7/7, conservation and exemption rows red-proved): insolvency
+finally has a consequence, the CANCEL/DROP half shared with the buyout so the two ends of a
+corporation cannot drift, the player exempt absolutely.
+
+**The first sweep rounds ran** — 36 cells plus 3 industrial spot cells — and one instrument
+lesson came with them: `world_params::epoch_year` defaults to **0**, so every lapse run to this
+point measured the **ancient band**, not NR-774's declared 1960 start; the manifest now names its
+band. The findings, band-labelled:
+
+- **Demand composition dominates** (sweep 5): pop demand_scale ×2 flips the ancient field to
+  **mean operating PROFIT (+2.36/qtr)** — the first operating-positive field ever measured.
+  The bg knob is inert in-band (the stopgap is industrial-only), and on the industrial spot
+  cells bg×2 makes things *worse* (more demand for ceiled mid-chain goods).
+- **Abundance barely differentiates** (sweep 1): sparse/lean/standard within ±1.2/qtr of each
+  other — in a demand-bound economy, more deposits do not help.
+- **Exits work**: end-of-run debtor counts fall ~57 → ~20; the industrial band's ~45% cull rate
+  says the thresholds are band-sensitive — an exit-threshold sweep axis is owed.
+- **The field culls but does not regrow** (valued production ×0.67–0.73): the growth half of
+  "profitable and growing" now hinges on the AI's build tempo and the demand level.
+
 ### Addendum, same session — the money loop closes a turn, and the diagnosis lands
 
 Ben asked why the after-fixes lapse still slides into debt: taxes or wages, or the market? The
