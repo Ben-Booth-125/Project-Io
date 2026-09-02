@@ -334,6 +334,50 @@ resource in `placement_rules::can_place` (mirror image of the extraction deposit
 
 ---
 
+## The recipe margin anchor (Ben, 2026-09-02)
+
+**Every recipe pays at base price.** Ben's sentence: *"the simplest way to do this is to ensure
+that all recipes (at base price) make a greater profit than marginal costs."* A recipe that cannot
+clear its own marginal cost at base price is unprofitable **by authoring** — no demand channel,
+band or scorer can rescue it — so this is the anchor every other economy lever sits on. It is a
+statement about the three authored tables (`scripts/recipes.lua`, `scripts/economy.lua`,
+`scripts/world_gen.lua`'s `base_price`), checked at **authoring time** and never against live
+resolved prices, which is BL-740's (maintenance floor anchor) discipline applied to the whole roster.
+
+**Two halves, because base is the middle of a band and not the price.** Resolved prices run from
+`floor_mult` to `ceil_mult` of base (`MARKETS.md` § Price resolution), so a recipe positive at base
+can still lose under glut.
+
+- **M1 — marginal, at base.** Per batch (per unit for extraction):
+  `revenue − marginal_cost ≥ k × marginal_cost`, where `marginal_cost` = inputs at base + wage per
+  batch, and wage per batch = `base_wage / base_rate` (output and wages both scale linearly with the
+  assigned workforce, so the per-batch figure is staffing-independent at habitability 1). `k` is
+  `economy.recipe_margin_anchor.profit_over_marginal`; `k = 1.0` is the sentence verbatim — profit at
+  least equal to marginal cost, revenue at least twice it.
+- **M2 — fixed cost at the floor.** Per tick at `typical_workforce` (the staffing generation seeds a
+  building with): `(revenue − inputs) × floor_mult × batches − wages − maintenance − goods upkeep ≥ 0`.
+  Inputs and outputs both at the floor, since a glut market has everything cheap. Maintenance is the
+  authored constant at workforce target 100; goods upkeep is the band's per-type basket valued at
+  base. This is BL-740's anchor stated once for extraction and processing alike.
+
+**What is exempt, and says so.** A recipe whose every output is unpriced (propellant — consumed by
+the Launchpad, never sold) has no market margin to anchor and is listed, not failed. An **unpriced
+input** is a defect, not an exemption: the good cannot be bought at any price.
+
+**Retune order.** Green is reached from costs and rates first (the per-batch wage and maintenance
+share move every row at once), then input quantities where a recipe is authored at zero or negative
+value-add, and base prices **last** — each tier's price is the next tier's input cost, so lifting
+prices compounds up the chain, widens the ladder `RESOURCES.md` rests on, and moves the derived
+`ceil_mult` (re-derive it with `haulage_measure` after any change to the cheapest base price). Two
+bands share one price table; a retune must clear both.
+
+**What the anchor does not claim.** It is necessary, not sufficient. A roster that pays at base can
+still lose collectively when the money entering the field is less than what leaves it (`FINANCE.md`
+owns the loop); the anchor is the precondition for that measurement meaning anything. The check is
+`tools/verify/recipe_margin`; the owner is BL-744 (recipe margin anchor).
+
+---
+
 ## Amenity and habitability buildings
 
 Amenity and habitability buildings do not produce tradeable industrial goods — they produce conditions. Their output is a change in the local habitability score or population growth rate, which feeds into workforce efficiency and long-term productive capacity. The feedback model is `docs/economy/POPULATION.md`.

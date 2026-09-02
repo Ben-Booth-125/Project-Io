@@ -4749,6 +4749,53 @@
      "evidence": "COMPLETE 2026-09-02. planetary_tilt_sy is pure in zoom (thresholds at rung midpoints); the ground_bake_midrung_tilt capture (free-form zoom 8) lands deterministically on the 22.5-deg side; ACTIONS zoom entries note the tilt at the top rungs, plain canvas only."
     }
    ]
+  },
+  {
+   "brief": "recipe-margin-anchor",
+   "title": "BL-744 - every recipe pays at base price",
+   "difficulty": null,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "active",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-744 - Sprint 31",
+   "batch": "sprint-31",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "An authoring-time instrument prices every processing recipe and every extractable target in BOTH era bands from the three authored tables (recipes.lua, economy.lua, world_gen.lua base_price) through a live Lua state, prints the per-row table, and asserts the two halves of PRODUCTION.md § The recipe margin anchor: M1 (margin >= k x marginal cost at base) and M2 (fixed cost covered at the price floor at typical staffing). Unpriced-output recipes are exempt and named; an unpriced INPUT fails. Non-vacuity and a differential red-proof are rows of their own.",
+     "verification": [
+      "headless: recipe_margin R0, R5, R6 (green); R1-R4 (the finding)"
+     ],
+     "notes": "Not add_test'ed until R1-R4 clear - a permanently red gate is ignored.",
+     "evidence": "COMPLETE 2026-09-02. build_lua_harness.bat recipe_margin; run from the repo root: R0 both bands loaded (19 / 27 recipes), authored table read (44 priced), anchor read (k=1.0, W=0.5); R5 no unpriced inputs; R6 zero-revenue row fails both halves, profitable row passes both, uncoverable fixed cost fails M2 alone, halving floor_mult lowers floor_net and leaves M1 untouched. R1-R4 red as expected: ancient 18/18/1/16, industrial 23/23/1/16."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "M1 holds for every priced recipe and every priced extraction target in both bands: recipe_margin R1 and R3 green, after a retune that does not simply lift every output base price (NR-776 order: rates and costs, then input quantities, prices last).",
+     "verification": [
+      "headless: recipe_margin R1, R3 (both bands)",
+      "headless: tier_margin R2 still holds (refining out-earns mining)"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "M2 holds for every priced recipe and every priced extraction target in both bands (BL-740's anchor, whole roster): recipe_margin R2 and R4 green at the authored typical_workforce and floor_mult; ceil_mult re-derived by haulage_measure if the cheapest base price moved; recipe_margin registered with ctest.",
+     "verification": [
+      "headless: recipe_margin R2, R4 (both bands)",
+      "headless: haulage_measure (ceiling derivation still clears)",
+      "code: CMakeLists add_test(recipe_margin)"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
   }
  ]
 }

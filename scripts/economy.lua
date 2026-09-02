@@ -1360,6 +1360,34 @@ economy = {
         reservation_mult = 9.0,  -- BL-654: a goods draw declines to buy above this (derived; see above)
     },
 
+    -- ===================================================================
+    -- BL-744 (Ben, 2026-09-02) — THE RECIPE MARGIN ANCHOR.
+    -- docs/economy/PRODUCTION.md § The recipe margin anchor.
+    -- ===================================================================
+    --
+    -- "The simplest way to do this is to ensure that all recipes (at base
+    -- price) make a greater profit than marginal costs." Two halves, both read
+    -- by tools/verify/recipe_margin at AUTHORING TIME against the three tables
+    -- (recipes.lua, this file, world_gen.lua's base_price) — never against live
+    -- resolved prices, which is BL-740's discipline applied to the whole roster:
+    --
+    --   M1  margin at base  >=  profit_over_marginal x marginal cost, per batch,
+    --       marginal cost = inputs at base + base_wage / base_rate.
+    --   M2  at the price FLOOR (price_band.floor_mult), a building staffed at
+    --       typical_workforce still covers maintenance + goods upkeep + wages.
+    --
+    -- profit_over_marginal = 1.0 is Ben's sentence verbatim: profit at least
+    -- equal to marginal cost, i.e. revenue at least twice it. It is DATA so the
+    -- bar can move with a measurement rather than a re-edit of the harness;
+    -- the harness prints the roster's count at 0 / 0.5 / 1 / 2 beside it.
+    -- typical_workforce = 0.5 is what corporation_generation.cpp seeds every
+    -- generated building with (default_workforce_assigned) — the staffing the
+    -- world actually opens at, not a best case.
+    recipe_margin_anchor = {
+        profit_over_marginal = 1.0,
+        typical_workforce    = 0.5,
+    },
+
     -- BL-263 (2026-08-11): spontaneous market emergence — a market appears the
     -- tick the first building completes on a body that has none, seeded from the
     -- home body's own prices/demand rather than from nothing. See

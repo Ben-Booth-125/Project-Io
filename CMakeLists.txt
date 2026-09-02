@@ -732,6 +732,28 @@ target_link_libraries(tier_margin PRIVATE io_world_obj lua54)
 target_compile_features(tier_margin PRIVATE cxx_std_20)
 target_compile_options(tier_margin PRIVATE ${IO_WARNING_FLAGS})
 
+# recipe_margin (BL-744, 2026-09-02) — live-Lua because it is the AUTHORED
+# tables it audits: does every recipe, in both bands, clear its marginal cost
+# at base price (M1) and its fixed cost at the price floor (M2)? No world is
+# built; it is pure arithmetic over recipes.lua / economy.lua / world_gen.lua.
+# Deliberately NOT add_test'ed: R1-R4 are expected red until the tables are
+# retuned to the anchor (the finding sprint 31 opens on), and a permanently
+# red gate trains people to ignore the gate. Register it when it clears.
+add_executable(recipe_margin
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/recipe_margin.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+)
+target_include_directories(recipe_margin PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(recipe_margin PRIVATE io_world_obj lua54)
+target_compile_features(recipe_margin PRIVATE cxx_std_20)
+target_compile_options(recipe_margin PRIVATE ${IO_WARNING_FLAGS})
+
 # haulage_measure (BL-442 step 2, 2026-08-17) — live-Lua for the same reason as
 # tier_margin: it measures the per-unit haulage the supply layer ACTUALLY charges
 # between adjacent markets, which is the authored logistics cost table times the

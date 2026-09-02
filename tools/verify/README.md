@@ -949,3 +949,23 @@ it survived a release cut. The glob loop now puts the sol2 and Lua **include** p
 harness; a path costs a TU that does not use it nothing, and putting them on all of them beats a
 hand-kept list the next shared header would fall off. **Linking** Lua stays opt-in — a harness
 that constructs a `lua_state` is still hand-declared with `lua54`.
+
+## `recipe_margin` — every recipe at base price (BL-744, sprint 31)
+
+Authoring-time arithmetic over `scripts/recipes.lua`, `scripts/economy.lua` and
+`scripts/world_gen.lua`'s `base_price`, for every processing recipe and every `k_extractable`
+target in both era bands. No world is built. Two halves per row (PRODUCTION.md § The recipe
+margin anchor): **M1** margin ≥ k × marginal cost at base; **M2** fixed cost covered at the price
+floor at typical staffing. R0 non-vacuity, R5 every input priced, R6 differential red-proof;
+R1–R4 are the finding and stay red until the tables are retuned — so it is not `add_test`'ed.
+
+Needs a live Lua state (it reads the authored tables, not a mirror):
+
+```
+cmd //c tools\verify\build_lua_harness.bat recipe_margin
+./build_gen/verify/recipe_margin.exe          # from the repo root
+```
+
+or the CMake target `recipe_margin` (declared by hand, `lua54` linked). The two knobs live in
+`economy.recipe_margin_anchor` (`profit_over_marginal`, `typical_workforce`); the harness prints
+them and the roster's count at k′ = 0 / 0.5 / 1 / 2 so the bar can move on a measurement.
