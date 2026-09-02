@@ -4,16 +4,15 @@ The success-lever session (2026-09-01) landed the two missing buyers and designe
 programme. The backlog holds exactly that programme: BL-723 (campaign lapse instrument) is the
 gate — everything else queues behind it.
 
-## Ratify first — NR-774 (four definitional calls, taken to keep moving)
+## NR-774 is RULED (Ben, 2026-09-01, via the session form) — resolved and archived
 
-1. **GDP** := valued production (Σ building output × resolved local price), with net income and
-   net worth beside it. The money loop is deliberately not closed, so one definition is held.
-2. **Influence** := catchment market share + footprint tiles + trade-route spread, stance/lobby
-   verbs logged beside them (sentiment cannot carry it — eight of ten factor weights are zero).
-3. **Band** := industrial 1960 (Ben, 2026-08-31); ancient stays reachable per-run via `--epoch`.
-4. **Proxy** := the corp AI, with two brackets stated in every report: cadence pessimism (one
-   strategic batch per 4 quarters vs a human every tick) and subsidy optimism (spectated corps
-   can claim nation budget lines; a played player-corp never is a claimant).
+1. **GDP** := valued production. 2. **Influence** := market share + footprint + routes.
+3. **Band** := **INDUSTRIAL 1960 ONLY** — every success-programme sweep passes `--epoch 1960`.
+   The `world_params` default epoch is 0 (ancient), so an unflagged run is the WRONG band; the
+   lapse manifest's band line is the check. The ancient rounds already run stand as labelled
+   history.
+4. **Proxy** := the corp AI with the two stated brackets. The sprint-31 spawn-intelligence idea
+   was ruled HOLD — nothing filed.
 
 ## Order of work
 

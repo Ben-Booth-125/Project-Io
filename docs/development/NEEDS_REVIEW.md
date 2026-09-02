@@ -24,11 +24,20 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*1 entries — 1 open, 0 resolved.*
+*1 entries — 0 open, 1 resolved.*
 
 ---
 
 ## Open
+
+*Nothing open.*
+
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
 
 ### NR-774 — Four definitional calls taken so the success sweeps are measurable - ratify or overturn
 *decision taken on your behalf · raised 2026-09-01 · from Success-lever session, 2026-09-01: the sweep battery (BL-723..BL-729) cannot log "GDP", "influence", a band, or a proxy without someone picking each. Picked to keep the session moving; the instrument encodes them.*
@@ -41,10 +50,5 @@ the work happens, and that is the durable record. What stays here is what is sti
 
 4. PROXY := the corp AI accepted as the skilled-player stand-in, with two brackets stated in every report: cadence pessimism (one strategic batch per corp per 4 quarters vs a human acting every tick) and subsidy optimism (under spectate every corp can claim nation budget lines; a played player-corp is never a claimant).
 
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
+> **RESOLVED.** Ben ruled via the session form, 2026-09-01. 1) GDP := VALUED PRODUCTION (as taken). 2) Influence := market share + footprint + routes (as taken). 3) Band := INDUSTRIAL 1960 ONLY — overriding the ancient-first recommendation and the delegated ancient default: every success-programme sweep passes --epoch 1960 from here; the ancient sweep rounds already run stand as labelled historical data. 4) Proxy := corp AI with the two stated brackets (as taken). The sprint-31 spawn-intelligence idea raised alongside was ruled HOLD — a thought, not a commitment; nothing filed.
 

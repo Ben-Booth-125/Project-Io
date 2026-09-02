@@ -50,15 +50,5 @@
   "PURGE 2026-08-23: 240 open entries -> 18. Every entry referring only to backlog ids <= BL-568 (retired by the same-day backlog purge) was retired; 16 more were answered by reading the current docs and tree. All 223 are frozen verbatim in archive/needs-review-purged-2026-08-23.json, each with a resolution saying why. The survivors are asked as a form: tools/session/register/review_queue.js, built by register/build.js, published at https://claude.ai/code/artifact/53fb4e56-2eae-439e-bcb7-121fa49bd340 . NR-576 records the calls taken in the sweep.",
   "DRAINED 2026-09-01 on Ben's instruction, from 117 open to 0. The queue had become a shadow backlog: most entries named WORK rather than a judgement, so ten backlog items (BL-713..BL-722) were minted to carry it and every entry was closed with a resolution saying where it went. THE RULE THAT KEEPS IT DRAINED, and it is now in CLAUDE.md Rule 0c: a call only Ben can make belongs here; work belongs in backlog.json; a fact worth remembering belongs in the comment or doc next to the code."
  ],
- "items": [
-  {
-   "id": "NR-774",
-   "kind": "decision-taken",
-   "status": "open",
-   "raised": "2026-09-01",
-   "title": "Four definitional calls taken so the success sweeps are measurable - ratify or overturn",
-   "source": "Success-lever session, 2026-09-01: the sweep battery (BL-723..BL-729) cannot log \"GDP\", \"influence\", a band, or a proxy without someone picking each. Picked to keep the session moving; the instrument encodes them.",
-   "what": "1. GDP := VALUED PRODUCTION - sum of building output x its market's resolved price, per tick - with net income (filed returns) and net worth logged beside it. The money loop is deliberately not closed (the market is a buyer of last resort paying with nobody's money), so no income-side aggregate is conservation-meaningful; one definition is picked and held for every comparison.\n\n2. INFLUENCE := catchment market share (standing.cpp's axis) + footprint tiles + trade-route spread, with stance/lobby verb counts logged beside them. Sentiment cannot carry it yet - eight of ten factor weights are authored at zero, so sentiment today moves only through procurement conduct.\n\n3. BAND := the industrial 1960 start (your 2026-08-31 ruling: \"we will be working on the 1960s start\"); ancient runs remain available per-run via --epoch. The two bands fail differently, so one sweep cannot serve both.\n\n4. PROXY := the corp AI accepted as the skilled-player stand-in, with two brackets stated in every report: cadence pessimism (one strategic batch per corp per 4 quarters vs a human acting every tick) and subsidy optimism (under spectate every corp can claim nation budget lines; a played player-corp is never a claimant)."
-  }
- ]
+ "items": []
 }
