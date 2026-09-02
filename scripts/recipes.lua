@@ -84,7 +84,12 @@ recipes = {
         era     = "industrial", -- BL-433
         group   = "Food Processing", -- BL-434: agriculture-adjacent, same feed-the-population kind
         inputs  = { water = 1.5, steel = 0.5 },
-        outputs = { agricultural_produce = 1.0 },
+        -- BL-744 (2026-09-02): one batch grows 5 units, not 1. At 1 unit the
+        -- bay sold 3.0 of produce for 9.0 of water and steel - the only recipe
+        -- in the roster that lost money BEFORE wages - and no price could fix
+        -- it, since produce is a raw priced by the Farm. Intensive growing is
+        -- the point of the bay; the yield is what makes it a method.
+        outputs = { agricultural_produce = 5.0 },
     },
 
     -- id 4 — Smelter, second recipe (BL-323 S1, PRODUCTION.md): metallic-asteroid
@@ -293,7 +298,10 @@ recipes = {
         display_name = "Charcoal Burner", -- BL-429 slice 2
         era          = "ancient",
         group        = "Fuel Production", -- BL-434: fuel/energy, not metal itself; the Bloomery/Smithy's supplier
-        inputs       = { timber = 3.0 },
+        -- BL-744 (2026-09-02): 3.0 -> 1.5 timber per charcoal. The Peat Kiln
+        -- is the cheapest charcoal route and sets the price; at 3.0 timber the
+        -- Burner could not cover its fixed cost at the floor (M2).
+        inputs       = { timber = 1.5 },
         outputs      = { charcoal = 1.0 },
     },
 
@@ -453,7 +461,10 @@ recipes = {
         display_name = "In-Situ Smelter",
         era          = "industrial",
         group        = "Metal Foundry", -- same group as ids 0, 4 and 19
-        inputs       = { regolith = 12.0 },
+        -- BL-744 (2026-09-02): 12 -> 8.5 regolith per unit. Regolith rose
+        -- 0.6 -> 1.0 so an off-world site pays its lights at the floor
+        -- (NR-779), and at 12 units this alternate no longer did (M2).
+        inputs       = { regolith = 8.5 },
         outputs      = { steel = 1.0 },
     },
 
@@ -544,7 +555,10 @@ recipes = {
         display_name = "Coking Kiln",
         era          = "ancient",
         group        = "Fuel Production", -- BL-434, with the Charcoal Burner and Peat Kiln
-        inputs       = { timber = 1.5, iron_blooms = 0.1 },
+        -- BL-744 (2026-09-02): timber 1.5 -> 0.8, blooms 0.1 -> 0.05. The kiln
+        -- is the deeper charcoal method; at the old quantities its inputs
+        -- exceeded the Peat Kiln's price and it failed the floor half (M2).
+        inputs       = { timber = 0.8, iron_blooms = 0.05 },
         outputs      = { charcoal = 1.0 },
     },
 
@@ -560,7 +574,10 @@ recipes = {
         display_name = "Bessemer Converter",
         era          = "industrial",
         group        = "Metal Foundry", -- BL-434, with the Smelter and its siblings
-        inputs       = { iron_ore = 1.5, coal = 0.5, machinery = 0.15 },
+        -- BL-744 (2026-09-02): machinery 0.15 -> 0.05 per unit. The converter
+        -- saves coal for capital; at 0.15 the capital share alone (8.3 at
+        -- machinery's anchored price) exceeded the whole steel price.
+        inputs       = { iron_ore = 1.5, coal = 0.5, machinery = 0.05 },
         outputs      = { steel = 1.0 },
         centre_proximity_radius = 6, -- BL-615: heavy processor class — see the steel recipe's note.
         qualified_workforce = 0.15, -- BL-613: the latest steel method wants some specialists; the plain Smelter wants none

@@ -64,6 +64,25 @@ struct world_gen_config
         return a;
     }();
 
+    /// BL-744 (2026-09-02): the ANCIENT band's base-price overrides, authored
+    /// under `world_gen.kepler_market.base_price_ancient`, indexed by
+    /// resource_type. 0 = inherit the shared table above. Base prices are
+    /// era-banded for the same reason recipes are (BL-433): the two bands reach
+    /// some goods by routes of different depth — ancient steel is timber →
+    /// charcoal → blooms → steel, industrial steel is ore + coal → steel — and
+    /// the recipe margin anchor (docs/economy/PRODUCTION.md § The recipe margin
+    /// anchor) prices a good off its own band's route, so one shared number
+    /// cannot satisfy both. Read through `base_price_for_epoch`; markets are
+    /// seeded from the merged table once, at world creation, so a save carries
+    /// its own prices and never re-reads this.
+    std::array<float, resource_count> kepler_base_price_ancient_override = {};
+
+    /// The base-price table a campaign opening in @p epoch_year seeds its
+    /// markets from: the shared table, with the ancient overrides applied when
+    /// `era_band_for_epoch(epoch_year)` is ancient. The band threshold is the
+    /// recipe registry's, so it is one number in the codebase.
+    std::array<float, resource_count> base_price_for_epoch(int64_t epoch_year) const;
+
     market_carving_params  market_carving{};
     endemic_pricing_params endemic{};
 

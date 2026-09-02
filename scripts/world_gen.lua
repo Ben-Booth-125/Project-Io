@@ -22,9 +22,9 @@ world_gen = {
             petroleum             = 3.5,
             water                 = 1.5,
             agricultural_produce  = 3.0,
-            steel                 = 8.0,
-            refined_fuel          = 10.0,
-            food_rations          = 6.0,
+            steel                 = 13.6,
+            refined_fuel          = 15.6,
+            food_rations          = 13.6,
 
             -- BL-340: closing the minable-but-unsellable asymmetry. These
             -- raws had authored deposits (BL-040) but no base price, so a
@@ -41,21 +41,21 @@ world_gen = {
             -- RESOURCES.md) — spacecraft_components sits 56x iron ore,
             -- the value gradient the space-equipment premise rests on.
             -- First-cut authored constants; retune by playtest.
-            silicon                = 5.0,
-            refined_copper         = 7.5,
-            ree_alloy              = 16.0,
-            machinery              = 22.0,
-            alloys                 = 34.0,
-            electronics            = 29.0,
-            spacecraft_components  = 140.0,
+            silicon                = 9.6,
+            refined_copper         = 13.6,
+            ree_alloy              = 25.6,
+            machinery              = 56,
+            alloys                 = 80,
+            electronics            = 41.6,
+            spacecraft_components  = 280,
 
             -- BL-368: the habitability tranche. Priced modestly above their
             -- primary input (water 1.5 / agricultural_produce 3.0 / food_rations
             -- 6.0 / steel 8.0) — welfare goods, not high-margin industrial
             -- products (RESOURCES.md § Habitability goods). First-cut, retune
             -- by playtest.
-            clean_water            = 3.0,
-            consumer_goods         = 12.0,
+            clean_water            = 7.7,
+            consumer_goods         = 56,
             medical_supplies       = 14.0,
 
             -- BL-457: the military terminal good. DERIVED from the processing
@@ -65,7 +65,7 @@ world_gen = {
             -- 1.443). Ordnance draws steel 8.0 + machinery 22.0 = 30.0, so
             -- 43.0 is a ratio of 1.433, inside that band. Re-derive if either
             -- input's price or the recipe quantities change (recipes.lua id 27).
-            ordnance               = 43.0,
+            ordnance               = 140.8,
 
             -- BL-429: the ANCIENT tier. BL-340 closed the minable-but-unsellable
             -- asymmetry for the space chain and left it wide open here — every one
@@ -101,13 +101,13 @@ world_gen = {
             -- thin, positive, and the worst of the three industrial routes, which
             -- is the shape the recipe was authored for. Pricing a good is not
             -- separable from the recipes that consume it.
-            regolith               = 0.6,
+            regolith               = 1,
 
             -- The ancient intermediates. Charcoal is dearer than the timber it
             -- comes from (a burn takes days and loses mass); blooms carry the
             -- charcoal plus the ore.
-            charcoal               = 4.0,
-            iron_blooms            = 9.0,
+            charcoal               = 6.5,
+            iron_blooms            = 24.6,
 
             -- BL-286's placeholder luxury, given a producer at last (the potter's
             -- and weaver's output). Priced as a modest trade good, not a treasure.
@@ -117,10 +117,10 @@ world_gen = {
             -- Every price DERIVED at the roster's observed ~1.433x markup over
             -- its input basket (id 27 ordnance's own ratio, recipes.lua), not
             -- picked. Re-derive if an input quantity in recipes.lua changes.
-            ceramics               = 3.4,  -- clay 2.0 * 1.2 = 2.4; 2.4 * 1.433
-            dressed_stone          = 2.9,  -- stone 2.0 * 1.0 = 2.0; 2.0 * 1.433
-            planks                 = 4.3,  -- timber 2.0 * 1.5 = 3.0; 3.0 * 1.433
-            tools                  = 25.5, -- iron_blooms 1.5*9.0 + planks 1.0*4.3 = 17.8; 17.8 * 1.433
+            ceramics               = 6.5,  -- clay 2.0 * 1.2 = 2.4; 2.4 * 1.433
+            dressed_stone          = 6.1,  -- stone 2.0 * 1.0 = 2.0; 2.0 * 1.433
+            planks                 = 7.6,  -- timber 2.0 * 1.5 = 3.0; 3.0 * 1.433
+            tools                  = 90.6, -- iron_blooms 1.5*9.0 + planks 1.0*4.3 = 17.8; 17.8 * 1.433
 
             -- BL-586 slice 2 (2026-08-24) — Tannery/Weaver/Shipwright. `hides`
             -- and `fibre` are raws, priced like the ambient/endemic bulk
@@ -131,9 +131,9 @@ world_gen = {
             -- `rigging` all DERIVED at the same ~1.433x markup as above.
             hides                  = 2.5,  -- endemic raw, dearer than the ambient bulk floor
             fibre                  = 1.3,  -- ambient crop, same tier as clay/peat
-            leather                = 7.2,  -- hides 2.0*2.5 = 5.0; 5.0 * 1.433
-            cloth                  = 3.7,  -- fibre 2.0*1.3 = 2.6; 2.6 * 1.433
-            rigging                = 14.5, -- planks 1.5*4.3 + cloth 1.0*3.7 = 10.15; 10.15 * 1.433
+            leather                = 11.6,  -- hides 2.0*2.5 = 5.0; 5.0 * 1.433
+            cloth                  = 6.8,  -- fibre 2.0*1.3 = 2.6; 2.6 * 1.433
+            rigging                = 38, -- planks 1.5*4.3 + cloth 1.0*3.7 = 10.15; 10.15 * 1.433
 
             -- BL-708 (2026-08-31) — POWER, the grid good. It HAS a price, and
             -- that is the design's whole first claim: power clears on the market
@@ -150,7 +150,7 @@ world_gen = {
             -- price. Cheaper PER UNIT than either fuel because one unit of fuel
             -- makes about two of power: power is the divided, distributed form
             -- of the same energy, and the price says so.
-            power                  = 1.45,
+            power                  = 2.6,
 
             -- BL-709 (2026-08-31) — CONSTRUCTION CAPACITY, the sector's product.
             -- docs/economy/PRODUCTION.md § Construction as a rate.
@@ -177,7 +177,7 @@ world_gen = {
             --   reinforced concrete : in 8.00 -> out 3.80 * 3.0 = 11.40  (1.425x)
             --
             -- Re-derive all five if this moves, or if any input price does.
-            construction_capacity  = 3.0,
+            construction_capacity  = 4.8,
         },
 
         -- Nation tradeable-resource concentration gates (BL-096): a nation
@@ -187,6 +187,21 @@ world_gen = {
         -- asset in a nation's territory multiplies its concentration by
         -- (1 + this), so a commercially-contested territory fractures
         -- further on top of raw geology. 0 disables the effect.
+
+        -- BL-744 (2026-09-02): the ANCIENT band's overrides. Base prices are
+        -- era-banded for the reason recipes are (BL-433): the ancient band
+        -- reaches steel by timber -> charcoal -> blooms -> steel, three doubling
+        -- stages under the anchor, where the industrial band reaches it in one
+        -- (ore + coal). One shared number cannot clear both - priced off the
+        -- bloom chain, steel dragged the industrial ladder to 600x iron ore.
+        -- Absent = inherit the table above. Read by world_gen_config::
+        -- base_price_for_epoch at market seeding; recipe_margin checks each
+        -- band against its own table. NR-778 records the call.
+        base_price_ancient = {
+            steel                 = 113,  -- 2 blooms (24.4) + charcoal, doubled
+            ordnance              = 113,  -- the Smithy's route, same inputs
+            construction_capacity = 6.6,    -- timber-frame method at planks 7.6
+        },
         carving = {
             rich_factor        = 1.30,
             barren_factor      = 0.70,

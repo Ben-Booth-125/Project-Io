@@ -82,9 +82,20 @@ economy = {
             -- inflated income — so every AI corp went bankrupt. Both producer
             -- base_rates scale x10 TOGETHER, restoring a workable scale without
             -- reopening the ratio: 200:80 is the same 2.5:1 as 20:8.
-            base_rate   = 20.0,
-            maintenance = 5.0,
-            base_wage   = 8.0,
+            --
+            -- BL-744 (Ben, 2026-09-02, the recipe margin anchor): both producer
+            -- base_rates DOUBLE together (40:16 is still 2.5:1), and extraction's
+            -- fixed costs come down so the floor half of the anchor holds - at
+            -- the price floor a site at typical staffing must still pay its
+            -- wages and maintenance (PRODUCTION.md § The recipe margin anchor,
+            -- M2). Ben's chosen lever was the fixed costs, not the raw prices:
+            -- maintenance 5 -> 2, wage 8 -> 4. The rate doubling is what makes
+            -- those numbers clear stone at 1.0 (5 x price at the floor against
+            -- 4.5 of costs) without touching a raw price; it also halves the
+            -- wage per unit. tools/verify/recipe_margin R3/R4 are the check.
+            base_rate   = 40.0,
+            maintenance = 2.0,
+            base_wage   = 4.0,
             build_cost  = 100.0,
             build_duration_ticks = 2.0,
             resource_costs = { steel = 20.0 },
@@ -160,8 +171,16 @@ economy = {
             },
         },
         processing_facility = {
-            base_rate   = 8.0,
-            maintenance = 10.0,
+            -- BL-744 (Ben, 2026-09-02): base_rate 8 -> 16 (ruled), halving the
+            -- wage per batch to 0.75 so it stops eating the whole authored
+            -- margin; maintenance 10 -> 2 on the same lever Ben chose for
+            -- extraction (NR-779) - at 10 the floor half of the anchor was
+            -- pricing every cheap good off the factory's lights rather than its
+            -- inputs (clean_water 3 -> 11.9 with it, 7.6 without). The
+            -- 2026-09-01 ledger named maintenance as 80% of every credit
+            -- leaving the field. recipe_margin R1/R2 are the check.
+            base_rate   = 16.0,
+            maintenance = 2.0,
             base_wage   = 12.0,
             build_cost  = 200.0,
             build_duration_ticks = 3.0,
@@ -1383,9 +1402,21 @@ economy = {
     -- typical_workforce = 0.5 is what corporation_generation.cpp seeds every
     -- generated building with (default_workforce_assigned) — the staffing the
     -- world actually opens at, not a best case.
+    --
+    -- THE ANCHOR ROUTE AND THE ALTERNATES (NR-780, 2026-09-02). A good with
+    -- several in-band routes is priced off its CHEAPEST route (lowest marginal
+    -- cost per unit of primary output): that route must clear
+    -- profit_over_marginal. Every other route must clear
+    -- alternate_profit_over_marginal - 0.0 means "profitable at base", no
+    -- more - and the floor half (M2) regardless, because the lights do not
+    -- care which recipe is running. Demanding k = 1.0 of every route at ONE
+    -- price would force every route to the same input cost, which erases the
+    -- point of alternate methods (PRODUCTION.md § Alternate production
+    -- methods): the easier route is meant to be easier.
     recipe_margin_anchor = {
-        profit_over_marginal = 1.0,
-        typical_workforce    = 0.5,
+        profit_over_marginal           = 1.0,
+        alternate_profit_over_marginal = 0.0,
+        typical_workforce              = 0.5,
     },
 
     -- BL-263 (2026-08-11): spontaneous market emergence — a market appears the

@@ -866,7 +866,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
     {
         const market_component kepler_market_template{
             .body       = kepler,
-            .base_price = gen_cfg.kepler_base_price,
+            // BL-744: the band's own table — ancient overrides applied when the
+            // campaign opens before 1700 (era_band_for_epoch, one threshold).
+            .base_price = gen_cfg.base_price_for_epoch(params.epoch_year),
         };
 
         // Per-nation tradeable-resource concentration = mean raw-deposit richness

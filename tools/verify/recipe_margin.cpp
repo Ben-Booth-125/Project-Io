@@ -51,6 +51,19 @@
 //       goods_upkeep is the band's per-type basket (economy.building_upkeep.goods)
 //       valued at base — power's 0.25/0.40 per tick is the first non-zero entry.
 //
+// THE ANCHOR ROUTE AND THE ALTERNATES (NR-780). A good with several in-band
+// routes is priced off its CHEAPEST route — lowest marginal cost per unit of
+// primary output — and that route must clear k. Every other route must clear
+// k_alt = economy.recipe_margin_anchor.alternate_profit_over_marginal (0.0:
+// profitable at base, no more) and M2 regardless. Demanding k of every route at
+// one price would force every route to the same input cost, which erases the
+// point of alternate methods. The anchor route is marked `*` in the table.
+//
+// ERA-BANDED PRICES (NR-778). Each band is checked against ITS OWN table —
+// world_gen_config::base_price_for_epoch — because the ancient band reaches
+// some goods by deeper routes (timber -> charcoal -> blooms -> steel) than the
+// industrial one, and the anchor prices a good off its own band's route.
+//
 // WHAT IS EXEMPT, AND SAYS SO. A recipe whose every output carries base_price 0
 // (propellant: "consumed by the Launchpad, never sold", RESOURCES.md) has no
 // market margin to anchor and is listed as UNPRICED rather than failed. A recipe
@@ -114,8 +127,9 @@ const char* band_name(era_band b)
 /// The anchor's authored knobs, read from economy.recipe_margin_anchor.
 struct anchor_params
 {
-    double profit_over_marginal = 0.0; ///< k in M1.
-    double typical_workforce    = 0.0; ///< W in M2.
+    double profit_over_marginal           = 0.0; ///< k in M1, the anchor route.
+    double alternate_profit_over_marginal = 0.0; ///< k_alt in M1, every other route.
+    double typical_workforce              = 0.0; ///< W in M2.
     bool   ok                   = false;
 };
 
@@ -198,7 +212,7 @@ int main()
     recipe_registry reg;
     reg.load_from_lua(lua);
     const world_gen_config gen_cfg = parsed_gen_config(lua);
-    const std::array<float, resource_count>& price = gen_cfg.kepler_base_price;
+    const std::array<float, resource_count>& price_shared = gen_cfg.kepler_base_price;
 
     // The standing vacuity guard: a registry that loaded nothing would report
     // every recipe as costless and pass.
@@ -217,13 +231,16 @@ int main()
             sol::optional<sol::table> a = (*econ)["recipe_margin_anchor"];
             if (a)
             {
-                sol::optional<double> k = (*a)["profit_over_marginal"];
-                sol::optional<double> w = (*a)["typical_workforce"];
-                if (k && w && std::isfinite(*k) && std::isfinite(*w) && *k >= 0.0 && *w > 0.0)
+                sol::optional<double> k  = (*a)["profit_over_marginal"];
+                sol::optional<double> ka = (*a)["alternate_profit_over_marginal"];
+                sol::optional<double> w  = (*a)["typical_workforce"];
+                if (k && ka && w && std::isfinite(*k) && std::isfinite(*ka) && std::isfinite(*w)
+                    && *k >= 0.0 && *ka >= 0.0 && *w > 0.0)
                 {
-                    anchor.profit_over_marginal = *k;
-                    anchor.typical_workforce    = *w;
-                    anchor.ok                   = true;
+                    anchor.profit_over_marginal           = *k;
+                    anchor.alternate_profit_over_marginal = *ka;
+                    anchor.typical_workforce              = *w;
+                    anchor.ok                             = true;
                 }
             }
         }
@@ -231,24 +248,26 @@ int main()
     if (!anchor.ok)
     {
         std::printf("FATAL: economy.recipe_margin_anchor is missing or malformed "
-                    "(needs finite profit_over_marginal >= 0 and typical_workforce > 0).\n");
+                    "(needs finite profit_over_marginal >= 0, alternate_profit_over_marginal >= 0, typical_workforce > 0).\n");
         return 2;
     }
 
     const double k          = anchor.profit_over_marginal;
+    const double k_alt      = anchor.alternate_profit_over_marginal;
     const double W          = anchor.typical_workforce;
     const double floor_mult = reg.price_band().floor_mult;
 
     int priced = 0;
     for (std::size_t r = 0; r < resource_count; ++r)
-        if (price[r] > 0.0f)
+        if (price_shared[r] > 0.0f)
             ++priced;
 
     std::printf("=== recipe_margin (BL-744) — every recipe at BASE price ===\n");
     std::printf("priced resources: %d of %zu%s\n", priced, resource_count,
                 gen_cfg.is_fallback ? "   <-- FALLBACK TABLE, not the authored one" : "");
-    std::printf("anchor: profit_over_marginal k = %.2f (M1: margin >= k x marginal cost), "
-                "typical_workforce W = %.2f, floor_mult = %.2f\n\n", k, W, floor_mult);
+    std::printf("anchor: k = %.2f on the anchor route (*), k_alt = %.2f on alternates "
+                "(M1: margin >= k x marginal cost), typical_workforce W = %.2f, floor_mult = %.2f\n\n",
+                k, k_alt, W, floor_mult);
 
     const era_band bands[] = { era_band::ancient, era_band::industrial };
 
@@ -268,6 +287,13 @@ int main()
         const era_band band = bands[bi];
         band_tally&    t    = tally[bi];
         reg.set_era(band);
+        // The band's own table (NR-778): ancient overrides applied for the 0 CE product.
+        const std::array<float, resource_count> price =
+            gen_cfg.base_price_for_epoch(band == era_band::ancient ? 0 : 1960);
+        int band_overrides = 0;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (price[r] != price_shared[r])
+                ++band_overrides;
 
         // --- processing ---------------------------------------------------
         const building_economics& pe = reg.economics(building_type::processing_facility);
@@ -278,16 +304,53 @@ int main()
             ? static_cast<double>(pe.base_wage) / static_cast<double>(pe.base_rate) : 0.0;
 
         std::printf("--- band %s — processing (base_rate %.2f batches/tick at W=1, "
-                    "maintenance %.2f, wage %.2f, goods upkeep %.2f/tick) ---\n",
+                    "maintenance %.2f, wage %.2f, goods upkeep %.2f/tick; %d band price overrides) ---\n",
                     band_name(band), pe.base_rate, pe.maintenance, pe.base_wage,
-                    basket_value(pbasket, price));
+                    basket_value(pbasket, price), band_overrides);
         print_header();
 
         const int n = reg.recipe_count(building_type::processing_facility);
+
+        // The anchor route per primary output: lowest marginal cost per unit of
+        // that output among the band's routes; ties go to the earlier recipe.
+        std::array<int, resource_count>    anchor_of;
+        std::array<double, resource_count> anchor_mc;
+        anchor_of.fill(-1);
+        anchor_mc.fill(0.0);
+        for (int i = 0; i < n; ++i)
+        {
+            const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+            const resource_type po = primary_output_resource(rc);
+            const std::size_t   pi = static_cast<std::size_t>(po);
+            if (rc.outputs[pi] <= 0.0f || price[pi] <= 0.0f)
+                continue;
+            double inp = 0.0;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (rc.inputs[r] > 0.0f)
+                    inp += static_cast<double>(rc.inputs[r]) * price[r];
+            const double mc_per_unit = (inp + p_wage_pb) / static_cast<double>(rc.outputs[pi]);
+            if (anchor_of[pi] < 0 || mc_per_unit < anchor_mc[pi])
+            {
+                anchor_of[pi] = i;
+                anchor_mc[pi] = mc_per_unit;
+            }
+        }
+
         for (int i = 0; i < n; ++i)
         {
             const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
             ++t.recipes;
+            // A recipe whose primary output is an EXTRACTABLE raw (hydroponics ->
+            // agricultural_produce) is never the anchor: the extraction site is
+            // that good's cheapest route and prices it, so the recipe is an
+            // alternate to the Farm and clears k_alt.
+            bool primary_is_raw = false;
+            for (const resource_type x : placement_rules::k_extractable)
+                if (x == primary_output_resource(rc))
+                    primary_is_raw = true;
+            const bool   is_anchor = !primary_is_raw
+                && anchor_of[static_cast<std::size_t>(primary_output_resource(rc))] == i;
+            const double kk        = is_anchor ? k : k_alt;
 
             double rev = 0.0, inp = 0.0;
             bool   any_out_priced = false, any_out = false;
@@ -326,13 +389,14 @@ int main()
             const double batches = static_cast<double>(pe.base_rate) * W;
             const double wages   = W * static_cast<double>(pe.base_wage);
             const row_eval e = evaluate(rev, inp, p_wage_pb, batches, wages, p_fixed,
-                                        floor_mult, k);
-            print_row(rc.name, rc.group, e);
+                                        floor_mult, kk);
+            print_row((is_anchor ? "*" : " ") + rc.name, rc.group, e);
             if (!e.m1) { ++t.m1_fail; t.m1_red.push_back(rc.name); }
             if (!e.m2) { ++t.m2_fail; t.m2_red.push_back(rc.name); }
-            for (int j = 0; j < 4; ++j)
-                if (e.mc > 0.0 ? e.margin >= k_ladder[j] * e.mc : e.revenue > 0.0)
-                    ++t.at_k[j];
+            if (is_anchor)
+                for (int j = 0; j < 4; ++j)
+                    if (e.mc > 0.0 ? e.margin >= k_ladder[j] * e.mc : e.revenue > 0.0)
+                        ++t.at_k[j];
         }
 
         // --- extraction ---------------------------------------------------
@@ -384,8 +448,8 @@ int main()
                     "| extraction targets %2d  M1 red %2d  M2 red %2d\n",
                     band_name(bands[bi]), t.recipes, t.priced_recipes, t.unpriced_out,
                     t.m1_fail, t.m2_fail, t.ext, t.ext_m1_fail, t.ext_m2_fail);
-        std::printf("  recipes clearing margin >= k' x marginal cost:  k'=0: %d  k'=0.5: %d  "
-                    "k'=1: %d  k'=2: %d  (of %d priced)\n",
+        std::printf("  anchor routes clearing margin >= k' x marginal cost:  k'=0: %d  k'=0.5: %d  "
+                    "k'=1: %d  k'=2: %d  (of %d priced recipes)\n",
                     t.at_k[0], t.at_k[1], t.at_k[2], t.at_k[3], t.priced_recipes);
         std::printf("  M1 red: %s\n  M2 red: %s\n  extraction M1 red: %s\n  extraction M2 red: %s\n",
                     join(t.m1_red).c_str(), join(t.m2_red).c_str(),
@@ -402,7 +466,7 @@ int main()
     check(!gen_cfg.is_fallback && priced > 10,
           "R0: the AUTHORED base_price table was read (" + std::to_string(priced) + " priced)");
     check(anchor.ok, "R0: economy.recipe_margin_anchor read (k=" + std::to_string(k) +
-          ", W=" + std::to_string(W) + ")");
+          ", k_alt=" + std::to_string(k_alt) + ", W=" + std::to_string(W) + ")");
 
     // --- R1..R4 ---------------------------------------------------------------
     for (int bi = 0; bi < 2; ++bi)
@@ -410,8 +474,9 @@ int main()
         const band_tally& t = tally[bi];
         const std::string b = band_name(bands[bi]);
         check(t.priced_recipes > 0 && t.m1_fail == 0,
-              "R1 [" + b + "]: every priced processing recipe clears M1 (margin >= " +
-              std::to_string(k) + " x marginal cost at base) — red: " + std::to_string(t.m1_fail));
+              "R1 [" + b + "]: every priced processing recipe clears M1 (anchor route k=" +
+              std::to_string(k) + ", alternates k=" + std::to_string(k_alt) + ") — red: " +
+              std::to_string(t.m1_fail));
         check(t.priced_recipes > 0 && t.m2_fail == 0,
               "R2 [" + b + "]: every priced processing recipe covers its fixed cost at the floor "
               "(M2, W=" + std::to_string(W) + ") — red: " + std::to_string(t.m2_fail));
