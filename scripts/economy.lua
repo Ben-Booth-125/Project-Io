@@ -497,14 +497,26 @@ economy = {
         -- turning maintenance construction on later is a data change - and so
         -- that the number it would need is measured, not guessed, when someone
         -- has provisioned the yards to answer it.
+        -- BL-738 (Ben, 2026-09-01: "Building should have upkeep too") — STAGE 1:
+        -- REPAIR MATERIALS. The safe widening is the one the table's own
+        -- criteria pick: a good must be MET on day 1 (the cliff is the cold
+        -- start, not the rate) and gluts want the demand. machinery/electronics
+        -- stay 0 — they are CEILED in 7-8 of 9 markets (supply-short; a draw
+        -- now starves the buildings against a shortage). timber and stone are
+        -- FLOORED (stone in 6 of 9; the campaign_lapse baseline puts extraction
+        -- corps at -6.75 cr/qtr operating for want of buyers), production dwarfs
+        -- these draws by two orders, and a structure consuming repair timber and
+        -- stone is the channel's own fiction. Rates are first-cut (~30-45/tick
+        -- band-wide against production in the thousands); demand_census and a
+        -- campaign_lapse cell measure them. Ancient rows untouched this stage.
         goods = {
             extraction_site = {
                 ancient    = { tools = 0.0, planks = 0.0, construction_capacity = 0.0 }, -- derived 0.07 / 0.15; capacity BL-709
-                industrial = { machinery = 0.0, power = 0.25, construction_capacity = 0.0 },  -- derived 0.11; power BL-708; capacity BL-709
+                industrial = { machinery = 0.0, power = 0.25, timber = 0.05, stone = 0.05, construction_capacity = 0.0 },  -- derived 0.11; power BL-708; repair BL-738; capacity BL-709
             },
             processing_facility = {
                 ancient    = { tools = 0.0, planks = 0.0, construction_capacity = 0.0 }, -- derived 0.14 / 0.30; capacity BL-709
-                industrial = { machinery = 0.0, electronics = 0.0, power = 0.40, construction_capacity = 0.0 }, -- derived 0.15 / 0.06; power BL-708; capacity BL-709
+                industrial = { machinery = 0.0, electronics = 0.0, power = 0.40, timber = 0.08, stone = 0.08, construction_capacity = 0.0 }, -- derived 0.15 / 0.06; power BL-708; repair BL-738; capacity BL-709
             },
         },
     },
