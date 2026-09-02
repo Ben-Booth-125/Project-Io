@@ -103,14 +103,14 @@ Found predominantly on moons, asteroids, and outer bodies; reachable in Era 1 an
 | Regolith | All terrain (airless bodies) | Loose surface dust and broken rock, present on every tile of every airless body at deposits of 20–50. Its purpose is **in-situ construction** — the route for building where you already are, not a trade good. |
 
 **Regolith pricing and its one consumer are one decision (Ben, 2026-08-16, NR-257).** Regolith
-carries a `base_price` of **0.6** — the cheapest good in the table, below the stone/sand bulk floor
-of 1.0, which is what "high mass, low unit value" means for something on every airless tile. It is
-priced because it is consumed: `steel_from_regolith` "In-Situ Smelter" (`scripts/recipes.lua`)
-reduces regolith to steel at a deliberately poor **12:1**, and a recipe input pulls the good into
-market demand at the tiles that run one — an unpriced input stalls the building forever. The ratio
-and the price are coupled: at 8:1 a bulk-low price would have made the deliberately poor route the
-most profitable steel in the game (clearing 3.2 against the Smelter's 1.0). At 12:1 it clears 0.8,
-the worst of the three industrial steel routes, which is the authored intent.
+carries a `base_price` of **1.0** — the stone/sand bulk floor, which is what "high mass, low unit
+value" means for something on every airless tile. It is priced because it is consumed:
+`steel_from_regolith` "In-Situ Smelter" (`scripts/recipes.lua`) reduces regolith to steel at a
+deliberately poor **8.5:1**, and a recipe input pulls the good into market demand at the tiles that
+run one — an unpriced input stalls the building forever. The ratio and the price are coupled:
+cheapen the one or cut the other and the deliberately poor route becomes the most profitable steel
+in the game. At 8.5:1 it clears 5.1 per unit against the Smelter's 6.6 and the iron-nickel route's
+7.6 — the worst of the three industrial steel routes, which is the authored intent.
 
 ### Ambient raw materials
 
@@ -135,8 +135,8 @@ Three Tier 2 goods belong to the ancient (pre-coal) chain rather than the indust
 
 | Resource | Tier | Base price | Produced by | Notes |
 |----------|------|-----------|-------------|-------|
-| Charcoal | 2 (refined) | 4.0 | Charcoal Burner / Peat Kiln / Coking Kiln | Refined fuel-wood; pre-coal smelting/heating input. Dearer than the timber it comes from — a burn takes days and loses mass. The Coking Kiln (BL-587) is a genuine alternate method, not a third route — see PRODUCTION.md § Alternate production methods. |
-| Iron blooms | 2 (refined) | 9.0 | Bloomery | Bloomery-refined iron intermediate — distinct from raw iron ore / iron-nickel ore. Carries the charcoal plus the ore. |
+| Charcoal | 2 (refined) | 6.5 | Charcoal Burner / Peat Kiln / Coking Kiln | Refined fuel-wood; pre-coal smelting/heating input. Dearer than the timber it comes from — a burn takes days and loses mass. The Coking Kiln (BL-587) is a genuine alternate method, not a third route — see PRODUCTION.md § Alternate production methods. |
+| Iron blooms | 2 (refined) | 24.6 | Bloomery | Bloomery-refined iron intermediate — distinct from raw iron ore / iron-nickel ore. Carries the charcoal plus the ore. |
 | Trade goods (misc) | 1 (endemic, placeholder) | 8.0 | Potter & Weaver, Glassworks | Generic endemic-luxury-class placeholder, priced as a modest trade good, not a treasure. A specific luxury name is a separate design step. |
 
 **Adding a resource is an append at the END of the enum, with its behaviour filed in the same
@@ -150,13 +150,13 @@ a new extractable raw with real tile-generation deposits, deliberately not attem
 
 | Resource | Tier | Base price | Produced by | Notes |
 |----------|------|-----------|-------------|-------|
-| Ceramics | 2 (refined) | 3.4 | Potter's Kiln | Clay's second consumer, alongside Potter & Weaver's `trade_goods_misc`. Terminal — sold, not reprocessed. |
-| Dressed stone | 2 (refined) | 2.9 | Stonemason | Stone's second consumer, alongside the Miller. Terminal — sold, not reprocessed. |
-| Planks | 2 (refined) | 4.3 | Sawmill | Timber's third consumer. NOT terminal — feeds the Toolmaker below. |
-| Tools | 2 (refined) | 25.5 | Toolmaker (blooms + planks) | Required depth 2 (both inputs' depth), so `depth(tools) = 3` — tied with the existing ancient ceiling, not past it. Terminal for now; BL-590 (per-building materials) gives it a real construction-material consumer. |
+| Ceramics | 2 (refined) | 6.5 | Potter's Kiln | Clay's second consumer, alongside Potter & Weaver's `trade_goods_misc`. Terminal — sold, not reprocessed. |
+| Dressed stone | 2 (refined) | 6.1 | Stonemason | Stone's second consumer, alongside the Miller. Terminal — sold, not reprocessed. |
+| Planks | 2 (refined) | 7.6 | Sawmill | Timber's third consumer. NOT terminal — feeds the Toolmaker below. |
+| Tools | 2 (refined) | 90.6 | Toolmaker (blooms + planks) | Required depth 2 (both inputs' depth), so `depth(tools) = 3` — tied with the existing ancient ceiling, not past it. Terminal for now; BL-590 (per-building materials) gives it a real construction-material consumer. |
 
-Every price above is DERIVED at the roster's observed ~1.433x markup over its input basket
-(`recipes.lua`'s id-27 ordnance comment states the method), not picked.
+Every price above is what the good's cheapest route needs under `docs/economy/PRODUCTION.md`
+§ The recipe margin anchor, not picked.
 
 ### Ancient roster, slice 2 (BL-586, 2026-08-24)
 
@@ -170,13 +170,13 @@ case: a grass/marsh crop, generated by the SAME cover-based ambient/biotic mecha
 |----------|------|-----------|-------------|-------|
 | Hides | 1 (endemic) | 2.5 | Endemic (temperate/subtropical grassland) | Dearer than the ambient bulk floor for being endemic — rarer, regional. Consumed by the Tannery. |
 | Fibre | 1 (ambient) | 1.3 | Ambient (grassland, wetland), alongside Agricultural Produce | Same tier as Clay/Peat. Consumed by the Weaver. |
-| Leather | 2 (refined) | 7.2 | Tannery (hides) | Terminal — sold, not reprocessed. |
-| Cloth | 2 (refined) | 3.7 | Weaver (fibre) | NOT terminal — feeds the Shipwright below, alongside Planks. |
-| Rigging | 2 (refined) | 14.5 | Shipwright (planks + cloth) | Required depth 1 (both inputs' depth), so `depth(rigging) = 2` — past the flat depth-1 ceiling every other slice-2 chain sits at. The roster's chosen name for the "terminal trade good" the design table calls for: ropework/cordage/tackle, in the same generic-material-noun register as Ceramics/Dressed Stone/Tools. Terminal — sold, not reprocessed. |
+| Leather | 2 (refined) | 11.6 | Tannery (hides) | Terminal — sold, not reprocessed. |
+| Cloth | 2 (refined) | 6.8 | Weaver (fibre) | NOT terminal — feeds the Shipwright below, alongside Planks. |
+| Rigging | 2 (refined) | 38.0 | Shipwright (planks + cloth) | Required depth 1 (both inputs' depth), so `depth(rigging) = 2` — past the flat depth-1 ceiling every other slice-2 chain sits at. The roster's chosen name for the "terminal trade good" the design table calls for: ropework/cordage/tackle, in the same generic-material-noun register as Ceramics/Dressed Stone/Tools. Terminal — sold, not reprocessed. |
 
-Every price above is DERIVED the same way as slice 1's: raws priced as bulk commons (hides a
-little dearer for being endemic), refined goods at the roster's ~1.433x markup over their input
-basket.
+Every price above is set the same way as slice 1's: raws priced as bulk commons (hides a little
+dearer for being endemic), refined goods at what their cheapest route needs under
+`docs/economy/PRODUCTION.md` § The recipe margin anchor.
 
 ---
 
@@ -219,8 +219,8 @@ base_price = 1.5 x (1 + 7.0 x normalised_distance_to_nearest_source)
 ```
 
 Measured on a generated world: tobacco 2.45 → 8.19 (×3.34), spices 3.72 → 7.56 (×2.03), coffee
-1.84 → 8.59 (**×4.67**). At the far end these beat steel (8.0) — a distant market pays more for
-coffee than for structural alloy, which is the point.
+1.84 → 8.59 (**×4.67**). At the far end these beat planks (7.6) and clean water (7.7) — a distant
+market pays more for coffee than for worked timber, which is the point.
 
 **The scarcest good commands the widest margin, and that is emergent rather than authored:** coffee
 had 30 source tiles against tobacco's 179, so it is further from more markets. Nobody tuned that.
@@ -247,12 +247,12 @@ Refined goods are the primary goods in inter-body trade during the early game.
 
 | Resource | Primary inputs | Processing building | Base price |
 |----------|---------------|---------------------|-----------|
-| Steel | Iron ore or iron-nickel ore (+ coal as reagent) | Smelter | 8.0 |
-| Refined fuel | Petroleum | Refinery | 10.0 |
-| Silicon | Silica | Refinery | 5.0 |
-| Refined copper | Copper ore | Smelter | 7.5 |
-| REE alloy | Rare earth ore | Refinery | 16.0 |
-| Food rations | Agricultural produce | Food Processor | 6.0 |
+| Steel | Iron ore or iron-nickel ore (+ coal as reagent) | Smelter | 13.6 (ancient 113.0) |
+| Refined fuel | Petroleum | Refinery | 15.6 |
+| Silicon | Silica | Refinery | 9.6 |
+| Refined copper | Copper ore | Smelter | 13.6 |
+| REE alloy | Rare earth ore | Refinery | 25.6 |
+| Food rations | Agricultural produce | Food Processor | 13.6 |
 
 **Liquid oxygen has no enum value of its own.** It is folded into the Chemical Plant's two
 propellant recipes — separated cryogenically from the local air on the Era 1 route, electrolysed
@@ -267,14 +267,14 @@ Products are the highest-value goods and the primary driver of market price dive
 
 | Resource | Primary inputs | Processing building | Base price |
 |----------|---------------|---------------------|-----------|
-| Machinery | Steel + refined copper | Fabricator | 22.0 |
-| Electronics | Silicon + refined copper + REE alloy | Electronics Lab | 29.0 |
+| Machinery | Steel + refined copper | Fabricator | 56.0 |
+| Electronics | Silicon + refined copper + REE alloy | Electronics Lab | 41.6 |
 | Propellant | Refined fuel + liquid oxygen | Chemical Plant | — (unpriced; consumed by the Launchpad, never sold) |
-| Alloys | Steel + REE alloy | Fabricator | 34.0 |
-| Spacecraft components | Alloys + electronics | Assembly Plant | 140.0 |
-| **Ordnance** | **Steel + machinery** | **Fabricator**; also the **Smithy** on the ancient roster | 43.0 |
+| Alloys | Steel + REE alloy | Fabricator | 80.0 |
+| Spacecraft components | Alloys + electronics | Assembly Plant | 280.0 |
+| **Ordnance** | **Steel + machinery** | **Fabricator**; also the **Smithy** on the ancient roster | 140.8 (ancient 113.0) |
 
-The margin ladder widens up the tiers — spacecraft components sits 56× iron ore — which is the
+The margin ladder widens up the tiers — spacecraft components sits 112× iron ore — which is the
 value gradient the space-equipment premise rests on. Propellant and spacecraft components are the
 key outputs enabling space access. Propellant is the operating cost of any launch; spacecraft
 components are consumed by infrastructure construction in orbit and on remote bodies.
@@ -295,11 +295,10 @@ rations; `medical_supplies` is a habitability good a population centre competes 
 it would put an army and a city on one price. A distinct field ration or medical draw is an
 **append with its behaviour filed in the same change** — never an interior insertion.
 
-**Its price is derived, not picked.** The processing roster marks an output up over its input
-basket by a strikingly tight ratio — machinery 1.419, alloys 1.417, electronics 1.415, spacecraft
-components 1.443. Ordnance draws steel 8.0 + machinery 22.0 = 30.0, so its `base_price` of **43.0**
-is a ratio of **1.433**, inside that band rather than beside it. Re-derive if either input's price
-or the recipe quantities move.
+**Its price is derived, not picked.** Ordnance is priced at what its cheapest route needs under
+`docs/economy/PRODUCTION.md` § The recipe margin anchor — the Fabricator's route on the industrial
+band, the Smithy's on the ancient band, hence one value per band (§ Base prices are era-banded).
+Re-derive if either input's price or the recipe quantities move.
 
 **It has a producer in every era band.** The Fabricator recipe carries `era = "industrial"`, and
 unit upkeep draws ordnance every tick regardless of band, so an ancient campaign (the default,
@@ -323,8 +322,8 @@ budget cost with no resource identity of its own.
 
 | Resource | Primary inputs | Building | Base price | Effect if undersupplied |
 |----------|---------------|----------|-----------|------------------------|
-| Clean water | Water | Water Treatment Plant | 3.0 | Reduces habitability; suppresses population growth |
-| Consumer goods | Food rations + steel | Consumer Goods Factory | 12.0 | Reduces workforce efficiency |
+| Clean water | Water | Water Treatment Plant | 7.7 | Reduces habitability; suppresses population growth |
+| Consumer goods | Food rations + steel | Consumer Goods Factory | 56.0 | Reduces workforce efficiency |
 | Medical supplies | Water + agricultural produce | Pharmaceutical Lab | 14.0 | Reduces habitability; raises mortality (long-term) |
 
 The three carry recipes (`scripts/recipes.lua` ids 14–16, all on the generic
@@ -370,24 +369,37 @@ tradeable, and `resolve_price` / the clearing pass ignore everything else
 `src/world/world_gen_config.hpp`). The tradeable set is:
 
 - **The prototype seven**: iron ore 2.5, petroleum 3.5, water 1.5, agricultural produce 3.0,
-  steel 8.0, refined fuel 10.0, food rations 6.0.
+  steel 13.6 (ancient 113.0), refined fuel 15.6, food rations 13.6.
 - **The remaining industrial raws**: coal 2.0, silica 2.0, copper ore 3.0, rare earth ore 6.0,
   iron-nickel ore 3.0, platinum-group metals 40.0. A raw with an authored deposit and no price is
   minable-but-unsellable, and a processing building drawing on it stalls forever; every deposit
   raw is therefore priced (BL-340, processing roster).
 - **The ambient raws and regolith**: stone 1.0, timber 1.5, sand 1.0, clay 1.2, peat 1.2,
-  regolith 0.6 — the same rule applied to the ancient chain (BL-429, ancient chain).
-- **The ancient intermediates**: charcoal 4.0, iron blooms 9.0, trade goods (misc) 8.0.
+  regolith 1.0 — the same rule applied to the ancient chain (BL-429, ancient chain).
+- **The ancient intermediates**: charcoal 6.5, iron blooms 24.6, trade goods (misc) 8.0.
 - **Endemic goods** (tobacco, spices, coffee, furs) with **distance-derived** per-market base
   prices: `1.5 × (1 + 7.0 × normalised distance to the nearest source)` (§ Mercantile). Only
   the 2–3 goods the world's biosphere actually evolved get priced.
-- **The processing-chain goods**: silicon 5.0, refined copper 7.5, REE alloy 16.0, machinery
-  22.0, alloys 34.0, electronics 29.0, spacecraft components 140.0.
-- **The habitability tranche**: clean water 3.0, consumer goods 12.0, medical supplies 14.0.
-- **Ordnance** 43.0.
+- **The processing-chain goods**: silicon 9.6, refined copper 13.6, REE alloy 25.6, machinery
+  56.0, alloys 80.0, electronics 41.6, spacecraft components 280.0.
+- **The habitability tranche**: clean water 7.7, consumer goods 56.0, medical supplies 14.0.
+- **Ordnance** 140.8 (ancient 113.0).
+- **Power** 2.6 and **construction capacity** 4.8 (ancient 6.6) — the grid good and the
+  construction sector's product (`docs/economy/PRODUCTION.md`).
 
 **Propellant is the one value with no base price.** It is made in a Chemical Plant and burned by
 a Launchpad, never mined and never sold, so it has no market presence.
+
+### Base prices are era-banded
+
+Base prices are authored per band, as recipes are (BL-433, era-tagged recipes): the shared
+`kepler_market.base_price` table serves the industrial product, and `base_price_ancient` overrides
+it, good by good, for the 0 CE product — absent means inherit. The bands reach some goods by routes
+of different depth (the ancient band reaches steel through timber → charcoal → blooms → steel; the
+industrial band in one step from ore and coal), and the anchor prices a good off its own band's
+route, so one number cannot clear both. Steel, ordnance and construction capacity carry ancient
+overrides. A market is seeded from its campaign's table once, at creation; the clearing engine
+never consults the band again.
 
 Water is in this tradeable set from tick 0: it carries an authored base price on the home-body
 markets and sits in the substrate demand basket (`scripts/economy.lua`, weight 0.40).

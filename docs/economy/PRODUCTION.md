@@ -273,9 +273,9 @@ belong here rather than there:
   off a starting corp's tick-one menu is the availability of its inputs, not a refusal.
 - It is `machinery`'s **second** consumer, after the heavy spacecraft route below. A single
   consumer is one revert away from orphaning a good.
-- Its `base_price` (43.0) is **derived** from this tier's own markup ratio, not authored — the
-  derivation and the numbers are in RESOURCES.md, and it should be re-derived rather than
-  re-guessed if either input's price moves.
+- Its `base_price` (140.8 industrial, 113.0 ancient) is **derived**, not authored — what its
+  cheapest route needs under § The recipe margin anchor, one value per band — and it should be
+  re-derived rather than re-guessed if either input's price moves.
 
 There is **no industrial ancient-arc shortcut here** — the deliberate omission stands. The
 ancient arc reaches ordnance through the **Smithy** (§ The ancient chain), because unit upkeep
@@ -301,14 +301,14 @@ Two further routes exist to give `regolith` and `platinum_group_metals` consumer
 are deliberately **poor value per unit** — they are about reaching a *place*, not about
 efficiency.
 
-At authored prices the three industrial steel routes clear, per unit of steel: iron-nickel **2.0**,
-Smelter **1.0**, in-situ **0.8**. That ordering is the design, and it is why the regolith ratio and
-regolith's `base_price` (0.6) cannot be tuned independently of each other — see the note on the
-recipe in `scripts/recipes.lua`.
+At authored prices the three industrial steel routes clear over inputs, per unit of steel:
+iron-nickel **7.6**, Smelter **6.6**, in-situ **5.1**. That ordering is the design, and it is why
+the regolith ratio and regolith's `base_price` (1.0) cannot be tuned independently of each other —
+see the note on the recipe in `scripts/recipes.lua`.
 
 | Inputs | Output | Era | Why it exists |
 |--------|--------|-----|---------------|
-| Regolith ×12 | Steel | 1 | In-situ reduction on an airless body. Twelve regolith per steel against the Smelter's two iron ore: regolith is on every tile of every airless body, so the point is that you can build **from where you are**. |
+| Regolith ×8.5 | Steel | 1 | In-situ reduction on an airless body. Eight and a half regolith per steel against the Smelter's two iron ore: regolith is on every tile of every airless body, so the point is that you can build **from where you are**. |
 | Platinum group metals ×0.5 | Electronics | 1 | Contact-grade/catalytic route. At base price 40 this is a premium alternative to the silicon + copper + REE chain, not a cheap bypass of it. |
 
 #### Food Processor
@@ -321,7 +321,7 @@ recipe in `scripts/recipes.lua`.
 
 | Inputs | Output | Era |
 |--------|--------|-----|
-| Water ×1.5 + steel ×0.5 | Agricultural produce | 0 |
+| Water ×1.5 + steel ×0.5 | Agricultural produce ×5 | 0 |
 
 A processing_facility recipe (`hydroponics_bay`, BL-166) that produces `agricultural_produce`
 from refined inputs instead of a terrain deposit — no "energy" resource exists in the roster, so
@@ -360,6 +360,15 @@ can still lose under glut.
   authored constant at workforce target 100; goods upkeep is the band's per-type basket valued at
   base. This is BL-740's anchor stated once for extraction and processing alike.
 
+**The anchor route.** A good with several in-band routes is priced off its **cheapest** — the
+lowest marginal cost per unit of primary output — and that route must clear `profit_over_marginal`.
+Every other route clears `alternate_profit_over_marginal` instead (`0` = profitable at base), and
+the floor half regardless. A recipe whose primary output is an extractable raw is always an
+alternate: extraction is that good's cheapest route.
+
+**Prices are era-banded.** Each band checks against its own price table — `RESOURCES.md` § Base
+prices are era-banded.
+
 **What is exempt, and says so.** A recipe whose every output is unpriced (propellant — consumed by
 the Launchpad, never sold) has no market margin to anchor and is listed, not failed. An **unpriced
 input** is a defect, not an exemption: the good cannot be bought at any price.
@@ -368,8 +377,8 @@ input** is a defect, not an exemption: the good cannot be bought at any price.
 share move every row at once), then input quantities where a recipe is authored at zero or negative
 value-add, and base prices **last** — each tier's price is the next tier's input cost, so lifting
 prices compounds up the chain, widens the ladder `RESOURCES.md` rests on, and moves the derived
-`ceil_mult` (re-derive it with `haulage_measure` after any change to the cheapest base price). Two
-bands share one price table; a retune must clear both.
+`ceil_mult` (re-derive it with `haulage_measure` after any change to the cheapest base price). Each
+band carries its own price table; a retune must clear both.
 
 **What the anchor does not claim.** It is necessary, not sufficient. A roster that pays at base can
 still lose collectively when the money entering the field is less than what leaves it (`FINANCE.md`
@@ -771,9 +780,9 @@ every one of them is priced and consumed, per the admission rule.
 
 | Recipe | Inputs → output | Depth |
 |---|---|---|
-| Charcoal Burner | 3 timber → 1 charcoal | 1 |
+| Charcoal Burner | 1.5 timber → 1 charcoal | 1 |
 | Peat Kiln | 2 peat → 1 charcoal | 1 |
-| Coking Kiln | 1.5 timber + 0.1 iron blooms → 1 charcoal | 3\* |
+| Coking Kiln | 0.8 timber + 0.05 iron blooms → 1 charcoal | 3\* |
 | Bloomery | 2 iron ore + 1 charcoal → 1 iron blooms | 2 |
 | Smithy | 2 iron blooms + 1 charcoal → 1 steel | 3 |
 | Smithy | 2 iron blooms + 1 charcoal → 1 **ordnance** | 3 |

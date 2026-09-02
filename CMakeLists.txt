@@ -591,6 +591,12 @@ target_compile_options(ground_bake_check PRIVATE ${IO_WARNING_FLAGS})
 add_executable(spawn_solvency
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/spawn_solvency.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    # world_gen_config.cpp: the harness PARSES scripts/world_gen.lua into a
+    # world_gen_config (its R0 row, the 2026-08-26 lesson) and so links
+    # load_from_lua - without this TU the target does not link, which under
+    # `nmake all` stops every target after it and reads as a suite of
+    # "Not Run" (found 2026-09-02, BL-744).
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
 )
 target_include_directories(spawn_solvency PRIVATE
@@ -736,9 +742,8 @@ target_compile_options(tier_margin PRIVATE ${IO_WARNING_FLAGS})
 # tables it audits: does every recipe, in both bands, clear its marginal cost
 # at base price (M1) and its fixed cost at the price floor (M2)? No world is
 # built; it is pure arithmetic over recipes.lua / economy.lua / world_gen.lua.
-# Deliberately NOT add_test'ed: R1-R4 are expected red until the tables are
-# retuned to the anchor (the finding sprint 31 opens on), and a permanently
-# red gate trains people to ignore the gate. Register it when it clears.
+# The glob below registers it with ctest like every other harness; it loads
+# the scripts by relative path, so it is in IO_TEST_SCRIPT_ROOTED_HARNESSES.
 add_executable(recipe_margin
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/recipe_margin.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
@@ -967,6 +972,9 @@ target_compile_options(price_band_harness PRIVATE ${IO_WARNING_FLAGS})
 add_executable(upkeep_harness
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/upkeep_harness.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    # world_gen_config.cpp: U1 prices the value anchor against the AUTHORED
+    # base_price table (BL-744) instead of a mirrored pair of constants.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
 )
 target_include_directories(upkeep_harness PRIVATE
@@ -1255,6 +1263,10 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     # the comment at the foreach below already warns about, found twice more.
     price_band_harness
     tier_margin
+    # ADDED 2026-09-02 (BL-744). Loads all three economy scripts by relative path
+    # and FATALs on an empty recipe set, so from build/ it would fail loudly
+    # rather than vacuously - but the failure would read as a broken harness.
+    recipe_margin
     # ADDED 2026-08-18 (NEW-10). Loads recipes/economy/world_gen/works by relative
     # path and FATALs on an empty recipe set rather than measuring a world the
     # game never builds — but only if it is looking at the real scripts/.

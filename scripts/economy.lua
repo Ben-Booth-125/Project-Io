@@ -644,8 +644,8 @@ economy = {
         -- (power 380) costs 230. First-cut authored constants; retune by
         -- playtest. Standing-force UPKEEP is deliberately absent — flagged to
         -- BL-377's contract loop, not decided here.
-        hire_base_cost      = 40.0,
-        hire_cost_per_power = 0.5,
+        hire_base_cost      = 120.0, -- BL-744 / NR-781: x2.776 with the head wage (was 40.0)
+        hire_cost_per_power = 1.4,   -- same factor (was 0.5)
 
         -- BL-454: standing-force UPKEEP — what it costs to KEEP a unit, as
         -- against hire_* above, which is what it costs to raise one. Before
@@ -785,8 +785,19 @@ economy = {
             -- BL-635: every figure in this table is its pre-2026-08-26 value
             -- x 0.025. The old values are kept in the trailing comments so the
             -- rescale is one readable multiplication rather than a rewrite.
-            credits_per_head           = 0.15,   -- flat wage per head per tick (was 6.0)
-            credits_per_head_per_power = 0.0001, -- wage scaled by the roster row's power_mod (was 0.004; bounded <= 0.00012, see derivation above)
+            -- BL-744 (NR-781, 2026-09-02): the recipe margin anchor repriced
+            -- ordnance 43 -> 140.8 and food_rations 6 -> 13.6, so the goods
+            -- half of a head's upkeep is 0.8328 cr/tick and the identity above
+            -- solves the wage at 0.4164 (the draw is kept - it is the military
+            -- terminal's demand - and the money side follows the price level).
+            -- The per-power term is re-bounded the same way the derivation
+            -- above bounds it: wage(420) <= 0.8328 x 0.667 = 0.5555 gives
+            -- credits_per_head_per_power <= 0.000331; 0.00028 is chosen with
+            -- headroom. hire_base_cost / hire_cost_per_power move by the same
+            -- x2.776 so "a year's keep < a fresh hire" (4 x 50 x 0.4164 = 83.3
+            -- < 120) still holds in consistent units.
+            credits_per_head           = 0.4164,  -- flat wage per head per tick (was 0.15; 6.0 before BL-635)
+            credits_per_head_per_power = 0.00028, -- wage scaled by the roster row's power_mod (was 0.0001; bounded <= 0.000331, seederivation above)
 
             -- The goods half of the vector, per head per tick. ORDNANCE is the
             -- good (BL-457 added it as the roster's first terminal MILITARY

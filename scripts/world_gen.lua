@@ -89,16 +89,18 @@ world_gen = {
             -- demand at the tiles that run one, so the exclusion stopped being
             -- tenable.
             --
-            -- 0.6 is the CHEAPEST good in this table, below the stone/sand bulk
-            -- floor of 1.0, which is what "high mass, low unit value" should mean
-            -- for something present on every tile of every airless body at
-            -- deposits of 20-50.
+            -- It sits AT the stone/sand bulk floor of 1.0, not below it. It was
+            -- authored at 0.6 - "high mass, low unit value" for something present
+            -- on every tile of every airless body at deposits of 20-50 - and
+            -- BL-744 (NR-779) lifted it: at 0.6 no fixed cost that still leaves a
+            -- mine a building could cover the floor half of the recipe margin
+            -- anchor (an off-world site earned 3.0/tick at the price floor against
+            -- 4.8 of costs). It is the one raw price the anchor moved.
             --
-            -- The recipe ratio moved WITH it, and had to. At 8 regolith per steel
-            -- the in-situ route would clear 8.0 - 4.8 = 3.2 against the Smelter's
-            -- 1.0 and the iron-nickel route's 2.0 — making the deliberately poor
-            -- route the most profitable steel in the game. At 12 it clears 0.8:
-            -- thin, positive, and the worst of the three industrial routes, which
+            -- The recipe ratio moved WITH it, and had to. At 12 regolith per steel
+            -- the in-situ route cleared inputs by 1.6 against the Smelter's 6.6
+            -- and the iron-nickel route's 7.6 and failed the floor half; at 8.5 it
+            -- clears 5.1 - still the worst of the three industrial routes, which
             -- is the shape the recipe was authored for. Pricing a good is not
             -- separable from the recipes that consume it.
             regolith               = 1,

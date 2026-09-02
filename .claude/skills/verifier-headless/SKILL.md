@@ -297,8 +297,9 @@ in `tools/verify/README.md`.
   the price floor at `typical_workforce`. Prints the per-row table and the roster's count at
   k′ = 0 / 0.5 / 1 / 2; unpriced-output recipes exempt and named; an unpriced input fails (R5); R0
   non-vacuity (priced-resource count printed — 10 means the fallback table); R6 differential
-  red-proof of the evaluator. **R1–R4 are the finding, not a gate** — red until the tables are
-  retuned, so it is deliberately NOT add_test'ed. NEEDS_LUA: build with
+  red-proof of the evaluator. **R1–R4 are the anchor** — red on 41 of 44 priced recipes the day
+  it was written, green after the sprint-31 retune (per-band prices, the anchor route rule, the
+  cost cuts); registered with ctest, script-rooted. NEEDS_LUA: build with
   `cmd //c tools\verify\build_lua_harness.bat recipe_margin`, run `./build_gen/verify/recipe_margin.exe`
   from the repo root.
 - **`campaign_lapse`** — BL-723, the spectated-campaign measurement instrument (2026-09-01): one

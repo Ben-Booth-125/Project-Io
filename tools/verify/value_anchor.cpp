@@ -852,12 +852,29 @@ int main()
         // words - "PRICE IS DERIVED, NOT PICKED" - and names the peers it was
         // derived against. This row holds the content to that sentence.
         //
-        // Only the Advanced-Fabrication tier is in the band. The roster as a
-        // whole is NOT tight (markups run 0.36 to 4.00 across all 40 recipes,
-        // measured 2026-08-23), so a roster-wide band would be a false claim in
-        // the other direction. The peers are the five the comment names.
-        static const char* const peers[] = {
-            "machinery", "alloys", "electronics", "spacecraft_components", "refined_fuel",
+        // BL-744 (2026-09-02) RE-AIMED THIS ROW. The rule that binds a price is
+        // no longer "one common markup across the tier" - it is the recipe
+        // margin anchor (PRODUCTION.md § The recipe margin anchor): on a good's
+        // cheapest in-band route, margin >= k x marginal cost at base with
+        // k = economy.recipe_margin_anchor.profit_over_marginal = 1.0, i.e. the
+        // output is worth at least (1 + k) x (inputs + wage per batch). Dropping
+        // the wage term makes that a LOWER bound on the markup over the input
+        // basket alone - markup >= 1 + k - which is what this row now holds the
+        // peers to. Their markups no longer sit within 5% of each other and are
+        // not meant to: a cheap good's wage term is a larger share of its price,
+        // so refined_fuel (2.23) sits above machinery (2.06). The peers are named
+        // by their ANCHOR route where a good has several (electronics is priced
+        // off the contact-grade route, spacecraft_components off the heavy one);
+        // tools/verify/recipe_margin is the full statement, this is the echo the
+        // military anchor needs so that ordnance's price is a derived one.
+        constexpr float k_recipe_anchor = 1.0f; // mirrors economy.recipe_margin_anchor.profit_over_marginal
+        struct peer { const char* recipe; const char* good; };
+        static const peer peers[] = {
+            { "machinery", "machinery" },
+            { "alloys", "alloys" },
+            { "electronics_contact_grade", "electronics" },
+            { "spacecraft_components_heavy", "spacecraft_components" },
+            { "refined_fuel", "refined_fuel" },
         };
         auto markup = [&](const char* recipe, resource_type out) {
             const auto  in  = recipe_basket(a.recipes, recipe, "inputs");
@@ -874,14 +891,14 @@ int main()
         for (std::size_t i = 0; i < sizeof peers / sizeof peers[0]; ++i)
         {
             bool                ok = false;
-            const resource_type r  = resource_names::resource_from_name(peers[i], ok);
+            const resource_type r  = resource_names::resource_from_name(peers[i].good, ok);
             if (!ok)
             {
-                std::printf("FATAL: peer good '%s' is not a resource.\n", peers[i]);
+                std::printf("FATAL: peer good '%s' is not a resource.\n", peers[i].good);
                 std::exit(2);
             }
-            const float m = markup(peers[i], r);
-            std::printf("       %-24s %.3f\n", peers[i], m);
+            const float m = markup(peers[i].recipe, r);
+            std::printf("       %-24s %.3f   (route %s)\n", peers[i].good, m, peers[i].recipe);
             peer_min = (i == 0 || m < peer_min) ? m : peer_min;
             peer_max = (i == 0 || m > peer_max) ? m : peer_max;
         }
@@ -889,12 +906,13 @@ int main()
         std::printf("       %-24s %.3f   <- the good the anchor draws\n",
                     "ordnance", ordnance_markup);
 
-        check(peer_min > 0.0f && (peer_max / peer_min) <= 1.05f,
-              "R6b the Advanced-Fabrication peers price within 5% of one common markup - "
-              "the band recipes.lua id 27 says ordnance was derived against exists");
-        check(ordnance_markup >= peer_min && ordnance_markup <= peer_max,
-              "R6c ...and ordnance sits INSIDE it, so its base_price is derived and not "
-              "picked - repriced ordnance, steel or machinery alone and this goes red");
+        const float anchor_floor = 1.0f + k_recipe_anchor;
+        check(peer_min >= anchor_floor,
+              "R6b every Advanced-Fabrication peer clears the recipe margin anchor on its anchor "
+              "route - markup over its input basket >= 1 + k (2.0), the floor the wage term only raises");
+        check(ordnance_markup >= anchor_floor,
+              "R6c ...and ordnance clears it too, so its base_price is derived from the anchor and "
+              "not picked - reprice steel or machinery alone and this goes red");
 
         // The vacuity guard: a non-uniform edit must actually break it, or the
         // row is measuring nothing. Repricing steel alone moves the basket and
@@ -904,9 +922,9 @@ int main()
         const auto  in_ord   = recipe_basket(a.recipes, "ordnance", "inputs");
         const float broken   = a.base_price[static_cast<std::size_t>(resource_type::ordnance)] /
                                basket_value(in_ord, steel_dear);
-        check(broken < peer_min,
-              "R6d ...and tripling STEEL alone - one price, in one file - drops ordnance's "
-              "markup out of the band, which a uniform reprice never would");
+        check(broken < anchor_floor,
+              "R6d ...and tripling STEEL alone - one price, in one file - drops ordnance below "
+              "the anchor, which a uniform reprice never would");
     }
     std::printf("\n");
 

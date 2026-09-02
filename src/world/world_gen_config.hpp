@@ -1,6 +1,7 @@
 #pragma once
 
 #include "components.hpp"
+#include "era_band.hpp" // BL-744: base_price_for_epoch selects the band's table
 
 #include <array>
 #include <cstdint>
@@ -80,8 +81,19 @@ struct world_gen_config
     /// The base-price table a campaign opening in @p epoch_year seeds its
     /// markets from: the shared table, with the ancient overrides applied when
     /// `era_band_for_epoch(epoch_year)` is ancient. The band threshold is the
-    /// recipe registry's, so it is one number in the codebase.
-    std::array<float, resource_count> base_price_for_epoch(int64_t epoch_year) const;
+    /// recipe registry's, so it is one number in the codebase. Inline, and in
+    /// this header, because hard_coded_world.cpp (io_world_obj, Lua-free) calls
+    /// it and world_gen_config.cpp is a Lua-linked TU the headless harnesses
+    /// never link.
+    std::array<float, resource_count> base_price_for_epoch(int64_t epoch_year) const
+    {
+        std::array<float, resource_count> out = kepler_base_price;
+        if (era_band_for_epoch(epoch_year) == era_band::ancient)
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (kepler_base_price_ancient_override[r] > 0.0f)
+                    out[r] = kepler_base_price_ancient_override[r];
+        return out;
+    }
 
     market_carving_params  market_carving{};
     endemic_pricing_params endemic{};

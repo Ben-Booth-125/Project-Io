@@ -957,7 +957,9 @@ Authoring-time arithmetic over `scripts/recipes.lua`, `scripts/economy.lua` and
 target in both era bands. No world is built. Two halves per row (PRODUCTION.md § The recipe
 margin anchor): **M1** margin ≥ k × marginal cost at base; **M2** fixed cost covered at the price
 floor at typical staffing. R0 non-vacuity, R5 every input priced, R6 differential red-proof;
-R1–R4 are the finding and stay red until the tables are retuned — so it is not `add_test`'ed.
+R1–R4 are the anchor itself: they went red on 41 of 44 priced recipes the day the harness was
+written, and the sprint-31 retune (per-band prices, the anchor route rule, the cost cuts) turned
+them green. Registered with ctest, script-rooted.
 
 Needs a live Lua state (it reads the authored tables, not a mirror):
 
@@ -967,5 +969,6 @@ cmd //c tools\verify\build_lua_harness.bat recipe_margin
 ```
 
 or the CMake target `recipe_margin` (declared by hand, `lua54` linked). The two knobs live in
-`economy.recipe_margin_anchor` (`profit_over_marginal`, `typical_workforce`); the harness prints
+`economy.recipe_margin_anchor` (`profit_over_marginal` on the anchor route,
+`alternate_profit_over_marginal` on every other route, `typical_workforce`); the harness prints
 them and the roster's count at k′ = 0 / 0.5 / 1 / 2 so the bar can move on a measurement.

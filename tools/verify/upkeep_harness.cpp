@@ -39,6 +39,7 @@
 #include "world/logistics.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/unit_roster.hpp"
+#include "world/world_gen_config.hpp"
 #include "world/world.hpp"
 
 #include <cmath>
@@ -252,6 +253,14 @@ int main()
         lua_state lua;
         lua.load("scripts/recipes.lua");
         lua.load("scripts/economy.lua");
+        // BL-744 (2026-09-02): the anchor is priced against the AUTHORED table,
+        // read from world_gen.lua rather than mirrored here - the mirror
+        // (ordnance 43.0, food_rations 6.0) went stale the day the recipe
+        // margin anchor re-priced both, and this row failed for the mirror's
+        // reason rather than the content's.
+        lua.load("scripts/world_gen.lua");
+        world_gen_config gen_cfg;
+        gen_cfg.load_from_lua(lua);
         recipe_registry reg;
         reg.load_from_lua(lua);
 
@@ -264,11 +273,13 @@ int main()
         check(up.goods_per_head[static_cast<std::size_t>(resource_type::food_rations)] > 0.0f,
               "U1 food_rations draw is non-zero");
 
-        // BL-543's value anchor, priced against the authored base_price
-        // constants (world_gen.lua: ordnance 43.0, food_rations 6.0) —
-        // Sigma(goods_per_head[r] x base_price[r]) ~= 2 x credits_per_head.
-        const float ordnance_base_price     = 43.0f;
-        const float food_rations_base_price = 6.0f;
+        // BL-543's value anchor, priced against the authored base_price table
+        // (world_gen.lua, parsed above; the industrial table, which is the
+        // shared one) — Sigma(goods_per_head[r] x base_price[r]) ~= 2 x
+        // credits_per_head.
+        const float ordnance_base_price     = gen_cfg.kepler_base_price[ordnance_idx()];
+        const float food_rations_base_price =
+            gen_cfg.kepler_base_price[static_cast<std::size_t>(resource_type::food_rations)];
         const float goods_value =
             up.goods_per_head[ordnance_idx()] * ordnance_base_price +
             up.goods_per_head[static_cast<std::size_t>(resource_type::food_rations)] * food_rations_base_price;

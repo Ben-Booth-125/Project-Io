@@ -869,30 +869,30 @@ debits (`supply_system.cpp`). Over 5 seeds, 39 markets on 5 multi-market bodies:
 
 | Market → nearest market neighbour | credits per unit |
 |---|---|
-| p10 | 0.12 |
-| median | 0.70 |
-| p90 | 1.67 |
-| max | 4.83 |
+| p10 | 0.08 |
+| median | 0.76 |
+| p90 | 5.65 |
+| max | 7.84 |
 
-The denominator is the **cheapest good carrying a base price: 0.60**. The binding case is
-therefore the worst haul against the cheapest good:
+The denominator is the **cheapest good carrying a base price: 1.00** (regolith, sitting at the
+stone/sand bulk floor — `RESOURCES.md` § What trades). The binding case is therefore the worst
+haul against the cheapest good:
 
 ```
-ceil > 1 + 4.83 / 0.60 = 9.06   ->   10.0
+ceil > 1 + 7.84 / 1.00 = 8.84   ->   10.0
 ```
 
 **Why a smaller ceiling is not enough.** A ceiling of 4.0 clears the *median* neighbour pair
-(which needs 2.16) and only just clears the p90 (3.79); the tail — the worst-connected market pair
-carrying the cheapest good — is permanently unservable at any scarcity. 10.0 covers **every**
-nearest-neighbour pair measured, for **every** priced good.
+(which needs 1.76) but not the p90 (6.65); the tail — the worst-connected market pair carrying
+the cheapest good — is permanently unservable at any scarcity. 10.0 covers **every**
+nearest-neighbour pair measured, for **every** priced good, with headroom below it.
 
-**A second, independent reading agrees.** The requirement's other half is that a scarce cheap
-good must be able to outprice an abundant dear one. Read *within a tier* — which is the only
-coherent reading, since RESOURCES.md promises margin widens *between* tiers — the ordinary raw
-tier spans 0.60 to 6.00 (`rare_earth_ore`), demanding `ceil > 10`. The two derivations land on
-the same number, which is the reason to trust it. Read *across* tiers it would demand 233
-(0.60 against `spacecraft_components` at 140), which would delete the tier model; that reading
-is rejected and recorded (NR-291).
+**A second, independent reading agrees on the shape.** The requirement's other half is that a
+scarce cheap good must be able to outprice an abundant dear one. Read *within a tier* — which is
+the only coherent reading, since RESOURCES.md promises margin widens *between* tiers — the
+ordinary raw tier spans 1.00 to 6.00 (`rare_earth_ore`), demanding `ceil > 6`, inside the
+haulage bound. Read *across* tiers it would demand 280 (1.00 against `spacecraft_components`
+at 280), which would delete the tier model; that reading is rejected and recorded (NR-291).
 
 **The floor is 0.25×.** The requirement derives a ceiling and says nothing about a floor; lowering
 it would widen the arbitrage margin only by cutting what an abundant producer receives (NR-290).

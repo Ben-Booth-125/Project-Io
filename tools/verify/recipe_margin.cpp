@@ -83,10 +83,12 @@
 //       fixed cost no floor can cover, and passes a plainly profitable one — so
 //       a green R1-R4 is a statement about the tables, not about the checker.
 //
-// R1-R4 are EXPECTED TO FAIL the day this is written. The failing rows are the
-// finding sprint 31 opens on; the retune that turns them green is BL-744's
-// second half (and BL-740's). The exit code reflects R0-R6 honestly, which is
-// why this harness is NOT registered with ctest until the tables clear it.
+// R1-R4 FAILED the day this was written - 41 of 44 priced recipes - and that
+// table is the finding sprint 31 opened on. The retune that turned them green
+// (BL-744 stage 2, BL-740) re-priced the roster per band; the harness is
+// registered with ctest like every other (script-rooted, since it loads the
+// scripts by relative path) and any table edit that breaks the anchor is red
+// at the gate.
 //
 // Run: .\build_gen\verify\recipe_margin.exe   (from the repo root)
 
