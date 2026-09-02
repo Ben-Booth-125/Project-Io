@@ -80,6 +80,27 @@ The clean positive: stone off the floor, 0.42× → 1.38× base — the price si
 loop behind it is what is missing. BL-740 (maintenance anchor) waits for its measured table —
 BL-739 just moved its baseline.
 
+### Addendum, same session — the money loop closes a turn, and the diagnosis lands
+
+Ben asked why the after-fixes lapse still slides into debt: taxes or wages, or the market? The
+field ledger exonerated both suspects — levies are 0.07% of drains, wages 13% — and named the
+real pair: **maintenance is 80% of every credit leaving the field**, and the market mints only
+1,485/qtr of external income against 2,241/qtr of drains: a structural −755/qtr the field must
+lose collectively, whoever wins individually.
+
+**Built on his ruling (firm exit yes; BL-741/742 first):** BL-741 — every nation levies its own
+jurisdiction (one seeded author had left 42 treasuries empty); BL-742 — state purchases fall back
+to market inventory when pools are swept (the measured industrial case), each channel keeping its
+own shape, self-capped at the line share, settling as the documented unbacked-market debit.
+BL-738's repair rates re-landed as stage 2. BL-743 (firm exit) filed fresh — the old BL-657/658
+rows no longer exist in any store.
+
+**The three-cell table** (baseline / after-fixes / round-two): extraction operating net −6.75 /
+−31.29 / **−20.83**; subsidies 0.0 / 0.7 / **61.1/qtr**; treasuries 167 / 99 / **8,280**. The
+circulation works — and exposed the next sink: **nations hoard ~68/qtr** because most budget
+lines still have no consumer. That calibration belongs to the sweeps (BL-728/BL-729), the
+spend-side breadth, and BL-743's exits — not to another ad-hoc rate change.
+
 ### Addendum, same session — BL-723 lands and the first film ships
 
 The campaign-lapse instrument built, T0-verified (every validity row mutation-proved red), and

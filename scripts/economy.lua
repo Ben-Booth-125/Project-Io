@@ -511,16 +511,19 @@ economy = {
         -- auto-surplus already swept to market). One clean positive stands:
         -- stone lifted off the floor (0.42x -> 1.38x base, floored markets
         -- 5 -> 2 of 9) — the price signal works; the money loop behind it is
-        -- what is missing. The rates return WITH BL-741/BL-742 (BL-738 now
-        -- requires both); the principle is Ben's ruling and is not withdrawn.
+        -- what is missing. STAGE 2 (same day): BL-741 (every nation levies its
+        -- own jurisdiction) and BL-742 (state purchases fall back to market
+        -- inventory) landed, so the income loop the withdrawal waited for
+        -- exists — the rates return, same first-cut values, re-measured by the
+        -- round-two campaign_lapse cell.
         goods = {
             extraction_site = {
                 ancient    = { tools = 0.0, planks = 0.0, construction_capacity = 0.0 }, -- derived 0.07 / 0.15; capacity BL-709
-                industrial = { machinery = 0.0, power = 0.25, timber = 0.0, stone = 0.0, construction_capacity = 0.0 },  -- derived 0.11; power BL-708; repair BL-738 withdrawn pending BL-741/742; capacity BL-709
+                industrial = { machinery = 0.0, power = 0.25, timber = 0.05, stone = 0.05, construction_capacity = 0.0 },  -- derived 0.11; power BL-708; repair BL-738 stage 2; capacity BL-709
             },
             processing_facility = {
                 ancient    = { tools = 0.0, planks = 0.0, construction_capacity = 0.0 }, -- derived 0.14 / 0.30; capacity BL-709
-                industrial = { machinery = 0.0, electronics = 0.0, power = 0.40, timber = 0.0, stone = 0.0, construction_capacity = 0.0 }, -- derived 0.15 / 0.06; power BL-708; repair BL-738 withdrawn pending BL-741/742; capacity BL-709
+                industrial = { machinery = 0.0, electronics = 0.0, power = 0.40, timber = 0.08, stone = 0.08, construction_capacity = 0.0 }, -- derived 0.15 / 0.06; power BL-708; repair BL-738 stage 2; capacity BL-709
             },
         },
     },
