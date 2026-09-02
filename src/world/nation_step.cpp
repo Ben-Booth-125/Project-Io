@@ -8,6 +8,7 @@
 #include "nation_ai.hpp"
 #include "nation_budget.hpp"
 #include "nation_generation.hpp" // BL-572: garrison_strength_in
+#include "network_upkeep.hpp"    // BL-643: the logistics_maintenance line's consumer
 #include "province.hpp"          // BL-572: province_holder_for, province lookup
 #include "recipe_registry.hpp"
 #include "space_programme.hpp"   // BL-644: the space_programme line's consumer
@@ -45,6 +46,14 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // the spend.
     std::vector<space_purchase> space = derive_space_programme_claims(
         w, w.nation_budgets, reg.space_programme(), report.budget_claims);
+
+    // ---- 2c. ...and network upkeep (BL-643): the logistics_maintenance
+    // line's consumer, the same state-purchase shape one claim kind over —
+    // UNEARMARKED, so rule 3's pro-rata fill applies and a half-funded network
+    // buys half its materials (network_upkeep.hpp says why that is the right
+    // shape for a continuous sink where the launch lot's lump is not).
+    std::vector<network_purchase> network = derive_network_upkeep_claims(
+        w, w.nation_budgets, reg.network_upkeep(), report.budget_claims);
     const std::vector<budget_claim>& claims = report.budget_claims;
 
     // ---- 3. Spend: the pure pass -------------------------------------------
@@ -93,6 +102,14 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
         if (t.line == budget_priority::space_programme)
             continue;
 
+        // A logistics_maintenance transfer (BL-643) is likewise settled below
+        // (4c), goods for credit, and folded onto `subsidies` only once the
+        // materials actually left the pool. No in-process producer other than
+        // derive_network_upkeep_claims puts a claim on this line, so nothing
+        // that used to reach the generic subsidy fold is re-routed by this.
+        if (t.line == budget_priority::logistics_maintenance)
+            continue;
+
         // An unearmarked transfer (no line has one yet — BL-538's other lines
         // will) IS a subsidy: credit that stays on the balance. `net()` carries
         // it so the delta is explained rather than appearing as income from
@@ -112,6 +129,17 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
         if (sp.completed)
             report.budgets[sp.supplier].subsidies += sp.credits;
     report.space_purchases = std::move(space);
+
+    // ---- 4c. Settle network upkeep (BL-643): each funded claim's pro-rata
+    // fraction of the material bill leaves the supplier's pool and ceases to
+    // exist — the Infrastructure demand channel's terminal sink (MARKETS.md
+    // § Demand channels). The credit is a sale exactly as 4b's is, folded
+    // onto `subsidies` only when the goods actually moved.
+    settle_network_purchases(w, network, report.national_budget);
+    for (const network_purchase& np : network)
+        if (np.completed)
+            report.budgets[np.supplier].subsidies += np.paid;
+    report.network_purchases = std::move(network);
 
     // ---- 5. Garrison upkeep (BL-571) — the military_research line's first
     // consumer, and the ONE line this pass debits without going through

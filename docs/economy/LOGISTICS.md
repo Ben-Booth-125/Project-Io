@@ -195,6 +195,19 @@ be a second decay model wearing a budget's clothes, which the first half of the 
 This is the sink the *logistics maintenance* line of the national budget (BL-538, national budget)
 pays into, and it gives a nation its first failure state — BL-550 (national insolvency).
 
+**The tax buys materials — the Infrastructure demand channel** (BL-643, network upkeep draws;
+`src/world/network_upkeep.{hpp,cpp}`). Each economy tick a nation's network bills **stone and
+timber** at authored per-element rates (`economy.network_upkeep`, scripts/economy.lua): every road
+tile in its territory by level, plus every active port and inland hub standing on its ground. The
+bill is **geography, never population** — network size is derived from the world each tick, so the
+channel scales exactly as MARKETS.md § Demand channels property 1 demands. The purchase is the
+state-purchase shape (NATIONS.md § A budget): a named supplier's pool, the supplier market's own
+price, the budget pass's direct transfer, and the goods **consumed** — repairs go into the roadbed.
+Unlike the space programme's lumps the claim is **pro-rata** (rule 3): upkeep is continuous, so
+half the repair budget buys half the materials, and an underfunded quarter is a reported partial
+fill, never a banked lump. Consistent with the binary ruling above, an unfunded draw degrades
+nothing — the network's failure state remains insolvency, not decay.
+
 ### 5. Physical scale and travel time (Ben, 2026-08-12)
 
 **Scale is derived, not authored.** Planetology generates `home_mass`; a rocky planet's radius

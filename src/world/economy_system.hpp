@@ -7,6 +7,7 @@
 #include "nation_budget.hpp" // budget_claim, national_budget_tick (BL-537; Sprint N3 T4)
 #include "nation_step.hpp"   // earmark_result (Sprint N3 T6)
 #include "space_programme.hpp" // space_purchase (BL-644)
+#include "network_upkeep.hpp"  // network_purchase (BL-643)
 #include "logistics.hpp"     // lp_pool_map (BL-596/BL-597, shared active+passive LP pool)
 #include "world.hpp"
 
@@ -317,6 +318,15 @@ struct economy_report
     /// and `quantity`; an unfunded row is demand the treasury could not yet
     /// cover. In emission order (ascending nation, then the fixed good order).
     std::vector<space_purchase> space_purchases;
+
+    /// What network upkeep did this tick (BL-643): every Infrastructure-channel
+    /// purchase intent — the material bill each nation's road/hub network asked
+    /// for, what the `logistics_maintenance` share actually funded (pro rata,
+    /// unlike the space programme's lumps), and what left the supplier's pool
+    /// and ceased to exist. The census surface: `quantity` is the bill,
+    /// `drawn` the realised consumption, and the gap is demand the budget
+    /// could not pay. In emission order (ascending nation, stone then timber).
+    std::vector<network_purchase> network_purchases;
 
 };
 

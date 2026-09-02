@@ -128,12 +128,25 @@ The first five are Ben's (2026-08-22); the next four were proposed alongside the
 deliberate — it arrives in lumps, it follows a weight a rival can lobby to move, and it is therefore
 worth playing *politics* over rather than merely scaling into.
 The spend mechanics are generic over the enum, and a line no consumer claims on is simply skipped.
+(`logistics_maintenance` also buys goods, but it funds the **Infrastructure** channel, not the
+State one — its demand scales with network size, not with treasury × weight; the weight only
+decides how much of the bill gets paid.)
 Most lines take no subject — a flat weighted claim on the tick's spendable — but `line_takes_subject`
 (`nation_budget.hpp`) names the three that do: `public_exploration`, `contracted_force` and
 `space_programme`, whose claims name a target (a survey site; an offer's escrow; the body a launch
 lot stands on) rather than only an amount. The earmark's whole-or-nothing fill (rule 3a) is what
 makes `space_programme`'s spend a lump: a share that cannot cover a whole launch lot buys nothing,
 banks the difference, and fires later.
+
+`logistics_maintenance`'s consumer is `derive_network_upkeep_claims` / `settle_network_purchases`
+(`src/world/network_upkeep.{hpp,cpp}`; BL-643, network upkeep draws): each tick the nation's road
+network — road tiles by level plus active ports and hubs, tallied from the world, never stored —
+bills stone and timber at authored rates ([`LOGISTICS.md`](../economy/LOGISTICS.md) § 4 owns the
+channel). The same state-purchase shape as the space programme below, with one deliberate
+difference: the claim is **unearmarked**, so rule 3's pro-rata fill applies — upkeep is continuous,
+and half the repair budget meaningfully buys half the materials, where rule 3a's lump exists for
+purchases a fraction of which buys nothing. The goods are consumed; the player's corp is never a
+supplier.
 
 `space_programme`'s consumer is `derive_space_programme_claims` / `settle_space_purchases`
 (`src/world/space_programme.{hpp,cpp}`): the state picks the supplier pool holding the most stock
