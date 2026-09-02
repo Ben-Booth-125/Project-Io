@@ -2,6 +2,10 @@
 
 #include "world.hpp"
 
+#include <algorithm> // BL-741: the sorted nation walk
+#include <string>    // BL-741: per-nation law ids
+#include <vector>
+
 law_effects evaluate_laws(const world& w, entity_id subject_corp)
 {
     law_effects fx;
@@ -97,27 +101,46 @@ entity_id choose_levy_author(const world& w)
 void seed_prototype_laws(world& w, float rate)
 {
     // BL-480: a law with no author cannot exist. No nations, no law.
-    const entity_id author = choose_levy_author(w);
-    if (author == null_entity)
-        return;
-
-    law levy;
-    levy.id      = "LAW-EXTRACTION-LEVY";
-    levy.name    = "Extraction Levy";
-    levy.effect  = law_effect_kind::extraction_levy;
-    levy.rate    = rate;
-    levy.scope_resource  = law::all_resources;
-    levy.enacting_nation = author;
-    // Empty condition_set: unconditional once enacted (BL-155's common case,
-    // and the path that exercises BL-342's always-true degenerate branch).
     //
-    // ENACTED at generation by its author nation (BL-480) — enactment is a
-    // governing-body act, not a player checkbox. The charge is now a transfer
-    // into the author's treasury, bounded by its jurisdiction, so what ships is
-    // a nation taxing extraction in its own territory rather than a free-floating
-    // money sink a corporation could switch on.
-    levy.enacted = true;
-    w.laws.push_back(levy);
+    // BL-741 (2026-09-01): EVERY nation authors its own levy, not just one.
+    // Measured motivation: with a single seeded author, 1 of 43 nations held
+    // any treasury (sum 108.3 cr over an 80-tick warm start), so every
+    // state-side demand channel — network upkeep (BL-643), the space programme
+    // (BL-644), the garrison line — was throttled by an empty wallet, funding
+    // 138 of 3,357 derived purchase intents. The charge machinery was built
+    // for this from the start: each schedule is jurisdiction-bounded and
+    // transfers into its own author's treasury, so N laws is the same
+    // arithmetic N times, and a corp extracting in nation A pays A, never B.
+    // Sorted walk: the law list is serialised state and its order is semantic.
+    std::vector<entity_id> nation_ids;
+    nation_ids.reserve(w.nations.size());
+    for (const auto& [nid, nc] : w.nations)
+    {
+        (void)nc;
+        nation_ids.push_back(nid);
+    }
+    std::sort(nation_ids.begin(), nation_ids.end());
+
+    for (const entity_id author : nation_ids)
+    {
+        law levy;
+        levy.id      = "LAW-EXTRACTION-LEVY-" + std::to_string(author);
+        levy.name    = "Extraction Levy";
+        levy.effect  = law_effect_kind::extraction_levy;
+        levy.rate    = rate;
+        levy.scope_resource  = law::all_resources;
+        levy.enacting_nation = author;
+        // Empty condition_set: unconditional once enacted (BL-155's common case,
+        // and the path that exercises BL-342's always-true degenerate branch).
+        //
+        // ENACTED at generation by its author nation (BL-480) — enactment is a
+        // governing-body act, not a player checkbox. The charge is a transfer
+        // into the author's treasury, bounded by its jurisdiction, so what ships
+        // is every nation taxing extraction in its own territory rather than a
+        // free-floating money sink a corporation could switch on.
+        levy.enacted = true;
+        w.laws.push_back(levy);
+    }
 }
 
 // ---------------------------------------------------------------------------
