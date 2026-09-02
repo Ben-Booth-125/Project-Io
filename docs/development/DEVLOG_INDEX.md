@@ -3,7 +3,7 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 194 entries across 2 volume(s).
+One line per session, newest first — 195 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
@@ -197,6 +197,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 | 2026-06-13 | [Layer 2: Primary canvases](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 1: ECS data model](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 0: Engine scaffolding](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
+| ? | [2026-09-02 (BL-744 stage 2) — The tables clear the anchor, and the field still falls](DEVLOG.md) | BL-731 BL-740 BL-744 BL-745 | DEVLOG.md |
 | ? | [2026-09-02 (sprint 31 opens) — Every recipe priced at base, and most of them lose](DEVLOG.md) | BL-740 BL-744 | DEVLOG.md |
 | ? | [2026-09-02 (sprint 30 opens) — The ground gets its edges back, and the land tilts](DEVLOG.md) | BL-736 BL-737 | DEVLOG.md |
 | ? | [2026-09-01 (BL-735, wave 2) — The ground sharpens, steps, and stops stalling](DEVLOG.md) | BL-732 BL-734 BL-735 | DEVLOG.md |

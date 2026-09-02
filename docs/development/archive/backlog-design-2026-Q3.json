@@ -5322,6 +5322,53 @@
     "design",
     "completed"
    ]
+  },
+  "BL-740": {
+   "status": "complete",
+   "glyph": "x",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "31",
+   "written": "2026-09-01",
+   "author": "Claude (operating-loss methods, Ben's rulings)",
+   "requires": [
+    "BL-739"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-740",
+   "short_name": "MAINTENANCE_FLOOR_ANCHOR",
+   "category": "Economy",
+   "title": "A building's fixed cost is coverable at the price FLOOR - an anchor, not a hand-tune",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "scripts/economy.lua",
+    "tools/verify/recipe_margin.cpp"
+   ],
+   "design": "Ben, 2026-09-01: agreed. The value_anchor discipline applied to operating cost: per extraction target, taper-mean output valued at base_price x floor_mult must cover the building's fixed cost per tick (maintenance incl. the BL-739 idle floor share + wages at typical workforce) - so the WORST legal market still pays the lights and profit comes from beating it, under any future base-price retune. THE WORK: derive the bound per (building type, target resource), retune the authored maintenance constants where they breach it, and add the harness rows (tier_margin or a sibling) asserting the invariant with a differential red-proof. The anchor is checked at authoring time against the authored tables, never against live resolved prices.\n\nFOLDED 2026-09-02 into BL-744's instrument: recipe_margin's M2 rows (R2 processing, R4 extraction) ARE this anchor, for the whole roster, at typical_workforce 0.5 and the authored floor_mult. The measured table this waited for exists: 16 of 18 extraction targets and 41 of 44 priced recipes miss it in both bands - at the floor a mine at W=0.5 earns 2.5 x price per tick against 9 of wages + maintenance. The retune half stays here and lands in the same pass as BL-744's, so one table clears both.\n\nCOMPLETE 2026-09-02 with BL-744 stage 2: extraction maintenance 5 -> 2 and wage 8 -> 4 (with base_rate 20 -> 40, the ratio rule), processing maintenance 10 -> 2; recipe_margin R2/R4 (the floor half, both bands, every priced target) green with a differential red-proof (R6). The one raw price moved is regolith 0.6 -> 1.0 (NR-779).",
+   "resolved": "2026-09-02",
+   "_row_keys": [
+    "status",
+    "glyph",
+    "priority",
+    "difficulty",
+    "version_goal",
+    "sprint",
+    "written",
+    "author",
+    "requires",
+    "blocked_on",
+    "parked",
+    "id",
+    "short_name",
+    "category",
+    "title",
+    "authority_doc",
+    "files",
+    "design",
+    "resolved"
+   ]
   }
  }
 }

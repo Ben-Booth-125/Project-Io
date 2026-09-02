@@ -10,6 +10,56 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-02 (BL-744 stage 2) — The tables clear the anchor, and the field still falls
+
+**Mode:** Full. **Runtime:** the same session as the opening, after Ben's three rulings via
+the form (reading A, processing base_rate 16, extraction fixed costs cut); ~6 full builds,
+~25 harness builds, 5 lapse runs.
+
+### Built
+
+**The retune.** Both producer base_rates doubled (40:16, the 2.5:1 ratio economy.lua's own note
+demands); extraction maintenance 5 → 2, wage 8 → 4; processing maintenance 10 → 2 (NR-779);
+25 goods re-priced off their cheapest in-band route at k = 1 with alternates at k = 0 plus the
+floor half (NR-780); **base prices era-banded** — `base_price_ancient` in world_gen.lua, a
+`base_price_for_epoch` accessor, markets seeded from the band's table (NR-778); five recipes
+re-costed; regolith 0.6 → 1.0. `recipe_margin` ALL PASS in both bands and registered with
+ctest (script-rooted). BL-740 closed with it.
+
+**Consequences absorbed.** Ordnance 43 → 140.8 broke Ben's military value anchor (19/19 rows
+out of band), so unit wages and hire costs moved ×2.776 (NR-781's sibling, recorded on the
+table); `value_anchor` R6 re-aimed from "one common markup" to the anchor rule; `upkeep_harness`
+U1 reads the authored prices instead of a mirror; `spawn_solvency` and `upkeep_harness` CMake
+targets gained the config TU they always needed; the era-band enum moved to `era_band.hpp`
+after the first cut put the accessor in a Lua-linked TU and every Lua-free harness failed to
+link. `haulage_measure`: the ceiling bound relaxed 14.07 → 8.84 (cheapest good now 1.0), so
+MARKETS.md's derivation clears again; RESOURCES.md and PRODUCTION.md price tables rewritten.
+
+### Verified
+
+Release-path battery green: value_anchor, era_roster, price_band, throughput_field_census,
+building_upkeep, unit_march, condition_set, world_determinism, spectator_determinism,
+upkeep_harness, demand_census, haulage_measure. Deliberately red: chain_depth's named-list
+guard (unchanged). Red for design reasons, left standing for Ben (NR-781): tier_margin R2
+(mining 28.2 vs refining 24.9 per building-tick) and spawn_solvency R3 (seated 3.1× the field
+per holding). `ctest -j6` is unusable here — 60 s Debug timeouts on every world-building
+harness are contention, not verdicts — and `nmake all` stops at battle_engagement_harness,
+which has not compiled since the mercenary teardown (BL-731 gains the note).
+
+### The finding — the anchor is necessary and was never sufficient
+
+`campaign_lapse --epoch 1960`, seeds 0 and 1: valued production ~0 at every measured tick,
+buildings active 1 of 22 reporting. The unwarmed 40-tick trace says why: 237 → 263 active
+buildings and 13–23k/tick through tick 12, then expenditure at 1.5–2.5× income from tick 4
+(inputs bought at the band's ceiling — processed goods ceiled in every market), interest to
+1k/tick, exits from tick 20, survivors idled by their own agency from tick 25. Maintenance and
+wages are now small; the drain is purchases. The ancient band takes the same wave and
+**recovers** (66 active, +1.9k/tick, one debtor at tick 40). The anchor is evaluated at base;
+the sim runs at the ceiling. **BL-745 (processor input bid cap)** carries the next lever: a
+processor's input bid capped by its recipe's live output value, the M1 identity at the tick.
+
+---
+
 ## 2026-09-02 (sprint 31 opens) — Every recipe priced at base, and most of them lose
 
 **Mode:** Design → Light build (one harness, one data table) → sprint bookkeeping. **Runtime:**

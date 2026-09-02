@@ -4756,8 +4756,8 @@
    "difficulty": null,
    "importance": null,
    "evaluated_difficulty": null,
-   "status": "active",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-09-02",
    "promoted_from": "backlog.json BL-744 - Sprint 31",
    "batch": "sprint-31",
    "archived": false,
@@ -4774,18 +4774,18 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "requirement": "M1 holds for every priced recipe and every priced extraction target in both bands: recipe_margin R1 and R3 green, after a retune that does not simply lift every output base price (NR-776 order: rates and costs, then input quantities, prices last).",
      "verification": [
       "headless: recipe_margin R1, R3 (both bands)",
       "headless: tier_margin R2 still holds (refining out-earns mining)"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE 2026-09-02. recipe_margin R1/R3 green in both bands after the retune (reading A, base_rate 16, per-band prices, anchor route rule): ancient 19/19 recipes, industrial 25/25 priced recipes, 18/18 extraction targets each band. tier_margin R2 (refining out-earns mining per building-tick) now reads 24.94 vs 28.24 and is RED - the ruled constants make extraction the larger per-building earner; NR-781 carries the call."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "requirement": "M2 holds for every priced recipe and every priced extraction target in both bands (BL-740's anchor, whole roster): recipe_margin R2 and R4 green at the authored typical_workforce and floor_mult; ceil_mult re-derived by haulage_measure if the cheapest base price moved; recipe_margin registered with ctest.",
      "verification": [
       "headless: recipe_margin R2, R4 (both bands)",
@@ -4793,7 +4793,7 @@
       "code: CMakeLists add_test(recipe_margin)"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE 2026-09-02. recipe_margin R2/R4 green in both bands at W=0.5, floor 0.25 (extraction maintenance 2, wage 4, base_rate 40; processing maintenance 2). haulage_measure re-run: cheapest good now 1.00, binding bound ceil > 8.84 against the authored 10.0 (was 14.07 - the derivation clears again; MARKETS.md § Where the ceiling comes from re-derived). recipe_margin added to IO_TEST_SCRIPT_ROOTED_HARNESSES and passes under ctest (0.02 s)."
     }
    ]
   }

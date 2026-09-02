@@ -179,7 +179,7 @@
    "files": [
     "tools/verify/nation_scorer_harness.cpp"
    ],
-   "design": "The harness references derive_contract_offers / contract_offer_params / world::mercenary_offers (~15 sites), all deleted by cc88997c (the mercenary teardown). It has not compiled since, which means the nation scorer's term-by-term guard rows have been unrunnable through every scorer change after the teardown - including BL-644's calm_space addition, which landed with zero direct scorer verification (nation_wiring's scored ticks cover it only indirectly).\n\nTHE WORK: strip the mercenary-era rows (their subject no longer exists - deleting them is truth, not weakening), get the remaining term guards compiling and green, and add a calm_space row on the harness's own mutate-what-it-reads pattern: raise calm, watch the space_programme weight move by calm_space x delta; zero calm_space, watch it stop. A check that cannot run is worse than one that fails (DEVELOPMENT_PRACTICES: rebuild before believing)."
+   "design": "The harness references derive_contract_offers / contract_offer_params / world::mercenary_offers (~15 sites), all deleted by cc88997c (the mercenary teardown). It has not compiled since, which means the nation scorer's term-by-term guard rows have been unrunnable through every scorer change after the teardown - including BL-644's calm_space addition, which landed with zero direct scorer verification (nation_wiring's scored ticks cover it only indirectly).\n\nTHE WORK: strip the mercenary-era rows (their subject no longer exists - deleting them is truth, not weakening), get the remaining term guards compiling and green, and add a calm_space row on the harness's own mutate-what-it-reads pattern: raise calm, watch the space_programme weight move by calm_space x delta; zero calm_space, watch it stop. A check that cannot run is worse than one that fails (DEVELOPMENT_PRACTICES: rebuild before believing).\n\nSIBLING ROT FOUND 2026-09-02: tools/verify/battle_engagement_harness.cpp(726) calls active_mercenary_contract_for, torn out with the mercenary contract in cc88997c, so it no longer compiles - and because it sorts early, `nmake all` stops there and every later harness reads as ctest 'Not Run'. Fix or retire it with the nation scorer harness."
   },
   {
    "status": "open",
@@ -257,31 +257,6 @@
   {
    "status": "designed",
    "glyph": "~",
-   "priority": "B",
-   "difficulty": 3,
-   "version_goal": null,
-   "sprint": "31",
-   "written": "2026-09-01",
-   "author": "Claude (operating-loss methods, Ben's rulings)",
-   "requires": [
-    "BL-739"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-740",
-   "short_name": "MAINTENANCE_FLOOR_ANCHOR",
-   "category": "Economy",
-   "title": "A building's fixed cost is coverable at the price FLOOR - an anchor, not a hand-tune",
-   "authority_doc": "docs/economy/PRODUCTION.md",
-   "files": [
-    "scripts/economy.lua",
-    "tools/verify/recipe_margin.cpp"
-   ],
-   "design": "Ben, 2026-09-01: agreed. The value_anchor discipline applied to operating cost: per extraction target, taper-mean output valued at base_price x floor_mult must cover the building's fixed cost per tick (maintenance incl. the BL-739 idle floor share + wages at typical workforce) - so the WORST legal market still pays the lights and profit comes from beating it, under any future base-price retune. THE WORK: derive the bound per (building type, target resource), retune the authored maintenance constants where they breach it, and add the harness rows (tier_margin or a sibling) asserting the invariant with a differential red-proof. The anchor is checked at authoring time against the authored tables, never against live resolved prices.\n\nFOLDED 2026-09-02 into BL-744's instrument: recipe_margin's M2 rows (R2 processing, R4 extraction) ARE this anchor, for the whole roster, at typical_workforce 0.5 and the authored floor_mult. The measured table this waited for exists: 16 of 18 extraction targets and 41 of 44 priced recipes miss it in both bands - at the floor a mine at W=0.5 earns 2.5 x price per tick against 9 of wages + maintenance. The retune half stays here and lands in the same pass as BL-744's, so one table clears both."
-  },
-  {
-   "status": "designed",
-   "glyph": "~",
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
@@ -303,7 +278,32 @@
     "scripts/world_gen.lua",
     "CMakeLists.txt"
    ],
-   "design": "Ben, 2026-09-02: \"the simplest way to do this is to ensure that all recipes (at base price) make a greater profit than marginal costs.\" PRODUCTION.md § The recipe margin anchor owns the design; this item carries the work, in two stages.\n\nSTAGE 1 - THE INSTRUMENT (built 2026-09-02). tools/verify/recipe_margin loads the three authored tables through a live Lua state (NEEDS_LUA: cmd //c tools\\verify\\build_lua_harness.bat recipe_margin) and, for every processing recipe and every k_extractable target in BOTH bands, prints revenue, inputs, wage per batch, margin, ratio and the per-tick base/floor nets, then asserts: M1 margin >= k x marginal cost at base (k = economy.recipe_margin_anchor.profit_over_marginal, 1.0); M2 fixed cost covered at the price floor at typical_workforce (0.5). R0 non-vacuity, R5 every input priced, R6 differential red-proof. Unpriced-output recipes (propellant) are exempt and say so. Deliberately NOT add_test'ed until the tables clear it - a permanently red gate trains people to ignore the gate.\n\nFIRST RUN, THE FINDING: ancient 18 of 19 priced recipes fail M1 (glass passes), 18 fail M2; industrial 23 of 25 fail M1 (medical_supplies, spacecraft_components_heavy pass), 23 fail M2; extraction M1 fails only on regolith, M2 fails on 16 of 18 in both bands. The mid-chain is authored at zero or negative value-add before wages (steel 8 from 7, refined_copper 7.5 from 6, food_rations 6 from 6, consumer_goods 12 from 14, steel_from_blooms 8 from 22) and the 1.50 wage per batch eats the rest.\n\nSTAGE 2 - THE RETUNE (the sprint's work). Turn R1-R4 green in both bands without simply lifting every output price. Order of preference (NR-776 asks Ben to confirm): (1) processing base_rate and the wage/maintenance side; (2) input quantities where value-add is zero or negative; (3) base prices last, up the chain in order, ceil_mult re-derived after (haulage_measure). Every change is a data change in the three tables; the harness is the check on every edit. Then register with ctest, and re-run campaign_lapse on the industrial band for the sprint's done-when.\n\nWHAT IT DOES NOT CLAIM. The anchor is necessary, not sufficient: the 2026-09-01 ledger's structural money-loop gap and the year-30 debt spiral are separate levers (BL-726). A roster that pays at base is the precondition for those measurements meaning anything."
+   "design": "Ben, 2026-09-02: \"the simplest way to do this is to ensure that all recipes (at base price) make a greater profit than marginal costs.\" PRODUCTION.md § The recipe margin anchor owns the design; this item carries the work, in two stages.\n\nSTAGE 1 - THE INSTRUMENT (built 2026-09-02). tools/verify/recipe_margin loads the three authored tables through a live Lua state (NEEDS_LUA: cmd //c tools\\verify\\build_lua_harness.bat recipe_margin) and, for every processing recipe and every k_extractable target in BOTH bands, prints revenue, inputs, wage per batch, margin, ratio and the per-tick base/floor nets, then asserts: M1 margin >= k x marginal cost at base (k = economy.recipe_margin_anchor.profit_over_marginal, 1.0); M2 fixed cost covered at the price floor at typical_workforce (0.5). R0 non-vacuity, R5 every input priced, R6 differential red-proof. Unpriced-output recipes (propellant) are exempt and say so. Deliberately NOT add_test'ed until the tables clear it - a permanently red gate trains people to ignore the gate.\n\nFIRST RUN, THE FINDING: ancient 18 of 19 priced recipes fail M1 (glass passes), 18 fail M2; industrial 23 of 25 fail M1 (medical_supplies, spacecraft_components_heavy pass), 23 fail M2; extraction M1 fails only on regolith, M2 fails on 16 of 18 in both bands. The mid-chain is authored at zero or negative value-add before wages (steel 8 from 7, refined_copper 7.5 from 6, food_rations 6 from 6, consumer_goods 12 from 14, steel_from_blooms 8 from 22) and the 1.50 wage per batch eats the rest.\n\nSTAGE 2 - THE RETUNE (the sprint's work). Turn R1-R4 green in both bands without simply lifting every output price. Order of preference (NR-776 asks Ben to confirm): (1) processing base_rate and the wage/maintenance side; (2) input quantities where value-add is zero or negative; (3) base prices last, up the chain in order, ceil_mult re-derived after (haulage_measure). Every change is a data change in the three tables; the harness is the check on every edit. Then register with ctest, and re-run campaign_lapse on the industrial band for the sprint's done-when.\n\nWHAT IT DOES NOT CLAIM. The anchor is necessary, not sufficient: the 2026-09-01 ledger's structural money-loop gap and the year-30 debt spiral are separate levers (BL-726). A roster that pays at base is the precondition for those measurements meaning anything.\n\nSTAGE 2 BUILT 2026-09-02 (Ben's rulings via the session form: reading A, processing base_rate 16, extraction fixed costs cut). Applied as: both producer base_rates doubled (40:16 keeps the 2.5:1 ratio economy.lua's own note demands), extraction maintenance 5 -> 2 / wage 8 -> 4, processing maintenance 10 -> 2 (NR-779), the re-priced table with the cheapest in-band route as the anchor at k = 1 and alternates at k = 0 plus the floor half (NR-780), base prices era-banded (NR-778), five recipes re-costed, regolith 0.6 -> 1.0. recipe_margin ALL PASS in both bands; registered with ctest, script-rooted. Consequences absorbed: unit wages x2.776 with hire costs (NR-781: the military value anchor holds again, 19/19 rows in band), value_anchor R6 re-aimed to the anchor rule, upkeep_harness U1 reads the authored prices, ceil_mult's bound relaxed 14.07 -> 8.84 (haulage_measure; MARKETS.md re-derived), RESOURCES.md/PRODUCTION.md price tables rewritten.\n\nTHE FIELD RE-MEASURE, SAME DAY (campaign_lapse, industrial 1960, seeds 0/1): the tables clear the anchor and the field STILL collapses - and now differently. Unwarmed 40-tick trace: 260 buildings active through tick 12 with valued production 13-23k/tick, then a debt wave (expenditure 15-23k against income 10-17k from tick 4; interest climbing to 1k/tick) and the exit wave twelve quarters later; from tick 25 the survivors are IDLE (43 -> 21 active of ~390 holdings) and valued production is ~0 at every measured tick 82-200 (baseline 181 at tick 200). The ancient band takes the same over-spend and exit wave and RECOVERS (66 active, net +1.9k/tick, one debtor at tick 40). Maintenance and wages are now small (1.1k + 0.6k/tick); the drain is EXPENDITURE - inputs bought at the band's ceiling (processed goods ceiled in every market: food_rations, silicon, refined_copper, electronics, clean_water, medical_supplies) - and the agency then idles the loss-making processors, which removes the supply that was ceiling the prices. The anchor is evaluated at BASE; the sim runs at the CEILING. Owner of the next lever: BL-745 (processor input bid cap)."
+  },
+  {
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "31",
+   "written": "2026-09-02",
+   "author": "Claude (BL-744 stage 2 field re-measure)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-745",
+   "short_name": "PROCESSOR_INPUT_BID_CAP",
+   "category": "Economy",
+   "title": "A processor never buys inputs worth more than its output - the anchor carried to live prices",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/market_clearing.cpp",
+    "scripts/economy.lua",
+    "tools/verify/campaign_lapse.cpp"
+   ],
+   "design": "THE FINDING (BL-744 stage 2, 2026-09-02). With every recipe clearing the margin anchor at base price, the industrial field still collapses by tick 25 of an unwarmed lapse: expenditure runs 1.5-2.5x income from tick 4, corps go into debt, exit twelve quarters later, and the survivors are idled by their own agency. The anchor is evaluated at BASE; the sim runs at the CEILING - processed goods are ceiled in every market (10x base), so a processor pays up to 10x for inputs its recipe values at 2x, loses on every batch, and is idled as 'persistently loss-making'. Idling it removes supply, which keeps the ceiling on, which idles the next one. The ancient band takes the same wave and recovers because its chains are shallow; the industrial mid-chain (silicon, refined_copper, electronics) does not.\n\nTHE DESIGN, in the anchor's own terms: a processor's input purchase (pool bid, BL-654; auto-demand) is capped so that Σ inputs at the bid price <= output value at the current price minus the wage per batch - the M1 identity carried from authoring time to the live tick. Above the cap it does not buy and runs at the supply scalar it has (the shortfall rule: scale down, never idle - PRODUCTION.md). This is a per-recipe reservation ceiling in place of the flat reservation_mult (9x base) for processing inputs; the flat one stays for upkeep goods. It must be pure and deterministic, one rule at the one shared seam, and the rival scorer's dial_recipe reads the same number.\n\nMEASURE FIRST: campaign_lapse --epoch 1960 --warm 0 --ticks 40 (tags diag-ind, diag-anc are the 2026-09-02 traces) with the expenditure/income split per tick; the done-when is the sprint's - operating-positive survivors that keep producing. Also owed: the agency's 'persistently loss-making' idle rule should read operating net at the recipe's own bid cap, not realised loss at the ceiling, or it will keep idling the buildings the cap is meant to save."
   }
  ]
 }
