@@ -80,6 +80,25 @@ The clean positive: stone off the floor, 0.42× → 1.38× base — the price si
 loop behind it is what is missing. BL-740 (maintenance anchor) waits for its measured table —
 BL-739 just moved its baseline.
 
+### Addendum, same session — NR-774 ruled, and the demand curves split the bands
+
+Ben ruled the four calls via the form (GDP = valued production; influence = share + footprint +
+routes; **band = industrial 1960 only**; proxy = corp AI, brackets stated) and held the
+sprint-31 spawn-intelligence idea. The full demand curves then ran on both bands (2 seeds per
+cell, pop ×0.5 → ×4):
+
+- **Ancient**: a real, noisy climb — −6.9/qtr at ×0.5 to **+2.4/qtr at ×2**, with an optimum
+  near ×2 (×2.5 falls back to −6.5: past the optimum, extra demand hits price ceilings and
+  raises everyone's input costs). Two-seed cells are noise-prone (×1.25 is an outlier).
+- **Industrial (the ruled band): demand scaling does NOT fix it.** Mean operating net wobbles
+  −7.3 → −4.5 with no monotone trend, op-positive corps 0–2 of ~37 at every level, and valued
+  production collapses (×0.13–0.29) as exits cull nearly half the field. The industrial band's
+  binding constraint is structural — the ceiled mid-chain (machinery/electronics), the missing
+  endpoint channels, and exit thresholds tuned on ancient numbers — not the demand level.
+
+The programme consequence: for the ruled band, the next lever is mid-chain supply and endpoint
+structure (and a band-sensitive exit threshold), with the demand knob shelved until those land.
+
 ### Addendum, same session — firm exit lands, and the first sweeps speak
 
 **BL-743 built and verified** (7/7, conservation and exemption rows red-proved): insolvency
