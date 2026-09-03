@@ -10,6 +10,57 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-02 (sprint 31 closes, sprint 33 opens) — A field that can pay, and the one that must grow
+
+**Mode:** the whole arc in one session — Design → Full → measure → rule → fix → measure — closed on
+Ben's call. **Runtime:** one long session; ~10 full builds, ~40 harness builds, ~20 lapse runs, one
+doc-sweep agent, no worktree agents.
+
+### What the session did, in order
+
+1. Merged sprint 29's ground bake to main and pushed.
+2. Ben's brief for the market: *every recipe, at base price, makes a greater profit than marginal
+   cost*. Built the instrument first (`recipe_margin`), and its first table was the finding: 41 of
+   44 priced recipes failed.
+3. Three rulings by form (reading A, processing rate 16, extraction fixed costs cut) → the retune,
+   the consequences absorbed (unit wages ×2.776, three harnesses re-aimed, two CMake targets that
+   never linked, an era-band header split), the docs re-priced.
+4. Four more rulings (one table with the ancient chain at depth one; the constants and the anchor
+   route rule ratified; two design-red harness rows re-expressed).
+5. Ben: *track balance for every company*. The lapse gained phase-attributed balance deltas and a
+   debt table; two differential runs named the drains — construction materials at the ceiling,
+   and the tick-20 supply-factor cliff on an unmet power draw.
+6. NR-782 (a)+(b) approved: the supply floor and the no-wire rule. The cliff is gone.
+
+### The session's number
+
+Standard industrial lapse, 80 warm / 120 measured, session-start tables against the engine now:
+
+| quarter 81 → 200 | baseline s0 | baseline s1 | now s0 | now s1 |
+|---|---|---|---|---|
+| operating-positive corps at end | 4 of 37 | 0 of 44 | 46 of 61 | 31 of 55 |
+| corps in debt at end | 7 of 37 | 12 of 44 | 6 of 61 | 4 of 55 |
+| median operating net / qtr at end | −3.0 | −3.0 | +16.9 | +1.7 |
+| median balance at end | 1,022 | 908 | 4,424 | 3,797 |
+| active buildings at end | 9 | 4 | 140 | 85 |
+| valued production 81 → 200 | 1,091 → 181 | 1,245 → 685 | 20,761 → 4,364 | 5,775 → 3,531 |
+| interest share of net loss at end | 84% | 82% | 5% | 70% |
+
+**Success on the solvency half; not yet on growth.** Valued production still falls across the
+thirty years, from a level ten to twenty times the old one; the field runs at a mean supply factor
+of ~0.57 for want of power; 42 of the 57 remaining debt entries are processors converting at a loss.
+
+### Closed, filed, archived
+
+BL-744 (recipe margin anchor) closed with BL-740; sprint 31 closed with its retro; **sprint 33**
+opened on the growth half — BL-746 stage 2 (generation bootstrap) first, then BL-745, BL-738,
+BL-726, BL-725 — with a done-when of production holding or growing over the run, a majority
+operating-positive, mean supply factor above 0.8, interest under a quarter of net loss. NR-775..782
+ruled and archived; the review queue is empty. Requirements groups archived. `NEXT_SESSION.md`
+is superseded by sprint 33's plan.
+
+---
+
 ## 2026-09-02 (BL-744 stage 2) — The tables clear the anchor, and the field still falls
 
 **Mode:** Full. **Runtime:** the same session as the opening, after Ben's three rulings via
@@ -59,6 +110,47 @@ in both bands against one table. **NR-779 and NR-780 ratified.** **NR-781:** `ti
 now compares net per unit of output between the tiers (the per-tick figures stay printed);
 `spawn_solvency` R3 holds the seated corp to the best rival's income per holding rather than
 3× the field mean. The stale 1.433× markup derivations in world_gen.lua's comments were swept.
+
+### Addendum, same session — every balance tracked, and the collapse has a name
+
+Ben: *"run a harness which tracks balance for every company"*. `campaign_lapse` now attributes
+every corp's balance delta per tick to the tick's phases — convoy legs, the agency batch
+(build, hire, buyout: capital), the seven budget flows, the nation step, convoy arrivals, exits —
+by snapshotting balances between phases (exact by construction, residual 0.000000, row C3), and
+logs each corp's produced value, active/idle/limited/unstaffed/exhausted/building/mothballed
+counts, labour and mean supply factor. `debt.csv` carries one row per debt entry with the
+trailing-4-tick flows and the dominant drain.
+
+**Industrial band, unwarmed, seeds 0/1: 129 of 129 debt entries dominated by expenditure**, and
+expenditure > income in every trailing window. Two differentials say what is in it:
+- Pool bids off (`reservation_mult` 0): no change. **Not the drain.**
+- Construction materials free: the first wave nearly vanishes (debtors at tick 20: 26 → 4,
+  median entry tick 22 → 34). **A processor costs 25 steel at 8–10× base while the scorer builds
+  through the boom.** BL-745 re-scoped to this, priority B.
+- **The cliff.** Between tick 20 and 21 active buildings fall 219 → 40 in one tick; unstaffed 0,
+  exhausted 0, labour unchanged. The mean supply factor decays from 1.0 to 0 and lands at tick 20:
+  `supply_decay_permille` 50 is 5%/tick, so a building whose power/timber/stone draw is never met
+  is dark exactly 20 ticks in — and power is a grid good most tiles cannot receive. **Industrial
+  goods-upkeep draws zeroed: no cliff, 207 active at tick 60, income ahead of inputs from tick
+  25, debtors 19 → 5.** The ancient band has no such draw and recovers on its own. BL-746 (upkeep
+  starvation cliff) filed at priority A; NR-782 asks which rule — a floor on the factor, no draw
+  where no wire reaches, or a generation bootstrap.
+
+### Addendum, same session — the lights go dim, not out
+
+Ben approved NR-782 (a) and (b). **The floor:** `supply_floor_permille = 500` in
+`economy.building_upkeep`, parsed and range-checked like its siblings; the decay stops there and a
+stranded factor is lifted to it. **No wire, no draw:** an unreached building's grid goods are struck
+from its basket before the shared draw, so it neither draws power it cannot receive nor weakens for
+want of it, while timber and stone still bind. `building_upkeep` R8/R9 pin both with differentials
+(floor 500 → 500 over 41 ticks, floor 250 → 250, lift from 120; unreached + on-grid stays 1000,
+off-grid decays to 750, timber alone to 950). PRODUCTION.md § A shortfall scales output carries the
+rule. **Re-measured:** no building reaches factor 0 at any tick; active buildings 224 → 221 over
+ticks 20–60 on seed 0 (was 219 → 2), 178 → 137 on seed 1; income at tick 60 13.4k / 6.8k (was
+132 / 2.9k); debtors 11 of 86 / 6 of 73 (was 22 of 66 / 13 of 58). The ancient band is byte-identical.
+What remains: the field's mean supply factor sits at ~0.57 — most buildings run at the floor
+because power still does not arrive (BL-746 stage 2, the generation bootstrap, NR-782 (c) held) —
+and 42 of the 57 remaining debt entries are loss-converting processors, which is BL-745's ground.
 
 ### The finding — the anchor is necessary and was never sufficient
 

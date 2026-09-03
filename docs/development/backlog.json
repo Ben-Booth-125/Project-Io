@@ -43,7 +43,7 @@
    "priority": "B",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": null,
+   "sprint": "33",
    "written": "2026-09-01",
    "author": "Claude (success-lever session, Ben's instruction)",
    "requires": [
@@ -67,7 +67,7 @@
    "priority": "B",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": null,
+   "sprint": "33",
    "written": "2026-09-01",
    "author": "Claude (success-lever session, Ben's instruction)",
    "requires": [
@@ -234,7 +234,7 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": null,
+   "sprint": "33",
    "written": "2026-09-01",
    "author": "Claude (operating-loss methods, Ben's rulings)",
    "requires": [
@@ -257,36 +257,10 @@
   {
    "status": "designed",
    "glyph": "~",
-   "priority": "A",
+   "priority": "B",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "31",
-   "written": "2026-09-02",
-   "author": "Claude (sprint 31 opening, Ben's instruction)",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-744",
-   "short_name": "RECIPE_MARGIN_ANCHOR",
-   "category": "Economy",
-   "title": "Every recipe pays at base price - the marginal anchor, measured then retuned",
-   "authority_doc": "docs/economy/PRODUCTION.md",
-   "files": [
-    "tools/verify/recipe_margin.cpp",
-    "scripts/economy.lua",
-    "scripts/recipes.lua",
-    "scripts/world_gen.lua",
-    "CMakeLists.txt"
-   ],
-   "design": "Ben, 2026-09-02: \"the simplest way to do this is to ensure that all recipes (at base price) make a greater profit than marginal costs.\" PRODUCTION.md § The recipe margin anchor owns the design; this item carries the work, in two stages.\n\nSTAGE 1 - THE INSTRUMENT (built 2026-09-02). tools/verify/recipe_margin loads the three authored tables through a live Lua state (NEEDS_LUA: cmd //c tools\\verify\\build_lua_harness.bat recipe_margin) and, for every processing recipe and every k_extractable target in BOTH bands, prints revenue, inputs, wage per batch, margin, ratio and the per-tick base/floor nets, then asserts: M1 margin >= k x marginal cost at base (k = economy.recipe_margin_anchor.profit_over_marginal, 1.0); M2 fixed cost covered at the price floor at typical_workforce (0.5). R0 non-vacuity, R5 every input priced, R6 differential red-proof. Unpriced-output recipes (propellant) are exempt and say so. Deliberately NOT add_test'ed until the tables clear it - a permanently red gate trains people to ignore the gate.\n\nFIRST RUN, THE FINDING: ancient 18 of 19 priced recipes fail M1 (glass passes), 18 fail M2; industrial 23 of 25 fail M1 (medical_supplies, spacecraft_components_heavy pass), 23 fail M2; extraction M1 fails only on regolith, M2 fails on 16 of 18 in both bands. The mid-chain is authored at zero or negative value-add before wages (steel 8 from 7, refined_copper 7.5 from 6, food_rations 6 from 6, consumer_goods 12 from 14, steel_from_blooms 8 from 22) and the 1.50 wage per batch eats the rest.\n\nSTAGE 2 - THE RETUNE (the sprint's work). Turn R1-R4 green in both bands without simply lifting every output price. Order of preference (NR-776 asks Ben to confirm): (1) processing base_rate and the wage/maintenance side; (2) input quantities where value-add is zero or negative; (3) base prices last, up the chain in order, ceil_mult re-derived after (haulage_measure). Every change is a data change in the three tables; the harness is the check on every edit. Then register with ctest, and re-run campaign_lapse on the industrial band for the sprint's done-when.\n\nWHAT IT DOES NOT CLAIM. The anchor is necessary, not sufficient: the 2026-09-01 ledger's structural money-loop gap and the year-30 debt spiral are separate levers (BL-726). A roster that pays at base is the precondition for those measurements meaning anything.\n\nSTAGE 2 BUILT 2026-09-02 (Ben's rulings via the session form: reading A, processing base_rate 16, extraction fixed costs cut). Applied as: both producer base_rates doubled (40:16 keeps the 2.5:1 ratio economy.lua's own note demands), extraction maintenance 5 -> 2 / wage 8 -> 4, processing maintenance 10 -> 2 (NR-779), the re-priced table with the cheapest in-band route as the anchor at k = 1 and alternates at k = 0 plus the floor half (NR-780), base prices era-banded (NR-778), five recipes re-costed, regolith 0.6 -> 1.0. recipe_margin ALL PASS in both bands; registered with ctest, script-rooted. Consequences absorbed: unit wages x2.776 with hire costs (NR-781: the military value anchor holds again, 19/19 rows in band), value_anchor R6 re-aimed to the anchor rule, upkeep_harness U1 reads the authored prices, ceil_mult's bound relaxed 14.07 -> 8.84 (haulage_measure; MARKETS.md re-derived), RESOURCES.md/PRODUCTION.md price tables rewritten.\n\nTHE FIELD RE-MEASURE, SAME DAY (campaign_lapse, industrial 1960, seeds 0/1): the tables clear the anchor and the field STILL collapses - and now differently. Unwarmed 40-tick trace: 260 buildings active through tick 12 with valued production 13-23k/tick, then a debt wave (expenditure 15-23k against income 10-17k from tick 4; interest climbing to 1k/tick) and the exit wave twelve quarters later; from tick 25 the survivors are IDLE (43 -> 21 active of ~390 holdings) and valued production is ~0 at every measured tick 82-200 (baseline 181 at tick 200). The ancient band takes the same over-spend and exit wave and RECOVERS (66 active, net +1.9k/tick, one debtor at tick 40). Maintenance and wages are now small (1.1k + 0.6k/tick); the drain is EXPENDITURE - inputs bought at the band's ceiling (processed goods ceiled in every market: food_rations, silicon, refined_copper, electronics, clean_water, medical_supplies) - and the agency then idles the loss-making processors, which removes the supply that was ceiling the prices. The anchor is evaluated at BASE; the sim runs at the CEILING. Owner of the next lever: BL-745 (processor input bid cap).\n\nRULINGS 2026-09-02 (review form): NR-778 OVERTURNED - one price table, the ancient chain shortened to depth 1. Applied: banded prices removed from world_gen_config / hard_coded_world / world_gen.lua; recipes.lua gains steel_bloomery (Bloomery Furnace, iron_ore 2 + timber 1.5 -> steel, ancient, appended so ids hold) and the Smithy becomes the deeper alternate at 0.4 blooms + 0.2 charcoal; the single table re-derived at the larger of the two bands' needs - steel 16.1, machinery 61.0, alloys 85.0, consumer_goods 61.0, ordnance 155.8, spacecraft_components 310.0, construction_capacity 6.6 (ladder ~124x). recipe_margin ALL PASS, both bands, one table. NR-779 and NR-780 ratified. NR-781: tier_margin R2 re-expressed per unit of output; spawn_solvency R3 re-expressed as seated <= the best rival per holding."
-  },
-  {
-   "status": "designed",
-   "glyph": "~",
-   "priority": "A",
-   "difficulty": 3,
-   "version_goal": null,
-   "sprint": "31",
+   "sprint": "33",
    "written": "2026-09-02",
    "author": "Claude (BL-744 stage 2 field re-measure)",
    "requires": [],
@@ -303,7 +277,33 @@
     "scripts/economy.lua",
     "tools/verify/campaign_lapse.cpp"
    ],
-   "design": "THE FINDING (BL-744 stage 2, 2026-09-02). With every recipe clearing the margin anchor at base price, the industrial field still collapses by tick 25 of an unwarmed lapse: expenditure runs 1.5-2.5x income from tick 4, corps go into debt, exit twelve quarters later, and the survivors are idled by their own agency. The anchor is evaluated at BASE; the sim runs at the CEILING - processed goods are ceiled in every market (10x base), so a processor pays up to 10x for inputs its recipe values at 2x, loses on every batch, and is idled as 'persistently loss-making'. Idling it removes supply, which keeps the ceiling on, which idles the next one. The ancient band takes the same wave and recovers because its chains are shallow; the industrial mid-chain (silicon, refined_copper, electronics) does not.\n\nTHE DESIGN, in the anchor's own terms: a processor's input purchase (pool bid, BL-654; auto-demand) is capped so that Σ inputs at the bid price <= output value at the current price minus the wage per batch - the M1 identity carried from authoring time to the live tick. Above the cap it does not buy and runs at the supply scalar it has (the shortfall rule: scale down, never idle - PRODUCTION.md). This is a per-recipe reservation ceiling in place of the flat reservation_mult (9x base) for processing inputs; the flat one stays for upkeep goods. It must be pure and deterministic, one rule at the one shared seam, and the rival scorer's dial_recipe reads the same number.\n\nMEASURE FIRST: campaign_lapse --epoch 1960 --warm 0 --ticks 40 (tags diag-ind, diag-anc are the 2026-09-02 traces) with the expenditure/income split per tick; the done-when is the sprint's - operating-positive survivors that keep producing. Also owed: the agency's 'persistently loss-making' idle rule should read operating net at the recipe's own bid cap, not realised loss at the ceiling, or it will keep idling the buildings the cap is meant to save."
+   "design": "THE FINDING (BL-744 stage 2, 2026-09-02). With every recipe clearing the margin anchor at base price, the industrial field still collapses by tick 25 of an unwarmed lapse: expenditure runs 1.5-2.5x income from tick 4, corps go into debt, exit twelve quarters later, and the survivors are idled by their own agency. The anchor is evaluated at BASE; the sim runs at the CEILING - processed goods are ceiled in every market (10x base), so a processor pays up to 10x for inputs its recipe values at 2x, loses on every batch, and is idled as 'persistently loss-making'. Idling it removes supply, which keeps the ceiling on, which idles the next one. The ancient band takes the same wave and recovers because its chains are shallow; the industrial mid-chain (silicon, refined_copper, electronics) does not.\n\nTHE DESIGN, in the anchor's own terms: a processor's input purchase (pool bid, BL-654; auto-demand) is capped so that Σ inputs at the bid price <= output value at the current price minus the wage per batch - the M1 identity carried from authoring time to the live tick. Above the cap it does not buy and runs at the supply scalar it has (the shortfall rule: scale down, never idle - PRODUCTION.md). This is a per-recipe reservation ceiling in place of the flat reservation_mult (9x base) for processing inputs; the flat one stays for upkeep goods. It must be pure and deterministic, one rule at the one shared seam, and the rival scorer's dial_recipe reads the same number.\n\nMEASURE FIRST: campaign_lapse --epoch 1960 --warm 0 --ticks 40 (tags diag-ind, diag-anc are the 2026-09-02 traces) with the expenditure/income split per tick; the done-when is the sprint's - operating-positive survivors that keep producing. Also owed: the agency's 'persistently loss-making' idle rule should read operating net at the recipe's own bid cap, not realised loss at the ceiling, or it will keep idling the buildings the cap is meant to save.\n\nMEASURED 2026-09-02 (campaign_lapse debt instrumentation, industrial band, unwarmed, seeds 0/1 - build_gen/verify/lapse/debt-ind-s*/debt.csv): 129 of 129 debt entries are dominated by the EXPENDITURE flow, and in every one of them expenditure exceeded income over the four ticks before entry. But two differential runs re-order the levers. (1) Construction materials at market price are the FIRST wave: with resource_costs zeroed the early wave nearly vanishes (debtors at tick 20: 26 -> 4; median entry tick 22 -> 34), because a processor costs 25 steel at 8-10x base = 3-4k against a mine earning ~50/tick and the scorer builds through the boom. (2) The pool bids are NOT the drain: reservation_mult 0 changes nothing. (3) The tick-20 cliff is BL-746's, not this item's: with the industrial goods-upkeep draws zeroed there is no collapse at all. This item therefore drops to B and re-scopes to the two real purchase leaks - construction materials bought at the ceiling (the scorer's build tempo should price materials at the live market, and the cap here should bound them by the building's expected value) and processing inputs bought above the recipe's output value - AFTER BL-746 lands, measured on the same instrument."
+  },
+  {
+   "status": "designed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "33",
+   "written": "2026-09-02",
+   "author": "Claude (campaign_lapse debt instrumentation, Ben's instruction to track every balance)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-746",
+   "short_name": "UPKEEP_STARVATION_CLIFF",
+   "category": "Economy",
+   "title": "The industrial band goes dark at tick 20 - an unmet goods-upkeep draw decays every building to zero",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "scripts/economy.lua",
+    "src/world/economy_system.cpp",
+    "src/world/components.hpp",
+    "tools/verify/campaign_lapse.cpp",
+    "tools/verify/building_upkeep.cpp"
+   ],
+   "design": "THE FINDING (2026-09-02, campaign_lapse --epoch 1960 --warm 0, seed 0). Between tick 20 and tick 21 active buildings fall 219 -> 40 and idle rise 18 -> 198 in ONE tick, with unstaffed 0, exhausted 0 and labour unchanged (118.5 -> 119.0). 77 of 95 corps go from active to zero-active that tick, almost all extraction corps, many with positive balances. The per-corp mean supply factor decays from 1.0 at tick 1 toward 0 and reaches it at tick 20: supply_decay_permille = 50 is 5% per tick of a 0..1000 factor, so a building whose goods-upkeep draw is never met hits zero output exactly 20 ticks after it starts. In the industrial band every extraction site draws power 0.25 + timber 0.05 + stone 0.05 per tick and every processor power 0.40 + timber 0.08 + stone 0.08 (BL-708, BL-738 stage 2); power is a GRID good that reaches only network-connected tiles, generation is 18 falling to 3 units against a demand of 64, and a generator short of power throttles itself. The ancient band has no such draw and takes the same debt wave without a cliff. DIFFERENTIAL PROOF: with the two industrial goods baskets zeroed the field holds 207-257 active buildings through tick 60, income runs ahead of inputs from tick 25, produced value 16-31k/tick, debtors 19 -> 5. Nothing else was changed.\n\nWHY IT IS A DESIGN DEFECT AND NOT A TUNING ONE. PRODUCTION.md § A shortfall scales output; it never idles says the lights go dim, not out - but a factor that decays without floor DOES go out, and it goes out for every building the grid cannot reach, which is most of them. Three levers, and Ben's call which (NR-782): (a) a FLOOR on the supply factor (e.g. 0.5) so an unmet draw halves output and never zeroes it - the rule as the doc states it; (b) NO DRAW WHERE THERE IS NO WIRE - a building the network does not reach does not draw power and does not decay for want of it (it pays the no-grid penalty some other way, or none); (c) generation bootstrap - generators exempt from the power draw, and the draw switched on per building only once its market has ever priced power. (a) and (b) are one-line rules at the one shared seam; (c) is the census's own reading of BL-708. Then re-run the debt instrument: the done-when is no one-tick cliff and a field whose active count tracks its holdings.\n\nMEASURE with: campaign_lapse --epoch 1960 --seed N --warm 0 --ticks 60 --tag <tag>; corps.csv carries supply_factor_mean and bldg_supply_zero per corp per tick; world.csv buildings_active/idle. The 2026-09-02 traces are debt-ind-s0/s1 (the cliff) and exp-noupkeep (without it).\n\nSTAGE 1 LANDED 2026-09-02 (Ben approved NR-782 (a) and (b)). The floor: supply_floor_permille = 500 in economy.building_upkeep, parsed and range-checked like its siblings; run_building_upkeep decays to max(floor, factor - decay) and lifts a stranded factor to the floor. No wire, no draw: an unreached building's grid goods are struck from its basket before the shared draw (its ordinary goods still draw and bind), and an emptied basket draws nothing and counts as met. building_upkeep R8 (floor 500 holds at 500 over 41 ticks, recovers by the authored step, the number is the authored one, a factor below it is lifted) and R9 (an unreached building does not weaken for power on the grid; the same good off the grid decays 5 x 50; timber still binds on the unreached tile) - every row with its differential. RE-MEASURED (campaign_lapse --epoch 1960 --warm 0 --ticks 60, tags fix-ind-s0/s1): no building at factor 0 at any tick; active buildings 224 at tick 20 and 221 at tick 60 (seed 0; was 219 -> 2), 178 and 137 (seed 1); income at tick 60 13.4k / 6.8k (was 132 / 2.9k); produced value 16.1k / 10.1k (was 262 / 2.0k); debtors 11 of 86 / 6 of 73 (was 22 of 66 / 13 of 58). The ancient band is byte-identical (19 entries, same table) - it has no draw to floor. Debt entries fall 67 -> 57 and 62 -> 58 and their shape changes: starved 32 -> 7, loss-converting 30 -> 42 - the residue is BL-745's.\n\nSTAGE 2 (open, NR-782 (c) held): the field's mean supply factor settles at ~0.57 - most buildings sit AT the floor because power still does not arrive (generation 18 -> 3 units against a demand of 64; a generator short of power throttles itself; only network-reached tiles can receive it). The generation bootstrap - generators exempt from the power draw, a building drawing power only once its catchment market has priced it - is the next lever, measured on the same instrument: the done-when is the mean supply factor climbing off the floor."
   },
   {
    "status": "designed",
@@ -311,13 +311,13 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "32",
+   "sprint": "34",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [],
    "blocked_on": null,
    "parked": false,
-   "id": "BL-746",
+   "id": "BL-747",
    "short_name": "TWO_SPAN_PREHISTORY",
    "category": "Generation",
    "title": "The Era -1 sim runs on the 1960 arc, as two spans on one engine with a boundary year between them",
@@ -330,7 +330,7 @@
     "src/world/history_sim.cpp",
     "tools/verify/history_sweep.cpp"
    ],
-   "design": "THE GAP. Under epoch 1960 the polity sim does not run at all: era_minus_one.cpp gates on epoch_year < 1700, so the arc we are building the product on has ancient borders from the one-shot ladder and settlement passes and no simulated history behind them. The design (HISTORY.md § The epoch and the run, 2026-09-03) is two spans on one engine: an ancient pass to a BOUNDARY YEAR and an industrial pass from the boundary to the epoch.\n\nTHE WORK. (1) Widen the gate: the sim runs whenever prehistory_years > 0, at any epoch. (2) history_sim_params gains boundary_year, derived in era_minus_one.cpp as epoch_year - 400 by default (so a 1960 arc is 1560 -> 1960 for pass 2; pass 1 is whatever prehistory_years leaves before it); on an ancient epoch the boundary falls past stop_year and there is one span, byte-identical to today - assert that with world_determinism against the current golden. (3) The tick-band ladder applies per span: the stepped clock's whole point is that rounds concentrate near the END of a span, so each span carries its own bands rather than one ladder stretched over both. (4) The band a region builds and fields at is capped at Medieval in pass 1 and released in pass 2 - the roster gating is already cumulative (works_roster, unit_roster), so this is a ceiling on the band the polity may reach, not a new table. (5) history_sweep reports both spans.\n\nDERIVED BOUNDARY (open, Ben's call): the year the first polity lights a furnace (run_settlement's furnace date) is the better-founded boundary than an authored offset. Build the authored default first; the derived one is a one-line swap once Stage 4 sits inside the run (BL-747).\n\nDONE WHEN: a 1960 world generates through both spans; the 0 CE world is unchanged; the generating-screen wait is measured and recorded on BL-753."
+   "design": "THE GAP. Under epoch 1960 the polity sim does not run at all: era_minus_one.cpp gates on epoch_year < 1700, so the arc we are building the product on has ancient borders from the one-shot ladder and settlement passes and no simulated history behind them. The design (HISTORY.md § The epoch and the run, 2026-09-03) is two spans on one engine: an ancient pass to a BOUNDARY YEAR and an industrial pass from the boundary to the epoch.\n\nTHE WORK. (1) Widen the gate: the sim runs whenever prehistory_years > 0, at any epoch. (2) history_sim_params gains boundary_year, derived in era_minus_one.cpp as epoch_year - 400 by default (so a 1960 arc is 1560 -> 1960 for pass 2; pass 1 is whatever prehistory_years leaves before it); on an ancient epoch the boundary falls past stop_year and there is one span, byte-identical to today - assert that with world_determinism against the current golden. (3) The tick-band ladder applies per span: the stepped clock's whole point is that rounds concentrate near the END of a span, so each span carries its own bands rather than one ladder stretched over both. (4) The band a region builds and fields at is capped at Medieval in pass 1 and released in pass 2 - the roster gating is already cumulative (works_roster, unit_roster), so this is a ceiling on the band the polity may reach, not a new table. (5) history_sweep reports both spans.\n\nDERIVED BOUNDARY (open, Ben's call): the year the first polity lights a furnace (run_settlement's furnace date) is the better-founded boundary than an authored offset. Build the authored default first; the derived one is a one-line swap once Stage 4 sits inside the run (BL-748, industrial pass ladder).\n\nDONE WHEN: a 1960 world generates through both spans; the 0 CE world is unchanged; the generating-screen wait is measured and recorded on BL-754 (generation budget)."
   },
   {
    "status": "designed",
@@ -338,15 +338,15 @@
    "priority": "A",
    "difficulty": 4,
    "version_goal": null,
-   "sprint": "32",
+   "sprint": "34",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
-    "BL-746"
+    "BL-747"
    ],
    "blocked_on": null,
    "parked": false,
-   "id": "BL-747",
+   "id": "BL-748",
    "short_name": "INDUSTRIAL_PASS_LADDER",
    "category": "Generation",
    "title": "Stage 4 inside the run - the industrial pass unlocks the Gunpowder and Industrial bands and names who industrialised, and when, from play rather than from a date fixed before the loop",
@@ -358,7 +358,7 @@
     "scripts/works.lua",
     "tools/verify/history_sweep.cpp"
    ],
-   "design": "TODAY Stage 4's furnace date is run_settlement's, fixed before the loop starts, and the sim's industrial clock is the capacity ladder that Invest climbs. Under an industrial epoch that is the wrong way round: the second span (BL-746) is WHERE industrialisation happens, so the furnace date should be the year a polity's materials capacity crosses the Industrial band inside the run - endowment-gated as now (above-average ancient fuel, the forge god's regions early), but reached by playing rather than pre-resolved.\n\nTHE WORK. (1) The capacity ladder's Industrial rung becomes the furnace event: the first polity to cross it writes Stage 4's history line and derive_national_character reads the crossing year instead of the settlement's. (2) The Gunpowder and Industrial works rows (Bastion Fort ... Coaling Station) and the era-keyed unit rows become reachable only in pass 2. (3) industrial_mod's pull-forward is expressed against the crossing, as HISTORY.md § Where each effect lands already says. (4) Fresh authoring: the industrial-ladder and averted-rupture designs were purged with the ancient pivot (2026-08-23); the purged prose is reference only, per the NR-517 precedent - do not restore it.\n\nNOT IN SCOPE: Stage 5 (the averted rupture, the Era 1 catastrophe) stays where ERAS.md § The point of an Era puts it; this item ends at the furnace.\n\nDONE WHEN: history_sweep over the seed spread reports the furnace year distribution and the count of polities that industrialised by the epoch, and the distribution is WIDE (some worlds late, some never) rather than clustered at the boundary."
+   "design": "TODAY Stage 4's furnace date is run_settlement's, fixed before the loop starts, and the sim's industrial clock is the capacity ladder that Invest climbs. Under an industrial epoch that is the wrong way round: the second span (BL-747, two-span prehistory) is WHERE industrialisation happens, so the furnace date should be the year a polity's materials capacity crosses the Industrial band inside the run - endowment-gated as now (above-average ancient fuel, the forge god's regions early), but reached by playing rather than pre-resolved.\n\nTHE WORK. (1) The capacity ladder's Industrial rung becomes the furnace event: the first polity to cross it writes Stage 4's history line and derive_national_character reads the crossing year instead of the settlement's. (2) The Gunpowder and Industrial works rows (Bastion Fort ... Coaling Station) and the era-keyed unit rows become reachable only in pass 2. (3) industrial_mod's pull-forward is expressed against the crossing, as HISTORY.md § Where each effect lands already says. (4) Fresh authoring: the industrial-ladder and averted-rupture designs were purged with the ancient pivot (2026-08-23); the purged prose is reference only, per the NR-517 precedent - do not restore it.\n\nNOT IN SCOPE: Stage 5 (the averted rupture, the Era 1 catastrophe) stays where ERAS.md § The point of an Era puts it; this item ends at the furnace.\n\nDONE WHEN: history_sweep over the seed spread reports the furnace year distribution and the count of polities that industrialised by the epoch, and the distribution is WIDE (some worlds late, some never) rather than clustered at the boundary."
   },
   {
    "status": "designed",
@@ -366,15 +366,15 @@
    "priority": "A",
    "difficulty": 4,
    "version_goal": null,
-   "sprint": "32",
+   "sprint": "34",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
-    "BL-746"
+    "BL-747"
    ],
    "blocked_on": null,
    "parked": false,
-   "id": "BL-748",
+   "id": "BL-749",
    "short_name": "SEA_LEG_CAMPAIGN",
    "category": "Generation",
    "title": "Reach across water - Campaign and Settle across a sea leg, staged from harbour works, so colonisation by a major is the Metropole played overseas",
@@ -386,7 +386,7 @@
     "scripts/works.lua",
     "tools/verify/history_sweep.cpp"
    ],
-   "design": "THE GAP. The sim knows enclosed-sea ring closure (w_ring) and nothing else about water: no Campaign or Settle target lies across a sea leg, so \"the extent of colonisation by major powers\" cannot be produced by pass 2 at all. The works roster already authors the rows that should gate it - Harbour Mole, Deepwater Wharf, Naval Yard, Coaling Station - and they do nothing for reach today.\n\nTHE DESIGN, in the sim's own currency. A sea leg is a candidate-grain extension of the target set: a region reachable by a coastal walk from a staging hub that holds a harbour work, with the leg's supply cost read from the same reach substrate the land term uses (one reach field, BL-325 ruling 3) and its range capped by the hub's best harbour row (Mole: littoral; Wharf: the enclosed sea; Naval Yard: open water; Coaling Station: any coast). Settle across the leg founds a holding that counts toward holdings_burden_q like any other - the burden of breadth is what makes an overseas empire strain, and reach-fed strain (COLLAPSE.md § 5, the Metropole's inevitability) is the accumulator it feeds. A colony is therefore expensive to hold and worth holding, and the major that holds too many culminates. Non-hegemony (BL-224's invariant) is not relaxed for the sea: 1960 arrives multipolar.\n\nBOUNDED BY CONSTRUCTION like the land verbs: two staging hubs per polity per round (the capital and one rotated coastal holding), candidate legs from those only. Deterministic - the coastal walk is over sorted tile indices.\n\nDONE WHEN: history_sweep reports overseas holdings per major at the epoch and the distribution is wide; a polity with no harbour work never founds across water (asserted); world_determinism on the 0 CE arc unchanged."
+   "design": "THE GAP. The sim knows enclosed-sea ring closure (w_ring) and nothing else about water: no Campaign or Settle target lies across a sea leg, so \"the extent of colonisation by major powers\" cannot be produced by pass 2 at all. The works roster already authors the rows that should gate it - Harbour Mole, Deepwater Wharf, Naval Yard, Coaling Station - and they do nothing for reach today.\n\nTHE DESIGN, in the sim's own currency. A sea leg is a candidate-grain extension of the target set: a region reachable by a coastal walk from a staging hub that holds a harbour work, with the leg's supply cost read from the same reach substrate the land term uses (one reach field, BL-325 ruling 3) and its range capped by the hub's best harbour row (Mole: littoral; Wharf: the enclosed sea; Naval Yard: open water; Coaling Station: any coast). Settle across the leg founds a holding that counts toward holdings_burden_q like any other - the burden of breadth is what makes an overseas empire strain, and reach-fed strain (COLLAPSE.md § 5, the Metropole's inevitability) is the accumulator it feeds. A colony is therefore expensive to hold and worth holding, and the major that holds too many culminates. Non-hegemony (BL-224, the non-hegemony invariant) is not relaxed for the sea: 1960 arrives multipolar.\n\nBOUNDED BY CONSTRUCTION like the land verbs: two staging hubs per polity per round (the capital and one rotated coastal holding), candidate legs from those only. Deterministic - the coastal walk is over sorted tile indices.\n\nDONE WHEN: history_sweep reports overseas holdings per major at the epoch and the distribution is wide; a polity with no harbour work never founds across water (asserted); world_determinism on the 0 CE arc unchanged."
   },
   {
    "status": "designed",
@@ -394,15 +394,15 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "32",
+   "sprint": "34",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
-    "BL-747"
+    "BL-748"
    ],
    "blocked_on": null,
    "parked": false,
-   "id": "BL-749",
+   "id": "BL-750",
    "short_name": "TARIFF_POSTURE",
    "category": "Politics",
    "title": "A polity chooses protection in the industrial pass, and the nation inherits it as an enacted import tariff at world setup",
@@ -415,7 +415,7 @@
     "src/world/law.cpp",
     "src/world/hard_coded_world.cpp"
    ],
-   "design": "THE LEVER. The import_tariff law (D4) exists and is inert at world setup - no tariff is enacted, so not one line of its arithmetic runs. The design (GENERATION_STRATEGY.md § Three passes, \"separate market conditions are produced by in-world forces with visible causes\") wants each nation's tariff posture to be a FACT OF HISTORY the player can read, not a per-nation dial. A nation that industrialised late relative to its neighbours protects what it has; one that industrialised first wants open markets.\n\nTHE DESIGN. In pass 2 (BL-746, BL-747) a polity carries a protection scalar, moved deterministically by its industrialisation timing against its neighbours' (the axis derive_national_character already reads for ideology) and by whether it holds colonies (BL-748: a metropole protects its ties). At handoff, a polity above the protection threshold enacts an import_tariff law on the campaign nation at world setup, rate banded off the scalar, author set so the transfer credits the nation's treasury as the law already specifies. Under the 2026-08-18 nation grant: a nation setting a tariff is exactly what the grant admits; pure, seeded, replayable, never a planner. Whether the polity carries it as a scored VERB (spend a round to raise protection) or as a DERIVED output read at handoff is Ben's call - the derived form is cheaper and is the default here; the verb form makes it a strategy weighting (BL-488's shape) and costs a candidate per round.\n\nTHE PLAYER'S HALF. The player's home market is sheltered because its nation's history sheltered it. That is the \"supporting local companies in their initial sales\" of the 2026-09-03 brief, done as a force with a visible cause.\n\nDONE WHEN: a 1960 world opens with some nations tariffed and most not, the Law panel shows each one, and the tariff pass's own harness (law tests) is green with generated tariffs in place."
+   "design": "THE LEVER. The import_tariff law (D4) exists and is inert at world setup - no tariff is enacted, so not one line of its arithmetic runs. The design (GENERATION_STRATEGY.md § Three passes, \"separate market conditions are produced by in-world forces with visible causes\") wants each nation's tariff posture to be a FACT OF HISTORY the player can read, not a per-nation dial. A nation that industrialised late relative to its neighbours protects what it has; one that industrialised first wants open markets.\n\nTHE DESIGN. In pass 2 (BL-747 two-span prehistory, BL-748 industrial pass ladder) a polity carries a protection scalar, moved deterministically by its industrialisation timing against its neighbours' (the axis derive_national_character already reads for ideology) and by whether it holds colonies (BL-749, sea-leg campaign: a metropole protects its ties). At handoff, a polity above the protection threshold enacts an import_tariff law on the campaign nation at world setup, rate banded off the scalar, author set so the transfer credits the nation's treasury as the law already specifies. Under the 2026-08-18 nation grant: a nation setting a tariff is exactly what the grant admits; pure, seeded, replayable, never a planner. Whether the polity carries it as a scored VERB (spend a round to raise protection) or as a DERIVED output read at handoff is Ben's call - the derived form is cheaper and is the default here; the verb form makes it a strategy weighting (BL-488, polity strategy weightings) and costs a candidate per round.\n\nTHE PLAYER'S HALF. The player's home market is sheltered because its nation's history sheltered it. That is the \"supporting local companies in their initial sales\" of the 2026-09-03 brief, done as a force with a visible cause.\n\nDONE WHEN: a 1960 world opens with some nations tariffed and most not, the Law panel shows each one, and the tariff pass's own harness (law tests) is green with generated tariffs in place."
   },
   {
    "status": "designed",
@@ -423,15 +423,16 @@
    "priority": "A",
    "difficulty": 4,
    "version_goal": null,
-   "sprint": "32",
+   "sprint": "34",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
-    "BL-745"
+    "BL-745",
+    "BL-746"
    ],
    "blocked_on": null,
    "parked": false,
-   "id": "BL-750",
+   "id": "BL-751",
    "short_name": "ECONOMIC_SETTLE_PASS",
    "category": "Economy",
    "title": "The warm start promoted to a generation pass - firms spawn and exit, banded coarse, until the field is operating-positive and steady",
@@ -443,7 +444,7 @@
     "src/world/hard_coded_world.cpp",
     "tools/verify/campaign_lapse.cpp"
    ],
-   "design": "TODAY app::start_new_game runs pre_game_ticks (80, ~20 years) then rebases the clock: a settling pass with no spawn and (since BL-743) an exit. The design (GENERATION_STRATEGY.md § Three passes of simulated history, pass 3) makes it the pass that produces market conditions at game start.\n\nTHE WORK. (1) The settle becomes a world-generation step with its own params (settle_ticks, settle band, spawn cadence, stop test) rather than an app constant; harnesses derive it through the same helper as the app (the BL-462 discipline). (2) SPAWN: Pass 6 background-firm generation re-runs at a fixed cadence against the demand the field has now (CORPORATION_GENERATION.md § Pass 6 recurs), so a niche opened by an exit re-fills. (3) CULL: firm exit as it stands. (4) STOP: operating-positive and steady - mean operating net positive and a majority of corps operating-positive across a trailing window, the campaign_lapse four metrics - with a hard tick cap. NEVER \"every chain closed\": stable is not saturated. (5) At the end of the pass assert the chain-completeness SPREAD (demand_census R5) so the settle cannot flatten the map. (6) Banded coarse: if cost demands it, a coarse band with scaled tick effects, the grain switch a pure function of sim state (the BL-492 shape), asserted by the determinism harness.\n\nPRECONDITION, not a neighbour: sprint 31's done-when. A settle selects over a roster; on a roster that loses at base a longer settle produces an EMPTY world (the 2026-09-02 lapse: industrial field idle by tick 25). Gated on BL-745 (processor input bid cap) landing and the lapse showing operating-positive survivors.\n\nDONE WHEN: campaign_lapse on a settled 1960 world shows the four metrics steady from tick 0 of play; the corp count at handoff is a consequence of the settle, not of the Pass 6 cap alone; the settle's wall clock is on BL-753."
+   "design": "TODAY app::start_new_game runs pre_game_ticks (80, ~20 years) then rebases the clock: a settling pass with no spawn and (since BL-743, firm exit) a cull. The design (GENERATION_STRATEGY.md § Three passes of simulated history, pass 3) makes it the pass that produces market conditions at game start.\n\nTHE WORK. (1) The settle becomes a world-generation step with its own params (settle_ticks, settle band, spawn cadence, stop test) rather than an app constant; harnesses derive it through the same helper as the app (the BL-462 discipline). (2) SPAWN: Pass 6 background-firm generation re-runs at a fixed cadence against the demand the field has now (CORPORATION_GENERATION.md § Pass 6 recurs), so a niche opened by an exit re-fills. (3) CULL: firm exit as it stands. (4) STOP: operating-positive and steady - mean operating net positive and a majority of corps operating-positive across a trailing window, the campaign_lapse four metrics - with a hard tick cap. NEVER \"every chain closed\": stable is not saturated. (5) At the end of the pass assert the chain-completeness SPREAD (demand_census R5) so the settle cannot flatten the map. (6) Banded coarse: if cost demands it, a coarse band with scaled tick effects, the grain switch a pure function of sim state (the BL-492 banded-year-grain shape), asserted by the determinism harness.\n\nPRECONDITION, not a neighbour: SPRINT 33's done-when, not sprint 31's. Sprint 31 closed 2026-09-02 a success on SOLVENCY - a majority of corps end thirty years operating-positive - and that is necessary but not what this pass needs. A settle selects over a field that must KEEP PRODUCING: valued production still falls across the run (x0.2 on seed 0, x0.6 on seed 1), so a longer settle on today's field would cull toward a smaller economy rather than a steady one. Gated on BL-746 (upkeep starvation cliff) and BL-745 (processor input bid cap), and on sprint 33 showing valued production flat or rising across the lapse.\n\nDONE WHEN: campaign_lapse on a settled 1960 world shows the four metrics steady from tick 0 of play; the corp count at handoff is a consequence of the settle, not of the Pass 6 cap alone; the settle's wall clock is on BL-754 (generation budget)."
   },
   {
    "status": "designed",
@@ -451,16 +452,16 @@
    "priority": "A",
    "difficulty": 2,
    "version_goal": null,
-   "sprint": "32",
+   "sprint": "34",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
-    "BL-748",
-    "BL-750"
+    "BL-749",
+    "BL-751"
    ],
    "blocked_on": null,
    "parked": false,
-   "id": "BL-751",
+   "id": "BL-752",
    "short_name": "COLONIAL_TIES",
    "category": "Economy",
    "title": "Pass 2's colonial ties seed the order book's preferred-seller relationships, so a colony's chains close through its metropole first",
@@ -470,7 +471,7 @@
     "src/world/hard_coded_world.cpp",
     "src/world/market_clearing.cpp"
    ],
-   "design": "THE LEVER. The order book already honours a buyer's preferred_seller, served first and tolerated up to 1.10x the cheapest compatible ask (MARKETS.md step 10). Nothing sets it at generation. Pass 2 (BL-748) produces ownership history - which metropole held which colony, and for how long - and that is exactly the fact a trade tie should be derived from.\n\nTHE DESIGN. At handoff, for each region that was an overseas holding at the epoch or within N years of it, firms placed there carry a preferred_seller toward the metropole nation's firms for the goods the colony cannot close itself (the chain-completeness read says which). A tie, not a rule: the 1.10x tolerance is the whole strength of it, and a cheaper local seller beyond that tolerance wins. This is the third of the three forces in GENERATION_STRATEGY.md § Three passes - tariffs, distance, ties - and the one that makes \"global trade\" a set of ROUTES with a history rather than a uniform pull toward the cheapest ask.\n\nDONE WHEN: haulage_measure on a 1960 world shows convoy traffic on colony<->metropole legs above the baseline; removing the ties (params) removes it; determinism unchanged."
+   "design": "THE LEVER. The order book already honours a buyer's preferred_seller, served first and tolerated up to 1.10x the cheapest compatible ask (MARKETS.md step 10). Nothing sets it at generation. Pass 2 (BL-749, sea-leg campaign) produces ownership history - which metropole held which colony, and for how long - and that is exactly the fact a trade tie should be derived from.\n\nTHE DESIGN. At handoff, for each region that was an overseas holding at the epoch or within N years of it, firms placed there carry a preferred_seller toward the metropole nation's firms for the goods the colony cannot close itself (the chain-completeness read says which). A tie, not a rule: the 1.10x tolerance is the whole strength of it, and a cheaper local seller beyond that tolerance wins. This is the third of the three forces in GENERATION_STRATEGY.md § Three passes - tariffs, distance, ties - and the one that makes \"global trade\" a set of ROUTES with a history rather than a uniform pull toward the cheapest ask.\n\nDONE WHEN: haulage_measure on a 1960 world shows convoy traffic on colony<->metropole legs above the baseline; removing the ties (params) removes it; determinism unchanged."
   },
   {
    "status": "designed",
@@ -478,15 +479,15 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "32",
+   "sprint": "34",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
-    "BL-750"
+    "BL-751"
    ],
    "blocked_on": null,
    "parked": false,
-   "id": "BL-752",
+   "id": "BL-753",
    "short_name": "GENERATION_SCOREBOARD",
    "category": "Generation",
    "title": "One seed-sweep instrument for the three passes - chain-completeness spread, the lapse four, the haulage baseline, the sweep distributions - read as distributions, never as per-world targets",
@@ -498,7 +499,7 @@
     "tools/verify/history_sweep.cpp",
     "tools/verify/run_sweep.cmake"
    ],
-   "design": "\"GAMIFYING GENERATION\" MEANS A SCOREBOARD, NOT A TARGET. Ben, 2026-08-31: no start is clamped up to viability or down to fairness; generation owes the SPREAD. The three passes are tuned by moving a force (a weight in history_sim_params, a tariff threshold, the settle's spawn cadence) and reading how the DISTRIBUTION across a seed spread moves. The instruments exist and are read one at a time; this item puts them on one sheet.\n\nTHE WORK. A sweep target (run_sweep.cmake already fans harnesses over seeds) that, per seed, records: chain-completeness spread (demand_census R5 - min, median, max, tails); the lapse four at handoff (mean operating net, operating-positive corps, valued production, debtors); the haulage baseline (convoy count and cargo vs the 1055/802 reference - goldens cannot see trade); and history_sweep's pass-1/pass-2 outputs (nation count, furnace years, overseas holdings, tariffed nations). One table, seeds as rows, printed and diffable. No assertion beyond \"the spread is not zero\" - the instrument reports, the sprint argues.\n\nDONE WHEN: the sheet exists, runs over the standard seed spread in one command, and sprint 32's retro cites it."
+   "design": "\"GAMIFYING GENERATION\" MEANS A SCOREBOARD, NOT A TARGET. Ben, 2026-08-31: no start is clamped up to viability or down to fairness; generation owes the SPREAD. The three passes are tuned by moving a force (a weight in history_sim_params, a tariff threshold, the settle's spawn cadence) and reading how the DISTRIBUTION across a seed spread moves. The instruments exist and are read one at a time; this item puts them on one sheet.\n\nTHE WORK. A sweep target (run_sweep.cmake already fans harnesses over seeds) that, per seed, records: chain-completeness spread (demand_census R5 - min, median, max, tails); the lapse four at handoff (mean operating net, operating-positive corps, valued production, debtors); the haulage baseline (convoy count and cargo vs the 1055/802 reference - goldens cannot see trade); and history_sweep's pass-1/pass-2 outputs (nation count, furnace years, overseas holdings, tariffed nations). One table, seeds as rows, printed and diffable. No assertion beyond \"the spread is not zero\" - the instrument reports, the sprint argues.\n\nDONE WHEN: the sheet exists, runs over the standard seed spread in one command, and sprint 34's retro cites it."
   },
   {
    "status": "designed",
@@ -506,16 +507,16 @@
    "priority": "A",
    "difficulty": 2,
    "version_goal": null,
-   "sprint": "32",
+   "sprint": "34",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
-    "BL-746",
-    "BL-750"
+    "BL-747",
+    "BL-751"
    ],
    "blocked_on": null,
    "parked": false,
-   "id": "BL-753",
+   "id": "BL-754",
    "short_name": "GENERATION_BUDGET",
    "category": "Generation",
    "title": "The generating-screen budget for three passes - measure first, then re-file only the affordability rungs the measurement demands",
@@ -524,7 +525,7 @@
     "src/core/app.cpp",
     "tools/verify/history_sweep.cpp"
    ],
-   "design": "BEN, 2026-09-03: \"I am interested to see if this can be done cheaply. This is in fact a difficult abstraction problem.\" The budget is the generating screen's wait (~25-38 s generation + ~6 s warm start today, per app.cpp). Pass 1 is already the most expensive pass; pass 2 doubles it and pass 3 lengthens the settle by an order of magnitude at 4 ticks a year. Cost tracks the province table, not the fighting (COLLAPSE.md § The 4000-year problem).\n\nTHE WORK. (1) Instrument the wait per pass on the loading screen's progress sink and in history_sweep, so every sprint-32 item records its cost on this item as it lands. (2) The affordability rungs in COLLAPSE.md § The 4000-year problem - kill the O(provinces) scans, quiet-province fast path, banded year grain, record on change - were purged with the ancient pivot and are NOT re-filed here in advance. Re-file the one the measurement points at, when it does, in that order. (3) The abstraction question Ben names is the handoff between two engines, not either engine: keep the handoff a struct of plain outputs (regions, works, strain, ties, posture) so pass 3 never reads pass 2's internals.\n\nDONE WHEN: a 1960 world with all three passes generates inside a budget Ben has stated on this item; if it cannot, the item records which rung buys it back and that rung is filed."
+   "design": "BEN, 2026-09-03: \"I am interested to see if this can be done cheaply. This is in fact a difficult abstraction problem.\" The budget is the generating screen's wait (~25-38 s generation + ~6 s warm start today, per app.cpp). Pass 1 is already the most expensive pass; pass 2 doubles it and pass 3 lengthens the settle by an order of magnitude at 4 ticks a year. Cost tracks the province table, not the fighting (COLLAPSE.md § The 4000-year problem).\n\nTHE WORK. (1) Instrument the wait per pass on the loading screen's progress sink and in history_sweep, so every sprint-34 item records its cost on this item as it lands. (2) The affordability rungs in COLLAPSE.md § The 4000-year problem - kill the O(provinces) scans, quiet-province fast path, banded year grain, record on change - were purged with the ancient pivot and are NOT re-filed here in advance. Re-file the one the measurement points at, when it does, in that order. (3) The abstraction question Ben names is the handoff between two engines, not either engine: keep the handoff a struct of plain outputs (regions, works, strain, ties, posture) so pass 3 never reads pass 2's internals.\n\nDONE WHEN: a 1960 world with all three passes generates inside a budget Ben has stated on this item; if it cannot, the item records which rung buys it back and that rung is filed."
   }
  ]
 }

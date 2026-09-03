@@ -473,6 +473,16 @@ economy = {
     building_upkeep = {
         supply_decay_permille    = 50,   -- the ONE subtraction, per tick, on an unmet draw
         supply_recovery_permille = 100,  -- regained per tick while the draw is met
+        -- BL-746 (Ben, 2026-09-02, NR-782 (a)): the FLOOR. An unmet draw dims a
+        -- building to half its nominal output and no further - PRODUCTION.md's
+        -- "the lights go dim, not out", which at floor 0 the decay did not
+        -- honour: every industrial building the power grid could not reach went
+        -- dark exactly 20 ticks in (1000/50), 219 -> 40 active in one tick,
+        -- measured on the campaign_lapse debt instrument. With the draws zeroed
+        -- the same field was solvent and growing. Paired with the no-wire rule
+        -- (economy_system.cpp § run_building_upkeep): a grid good is not drawn
+        -- at all where the network does not reach.
+        supply_floor_permille    = 500,
 
         -- BL-708 (2026-08-31) — POWER IS THE FIRST NON-ZERO ENTRY IN THIS TABLE,
         -- and the reason it can be is the reason PRODUCTION.md § Power gives:

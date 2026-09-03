@@ -51,7 +51,24 @@
 //   corps_index.csv  corp,name,focus,home_nation,is_background
 //   corps.csv        tick,corp,balance,income,expenditure,maintenance,wages,
 //                    interest,levies,upkeep,subsidies,net,holdings,
-//                    footprint_tiles,market_share
+//                    footprint_tiles,market_share,
+//                    convoys,agency,budget,nation,arrivals,exits,delta,
+//                    produced_value,bldg_active,bldg_idle,bldg_limited,
+//                    bldg_unstaffed,bldg_exhausted,bldg_building,bldg_mothballed,labour,
+//                    supply_factor_mean,bldg_supply_zero
+//                    (BL-745 debt instrumentation, 2026-09-02: the seven deltas
+//                    are this tick's BALANCE DELTA attributed by tick PHASE -
+//                    convoy legs debited at dispatch; the corp AI batch inside
+//                    run_economy_step (build cost + materials, hires, buyouts,
+//                    recipe switches - CAPITAL, not in any filed flow); the
+//                    seven budget flows; the nation step; convoy arrival
+//                    credits; the firm-exit wind-up; and their sum, which is
+//                    exactly balance(t) - balance(t-1). Nothing is inferred:
+//                    every column is a difference of two snapshots.)
+//   debt.csv         one row per corp that ENTERED debt inside the measured
+//                    window: the tick, what it held, and its trailing-4-tick
+//                    flows with the dominant drain named. Printed as a table
+//                    and a histogram at the end of the run.
 //   markets.csv      tick,market,body,resource,price,base_price,supply,demand,
 //                    shortfall            (priced resources only)
 //   world.csv        tick,valued_production,exchange_revenue,convoys,
@@ -87,8 +104,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <deque>
+#include <map>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -120,26 +140,72 @@ struct lapse_params
     double      budget_s    = 900.0; ///< T0d wall-clock ceiling for one rollout.
 };
 
+/// BL-745 debt instrumentation: one corp's balance delta this tick, attributed
+/// to the tick phase that moved it. The seven sum to balance(t) - balance(t-1)
+/// by construction (each is a difference of two snapshots).
+struct phase_deltas
+{
+    double convoys  = 0.0; ///< dispatch_convoys: leg costs debited at departure.
+    double agency   = 0.0; ///< run_economy_step: the corp AI batch — build, hire, buyout, switch. CAPITAL.
+    double budget   = 0.0; ///< clear_markets + apply_budget: the seven filed flows.
+    double nation   = 0.0; ///< run_nation_step + tech gates: state purchases, subsidies, levies settled there.
+    double arrivals = 0.0; ///< credit_arrived_convoys: cargo sold on arrival.
+    double exits    = 0.0; ///< run_firm_exits: the wind-up.
+    double total() const { return convoys + agency + budget + nation + arrivals + exits; }
+};
+
 /// One economy tick in app::step_economy's order — acquisition_viability's own
 /// loop, spectating always true here.
 std::unordered_map<entity_id, corp_cash_flow>
-tick(world& w, const recipe_registry& reg, int t, economy_report& rep_out)
+tick(world& w, const recipe_registry& reg, int t, economy_report& rep_out,
+     std::map<entity_id, phase_deltas>* phases = nullptr)
 {
     w.current_econ_tick = t;
     w.current_day_tick  = t;
     lp_pool_map lp;
+    // BL-745 debt instrumentation: every corp's balance is snapshotted between
+    // the tick's phases, so the balance delta is ATTRIBUTED rather than
+    // inferred. A corp absent from a snapshot (spawned or wound up mid-tick)
+    // contributes the delta of the snapshots it is in.
+    std::unordered_map<entity_id, float> s_prev, s_cur;
+    auto snap = [&](std::unordered_map<entity_id, float>& m) {
+        m.clear();
+        for (const auto& [id, cc] : w.corporations)
+            m[id] = cc.balance;
+    };
+    auto attribute = [&](double phase_deltas::*field) {
+        if (!phases)
+            return;
+        snap(s_cur);
+        for (const auto& [id, bal] : s_cur)
+        {
+            const auto pit = s_prev.find(id);
+            const double before = (pit != s_prev.end()) ? pit->second : 0.0;
+            (*phases)[id].*field += static_cast<double>(bal) - before;
+        }
+        s_prev.swap(s_cur);
+    };
+    if (phases)
+        snap(s_prev);
+
     dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
                      reg.logistics_cost(convoy_mode::space), &lp);
     advance_convoys(w);
+    attribute(&phase_deltas::convoys);
     economy_report rep = run_economy_step(w, reg, /*spectating=*/true, &lp);
+    attribute(&phase_deltas::agency);
     auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
                  &rep.building_labour);
+    attribute(&phase_deltas::budget);
     run_nation_step(w, reg, rep, t);
     advance_tech_gates(w);
+    attribute(&phase_deltas::nation);
     credit_arrived_convoys(w, t);
+    attribute(&phase_deltas::arrivals);
     // BL-743: the insolvency wind-up, last — app::step_economy's own order.
     run_firm_exits(w, reg.firm_exit(), &rep.firm_exits);
+    attribute(&phase_deltas::exits);
     rep_out = std::move(rep);
     return flows;
 }
@@ -176,12 +242,36 @@ std::vector<entity_id> sorted_market_ids(const world& w)
 /// good's price. Unpriced goods (base_price 0 at that market) value at the
 /// resolved price on the row, which is 0 for a good no market prices — an
 /// unpriced good contributes nothing, exactly as it earns nothing.
-double valued_production(const world& w, const recipe_registry& reg,
-                         const economy_report& rep)
+/// BL-745 debt instrumentation: one corp's producing side this tick — the value
+/// of what its buildings made (NR-774's GDP definition, per owner) and how many
+/// of them ran, sat idle, or reported a binding input. Read beside the filed
+/// expenditure, it says whether a firm that is losing money made and sold at a
+/// loss (produced ~ expenditure) or bought inputs it never turned into output
+/// (produced ~ 0 with expenditure > 0 — the starved partial-buy shape).
+struct corp_prod
 {
-    double total = 0.0;
+    double value   = 0.0;
+    int    active  = 0;
+    int    idle    = 0;
+    int    limited = 0; ///< has_limiting: a binding input was reported.
+    int    unstaffed = 0; ///< idle with no effective workforce at all.
+    int    exhausted = 0; ///< extraction: the deposit is spent.
+    double labour  = 0.0; ///< Σ effective_workforce over the reporting buildings.
+};
+
+std::map<entity_id, corp_prod> per_corp_production(const world& w, const recipe_registry& reg,
+                                                   const economy_report& rep)
+{
+    std::map<entity_id, corp_prod> out;
     for (const building_report& br : rep.buildings)   // deterministic pass order
     {
+        corp_prod& cp = out[br.corp];
+        if (br.active)  ++cp.active;
+        if (br.idle)    ++cp.idle;
+        if (br.has_limiting) ++cp.limited;
+        if (br.idle && br.effective_workforce <= 0.0f) ++cp.unstaffed;
+        if (br.exhausted) ++cp.exhausted;
+        cp.labour += static_cast<double>(br.effective_workforce);
         if (!(br.output_quantity > 0.0f))
             continue;
         const auto bit = w.buildings.find(br.building);
@@ -194,8 +284,8 @@ double valued_production(const world& w, const recipe_registry& reg,
 
         if (br.type == building_type::extraction_site)
         {
-            total += static_cast<double>(br.output_quantity)
-                   * static_cast<double>(mc.price[static_cast<std::size_t>(br.target_resource)]);
+            cp.value += static_cast<double>(br.output_quantity)
+                      * static_cast<double>(mc.price[static_cast<std::size_t>(br.target_resource)]);
             continue;
         }
         const recipe* rc = reg.get_recipe(br.recipe);
@@ -209,9 +299,20 @@ double valued_production(const world& w, const recipe_registry& reg,
         const double scale = static_cast<double>(br.output_quantity) / authored_sum;
         for (std::size_t r = 0; r < resource_count; ++r)
             if (rc->outputs[r] > 0.0f)
-                total += static_cast<double>(rc->outputs[r]) * scale
-                       * static_cast<double>(mc.price[r]);
+                cp.value += static_cast<double>(rc->outputs[r]) * scale
+                          * static_cast<double>(mc.price[r]);
     }
+    return out;
+}
+
+/// The world total of the above — unchanged in value from the original walk
+/// (same rows, same prices, same order), now summed from the per-corp map.
+double valued_production(const world& w, const recipe_registry& reg,
+                         const economy_report& rep)
+{
+    double total = 0.0;
+    for (const auto& [corp, cp] : per_corp_production(w, reg, rep))
+        total += cp.value;
     return total;
 }
 
@@ -258,6 +359,9 @@ struct rollout_result
     int         corp_rows     = 0;
     int         market_rows   = 0;
     double      elapsed_s     = 0.0;
+    std::string debt_csv;               ///< BL-745: one row per debt entry in the window.
+    int         debt_entries  = 0;
+    double      phase_residual_max = 0.0; ///< max |delta - sum of phases| seen (must be ~0).
 };
 
 void appendf(std::string& s, const char* fmt, ...)
@@ -309,7 +413,33 @@ rollout_result run_rollout(const lapse_params& lp, const recipe_registry& reg,
     }
 
     out.corps_csv = "tick,corp,balance,income,expenditure,maintenance,wages,interest,"
-                    "levies,upkeep,subsidies,net,holdings,footprint_tiles,market_share\n";
+                    "levies,upkeep,subsidies,net,holdings,footprint_tiles,market_share,"
+                    "convoys,agency,budget,nation,arrivals,exits,delta,"
+                    "produced_value,bldg_active,bldg_idle,bldg_limited,bldg_unstaffed,bldg_exhausted,"
+                    "bldg_building,bldg_mothballed,labour,supply_factor_mean,bldg_supply_zero\n";
+    out.debt_csv  = "tick,corp,focus,balance_at_entry,holdings,extraction,processing,other,"
+                    "t4_income,t4_inputs,t4_maintenance,t4_wages,t4_interest,t4_upkeep,"
+                    "t4_capital,t4_convoys,t4_arrivals,t4_produced,active_at_entry,idle_at_entry,"
+                    "limited_at_entry,unstaffed_at_entry,building_at_entry,mothballed_at_entry,"
+                    "dominant_drain,idle_ticks_of_4\n";
+
+    // BL-745: per-corp trailing window and debt-entry bookkeeping.
+    struct trailing_row
+    {
+        double income = 0, inputs = 0, maintenance = 0, wages = 0, interest = 0, upkeep = 0;
+        double capital = 0, convoys = 0, arrivals = 0, produced = 0;
+    };
+    std::map<entity_id, std::deque<trailing_row>> trailing;
+    std::map<entity_id, float> prev_balance;
+    std::set<entity_id> entered;   // corps that already entered debt in the window
+    struct drain_tally { const char* name; int count; double sum; };
+    drain_tally drains[] = { {"inputs", 0, 0}, {"maintenance", 0, 0}, {"wages", 0, 0},
+                             {"interest", 0, 0}, {"upkeep", 0, 0}, {"capital", 0, 0},
+                             {"convoys", 0, 0} };
+    std::vector<int> entry_ticks;
+    int idle_entries = 0;
+    for (const entity_id id : sorted_corp_ids(w))
+        prev_balance[id] = w.corporations.at(id).balance;
     out.markets_csv = "tick,market,body,resource,price,base_price,supply,demand,shortfall\n";
     out.world_csv = "tick,valued_production,exchange_revenue,convoys,buildings_active,"
                     "buildings_idle,corps,corps_in_debt,hostile_pairs,friend_pairs,"
@@ -319,11 +449,18 @@ rollout_result run_rollout(const lapse_params& lp, const recipe_registry& reg,
     for (int t = 1; t <= total_ticks; ++t)
     {
         economy_report rep;
-        auto flows = tick(w, reg, t, rep);
+        std::map<entity_id, phase_deltas> phases;
+        auto flows = tick(w, reg, t, rep, &phases);
         if (t <= lp.warm_ticks)
+        {
+            prev_balance.clear();
+            for (const entity_id id : sorted_corp_ids(w))
+                prev_balance[id] = w.corporations.at(id).balance;
             continue;   // the warm start settles; the measured window logs
+        }
 
         // --- per-corp rows (rep.budgets is a std::map — already sorted) -----
+        const std::map<entity_id, corp_prod> prod = per_corp_production(w, reg, rep);
         const std::vector<corp_standing> standings = compute_corp_standings(w, flows);
         std::unordered_map<entity_id, float> share;
         for (const corp_standing& s : standings)
@@ -337,8 +474,21 @@ rollout_result run_rollout(const lapse_params& lp, const recipe_registry& reg,
             if (bit != rep.budgets.end())
                 b = bit->second;
             const auto sit = share.find(id);
+            phase_deltas pd;
+            if (const auto ph = phases.find(id); ph != phases.end())
+                pd = ph->second;
+            {
+                const auto pb = prev_balance.find(id);
+                if (pb != prev_balance.end())
+                {
+                    const double delta = static_cast<double>(cc.balance) - pb->second;
+                    out.phase_residual_max =
+                        std::max(out.phase_residual_max, std::fabs(delta - pd.total()));
+                }
+            }
             appendf(out.corps_csv,
-                    "%d,%llu,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%d,%d,%.6f\n",
+                    "%d,%llu,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%d,%d,%.6f,"
+                    "%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,",
                     t, static_cast<unsigned long long>(id),
                     static_cast<double>(cc.balance),
                     static_cast<double>(b.income), static_cast<double>(b.expenditure),
@@ -348,8 +498,104 @@ rollout_result run_rollout(const lapse_params& lp, const recipe_registry& reg,
                     static_cast<double>(b.net()),
                     static_cast<int>(cc.assets.size()),
                     distinct_footprint_tiles(w, cc),
-                    sit == share.end() ? 0.0 : static_cast<double>(sit->second));
+                    sit == share.end() ? 0.0 : static_cast<double>(sit->second),
+                    pd.convoys, pd.agency, pd.budget, pd.nation, pd.arrivals, pd.exits,
+                    pd.total());
+            corp_prod cp;
+            if (const auto cit = prod.find(id); cit != prod.end())
+                cp = cit->second;
+            int under_construction = 0, mothballed = 0, supply_n = 0, supply_zero = 0;
+            double supply_sum = 0.0;
+            for (const entity_id bid : cc.assets)
+                if (const auto bt = w.buildings.find(bid); bt != w.buildings.end())
+                {
+                    if (bt->second.ticks_remaining > 0) ++under_construction;
+                    else if (bt->second.decommissioned) ++mothballed;
+                    else
+                    {
+                        // BL-641's output scalar: 1000 = fully supplied, 0 = dark.
+                        supply_sum += static_cast<double>(bt->second.supply_factor_permille) / 1000.0;
+                        ++supply_n;
+                        if (bt->second.supply_factor_permille <= 0) ++supply_zero;
+                    }
+                }
+            appendf(out.corps_csv, "%.4f,%d,%d,%d,%d,%d,%d,%d,%.4f,%.3f,%d\n", cp.value, cp.active,
+                    cp.idle, cp.limited, cp.unstaffed, cp.exhausted, under_construction,
+                    mothballed, cp.labour, supply_n > 0 ? supply_sum / supply_n : 1.0,
+                    supply_zero);
             ++out.corp_rows;
+
+            // --- BL-745: the trailing window and the moment of entry ------------
+            {
+                trailing_row tr;
+                tr.income      = b.income;
+                tr.inputs      = b.expenditure;
+                tr.maintenance = b.maintenance;
+                tr.wages       = b.wages;
+                tr.interest    = b.interest;
+                tr.upkeep      = b.upkeep;
+                tr.capital     = -pd.agency;   // a debit, reported as a positive drain
+                tr.convoys     = -pd.convoys;
+                tr.arrivals    = pd.arrivals;
+                tr.produced    = cp.value;
+                auto& dq = trailing[id];
+                dq.push_back(tr);
+                if (dq.size() > 4)
+                    dq.pop_front();
+
+                const auto pb = prev_balance.find(id);
+                const bool was_solvent = (pb == prev_balance.end()) || pb->second >= 0.0f;
+                if (was_solvent && cc.balance < 0.0f && !entered.count(id))
+                {
+                    entered.insert(id);
+                    trailing_row s4;
+                    int idle = 0;
+                    for (const trailing_row& r : dq)
+                    {
+                        s4.income += r.income; s4.inputs += r.inputs;
+                        s4.maintenance += r.maintenance; s4.wages += r.wages;
+                        s4.interest += r.interest; s4.upkeep += r.upkeep;
+                        s4.capital += r.capital; s4.convoys += r.convoys;
+                        s4.arrivals += r.arrivals;
+                        s4.produced += r.produced;
+                        if (r.income <= 0.0) ++idle;
+                    }
+                    int ext = 0, proc = 0, other = 0;
+                    for (const entity_id bid : cc.assets)
+                    {
+                        const auto bt = w.buildings.find(bid);
+                        if (bt == w.buildings.end()) { ++other; continue; }
+                        if (bt->second.type == building_type::extraction_site) ++ext;
+                        else if (bt->second.type == building_type::processing_facility) ++proc;
+                        else ++other;
+                    }
+                    const double vals[] = { s4.inputs, s4.maintenance, s4.wages, s4.interest,
+                                            s4.upkeep, s4.capital, s4.convoys };
+                    int dom = 0;
+                    for (int k = 1; k < 7; ++k)
+                        if (vals[k] > vals[dom]) dom = k;
+                    ++drains[dom].count;
+                    drains[dom].sum += vals[dom];
+                    entry_ticks.push_back(t);
+                    if (idle >= static_cast<int>(dq.size())) ++idle_entries;
+                    const char* focus =
+                        cc.focus == industrial_focus::extraction ? "extraction" :
+                        cc.focus == industrial_focus::processing ? "processing" : "trade";
+                    appendf(out.debt_csv,
+                            "%d,%llu,%s,%.2f,%d,%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,"
+                            "%.2f,%d,%d,%d,%d,%d,%d,%s,%d\n",
+                            t, static_cast<unsigned long long>(id), focus,
+                            static_cast<double>(cc.balance),
+                            static_cast<int>(cc.assets.size()), ext, proc, other,
+                            s4.income, s4.inputs, s4.maintenance, s4.wages, s4.interest,
+                            s4.upkeep, s4.capital, s4.convoys, s4.arrivals,
+                            s4.produced, cp.active, cp.idle, cp.limited,
+                            cp.unstaffed, under_construction, mothballed,
+                            drains[dom].name, idle);
+                    ++out.debt_entries;
+                }
+            }
+            prev_balance[id] = cc.balance;
         }
 
         // --- per-market rows, priced resources only -------------------------
@@ -418,6 +664,24 @@ rollout_result run_rollout(const lapse_params& lp, const recipe_registry& reg,
             out.final_valued = valued;
             out.final_demand = demand_sum;
         }
+    }
+
+    // --- BL-745: the debt-entry summary --------------------------------------
+    std::printf("\n=== debt entries in the measured window: %d corp(s) ===\n", out.debt_entries);
+    std::printf("  phase attribution residual (max |delta - sum of phases|): %.6f\n",
+                out.phase_residual_max);
+    if (!entry_ticks.empty())
+    {
+        std::sort(entry_ticks.begin(), entry_ticks.end());
+        std::printf("  entry tick: first %d, median %d, last %d; idle for the whole trailing "
+                    "window at entry: %d of %d\n",
+                    entry_ticks.front(), entry_ticks[entry_ticks.size() / 2],
+                    entry_ticks.back(), idle_entries, out.debt_entries);
+        std::printf("  dominant drain over the 4 ticks before entry (count, mean of the "
+                    "dominant flow):\n");
+        for (const drain_tally& d : drains)
+            if (d.count > 0)
+                std::printf("    %-12s %3d  %10.2f\n", d.name, d.count, d.sum / d.count);
     }
 
     out.elapsed_s = std::chrono::duration<double>(
@@ -625,6 +889,7 @@ int main(int argc, char** argv)
     write_file(dir / "corps.csv", r.corps_csv);
     write_file(dir / "markets.csv", r.markets_csv);
     write_file(dir / "world.csv", r.world_csv);
+    write_file(dir / "debt.csv", r.debt_csv);
 
     // The zero-observation guard holds in campaign mode too — a silent empty
     // run must not look like a delivered one.
@@ -632,6 +897,14 @@ int main(int argc, char** argv)
           "C1", "the campaign logged corps, markets, and non-zero valued production");
     check(r.elapsed_s < lp.budget_s,
           "C2", "the rollout finished inside its wall-clock ceiling");
+    // BL-745: the attribution is exact by construction; a residual means a
+    // balance moved outside the six snapshotted phases and the columns lie.
+    {
+        const std::string what = "every corp's balance delta is fully attributed to the "
+                                 "tick's phases (max residual " +
+                                 std::to_string(r.phase_residual_max) + ")";
+        check(r.phase_residual_max < 0.01, "C3", what.c_str());
+    }
 
     std::printf("  wrote %s (%d corp rows, %d market rows, %.1f s)\n",
                 dir.string().c_str(), r.corp_rows, r.market_rows, r.elapsed_s);
