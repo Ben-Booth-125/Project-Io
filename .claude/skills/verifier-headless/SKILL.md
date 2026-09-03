@@ -83,7 +83,12 @@ in `tools/verify/README.md`.
   `any` basket applies in both arcs, a banded one only in its own), and a **zero
   entry is skipped exactly as an absent one** — down to creating no pool that did not
   already exist, which is the property the inertness rests on. R6: two independently
-  built worlds run 12 contended ticks to identical supply factors and pools. Build
+  built worlds run 12 contended ticks to identical supply factors and pools. R8
+  (BL-746, 2026-09-02): the decay stops at the authored **floor** — 41 unmet ticks at
+  floor 500 leave 500, a met draw recovers from it, floor 250 lands at 250, a stranded
+  factor is lifted to the floor. R9 (BL-746): **no wire, no draw** — an unreached
+  building drawing a grid good stays at 1000, the same good off the grid decays 5 × 50,
+  and timber in the same basket still binds on the unreached tile. Build
   via `build_harness.bat`. The two rows it deliberately does NOT carry: bit-identity
   at zero rates is a **byte-compare** of `econ_harness` / `econ_bankruptcy` /
   `econ_stability` across the change, and the Industry channel reading PRESENT is

@@ -681,6 +681,11 @@ void recipe_registry::load_from_lua(lua_state& lua)
             bupk->get_or("supply_decay_permille",    bp.supply_decay_permille);
         bp.supply_recovery_permille =
             bupk->get_or("supply_recovery_permille", bp.supply_recovery_permille);
+        bp.supply_floor_permille =
+            bupk->get_or("supply_floor_permille", bp.supply_floor_permille);
+        if (bp.supply_floor_permille < 0 || bp.supply_floor_permille > 1000)
+            throw std::runtime_error("recipe_registry: building_upkeep.supply_floor_permille "
+                                     "must be in [0, 1000] (BL-746)");
         // Both are per-mille of a 0..1000 factor, so the honest domain is
         // [0, 1000]. Rejected by name rather than clamped, the untrusted-input
         // rule applied at the authoring boundary (economy.acquisition's

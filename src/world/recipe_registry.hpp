@@ -251,6 +251,14 @@ struct building_upkeep_params
     /// Regained per tick while the draw is met (or while there is nothing to
     /// draw). Ceilinged at 1000 (fully supplied).
     int supply_recovery_permille = 0;
+    /// BL-746 (Ben, 2026-09-02, ruling NR-782 (a)): the FLOOR an unmet draw can
+    /// decay the factor to. "The lights go dim, not out" — PRODUCTION.md § A
+    /// shortfall scales output — was a rule the decay did not honour: at floor 0
+    /// a building whose draw is never met is dark exactly 1000/decay ticks in,
+    /// and in the industrial band that was every building the power grid could
+    /// not reach, at tick 20, in one tick. 0 keeps the old behaviour (every
+    /// hand-built harness registry); the authored value is economy.lua's.
+    int supply_floor_permille = 0;
 };
 
 /// Resolve @p bt's upkeep basket for a campaign running in band @p campaign,

@@ -552,6 +552,15 @@ of magnitude.
 A building on reduced output keeps bidding. That is the whole difference: it stays a participant in
 the market that has to supply it.
 
+**Dim, never dark (Ben, 2026-09-02).** The reduction has a floor: an unmet draw decays a building's
+supply factor by the authored step per tick down to `supply_floor_permille` and no further, so the
+worst-supplied building still runs at that fraction of nominal. A decay without a floor is an idle
+with a delay — every building whose draw is never met goes dark exactly `1000 / decay` ticks in,
+together, which is the cliff this rule exists to prevent. **And no wire, no draw:** a grid good
+(`LOGISTICS.md` § 3a) is drawn only where the road network reaches the building's tile. Where it
+does not, the good cannot arrive, so the building neither draws it nor weakens for want of it; the
+ordinary goods in its basket still draw and still bind. Owner: BL-746 (upkeep starvation cliff).
+
 **The corollary for authoring:** a channel's rates may ship at zero while its shape ships complete.
 A draw for a good the world does not yet make is not a channel that needs tuning down — it is a
 channel whose supply has not been induced yet, and the honest response is to ship it inert and turn

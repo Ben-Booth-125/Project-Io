@@ -120,12 +120,13 @@ struct fixture
 
 /// A registry authoring ONE resource on ONE building type in ONE band.
 recipe_registry make_registry(building_type bt, era_band band, resource_type good, float qty,
-                              int decay = 50, int recovery = 100)
+                              int decay = 50, int recovery = 100, int floor = 0)
 {
     recipe_registry reg;
     building_upkeep_params up;
     up.supply_decay_permille    = decay;
     up.supply_recovery_permille = recovery;
+    up.supply_floor_permille    = floor;
     up.goods[static_cast<std::size_t>(bt)][static_cast<std::size_t>(band)][ri(good)] = qty;
     reg.set_building_upkeep(up);
     reg.set_era(band == era_band::any ? era_band::any : band);
@@ -640,6 +641,136 @@ void r7_the_reservation_ceiling()
 
 } // namespace
 
+// ---------------------------------------------------------------------------
+// R8 — BL-746 (NR-782 (a)): the decay stops at the authored floor
+// ---------------------------------------------------------------------------
+void r8_the_floor()
+{
+    std::printf("\n--- R8  an unmet draw dims a building to the FLOOR and no further (BL-746) ---\n");
+
+    // Floor 500: sustained neglect halves the building and stops there.
+    {
+        fixture f;
+        f.build(1, building_type::processing_facility);
+        const entity_id b = f.buildings[0];
+        recipe_registry reg = make_registry(building_type::processing_facility,
+                                            era_band::ancient, resource_type::tools, 1.0f,
+                                            /*decay=*/50, /*recovery=*/100, /*floor=*/500);
+        for (int i = 0; i < 40; ++i)
+            run_building_upkeep(f.w, reg, g_upkeep_report);
+        check(f.w.buildings.at(b).supply_factor_permille == 500,
+              "R8 41 unmet ticks at floor 500 leave the factor at exactly 500");
+        check_near(building_supply_scalar(f.w.buildings.at(b)), 0.5f,
+                   "R8 ... so the building runs at half nominal, not zero");
+
+        // A met draw recovers from the floor exactly as it recovered from any
+        // other value — the floor is a floor, not a trap.
+        f.pool().quantities[ri(resource_type::tools)] = 100.0f;
+        run_building_upkeep(f.w, reg, g_upkeep_report);
+        check(f.w.buildings.at(b).supply_factor_permille == 600,
+              "R8 a met draw recovers from the floor by supply_recovery_permille");
+    }
+
+    // The differential: floor 0 is the old rule, and R2 above already pins that
+    // it reaches 0 — so a floor of 250 lands at 250, not at 500 and not at 0.
+    {
+        fixture f;
+        f.build(1, building_type::processing_facility);
+        const entity_id b = f.buildings[0];
+        recipe_registry reg = make_registry(building_type::processing_facility,
+                                            era_band::ancient, resource_type::tools, 1.0f,
+                                            50, 100, /*floor=*/250);
+        for (int i = 0; i < 40; ++i)
+            run_building_upkeep(f.w, reg, g_upkeep_report);
+        check(f.w.buildings.at(b).supply_factor_permille == 250,
+              "R8 the floor is the AUTHORED number, not a constant (250 -> 250)");
+    }
+
+    // A factor already below the floor (a save from before the rule) is lifted
+    // to it on its next unmet tick rather than left stranded.
+    {
+        fixture f;
+        f.build(1, building_type::processing_facility);
+        const entity_id b = f.buildings[0];
+        f.w.buildings.at(b).supply_factor_permille = 120;
+        recipe_registry reg = make_registry(building_type::processing_facility,
+                                            era_band::ancient, resource_type::tools, 1.0f,
+                                            50, 100, /*floor=*/500);
+        run_building_upkeep(f.w, reg, g_upkeep_report);
+        check(f.w.buildings.at(b).supply_factor_permille == 500,
+              "R8 a factor below the floor is lifted to it on the next unmet tick");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// R9 — BL-746 (NR-782 (b)): no wire, no draw
+// ---------------------------------------------------------------------------
+void r9_no_wire_no_draw()
+{
+    std::printf("\n--- R9  a grid good is not drawn, and does not weaken, where no wire reaches (BL-746) ---\n");
+
+    // A one-tile body with no road, no hub, no port: the network reaches nothing,
+    // so the tile is unreached and power cannot arrive there.
+    auto one_tile_body = [](fixture& f) {
+        f.build(1, building_type::processing_facility);
+        f.w.bodies[f.body].grid_width  = 1;
+        f.w.bodies[f.body].grid_height = 1;
+        tile_component& tc = f.w.tiles.at(f.w.buildings.at(f.buildings[0]).tile);
+        tc.grid_x = 0;
+        tc.grid_y = 0;
+    };
+
+    // Power on the grid, drawn by the industrial processor, pool empty.
+    {
+        fixture f;
+        one_tile_body(f);
+        const entity_id b = f.buildings[0];
+        recipe_registry reg = make_registry(building_type::processing_facility,
+                                            era_band::industrial, resource_type::power, 0.4f);
+        grid_goods_params g;
+        g.is_grid[ri(resource_type::power)] = true;
+        reg.set_grid_goods(g);
+        for (int i = 0; i < 5; ++i)
+            run_building_upkeep(f.w, reg, g_upkeep_report);
+        check(f.w.buildings.at(b).supply_factor_permille == 1000,
+              "R9 an unreached building does NOT weaken for a grid good it cannot receive");
+    }
+
+    // THE DIFFERENTIAL: the same draw with power NOT on the grid is an ordinary
+    // unmet draw and decays — so the rule keys on the grid flag, not on power.
+    {
+        fixture f;
+        one_tile_body(f);
+        const entity_id b = f.buildings[0];
+        recipe_registry reg = make_registry(building_type::processing_facility,
+                                            era_band::industrial, resource_type::power, 0.4f);
+        for (int i = 0; i < 5; ++i)
+            run_building_upkeep(f.w, reg, g_upkeep_report);
+        check(f.w.buildings.at(b).supply_factor_permille == 750,
+              "R9 ... while the same good OFF the grid is an ordinary unmet draw (5 x 50)");
+    }
+
+    // The ordinary goods in the basket still draw and still bind on an
+    // unreached tile: strip the wire, not the timber.
+    {
+        fixture f;
+        one_tile_body(f);
+        const entity_id b = f.buildings[0];
+        recipe_registry reg = make_registry(building_type::processing_facility,
+                                            era_band::industrial, resource_type::power, 0.4f);
+        building_upkeep_params up = reg.building_upkeep();
+        up.goods[static_cast<std::size_t>(building_type::processing_facility)]
+                [static_cast<std::size_t>(era_band::industrial)][ri(resource_type::timber)] = 0.08f;
+        reg.set_building_upkeep(up);
+        grid_goods_params g;
+        g.is_grid[ri(resource_type::power)] = true;
+        reg.set_grid_goods(g);
+        run_building_upkeep(f.w, reg, g_upkeep_report);
+        check(f.w.buildings.at(b).supply_factor_permille == 950,
+              "R9 the unreached building still weakens for the TIMBER it could have had");
+    }
+}
+
 int main()
 {
     std::printf("building_upkeep — BL-641, requirement group `building-upkeep-goods` R1-R3, R6;\n");
@@ -653,6 +784,8 @@ int main()
     r2_the_shortfall_rule();
     r6_determinism();
     r7_the_reservation_ceiling();
+    r8_the_floor();
+    r9_no_wire_no_draw();
 
     std::printf("\n%s — %d failure(s)\n", g_failures == 0 ? "PASS" : "FAIL", g_failures);
     return g_failures == 0 ? 0 : 1;

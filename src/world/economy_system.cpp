@@ -2652,17 +2652,51 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
         // price signal rather than a silent sink — and paid for, unless the good
         // prices above the buyer's reservation ceiling, in which case the
         // building goes without and the shortfall rule below applies unchanged.
-        const bool unmet = draw_goods_or_bid(w, reg, report, corp, body, b.tile, basket[ti]);
+        // BL-746 (Ben, 2026-09-02, ruling NR-782 (b)): NO WIRE, NO DRAW. A grid
+        // good on a tile the network does not reach cannot arrive, so the draw
+        // is a fiction and the building must not decay for want of it. The
+        // grid goods are struck from THIS building's basket before the draw;
+        // the ordinary goods still draw and still bind. Measured before this
+        // rule: every unreached industrial building — most of them — went dark
+        // 1000/decay ticks in, in one tick, whatever its owner did.
+        std::array<float, resource_count> need = basket[ti];
+        bool any_need = true;
+        if (grid_rules)
+        {
+            const float rc        = tile_reach_cost(w, b.tile);
+            const bool  connected = (rc >= 0.0f) && std::isfinite(rc);
+            if (!connected)
+            {
+                any_need = false;
+                for (std::size_t r = 0; r < resource_count; ++r)
+                {
+                    if (reg.grid_goods().grid(r))
+                        need[r] = 0.0f;
+                    if (need[r] > 0.0f)
+                        any_need = true;
+                }
+            }
+        }
+        // A basket the strip emptied draws nothing and creates no pool; the
+        // building counts as supplied for the tick (recovery below).
+        const bool unmet = any_need
+            ? draw_goods_or_bid(w, reg, report, corp, body, b.tile, need)
+            : false;
 
         // THE SHORTFALL RULE IS THE SAME RULE. An unmet draw takes the same
         // subtraction an out-of-supply unit takes; it never destroys, idles or
         // decommissions the building. A met draw recovers, ceilinged at 1000.
+        // BL-746 (NR-782 (a)): the decay stops at the authored floor — the
+        // lights go dim, not out — so an unmet draw scales output down and
+        // never to zero. A factor already below the floor (a save from before
+        // the rule) is lifted to it on its next unmet tick.
         const int before = b.supply_factor_permille;
         if (unmet)
         {
             ++out.unmet;
             b.supply_factor_permille =
-                std::max(0, b.supply_factor_permille - up.supply_decay_permille);
+                std::max(up.supply_floor_permille,
+                         b.supply_factor_permille - up.supply_decay_permille);
         }
         else
         {
