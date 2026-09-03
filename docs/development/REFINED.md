@@ -1,37 +1,57 @@
 # REFINED — active worklist
 
-Sprint 32 (gamified generation), wave 1. Promoted 2026-09-03 after the subsystem map.
+Sprint 32 (gamified generation), **wave 2 — the eight-phase reorder**. Promoted 2026-09-03.
 
-**Scope of this wave.** BL-747 (two-span prehistory) and BL-754 (generation budget). These
-two are the foundation and the measurement: the arc running at all, and the number that says
-whether the rest is affordable — which is Ben's stated question for the sprint.
+## The batch, and why it is four items rather than twelve
 
-**Not in this wave, and why.** BL-751 (economic settle pass) is gated on sprint 33's growth
-half. BL-749 (sea-leg campaign) was scoped and found under-specified: the map turned up two
-pre-existing defects it sits on (BL-755, the sim already crosses water free; BL-756, it settles
-on ocean) plus five design calls only Ben can take. BL-748 (industrial pass ladder) and BL-750
-(tariff posture) follow BL-747 and are wave 2.
+Ben asked for the twelve reorder items as a batch delivery. Carving the collision map turned it
+into **four waves**, because the dependency graph is deep rather than wide — BL-765 needs BL-763
+and BL-764; BL-768 and BL-769 need BL-766 and BL-767; BL-770 needs BL-771; BL-772 needs BL-770;
+BL-773 needs BL-772. A twelve-item "batch" over that graph is a sequence wearing a batch's name.
 
-## BL-747 — two-span prehistory
+**This wave delivers four**, chosen as the deepest independent roots — two phase foundations, one
+prerequisite that unblocks the largest win, and one instrument that another item is already
+blocked on:
 
-- [ ] T1. `era_minus_one_enabled` drops the `epoch_year < 1700` clause and gates on
-      `prehistory_years > 0` alone. The settlement clause stays at the call site.
-- [ ] T2. `history_sim_params` gains `boundary_year` (default: past any stop year, so the
-      struct default is one span). `era_minus_one_sim_params` derives it as
-      `epoch_year - 400`, and fills `tick_bands` per span rather than one band.
-- [ ] T3. `run_history_sim` reads `boundary_year` to ceiling the roster band a polity may
-      reach — Medieval before, unrestricted after — for the works roster and the unit roster,
-      from one derivation, not two.
-- [ ] T4. The 0 CE arc executes identically: the boundary falls past `stop_year`, the ceiling
-      never lifts, and the second span is empty by construction. Verified against the
-      2026-09-03 digests, not by re-blessing.
-- [ ] T5. `history_sweep` reports both spans.
+- [ ] **BL-762 (resource origin split)** — phase 1. A `resource_origin` classification, and the
+      Body phase places only geological deposits. HAZARD: `tile_rng` is shared with the endemic
+      draw and with hazard/habitability jitter, so removing a draw moves them.
+- [ ] **BL-763 (continent time axis)** — phase 2 foundation. `run_continents` returns an ordered
+      sequence of plate snapshots with a defined epoch length; the endpoint is unchanged.
+- [ ] **BL-771 (tick length is a constant)** — phase 6 prerequisite. Make tick length a parameter
+      and classify every rate by its true period. Unblocks BL-770, which unblocks BL-772, which is
+      the 72-second win.
+- [ ] **BL-757 (sweep measures another era)** — the instrument BL-767 is blocked on. Point the
+      sweep at the run generation actually performs.
 
-## BL-754 — generation budget (instrumentation half only)
+## Held back, with reasons
 
-- [ ] T6. Generation times each pass and reports it; `world_determinism` and `history_sweep`
-      print the per-pass wall clock. Reported, never asserted.
-- [ ] T7. Record the two-span cost against the 2026-09-03 baseline (era pass 6.4 s of an
-      11.2 s world build) on BL-754.
+- **BL-764 (Lagrangian tiles)** — difficulty 5, and its own item says it should split again at
+  promotion. It is a representation change to the oldest layer in the generator and every pass
+  downstream reads its output. It gets its own delivery, not a slot in a batch.
+- **BL-765 (paleo deposits)** — needs BL-763 and BL-764.
+- **BL-766 (population map early)** — difficulty 5, touches the sim, the ECS and two save
+  versions, and it collides with **BL-758**, which is an open ruling for Ben. It probably
+  *dissolves* BL-758 (if centres exist before the sim, the sim's seed-any-zero-population rule
+  becomes moot), which is a reason to sequence it deliberately rather than race it.
+- **BL-767 (empires reliably form)** — gated on BL-757 landing in this wave. Next wave.
+- **BL-768, BL-769** — need BL-766 and BL-767.
+- **BL-770 (Era 0 candidate search)** — needs BL-771 from this wave, and BL-761.
+- **BL-772, BL-773** — need BL-770.
 
-**Requirement groups.** `two-span-prehistory` (R1–R5), `generation-budget` (R1).
+## Barriers (Batch Delivery semantics)
+
+Every task across all four items reaches a terminal state before **any** item is committed. Then
+**one** `verifier-review` pass over the whole integrated set — the failure it hunts is
+cross-slice. Commits are one per item, back to back, after the review closes clean.
+
+## The invariant every slice inherits
+
+The 0 CE world stays byte-identical unless an item states otherwise and blesses it deliberately.
+The acceptance test is `world_determinism`'s digests, measured 2026-09-03:
+`039EE9880739CDF6` (seed A on), `B0EBBA249B3DDABB` (seed B on), `DE55600457797638` (off).
+BL-762 is the one item that may legitimately move them; if it does, the movement is stated and
+blessed on purpose, never absorbed.
+
+**Requirement groups.** `resource-origin-split`, `continent-time-axis`, `tick-length-parameter`,
+`sweep-measures-generation`.

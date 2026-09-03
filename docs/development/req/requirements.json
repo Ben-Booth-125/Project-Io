@@ -4457,6 +4457,235 @@
      "evidence": "COMPLETE 2026-09-03. Generation now reports per-pass wall clock and the span structure; world_determinism prints both. Measured on the merged tree, RELEASE harness path (build_lua_harness.bat -> build_gen/verify/), which memory io-headless-build-invocation names as the evidence path:\n\n  0 CE, 400 y      total 8200 ms = pre-settlement 443 + settlement 4 + ERA-1 323 + post-era 7428\n  0 CE, no era     total 6661 ms = pre-settlement 455 + settlement 3 + ERA-1   0 + post-era 6202\n  1960, two-span   total 7996 ms = pre-settlement 465 + settlement 2 + ERA-1 197 + post-era 7331\n\nTWO FINDINGS. (1) THE SECOND SPAN IS FREE, and in fact cheaper: 800 years at epoch 1960 costs 197 ms against 323 ms for 400 years at 0 CE. Cost tracks the region table the sim grows, not the years it walks, and at 1960 the settlement pass has already founded most regions - 506 sim foundings against 833. (2) THE ERA PASS COSTS 4x ITS OWN WALL CLOCK. Era on vs off at 0 CE is a ~1.5 s difference of which only 323 ms is the sim; the rest is the post-era passes working over the 833 regions it founded. Anyone budgeting the era off its own timer is wrong by four. Reported, never asserted.\n\nBUILD TYPE IS PART OF THE MEASUREMENT (cold review, 2026-09-03). The same passes in a Debug build/ tree price at 0 CE total 73130 ms with era-1 26189 ms, and 1960 two-span total 57792 ms with era-1 13838 ms. The era pass is 3.9% of a Release build and 36% of a Debug one - a ~9x difference in SHARE - so the derived ratio \"the era costs 4x its own wall clock\" is a Release fact and reads 1.45x in Debug. What reproduces across BOTH build types, and is the finding that matters, is the DIRECTION: the two-span 1960 world builds FASTER than the single-span 0 CE one (57.8 s vs 73.1 s in Debug, 8.0 s vs 8.2 s in Release). Quote no ratio from this row without its build type."
     }
    ]
+  },
+  {
+   "brief": "resource-origin-split",
+   "title": "BL-762 - deposits split by origin: metals with the body, biology deferred to Life",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "active",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-762 - Sprint 32",
+   "batch": "sprint-32-wave-2",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "A `resource_origin` classification exists as ONE table and is the single source of the geological/biological split. Nothing re-derives it from an inline gate, and every resource in the roster carries a value.",
+     "verification": [
+      "headless: a new or extended harness asserts every resource_type has an origin",
+      "static: review confirms no second classification exists"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "The Body phase places only GEOLOGICAL deposits. Biological resources (coal, petroleum, peat, timber, agricultural_produce, fibre) are not placed there.",
+     "verification": [
+      "headless: earthlike_tile_census reports zero biological deposits after the Body phase"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "THE STREAM IS NOT SILENTLY RE-CUT. `tile_rng` is consumed past the deposit block by the endemic amount draw and by derive_environment's hazard/habitability jitter, so the biological draws either stay in place and consuming (writing zero), or the stream is re-cut deliberately and the 0 CE digests are re-blessed as a STATED act with the old and new values recorded.",
+     "verification": [
+      "headless: world_determinism - either the three digests hold, or they move once with both values recorded on the item"
+     ],
+     "notes": "This is the row that decides whether BL-762 is a refactor or a world change. It must not be resolved by adjusting the harness.",
+     "evidence": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "Endowment still gates: a body whose biosphere never reached land has no coal anywhere, and the gate is the origin table plus planetology rather than a scattered `>=` in S8.",
+     "verification": [
+      "headless: planetology_sweep or an extension reports coal endowment zero for a pre-land peak"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "continent-time-axis",
+   "title": "BL-763 - continents return a sequence of plate snapshots, not an endpoint",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "active",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-763 - Sprint 32",
+   "batch": "sprint-32-wave-2",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "`run_continents` returns an ordered sequence of plate snapshots with a DEFINED epoch length. `drift_col`/`drift_row` are integrated by an explicit loop rather than documented as \"per-epoch\" with no epoch defined anywhere.",
+     "verification": [
+      "headless: a harness asserts the sequence is ordered, non-empty, and its epoch length is a stated parameter"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "THE ENDPOINT IS UNCHANGED. The final snapshot is identical to today's `continent_state` output, so nothing downstream of continents moves and the 0 CE digests hold.",
+     "verification": [
+      "headless: world_determinism - the three 2026-09-03 digests unchanged"
+     ],
+     "notes": "The sequence is additive; the present-day answer must be bit-identical or the item has changed the world rather than described its past.",
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "The shared plate RNG stream is not disturbed. `run_continents` draws every plate's position, direction and oceanic flag from one stream in a fixed order; any new draw inserted into that loop shifts every subsequent plate.",
+     "verification": [
+      "headless: world_determinism",
+      "static: review confirms no draw was inserted before an existing one"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "The expensive neighbour is NOT re-run per epoch. The rift-basin search (corridor_of, O(total) per candidate pair with a 25-sample inlandness probe per corridor tile) runs once, not once per snapshot.",
+     "verification": [
+      "headless: the harness reports per-epoch wall clock, and total cost stays within single-digit ms per snapshot"
+     ],
+     "notes": "Feasibility measured the Voronoi snapshot as cheap (~316k distance evals) and named the basin search as the real cost.",
+     "evidence": null
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "requirement": "The stale comment at hard_coded_world.hpp is corrected: it claims `continent_state` \"never enters world, so it stays off the serialisation seam\", and it IS serialised on the envelope seam (save_game.cpp).",
+     "verification": [
+      "static: review confirms the comment matches the code"
+     ],
+     "notes": null,
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "tick-length-parameter",
+   "title": "BL-771 - the economy gets a tick-length parameter, and every rate declares its period",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "active",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-771 - Sprint 32",
+   "batch": "sprint-32-wave-2",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "Tick length is a PARAMETER, not a static constexpr. `econ_tick_days` becomes configurable and the default reproduces today's 90-day quarter exactly.",
+     "verification": [
+      "headless: econ_harness and upkeep_harness green at the default",
+      "headless: world_determinism unchanged"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Every rate constant declares its PERIOD (per-tick, per-quarter, per-year) and is derived from the tick-length parameter rather than assumed quarterly. The authored tables say which they are.",
+     "verification": [
+      "headless: a harness enumerates the rate set and asserts each carries a declared period"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "The constants that do NOT scale linearly are identified and handled explicitly rather than multiplied: interest compounding, build durations counted in ticks, and every decay/recovery step. A list of them is recorded on the item.",
+     "verification": [
+      "headless: a differential harness runs the same simulated span at two tick lengths and reports the divergence per flow"
+     ],
+     "notes": "A 4-year tick is a 16x rescale. Anything that compounds or counts ticks changes MEANING, not magnitude, and multiplying it is the defect this row exists to catch.",
+     "evidence": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "REPORTED, NOT ASSERTED: the same simulated span at two different tick lengths reaches comparable state, and the harness prints the per-flow divergence so the trade is visible. No magnitude is pinned.",
+     "verification": [
+      "headless: the differential harness prints the table"
+     ],
+     "notes": "The legitimate alternative - run phase 6 at the ordinary quarterly tick and simulate fewer years - is Ben's to choose, and this row's numbers are what he chooses from.",
+     "evidence": null
+    }
+   ]
+  },
+  {
+   "brief": "sweep-measures-generation",
+   "title": "BL-757 - the era sweep measures the run that generates a world",
+   "difficulty": 2,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "active",
+   "resolved": null,
+   "promoted_from": "backlog.json BL-757 - Sprint 32",
+   "batch": "sprint-32-wave-2",
+   "archived": false,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "`history_sweep --epoch <year>` derives its params through `era_minus_one_sim_params` AND matches generation on the other four divergence axes: the folded seed (`era_minus_one_sim_seed`), a real creed pointer, generation's works registry, and the PRE-sim settlement.",
+     "verification": [
+      "headless: history_sweep --epoch 0 reproduces generation's own counts for a seed - battles 270, conquests 207, foundings 833 on seed ABCDEF01"
+     ],
+     "notes": "Deriving the params alone closes axes 1-2 of six. The 2026-09-03 banner fix already says so honestly; this row makes the claim true instead.",
+     "evidence": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "The default (no --epoch) sweep is unchanged and still labelled as the struct-default ladder, so the research instrument survives alongside the generation-measuring one.",
+     "verification": [
+      "headless: history_sweep with no flag reports the same distributions as before"
+     ],
+     "notes": null,
+     "evidence": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "The S2 recheck runs the SAME span and the SAME world as the rows it rechecks.",
+     "verification": [
+      "headless: history_sweep --epoch 1960 - S2 green and comparing a two-span run against a two-span run"
+     ],
+     "notes": "Partly fixed 2026-09-03: the shadowed params and the epoch-less recheck world were corrected. This row closes what remains.",
+     "evidence": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "Works raised is reported PER BAND, so BL-767 can tune against it and BL-768 can see whether build_work ever wins.",
+     "verification": [
+      "headless: history_sweep reports works per roster band, either side of the boundary year"
+     ],
+     "notes": "Zero works were raised across 16 seeds; the cause is the argmax, not the gates. A per-band figure is what makes that visible rather than inferred.",
+     "evidence": null
+    }
+   ]
   }
  ]
 }
