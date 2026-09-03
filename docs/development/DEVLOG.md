@@ -46,6 +46,20 @@ per holding). `ctest -j6` is unusable here — 60 s Debug timeouts on every worl
 harness are contention, not verdicts — and `nmake all` stops at battle_engagement_harness,
 which has not compiled since the mercenary teardown (BL-731 gains the note).
 
+### Addendum, same session — the review queue ruled, and the ancient chain gets shorter
+
+Ben ruled the four open entries via the form. **NR-778 overturned:** one price table, and the
+ancient chain to steel shortened to depth one rather than banded prices. Applied as
+`steel_bloomery` (Bloomery Furnace: ore + timber → steel, appended so ids hold), the Smithy
+re-costed as the deeper alternate (0.4 blooms + 0.2 charcoal), the banded-price plumbing removed
+from config, seeding and world_gen.lua, and the single table re-derived at the larger of the two
+bands' needs — steel 16.1, machinery 61.0, alloys 85.0, consumer goods 61.0, ordnance 155.8,
+spacecraft components 310.0, construction capacity 6.6, ladder ~124×. `recipe_margin` ALL PASS
+in both bands against one table. **NR-779 and NR-780 ratified.** **NR-781:** `tier_margin` R2
+now compares net per unit of output between the tiers (the per-tick figures stay printed);
+`spawn_solvency` R3 holds the seated corp to the best rival's income per holding rather than
+3× the field mean. The stale 1.433× markup derivations in world_gen.lua's comments were swept.
+
 ### The finding — the anchor is necessary and was never sufficient
 
 `campaign_lapse --epoch 1960`, seeds 0 and 1: valued production ~0 at every measured tick,

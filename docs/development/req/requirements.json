@@ -4793,7 +4793,7 @@
       "code: CMakeLists add_test(recipe_margin)"
      ],
      "notes": null,
-     "evidence": "COMPLETE 2026-09-02. recipe_margin R2/R4 green in both bands at W=0.5, floor 0.25 (extraction maintenance 2, wage 4, base_rate 40; processing maintenance 2). haulage_measure re-run: cheapest good now 1.00, binding bound ceil > 8.84 against the authored 10.0 (was 14.07 - the derivation clears again; MARKETS.md § Where the ceiling comes from re-derived). recipe_margin added to IO_TEST_SCRIPT_ROOTED_HARNESSES and passes under ctest (0.02 s)."
+     "evidence": "COMPLETE 2026-09-02. recipe_margin R2/R4 green in both bands at W=0.5, floor 0.25 (extraction maintenance 2, wage 4, base_rate 40; processing maintenance 2). haulage_measure re-run: cheapest good now 1.00, binding bound ceil > 8.84 against the authored 10.0 (was 14.07 - the derivation clears again; MARKETS.md § Where the ceiling comes from re-derived). recipe_margin added to IO_TEST_SCRIPT_ROOTED_HARNESSES and passes under ctest (0.02 s). RE-VERIFIED 2026-09-02 after NR-778 was overturned: one price table, ancient steel at depth 1 (steel_bloomery), recipe_margin ALL PASS in both bands against the single table."
     }
    ]
   }

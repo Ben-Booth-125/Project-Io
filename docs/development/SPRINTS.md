@@ -78,6 +78,8 @@ STAGE 2 RESULT (2026-09-02). The anchor holds: 25 goods re-priced (spacecraft_co
 
 THE FIELD (campaign_lapse, industrial, unwarmed 40 ticks): active buildings 237 -> 263 through tick 12, valued production 13-23k/tick; expenditure 1.5-2.5x income from tick 4 (inputs at the ceiling), interest to 1k/tick, exits from tick 20, survivors idle from tick 25 (43 -> 21 active of ~390 holdings), valued production ~0 for the whole measured window of the warm-started run. The ancient band takes the same over-spend and exit wave and recovers (66 active, +1.9k/tick, one debtor at tick 40). The anchor is necessary and was never sufficient; the next lever is BL-745.
 
+RULINGS (2026-09-02, review form): NR-778 overturned - no banded prices; the ancient chain to steel is depth one (Bloomery Furnace: ore + timber -> steel), the Smithy the deeper alternate, one table re-derived (steel 16.1, ladder ~124x). NR-779/780 ratified. NR-781: tier_margin R2 compares net per UNIT of output; spawn_solvency R3 holds the seated corp to the best rival per holding rather than 3x the mean.
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -126,7 +128,7 @@ THE FIELD (campaign_lapse, industrial, unwarmed 40 ticks): active buildings 237 
 | 27 | The other half of the economy - demand, resumed | CLOSED 2026-09-02 on Ben's call (archive all prior sprints, sprint 31 opens). Both buyers and the whole operating-loss block landed; what it measured is the reason sprint 31 exists. |
 | 29 | The world gets a face - detailed canvas rendering | CLOSED 2026-09-02 on Ben's call (archive all prior sprints). The ground has a mechanism: baked painterly chunks in the C-F direction, stepped zoom with bake tiers, a threaded bake, muted borders. |
 | 30 | Canvas texture update | CLOSED 2026-09-02 on Ben's call (archive all prior sprints) with wave 1 landed and merged to main the same day: edges back on the ground, the land tilts at the top rungs. |
-| 31 | Long-term market viability - every recipe pays at base price | OPEN. 2026-09-02: BL-744 stage 2 landed on Ben's three rulings - the tables clear the anchor in both bands (recipe_margin ALL PASS, ctest-registered), BL-740 closed with it. The field re-measure then said the industrial band STILL collapses, differently: inputs bought at the ceiling, processors idled by their own agency, valued production ~0 from tick 25. BL-745 (processor input bid cap) is the next lever. |
+| 31 | Long-term market viability - every recipe pays at base price | OPEN. 2026-09-02: BL-744 stage 2 landed and ruled on - one price table (NR-778 overturned: the ancient chain reaches steel at depth 1 instead), the three constants and the anchor-route rule ratified, the two design-red harness rows re-expressed. recipe_margin ALL PASS in both bands. The field re-measure says the industrial band still collapses on inputs bought at the ceiling; BL-745 (processor input bid cap) is the next lever. |
 
 **Next up.** SPRINT NUMBERING, reset by Ben on 2026-08-30: the proposed shell-chrome (old 25) and startup (old 27) batches are DELETED - "Sprint 25 and 27 don't need a revisit, UI items for these are working great" - and the canvases batch renumbered from 26 to 25. THE NEXT NEW SPRINT IS 26. Two of the six UI review batches from 2026-08-28 therefore never run, and that is a judgement that their surfaces are good enough rather than a deferral.
 
