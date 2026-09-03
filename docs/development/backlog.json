@@ -448,7 +448,7 @@
     "src/world/hard_coded_world.cpp",
     "tools/verify/campaign_lapse.cpp"
    ],
-   "design": "TODAY app::start_new_game runs pre_game_ticks (80, ~20 years) then rebases the clock: a settling pass with no spawn and (since BL-743, firm exit) a cull. The design (GENERATION_STRATEGY.md § Three passes of simulated history, pass 3) makes it the pass that produces market conditions at game start.\n\nTHE WORK. (1) The settle becomes a world-generation step with its own params (settle_ticks, settle band, spawn cadence, stop test) rather than an app constant; harnesses derive it through the same helper as the app (the BL-462 discipline). (2) SPAWN: Pass 6 background-firm generation re-runs at a fixed cadence against the demand the field has now (CORPORATION_GENERATION.md § Pass 6 recurs), so a niche opened by an exit re-fills. (3) CULL: firm exit as it stands. (4) STOP: operating-positive and steady - mean operating net positive and a majority of corps operating-positive across a trailing window, the campaign_lapse four metrics - with a hard tick cap. NEVER \"every chain closed\": stable is not saturated. (5) At the end of the pass assert the chain-completeness SPREAD (demand_census R5) so the settle cannot flatten the map. (6) Banded coarse: if cost demands it, a coarse band with scaled tick effects, the grain switch a pure function of sim state (the BL-492 banded-year-grain shape), asserted by the determinism harness.\n\nPRECONDITION, not a neighbour: SPRINT 33's done-when, not sprint 31's. Sprint 31 closed 2026-09-02 a success on SOLVENCY - a majority of corps end thirty years operating-positive - and that is necessary but not what this pass needs. A settle selects over a field that must KEEP PRODUCING: valued production still falls across the run (x0.2 on seed 0, x0.6 on seed 1), so a longer settle on today's field would cull toward a smaller economy rather than a steady one. Gated on BL-746 (upkeep starvation cliff) and BL-745 (processor input bid cap), and on sprint 33 showing valued production flat or rising across the lapse.\n\nDONE WHEN: campaign_lapse on a settled 1960 world shows the four metrics steady from tick 0 of play; the corp count at handoff is a consequence of the settle, not of the Pass 6 cap alone; the settle's wall clock is on BL-754 (generation budget)."
+   "design": "TODAY app::start_new_game runs pre_game_ticks (80, ~20 years) then rebases the clock: a settling pass with no spawn and (since BL-743, firm exit) a cull. The design (GENERATION_STRATEGY.md § Three passes of simulated history, pass 3) makes it the pass that produces market conditions at game start.\n\nTHE WORK. (1) The settle becomes a world-generation step with its own params (settle_ticks, settle band, spawn cadence, stop test) rather than an app constant; harnesses derive it through the same helper as the app (the BL-462 discipline). (2) SPAWN: Pass 6 background-firm generation re-runs at a fixed cadence against the demand the field has now (CORPORATION_GENERATION.md § Pass 6 recurs), so a niche opened by an exit re-fills. (3) CULL: firm exit as it stands. (4) STOP: operating-positive and steady - mean operating net positive and a majority of corps operating-positive across a trailing window, the campaign_lapse four metrics - with a hard tick cap. NEVER \"every chain closed\": stable is not saturated. (5) At the end of the pass assert the chain-completeness SPREAD (demand_census R5) so the settle cannot flatten the map. (6) Banded coarse: if cost demands it, a coarse band with scaled tick effects, the grain switch a pure function of sim state (the BL-492 banded-year-grain shape), asserted by the determinism harness.\n\nPRECONDITION, not a neighbour: SPRINT 33's done-when, not sprint 31's. Sprint 31 closed 2026-09-02 a success on SOLVENCY - a majority of corps end thirty years operating-positive - and that is necessary but not what this pass needs. A settle selects over a field that must KEEP PRODUCING: valued production still falls across the run (x0.2 on seed 0, x0.6 on seed 1), so a longer settle on today's field would cull toward a smaller economy rather than a steady one. Gated on BL-746 (upkeep starvation cliff) and BL-745 (processor input bid cap), and on sprint 33 showing valued production flat or rising across the lapse.\n\nDONE WHEN: campaign_lapse on a settled 1960 world shows the four metrics steady from tick 0 of play; the corp count at handoff is a consequence of the settle, not of the Pass 6 cap alone; the settle's wall clock is on BL-754 (generation budget).\n\n--- SUPERSEDED IN SHAPE BY THE 2026-09-03 PHASE REORDER ---\n\nBen's point 8 retires the warm start rather than promoting it, and his point 6 replaces the settle with a DIRECTED PARALLEL CANDIDATE SEARCH over 1560-1960 (BL-770). This item was the warm start promoted - the same undirected pass, longer, with spawn and cull - and that is no longer the design. Do NOT build it as filed. Either rewrite it around phase 6 or close it superseded; BL-772 owns the retirement and BL-770 owns what replaces it. Its gate on sprint 33's growth half still applies to BL-770, for the same reason: a search over a field whose valued production falls will select the least-bad shrinking economy."
   },
   {
    "status": "designed",
@@ -697,6 +697,334 @@
     "tools/verify/campaign_lapse.cpp"
    ],
    "design": "MEASURED 2026-09-03 in the RELEASE play build (build_rel), running the app twice with --autostart:\n\n  epoch 1960 (two-span)   warm_start_80_ticks  73167 ms   convoys 14763.9 | run_economy_step 57023.9\n  epoch 0    (ancient)    warm_start_80_ticks  72088 ms   convoys 28321.1 | run_economy_step 42361.6\n\nTHE HEADLINE: THE TWO ARCS COST THE SAME, so this is NOT caused by BL-747. The 0 CE arc is byte-identical across that change (digests unmoved), and it pays 72.1 s where the new two-span 1960 arc pays 73.2 s. The warm start was already this expensive; running the sim at 1960 added roughly a second. Filed separately from BL-754 for exactly that reason - it is the startup cost the player actually waits through, and it belongs to the economy tick, not to generation.\n\nTHE SCALE OF THE MISMATCH. app.cpp's own comment budgets \"the ~25-38 s generation plus ~6 s warm start that follow it\". The warm start is running at 12x that. And it dwarfs the thing this sprint has been optimising: the Era -1 sim is 197-323 ms, generation end to end is ~8 s in the Release harness path, and the warm start is 72 s. Any conversation about whether generation can afford more complexity is answered by this number - generation is not where the startup budget goes.\n\nWHERE IT GOES, and the two arcs split differently, which is the useful part:\n  * run_economy_step dominates both, but MORE on the industrial band (57.0 s vs 42.4 s) - more recipes, more buildings, deeper chains.\n  * convoys are the reverse (14.8 s industrial vs 28.3 s ancient), which is worth understanding on its own: the ancient arc spends nearly twice as long moving goods. Candidate cause is the ancient chain being shallower, so more raw tonnage moves further, but that is a hypothesis and not a measurement.\n  * Everything else is noise: clear_markets ~0.11 s, apply_budget ~0.77 s, history_recorders ~0.39 s.\n\nTHE WORK, in order. (1) Profile run_economy_step across the 80 warm ticks and find what is O(n^2) or rebuilding per tick - 42-57 s over 80 ticks is 530-710 ms PER TICK, which is also what the player pays per tick at speed once playing, so this is a play-speed problem wearing a loading-screen costume. (2) Same for the convoy pass. (3) Only then consider reducing pre_game_ticks, which would be treating the symptom - the settle wants MORE ticks, not fewer (BL-751 makes the warm start a real generation pass).\n\nWHY IT MATTERS BEYOND THE WAIT: BL-751 (economic settle pass) proposes lengthening this pass by an order of magnitude so firms spawn and exit until the field is steady. At 0.9 s a tick that is not affordable, and BL-751's gate should read this item as well as sprint 33's growth half."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": "32",
+   "written": "2026-09-03",
+   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-762",
+   "short_name": "RESOURCE_ORIGIN_SPLIT",
+   "category": "Generation",
+   "title": "Phase 1 - deposits split by ORIGIN: metals seeded with the body, biological resources deferred to the Life phase",
+   "authority_doc": "docs/economy/RESOURCES.md",
+   "files": [
+    "src/world/components.hpp",
+    "src/world/tile_generation.cpp",
+    "src/world/planetology.cpp",
+    "docs/economy/RESOURCES.md",
+    "docs/generation/TILE_GENERATION.md"
+   ],
+   "design": "THE AIM (Ben, point 1): \"In this phase we should also seed simple resource deposits. For example metals.\" Metals are lithospheric and belong with the body; coal, timber and oil are the biosphere's residue and belong to Life (BL-765).\n\nWHAT ALREADY EXISTS, and it is more than half the job. The split is ALREADY ENCODED, but as scattered gates rather than a table: planetology S8 (planetology.cpp:1413-1512) gates coal on peak life reaching land (:1455), petroleum on oxygenation (:1450), peat and timber and agricultural_produce on life still being present (:1457-1463). Fossils key off st.peak and living resources off st.stage, which is exactly why a dead world keeps its coal and loses its forests. generate_deposits is a PURE function of (substrate, cover, density, landform, two seeded streams, rarity) - tile_generation.cpp:1215, and the ore-field pre-pass already REPLAYS it exactly (:1793-1810) to build a bears mask, so replaying a subset is proven machinery, not a hope.\n\nWHAT IS MISSING. (1) A resource ORIGIN classification. Nothing in src/ answers is_biological(resource_type) - the roster groups by source location and tier, RESOURCES.md by production tier and value track, and neither axis is geological vs biological. The only biotic predicate is is_biotic_cover(), which classifies COVER. (2) Endowment is a scalar MULTIPLY, not a placement - it can zero a resource but cannot say WHERE it goes.\n\nTHE TRAP THAT MAKES THIS SUBSTANTIAL RATHER THAN SMALL. tile_rng is SHARED past the deposit call: the endemic amount draw (tile_generation.cpp:1934) and derive_environment's hazard/habitability jitter (:1949) consume it after the deposits do. So removing a draw from the deposit block MOVES HAZARD AND HABITABILITY on every tile - a world-changing edit dressed as a refactor. Either keep the biological draws in place and consuming (writing zero), or re-cut the stream deliberately and re-bless the 0 CE digests as a stated act.\n\nDONE WHEN: a resource_origin table exists and is the single source of the geological/biological split; the Body phase places only geological deposits; world_determinism's 0 CE digests either hold, or move once with the movement stated and blessed on purpose."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": "32",
+   "written": "2026-09-03",
+   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-763",
+   "short_name": "CONTINENT_TIME_AXIS",
+   "category": "Generation",
+   "title": "Phase 2 - continents gain a TIME AXIS: drift produces a sequence of plate positions, not just an endpoint",
+   "authority_doc": "docs/generation/CONTINENTS.md",
+   "files": [
+    "src/world/continents.hpp",
+    "src/world/continents.cpp",
+    "src/core/save_game.cpp",
+    "docs/generation/CONTINENTS.md"
+   ],
+   "design": "THE AIM (Ben, point 2, and his call on the form: SAMPLE REAL DRIFT HISTORY rather than a proxy). Coal has to go where the ancient swamps were, which means the generator must be able to answer \"where was this ground, and what was it, at age T\".\n\nTHIS IS THE FIRST OF THREE AND IT IS NEW MACHINERY, not a reorder. The feasibility pass returned BLOCKED-NEEDS-NEW-MACHINERY on the whole question, and this item is the least of the three gaps.\n\nWHAT IS MISSING HERE. run_continents takes no age, no epoch count and no timestep, and returns no sequence. drift_col/drift_row are documented \"per-epoch\" but NO EPOCH LENGTH IS DEFINED ANYWHERE and no loop advances them - the drift vector exists and nothing integrates it.\n\nWHAT IT WOULD COST, measured by the feasibility pass: the grid is 261x121 = 31,581 tiles and plate_count is 4-10, so one Voronoi snapshot is ~316k distance evaluations worst case plus two O(total) boundary walks. Replaying that for ~20 epochs is single-digit milliseconds. THE SNAPSHOT IS CHEAP; the expensive neighbour is the rift-basin search (corridor_of is O(total) per candidate pair, up to 45 pairs, with a 25-sample inlandness probe per corridor tile), which must NOT be re-run per epoch.\n\nGOTCHAS. run_continents draws every plate's position, direction and oceanic flag from ONE shared stream in a fixed order (continents.cpp:68-84), so any new draw inserted in that loop shifts every subsequent plate and changes the world. And continent_state IS serialised (save_game.cpp:253-270) despite hard_coded_world.hpp:325-332 claiming it \"never enters world, so it stays off the serialisation seam\" - that comment is WRONG about the envelope seam and should be fixed with this item.\n\nDONE WHEN: run_continents returns an ordered sequence of plate snapshots with a defined epoch length; the endpoint snapshot is identical to today's output so nothing downstream moves; the stale comment is corrected."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 5,
+   "version_goal": null,
+   "sprint": "32",
+   "written": "2026-09-03",
+   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
+   "requires": [
+    "BL-763"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-764",
+   "short_name": "LAGRANGIAN_TILES",
+   "category": "Generation",
+   "title": "Phase 2 - tiles ride plates, and a tile can be asked where it was and what its climate was at age T",
+   "authority_doc": "docs/generation/CONTINENTS.md",
+   "files": [
+    "src/world/continents.cpp",
+    "src/world/tile_generation.cpp",
+    "src/world/planetology.cpp",
+    "docs/generation/CONTINENTS.md",
+    "docs/generation/PLANETOLOGY.md"
+   ],
+   "design": "THE AIM: the second and deepest of the three gaps behind Ben's \"realistically mapping the landform from ancient life to modern resources\" (point 2). BL-763 gives drift a clock; this gives it a frame of reference.\n\nTHE STRUCTURAL PROBLEM, and it does not go away by adding a loop. plate_id (continents.cpp:112) answers \"which plate SEED is nearest this fixed grid cell\". Tiles do not ride plates. Even with drifting seeds you get a Voronoi partition that reshuffles under stationary ground, not ground that moves - so \"this tile was at the equator in the Carboniferous\" is not expressible.\n\nAND PALEO-LATITUDE IS THE SAME PROBLEM IN ITS SHARPEST FORM. Latitude is band_for_row(row) - THE GRID ROW ITSELF (tile_generation.cpp:314). A tile's climate band is fixed for all time by where it sits in the raster. There is no representation in which a tile HAD a different latitude, which is precisely what a coal-forming swamp at a tropical palaeolatitude requires.\n\nTHE THIRD GAP, PALEO-CLIMATE: nothing computes moisture, temperature or cover at a past epoch. theta_at (planetology.cpp:952) is the only past-state reconstructor and it returns a body-GLOBAL thermal scalar, not a per-tile climate. There is no climate_at(tile, age).\n\nSCOPE HONESTLY. This is a representation change to the oldest layer in the generator, and every pass downstream reads its output. It is the single largest item in the reorder and should be split again at promotion rather than taken whole. A cheaper intermediate exists and was NOT chosen (a present-landform proxy, form option (b)) - Ben took the real one, so it is filed at its real size.\n\nDONE WHEN: a tile can be asked for its position and climate band at a given age, deterministically; the present-day answer is identical to today's, so nothing downstream moves until BL-765 reads the past."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": "32",
+   "written": "2026-09-03",
+   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
+   "requires": [
+    "BL-763",
+    "BL-764",
+    "BL-762"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-765",
+   "short_name": "PALEO_DEPOSITS",
+   "category": "Generation",
+   "title": "Phase 2 - coal where the ancient swamps were, oil where the ancient seas were, timber where the forest is now",
+   "authority_doc": "docs/generation/PLANETOLOGY.md",
+   "files": [
+    "src/world/tile_generation.cpp",
+    "src/world/planetology.cpp",
+    "docs/economy/RESOURCES.md",
+    "docs/generation/TILE_GENERATION.md"
+   ],
+   "design": "THE AIM (Ben, point 2): a Life phase that maps \"ancient life to modern resources\" over the real landform. This is the payoff item - BL-763 and BL-764 exist only to make it possible.\n\nTHE SHAPE. A sibling pass (the established extension pattern: every tile-layer extension lands as a sibling reading the shared generation_record, settled 2026-07-21) that runs AFTER planetology's biosphere chain and places the biological deposits BL-762 deferred. Each resource reads the epoch its formation belongs to: coal from swamp cover at the carboniferous-analogue epoch, petroleum from shallow-sea extent at its own, peat from present marsh, timber and produce from present cover. Fossils read PAST state, living resources read PRESENT - the same fossil/living split planetology S8 already encodes in its peak-vs-stage gates.\n\nIT MUST BE A CONSEQUENCE, NOT A ROLL (Ben, standing: new generation stages are deterministic consequences of upstream scalars). The epoch a resource forms in is derived from the biosphere history, not authored per resource; the placement is derived from the paleo-climate at that epoch, not from a rarity draw.\n\nWHAT ALREADY POINTS THIS WAY: ore-field siting ALREADY crosses the geological/biological line - coal's candidate test reads COVER (marsh, forest, grass) plus a land-height percentile (tile_generation.cpp:1004-1013), sitting in the same routine that sites porphyry copper off the convergent-boundary mask. So a coal field already asks a biological question; it just asks it of the PRESENT map.\n\nDONE WHEN: coal, petroleum and peat are placed from the paleo record rather than from present cover; a world whose biosphere never reached land has no coal anywhere (already true via endowment, now true by construction); the distribution across a seed sweep is reported, not asserted."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 5,
+   "version_goal": null,
+   "sprint": "32",
+   "written": "2026-09-03",
+   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
+   "requires": [
+    "BL-747"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-766",
+   "short_name": "POPULATION_MAP_EARLY",
+   "category": "Generation",
+   "title": "Phase 3 - the population map is drawn early and weighted by farming, then GROWN AND DESTROYED by history",
+   "authority_doc": "docs/economy/POPULATION.md",
+   "files": [
+    "src/world/population_generation.cpp",
+    "src/world/settlement.hpp",
+    "src/world/history_sim.cpp",
+    "src/world/hard_coded_world.cpp",
+    "src/core/save_game.cpp"
+   ],
+   "design": "THE AIM (Ben, point 3 and point 5, and his call on the form: DRAW EARLY, EVOLVE THROUGH HISTORY). \"We should also draw the population map, giving extra attention to areas where farming would be easy\", and city states count as population centres inside the History phase.\n\nTHIS DELIBERATELY OVERTURNS BL-610. Centres were moved AFTER the Era -1 sim (hard_coded_world.cpp:672-680) so that centre count and scale would be the history's consequence rather than a land-area divisor. Ben's ordering keeps that goal and gets it a better way: centres exist DURING the history and are grown, sacked and abandoned by it, so they are still history's consequence - and the sim stops running over a world with no cities in it, which is the defect the current order leaves.\n\nWHAT IS MISSING, and it is one thing more than it looks. (1) THERE IS NO CENTRE-REGION BINDING IN EITHER DIRECTION. region (settlement.hpp:74-159) carries anchor, col, row, population, manpower_stock - no entity id, no tile id, no centre list; the only mapping anywhere is a spatial nearest-search. (2) The sim has NO ECS access by design (history_sim.hpp:747-755: no world&, no tile ids, no entity allocator), so centres cannot be CREATED inside it without either breaking that property or representing them at sim grain and materialising them after. (3) sim_terrain_view carries substrate, cover, density and landform only - placement needs habitability and deposits, which are not in it.\n\nTHE RECOMMENDED SHAPE, given (2): represent centres at SIM GRAIN (a small struct on the region, integer, no entities) and materialise the ECS centres once after the sim, from that record. It keeps the sim world-free, keeps determinism integer, and still lets cities rise and fall.\n\nSAVE FORMAT: two nested versions and neither migrates - world_save_version 23 covers population_centre_component, save_game_version 4 covers the envelope. A field on region bumps one, a field on the centre bumps the other. And r_popcentre validates each bool as exactly 0 or 1 and fails the whole stream otherwise; any new flag carries the same contract.\n\nDONE WHEN: the farming-weighted map is drawn before the sim; the sim grows and destroys centres; the campaign-era centres are materialised from that record; a sacked city is visible as a smaller or absent centre at the epoch."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": "32",
+   "written": "2026-09-03",
+   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
+   "requires": [
+    "BL-757"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-767",
+   "short_name": "EMPIRES_RELIABLY_FORM",
+   "category": "Generation",
+   "title": "Phase 4 - tune the forces until empires reliably form, grow and collapse, measured as a distribution and never clamped",
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp",
+    "tools/verify/history_sweep.cpp",
+    "docs/lore/COLLAPSE.md"
+   ],
+   "design": "THE AIM (Ben, point 4): \"We definitely want to force outcomes where empires form, grow, and collapse. I think we should be able to select parameters that force empires forming.\"\n\nTHE READING IS SETTLED, and it was raised rather than assumed. On the elicitation form of 2026-09-03 Ben chose TUNE-FORCES-COMMON-OUTCOME over guarantee-by-reroll and over clamping the map: empires are to be a COMMON outcome across the seed spread, and a world with none is a legitimate outcome. That keeps three standing rulings intact - nation count emerges and is never tuned to a target (2026-07-30), no world is clamped up to viability or down to fairness (2026-08-31), and BL-224's non-hegemony invariant, under which every major must lose eventually and the epoch arrives multipolar.\n\nSO THE WORK IS A TUNING LOOP, NOT A GATE. COLLAPSE.md already supplies the theory: collapse is INEVITABLE for a major, a deterministic consequence of upstream scalars, and the metagame is when it breaks, how it breaks, and who inherits. What is missing is that nothing measures whether a major ever RISES. The strategy roster (six shapes, BL-488's weightings) is authored and unmeasured.\n\nWHAT TO BUILD: report, per seed, the largest polity's peak share of the map and the year it peaked, whether it then lost that peak, and which culmination resolved it. Then tune the verb weights until the rise-peak-fall shape is common across the spread. Report the distribution; assert only that the spread is not degenerate.\n\nA PREREQUISITE THAT IS ALREADY FILED: this needs a sweep that measures the run generation actually performs, and today's does not (BL-757). Tuning against the struct-default ladder would tune the wrong sim.\n\nDONE WHEN: the sweep reports the rise-and-fall shape per seed; empires are common across the standard spread and absent in some worlds; no world is inspected and adjusted."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": "32",
+   "written": "2026-09-03",
+   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
+   "requires": [
+    "BL-757",
+    "BL-766"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-768",
+   "short_name": "ROADS_AND_MARKETS_FROM_HISTORY",
+   "category": "Generation",
+   "title": "Phase 4 - simple roads stamped FROM the history, and markets emerging at the end of it",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/road_generation.cpp",
+    "src/world/hard_coded_world.cpp",
+    "scripts/works.lua"
+   ],
+   "design": "THE AIM (Ben, point 4): \"We should also be laying simple roads to supply provinces. And markets should begin to emerge towards the end of this phase.\"\n\nFEASIBILITY SAYS: DERIVE THEM FROM THE HISTORY, DO NOT LAY THEM INSIDE IT. Laying roads during the sim came back BLOCKED-NEEDS-NEW-MACHINERY for three independent reasons. (1) The sim has no write channel to the world - no world&, deliberately (history_sim.hpp:68-75). (2) It has no tile-grain route: its Dijkstra is region-to-region over the neighbour graph and returns a COST, never a tile list; the only thing that returns tiles takes world&. (3) generate_roads' node source is w.population_centre_tile, which is empty until after the sim. There is also a determinism idiom mismatch - the sim is integer fixed-point with no floats in the decision path, and edge_tier plus the redundancy rationing are float.\n\nSO THE SHAPE IS: the sim RECORDS what it built (the works roster's road rows - Way Station, Span Bridge, Cut Canal - already represent exactly this), and a pass immediately after it STAMPS ancient-tier roads from that record over the settlement set. Same for markets: carve them at the end of the history phase from where trade actually concentrated, rather than from population alone.\n\nTHIS ALSO GIVES THE WORKS ROSTER SOMETHING TO DO. BL-757 measured zero works raised across sixteen seeds because build_work never wins the scored contest. Roads that visibly persist into the campaign are the first real payoff for winning it, and the scorer should be re-weighted with that payoff in view.\n\nAN ERA-APPROPRIATE TIER RULE IS OWED: edge_tier and the rationing key off nation qualification percentile, a 1960-era field. Ancient roads need their own tier rule rather than borrowing the industrial one.\n\nDONE WHEN: a 1960 world opens with roads whose shape follows the history's trunk routes; markets sit where trade concentrated; works raised is non-zero and its roads are visible on the canvas."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": "32",
+   "written": "2026-09-03",
+   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
+   "requires": [
+    "BL-766",
+    "BL-767"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-769",
+   "short_name": "CONSEQUENCE_FOLDS_INTO_HISTORY",
+   "category": "Generation",
+   "title": "Phase 5 - city states and pseudo-national borders become part of the History phase, so the history keeps its detail",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/nation_generation.cpp",
+    "src/world/settlement.cpp",
+    "docs/generation/GENERATION_STRATEGY.md",
+    "docs/lore/HISTORY.md"
+   ],
+   "design": "THE AIM (Ben, point 5): \"if we leave the consequence for after history, we lose detail in that history phase. I think it is fine to consider city states as population centres, and pseudo national borders as part of The History. I.e. you may have a Roman citizen, or an Athenian citizen.\"\n\nWHAT CHANGES. Phase 5 stops CREATING the map and starts FINALISING what the history produced. The sim already writes region::nation as it goes, so pseudo-national borders exist inside it in embryo; what is missing is that they are not a political object a person can belong to. A citizen of a city state needs the centre (BL-766) and the polity to be the same kind of thing at sim grain.\n\nTHE NAMING RULE APPLIES AND IS NOT NEGOTIABLE. Ben's \"Roman or Athenian\" is the reader's analogy, not content: every generated polity, city and people is sci-fi/fantasy from the seeded banks. Real history is a mechanism reference, never a name source.\n\nWHAT PHASE 5 KEEPS: generate_nations resolving the final territory from what the history left, derive_national_character reading its outputs, and the institutional record. What it LOSES: inventing the political map from region anchors as though the history had not just drawn one.\n\nDONE WHEN: the History phase produces named polities and city states that the campaign inherits rather than re-derives; GENERATION_STRATEGY.md's phase table is rewritten around the new boundary."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 5,
+   "version_goal": null,
+   "sprint": "32",
+   "written": "2026-09-03",
+   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
+   "requires": [
+    "BL-771",
+    "BL-761"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-770",
+   "short_name": "ERA_ZERO_CANDIDATE_SEARCH",
+   "category": "Economy",
+   "title": "Phase 6 - the Era 0 economic sim, 1560-1960, as a PARALLEL candidate search for a viable but uneven corporate landscape",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/corporation_generation.cpp",
+    "src/core/app.cpp",
+    "src/world/hard_coded_world.cpp",
+    "tools/verify/campaign_lapse.cpp"
+   ],
+   "design": "THE AIM (Ben, point 6): with roads, provinces, borders and markets already drawn by the history, phase 6 determines \"what combination of companies/corporations makes a massive profit - and we should do this with multiple parallel candidate searches as a 1560 CE - 1960 CE pass\".\n\nTWO CALLS TAKEN ON THE FORM, 2026-09-03. (1) WHAT VARIES between candidates: corporation ROSTERS, starting PLACEMENTS, and ROAD/INFRASTRUCTURE TIERS - explicitly NOT whole upstream worlds, so generation runs ONCE and only the economic sim repeats. (2) THE OBJECTIVE is VIABLE-BUT-UNEVEN, not maximum profit. Maximising total profit would flatten the map that GENERATION_STRATEGY.md § Asymmetry is the deliverable exists to keep uneven; the search picks a landscape where profit is POSSIBLE and unevenly distributed.\n\nTHE BUDGET WORKS, AND ONLY BECAUSE IT IS PARALLEL. Measured 2026-09-03: 530-710 ms per economy tick, so 100 ticks at 4 years a tick is 53-71 s per candidate. Ben chose SIX candidates. Serially that is 5.3-7.1 minutes and breaks his 3-6 minute budget; in parallel on this machine's 16 logical cores it is ~1 minute of wall clock for all six. So the parallelism is not an optimisation, it is the reason the shape fits.\n\nDETERMINISM IS THE BINDING CONSTRAINT ON THE PARALLELISM. Each candidate must be a PURE function of (shared world, candidate seed, candidate parameters) with no shared mutable state, and the winner chosen by a deterministic argmax over a total order with an explicit tie-break - never by which thread finished first. Thread count must not change the result. Assert it: same seed, different thread counts, identical winner.\n\nMEMORY: six live copies of a 31,581-tile world plus its entities. Measure it before assuming it fits.\n\nDONE WHEN: six candidates evaluate in parallel inside ~1 minute; the winner is identical across thread counts; the chosen landscape scores viable-but-uneven on the chain-completeness spread rather than on total profit."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": null,
+   "sprint": "32",
+   "written": "2026-09-03",
+   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-771",
+   "short_name": "TICK_LENGTH_IS_A_CONSTANT",
+   "category": "Economy",
+   "title": "Phase 6 prerequisite - the economy has no tick-length parameter, so a 4-year tick is a 16x rescale of every rate",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/sim_loop.hpp",
+    "src/world/budget_system.hpp",
+    "scripts/economy.lua",
+    "src/world/economy_system.cpp"
+   ],
+   "design": "FOUND by the feasibility pass, 2026-09-03, scoping Ben's phase 6. It is a prerequisite nobody had named.\n\nTHE FACT. econ_tick_days is a static constexpr 90 (sim_loop.hpp:28), and the rate constants are authored PER QUARTER - k_debt_interest_per_quarter and its siblings (budget_system.hpp:15-20), with maintenance, wages and upkeep all per-tick in scripts/economy.lua. There is no tick-length parameter anywhere. So running phase 6 at \"four years a tick\" is not a loop-bound change: it is a SIXTEEN-FOLD rescale of every rate constant in the economy, and any that does not scale linearly (interest compounding, build durations measured in ticks, decay and recovery steps) changes meaning rather than magnitude.\n\nWHY IT MATTERS BEYOND PHASE 6: it is the same defect class as BL-462 (a harness measuring a different run from the one that generates a world). A phase-6 candidate evaluated on rescaled rates is not measuring the economy the campaign will run.\n\nTHE WORK. Make tick length a parameter; classify every rate as per-tick, per-quarter or per-year and derive it from that parameter; identify the constants that do NOT scale linearly and handle them explicitly rather than by multiplication. Then assert equivalence: the same simulated span at two different tick lengths reaches comparable state, within a stated tolerance.\n\nTHE ALTERNATIVE, and it is legitimate: run phase 6 at the ordinary quarterly tick and simply accept fewer simulated years per candidate. 400 years at 90-day ticks is 1600 ticks - far outside the budget - so the alternative is really \"simulate less history, at honest rates\". That trade is Ben's to make and should be put to him with this item's numbers."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": null,
+   "sprint": "32",
+   "written": "2026-09-03",
+   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
+   "requires": [
+    "BL-770"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-772",
+   "short_name": "RETIRE_WARM_START",
+   "category": "Economy",
+   "title": "Phase 8 - retire the warm start and the background-firm pass; phase 6 carries their burden",
+   "authority_doc": "docs/economy/ERAS.md",
+   "files": [
+    "src/core/app.cpp",
+    "src/world/corporation_generation.cpp",
+    "docs/economy/ERAS.md",
+    "docs/economy/MARKETS.md"
+   ],
+   "design": "THE AIM (Ben, point 8): \"I think we should retire this phase and push the burden onto phase 6.\"\n\nIT IS THE SINGLE BIGGEST BUDGET WIN AVAILABLE, AND IT IS MEASURED. The warm start is 72-73 SECONDS in the release play build, on BOTH arcs, against the ~6 s app.cpp budgets for it (BL-761). It is most of the ~2 minutes generation takes today, which matches Ben's own estimate that \"most of that is Phase 7\". Retiring it frees the entire budget that phase 6's candidate search needs.\n\nIT IS ALSO THE RIGHT DESIGN, not just the cheap one. The warm start is 80 undirected ticks that settle whatever generation happened to place. Phase 6 is 400 directed years that CHOOSE the corporate landscape. Keeping both would be paying twice for the weaker answer.\n\nWHAT GOES: app::start_new_game's pre_game_ticks loop and its sliced-progress UI, and Pass 6 background-firm generation as a separate one-shot (CORPORATION_GENERATION.md § Pass 6) - the firms phase 6 selects ARE the background economy.\n\nTHIS SUPERSEDES BL-751 (economic settle pass) AS DESIGNED. That item was the warm start PROMOTED - the same pass, longer, with spawn and cull. Ben's ordering replaces it with a directed search. BL-751 should be rewritten around phase 6 or closed as superseded; it must not be built as filed.\n\nWHAT MUST NOT BE LOST: the warm start exists so play opens on a settled position rather than a cold one, and the clock is rebased so play always begins at the epoch (BL-369). Phase 6 has to hand over a world in that same settled state, and ERAS.md's \"the warm start has no calendar meaning\" paragraph needs rewriting rather than deleting.\n\nDONE WHEN: no pre_game_ticks loop remains; a world handed to play is settled by phase 6; startup time drops by ~72 s; ERAS.md and MARKETS.md § Background corporations describe the new source of the background economy."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": null,
+   "sprint": "32",
+   "written": "2026-09-03",
+   "author": "Ben (the 8-point generation reorder, 2026-09-03, with the five calls taken on the elicitation form); Claude (itemisation, against the feasibility pass)",
+   "requires": [
+    "BL-754",
+    "BL-772"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-773",
+   "short_name": "GENERATION_BUDGET_3_TO_6_MIN",
+   "category": "Generation",
+   "title": "The reorder measured against Ben 3-6 minute generation budget, per phase, with the parallel plan asserted",
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "files": [
+    "src/core/app.cpp",
+    "tools/verify/history_sweep.cpp",
+    "docs/generation/GENERATION_STRATEGY.md"
+   ],
+   "design": "THE TARGET (Ben, 2026-09-03): \"I'm aiming to have generation take anywhere from 3-6 minutes. The current generation takes about 2 minutes, and most of that is Phase 7.\"\n\nTHE ARITHMETIC AS IT STANDS, measured 2026-09-03. Today: ~2 min, of which the warm start is 72-73 s (BL-761) - Ben's estimate confirmed. Retiring it (BL-772) returns ~72 s. Phase 6 at six candidates is 53-71 s EACH serially, which would be 5.3-7.1 min and break the budget; in parallel on 16 logical cores it is ~1 min of wall clock. So the reorder's headline cost is roughly: generation once + ~1 min of parallel search, leaving real headroom for the extra complexity phases 1-5 add.\n\nWHAT THIS ITEM OWNS: keeping that arithmetic true as each phase lands. Every item in the reorder records its measured cost here as it completes, and the total is checked against 3-6 minutes rather than assumed. BL-754 already instruments per-pass timing, and its unfinished half - the app never prints the budget because the [gen budget] line only fires when a harness passes a fixture - must land here, because a budget nobody can see in the game is not a budget.\n\nTHE RISK TO WATCH, stated up front: the era pass costs ~4x its own wall clock, because everything downstream works over the regions it founded. Phases 1-5 all ADD founded detail. So the cheap-looking additions are the ones to measure, not the expensive-looking ones.\n\nDONE WHEN: a full reordered generation is timed per phase in the play build, the total sits in 3-6 minutes, and the app itself reports it."
   }
  ]
 }

@@ -28,20 +28,25 @@ The subject docs:
 Generation runs, in `make_hard_coded_world`:
 
 ```
-planetology → continents → tiles                       (per body)
-  → population centres → history ladder → creeds → settlement
-  → history sim, pass 1 (ancient) → history sim, pass 2 (industrial) → nations
-  → institutional history → provinces → roads → corporations → markets → laws   (homeworld only)
+planetology → continents → tiles → rivers              (per body)
+  → history ladder → creeds → settlement                 (homeworld only, from here)
+  → history sim, pass 1 (ancient) → history sim, pass 2 (industrial)
+  → population centres → nations → national character
+  → ruptures → institutional history → provinces → roads → corporations → markets
+  → other bodies' tiles → laws
   → provinces                                            (every other body, last)
-  → the economic settle (pass 3)                         (after the worker, before play)
+  → background firms → the economic settle (pass 3)      (after the worker, before play)
 ```
 
 The three simulated passes — two polity spans and one economic settle — are § Three passes of
 simulated history; `../lore/HISTORY.md` owns the polity spans.
 
 A body's atmosphere/history precedes its plates; plates precede its terrain; deposits exist
-before territory is drawn over them. On the homeworld, population centres are placed **before**
-nations (so the substrate-density pass can read them), the history ladder runs **before**
+before territory is drawn over them. On the homeworld, population centres are placed **after the
+Era −1 sim and before nations** — after, because the sim has grown, warred and plagued the
+regions' populations, so the centre count and scale distribution are the history's *consequence*
+rather than a land-area divisor and an authored draw (BL-610, centres from demography); before,
+so the substrate-density pass can read them. The history ladder runs **before**
 `generate_nations` because it *drives* the seed budget, and Stages 1–2 of the institutional
 history are recorded **after** — they name and count nations that did not exist a moment
 earlier. On the homeworld the **province partition runs before roads** (Ben, 2026-08-25;
@@ -327,6 +332,60 @@ The planetology state flows into settlement and nations: `run_history_ladder` co
 that connection — planetology and ladder outcomes shaping which corporations exist and where — is
 BL-210's to close. **Full architecture, rationale, and the per-doc open questions live in
 BL-210** (`backlog.json`).
+
+---
+
+## The eight phases (Ben, 2026-09-03)
+
+The pass map above is the *call order*. This section is the **phase structure** it serves — the
+reorder Ben set out on 2026-09-03, with the five open calls taken on an elicitation form the same
+day. Where a phase's aim and its current implementation disagree, the phase wins and the gap is
+work.
+
+| # | Phase | Its aim | Owns |
+|---|---|---|---|
+| 1 | **The Body** | The world as geology: atmosphere, chemistry, plates, terrain — and **geological deposits**, metals among them. | BL-762 (resource origin split) |
+| 2 | **Life** | The biosphere's residue as resources — coal where the ancient swamps were, oil where the ancient seas were, timber where the forest still stands. | BL-763 (continent time axis), BL-764 (Lagrangian tiles), BL-765 (paleo deposits) |
+| 3 | **The People** | Where people are, weighted toward ground that farms easily — drawn **before** history and evolved by it. | BL-766 (population map early) |
+| 4 | **The History** | Empires that form, grow and collapse; the roads that supplied them; the markets that emerged from their trade. | BL-767 (empires reliably form), BL-768 (roads and markets from history) |
+| 5 | **The map of consequence** | **Finalise** what the history produced, rather than invent it. City states and pseudo-national borders belong to phase 4. | BL-769 (consequence folds into history) |
+| 6 | **The economic substrate** | The Era 0 sim, 1560–1960: search in parallel for a corporate landscape that is **viable but uneven**. | BL-770 (Era 0 candidate search), BL-771 (tick length is a constant) |
+| 7 | **The rest** | The other bodies, the laws, the partitions. Expands as core systems land. | — |
+| 8 | ~~Warm start~~ | **Retired.** Its burden moves to phase 6. | BL-772 (retire warm start) |
+
+**Five calls, taken on the form rather than assumed** (the NR-517 precedent — read a silence as a
+decision and you set the quiet precedent this project files items to avoid):
+
+1. **Empires are tuned for, never clamped.** "Force outcomes where empires form" means *tune the
+   forces until empires are a common outcome across the seed spread*, not guarantee one per world
+   and not impose one post-hoc. A world with no empire stays a legitimate outcome, which is what
+   keeps § Asymmetry is the deliverable, the 2026-07-30 emergent-nation-count ruling and BL-224's
+   non-hegemony invariant all intact.
+2. **The population map is drawn early and evolved.** This overturns BL-610's ordering while
+   keeping its goal: centres are still history's consequence, but now because history *grew and
+   sacked them* rather than because they were placed afterwards. It also stops the sim running
+   over a world with no cities in it.
+3. **The candidate search varies rosters, placements and road tiers — not worlds.** So generation
+   runs once and only the economic sim repeats, which is the whole reason the budget closes.
+4. **The search optimises for viable-but-uneven, not maximum profit.** Maximising profit would
+   flatten exactly the spread this document asks generation to produce.
+5. **Life samples the real drift history**, rather than proxying ancient climate from the present
+   landform. That is the expensive answer and it was taken deliberately; BL-764 is the largest item
+   in the reorder because of it.
+
+**The parallelism is not an optimisation, it is why the shape fits.** Six candidates at 53–71 s
+each is 5–7 minutes serially and breaks the 3–6 minute budget; run in parallel they cost about one
+candidate's wall clock. That makes determinism the binding constraint: each candidate must be a
+pure function of (shared world, candidate seed, candidate parameters), and the winner chosen by a
+deterministic argmax with an explicit tie-break — **never by which thread finished first**, and
+never varying with thread count. BL-773 owns the budget as a whole.
+
+**Two of the eight points needed new machinery rather than a reorder**, and are filed at that size
+rather than as tweaks. Sampling real drift history has no time axis to sample (nothing integrates
+plate motion), no frame in which ground moves (tiles do not ride plates — a tile's latitude *is*
+its grid row, fixed for all time), and no per-tile past climate. And roads cannot be laid *inside*
+the history sim, which is deliberately world-free and whose pathfinder returns a cost between
+regions rather than a list of tiles — so they are **stamped from** the history's record instead.
 
 ---
 
