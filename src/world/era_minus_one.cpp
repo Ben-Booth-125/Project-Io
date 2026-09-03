@@ -7,24 +7,66 @@
 
 bool era_minus_one_enabled(const world_params& params)
 {
-    // An antiquity start generates the world BEFORE the 0-1960 story happens,
-    // so the year-tick sim is what produces the run-up. Above 1700 the
-    // settlement pass has already pre-computed that history and the era has
-    // nothing left to simulate.
+    // THE EPOCH CLAUSE IS GONE (BL-747). It read
+    // `params.epoch_year < 1700 && params.prehistory_years > 0`, on the
+    // reasoning that above 1700 the settlement pass had already pre-computed
+    // the history and the era had nothing left to simulate. The two-span
+    // design says otherwise: the same engine plays an ancient span and then an
+    // industrial one, so a 1960 arc runs the sim too — the epoch decides only
+    // whether there IS a second span, which is
+    // `era_minus_one_has_industrial_span`'s question, not this one's.
     //
     // `prehistory_years == 0` is a SCOPE KNOB, not a tuning dial: it skips the
     // pass outright, which is how the harnesses that do not test the era avoid
     // paying its cost (world_params::prehistory_years).
-    return params.epoch_year < 1700 && params.prehistory_years > 0;
+    return params.prehistory_years > 0;
+}
+
+bool era_minus_one_has_industrial_span(const world_params& params)
+{
+    // The same 1700 the gate used to turn on, now asking a different question.
+    return params.epoch_year >= 1700;
 }
 
 history_sim_params era_minus_one_sim_params(const world_params& params)
 {
     history_sim_params hp;
-    hp.start_year      = params.epoch_year - params.prehistory_years;
-    hp.stop_year       = params.epoch_year;
-    hp.tick_bands[0]   = {params.epoch_year, 4};
-    hp.tick_band_count = 1;
+
+    // The stop year is the epoch on BOTH shapes; only the start and the
+    // interior differ.
+    const bool two_span = era_minus_one_has_industrial_span(params);
+    hp.stop_year = params.epoch_year;
+
+    if (two_span)
+    {
+        // 1160 -> 1560 -> 1960 at the defaults. The ancient span is
+        // `prehistory_years` long and capped at the medieval band; the
+        // industrial span is `industrial_years` long with the ladder
+        // unrestricted. Both bands tick at 4 years, as the single-span run
+        // always has — the clock is not what changes between the spans, the
+        // roster ceiling is.
+        hp.boundary_year      = params.epoch_year - params.industrial_years;
+        hp.start_year         = hp.boundary_year - params.prehistory_years;
+        hp.span1_band_ceiling = roster_band::medieval;
+        hp.tick_bands[0]      = {hp.boundary_year, 4};
+        hp.tick_bands[1]      = {params.epoch_year, 4};
+        hp.tick_band_count    = 2;
+    }
+    else
+    {
+        // EXACTLY what this function did before BL-747, byte for byte, and
+        // that is the point: `boundary_year` and `span1_band_ceiling` are left
+        // at their struct defaults (INT64_MIN and `industrial`), so the
+        // ceiling is inert twice over — no year is before the boundary, AND
+        // the clamp is the identity. An ancient epoch therefore executes the
+        // same values through the same code as it did, which is what keeps the
+        // 0 CE arc's `state_hash` byte-identical across this change. Adding a
+        // candidate to the scorer would move the argmax even where it never
+        // wins; adding an inert clamp cannot.
+        hp.start_year      = params.epoch_year - params.prehistory_years;
+        hp.tick_bands[0]   = {params.epoch_year, 4};
+        hp.tick_band_count = 1;
+    }
 
     // NO supply-decay override here, deliberately.
     //

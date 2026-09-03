@@ -15,6 +15,7 @@
 // Writes: history_sweep.json beside the working directory, plus the table below.
 // ---------------------------------------------------------------------------
 
+#include "world/era_minus_one.hpp" // --epoch: derive generation's own sim params
 #include "world/hard_coded_world.hpp"
 #include "world/history_sim.hpp"
 #include "world/sim_terrain_build.hpp"
@@ -261,19 +262,90 @@ std::string json_escape(const std::string& s)
 int main(int argc, char** argv)
 {
     int seed_count = 16;
-    if (argc > 1)
+    int64_t epoch_year = 0;
+    bool derive_from_generation = false;
+
+    for (int a = 1; a < argc; ++a)
     {
-        const int n = std::atoi(argv[1]);
+        const std::string arg = argv[a];
+        // `--epoch <year>` derives the sim params through
+        // `era_minus_one_sim_params`, i.e. the run GENERATION performs. Opt-in
+        // rather than the default, so every number this sweep has ever printed
+        // keeps meaning what it meant.
+        if (arg == "--epoch" && a + 1 < argc)
+        {
+            epoch_year = std::atoll(argv[++a]);
+            derive_from_generation = true;
+            continue;
+        }
+        const int n = std::atoi(argv[a]);
         if (n > 0) seed_count = n;
     }
 
-    // Label the span from the defaults rather than restating it, so the banner
-    // cannot drift from the run the way "0 -> 1960 CE" did.
-    const history_sim_params epoch;
-    std::printf("=== history sweep (BL-275) — %d seeds, %lld -> %lld ===\n\n",
+    // THE PARAMS THIS SWEEP ACTUALLY RUNS — derived once, printed, then used
+    // unchanged in the loop below. Hoisted out of the loop rather than
+    // default-constructed per seed because they never depended on the seed, and
+    // because a banner that restates a span it does not share with the run is
+    // how "0 -> 1960 CE" drifted in the first place.
+    world_params sweep_wp;
+    sweep_wp.epoch_year = epoch_year;
+    const history_sim_params params =
+        derive_from_generation ? era_minus_one_sim_params(sweep_wp) : history_sim_params{};
+
+    std::printf("=== history sweep (BL-275) — %d seeds, %lld -> %lld ===\n",
                 seed_count,
-                static_cast<long long>(epoch.start_year),
-                static_cast<long long>(epoch.stop_year));
+                static_cast<long long>(params.start_year),
+                static_cast<long long>(params.stop_year));
+
+    // --- WHAT THIS SWEEP MEASURES, STATED ON THE FACE OF THE REPORT ---------
+    //
+    // WITHOUT `--epoch` these are `history_sim_params`'s STRUCT DEFAULTS, and
+    // those are NOT the params generation runs. Generation derives its own
+    // through `era_minus_one_sim_params` — at the 0 CE epoch that is -400 -> 0
+    // on ONE four-year band (100 rounds), against the default's -4000 -> 0 on
+    // six bands (136 rounds). That divergence is the BL-462 defect,
+    // era_minus_one.hpp is the file written to close it, and this harness is
+    // still on the wrong side of it. Printing the numbers does not fix that; it
+    // stops the report being read as a measurement of the shipped run.
+    //
+    // The span is reported from the params rather than assumed, so a two-span
+    // run (BL-747) shows both halves and a single-span run says so outright
+    // instead of printing a boundary of INT64_MIN as if it meant something.
+    {
+        const bool two_span = params.boundary_year != INT64_MIN;
+        // Decision ROUNDS, counted the way the sim counts them — by walking
+        // `step_for_year` — rather than by dividing the span by a step this
+        // harness picked. Same reason `region_distance` is public.
+        int64_t rounds_span1 = 0, rounds_span2 = 0;
+        for (int64_t y = params.start_year; y < params.stop_year;)
+        {
+            if (two_span && y < params.boundary_year) ++rounds_span1;
+            else                                      ++rounds_span2;
+            y += step_for_year(params, y);
+        }
+
+        std::printf("    params: %s\n",
+                    derive_from_generation
+                        ? "DERIVED via era_minus_one_sim_params — generation's own run"
+                        : "history_sim_params STRUCT DEFAULTS — *not* the run that builds a world");
+        if (two_span)
+            std::printf("    spans:  ancient %lld -> %lld (%lld rounds, band ceiling %d)"
+                        " | industrial %lld -> %lld (%lld rounds, unrestricted)\n",
+                        static_cast<long long>(params.start_year),
+                        static_cast<long long>(params.boundary_year),
+                        static_cast<long long>(rounds_span1),
+                        static_cast<int>(params.span1_band_ceiling),
+                        static_cast<long long>(params.boundary_year),
+                        static_cast<long long>(params.stop_year),
+                        static_cast<long long>(rounds_span2));
+        else
+            std::printf("    spans:  SINGLE %lld -> %lld (%lld rounds), no boundary year\n",
+                        static_cast<long long>(params.start_year),
+                        static_cast<long long>(params.stop_year),
+                        static_cast<long long>(rounds_span2));
+        std::printf("    clock:  %d tick band%s\n\n",
+                    params.tick_band_count, params.tick_band_count == 1 ? "" : "s");
+    }
 
     std::vector<sweep_row> rows;
     rows.reserve(static_cast<std::size_t>(seed_count));
@@ -304,14 +376,11 @@ int main(int argc, char** argv)
         row.regions_start = static_cast<int>(ss.regions.size());
         row.lacunae         = k->settlement.lacunae;
 
-        // THE DEFAULT EPOCH IS THE ONE THE GAME RUNS. This was pinned to
-        // 0 -> 1960, which the 0 CE epoch change superseded: the sim runs
-        // 4000 BCE -> 0 CE now, under the stepped decision clock whose bands all
-        // sit below year 0. Pinned to 0..1960 the sweep ran 1960 FLAT ticks past
-        // the last band and measured neither the span nor the clock the game
-        // uses — so no calibration could be read off it. Every window below is
-        // derived from `params` for the same reason.
-        history_sim_params params;
+        // `params` is now hoisted above the loop and PRINTED in the banner, so
+        // what this sweep runs is visible rather than inferred. It is still the
+        // struct default unless `--epoch` was passed — see the banner block for
+        // why that is not generation's run. Every window below is derived from
+        // `params` rather than restating a span.
         const int64_t span = params.stop_year - params.start_year;
 
         // REAL TERRAIN (BL-316 S1). Kepler's own ground, so mountains cost what

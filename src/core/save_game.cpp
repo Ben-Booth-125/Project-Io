@@ -86,6 +86,7 @@ void w_world_params(std::ostream& o, const world_params& p)
     w_enum(o, p.abundance);
     w_i64(o, p.epoch_year);
     w_int(o, p.prehistory_years);
+    w_int(o, p.industrial_years); // save_game_version 4 (BL-747) -- keep r_world_params in step.
     w_int(o, p.body_count);
     w_prefs(o, p.preferences);
 }
@@ -93,7 +94,8 @@ void w_world_params(std::ostream& o, const world_params& p)
 bool r_world_params(std::istream& i, world_params& p)
 {
     return r_u32(i, p.seed) && r_enum(i, p.abundance, max_abundance) && r_i64(i, p.epoch_year)
-        && r_int(i, p.prehistory_years) && r_int(i, p.body_count) && r_prefs(i, p.preferences);
+        && r_int(i, p.prehistory_years) && r_int(i, p.industrial_years) // save_game_version 4
+        && r_int(i, p.body_count) && r_prefs(i, p.preferences);
 }
 
 void w_planetology_params(std::ostream& o, const planetology_params& p)

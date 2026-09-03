@@ -70,10 +70,29 @@ class works_registry;
 /// Does generation run the Era -1 sim for these params, as far as the params
 /// alone can say?
 ///
+/// THE EPOCH NO LONGER DECIDES THIS (BL-747). It used to: an `epoch_year`
+/// at or above 1700 skipped the pass outright, on the reasoning that the
+/// settlement pass had already pre-computed that history and the era had
+/// nothing left to simulate. The two-span design replaces that — the epoch
+/// now decides only whether the run has a SECOND span, not whether it runs at
+/// all, so a 1960 arc plays the same engine across an ancient span and then
+/// an industrial one (docs/lore/HISTORY.md § The epoch and the run).
+///
+/// What remains is the SCOPE KNOB: `prehistory_years == 0` skips the pass, and
+/// that is how the harnesses that do not test the era avoid paying its cost
+/// (world_params::prehistory_years). Not a tuning dial.
+///
 /// The real gate has a third clause — `!settlement.regions.empty()` — which is
 /// not a question about params, so it stays at the call site. Ask
 /// `era_minus_one_fixture::ran` for the answer that includes it.
 bool era_minus_one_enabled(const world_params& params);
+
+/// Does this epoch carry an INDUSTRIAL span? Above 1700 the sim plays the
+/// run-up to an industrial start, so the boundary sits `industrial_years`
+/// before the epoch and the higher bands unlock there. At an ancient epoch
+/// there is no second span and the derivation below leaves every new field
+/// at its inert default.
+bool era_minus_one_has_industrial_span(const world_params& params);
 
 /// The `history_sim_params` generation runs the era on.
 ///
@@ -147,4 +166,40 @@ struct era_minus_one_fixture
     int64_t conquests = 0;
     int64_t foundings = 0;
     int64_t years     = 0;
+
+    // --- The generation budget (BL-754) -----------------------------------
+    //
+    // WHY THE TIMINGS LIVE HERE AND NOT ON `generation_report`. The report is
+    // serialised in full by src/core/save_game.cpp, so a field on it is a
+    // SAVE-FORMAT change — and a wall clock is the worst possible thing to put
+    // through a save: it differs every run on the same machine and differs
+    // again on another, so a saved world would carry a value no two loads
+    // agree on. This fixture has no save-seam presence at all (see the type
+    // comment above), which makes it the only surface in the Era -1 path where
+    // a measurement can sit without becoming world state.
+    //
+    // NOTHING BELOW MAY EVER ENTER A DIGEST OR HASH. These are milliseconds of
+    // wall clock; folding one into `state_hash` would make generation
+    // non-deterministic by construction, which is the standing rule this whole
+    // layer is built around. They are REPORTED, never asserted and never
+    // compared — a budget is read by a human, not by a check.
+    //
+    // Zero when the caller asked for no fixture, and zero for any pass that
+    // did not run.
+
+    /// Wall clock of `make_hard_coded_world` end to end, in milliseconds.
+    int64_t ms_world_total = 0;
+
+    /// Wall clock of the Era -1 year-tick sim alone — the pass BL-754 exists
+    /// to price, and historically ~6.4 s of an ~11.2 s single-span build.
+    int64_t ms_era = 0;
+
+    /// Wall clock of the settlement pass that precedes the era, and of
+    /// everything before it (planetology, continents, tiles, provinces). The
+    /// three plus `ms_era` account for `ms_world_total` up to the passes that
+    /// run after the era (nations, corporations, roads), which fall into
+    /// `ms_after_era`.
+    int64_t ms_before_settlement = 0;
+    int64_t ms_settlement        = 0;
+    int64_t ms_after_era         = 0;
 };

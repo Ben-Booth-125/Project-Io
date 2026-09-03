@@ -157,13 +157,17 @@ doctrine_row doctrine_for(const polity& p)
 ///
 /// `readiness_q` is the caller-side lever the winter-campaign candidate uses
 /// against a defender (history_sim.hpp § season).
+///
+/// `ceiling` is the two-span band cap (BL-747), defaulted to `industrial` — no
+/// restriction — so a caller outside the year loop is unchanged.
 std::vector<army_stack_entry> build_stack(int64_t manpower,
                                           const region& home,
                                           const polity&   owner,
-                                          int             readiness_q)
+                                          int             readiness_q,
+                                          roster_band     ceiling = roster_band::industrial)
 {
     const int band_index = clampi(owner.capacity[static_cast<int>(sim_domain::military)], 1, 6);
-    const roster_band band = roster_band_for_capacity(band_index);
+    const roster_band band = min_band(roster_band_for_capacity(band_index), ceiling);
 
     // Cohesion folds into readiness rather than into the counts: a shaken
     // polity fields the same men fighting worse, not fewer men fighting well.
@@ -906,8 +910,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // metallurgy instead. Same band enum, different column — which
                 // is the point of the two tables sharing `roster_band` rather
                 // than one deriving from the other.
-                const roster_band band =
-                    roster_band_for_capacity(clampi(q.capacity[static_cast<int>(sim_domain::materials)], 1, 6));
+                const roster_band band = min_band(
+                    roster_band_for_capacity(clampi(q.capacity[static_cast<int>(sim_domain::materials)], 1, 6)),
+                    sim_band_ceiling(params, y));
 
                 for (int slot = 0; slot < clampi(params.work_candidate_regions, 0, 8); ++slot)
                 {
@@ -1038,11 +1043,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 for (const polity& o : out.polities)
                     if (o.id == owner[ti]) { dq = &o; break; }
 
-                std::vector<army_stack_entry> atk = build_stack(raised, home, q, 1000);
+                std::vector<army_stack_entry> atk =
+                    build_stack(raised, home, q, 1000, sim_band_ceiling(params, y));
                 const int64_t def_want = (tgt.manpower_stock * params.levy_fraction_q) / 1000;
                 const int64_t def_men  = raise_manpower(tgt, def_want);
                 std::vector<army_stack_entry> def =
-                    build_stack(def_men, tgt, dq ? *dq : q, def_ready);
+                    build_stack(def_men, tgt, dq ? *dq : q, def_ready, sim_band_ceiling(params, y));
 
                 const battle_outcome bo = resolve_battle(
                     atk, doctrine_for(q),

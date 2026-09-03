@@ -74,7 +74,13 @@ inline constexpr uint32_t save_game_magic =
 /// `read_save_game` compares this constant for equality and rejects on any
 /// mismatch. There is no upgrade path to write, and adding one for a single
 /// raster would be inventing a scheme this file does not have.
-inline constexpr uint32_t save_game_version = 3; // NR-733: the report carries the Era -1 time-lapse
+/// Bumped to 4 when `world_params` gained `industrial_years` (BL-747, the
+/// two-span prehistory): `w_world_params` gains one int between
+/// `prehistory_years` and `body_count`. A MID-RECORD gap again, so a v3
+/// stream's world-params record misreads `body_count` and the preferences
+/// after it — refused whole on the same strict-equality contract, for the same
+/// reason as the v2 bump above.
+inline constexpr uint32_t save_game_version = 4; // BL-747: world_params carries industrial_years
 
 /// Default extension for a save file. One place, so the CLI, the quick-save
 /// binding and the verify API cannot disagree about it.

@@ -37,6 +37,7 @@
 // build in tools/verify/README.md.
 
 #include "world/components.hpp"
+#include "world/era_minus_one.hpp" // BL-754: the per-pass clock rides the fixture
 #include "world/hard_coded_world.hpp"
 #include "harness_params.hpp"
 #include "world/world.hpp"
@@ -243,15 +244,49 @@ void check(bool ok, const char* label)
 
 /// Build a world and report how long it took, so the era pass's cost is a
 /// measured number in the log rather than an estimate in a comment.
+///
+/// SINCE BL-754 IT ALSO REPORTS THE PER-PASS SPLIT. The total on its own could
+/// not answer the sprint's question — what the Era -1 pass costs against
+/// everything else, and what a second span adds to it — because a slower total
+/// is equally consistent with a slower tile pass. `make_hard_coded_world`
+/// measures the split itself and hands it back on the fixture (which, unlike
+/// `generation_report`, has no save-seam presence), so this asks for a fixture
+/// purely to read the clock off it.
+///
+/// Timings are REPORTED here and never asserted. They vary with the machine,
+/// the build type and the load, so binding a check to one would be pinning a
+/// number that is not a property of the world.
 world timed_world(const world_params& p, generation_report* rep, const char* what)
 {
+    era_minus_one_fixture fx;
     const auto t0 = std::chrono::steady_clock::now();
-    world w = make_hard_coded_world(p, rep);
+    world w = make_hard_coded_world(p, rep, {}, nullptr, nullptr, &fx);
     const double secs =
         std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     std::printf("     [%-24s] %7.2f s  (seed %08X, prehistory %d y, epoch %lld)\n",
                 what, secs, p.seed, p.prehistory_years,
                 static_cast<long long>(p.epoch_year));
+    std::printf("         passes: pre-settlement %5lld ms | settlement %5lld ms |"
+                " era-1 %6lld ms | post-era %5lld ms\n",
+                static_cast<long long>(fx.ms_before_settlement),
+                static_cast<long long>(fx.ms_settlement),
+                static_cast<long long>(fx.ms_era),
+                static_cast<long long>(fx.ms_after_era));
+    if (fx.ran)
+    {
+        // The span structure the run ACTUALLY used, read off the fixture rather
+        // than re-derived — same reason the fixture exists at all (BL-462).
+        char boundary[32] = "(none)";
+        if (fx.params.boundary_year != INT64_MIN)
+            std::snprintf(boundary, sizeof boundary, "%lld",
+                          static_cast<long long>(fx.params.boundary_year));
+        std::printf("         span:   %lld -> %s -> %lld"
+                    "  (tick bands %d, span-1 ceiling band %d)\n",
+                    static_cast<long long>(fx.params.start_year), boundary,
+                    static_cast<long long>(fx.params.stop_year),
+                    fx.params.tick_band_count,
+                    static_cast<int>(fx.params.span1_band_ceiling));
+    }
     std::fflush(stdout);
     return w;
 }
@@ -405,6 +440,51 @@ int main()
                     static_cast<long long>(rep_a2.prehistory_battles),
                     static_cast<long long>(rep_a2.prehistory_conquests),
                     static_cast<long long>(rep_a2.prehistory_foundings));
+
+    // -----------------------------------------------------------------------
+    // R4 — the TWO-SPAN arc (BL-747), and the generation budget (BL-754)
+    // -----------------------------------------------------------------------
+    // Until BL-747 an `epoch_year` of 1960 skipped the Era -1 pass outright:
+    // `era_minus_one_enabled` gated on `epoch_year < 1700`, so the industrial
+    // arc generated with no year-tick history at all. It now runs the SAME
+    // engine across two spans — an ancient one capped at the medieval roster
+    // band, then an industrial one with the ladder unrestricted — expressed as
+    // params on the single existing invocation rather than a second call to
+    // `run_history_sim` (era_minus_one.hpp § a seventh caller).
+    //
+    // WHAT IS ASSERTED HERE AND WHAT IS NOT. Asserted: the pass runs at 1960
+    // at all, it spans both halves, and it is deterministic. NOT asserted: any
+    // magnitude — battle counts, founding counts or wall clock. Those are
+    // REPORTED, because the sprint's question is what the second span costs and
+    // a number nobody has chosen a target for is not a contract.
+    std::printf("\n--- R4: the two-span arc at epoch 1960 (BL-747) ---\n");
+    std::fflush(stdout);
+
+    const world_params ind_a{ .seed = seed_a, .abundance = abundance_level::standard,
+                              .epoch_year = 1960, .prehistory_years = 400,
+                              .industrial_years = 400 };
+
+    generation_report rep_i1{}, rep_i2{};
+    const world w_i1 = timed_world(ind_a, &rep_i1, "seed A, epoch 1960 #1");
+    const world w_i2 = timed_world(ind_a, &rep_i2, "seed A, epoch 1960 #2");
+
+    const uint64_t d_i1 = deep_digest(w_i1);
+    const uint64_t d_i2 = deep_digest(w_i2);
+    std::printf("     digest 1960/two-span = %016llX and %016llX\n",
+                static_cast<unsigned long long>(d_i1), static_cast<unsigned long long>(d_i2));
+    std::printf("     report 1960: years=%lld battles=%lld conquests=%lld foundings=%lld\n",
+                static_cast<long long>(rep_i1.prehistory_years),
+                static_cast<long long>(rep_i1.prehistory_battles),
+                static_cast<long long>(rep_i1.prehistory_conquests),
+                static_cast<long long>(rep_i1.prehistory_foundings));
+
+    check(rep_i1.prehistory_years == 800,
+          "R4.1 the 1960 arc ran BOTH spans (400 ancient + 400 industrial = 800 years)");
+    check(rep_i1.prehistory_battles + rep_i1.prehistory_conquests
+              + rep_i1.prehistory_foundings > 0,
+          "R4.2 the era pass DID something at epoch 1960 (it used to be skipped entirely)");
+    check(d_i1 == d_i2 && rep_i1.prehistory_battles == rep_i2.prehistory_battles,
+          "R4.3 the two-span run is deterministic (deep digest and counters both agree)");
 
     std::printf("\n%s (%d failure%s)\n", failures == 0 ? "ALL PASS" : "FAILURES", failures,
                 failures == 1 ? "" : "s");
