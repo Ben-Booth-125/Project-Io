@@ -373,6 +373,37 @@ decision and you set the quiet precedent this project files items to avoid):
    landform. That is the expensive answer and it was taken deliberately; BL-764 is the largest item
    in the reorder because of it.
 
+**Phase 6 is a STATIC SEARCH, not a simulation (Ben, 2026-09-03).** He put the goal narrowly:
+*"we are not looking for a 100% accurate series of trades… and neither what makes the most profit
+per tile. We want to find, given a planet with markets and national borders — how can we saturate
+all the resources in said market, so that each part makes some profit?"*
+
+**That is not a simulation question.** A tick answers *who traded what, at which price, this
+quarter*. Saturation — every resource has a supplier and a buyer, every chain reaches a terminal
+sink, every participant clears its costs — is a **static property of a candidate roster against a
+fixed world**. Roads, borders, markets, deposits and population are all settled by the end of
+phase 4, and none of them moves during phase 6, so there is nothing to step.
+
+**Both measures already exist**, which is the part worth knowing before anyone writes a simulator:
+`measure_completeness` returns terminals-closed over terminals-total per market from a static world
+and a recipe registry, and the recipe-margin computation returns revenue minus marginal cost
+(inputs at base plus the wage per batch) from the registry alone. Between them they answer both
+halves of that sentence. They sit inside harness anonymous namespaces today, so generation cannot
+link them — BL-775's to fix, and worth fixing regardless, because two callers sharing one
+implementation is the discipline that stops a check measuring something different from the code.
+
+So the method is **evaluate statically, validate dynamically, once**: score every candidate as a
+coverage-and-margin problem in milliseconds, pick the winner by a deterministic argmax over a total
+order with an explicit tie-break, then run **one** short tick simulation on the winner alone to
+confirm it holds up live. That dissolves the span question — there is no span, because there is no
+clock — and it turns the candidate count from a budget question into a design one.
+
+**The one thing a static check cannot see is price feedback**, and it is the failure that actually
+killed the industrial field: processors buying inputs at the ceiling and being idled as
+loss-making. The cheap proxy is a per-resource supply-to-demand **ratio** per market — the ratio is
+static, and it is what drives a price to the ceiling in the first place. The validation run is what
+confirms the proxy was good enough.
+
 **The parallelism is not an optimisation, it is why the shape fits.** Six candidates at 53–71 s
 each is 5–7 minutes serially and breaks the 3–6 minute budget; run in parallel they cost about one
 candidate's wall clock. That makes determinism the binding constraint: each candidate must be a
