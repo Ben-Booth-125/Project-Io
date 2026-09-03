@@ -326,9 +326,15 @@ struct generation_report
         /// `history` is empty here — those lines were moved into `state.history`
         /// at generation, where the biography reads them; what is kept is the
         /// plate set and the per-tile `plate_id`, which nothing else records.
-        /// The Continent lens is the consumer. Presentation data, like the rest
-        /// of this struct: it never enters `world`, so it stays off the
-        /// serialisation seam.
+        /// The Continent lens is the consumer.
+        ///
+        /// IT IS NOT OFF THE SERIALISATION SEAM (corrected 2026-09-03, BL-763).
+        /// This comment used to say "it never enters `world`, so it stays off
+        /// the serialisation seam". The first clause is true and the second does
+        /// not follow: `continent_state` is written and read by
+        /// `src/core/save_game.cpp` as part of the SAVE ENVELOPE, so a field
+        /// added here is a `save_game_version` bump exactly like a field on
+        /// `world_params`. Two seams, and this struct is on the second one.
         continent_state continents;
 
         /// What the settlement/industrialisation pass computed for this body

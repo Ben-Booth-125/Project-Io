@@ -114,3 +114,77 @@ struct continent_state
 /// @param seed Per-body seed, already folded with the campaign seed (same
 ///             convention as run_planetology and generate_body_tiles).
 continent_state run_continents(const planetology_state& pl, int gw, int gh, uint32_t seed);
+
+// ===========================================================================
+// BL-763 — the drift TIME AXIS
+// ===========================================================================
+//
+// `tectonic_plate::drift_col`/`drift_row` were documented "per-epoch" and NO
+// EPOCH LENGTH WAS DEFINED ANYWHERE. The drift vector existed and nothing
+// integrated it, so the pass produced an endpoint and no history: "where was
+// this ground at age T" was not a question the layer could answer. That is the
+// first of the three gaps behind the Life phase (BL-765); the other two —
+// ground that actually rides its plate, and a per-tile past climate — are
+// BL-764's and are NOT addressed here.
+//
+// WHY A DERIVED SNAPSHOT RATHER THAN A STORED SEQUENCE. The item asked for
+// `run_continents` to return an ordered sequence. It does not, deliberately:
+// `continent_state` is on the SAVE ENVELOPE seam (src/core/save_game.cpp), and
+// twenty `plate_id` rasters at 31,581 tiles each is ~2.5 MB of save per body
+// for data that is a pure function of five floats per plate. So the sequence is
+// DERIVABLE rather than stored — the epoch length and depth are defined
+// constants, and `continent_snapshot_at` reconstructs any epoch on demand. The
+// ordered sequence is `continent_snapshot_at(cs, e, ...)` for e in [0, depth],
+// and it costs nothing until someone asks for it.
+
+/// Years per drift epoch. One grid column on the home body is roughly 153 km
+/// (a ~40,000 km circumference over 261 columns), and Earth-like plate motion
+/// covers that in about 3-6 My — so 5 My per epoch puts `drift_col`'s clamped
+/// 0.15-1.2 columns per epoch at a plausible rate rather than an arbitrary one.
+/// It is a STATED constant, which is the whole point: the previous value was
+/// undefined and therefore unfalsifiable.
+inline constexpr int64_t continent_epoch_years = 5'000'000;
+
+/// How far back the drift record is meaningful, in epochs. 20 epochs is 100 My
+/// — deep enough to reach a carboniferous-analogue coal window, shallow enough
+/// that extrapolating a single linear drift vector is not a fiction. Past this
+/// the plates' straight-line motion stops being a defensible reconstruction.
+inline constexpr int continent_drift_epochs = 20;
+
+/// The plate configuration at one past epoch. Derived, never stored.
+struct continent_snapshot
+{
+    /// How far back this snapshot sits. 0 is the present.
+    int     epochs_back         = 0;
+    int64_t years_before_present = 0;
+
+    /// The plates with their seeds wound BACK along their drift vectors. Every
+    /// other field (drift, oceanic) is carried through unchanged — drift is a
+    /// constant of the plate, not a per-epoch state.
+    std::vector<tectonic_plate> plates;
+
+    /// [row*gw+col] index into `plates`, the Voronoi assignment at that epoch.
+    /// At `epochs_back == 0` this is bit-identical to `continent_state::plate_id`
+    /// by construction — same seeds, same comparison, same tie-break.
+    std::vector<int> plate_id;
+};
+
+/// The plate configuration @p epochs_back drift epochs before the present.
+///
+/// PURE, and it consumes NO RANDOMNESS. That is what makes it safe to add: the
+/// plate stream in `run_continents` draws position, direction and oceanic flag
+/// for every plate from one shared `rng` in a fixed order, so a single new draw
+/// anywhere in that loop would shift every subsequent plate and change the
+/// world. This function touches none of it — it winds existing seeds back and
+/// re-runs the Voronoi.
+///
+/// It also does NOT re-run the boundary classification or the rift-basin
+/// search. The basin search is the expensive half of the pass (O(total) per
+/// candidate pair with a 25-sample inlandness probe per corridor tile) and it
+/// describes the PRESENT surface; re-running it per epoch would cost more than
+/// the snapshot and mean less.
+///
+/// A stagnant-lid body (one plate) returns its single plate and an all-zero
+/// assignment at every epoch, which is correct: nothing drifted.
+continent_snapshot continent_snapshot_at(const continent_state& cs, int epochs_back,
+                                        int gw, int gh);

@@ -50,6 +50,66 @@ float wrapped_dcol(float a, float b, int gw)
 
 } // namespace
 
+continent_snapshot continent_snapshot_at(const continent_state& cs, int epochs_back,
+                                        int gw, int gh)
+{
+    continent_snapshot out;
+    out.epochs_back          = epochs_back < 0 ? 0 : epochs_back;
+    out.years_before_present = static_cast<int64_t>(out.epochs_back) * continent_epoch_years;
+    out.plates               = cs.plates;
+
+    const int total = gw * gh;
+    if (cs.plates.empty() || total <= 0)
+        return out;
+
+    // Wind the seeds BACK along the drift vectors. Columns wrap; rows do not,
+    // and are deliberately left unclamped — a seed off the top or bottom of the
+    // grid is still a well-defined nearest-plate centre, and clamping it would
+    // pile plates against the poles as the epoch deepens.
+    const float back = static_cast<float>(out.epochs_back);
+    for (tectonic_plate& p : out.plates)
+    {
+        float c = p.seed_col - p.drift_col * back;
+        const float w = static_cast<float>(gw);
+        if (w > 0.0f)
+        {
+            c = std::fmod(c, w);
+            if (c < 0.0f) c += w;
+        }
+        p.seed_col = c;
+        p.seed_row = p.seed_row - p.drift_row * back;
+    }
+
+    out.plate_id.assign(static_cast<std::size_t>(total), 0);
+    if (out.plates.size() == 1)
+        return out; // Stagnant lid: one plate owns everything, at every epoch.
+
+    // The SAME comparison and the SAME tie-break as run_continents' own Voronoi
+    // (strict <, so the lowest plate index wins a tie). That identity is what
+    // makes epochs_back == 0 reproduce continent_state::plate_id exactly, and it
+    // is asserted rather than assumed.
+    const int plate_count = static_cast<int>(out.plates.size());
+    for (int row = 0; row < gh; ++row)
+    {
+        for (int col = 0; col < gw; ++col)
+        {
+            int   best    = 0;
+            float best_d2 = 1e30f;
+            for (int i = 0; i < plate_count; ++i)
+            {
+                const float dc = wrapped_dcol(static_cast<float>(col),
+                                              out.plates[static_cast<std::size_t>(i)].seed_col, gw);
+                const float dr = static_cast<float>(row)
+                               - out.plates[static_cast<std::size_t>(i)].seed_row;
+                const float d2 = dc * dc + dr * dr;
+                if (d2 < best_d2) { best_d2 = d2; best = i; }
+            }
+            out.plate_id[static_cast<std::size_t>(col + row * gw)] = best;
+        }
+    }
+    return out;
+}
+
 continent_state run_continents(const planetology_state& pl, int gw, int gh, uint32_t seed)
 {
     continent_state out;

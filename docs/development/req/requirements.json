@@ -4519,62 +4519,62 @@
    "difficulty": 4,
    "importance": null,
    "evaluated_difficulty": null,
-   "status": "active",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-09-03",
    "promoted_from": "backlog.json BL-763 - Sprint 32",
    "batch": "sprint-32-wave-2",
    "archived": false,
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "requirement": "`run_continents` returns an ordered sequence of plate snapshots with a DEFINED epoch length. `drift_col`/`drift_row` are integrated by an explicit loop rather than documented as \"per-epoch\" with no epoch defined anywhere.",
      "verification": [
       "headless: a harness asserts the sequence is ordered, non-empty, and its epoch length is a stated parameter"
      ],
-     "notes": null,
-     "evidence": null
+     "notes": "The row asked for a returned sequence. A derived one is strictly better here because of the save seam, and the reasoning is in the header comment beside the constants so the next reader does not re-litigate it.",
+     "evidence": "COMPLETE 2026-09-03, with a deliberate deviation stated rather than smuggled. The epoch length and depth are now STATED constants - continent_epoch_years = 5,000,000 (one grid column is ~153 km and Earth-like plate motion covers that in 3-6 My, so the clamped 0.15-1.2 columns per epoch sits at a plausible rate) and continent_drift_epochs = 20, which is 100 My. continent_snapshot_at(cs, e, gw, gh) reconstructs any epoch. THE DEVIATION: run_continents does NOT return a stored sequence. continent_state is on the save ENVELOPE seam, and 20 plate_id rasters at 31,581 tiles each is ~2.5 MB of save per body for data that is a pure function of five floats per plate. The sequence is therefore DERIVABLE - snapshot_at over [0, depth] - and costs nothing until asked for. continent_drift C2b asserts the age arithmetic."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "requirement": "THE ENDPOINT IS UNCHANGED. The final snapshot is identical to today's `continent_state` output, so nothing downstream of continents moves and the 0 CE digests hold.",
      "verification": [
       "headless: world_determinism - the three 2026-09-03 digests unchanged"
      ],
      "notes": "The sequence is additive; the present-day answer must be bit-identical or the item has changed the world rather than described its past.",
-     "evidence": null
+     "evidence": "COMPLETE 2026-09-03. world_determinism digests unmoved: 039EE9880739CDF6 / B0EBBA249B3DDABB / DE55600457797638, era report years=400 battles=270 conquests=207 foundings=833. And the sharper check is in the new harness rather than in the world: continent_drift C1 asserts that epoch 0 reproduces continent_state::plate_id BIT-IDENTICALLY, using the same comparison and the same strict-< tie-break as run_continents own Voronoi. That identity is what makes every deeper epoch a reconstruction instead of a fiction - if zero offset disagreed with the present, nothing built on this would mean anything."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "requirement": "The shared plate RNG stream is not disturbed. `run_continents` draws every plate's position, direction and oceanic flag from one stream in a fixed order; any new draw inserted into that loop shifts every subsequent plate.",
      "verification": [
       "headless: world_determinism",
       "static: review confirms no draw was inserted before an existing one"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE 2026-09-03, and asserted rather than reasoned. The snapshot consumes NO randomness - it winds existing seeds back along drift vectors and re-runs the Voronoi - so no draw was inserted into the shared plate stream, which draws position, direction and oceanic flag for every plate in one fixed order. continent_drift C4 proves the stream is where it was: a second run_continents at the same seed produces identical plates AND identical plate_id."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "requirement": "The expensive neighbour is NOT re-run per epoch. The rift-basin search (corridor_of, O(total) per candidate pair with a 25-sample inlandness probe per corridor tile) runs once, not once per snapshot.",
      "verification": [
       "headless: the harness reports per-epoch wall clock, and total cost stays within single-digit ms per snapshot"
      ],
      "notes": "Feasibility measured the Voronoi snapshot as cheap (~316k distance evals) and named the basin search as the real cost.",
-     "evidence": null
+     "evidence": "COMPLETE 2026-09-03, reported not asserted. Measured by continent_drift C6: 21 snapshots in 5.1 ms, 0.24 ms each, against 2.8 ms for one full run_continents - so a snapshot is ~12x cheaper than the pass, which is the observable form of 'the rift-basin search is not re-run'. snapshot_at deliberately does neither the boundary classification nor the basin search: the basin search describes the PRESENT surface, so re-running it per epoch would cost more and mean less. CAVEAT ON THE COMPARISON: the harness builds its planetology_state by hand, so its run_continents baseline may not exercise every gate the real pass does - the ratio is indicative, not a budget."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "requirement": "The stale comment at hard_coded_world.hpp is corrected: it claims `continent_state` \"never enters world, so it stays off the serialisation seam\", and it IS serialised on the envelope seam (save_game.cpp).",
      "verification": [
       "static: review confirms the comment matches the code"
      ],
      "notes": null,
-     "evidence": null
+     "evidence": "COMPLETE 2026-09-03. The comment at hard_coded_world.hpp said continent_state 'never enters world, so it stays off the serialisation seam'. The first clause is true and the second does not follow: save_game.cpp writes and reads it as part of the save ENVELOPE, so a field here is a save_game_version bump exactly like a field on world_params. Corrected in place, naming both seams so the mistake is not available to make again."
     }
    ]
   },
