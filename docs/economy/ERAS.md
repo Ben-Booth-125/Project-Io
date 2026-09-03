@@ -30,13 +30,14 @@ that say "era" in code, which already establishes those as separate axes. Nothin
 
 **The working start is the 1960s** (Ben, 2026-08-31). `world_params::epoch_year = 1960` selects it
 and the branch is live: `era_band_for_epoch` puts the recipe registry on the industrial band, and the
-Era −1 antiquity prehistory is skipped (`era_minus_one.cpp` runs only below 1700). The 0 CE ancient
+prehistory sim runs to it in two spans, ancient then industrial (`docs/lore/HISTORY.md` § The
+epoch and the run). The 0 CE ancient
 start (Ben, 2026-08-12; NR-177 — the mercenary company, the antiquity prehistory) remains a supported
 configuration on the same ladder; `docs/development/ROADMAP.md` § The two arcs owns which is the
 commercial product, and this document owns only the Era structure, which is the same on both.
 
 **The prehistory is a generator, not a play layer.** Generation runs a pre-epoch history sim that
-produces the 0 CE world the campaign opens on: **400 years in one band, at 4 years a tick — 100
+produces the world the campaign opens on, at either epoch. On the ancient arc it is one span: **400 years in one band, at 4 years a tick — 100
 decision rounds** (`world_params::prehistory_years = 400`, `src/world/hard_coded_world.hpp`; the
 single band is `hp.tick_bands[0] = {epoch_year, 4}` in `hard_coded_world.cpp`). A six-band ladder
 (100 → 50 → 20 → 10 → 5 → 1 years) is authored as the `history_sim_params` struct default
@@ -48,7 +49,10 @@ ruled 2026-08-12). Authority for the prehistory run is `docs/lore/HISTORY.md`.
 `pre_game_ticks` (80, ~20 years) before play begins, then rebases the clock — so play always opens
 at the epoch regardless of how many warm-start ticks ran. It is a settling pass that produces a
 plausible opening position: the world is generated *at* the epoch and ticked forward to reach a
-steady economy, not generated at an earlier date and advanced.
+steady economy, not generated at an earlier date and advanced. It is the third pass of simulated
+history — the economic settle in which firms spawn and exit until the field is operating-positive
+and steady — and its design is `docs/generation/GENERATION_STRATEGY.md` § Three passes of
+simulated history.
 
 ## Three things that say "era" in code, and which one this is
 

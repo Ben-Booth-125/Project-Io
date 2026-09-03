@@ -346,6 +346,14 @@ Pass 6 places; the design does not author a count.
 > having quietly become the load-bearing shaping constraint. Whether that is the design anyone
 > wants is open (BL-656); what is settled is that the doc now describes what the code does.
 
+**Pass 6 recurs through the economic settle (Ben, 2026-09-03).** The settle —
+`GENERATION_STRATEGY.md` § Three passes of simulated history — runs the campaign economy tick
+before play until the field is operating-positive and steady, and Pass 6 is its spawn act: it is
+re-run at a fixed cadence through the settle against the demand the field has *now*, so a niche
+opened by an exit is re-filled by a fresh firm rather than left as a gap that never closes. Firm
+exit is the cull. The calibration rule above is unchanged; what changes is that it is applied
+repeatedly, and that the stop condition belongs to the settle, not to Pass 6.
+
 **Background firms are full participants, not a cheaper model.** Once placed, a background firm is
 otherwise ordinary: it runs the **full corp_ai scored-utility layer** — build, demolish, survey,
 road, hire, and trade decisions — identical to the corp_ai instance driving the named rivals

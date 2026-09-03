@@ -80,6 +80,27 @@ THE FIELD (campaign_lapse, industrial, unwarmed 40 ticks): active buildings 237 
 
 RULINGS (2026-09-02, review form): NR-778 overturned - no banded prices; the ancient chain to steel is depth one (Bloomery Furnace: ore + timber -> steel), the Smithy the deeper alternate, one table re-derived (steel 16.1, ladder ~124x). NR-779/780 ratified. NR-781: tier_margin R2 compares net per UNIT of output; spawn_solvency R3 holds the seated corp to the best rival per holding rather than 3x the mean.
 
+### Sprint 32 — Gamified generation - three passes of simulated history to a functioning global trade network
+*Gated · opened 2026-09-03*
+
+**Goal.** Generation tuned to reach a DESCRIBED output - a functioning global trade network at the epoch, with separate market conditions per region and local firms sheltered in their early sales - without steering any single world to a target. Ben, 2026-09-03: one pass to determine ancient borders and cultural doctrines, a second to determine the extent of colonisation by major powers and market conditions upon game start; "I am interested to see if this can be done cheaply. This is in fact a difficult abstraction problem." The shape: the polity sim run as TWO SPANS on one engine (ancient to a boundary year, industrial to the epoch, sea legs open in the second), then the warm start promoted to an ECONOMIC SETTLE in which firms spawn and exit until the field is operating-positive and steady. Three in-world forces produce the market differentiation - tariffs from industrialisation timing, distance on the real network, colonial ties as preferred sellers - and a seed-sweep scoreboard reads the SPREAD, never a per-world value.
+
+**Planned.**
+- BL-746 (two-span prehistory) - FIRST and cheapest: the sim runs on the 1960 arc at all, with a boundary year; the 0 CE world byte-identical.
+- BL-753 (generation budget) - instrumented alongside BL-746 so every later item records its cost as it lands.
+- BL-747 (industrial pass ladder) - Stage 4 inside the run; the furnace reached by play, not pre-resolved.
+- BL-748 (sea-leg campaign) - reach across water from harbour works; colonisation as the Metropole overseas; non-hegemony unrelaxed.
+- BL-749 (tariff posture) - protection derived from industrialisation timing and ties, enacted as an import_tariff law at setup.
+- BL-750 (economic settle pass) - GATED on BL-745 and the lapse showing operating-positive survivors; recurring Pass 6 spawn, firm exit as the cull, stable-not-saturated stop.
+- BL-751 (colonial ties) - preferred-seller relationships from pass 2's ownership history.
+- BL-752 (generation scoreboard) - one sheet over the seed spread; the retro cites it.
+
+**Done when.** A 1960 world generates through both polity spans and the settle inside a budget Ben has stated on BL-753; the scoreboard (BL-752) over the standard seed spread shows a WIDE chain-completeness spread, some nations tariffed and most not, overseas holdings per major that vary by seed, and the lapse four steady from tick 0 of play; the 0 CE world is byte-identical to today (pass 1 only).
+
+**Risk.** THE ABSTRACTION. Two engines (the polity sim with regions and rounds; the economy tick with firms and credits) and one handoff between them - if pass 3 reads pass 2's internals the two engines fuse and neither stays cheap. Keep the handoff a struct of plain outputs. THE PRECONDITION. A settle selects over a roster; on today's roster the industrial field is idle by tick 25, so a longer settle produces an empty world - BL-750 does not start until sprint 31 has operating-positive survivors. THE COST. Pass 1 is already the most expensive pass; pass 2 doubles it; a 4-ticks-a-year settle is an order of magnitude over the warm start. Measure per pass first (BL-753); re-file affordability rungs only when the number demands. THE TEMPTATION. "Gamify" must not become a per-world target; the 2026-08-31 asymmetry ruling stands - tune forces, read distributions.
+
+ORDER OF CHEAPNESS. BL-746 and BL-753 first because they are the arc running at all and the number that says whether the rest is affordable; BL-747/748/749 are pass-2 substance and can fan out to generation-dev agents in worktrees once BL-746 is in; BL-750 waits on sprint 31; BL-751 and BL-752 close the loop. OPEN CALLS FOR BEN, to be put on a form when BL-746 is picked up: the boundary year (authored 400 before the epoch vs derived from the first furnace); tariff as a scored polity VERB vs a DERIVED output at handoff; whether the settle REPLACES the warm start or follows it.
+
 ## Where things stand
 
 | Sprint | Theme | State |
@@ -129,6 +150,7 @@ RULINGS (2026-09-02, review form): NR-778 overturned - no banded prices; the anc
 | 29 | The world gets a face - detailed canvas rendering | CLOSED 2026-09-02 on Ben's call (archive all prior sprints). The ground has a mechanism: baked painterly chunks in the C-F direction, stepped zoom with bake tiers, a threaded bake, muted borders. |
 | 30 | Canvas texture update | CLOSED 2026-09-02 on Ben's call (archive all prior sprints) with wave 1 landed and merged to main the same day: edges back on the ground, the land tilts at the top rungs. |
 | 31 | Long-term market viability - every recipe pays at base price | OPEN. 2026-09-02: BL-744 stage 2 landed and ruled on - one price table (NR-778 overturned: the ancient chain reaches steel at depth 1 instead), the three constants and the anchor-route rule ratified, the two design-red harness rows re-expressed. recipe_margin ALL PASS in both bands. The field re-measure says the industrial band still collapses on inputs bought at the ceiling; BL-745 (processor input bid cap) is the next lever. |
+| 32 | Gamified generation - three passes of simulated history to a functioning global trade network | GATED on sprint 31's done-when. 2026-09-03: shape settled and written into GENERATION_STRATEGY.md § Three passes of simulated history, HISTORY.md § The epoch and the run, ERAS.md and CORPORATION_GENERATION.md § Pass 6; eight items filed (BL-746..BL-753). Nothing built. |
 
 **Next up.** SPRINT NUMBERING, reset by Ben on 2026-08-30: the proposed shell-chrome (old 25) and startup (old 27) batches are DELETED - "Sprint 25 and 27 don't need a revisit, UI items for these are working great" - and the canvases batch renumbered from 26 to 25. THE NEXT NEW SPRINT IS 26. Two of the six UI review batches from 2026-08-28 therefore never run, and that is a judgement that their surfaces are good enough rather than a deferral.
 
@@ -138,4 +160,4 @@ NEXT UP: sprint 25 (canvases & the zoom ladder), carrying BL-694 (top-bar tracke
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*44 sprints archived cold; 1 open/gated in the hot store.*
+*44 sprints archived cold; 2 open/gated in the hot store.*

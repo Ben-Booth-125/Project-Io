@@ -29,10 +29,15 @@ Generation runs, in `make_hard_coded_world`:
 
 ```
 planetology → continents → tiles                       (per body)
-  → population centres → history ladder → nations
+  → population centres → history ladder → creeds → settlement
+  → history sim, pass 1 (ancient) → history sim, pass 2 (industrial) → nations
   → institutional history → provinces → roads → corporations → markets → laws   (homeworld only)
   → provinces                                            (every other body, last)
+  → the economic settle (pass 3)                         (after the worker, before play)
 ```
+
+The three simulated passes — two polity spans and one economic settle — are § Three passes of
+simulated history; `../lore/HISTORY.md` owns the polity spans.
 
 A body's atmosphere/history precedes its plates; plates precede its terrain; deposits exist
 before territory is drawn over them. On the homeworld, population centres are placed **before**
@@ -324,6 +329,76 @@ BL-210's to close. **Full architecture, rationale, and the per-doc open question
 BL-210** (`backlog.json`).
 
 ---
+
+## Three passes of simulated history (Ben, 2026-09-03)
+
+> *"We have one pass to determine ancient borders and cultural doctrines, and then a second pass
+> to determine the extent of colonisation by major powers, and market conditions upon game
+> start."*
+
+The continuous history above is produced by **three passes on two engines**, and the abstraction
+problem the design has to solve is the **handoff** between them, not either engine. Generation is
+being tuned to reach a described output — a functioning global trade network at the epoch — and
+the rule for reaching it is unchanged from § Asymmetry is the deliverable: **tune the forces,
+never the outcome**. Each pass has a scoreboard read over a seed sweep; no world is steered to a
+target.
+
+| Pass | Engine | Span | Produces |
+|---|---|---|---|
+| **1 — Ancient** | The polity sim (`history_sim`), Classical and Medieval bands | The prehistory span to the **boundary year** | Ancient borders, cultural doctrines, the lacunae — who walked where |
+| **2 — Industrial** | The same polity sim, Gunpowder and Industrial bands unlocked, sea legs open | The boundary year to the epoch | The extent of colonisation by major powers, which polities industrialised and when, each nation's tariff posture |
+| **3 — Settle** | The campaign economy tick (`run_economy_step`) with the full corp AI | No calendar meaning; banded coarse, at the epoch | Market conditions at game start: which firms exist, what each market can close, the price field |
+
+**Pass 1 and pass 2 are one engine, not two.** The works roster is cumulative across its four
+bands and the unit roster is era-keyed, so the second span is the first span continued with more
+rows offered, not a second mechanism. What pass 2 adds is **reach across water** — a campaign or
+settle target across a sea leg, staged from harbour works — because colonisation by a major is
+the Metropole strategy played overseas, and it culminates as every major does (`../lore/COLLAPSE.md`).
+The epoch still arrives multipolar; the non-hegemony invariant is not relaxed for the sea.
+
+**The boundary year is a parameter with a default, not a fact.** The default is 400 years before
+the epoch, so that on a 1960 arc pass 2 is 1560 → 1960 and pass 1 is whatever
+`prehistory_years` leaves before it. A derived boundary — the year the first polity lights a
+furnace — is the better-founded alternative and is open; both are consequences of upstream
+scalars, and neither is a roll. On an ancient epoch there is no pass 2: the boundary falls past
+the epoch and the sim stops where it stops today.
+
+**Pass 3 is the warm start, promoted.** `app::start_new_game`'s pre-game ticks already settle
+the economy before play; pass 3 makes that a generation pass with the two acts it lacks:
+background firm generation (`CORPORATION_GENERATION.md` § Pass 6) **recurs** through the settle
+rather than running once, and **firm exit** is the cull. Firms spawn and collapse until the field
+is operating-positive and steady; the survivors are viable by construction, and the player enters
+a field that has already been selected rather than one that is about to be. Two properties bound
+it. **Stable is not saturated**: the stop condition is operating-positive and steady, never every
+chain closed, and the chain-completeness spread is asserted at the end of the pass, so the
+opportunity surface the economic premise needs survives the settle. And **a settle can only select
+over a roster that can pay**: on a roster that loses at base, a longer settle produces an empty
+world, not a stable one. The recipe-margin anchor (`../economy/PRODUCTION.md`) is therefore a
+precondition of pass 3, not a neighbour.
+
+**What crosses each handoff, and nothing else.**
+
+- Pass 1 → pass 2: the region table, cultures, works, the strain accumulators. Nothing is reset.
+- Pass 2 → the political map: the same outputs `generate_nations` reads today, plus two new
+  ones — a nation's **tariff posture**, enacted as an ordinary `import_tariff` law at world
+  setup where pass 2's polity chose protection, and its **colonial ties**, which seed the
+  order book's preferred-seller relationships so a colony's chains close through its metropole
+  before they close anywhere else.
+- Pass 3 → play: the world state, as the warm start hands it over today. Pass 3 seeds no
+  behaviour (§ Generation seeds no behaviour in `CORPORATION_GENERATION.md` still holds).
+
+**Separate market conditions are produced by in-world forces with visible causes** — never by a
+term inside an agent. Tariffs, because a nation that industrialised late relative to its
+neighbours protects what it has; distance, because the landed price of a far competitor's good
+is high on the real road and sea network; ties, because history routed a colony's trade through
+its metropole. A local firm's early sales are sheltered by the same three, and a player can read
+why on the map.
+
+**The cost question is open and is measured first.** Pass 1 is already the most expensive pass;
+pass 2 doubles it and pass 3 lengthens the warm start. The budget is the generating screen's wait,
+and the affordability rungs in `../lore/COLLAPSE.md` § The 4000-year problem become load-bearing
+in the order that document gives. Whether the shape can be had cheaply is the sprint's question,
+not this document's.
 
 ## Open cross-doc items
 

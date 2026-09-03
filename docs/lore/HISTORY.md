@@ -7,12 +7,26 @@ generation stack hangs dated history lines off. Companion to `../generation/PLAN
 
 ## The epoch and the run
 
-**The campaign epoch is 0 CE** (Ben, 2026-08-12; the refocus to the ancient era, NR-177). The
-ladder runs up to an ancient start, not an industrial one. Stages 0–4 — agrarian surplus, the
-enforceable promise, fragmentation-with-connectivity, capital disciplines the sovereign, the
-energy transition — are pre-industrial in mechanism and sit inside the pre-epoch run. The old
-Stages 5 and 6 (the rupture and saturation) lie past the epoch entirely and are DLC-era material
-alongside the parked space arc; what replaces them is § Stage 5 below.
+**The ladder runs to whichever epoch the arc sets** — 0 CE for the ancient arc (Ben, 2026-08-12;
+NR-177) and 1960 for the industrial one (Ben, 2026-08-31). Stages 0–3 — agrarian surplus, the
+enforceable promise, fragmentation-with-connectivity, capital disciplines the sovereign — are
+pre-industrial in mechanism and sit inside the pre-epoch run on both arcs. Stage 4, the energy
+transition, sits inside the run only on an industrial epoch. The old Stages 5 and 6 (the rupture
+and saturation) lie past both epochs and are DLC-era material alongside the parked space arc; what
+replaces them is § Stage 5 below.
+
+**The run is two spans on one engine (Ben, 2026-09-03).** The sim plays the polities forward in
+an **ancient pass** — Classical and Medieval bands, ending at a **boundary year** — and, where the
+epoch lies past that boundary, an **industrial pass** from the boundary to the epoch with the
+Gunpowder and Industrial bands unlocked and sea legs open to Campaign and Settle. The first pass
+determines ancient borders and cultural doctrines; the second determines the extent of
+colonisation by the majors, who industrialised and when, and each polity's tariff posture. The
+boundary defaults to 400 years before the epoch; a boundary derived from the first furnace is the
+open alternative. Nothing resets between the spans — the region table, works and strain carry
+across — and on an ancient epoch the boundary falls past the stop year, so there is one span, as
+today. A third, economic pass follows the political map and is not this document's: it is the
+settle in `../generation/GENERATION_STRATEGY.md` § Three passes of simulated history, and it is
+the pass that produces market conditions at game start.
 
 The pre-epoch history is **produced by a running simulation, not narrated over a finished map.**
 The one-shot passes (`history_ladder`, `creeds`, `settlement`) found the cradles, the cultures and
@@ -24,7 +38,7 @@ globalisation event — do not run; the sim produces that history live.
 
 **The span is a parameter, and the derivation lives in one place.** `era_minus_one.cpp` derives
 `history_sim_params` from `world_params`: `start_year = epoch_year − prehistory_years`,
-`stop_year = epoch_year`, and the tick bands. `prehistory_years` is a **scope knob, not a tuning
+`stop_year = epoch_year`, the boundary year between the two spans, and the tick bands. `prehistory_years` is a **scope knob, not a tuning
 dial** — set to 0 it skips the pass entirely, which is how harnesses that do not test the era
 avoid paying for it. Every harness derives its parameters through the same helpers, so no check
 measures a different run from the one that generates a world (BL-462).
