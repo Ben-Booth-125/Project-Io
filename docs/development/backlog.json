@@ -311,7 +311,7 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "34",
+   "sprint": "32",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [],
@@ -338,7 +338,7 @@
    "priority": "A",
    "difficulty": 4,
    "version_goal": null,
-   "sprint": "34",
+   "sprint": "32",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
@@ -366,7 +366,7 @@
    "priority": "A",
    "difficulty": 4,
    "version_goal": null,
-   "sprint": "34",
+   "sprint": "32",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
@@ -394,7 +394,7 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "34",
+   "sprint": "32",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
@@ -423,7 +423,7 @@
    "priority": "A",
    "difficulty": 4,
    "version_goal": null,
-   "sprint": "34",
+   "sprint": "32",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
@@ -452,7 +452,7 @@
    "priority": "A",
    "difficulty": 2,
    "version_goal": null,
-   "sprint": "34",
+   "sprint": "32",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
@@ -479,7 +479,7 @@
    "priority": "A",
    "difficulty": 3,
    "version_goal": null,
-   "sprint": "34",
+   "sprint": "32",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
@@ -499,7 +499,7 @@
     "tools/verify/history_sweep.cpp",
     "tools/verify/run_sweep.cmake"
    ],
-   "design": "\"GAMIFYING GENERATION\" MEANS A SCOREBOARD, NOT A TARGET. Ben, 2026-08-31: no start is clamped up to viability or down to fairness; generation owes the SPREAD. The three passes are tuned by moving a force (a weight in history_sim_params, a tariff threshold, the settle's spawn cadence) and reading how the DISTRIBUTION across a seed spread moves. The instruments exist and are read one at a time; this item puts them on one sheet.\n\nTHE WORK. A sweep target (run_sweep.cmake already fans harnesses over seeds) that, per seed, records: chain-completeness spread (demand_census R5 - min, median, max, tails); the lapse four at handoff (mean operating net, operating-positive corps, valued production, debtors); the haulage baseline (convoy count and cargo vs the 1055/802 reference - goldens cannot see trade); and history_sweep's pass-1/pass-2 outputs (nation count, furnace years, overseas holdings, tariffed nations). One table, seeds as rows, printed and diffable. No assertion beyond \"the spread is not zero\" - the instrument reports, the sprint argues.\n\nDONE WHEN: the sheet exists, runs over the standard seed spread in one command, and sprint 34's retro cites it."
+   "design": "\"GAMIFYING GENERATION\" MEANS A SCOREBOARD, NOT A TARGET. Ben, 2026-08-31: no start is clamped up to viability or down to fairness; generation owes the SPREAD. The three passes are tuned by moving a force (a weight in history_sim_params, a tariff threshold, the settle's spawn cadence) and reading how the DISTRIBUTION across a seed spread moves. The instruments exist and are read one at a time; this item puts them on one sheet.\n\nTHE WORK. A sweep target (run_sweep.cmake already fans harnesses over seeds) that, per seed, records: chain-completeness spread (demand_census R5 - min, median, max, tails); the lapse four at handoff (mean operating net, operating-positive corps, valued production, debtors); the haulage baseline (convoy count and cargo vs the 1055/802 reference - goldens cannot see trade); and history_sweep's pass-1/pass-2 outputs (nation count, furnace years, overseas holdings, tariffed nations). One table, seeds as rows, printed and diffable. No assertion beyond \"the spread is not zero\" - the instrument reports, the sprint argues.\n\nDONE WHEN: the sheet exists, runs over the standard seed spread in one command, and sprint 32's retro cites it."
   },
   {
    "status": "designed",
@@ -507,7 +507,7 @@
    "priority": "A",
    "difficulty": 2,
    "version_goal": null,
-   "sprint": "34",
+   "sprint": "32",
    "written": "2026-09-03",
    "author": "Ben (design session 2026-09-03, \"gamify generation\"); Claude (itemisation)",
    "requires": [
@@ -525,7 +525,7 @@
     "src/core/app.cpp",
     "tools/verify/history_sweep.cpp"
    ],
-   "design": "BEN, 2026-09-03: \"I am interested to see if this can be done cheaply. This is in fact a difficult abstraction problem.\" The budget is the generating screen's wait (~25-38 s generation + ~6 s warm start today, per app.cpp). Pass 1 is already the most expensive pass; pass 2 doubles it and pass 3 lengthens the settle by an order of magnitude at 4 ticks a year. Cost tracks the province table, not the fighting (COLLAPSE.md § The 4000-year problem).\n\nTHE WORK. (1) Instrument the wait per pass on the loading screen's progress sink and in history_sweep, so every sprint-34 item records its cost on this item as it lands. (2) The affordability rungs in COLLAPSE.md § The 4000-year problem - kill the O(provinces) scans, quiet-province fast path, banded year grain, record on change - were purged with the ancient pivot and are NOT re-filed here in advance. Re-file the one the measurement points at, when it does, in that order. (3) The abstraction question Ben names is the handoff between two engines, not either engine: keep the handoff a struct of plain outputs (regions, works, strain, ties, posture) so pass 3 never reads pass 2's internals.\n\nDONE WHEN: a 1960 world with all three passes generates inside a budget Ben has stated on this item; if it cannot, the item records which rung buys it back and that rung is filed."
+   "design": "BEN, 2026-09-03: \"I am interested to see if this can be done cheaply. This is in fact a difficult abstraction problem.\" The budget is the generating screen's wait (~25-38 s generation + ~6 s warm start today, per app.cpp). Pass 1 is already the most expensive pass; pass 2 doubles it and pass 3 lengthens the settle by an order of magnitude at 4 ticks a year. Cost tracks the province table, not the fighting (COLLAPSE.md § The 4000-year problem).\n\nTHE WORK. (1) Instrument the wait per pass on the loading screen's progress sink and in history_sweep, so every sprint-32 item records its cost on this item as it lands. (2) The affordability rungs in COLLAPSE.md § The 4000-year problem - kill the O(provinces) scans, quiet-province fast path, banded year grain, record on change - were purged with the ancient pivot and are NOT re-filed here in advance. Re-file the one the measurement points at, when it does, in that order. (3) The abstraction question Ben names is the handoff between two engines, not either engine: keep the handoff a struct of plain outputs (regions, works, strain, ties, posture) so pass 3 never reads pass 2's internals.\n\nDONE WHEN: a 1960 world with all three passes generates inside a budget Ben has stated on this item; if it cannot, the item records which rung buys it back and that rung is filed."
   }
  ]
 }
