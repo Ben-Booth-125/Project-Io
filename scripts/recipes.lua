@@ -325,7 +325,15 @@ recipes = {
         display_name = "Smithy", -- BL-429 slice 2
         era          = "ancient",
         group        = "Metal Foundry", -- BL-434
-        inputs       = { iron_blooms = 2.0, charcoal = 1.0 },
+        -- BL-744 (Ben, 2026-09-02, overturning NR-778): the ancient chain to
+        -- steel is DEPTH ONE - the Bloomery at the end of this file smelts ore
+        -- and timber straight to steel and is the band's anchor route. The
+        -- Smithy stays as the deeper ALTERNATE (blooms + charcoal), held to
+        -- "profitable at base" plus the floor half; at 2 blooms + 1 charcoal it
+        -- consumed 55 of inputs for a 16 steel and could not be. A bloom is a
+        -- consolidated lump, not a unit of steel, so the ratio is authored by
+        -- what the route must clear rather than by a mass balance.
+        inputs       = { iron_blooms = 0.4, charcoal = 0.2 },
         outputs      = { steel = 1.0 },
     },
 
@@ -917,6 +925,26 @@ recipes = {
         -- that band.
         inputs       = { steel = 0.5, stone = 2.0, sand = 2.0 },
         outputs      = { construction_capacity = 3.8 },
+    },
+
+    -- BL-744 (Ben, 2026-09-02, overturning NR-778): THE ANCIENT CHAIN TO STEEL
+    -- IS DEPTH ONE. Under the recipe margin anchor every processing stage at
+    -- least doubles the value it takes in, so a three-stage route (timber ->
+    -- charcoal -> blooms -> steel) priced ancient steel at 113 against the
+    -- industrial band's 14, and the two bands could not share a price table.
+    -- Ben's call was ONE table and a shorter chain rather than banded prices:
+    -- the Bloomery smelts ore and timber straight to steel (the timber is the
+    -- charcoal, burned in place), so steel's cheapest ancient route is one step
+    -- above raws and its price is set here. The Smithy (steel_from_blooms) is
+    -- now the deeper alternate. Appended, never inserted - ids are indices.
+    {
+        name         = "steel_bloomery",
+        display_name = "Bloomery Furnace",
+        era          = "ancient",
+        group        = "Metal Foundry",
+        inputs       = { iron_ore = 2.0, timber = 1.5 },
+        outputs      = { steel = 1.0 },
+        centre_proximity_radius = 6, -- the heavy processor class, as the steel recipe
     },
 }
 

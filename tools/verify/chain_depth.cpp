@@ -735,6 +735,11 @@ int main()
             "trade_goods", "glass", "tannery", "weaver",               // Artisan Goods
             "ceramics_kiln", "stonemason", "sawmill",                  // Construction Materials
             "iron_blooms", "steel_from_blooms", "ordnance_from_blooms",// Metal Foundry
+            // BL-744 (2026-09-02, Ben overturning NR-778) — the Bloomery Furnace,
+            // the ancient band's depth-one route to steel (ore + timber). Raw
+            // inputs, no tech lock, so it opens at tick 0 and must: it is the
+            // route the recipe margin anchor prices ancient steel off. 18 -> 19.
+            "steel_bloomery",
             "shipwright",                                              // Advanced Fabrication
             // BL-709 (2026-08-31) — the two ANCIENT construction methods. Both
             // open at tick 0 and must: capacity is not cargo, so a region with

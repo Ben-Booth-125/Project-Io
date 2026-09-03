@@ -44,22 +44,6 @@ void world_gen_config::load_from_lua(lua_state& lua)
             }
         }
 
-        // BL-744: the ancient band's overrides. Same shape, same rejection of an
-        // unknown name; 0 (or absent) inherits the shared table.
-        if (sol::optional<sol::table> bpa = (*km)["base_price_ancient"])
-        {
-            for (const auto& kv : *bpa)
-            {
-                const std::string rname = kv.first.as<std::string>();
-                bool ok = false;
-                const resource_type r = resource_names::resource_from_name(rname, ok);
-                if (!ok)
-                    throw std::runtime_error(
-                        "Unknown resource '" + rname + "' in world_gen.kepler_market.base_price_ancient");
-                kepler_base_price_ancient_override[static_cast<std::size_t>(r)] = kv.second.as<float>();
-            }
-        }
-
         if (sol::optional<sol::table> cv = (*km)["carving"])
         {
             market_carving.rich_factor        = cv->get_or("rich_factor",        market_carving.rich_factor);

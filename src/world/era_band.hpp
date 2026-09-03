@@ -1,10 +1,11 @@
 #pragma once
 // The era band — which product's roster an authored entry belongs to — in a
-// header of its own (BL-744, 2026-09-02) so that world_gen_config.hpp can
-// select a base-price table by band WITHOUT pulling recipe_registry.hpp's
-// include set into every generation TU, and without putting the accessor in a
-// Lua-linked .cpp that the Lua-free harnesses never link (the first cut did
-// exactly that, and every harness built on io_world_obj alone failed to link).
+// header of its own (BL-744, 2026-09-02). Split out so a header lighter than
+// recipe_registry.hpp can read the band; the per-band price table that first
+// needed it was overturned the same day (NR-778 — one table, a depth-one
+// ancient steel route instead), and the split stays because it costs nothing
+// and the lesson it carries does: a function called from io_world_obj must not
+// live in a Lua-linked .cpp, or every Lua-free harness fails to link.
 // recipe_registry.hpp includes this and is unchanged for every reader.
 
 #include <cstddef>

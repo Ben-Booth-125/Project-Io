@@ -1,7 +1,6 @@
 #pragma once
 
 #include "components.hpp"
-#include "era_band.hpp" // BL-744: base_price_for_epoch selects the band's table
 
 #include <array>
 #include <cstdint>
@@ -65,35 +64,12 @@ struct world_gen_config
         return a;
     }();
 
-    /// BL-744 (2026-09-02): the ANCIENT band's base-price overrides, authored
-    /// under `world_gen.kepler_market.base_price_ancient`, indexed by
-    /// resource_type. 0 = inherit the shared table above. Base prices are
-    /// era-banded for the same reason recipes are (BL-433): the two bands reach
-    /// some goods by routes of different depth — ancient steel is timber →
-    /// charcoal → blooms → steel, industrial steel is ore + coal → steel — and
-    /// the recipe margin anchor (docs/economy/PRODUCTION.md § The recipe margin
-    /// anchor) prices a good off its own band's route, so one shared number
-    /// cannot satisfy both. Read through `base_price_for_epoch`; markets are
-    /// seeded from the merged table once, at world creation, so a save carries
-    /// its own prices and never re-reads this.
-    std::array<float, resource_count> kepler_base_price_ancient_override = {};
-
-    /// The base-price table a campaign opening in @p epoch_year seeds its
-    /// markets from: the shared table, with the ancient overrides applied when
-    /// `era_band_for_epoch(epoch_year)` is ancient. The band threshold is the
-    /// recipe registry's, so it is one number in the codebase. Inline, and in
-    /// this header, because hard_coded_world.cpp (io_world_obj, Lua-free) calls
-    /// it and world_gen_config.cpp is a Lua-linked TU the headless harnesses
-    /// never link.
-    std::array<float, resource_count> base_price_for_epoch(int64_t epoch_year) const
-    {
-        std::array<float, resource_count> out = kepler_base_price;
-        if (era_band_for_epoch(epoch_year) == era_band::ancient)
-            for (std::size_t r = 0; r < resource_count; ++r)
-                if (kepler_base_price_ancient_override[r] > 0.0f)
-                    out[r] = kepler_base_price_ancient_override[r];
-        return out;
-    }
+    // ONE base-price table for both era bands (Ben, 2026-09-02, overturning
+    // NR-778). A per-band override was tried when the ancient bloom chain priced
+    // its own steel at 113; the ruling was to shorten that chain to depth 1
+    // instead (recipes.lua's Bloomery) so one table clears the recipe margin
+    // anchor in both bands. A good's price is the larger of the two bands'
+    // anchor-route needs; recipe_margin checks both against this one table.
 
     market_carving_params  market_carving{};
     endemic_pricing_params endemic{};

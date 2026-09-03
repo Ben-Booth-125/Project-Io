@@ -59,10 +59,12 @@
 // one price would force every route to the same input cost, which erases the
 // point of alternate methods. The anchor route is marked `*` in the table.
 //
-// ERA-BANDED PRICES (NR-778). Each band is checked against ITS OWN table —
-// world_gen_config::base_price_for_epoch — because the ancient band reaches
-// some goods by deeper routes (timber -> charcoal -> blooms -> steel) than the
-// industrial one, and the anchor prices a good off its own band's route.
+// ONE PRICE TABLE FOR BOTH BANDS (Ben, 2026-09-02, overturning NR-778). A
+// per-band override was tried when the ancient bloom chain priced its own steel
+// at 113; the ruling was to shorten that chain to depth one instead (the
+// Bloomery, recipes.lua) so one table clears the anchor in both bands. A good's
+// price must satisfy the LARGER of the two bands' anchor-route needs; both
+// bands are checked below against the same table.
 //
 // WHAT IS EXEMPT, AND SAYS SO. A recipe whose every output carries base_price 0
 // (propellant: "consumed by the Launchpad, never sold", RESOURCES.md) has no
@@ -289,13 +291,8 @@ int main()
         const era_band band = bands[bi];
         band_tally&    t    = tally[bi];
         reg.set_era(band);
-        // The band's own table (NR-778): ancient overrides applied for the 0 CE product.
-        const std::array<float, resource_count> price =
-            gen_cfg.base_price_for_epoch(band == era_band::ancient ? 0 : 1960);
-        int band_overrides = 0;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (price[r] != price_shared[r])
-                ++band_overrides;
+        // One table for both bands (Ben, 2026-09-02, overturning NR-778).
+        const std::array<float, resource_count>& price = price_shared;
 
         // --- processing ---------------------------------------------------
         const building_economics& pe = reg.economics(building_type::processing_facility);
@@ -306,9 +303,9 @@ int main()
             ? static_cast<double>(pe.base_wage) / static_cast<double>(pe.base_rate) : 0.0;
 
         std::printf("--- band %s — processing (base_rate %.2f batches/tick at W=1, "
-                    "maintenance %.2f, wage %.2f, goods upkeep %.2f/tick; %d band price overrides) ---\n",
+                    "maintenance %.2f, wage %.2f, goods upkeep %.2f/tick) ---\n",
                     band_name(band), pe.base_rate, pe.maintenance, pe.base_wage,
-                    basket_value(pbasket, price), band_overrides);
+                    basket_value(pbasket, price));
         print_header();
 
         const int n = reg.recipe_count(building_type::processing_facility);

@@ -247,7 +247,7 @@ Refined goods are the primary goods in inter-body trade during the early game.
 
 | Resource | Primary inputs | Processing building | Base price |
 |----------|---------------|---------------------|-----------|
-| Steel | Iron ore or iron-nickel ore (+ coal as reagent) | Smelter | 13.6 (ancient 113.0) |
+| Steel | Iron ore or iron-nickel ore (+ coal as reagent) | Smelter; also the **Bloomery Furnace** on the ancient roster | 16.1 |
 | Refined fuel | Petroleum | Refinery | 15.6 |
 | Silicon | Silica | Refinery | 9.6 |
 | Refined copper | Copper ore | Smelter | 13.6 |
@@ -267,14 +267,14 @@ Products are the highest-value goods and the primary driver of market price dive
 
 | Resource | Primary inputs | Processing building | Base price |
 |----------|---------------|---------------------|-----------|
-| Machinery | Steel + refined copper | Fabricator | 56.0 |
+| Machinery | Steel + refined copper | Fabricator | 61.0 |
 | Electronics | Silicon + refined copper + REE alloy | Electronics Lab | 41.6 |
 | Propellant | Refined fuel + liquid oxygen | Chemical Plant | — (unpriced; consumed by the Launchpad, never sold) |
-| Alloys | Steel + REE alloy | Fabricator | 80.0 |
-| Spacecraft components | Alloys + electronics | Assembly Plant | 280.0 |
-| **Ordnance** | **Steel + machinery** | **Fabricator**; also the **Smithy** on the ancient roster | 140.8 (ancient 113.0) |
+| Alloys | Steel + REE alloy | Fabricator | 85.0 |
+| Spacecraft components | Alloys + electronics | Assembly Plant | 310.0 |
+| **Ordnance** | **Steel + machinery** | **Fabricator**; also the **Smithy** on the ancient roster | 155.8 |
 
-The margin ladder widens up the tiers — spacecraft components sits 112× iron ore — which is the
+The margin ladder widens up the tiers — spacecraft components sits 123× iron ore — which is the
 value gradient the space-equipment premise rests on. Propellant and spacecraft components are the
 key outputs enabling space access. Propellant is the operating cost of any launch; spacecraft
 components are consumed by infrastructure construction in orbit and on remote bodies.
@@ -296,8 +296,8 @@ it would put an army and a city on one price. A distinct field ration or medical
 **append with its behaviour filed in the same change** — never an interior insertion.
 
 **Its price is derived, not picked.** Ordnance is priced at what its cheapest route needs under
-`docs/economy/PRODUCTION.md` § The recipe margin anchor — the Fabricator's route on the industrial
-band, the Smithy's on the ancient band, hence one value per band (§ Base prices are era-banded).
+`docs/economy/PRODUCTION.md` § The recipe margin anchor — the Fabricator's route, which is the larger of the two bands'
+needs, so the one value serves both.
 Re-derive if either input's price or the recipe quantities move.
 
 **It has a producer in every era band.** The Fabricator recipe carries `era = "industrial"`, and
@@ -323,7 +323,7 @@ budget cost with no resource identity of its own.
 | Resource | Primary inputs | Building | Base price | Effect if undersupplied |
 |----------|---------------|----------|-----------|------------------------|
 | Clean water | Water | Water Treatment Plant | 7.7 | Reduces habitability; suppresses population growth |
-| Consumer goods | Food rations + steel | Consumer Goods Factory | 56.0 | Reduces workforce efficiency |
+| Consumer goods | Food rations + steel | Consumer Goods Factory | 61.0 | Reduces workforce efficiency |
 | Medical supplies | Water + agricultural produce | Pharmaceutical Lab | 14.0 | Reduces habitability; raises mortality (long-term) |
 
 The three carry recipes (`scripts/recipes.lua` ids 14–16, all on the generic
@@ -369,7 +369,7 @@ tradeable, and `resolve_price` / the clearing pass ignore everything else
 `src/world/world_gen_config.hpp`). The tradeable set is:
 
 - **The prototype seven**: iron ore 2.5, petroleum 3.5, water 1.5, agricultural produce 3.0,
-  steel 13.6 (ancient 113.0), refined fuel 15.6, food rations 13.6.
+  steel 16.1, refined fuel 15.6, food rations 13.6.
 - **The remaining industrial raws**: coal 2.0, silica 2.0, copper ore 3.0, rare earth ore 6.0,
   iron-nickel ore 3.0, platinum-group metals 40.0. A raw with an authored deposit and no price is
   minable-but-unsellable, and a processing building drawing on it stalls forever; every deposit
@@ -381,25 +381,14 @@ tradeable, and `resolve_price` / the clearing pass ignore everything else
   prices: `1.5 × (1 + 7.0 × normalised distance to the nearest source)` (§ Mercantile). Only
   the 2–3 goods the world's biosphere actually evolved get priced.
 - **The processing-chain goods**: silicon 9.6, refined copper 13.6, REE alloy 25.6, machinery
-  56.0, alloys 80.0, electronics 41.6, spacecraft components 280.0.
-- **The habitability tranche**: clean water 7.7, consumer goods 56.0, medical supplies 14.0.
+  61.0, alloys 85.0, electronics 41.6, spacecraft components 310.0.
+- **The habitability tranche**: clean water 7.7, consumer goods 61.0, medical supplies 14.0.
 - **Ordnance** 140.8 (ancient 113.0).
-- **Power** 2.6 and **construction capacity** 4.8 (ancient 6.6) — the grid good and the
+- **Power** 2.6 and **construction capacity** 6.6 — the grid good and the
   construction sector's product (`docs/economy/PRODUCTION.md`).
 
 **Propellant is the one value with no base price.** It is made in a Chemical Plant and burned by
 a Launchpad, never mined and never sold, so it has no market presence.
-
-### Base prices are era-banded
-
-Base prices are authored per band, as recipes are (BL-433, era-tagged recipes): the shared
-`kepler_market.base_price` table serves the industrial product, and `base_price_ancient` overrides
-it, good by good, for the 0 CE product — absent means inherit. The bands reach some goods by routes
-of different depth (the ancient band reaches steel through timber → charcoal → blooms → steel; the
-industrial band in one step from ore and coal), and the anchor prices a good off its own band's
-route, so one number cannot clear both. Steel, ordnance and construction capacity carry ancient
-overrides. A market is seeded from its campaign's table once, at creation; the clearing engine
-never consults the band again.
 
 Water is in this tradeable set from tick 0: it carries an authored base price on the home-body
 markets and sits in the substrate demand basket (`scripts/economy.lua`, weight 0.40).

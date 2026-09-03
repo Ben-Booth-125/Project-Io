@@ -386,6 +386,7 @@ struct seed_result
     double rival_net_mean = 0.0;
     double rival_balance_median = 0.0;
     flow_row rival_mean;          ///< per-corp mean of the trailing flows
+    double rival_max_per_holding = 0.0; ///< the best rival's income per holding (R3's range, BL-744)
     int    field_holdings_open = 0;
     int    field_holdings_close = 0;
     int    rival_units = 0, rival_heads = 0;
@@ -534,6 +535,9 @@ seed_result run_seed(uint32_t seed, const recipe_registry& reg, bool prehistory,
             rival_acc.net         += row.net;
             rival_acc.holdings    += row.holdings;
             ++rival_acc.quarters;
+            if (row.holdings > 0.0)
+                out.rival_max_per_holding =
+                    std::max(out.rival_max_per_holding, row.income / row.holdings);
         }
     }
 
@@ -851,23 +855,31 @@ int main(int argc, char** argv)
 
         // A subsidy would show as the seated corp out-earning the field per
         // holding on income it did not produce. The honest form is the seated
-        // corp's income per holding sitting within the field's own range.
+        // corp's income per holding sitting within the field's own RANGE - at
+        // or below the best rival's - rather than within 3x the field's MEAN.
+        // RE-EXPRESSED 2026-09-02 (Ben, ruling on NR-781): the 3x-mean form
+        // tripped at 3.1x after BL-744 doubled extraction income per building,
+        // with no subsidy path touched; a spawn that earns what the best rival
+        // earns is not subsidised, whatever the mean of a field full of idle
+        // processors says. The mean is still printed for the record.
         const double seated_per_holding =
             seated_mean.holdings > 0.0 ? seated_mean.income / seated_mean.holdings : 0.0;
-        double field_income = 0.0, field_holdings = 0.0;
+        double field_income = 0.0, field_holdings = 0.0, field_max = 0.0;
         for (const seed_result& r : rows)
         {
             field_income   += r.rival_mean.income;
             field_holdings += r.rival_mean.holdings;
+            field_max       = std::max(field_max, r.rival_max_per_holding);
         }
         const double field_per_holding =
             field_holdings > 0.0 ? field_income / field_holdings : 0.0;
-        std::printf("  income per holding: seated %.1f cr/qtr, field %.1f cr/qtr\n",
-                    seated_per_holding, field_per_holding);
+        std::printf("  income per holding: seated %.1f cr/qtr, field mean %.1f cr/qtr, "
+                    "field best %.1f cr/qtr\n",
+                    seated_per_holding, field_per_holding, field_max);
         check_on_real_spawn(
-              field_per_holding <= 0.0 || seated_per_holding <= 3.0 * field_per_holding,
-              "R3", "the seated corp is not out-earning the field per holding "
-                    "(no handed subsidy)");
+              field_max <= 0.0 || seated_per_holding <= field_max,
+              "R3", "the seated corp earns no more per holding than the best rival "
+                    "(within the field's range - no handed subsidy)");
     }
 
     // ---------------------------------------------------------------------

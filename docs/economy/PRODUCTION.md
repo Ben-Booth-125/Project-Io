@@ -273,8 +273,8 @@ belong here rather than there:
   off a starting corp's tick-one menu is the availability of its inputs, not a refusal.
 - It is `machinery`'s **second** consumer, after the heavy spacecraft route below. A single
   consumer is one revert away from orphaning a good.
-- Its `base_price` (140.8 industrial, 113.0 ancient) is **derived**, not authored — what its
-  cheapest route needs under § The recipe margin anchor, one value per band — and it should be
+- Its `base_price` (155.8) is **derived**, not authored — what its cheapest route needs under
+  § The recipe margin anchor, the larger of the two bands' needs — and it should be
   re-derived rather than re-guessed if either input's price moves.
 
 There is **no industrial ancient-arc shortcut here** — the deliberate omission stands. The
@@ -366,8 +366,11 @@ Every other route clears `alternate_profit_over_marginal` instead (`0` = profita
 the floor half regardless. A recipe whose primary output is an extractable raw is always an
 alternate: extraction is that good's cheapest route.
 
-**Prices are era-banded.** Each band checks against its own price table — `RESOURCES.md` § Base
-prices are era-banded.
+**One price table for both bands.** A good's price is the larger of the two bands' anchor-route
+needs, and the bands are kept compatible by keeping their routes to a shared good at comparable
+depth: the ancient chain reaches steel in one step (the Bloomery Furnace, ore and timber), so its
+anchor sits beside the Smelter's rather than three doubling stages above it. A per-band price
+table was considered and rejected (Ben, 2026-09-02).
 
 **What is exempt, and says so.** A recipe whose every output is unpriced (propellant — consumed by
 the Launchpad, never sold) has no market margin to anchor and is listed, not failed. An **unpriced
@@ -784,7 +787,8 @@ every one of them is priced and consumed, per the admission rule.
 | Peat Kiln | 2 peat → 1 charcoal | 1 |
 | Coking Kiln | 0.8 timber + 0.05 iron blooms → 1 charcoal | 3\* |
 | Bloomery | 2 iron ore + 1 charcoal → 1 iron blooms | 2 |
-| Smithy | 2 iron blooms + 1 charcoal → 1 steel | 3 |
+| Bloomery Furnace | 2 iron ore + 1.5 timber → 1 steel | 1 |
+| Smithy | 0.4 iron blooms + 0.2 charcoal → 1 steel | 3 |
 | Smithy | 2 iron blooms + 1 charcoal → 1 **ordnance** | 3 |
 | Potter & Weaver | 2 clay + 1 timber → 1 trade goods | 1 |
 | Glassworks | 2 sand → 1 trade goods | 1 |
@@ -961,7 +965,7 @@ game start."* The opposite is now the design (Ben, 2026-08-29): a corp may run *
 tech permits**, so the start gate is a **tech** question and nothing else.
 
 A fresh ancient corp — no tech earned, no buildings, no balance — sees **sixteen** of the ancient
-band's seventeen processing recipes open on tick one:
+band's nineteen processing recipes open on tick one:
 
 | Group | Open at tick 0 | Why |
 |---|---|---|
@@ -969,7 +973,7 @@ band's seventeen processing recipes open on tick one:
 | Food Processing | Food Rations, Miller | The any-band/ancient pair, both open. |
 | Artisan Goods | Potter & Weaver, Glassworks, Tannery, Weaver | An early corp may sell trade goods without earning anything first. |
 | Construction Materials | Potter's Kiln, Stonemason, Sawmill | BL-586's slice-1 buildings — foundational, not earned content. |
-| Metal Foundry | Bloomery, and the Smithy's two routes (steel, ordnance) | Open. The chain is limited by charcoal supply and by whether blooms find a buyer — a market fact, not a refusal. |
+| Metal Foundry | Bloomery Furnace (ore + timber → steel, the band's depth-one route), Bloomery, and the Smithy's two routes (steel, ordnance) | Open. The Furnace needs only raws; the bloom chain is limited by charcoal supply and by whether blooms find a buyer — a market fact, not a refusal. |
 | Advanced Fabrication | Shipwright | Open, and shut in practice by its own inputs: it draws `planks` and `cloth`, and the shipped ancient world produces no planks. |
 | **The one closure** | *(Toolmaker — tech)* | `E0-EC-01` "Tool-and-Die Practice" gates the Toolmaker on owning a processing facility and a Cr 500 surplus. A fresh corp meets neither. |
 
